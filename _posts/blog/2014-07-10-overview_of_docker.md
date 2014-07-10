@@ -82,16 +82,15 @@ image和container的关系很像程序和进程之间的关系。
 * 以后台方式运行image<br/>
 	`docker run -d -p 41880:80 imageName apache2ctl start FOREGROUND`<br/>
     这时，container运行后，将不提供tty与用户交互。用户可以通过docker主机的41880端口访问container的apache2服务。
+
 #### 4.3.2 增删改查container ####
 如果docker run 算是增加container的话，其他相关命令如下：
-
 
 1. docker ps，列出container
 2. docker rm containerId，删除containerId对应的container
 3. docker start containerId，启动一个已经exited的container
 4. docker attach containerId，从docker主机进入一个已exited的container
 5. docker stop containerId，停止一个正在运行的container
-
 
 ## 5 访问和文件共享 ##
 我们知道，传统的虚拟方式整出来一个完整的“计算机”，在一定配置下，虚拟出来的计算机之间以及虚拟机与宿主机之间可以自由的互相访问和文件共享（或传输），那么docker出来的container如何实现这种效果呢？

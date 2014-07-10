@@ -129,19 +129,23 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
 <li>运行image并对外映射端口<br/>
   <code>docker run -i -t -p 2022:22 imageName /bin/bash</code><br/>
   由此，即可以在docker本机的2022端口访问container的22端口。<br/></li>
-<li><p>以后台方式运行image<br/>
+<li>以后台方式运行image<br/>
   <code>docker run -d -p 41880:80 imageName apache2ctl start FOREGROUND</code><br/>
-  这时，container运行后，将不提供tty与用户交互。用户可以通过docker主机的41880端口访问container的apache2服务。</p>
+  这时，container运行后，将不提供tty与用户交互。用户可以通过docker主机的41880端口访问container的apache2服务。</li>
+</ul>
+
 
 <h4>4.3.2 增删改查container</h4>
 
-<p>如果docker run 算是增加container的话，其他相关命令如下：</p></li>
-<li><p>docker ps，列出container</p></li>
+<p>如果docker run 算是增加container的话，其他相关命令如下：</p>
+
+<ol>
+<li>docker ps，列出container</li>
 <li>docker rm containerId，删除containerId对应的container</li>
 <li>docker start containerId，启动一个已经exited的container</li>
 <li>docker attach containerId，从docker主机进入一个已exited的container</li>
 <li>docker stop containerId，停止一个正在运行的container</li>
-</ul>
+</ol>
 
 
 <h2>5 访问和文件共享</h2>
