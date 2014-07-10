@@ -4,6 +4,9 @@
 <p>
 文中提到的“docker主机”、“docker虚拟机”等可以认为是安装docker服务的linux主机/虚拟机。
 </p>
+<p>
+笔者在学习docker的过程中得到了larry的耐心指导和帮助，同时感谢ETA team及所有同事。
+</p>
 ## 2 docker概述 ##
 <p>
 Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻量级的、可移植的、自给自足的容器。从概念上讲，它有点像个虚拟机，允许多个应用使用单个强劲机器，同时保持每个应用各自不同的具体配置，不会干扰其他应用。与虚拟机不同的是，应用原生地运行在 Linux 内核下，每个应用与其他应用隔离，在操作系统下面也隔离。
@@ -20,13 +23,14 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 2. 安装过程
 	1. 运行安装程序
 	2. 安装过程中会附带安装virtualbox和git，如果您已安装此软件，可以取消选中
-	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：`docker@bootdocker~$`
+	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：<br/>
+	`docker@bootdocker~$`<br/>
 	![Alt text](http://qiankunli.github.io/images/blog/boot2docker_start.png)
 ## 4 docker操作 ##
 ### 4.1 image和container ###
 <p>image和container是docker中很重要的两个概念，docker程序提供的docker命令，主要就是对这两个“实体”进行操作。</p>
 <p>还记得上大学的时候，很流行用一键ghost装系统，GHO镜像还原到系统后，除了windows系统本身，还自动装好了许多软件，做了一些配置（比如讲my documents设置到D盘），真是非常方便。docker中的image也有这么点意思。首先会有一个base image（类似于windows纯净版），在base image的基础上做一些改动，比如装个软件啥的，就形成了新的有个人特色的image，新的image的可以传给别人使用。</p>
-<p>我们运行一个image，就会产生一个container。就像我们用一键ghost还原一个GHO，就会有一个操作系统可以运行一样。container实际上就是docker虚拟出来的linux，操作container就像你操作一般linux系统一样。</p>
+<p>我们运行一个image，就会产生一个container。就像我们用一键ghost还原一个GHO，就会有一个操作系统可以运行一样。container实际上就是docker虚拟出来的linux，操作container就像你操作一般的linux系统一样。</p>
 
 ### 4.2 image管理 ###
 #### 4.2.1 什么是Dockerfile ####
@@ -100,7 +104,7 @@ image和container的关系很像程序和进程之间的关系。
 
 1. docker提供container linking功能。
 	* 运行一个db container `docker run -i -t --name db -P imageName /bin/bash`
-	* 再运行一个app container `docker run -i -t --name app --link db:db imageName /bin/bash`
+	* 再运行一个app container `docker run -i -t --name app --link db:db imageName /bin/bash`<br/>
 由此，app container将能够获取db container的环境变量值，db container的相关信息也将添加到app contaienr的/etc/hosts文件下，两个container也因此可以协同工作。
 
 2.  contaienr之间的文件共享
@@ -109,13 +113,13 @@ image和container的关系很像程序和进程之间的关系。
 ### 6.1 docker如何和windows宿主机文件共享 ###
 virtualbox使用docker自带的iso无法使docker虚拟机与windows主机共享文件，一老外不服，自己维护了一个网站[https://medium.com/boot2docker-lightweight-linux-for-docker/boot2docker-together-with-virtualbox-guest-additions-da1e3ab2465c](https://medium.com/boot2docker-lightweight-linux-for-docker/boot2docker-together-with-virtualbox-guest-additions-da1e3ab2465c)，我们可以从这里下载到docker相应版本的iso，使用这里的iso，docker虚拟机与windows主机可以share folder。前文提到docker虚拟机可以与container文件共享，再结合此处，我们便可以实现windows、docker主机和container之间的文件共享。
 ### 6.2 container网络访问问题 ###
-一个比较郁闷的事是container有时会无法访问网络，这是docker的一个bug。所以，每次出现问题时，就得有劳大家亲自操刀，在docker下执行：
+一个比较郁闷的事是container有时会无法访问网络，这是docker的一个bug。所以，每次出现问题时，就得有劳大家亲自操刀，在docker下执行：<br/>
     `sudo udhcpc`<br/>
 	`sudo /etc/init.d/docker restart`<br/>
 在大多数情况下可以解决这个问题。如果不愉快还是发生了，亲，重启虚拟机吧！
 ## 7 我们可以用docker做什么 ##
 这是一个很开放的问题，这里我揣测两点：
-1. 计算机界的先驱们呕心沥血的解决的程序的可移植性，比如java的“一次编写，处处运行”。但随着系统越来越复杂，节点越来越多，配置越来越多，移植一套系统到新的环境上也慢慢成为一个“很有含量”的工作。举个最简单的例子，笔者为了在github上写这个博客，需要一套装有jekyll环境的系统。jekyll依赖ruby和其它不知道的程序，window下安装jekyll，那是各种坑。linux下，配repo源，install各种程序，别说不好找这样的网页，就算找到了，那种感觉，你懂的呀！最后，找了一个
 
-image，容器的可移植性
-轻便性
+
+1. 计算机界的先驱们呕心沥血的解决了程序的可移植性，比如java的“一次编写，处处运行”。但随着系统越来越复杂，节点越来越多，配置越来越多，移植一套系统到新的环境上也慢慢成为一个“很有含量”的工作。举个最简单的例子，笔者为了在github上写这个博客，需要一套装有jekyll环境的系统。jekyll依赖ruby和其它不知道干啥的程序，window下安装jekyll，那是各种坑。linux下，配repo源，install各种程序，别说不好找这样的网页，就算找到了，各种莫名其妙的错，你懂的呀！最后，我找了一个配好jekyll环境的image，docker run一下，直接ok，我是写博客的，可不是来搭环境的。
+2. 启动一个虚拟机需要多长时间？一个真实的linux启动一次需要多长时间？你的笔记本可以同时运行几个虚拟机？运行了虚拟机之后，还能流畅的运行其他程序么？要不要体验一下一两秒中进入“虚拟机”感觉？要不要看看同时运行十几个“虚拟机”是什么样子？你想不想用自己的笔记本搭一个小集群？
