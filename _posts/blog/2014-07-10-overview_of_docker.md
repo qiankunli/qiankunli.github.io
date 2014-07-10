@@ -1,8 +1,3 @@
----
-layout: post
-title: docker快速入门 
-category: blog
----
 # docker快速入门 #
 ## 前言 ##
 <p>本文是关于我对docker的一些理解，将持续更新，如有错误和建议，请及时反馈到qiankun.li@qq.com。</p>
@@ -22,8 +17,7 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 2. 安装过程
 	1. 运行安装程序
 	2. 安装过程中会附带安装virtualbox和git，如果您已安装此软件，可以取消选中
-	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：`docker@bootdocker~$` <br/>
-	![Alt text](/imags/blog/boot2docker_start.png) <br/>
+	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：`docker@bootdocker~$`
 ## docker操作 ##
 ### image和container概念 ###
 <p>image和container是docker中很重要的两个概念，docker对应的docker命令，主要就是对这两个“实体”进行操作。</p>
