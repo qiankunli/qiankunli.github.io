@@ -26,6 +26,7 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：<br/>
 	`docker@bootdocker~$`<br/>
 	![Alt text](http://qiankunli.github.io/images/blog/boot2docker_start.png)
+<br/>
 ## 4 docker操作 ##
 ### 4.1 image和container ###
 <p>image和container是docker中很重要的两个概念，docker程序提供的docker命令，主要就是对这两个“实体”进行操作。</p>
