@@ -68,18 +68,19 @@ docker的开发团队不只是要做一个软件，还想做一个社区。我�
 1. docker search imageName，查询库中关于imageName的库
 2. docker pull imageName，从库中拉取iamgeName到本地
 3. docker push imageName，将imageName上传到库中
+
 ### 4.3 container管理 ###
 image和container的关系很像程序和进程之间的关系。
 #### 4.3.1 运行container ####
-1. 简单运行，执行完命令后退出<br/>
-	`docker run imageName echo "hello world"`
-2. 运行image并进入bash，通过bash控制container<br/>
-	`docker run -i -t imageName /bin/bash`
-3. 运行image并对外映射端口<br/>
-	`docker run -i -t -p 2022:22 imageName /bin/bash`
-	由此，即可以在docker本机的2022端口访问container的22端口。
-4. 以后台方式运行image<br/>
-	`docker run -d -p 41880:80 imageName apache2ctl start FOREGROUND`
+* 简单运行，执行完命令后退出<br/>
+	`docker run imageName echo "hello world"`<br/>
+* 运行image并进入bash，通过bash控制container<br/>
+	`docker run -i -t imageName /bin/bash`<br/>
+* 运行image并对外映射端口<br/>
+	`docker run -i -t -p 2022:22 imageName /bin/bash`<br/>
+	由此，即可以在docker本机的2022端口访问container的22端口。<br/>
+* 以后台方式运行image<br/>
+	`docker run -d -p 41880:80 imageName apache2ctl start FOREGROUND`<br/>
     这时，container运行后，将不提供tty与用户交互。用户可以通过docker主机的41880端口访问container的apache2服务。
 #### 4.3.2 增删改查container ####
 如果docker run 算是增加container的话，其他相关命令如下：
@@ -90,6 +91,8 @@ image和container的关系很像程序和进程之间的关系。
 3. docker start containerId，启动一个已经exited的container
 4. docker attach containerId，从docker主机进入一个已exited的container
 5. docker stop containerId，停止一个正在运行的container
+
+
 ## 5 访问和文件共享 ##
 我们知道，传统的虚拟方式整出来一个完整的“计算机”，在一定配置下，虚拟出来的计算机之间以及虚拟机与宿主机之间可以自由的互相访问和文件共享（或传输），那么docker出来的container如何实现这种效果呢？
 ### 5.1 docker主机和container之间的联系 ###
@@ -101,15 +104,19 @@ image和container的关系很像程序和进程之间的关系。
 2. 除端口映射外，docker主机与container还可以进行文件共享，执行命令<br/>
 	`docker run -i -t -p 9080:80  -v /home/docker/git:/root/git imageName /bin/bash`<br/>
 	对docker主机上/home/docker/git的更改将同步到container的/root/git目录，反之亦然。
+
+
 ### 5.2 container之间的联系 ###
+
 
 1. docker提供container linking功能。
 	* 运行一个db container `docker run -i -t --name db -P imageName /bin/bash`
 	* 再运行一个app container `docker run -i -t --name app --link db:db imageName /bin/bash`<br/>
 由此，app container将能够获取db container的环境变量值，db container的相关信息也将添加到app contaienr的/etc/hosts文件下，两个container也因此可以协同工作。
-
-2.  contaienr之间的文件共享
+2. contaienr之间的文件共享
 	container之间进行文件共享有多种方式，最简单地一种就是，两个contaienr和所在docker主机共享同一个文件。
+
+
 ## 6 一些细节 ##
 ### 6.1 docker如何和windows宿主机文件共享 ###
 virtualbox使用docker自带的iso无法使docker虚拟机与windows主机共享文件，一老外不服，自己维护了一个网站[https://medium.com/boot2docker-lightweight-linux-for-docker/boot2docker-together-with-virtualbox-guest-additions-da1e3ab2465c](https://medium.com/boot2docker-lightweight-linux-for-docker/boot2docker-together-with-virtualbox-guest-additions-da1e3ab2465c)，我们可以从这里下载到docker相应版本的iso，使用这里的iso，docker虚拟机与windows主机可以share folder。前文提到docker虚拟机可以与container文件共享，再结合此处，我们便可以实现windows、docker主机和container之间的文件共享。
