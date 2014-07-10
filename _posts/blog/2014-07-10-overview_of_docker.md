@@ -1,3 +1,8 @@
+---
+layout: post
+title:docker快速入门 
+category:blog
+---
 # docker快速入门 #
 ## 前言 ##
 <p>本文是关于我对docker的一些理解，将持续更新，如有错误和建议，请及时反馈到qiankun.li@qq.com。</p>
