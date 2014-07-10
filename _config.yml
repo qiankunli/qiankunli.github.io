@@ -1,0 +1,4 @@
+permalink: /:year/:month/:day/:title.html
+# build website auto when the file is updated
+auto: false
+markdown: rdiscount
