@@ -1,7 +1,7 @@
 ---
 layout: post
-title:docker快速入门 
-category:blog
+title: docker快速入门 
+category: blog
 ---
 # docker快速入门 #
 ## 前言 ##
