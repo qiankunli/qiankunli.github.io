@@ -18,8 +18,8 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 ## 3 docker安装 ##
 ### 3.1 windows下v1.0.1安装 ###
 1. 准备
-	1. windows7
-	2. docker-install.exe，下载地址[https://github.com/boot2docker/windows-installer/releases](https://github.com/boot2docker/windows-installer/releases)
+	* windows7
+	* docker-install.exe，下载地址[https://github.com/boot2docker/windows-installer/releases](https://github.com/boot2docker/windows-installer/releases)
 2. 安装过程
 	1. 运行安装程序
 	2. 安装过程中会附带安装virtualbox和git，如果您已安装此软件，可以取消选中
