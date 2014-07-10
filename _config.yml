@@ -1,4 +1,5 @@
 permalink: /:year/:month/:day/:title.html
 # build website auto when the file is updated
-auto: false
+auto: true
 markdown: rdiscount
+BASE_PATH:/docker
