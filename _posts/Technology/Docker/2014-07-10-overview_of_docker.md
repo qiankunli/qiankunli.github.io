@@ -1,7 +1,8 @@
 ---
 layout: post
 title: docker快速入门
-category: Docker
+category: 技术
+tags: Docker
 ---
 
 ## 1 前言 ##
@@ -12,19 +13,6 @@ category: Docker
 <p>
 笔者在学习docker的过程中得到了larry的耐心指导和帮助，同时感谢ETA team及所有同事。
 </p>
-文章结构如下
-
-1. 前言
-2. docker概述
-3. docker安装
-	1. windows下安装
-4. docker操作
-	1. image和container
-	2. image管理
-	3. container管理
-5. 访问与文件共享
-6. 一些细节
-7. 我们能用docker做什么
 
 ## 2 docker概述 ##
 <p>
