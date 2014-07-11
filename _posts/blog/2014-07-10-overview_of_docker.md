@@ -1,12 +1,26 @@
 # docker快速入门 #
 ## 1 前言 ##
-<p>本文是关于我对docker的一些理解，将持续更新，如有错误和建议，请及时反馈到qiankun.li@qq.com。本文更类似于一个知识点的总结，具体的细节请参见官方文档[https://docs.docker.com/](https://docs.docker.com/)。</p>
+本文是关于我对docker的一些理解，将持续更新，如有错误和建议，请及时反馈到qiankun.li@qq.com。本文更类似于一个知识点的总结，具体的细节请参见官方文档 [https://docs.docker.com](https://docs.docker.com) 。如果你事先对docker并不了解，建议先完成[http://www.slideshare.net/larrycai/learn-docker-in-90-minutes](http://www.slideshare.net/larrycai/learn-docker-in-90-minutes)的内容，通过实际操作对docker有一个感性的认识。
 <p>
 文中提到的“docker主机”、“docker虚拟机”等可以认为是安装docker服务的linux主机/虚拟机。
 </p>
 <p>
 笔者在学习docker的过程中得到了larry的耐心指导和帮助，同时感谢ETA team及所有同事。
 </p>
+文章结构如下
+
+1. 前言
+2. docker概述
+3. docker安装
+	1. windows下安装
+4. docker操作
+	1. image和container
+	2. image管理
+	3. container管理
+5. 访问与文件共享
+6. 一些细节
+7. 我们能用docker做什么
+
 ## 2 docker概述 ##
 <p>
 Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻量级的、可移植的、自给自足的容器。从概念上讲，它有点像个虚拟机，允许多个应用使用单个强劲机器，同时保持每个应用各自不同的具体配置，不会干扰其他应用。与虚拟机不同的是，应用原生地运行在 Linux 内核下，每个应用与其他应用隔离，在操作系统下面也隔离。
