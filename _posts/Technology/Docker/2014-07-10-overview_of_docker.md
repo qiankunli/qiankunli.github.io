@@ -53,7 +53,7 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
 制作image有两种方式：
 
 1. 通过Dockerfile
-	dockerfile记录了目标image所属的初始image，以及对初始image所做的操作及改动，通过dockerfile文件，我们可以docker build出一个新的image文件。dockerfile的语法可以参见相关文档。
+    dockerfile记录了目标image所属的初始image，以及对初始image所做的操作及改动，通过dockerfile文件，我们可以docker build出一个新的image文件。dockerfile的语法可以参见相关文档。
 2. 通过commit container
 	我们可以先docker run运行一个image，在对应的container中进行个性化更改，然后docker commit该container。contaienr可以跟踪我们对其做的改动，并在原来image的基础上生成新的image。
 
