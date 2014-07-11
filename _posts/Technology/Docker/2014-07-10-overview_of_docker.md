@@ -32,7 +32,7 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 	2. 安装过程中会附带安装virtualbox和git，如果您已安装此软件，可以取消选中
 	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：<br/>
 	`docker@bootdocker~$`<br/>
-	![Alt text](http://qiankunli.github.io/images/blog/boot2docker_start.png)
+	![Alt text](/public/upload/boot2docker_start.png)
 <br/>
 ## 4 docker操作 ##
 ### 4.1 image和container ###
