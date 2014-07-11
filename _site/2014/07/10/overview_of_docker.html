@@ -1,9 +1,83 @@
-<h1>docker快速入门</h1>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+<title>docker快速入门 | 李乾坤的博客</title>
+<meta name="author" content="李乾坤">
 
-<h2>1 前言</h2>
 
-<p>本文是关于我对docker的一些理解，将持续更新，如有错误和建议，请及时反馈到qiankun.li@qq.com。本文更类似于一个知识点的总结，具体的细节请参见官方文档[https://docs.docker.com/](https://docs.docker.com/)。</p>
+<link rel="shortcut icon" href="/public/upload/gavatar/favicon.ico" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="/public/css/bootstrap.css">
+<link rel="stylesheet" href="/public/css/font-awesome.css">
+<link rel="stylesheet" href="/public/js/prettify/prettify.css">
+<link rel="stylesheet" href="/public/css/base.css">
+<link href="/pages/atom.xml" rel="alternate" title="李乾坤的博客" type="application/atom+xml">
+</head>
+<body>
+  <div class="container">
+    <div class="row">
+      <div class="col-md-4 col-lg-4 col-sm-12 col-xs-12 aside visible-md visible-lg">
+  <div class="row">
+    <div class="col-md-3 col-xs-3 aside1">
+      <br>
+      <a class="pjaxlink" href="/"><img src="/public/upload/gavatar/gavatar.jpg" class="img-rounded avatar"></a>
+      <br><br>
+      <ul class="nav nav-pills nav-stacked">
+        
+          <li><a href="#docker" data-toggle="tab">docker</a></li>
+        
+        <li><a href="#tags" data-toggle="tab">标签</a></li>
+        <li><a class="pjaxlink" href="/pages/about.html">关于</a></li>
+      </ul>
+      <div class="aside1_bottom">
+        <table class="table table-condensed">
+          <tr>
+            <td><a href="/pages/atom.xml" target="_blank"><i class="fa fa-rss fa-2x"></i></a></td>
+            <td><a href="mailto:qiankun.li@qq.com"><i class="fa fa-envelope-o fa-2x"></i></a></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <div class="col-md-9 col-xs-9 aside2">
+      <div class="row">
+        <div class="tab-content">
+           
+            <div class="tab-pane" id="docker">
+              <div class="list-group">
+                <h2 class="center">docker</h2>
+                
+                  <a href="/2014/07/10/overview_of_docker.html" class="list-group-item pjaxlink">docker快速入门</a>
+                
+              </div>
+            </div>
+          
+          <div class="tab-pane" id="tags">
+            <div class="panel-group" id="accordion">
+              <h2 class="center">标签</h2>
+              
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      <div class="col-md-8 col-lg-8 col-sm-12 col-xs-12 aside3">
+        <div id="container">
+          <div id="pjax">
+            <div class="row">
+  <div class="col-md-12 aside3-title">
+    <br>
+    <h2 id="#identifier">docker快速入门</h2>
+    2014年07月10日
+  </div>
+  <div class="col-md-12 aside3-content">
+    <hr>
+    <div id="content">
+      <h2>1 前言</h2>
 
+<p>本文是关于我对docker的一些理解，将持续更新，如有错误和建议，请及时反馈到qiankun.li@qq.com。本文更类似于一个知识点的总结，具体的细节请参见官方文档 <a href="https://docs.docker.com">https://docs.docker.com</a> 。如果你事先对docker并不了解，建议先完成<a href="http://www.slideshare.net/larrycai/learn-docker-in-90-minutes">http://www.slideshare.net/larrycai/learn-docker-in-90-minutes</a>的内容，通过实际操作对docker有一个感性的认识。</p>
 
 <p>
 文中提到的“docker主机”、“docker虚拟机”等可以认为是安装docker服务的linux主机/虚拟机。
@@ -13,6 +87,31 @@
 <p>
 笔者在学习docker的过程中得到了larry的耐心指导和帮助，同时感谢ETA team及所有同事。
 </p>
+
+
+<p>文章结构如下</p>
+
+<ol>
+<li>前言</li>
+<li>docker概述</li>
+<li>docker安装
+
+<ol>
+<li>windows下安装</li>
+</ol>
+</li>
+<li>docker操作
+
+<ol>
+<li>image和container</li>
+<li>image管理</li>
+<li>container管理</li>
+</ol>
+</li>
+<li>访问与文件共享</li>
+<li>一些细节</li>
+<li>我们能用docker做什么</li>
+</ol>
 
 
 <h2>2 docker概述</h2>
@@ -202,3 +301,49 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
 <li>启动一个虚拟机需要多长时间？一个真实的linux启动一次需要多长时间？你的笔记本可以同时运行几个虚拟机？运行了虚拟机之后，还能流畅的运行其他程序么？要不要体验一下一两秒中进入“虚拟机”感觉？要不要看看同时运行十几个“虚拟机”是什么样子？你想不想用自己的笔记本搭一个小集群？</li>
 </ol>
 
+
+    </div>
+    <hr>
+    <div id="disqus_thread">
+  <button type="button" name="lqk-zh" class="btn btn-default show-commend">显示评论</button>
+</div>
+
+  </div>
+  <!-- 目录 -->
+  <div id="content_table" style="position:fixed;right:20px;top:120px;display:none;">
+    <div class="panel panel-success">
+      <div class="panel-body" id="nav"></div>
+    </div>
+  </div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="position:fixed;right:20px;top:10px;">
+  <button id="nav_btn" class="btn btn-lg" style="height:45px;width:45px;"><i class="fa fa-angle-left"></i></button>
+</div>
+<div style="position:fixed;right:20px;top:60px;">
+  <button id="content_btn" class="btn btn-lg" style="height:45px;width:45px;"><i class="fa fa-angle-down"></i></button>
+</div>
+<script type="text/javascript" src="/public/js/jquery.js"></script>
+<script type="text/javascript" src="/public/js/bootstrap.js"></script>
+<script src="/public/js/jquery.pjax.js"></script>
+<script src="/public/js/prettify/prettify.js"></script>
+<script>
+    $('a[href="#技术"]').tab('show');
+</script>
+<script src="/public/js/base.js"></script>
+  <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+  ga('create', '', '');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>
