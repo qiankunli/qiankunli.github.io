@@ -34,13 +34,13 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 ## 4 docker操作 ##
 ### 4.1 image和container ###
 <p>image和container是docker中很重要的两个概念，docker程序提供的docker命令，主要就是对这两个“实体”进行操作。</p>
-<p>还记得上大学的时候，很流行用一键ghost装系统，GHO镜像还原到系统后，除了windows系统本身，还自动装好了许多软件，做了一些配置（比如讲my documents设置到D盘），真是非常方便。docker中的image也有这么点意思。首先会有一个base image（类似于windows纯净版），在base image的基础上做一些改动，比如装个软件啥的，就形成了新的有个人特色的image，新的image的可以传给别人使用。</p>
+<p>还记得上大学的时候，很流行用一键ghost装系统，GHO镜像还原到系统后，除了windows系统本身，还自动装好了许多软件，做了一些配置（比如将my documents设置到D盘），真是非常方便。docker中的image也有这么点意思。首先会有一个base image（类似于windows纯净版），在base image的基础上做一些改动，比如装个软件啥的，就形成了新的有个人特色的image，新的image的可以传给别人使用。</p>
 <p>我们运行一个image，就会产生一个container。就像我们用一键ghost还原一个GHO，就会有一个操作系统可以运行一样。container实际上就是docker虚拟出来的linux，操作container就像你操作一般的linux系统一样。</p>
 
 ### 4.2 image管理 ###
 #### 4.2.1 什么是Dockerfile ####
 <p>
-“Dockerfile是一个image的表示，可以通过Dockerfile来描述构建镜像的步骤。”说的接地气点，dockerfile类似于数据库的日志，根据日志我们知道数据库从时刻1到时刻2发生了什么，由此可以恢复或到达数据库某个时刻的状态。已知image1，我们在dockerfile中记录对image1的改动，便可以根据dockerfile build出image2。也因为dockerfile，image1和image2便具备了父子关系。有了父子，自然也可以搞出来兄弟关系，我们可以使用docker tree查看image之间的树形家族结构。
+“Dockerfile是一个image的表示，可以通过Dockerfile来描述构建镜像的步骤。”说的接地气点，dockerfile类似于数据库的日志，根据日志我们知道数据库从时刻1到时刻2发生了什么，由此可以恢复或到达数据库某个时刻的状态。已知image1，我们在dockerfile中记录对image1的改动，便可以根据dockerfile build出image2。也因为dockerfile，image1和image2便具备了父子关系。有了父子，自然也可以搞出来兄弟关系，我们可以使用`docker images --tree`查看image之间的树形家族结构。
 </p>
 <p>
 dockerfile方便了image的传播，只要有同一个base image，我们下载一个“日志文件”，便可以运行对方制作的image。“一个不包括恶意行为的dockerfile” + “一个可靠地base image” = “一个可靠好用的image”。
