@@ -43,7 +43,7 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 “Dockerfile是一个image的表示，可以通过Dockerfile来描述构建镜像的步骤。”说的接地气点，dockerfile类似于数据库的日志，根据日志我们知道数据库从时刻1到时刻2发生了什么，由此可以恢复或到达数据库某个时刻的状态。已知image1，我们在dockerfile中记录对image1的改动，便可以根据dockerfile build出image2。也因为dockerfile，image1和image2便具备了父子关系。有了父子，自然也可以搞出来兄弟关系，我们可以使用`docker images --tree`查看image之间的树形家族结构。
 </p>
 <p>
-dockerfile方便了image的传播，只要有同一个base image，我们下载一个“日志文件”，便可以运行对方制作的image。“一个不包括恶意行为的dockerfile” + “一个可靠地base image” = “一个可靠好用的image”。
+dockerfile方便了image的传播，只要是同一个base image，我们下载一个“日志文件”，便可以利用这个文件build出相应的image。“一个不包括恶意行为的dockerfile” + “一个可靠地base image” = “一个可靠好用的image”。
 </p>
 
 #### 4.2.2 如何制作image ####
