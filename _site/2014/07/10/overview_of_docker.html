@@ -25,7 +25,7 @@
       <br><br>
       <ul class="nav nav-pills nav-stacked">
         
-          <li><a href="#docker" data-toggle="tab">docker</a></li>
+          <li><a href="#技术" data-toggle="tab">技术</a></li>
         
         <li><a href="#tags" data-toggle="tab">标签</a></li>
         <li><a class="pjaxlink" href="/pages/about.html">关于</a></li>
@@ -43,9 +43,11 @@
       <div class="row">
         <div class="tab-content">
            
-            <div class="tab-pane" id="docker">
+            <div class="tab-pane" id="技术">
               <div class="list-group">
-                <h2 class="center">docker</h2>
+                <h2 class="center">技术</h2>
+                
+                  <a href="/2014/07/18/haproxy.html" class="list-group-item pjaxlink">haproxy简单实例</a>
                 
                   <a href="/2014/07/10/overview_of_docker.html" class="list-group-item pjaxlink">docker快速入门</a>
                 
@@ -55,6 +57,38 @@
           <div class="tab-pane" id="tags">
             <div class="panel-group" id="accordion">
               <h2 class="center">标签</h2>
+               
+                <div class="panel panel-info">
+                  <div class="panel-heading">
+                    <h4 class="panel-title">
+                      <a data-toggle="collapse" data-toggle="collapse" data-parent="#accordion" href="#Docker">Docker</a>
+                      <span class="badge pull-right">1</span>
+                    </h4>
+                  </div>
+                  <div id="Docker" class="panel-collapse collapse">
+                    
+                      <a  href='/2014/07/10/overview_of_docker.html' class="list-group-item pjaxlink">
+                        docker快速入门
+                      </a>
+                    
+                  </div>
+                </div>
+               
+                <div class="panel panel-info">
+                  <div class="panel-heading">
+                    <h4 class="panel-title">
+                      <a data-toggle="collapse" data-toggle="collapse" data-parent="#accordion" href="#WEB">WEB</a>
+                      <span class="badge pull-right">1</span>
+                    </h4>
+                  </div>
+                  <div id="WEB" class="panel-collapse collapse">
+                    
+                      <a  href='/2014/07/18/haproxy.html' class="list-group-item pjaxlink">
+                        haproxy简单实例
+                      </a>
+                    
+                  </div>
+                </div>
               
             </div>
           </div>
@@ -84,36 +118,6 @@
 </p>
 
 
-<p>
-笔者在学习docker的过程中得到了larry的耐心指导和帮助，同时感谢ETA team及所有同事。
-</p>
-
-
-<p>文章结构如下</p>
-
-<ol>
-<li>前言</li>
-<li>docker概述</li>
-<li>docker安装
-
-<ol>
-<li>windows下安装</li>
-</ol>
-</li>
-<li>docker操作
-
-<ol>
-<li>image和container</li>
-<li>image管理</li>
-<li>container管理</li>
-</ol>
-</li>
-<li>访问与文件共享</li>
-<li>一些细节</li>
-<li>我们能用docker做什么</li>
-</ol>
-
-
 <h2>2 docker概述</h2>
 
 <p>
@@ -128,7 +132,7 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 
 <h2>3 docker安装</h2>
 
-<h3>3.1 windows下v1.0.1安装</h3>
+<h3>3.1 windows下v1.1.1安装</h3>
 
 <ol>
 <li>准备
@@ -145,8 +149,7 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 <li>安装过程中会附带安装virtualbox和git，如果您已安装此软件，可以取消选中</li>
 <li>安装完毕后，可以运行程序。如果成功，可以看到命令行：<br/>
 <code>docker@bootdocker~$</code><br/>
-<img src="http://qiankunli.github.io/images/blog/boot2docker_start.png" alt="Alt text" />
-<br/>
+<img src="/public/upload/boot2docker_start.png" alt="Alt text" /><br/>
 
 <h2>4 docker操作</h2>
 
@@ -159,7 +162,7 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 <p>image和container是docker中很重要的两个概念，docker程序提供的docker命令，主要就是对这两个“实体”进行操作。</p>
 
 
-<p>还记得上大学的时候，很流行用一键ghost装系统，GHO镜像还原到系统后，除了windows系统本身，还自动装好了许多软件，做了一些配置（比如讲my documents设置到D盘），真是非常方便。docker中的image也有这么点意思。首先会有一个base image（类似于windows纯净版），在base image的基础上做一些改动，比如装个软件啥的，就形成了新的有个人特色的image，新的image的可以传给别人使用。</p>
+<p>还记得上大学的时候，很流行用一键ghost装系统，GHO镜像还原到系统后，除了windows系统本身，还自动装好了许多软件，做了一些配置（比如将my documents设置到D盘），真是非常方便。docker中的image也有这么点意思。首先会有一个base image（类似于windows纯净版），在base image的基础上做一些改动，比如装个软件啥的，就形成了新的有个人特色的image，新的image的可以传给别人使用。</p>
 
 
 <p>我们运行一个image，就会产生一个container。就像我们用一键ghost还原一个GHO，就会有一个操作系统可以运行一样。container实际上就是docker虚拟出来的linux，操作container就像你操作一般的linux系统一样。</p>
@@ -170,12 +173,12 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 <h4>4.2.1 什么是Dockerfile</h4>
 
 <p>
-“Dockerfile是一个image的表示，可以通过Dockerfile来描述构建镜像的步骤。”说的接地气点，dockerfile类似于数据库的日志，根据日志我们知道数据库从时刻1到时刻2发生了什么，由此可以恢复或到达数据库某个时刻的状态。已知image1，我们在dockerfile中记录对image1的改动，便可以根据dockerfile build出image2。也因为dockerfile，image1和image2便具备了父子关系。有了父子，自然也可以搞出来兄弟关系，我们可以使用docker tree查看image之间的树形家族结构。
+“Dockerfile是一个image的表示，可以通过Dockerfile来描述构建镜像的步骤。”说的接地气点，dockerfile类似于数据库的日志，根据日志我们知道数据库从时刻1到时刻2发生了什么，由此可以恢复或到达数据库某个时刻的状态。已知image1，我们在dockerfile中记录对image1的改动，便可以根据dockerfile build出image2。也因为dockerfile，image1和image2便具备了父子关系。有了父子，自然也可以搞出来兄弟关系，我们可以使用`docker images --tree`查看image之间的树形家族结构。
 </p>
 
 
 <p>
-dockerfile方便了image的传播，只要有同一个base image，我们下载一个“日志文件”，便可以运行对方制作的image。“一个不包括恶意行为的dockerfile” + “一个可靠地base image” = “一个可靠好用的image”。
+dockerfile方便了image的传播，只要是同一个base image，我们下载一个“日志文件”，便可以利用这个文件build出相应的image。“一个不包括恶意行为的dockerfile” + “一个可靠地base image” = “一个可靠好用的image”。
 </p>
 
 
@@ -196,10 +199,11 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
 <p>我们本地的image可以由docker命令来管理，下面是相关的一些命令：</p>
 
 <ol>
-<li>docker images，列出已有的images</li>
-<li>docker rmi imageName/imageId，删除image，前提所有运行该image的container已被删除掉</li>
-<li>docker build -t tagName path，根据path下的Dockerfile创建新的image</li>
-<li>docker tag imageName/imageId，更改某个image的tag</li>
+<li><code>docker images</code>，列出已有的images
+ <img src="/public/upload/docker_images.png" alt="Alt text" /><br/></li>
+<li><code>docker rmi redhat-base:6.4</code>，删除image，前提所有运行该image的container已被删除掉</li>
+<li><code>docker build -t redhat-base:6.4 /path</code>，根据path下的Dockerfile创建新的image</li>
+<li><code>docker tag redhat-base:6.4</code>，更改某个image的tag</li>
 </ol>
 
 
@@ -208,9 +212,9 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
 <p>docker的开发团队不只是要做一个软件，还想做一个社区。我们可以在github上分享我们的dockfile或image，寻找并pull我们需要的image（这一点跟git很像）。下面是相关的一些操作：</p>
 
 <ol>
-<li>docker search imageName，查询库中关于imageName的库</li>
-<li>docker pull imageName，从库中拉取iamgeName到本地</li>
-<li>docker push imageName，将imageName上传到库中</li>
+<li><code>docker search larrycai/postgresql</code>，查询库中关于imageName的库</li>
+<li><code>docker pull larrycai/postgresql</code>，从库中拉取iamgeName到本地</li>
+<li><code>docker push larrycai/postgresql</code>，将imageName上传到库中</li>
 </ol>
 
 
@@ -222,14 +226,14 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
 
 <ul>
 <li>简单运行，执行完命令后退出<br/>
-  <code>docker run imageName echo "hello world"</code><br/></li>
+  <code>docker run redhat-base:6.4 echo "hello world"</code><br/></li>
 <li>运行image并进入bash，通过bash控制container<br/>
-  <code>docker run -i -t imageName /bin/bash</code><br/></li>
+  <code>docker run -i -t redhat-base:6.4 /bin/bash</code><br/></li>
 <li>运行image并对外映射端口<br/>
-  <code>docker run -i -t -p 2022:22 imageName /bin/bash</code><br/>
+  <code>docker run -i -t -p 2022:22 redhat-base:6.4 /bin/bash</code><br/>
   由此，即可以在docker本机的2022端口访问container的22端口。<br/></li>
 <li>以后台方式运行image<br/>
-  <code>docker run -d -p 41880:80 imageName apache2ctl start FOREGROUND</code><br/>
+  <code>docker run -d -p 41880:80 redhat-base:6.4 apache2ctl start FOREGROUND</code><br/>
   这时，container运行后，将不提供tty与用户交互。用户可以通过docker主机的41880端口访问container的apache2服务。</li>
 </ul>
 
@@ -239,11 +243,12 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
 <p>如果docker run 算是增加container的话，其他相关命令如下：</p>
 
 <ol>
-<li>docker ps，列出container</li>
-<li>docker rm containerId，删除containerId对应的container</li>
-<li>docker start containerId，启动一个已经exited的container</li>
-<li>docker attach containerId，从docker主机进入一个已exited的container</li>
-<li>docker stop containerId，停止一个正在运行的container</li>
+<li><code>docker ps -a</code>，列出所有container
+ <img src="/public/upload/docker_ps_a.png" alt="Alt text" /><br/></li>
+<li><code>docker rm dc126312903f</code>，删除containerId对应的container</li>
+<li><code>docker start dc126312903f</code>，启动一个已经exited的container</li>
+<li><code>docker attach dc126312903f</code>，从docker主机进入一个已exited的container</li>
+<li><code>docker stop dc126312903f</code>，停止一个正在运行的container</li>
 </ol>
 
 
@@ -271,7 +276,7 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
 <ul>
 <li>运行一个db container <code>docker run -i -t --name db -P imageName /bin/bash</code></li>
 <li>再运行一个app container <code>docker run -i -t --name app --link db:db imageName /bin/bash</code><br/>
-由此，app container将能够获取db container的环境变量值，db container的相关信息也将添加到app contaienr的/etc/hosts文件下，两个container也因此可以协同工作。</li>
+由此，app container将能够获取db container的环境变量值，db container的相关信息也将添加到app contaienr的/etc/hosts文件下，两个container也因此可以协同工作。关于container linking具体信息请参见<a href="https://docs.docker.com/userguide/dockerlinks/">https://docs.docker.com/userguide/dockerlinks/</a>。</li>
 </ul>
 </li>
 <li>contaienr之间的文件共享
@@ -297,7 +302,7 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
 <p>这是一个很开放的问题，这里我揣测两点：</p>
 
 <ol>
-<li>计算机界的先驱们呕心沥血的解决了程序的可移植性，比如java的“一次编写，处处运行”。但随着系统越来越复杂，节点越来越多，配置越来越多，移植一套系统到新的环境上也慢慢成为一个“很有含量”的工作。举个最简单的例子，笔者为了在github上写这个博客，需要一套装有jekyll环境的系统。jekyll依赖ruby和其它不知道干啥的程序，window下安装jekyll，那是各种坑。linux下，配repo源，install各种程序，别说不好找这样的网页，就算找到了，各种莫名其妙的错，你懂的呀！最后，我找了一个配好jekyll环境的image，docker run一下，直接ok，我是写博客的，可不是来搭环境的。</li>
+<li>计算机界的先驱们呕心沥血的解决了程序的可移植性，比如java的“一次编写，处处运行”。但随着系统越来越复杂，节点越来越多，配置越来越多，移植一套系统到新的环境上也慢慢成为一个“很有含量”的工作。举个最简单的例子，笔者为了在github上写这个博客，需要一套装有jekyll环境的系统。jekyll依赖ruby和其它不知道干啥的程序，windows下安装jekyll，那是各种坑。linux下，配repo源，install各种程序，别说不好找这样的网页，就算找到了，各种莫名其妙的错，你懂的呀！最后，我找了一个配好jekyll环境的image，docker run一下，直接ok，我是写博客的，可不是来搭环境的。</li>
 <li>启动一个虚拟机需要多长时间？一个真实的linux启动一次需要多长时间？你的笔记本可以同时运行几个虚拟机？运行了虚拟机之后，还能流畅的运行其他程序么？要不要体验一下一两秒中进入“虚拟机”感觉？要不要看看同时运行十几个“虚拟机”是什么样子？你想不想用自己的笔记本搭一个小集群？</li>
 </ol>
 
@@ -305,7 +310,7 @@ dockerfile方便了image的传播，只要有同一个base image，我们下载�
     </div>
     <hr>
     <div id="disqus_thread">
-  <button type="button" name="lqk-zh" class="btn btn-default show-commend">显示评论</button>
+  <button type="button" name="qiankunli" class="btn btn-default show-commend">显示评论</button>
 </div>
 
   </div>
