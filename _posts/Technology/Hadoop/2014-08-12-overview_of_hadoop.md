@@ -8,6 +8,8 @@ tags: Hadoop
 # 前言 #
 学习Hadoop已经快半年了，中间断断续续，没有找到相关的Hadoop工作机会，只是自己靠兴趣在学，感觉掌握的非常有限。因为没有实践，别人尤其是面试官问起来时经常感觉底气不足，在这里记录下我对Hadoop的一点理解，也算是对半年学习的一个小结。
 
+本文档是我想一点写一点，未完待续!
+
 # Hadoop是什么 #
 上半年参加阿里的面试，临到最后，面试官问我：“你既然学了Hadoop，那你把我当成对Hadoop一点都不了解的人，你怎么给我讲Hadoop？”我当时说：“Hadoop类似于一个操作系统，无非是传统的操作系统只管理一台机器，而它能管理多台机器。”当时Hadoop2.x还没有出来，这样的回答不太合适。Hadoop2.x出来后，Hadoop拥有自己的文件系统hdfs和资源管理组件yarn，这么说就有一点味道了。
 
@@ -33,7 +35,7 @@ tags: Hadoop
 	存储分散到多台主机上，计算分散到多台主机上
 - 问题
 	
-	分散到哪台主机上？如何处理？化整为零后，还能不能化零为整？
+	分散到哪台主机上？如何处理？化整为零后，如何化零为整？
 
 首先谈一下hadoop是干什么的，简单点说，hadoop是处理大数据的，处理大数据，首先要能存储。可一台主机存不下，那就多台。一个文件存在多个主机上，增删改查，一大堆问题，我们要屏蔽掉这些问题，于是Hadoop有了HDFS，我们只管增删改查文件，其他的问题它来解决。
 
@@ -59,15 +61,26 @@ tags: Hadoop
 
 # HDFS #
 
-namenode存储meta数据：文件系统目录结构和文件所包含的块。datanode数据存储文件数据本身，块在哪写datanode上由datanode启动时向namenode汇报。类似linux的索引节点和一般块。
+主节点运行Namenode，从节点运行Datanode。
+
+HDFS数据分为两类：文件目录结构，文件数据本身。
+
+Namenode存储meta数据：文件系统目录结构和文件和所包含块的映射关系。Datanode数据存储文件数据块本身，一个Datanode存储哪些块由datanode启动时向namenode汇报（safemode概念）。这类似于linux的索引块和一般磁盘块，文件在磁盘中也不是连续存储的，类比一下，道理都是一样的。文件系统嘛，就是完成从文件名（路径）到数据块的映射。（数据库管理系统，完成从记录到磁盘块的映射）
 
 SecondaryNamenode，namenode为高效访问数据 ==> 内存 ==> 易丢失 ==> 备份fsimage ==> 备份和内存数据不同步 ==> 两次备份之间记录日志edits ==> 需要合并fsimage和edits，namenode没空 ==> SecondaryNamenode
 
 
 # YARN #
-在hadoop2.x版本中，提出了新的组件yarn，
+主节点ResourceManager，从节点NodeManager
+
+在hadoop2.x版本中，提出了新的组件yarn，ResourceManager通过NodeManager感知节点的能力和状态，以便分派。
+
+ApplicationMaster和代表一个job，和ResourceManager要资源，和NodeManager协作完成工作。
 
 # MapReduce思路 #
+
+现如今，Hadoop还可以选择其它计算模型。
+
 MapReduce，在Hadoop中，整个过程分为六个阶段，主要是map和reduce两个过程。
 
 我们提到，程序跟着文件走，然后存储该文件数据的节点同时运行，最后汇总，输出。但是，A节点该文件块对应的某些数据和B节点的数据有关系，要一块处理。于是，处理之前，要先把所有相关的数据拢到一块，再分别处理。then，处理过程一分为二：先将数据归类，相同特征的数据（或需要一起处理的数据）放一个节点；节点之间的数据没有瓜葛了，处理。（数据归类好后，持久化存储起来是不是更好？）
@@ -75,3 +88,10 @@ MapReduce，在Hadoop中，整个过程分为六个阶段，主要是map和reduc
 关于这个，有一个很形象的比喻，那就是SQL中的group by语句和聚集函数。`select count(*) from student group by sex`，计算男女生的人数，总要先将男生和女生从人群中拉出来，站两堆，才数的过来。这里，group by对应map过程，count对应reduce过程。
 
 这里，六大阶段不再赘述，但每个阶段我们都可以个性化，以满足不同的业务需求。
+
+# 其它 #
+
+- 主节点负责响应请求，实际的实施还是由客户端和从节点交互完成的
+
+	- FileSystem从namenode得到文件块所在的datanode后，和datanode交互读取数据
+	- ApplicationMaster从ResourceManager要到资源后，和NodeManager交互完成计算过程
