@@ -47,6 +47,10 @@
               <div class="list-group">
                 <h2 class="center">技术</h2>
                 
+                  <a href="/2014/09/02/ThreadLocal.html" class="list-group-item pjaxlink">ThreadLocal小结</a>
+                
+                  <a href="/2014/08/12/overview_of_hadoop.html" class="list-group-item pjaxlink">我对Hadoop的认识</a>
+                
                   <a href="/2014/07/18/haproxy.html" class="list-group-item pjaxlink">haproxy简单实例</a>
                 
                   <a href="/2014/07/10/overview_of_docker.html" class="list-group-item pjaxlink">docker快速入门</a>
@@ -85,6 +89,38 @@
                     
                       <a  href='/2014/07/18/haproxy.html' class="list-group-item pjaxlink">
                         haproxy简单实例
+                      </a>
+                    
+                  </div>
+                </div>
+               
+                <div class="panel panel-info">
+                  <div class="panel-heading">
+                    <h4 class="panel-title">
+                      <a data-toggle="collapse" data-toggle="collapse" data-parent="#accordion" href="#Hadoop">Hadoop</a>
+                      <span class="badge pull-right">1</span>
+                    </h4>
+                  </div>
+                  <div id="Hadoop" class="panel-collapse collapse">
+                    
+                      <a  href='/2014/08/12/overview_of_hadoop.html' class="list-group-item pjaxlink">
+                        我对Hadoop的认识
+                      </a>
+                    
+                  </div>
+                </div>
+               
+                <div class="panel panel-info">
+                  <div class="panel-heading">
+                    <h4 class="panel-title">
+                      <a data-toggle="collapse" data-toggle="collapse" data-parent="#accordion" href="#Java">Java</a>
+                      <span class="badge pull-right">1</span>
+                    </h4>
+                  </div>
+                  <div id="Java" class="panel-collapse collapse">
+                    
+                      <a  href='/2014/09/02/ThreadLocal.html' class="list-group-item pjaxlink">
+                        ThreadLocal小结
                       </a>
                     
                   </div>
@@ -302,7 +338,7 @@ dockerfile方便了image的传播，只要是同一个base image，我们下载�
 <p>这是一个很开放的问题，这里我揣测两点：</p>
 
 <ol>
-<li>计算机界的先驱们呕心沥血的解决了程序的可移植性，比如java的“一次编写，处处运行”。但随着系统越来越复杂，节点越来越多，配置越来越多，移植一套系统到新的环境上也慢慢成为一个“很有含量”的工作。举个最简单的例子，笔者为了在github上写这个博客，需要一套装有jekyll环境的系统。jekyll依赖ruby和其它不知道干啥的程序，windows下安装jekyll，那是各种坑。linux下，配repo源，install各种程序，别说不好找这样的网页，就算找到了，各种莫名其妙的错，你懂的呀！最后，我找了一个配好jekyll环境的image，docker run一下，直接ok，我是写博客的，可不是来搭环境的。</li>
+<li>计算机界的先驱们呕心沥血的解决了程序的可移植性，比如java的“一次编写，处处运行”。但随着系统越来越复杂，节点越来越多，配置越来越多，移植一套系统到新的环境上也慢慢成为一个“很有含量”的工作。举个最简单的例子，笔者为了在github上写这个博客，需要一套装有jekyll环境的系统。jekyll依赖ruby和其它不知道干啥的程序，windows下安装jekyll，那是各种坑。linux下，配repo源，install各种程序，别说不好找这样的网页来参考，就算找到了，各种莫名其妙的错，你懂的呀！最后，我找了一个配好jekyll环境的image，docker run一下，直接ok，我是写博客的，可不是来搭环境的。</li>
 <li>启动一个虚拟机需要多长时间？一个真实的linux启动一次需要多长时间？你的笔记本可以同时运行几个虚拟机？运行了虚拟机之后，还能流畅的运行其他程序么？要不要体验一下一两秒中进入“虚拟机”感觉？要不要看看同时运行十几个“虚拟机”是什么样子？你想不想用自己的笔记本搭一个小集群？</li>
 </ol>
 
