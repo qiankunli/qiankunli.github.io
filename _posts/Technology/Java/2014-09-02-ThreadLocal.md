@@ -35,25 +35,21 @@ keywords: ThreadLocal 线程安全
 	   ThreadLocal.ThreadLocalMap threadLocals= null ;  
 	}  
 
-这里，有一个跟寻常开发习惯不同的地方，一般，一个类的成员变量由这个类自己负责初始化，而在Thread类中，由ThreadLocal类负责对其threadLocals成员初始化，对我来讲，了解了这点，ThreadLocal就没有什么神秘了。
+    threadLocals ==> <ThreadLocal1,value1>
+	                 <ThreadLocal2,value2>
+	                 <ThreadLocal3,value3>
 
-	//	Java线程以这样的方式预定义自己的本地化变量
-	Thread{
-	  //	所有本地化变量存储在map中
-	  threadLocals ==> <ThreadLocal1,value1>
-	                   <ThreadLocal2,value2>
-	                   <ThreadLocal3,value3>
-	}
 
 	线程运行{
-	//	运行时，线程想通过ThreadLocal拿到这个本地化对象
+	//	运行时，线程想通过ThreadLocal拿到这个本地化对象。如果ThreadLocalMap为空，便创建一个ThreadLocalMap挂接到threadLocals上。创建对象，存入到threadLocals中，并返回。
 		本地化对象 =  xxx(ThreadLocal)
 	//	这个xxx的过程本该由线程负责，但线程往往是预定义好的。便将这部分代码归到了ThreadLocal名下，从而使ThreadLocal不只是作为一个key值存在了。
 	
 	}
 
+这里，有一个跟寻常开发习惯不同的地方，一般，一个类的成员变量由这个类自己负责初始化，而在Thread类中，由ThreadLocal类负责对其threadLocals成员初始化，对我来讲，了解了这点，ThreadLocal就没有什么神秘了。
 
-目前，我还没有找到解释这个方案的更通俗易懂的方式，真奇怪，相出这个方法的人，怎么不整一个设计模式呢？
+目前，我还没有找到解释这个方案的更通俗易懂的方式，真奇怪，想出这个方法的人，怎么不整一个设计模式呢？
 
 
 # 使用限制 #
