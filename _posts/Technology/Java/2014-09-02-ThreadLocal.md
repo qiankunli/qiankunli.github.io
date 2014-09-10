@@ -22,18 +22,21 @@ keywords: ThreadLocal 线程安全
 以上是从线程安全的角度出发，那么从线程本身角度看，线程操作时，往往需要一些对象（或变量），这些对象只有这个线程才可以使用。Java在语法层面没有提供线程的“局部变量（成员变量）” 这个支持，当然，我们可以变通一下：
    
     class MyThread extends Thread{
-      int abc;
+      int abc;	//	我们自定义的局部变量
       public void run(){xxx}
     }
 
 
-其实，观察Java Thread类源码，可以发现其有一个ThreadLocalMap成员，我们可以揣测，开发Java的那些大咖们估计我们会有这样的需求，但不知道我们会需要什么样的成员，所以预留这样一个位置，留给我们来为threadLocals成员赋值。
+其实为实现这个特性，除了我们自己继承Thread类以外，观察Java Thread类源码，可以发现其有一个ThreadLocalMap成员。我们可以揣测，开发Java的那些大咖们估计我们会有这样的需求，但不知道我们会需要什么样的成员变量，所以预留这样一个“容器”，留给我们来存储自定义成员变量。
 
-
+	//	Thread类部分源码
 	public class Thread implements Runnable {  
-	// ThreadLocalMap是一个以ThreadLocal为key，Object为值的map，由ThreadLocal维护   
-	   ThreadLocal.ThreadLocalMap threadLocals= null ;  
+	    ThreadLocal.ThreadLocalMap threadLocals= null ;  
+		xxx;
 	}  
+
+
+ThreadLocalMap是一个以ThreadLocal为key，Object为值的map，由ThreadLocal维护。
 
     threadLocals ==> <ThreadLocal1,value1>
 	                 <ThreadLocal2,value2>
