@@ -29,9 +29,10 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 2. 安装过程
 	1. 运行安装程序
 	2. 安装过程中会附带安装virtualbox和git，如果您已安装此软件，可以取消选中
-	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：<br/>
-	`docker@bootdocker~$`<br/>
-	![Alt text](/public/upload/boot2docker_start.png)<br/>
+	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：`docker@bootdocker~$`
+	
+		![Alt text](/public/upload/boot2docker_start.png)
+
 ## 4 docker操作 ##
 ### 4.1 image和container ###
 image和container是docker中很重要的两个概念，docker程序提供的docker命令，主要就是对这两个“实体”进行操作。
@@ -63,7 +64,9 @@ dockerfile方便了image的传播，只要是同一个base image，我们下载�
 
 
 1. `docker images`，列出已有的images
-    ![Alt text](/public/upload/docker_images.png)<br/>
+
+    ![Alt text](/public/upload/docker_images.png)
+
 2. `docker rmi redhat-base:6.4`，删除image，前提所有运行该image的container已被删除掉
 3. `docker build -t redhat-base:6.4 /path`，根据path下的Dockerfile创建新的image
 4. `docker tag redhat-base:6.4`，更改某个image的tag
@@ -141,8 +144,9 @@ virtualbox使用docker自带的iso无法使docker虚拟机与windows主机共享
 ### 6.2 container网络访问问题 ###
 一个比较郁闷的事是container有时会无法访问网络，这是docker的一个bug。所以，每次出现问题时，就得有劳大家亲自操刀，在docker下执行：
 
-    `sudo udhcpc`<br/>
-	`sudo /etc/init.d/docker restart`<br/>
+    $ sudo udhcpc
+	$ sudo /etc/init.d/docker restart
+
 在大多数情况下可以解决这个问题。如果不愉快还是发生了，亲，重启虚拟机吧！
 
 ## 7 我们可以用docker做什么 ##
