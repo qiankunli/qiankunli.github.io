@@ -8,7 +8,7 @@ keywords: 集群 监控 zabbix
 
 ## 1. Introduction ##
 
-Why zabbix? firstly, it's free,it is important for us Chinese company;secondly, there are a community to support it ,so you hava a question, you can find a person to ask for help;lastly,it may be enough to do what we want to do.so, if you want to monitor a cluster, it is necessary for you to move on.
+Why zabbix? firstly, it's free,it is important for us Chinese company;secondly, there is a community to support it ,so you hava a question, you can find a person to ask for help;lastly,it may be enough to do what we want to do.so, if you want to monitor a cluster, it is necessary for you to move on.
 
 ## 2. Installation ##
 
