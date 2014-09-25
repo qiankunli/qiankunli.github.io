@@ -1,6 +1,6 @@
 ---
 layout: post
-title: zabbix使用
+title: zabbix安装
 category: 技术
 tags: WEB
 keywords: 集群 监控 zabbix
