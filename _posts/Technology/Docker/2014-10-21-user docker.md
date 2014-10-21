@@ -1,6 +1,6 @@
 ---
 layout: post
-title: docker进一步学习
+title: docker使用
 category: 技术
 tags: Docker
 keywords: Docker Container Image
@@ -21,31 +21,12 @@ Container后台运行时，都会执行一个启动脚本，我们可以使用`d
 
 Container后台运行时，我们通常需要“SSH”进去，进行一些必要的操作，而Container root用户的密码实际是随机生成的。So，这就要求我们在制作Image时，加上这么一句`RUN echo 'root:docker' |chpasswd`，这样root用户的密码就固定了。
 
-## 5 使用fig ##
-如果为模拟一个系统，需要启动多个Container，那就得写一个脚本，执行多个`docker run`命令了，然而，这样做或许不太清晰。于是就有了fig工具，我们可以使用`fig.yml`来表示需要执行的image，示例如下:
+## 5 保存image到本地 ##
 
-	postgresql:  
-  		image: ImageA
- 		ports:
-    		- :22
-    		- 5432:5432
-  		environment:
-    		DB: bmc
-    		USER: bmc
-    		PASS: bmc
-  		volumes:
-    		- /tmp/postgresql:/postgresql
-	karaf:  
-  		image: ImageB
-  		ports:
-    		- :22
-    		- 8055:8055
-  		links:
-    		- ImageA:imagea
+大多数情况下，我们可以从[docker官方registry](https://registry.hub.docker.com/ "")中下载image。同时，也可以将image保存在tar文件，方便在工作中，进行image的分发（当然，在企业中最好建立自己的docker私有registry）。
 
-然后执行`fig up -d`，这两个container便可以愉快的执行了。
-
-同时，还可以使用`fig [-f xx.yml] ps`来查看当前运行的contaienr，以及`fig [-f xx.yml] logs`来查看后台运行的contaienr的输出。
+1. 将image保存为tar文件:`docker save -o TarFileName ImageID`
+2. 将tar文件导入为image:·docker load -i TarFileName·
 
 ## 6 清除掉所有正在运行的container ##
 使用命令`docker rm -f $(docker ps -aq)`，便可以清除掉所有正在运行的contaienr，当然，这个命令比较暴力，小心“误伤”。
@@ -78,6 +59,23 @@ containre在实际应用中，通常是后台运行，多个container相互配�
 
 ## 11 尽量缩小image的大小 ##
 
+0. base image应该尽可能的小
 1. 如果添加了tar.gz,那么解压缩完毕后，可以删除原来的压缩文件
 2. 如果tar.gz是从网络上获取的，则可以直接  `curl xxx.tar.gz | tar -C destinationdir -zxvf`
-3. 安装软件精良通过yum apt-get install等方式  
+3. 安装软件尽量通过yum apt-get install等方式  
+
+此段未整理
+
+## 12 更改boot2docker-vm 时区##
+
+`docker pull boot2docker/boot2docker`拿到最新的boot2docker image，自己使用Dockerfile
+
+    FROM boot2docker/boot2docker
+    RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+    RUN /make_iso.sh
+    CMD ["cat", "boot2docker.iso"]
+    
+大致是这样。制作出新的image，再执行`docker run --rm ImageId > boot2docker.iso`即可得到新的boot2docker.iso。
+
+
+    
