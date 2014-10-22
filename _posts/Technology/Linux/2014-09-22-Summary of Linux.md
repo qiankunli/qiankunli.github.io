@@ -56,7 +56,7 @@ keywords: Linux
   
   1.3. `source file` 执行成功
   
-2. 具有可执行权限，文件内容为`a=test`
+2. 具有可执行权限，file添加一行为`a=test`
 
   2.1 `./file;echo $a` 输出"test!!!!!!!!!!!!!!!!!!!!!"`,没有输出$a
   
