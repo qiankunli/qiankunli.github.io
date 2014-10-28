@@ -24,3 +24,5 @@ VBoxManage.exe一般在virtualbox 安装目录下，以为virtualbox vm 添加sh
 如果你需要对某个vm进行某些操作，但这些操作会影响vm现有的环境，便可以选择先克隆该vm，在新vm上进行必要的操作。
 
 **注意**，操作过程中须勾选`reinitalize the MAC address of all network cards`选项。
+
+## Vagrant
