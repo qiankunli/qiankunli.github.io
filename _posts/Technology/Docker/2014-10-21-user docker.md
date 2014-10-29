@@ -71,7 +71,7 @@ containre在实际应用中，通常是后台运行，多个container相互配�
 `docker pull boot2docker/boot2docker`拿到最新的boot2docker image，自己使用Dockerfile
 
     FROM boot2docker/boot2docker
-    RUN cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+    RUN cp /usr/share/zoneinfo/Asia/Shanghai $ROOTFS/etc/localtime
     RUN /make_iso.sh
     CMD ["cat", "boot2docker.iso"]
     

@@ -39,6 +39,13 @@ keywords: Linux
 
 ## socket文件 ##
 
+socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程TCP通信（AF_INET）来说，是不存在sock文件一说的。以mysql.sock文件为例，假定AB两台主机，mysql服务运行在B主机上。
+
+- 那么对于A主机来说，访问mysql服务只能通过`ip:port`的方式。
+- 对于B主机上程序来说，访问mysql服务除了通过`localhost:port`外，还可以通过socket文件方式。后者的好处是：如果通过mysql.conf更改mysql的服务端口，那么mysql服务重新启动时将生成新的socket文件，对于程序来说，不用做任何改变。而前者则需要改变程序中的端口设置。
+
+另外，指定socket文件url一个例子：`unix:///home/docker/docker.sock`，其中`unix://`类似于`tcp://`，后面的`/home/docker/docker.sock`表明socket文件的路径。
+
 ## source和**.** 命令##
 
 有两种方法执行shell scripts:

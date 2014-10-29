@@ -37,6 +37,10 @@ keywords: Docker Container Image
 
 注意，fig是由python编写完成，所以`fig.yml`文件内容应符合python语法要求，尤其是缩进。
 
+## expect
+
+docker中推荐一个contaienr只运行一个service。这样，对于一个复杂的系统，就需要多个container去协调运行。而我们在使用时，往往希望只进入一个container，便完成对整个系统的操作，所以expect必不可少。
+
 ## dockerize ##
 
 http://jasonwilder.com/blog/2014/10/13/a-simple-way-to-dockerize-applications/

@@ -117,6 +117,8 @@ contaienr主要通过暴露端口对外提供服务。
 	`docker run -i -t -p 9080:80 imageName /bin/bash`
 
 	我们便可以通过docker主机上的9080端口来访问container的apache服务。
+	
+除使用`-p`明确指定外。我们创建容器时，可以使用`-P`标志来自动映射container对外暴露的任意网络端口到我们Docker主机上介于49000到49900之间的随机高位端口。
 
 2. 除端口映射外，docker主机与container还可以进行文件共享，执行命令
 	
@@ -150,6 +152,8 @@ virtualbox使用docker自带的iso无法使docker虚拟机与windows主机共享
 	$ sudo /etc/init.d/docker restart
 
 在大多数情况下可以解决这个问题。如果不愉快还是发生了，亲，重启虚拟机吧！
+
+这个问题在新版本中貌似已被解决！
 
 ## 7 我们可以用docker做什么 ##
 这是一个很开放的问题，这里我揣测两点：
