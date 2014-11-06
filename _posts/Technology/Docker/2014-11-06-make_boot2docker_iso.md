@@ -1,5 +1,10 @@
-# 定制自己的boot2docker.iso
-
+---
+layout: post
+title: 定制自己的boot2docker.iso
+category: 技术
+tags: Docker
+keywords: Docker Container boot2docker
+---
 ## 前言
 
 阅读本文，需要你对docker,Dockerfile,boot2docker-vm,virtualbox以及github等有一定了解。文章中如有错误，欢迎大家批评指正。
