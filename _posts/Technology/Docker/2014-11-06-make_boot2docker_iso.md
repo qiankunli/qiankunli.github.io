@@ -83,8 +83,13 @@ boot2docker-vm是一个非常精简的linux，很多linux命令没有安装。
 
 看到这里，我相信你可以根据自己的需求制作自己的boot2docker.iso了。
 
+## 其他
+
+本文已授权在[DockerPool][]发表。
+
 [boot2docker.exe]: https://github.com/boot2docker/windows-installer/releases
 [docker官网]: https://hub.docker.com
 [https://github.com/]: https://github.com/
 [http://qiankunli.github.io/]: http://qiankunli.github.io/
 [qiankun.li@qq.com]: qiankun.li@qq.com
+[DockerPool]: http://www.dockerpool.com/
