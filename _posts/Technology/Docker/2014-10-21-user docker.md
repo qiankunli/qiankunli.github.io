@@ -77,5 +77,11 @@ containre在实际应用中，通常是后台运行，多个container相互配�
     
 大致是这样。制作出新的image，再执行`docker run --rm ImageId > boot2docker.iso`即可得到新的boot2docker.iso。
 
+以此为引子，运行`boot2docker/boot2docker`image 后，其`$ROOTFS`目录下的内容会被写入boot2docker.iso,而这也是我们定制boot2docker.iso的重要渠道。除了上面提到的更改boot2docker-vm的时区外，还可以写入环境变量和自定义boot2docker-vm后，首次执行的脚本。
 
+    FROM boot2docker/boot2docker
+    RUN echo "http_proxy=xxxx" >> $ROOTFS/etc/profile
+    RUN echo "/scripts/start.sh" >> $ROOTFS/etc/profile
+    RUN /make_iso.sh
+    CMD ["cat", "boot2docker.iso"]
     

@@ -46,6 +46,14 @@ socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程T
 
 另外，指定socket文件url一个例子：`unix:///home/docker/docker.sock`，其中`unix://`类似于`tcp://`，后面的`/home/docker/docker.sock`表明socket文件的路径。
 
+## rsync
+
+负责进行文件同步的
+
+`rsync -vzrtopgu --delete dir_path1 dir_path2`
+
+注意，dir_path1中的改变都会被同步到dir_path2中，但是，如果dir_path2改变，并且dir_path2在命令中的先后顺序不变的话，其改变不会被同步到dir_path1中。也就是说，这种同步是单向的，以dir_path1为准。
+
 ## source和**.** 命令##
 
 有两种方法执行shell scripts:

@@ -27,7 +27,7 @@ VBoxManage.exe一般在virtualbox 安装目录下，以为virtualbox vm 添加sh
 
 ## Vagrant
 
-其实将vagrant写在本章是不公平的，Vagrant是一个创建和配置轻量级，可复制，可移植开发环境的工具。我知道的用途主要有：
+其实将vagrant写在本章是不公平的，Vagrant是一个创建和配置轻量级，可复制，可移植开发环境的工具。"人话"就是，vagrant是一个虚拟机管理工具，我知道的用途主要有：
 
 1. 假如你有一个virtualbox虚拟机软件，自己配置了一个cenots vm，你对这个vm做一些特殊配置。这一切步骤，都可以通过Vagrantfile**描述出来**，并在其他人的电脑上重现你所做的所有工作。
 2. 你已安装virtualbox，想create一个centos vm
