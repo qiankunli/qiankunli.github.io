@@ -81,6 +81,8 @@ boot2docker-vm是一个非常精简的linux，很多linux命令没有安装。
         echo "" >> $ROOTFS/etc/motd
     # 配置http_proxy代理
     RUN echo "export http_proxy= your proxy" >> $ROOTFS/etc/profile
+    # 配置boot2docker-vm时区
+    RUN cp /usr/share/zoneinfo/Asia/Shanghai $ROOTFS/etc/localtime
     # 配置启动脚本
     RUN echo "/start.sh" >> $ROOTFS/etc/profile
     RUN /make_iso.sh

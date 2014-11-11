@@ -13,13 +13,18 @@ keywords: Docker Container Image
 
 Container后台运行时，都会执行一个启动脚本，我们可以使用`docker logs ContainerID`来跟踪这个脚本的执行情况。当然，这个脚本需要有一些必要的输出，来为我们提供判断。
 
+如果我们想访问后台运行的container
+
+1. container中运行sshd服务，并expose 22端口，在宿主机中使用ssh访问。
+2. 在docker1.3版本后，可以使用`docker exec -it ContainerId bash`进入container中并访问。
+
 ## 3 查看container的IP地址 ##
 
 我们可以使用 `docker inspect ContainerID`来观察container的很多信息，其中经常使用的就是`docker inspect ContainerID | grep IPADDRESS`来查看Container的IP地址。
 
 ## 4 为container设置root用户密码 ##
 
-Container后台运行时，我们通常需要“SSH”进去，进行一些必要的操作，而Container root用户的密码实际是随机生成的。So，这就要求我们在制作Image时，加上这么一句`RUN echo 'root:docker' |chpasswd`，这样root用户的密码就固定了。
+Container后台运行时，我们通常需要“SSH”进去，进行一些必要的操作，而Container root用户的密码实际是随机生成的。So，这就要求我们在制作Image时，加上这么一句`RUN echo 'root:docker' | chpasswd`，这样root用户的密码就固定了。
 
 ## 5 保存image到本地 ##
 
@@ -27,6 +32,22 @@ Container后台运行时，我们通常需要“SSH”进去，进行一些必�
 
 1. 将image保存为tar文件:`docker save -o TarFileName ImageID`
 2. 将tar文件导入为image:·docker load -i TarFileName·
+
+在docker中，对于大部分操作image的命令，使用`repo:tag`和`ImageId`来唯一标记一个image效果是一样的，但是对于`docker save/load`命令组来说，效果有所不同。
+
+1. `docker save repo`
+
+    Saves all tagged images and parents in the repo, and creates a repositories file listing the tags
+2. `docker save repo:tag`
+
+    Saves tagged image and parents in repo, and creates a repositories file listing the tag
+3. `docker save ImageId`
+
+    Saves image and parents, does not create repositories file. The save relates to the image only, and tags are left out by design and left as an exercise for the user to populate based on their own naming convention.
+    此时只保存image的内容，用户可以根据自己本地image的命名习惯来为image命名。
+    
+所以，不同的`docker save`，导致`docker load`时会有不同的结果。
+
 
 ## 6 清除掉所有正在运行的container ##
 使用命令`docker rm -f $(docker ps -aq)`，便可以清除掉所有正在运行的contaienr，当然，这个命令比较暴力，小心“误伤”。
@@ -53,7 +74,7 @@ Container后台运行时，我们通常需要“SSH”进去，进行一些必�
 
 ## 10 Dockerfile和初始化脚本 ##
 
-containre在实际应用中，通常是后台运行，多个container相互配合，模拟一个比较大的应用。这时，Dockerfile和初始化脚本要有一个平衡
+containre在实际应用中，通常是后台运行，多个container相互配合，模拟一个比较大的应用。这时，Dockerfile和初始化脚本要有一个平衡。
 
 未完待续
 
@@ -64,24 +85,6 @@ containre在实际应用中，通常是后台运行，多个container相互配�
 2. 如果tar.gz是从网络上获取的，则可以直接  `curl xxx.tar.gz | tar -C destinationdir -zxvf`
 3. 安装软件尽量通过yum apt-get install等方式  
 
-此段未整理
 
-## 12 更改boot2docker-vm 时区##
 
-`docker pull boot2docker/boot2docker`拿到最新的boot2docker image，自己使用Dockerfile
 
-    FROM boot2docker/boot2docker
-    RUN cp /usr/share/zoneinfo/Asia/Shanghai $ROOTFS/etc/localtime
-    RUN /make_iso.sh
-    CMD ["cat", "boot2docker.iso"]
-    
-大致是这样。制作出新的image，再执行`docker run --rm ImageId > boot2docker.iso`即可得到新的boot2docker.iso。
-
-以此为引子，运行`boot2docker/boot2docker`image 后，其`$ROOTFS`目录下的内容会被写入boot2docker.iso,而这也是我们定制boot2docker.iso的重要渠道。除了上面提到的更改boot2docker-vm的时区外，还可以写入环境变量和自定义boot2docker-vm后，首次执行的脚本。
-
-    FROM boot2docker/boot2docker
-    RUN echo "http_proxy=xxxx" >> $ROOTFS/etc/profile
-    RUN echo "/scripts/start.sh" >> $ROOTFS/etc/profile
-    RUN /make_iso.sh
-    CMD ["cat", "boot2docker.iso"]
-    
