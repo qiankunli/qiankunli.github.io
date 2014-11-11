@@ -41,6 +41,8 @@ Container后台运行时，我们通常需要“SSH”进去，进行一些必�
 2. `docker save repo:tag`
 
     Saves tagged image and parents in repo, and creates a repositories file listing the tag
+    
+    同时，采用这种方式，`docker load`时，即使本地已有tag为`repo:tag`的image，也不会报错。
 3. `docker save ImageId`
 
     Saves image and parents, does not create repositories file. The save relates to the image only, and tags are left out by design and left as an exercise for the user to populate based on their own naming convention.
