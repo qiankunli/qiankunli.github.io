@@ -170,7 +170,7 @@ keywords: CoreOS Docker
 
 [http://www.infoq.com/cn/articles/coreos-analyse-etcd][]
 
-李乾坤，博客:[http://qiankunli.github.io/][]，邮箱:[qiankun.li@qq.com][]
+本文已授权在[dockerpool][]上发表，欢迎大家参与讨论！
 
 [ISO]: https://coreos.com/docs/running-coreos/platforms/iso/
 [http://codebeautify.org/yaml-validator]: http://codebeautify.org/yaml-validator
@@ -180,3 +180,4 @@ keywords: CoreOS Docker
 [http://www.infoq.com/cn/articles/coreos-analyse-etcd]: http://www.infoq.com/cn/articles/coreos-analyse-etcd
 [http://qiankunli.github.io/]: http://qiankunli.github.io/
 [qiankun.li@qq.com]: qiankun.li@qq.com
+[dockerpool]: http://www.dockerpool.com/
