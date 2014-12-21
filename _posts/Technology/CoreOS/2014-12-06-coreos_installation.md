@@ -145,12 +145,13 @@ keywords: CoreOS Docker
     3. 修改user-data文件，针对安装的主机，采用第一种方式的cloud-config.yaml文件内容，每装一台，修改一次。
 3. 修改Vagrantfile文件
 
-    1. 注释config.vm.box_version = ">= 308.0.1"
-    2. 修改**config.vm.define vm_name = "core-%02d" % i do |config|**  为**config.vm.define vm_name = "core-01" do |config|**，其中core-01为要安装主机的主机名，每装一台，修改一次。
+    1. 注释`config.vm.box_version = ">= 308.0.1"`
+    2. 修改`config.vm.define vm_name = "core-%02d" % i do |config|`  为`config.vm.define vm_name = "core-01" do |config|`，其中core-01为要安装主机的主机名，每装一台，修改一次。
+    3. 修改`ip = "172.17.8..#{i+100}"`为自己适合的网段（如果有必要的话）。
 
 4.  下载[box文件][]并安装，`vagrant box add coreos-stable coreos_production_vagrant.box`。（参见第二种方式第四步）
 5.  执行`vagrant up`，安装完毕后，使用putty登录，用户名为core，记得配置私钥。
-6.  删除每台coreos主机中的`/etc/systemd/network/50-vagrant1.network`文件，并重启所有系统。
+
 
 ## 小结
 
