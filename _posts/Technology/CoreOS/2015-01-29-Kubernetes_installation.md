@@ -344,3 +344,4 @@ This component is used to manage container deployments. It ensures that the cont
 [How To Install and Configure Kubernetes on top of a CoreOS Cluster]: https://www.digitalocean.com/community/tutorials/how-to-install-and-configure-kubernetes-on-top-of-a-coreos-cluster
 [http://qiankunli.github.io/ ]: http://qiankunli.github.io/ 
 [qiankun.li@qq.com]: qiankun.li@qq.com
+[dockerpool]: http://www.dockerpool.com/
