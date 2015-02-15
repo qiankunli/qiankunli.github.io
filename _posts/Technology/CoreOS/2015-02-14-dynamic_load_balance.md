@@ -147,9 +147,9 @@ This allows us to pass requests to the pool_name and Nginx will select one of th
 对于template文件来说，不是静态的定义upstream servers，这些信息在渲染时再动态的填充（我们从etcd中获取apache服务器的ip地址和端口）。我们先用Go template来表示这些动态内容。
 
     upstream apache_pool {
-    {{ range getvs "/services/apache/*" }}
-        server {{ . }};
-    {{ end }}
+    {\{ range getvs "/services/apache/*" \}}
+        server {\{ . \}};
+    {\{ end \}}
     }
 
 我们定义了一个upstream pool of servers 叫做`apache_pool`，在这个快内，我们用双大括号表示里面填充的是Go代码。
