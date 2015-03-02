@@ -81,4 +81,6 @@ socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程T
 
 `. ./file`中第一个点，代表`source`，第二个点代表当前路径。file不需要具备可执行权限，file中的所有指令将在当前shell中执行。也即如果file设置环境变量，当前shell也能感知到。 
 
-未完待续
+## 一次创建多个文件夹
+
+    mkdir -p /etc/confd/{conf.d,templates}
