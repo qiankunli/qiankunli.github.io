@@ -1,6 +1,6 @@
 ---
 layout: post
-title: CoreOS安装
+title: CoreOS 安装
 category: 技术
 tags: CoreOS
 keywords: CoreOS Docker

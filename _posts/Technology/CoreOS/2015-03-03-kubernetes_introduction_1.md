@@ -11,19 +11,23 @@ keywords: CoreOS Docker Kubernetes
 
 本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删减。有的地方没有翻译，或者因为不太确定，或者因为翻译成中文后就没有感觉了。
 
+本文主要讲了Container Engine cluster和Pod的概念
+
 ##  Container Engine cluster
 
 A Container Engine cluster is a group of Compute Engine instances running Kubernetes. It consists of one or more node instances, and a Kubernetes master instance. A cluster is the foundation of a Container Engine application—pods, services, and replication controllers all run on top of a cluster.
+
+（一个Container Engine cluster主要包含一个master和多个slave节点）
 
 ### The Kubernetes master
 
 Every cluster has a single master instance. The master provides a unified view into the cluster and, through its publicly-accessible endpoint, is the doorway for interacting with the cluster.
 
-The master runs the Kubernetes API server, which services REST requests, schedules pod creation and deletion on worker nodes, and synchronizes pod information (such as open ports and location) with service information.
+**The master runs the Kubernetes API server, which services REST requests, schedules pod creation and deletion on worker nodes, and synchronizes pod information (such as open ports and location) with service information.**
 
 ### Nodes
 
-A cluster can have one or more node instances. These are managed from the master, and run the services necessary to support Docker containers. Each node runs the Docker runtime and hosts a Kubelet agent, which manages the Docker containers scheduled on the host. Each node also runs a simple network proxy.
+A cluster can have one or more node instances. These are managed from the master, and run the services necessary to support Docker containers. Each node runs the Docker runtime and hosts a Kubelet agent（管理docker runtime）, which manages the Docker containers scheduled on the host. Each node also runs a simple network proxy（网络代理程序）.
 
 ## What is a pod?
 
@@ -64,7 +68,9 @@ Individual pods are not intended to run multiple instances of the same applicati
 
 **A pod is a relatively tightly coupled group of containers that are scheduled onto the same host. It models an application-specific "virtual host" in a containerized environment. Pods serve as units of scheduling, deployment, and horizontal scaling/replication. Pods share fate, and share some resources, such as storage volumes and IP addresses.**
 
-### Pod configuration file
+### Creating a pod
+
+#### Pod configuration file
 
 A pod configuration file specifies required information about the pod/ It can be formatted as YAML or as JSON, and supports the following fields:
 
@@ -82,14 +88,49 @@ A pod configuration file specifies required information about the pod/ It can be
     
 Required fields are:
 
-id: The name of this pod. It must be an RFC1035 compatible value and be unique on this container cluster.
-kind: Always Pod.
-apiVersion: Currently v1beta1.
-desiredState: The configuration for this pod. It must contain a child manifest object.
+- id: The name of this pod. It must be an RFC1035 compatible value and be unique on this container cluster.
+- kind: Always Pod.
+- apiVersion: Currently v1beta1.
+- desiredState: The configuration for this pod. It must contain a child manifest object.
+
 Optional fields are:
 
-labels are arbitrary key:value pairs that **can be used by replication controllers and services for grouping and targeting pods**.
+- labels are arbitrary key:value pairs that **can be used by replication controllers and services for grouping and targeting pods**.
 
-### Manifest
+#### Manifest
 
-Manifest部分的内容不再赘述，可以参见文档
+Manifest部分的内容不再赘述（所包含字段，是否必须，以及其意义），可以参见文档
+
+#### Sample file
+
+    {
+      "id": "redis-controller",
+      "kind": "Pod",
+      "apiVersion": "v1beta1",
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "containers": [{
+            "name": "redis",
+            "image": "dockerfile/redis",
+            "ports": [{
+              "containerPort": 6379,
+              "hostPort": 6379
+            }]
+          }]
+        }
+      },
+      "labels": {
+        "name": "redis-controller"
+      }
+    }
+
+### Viewing a pod
+
+    kubectl get pod xxx
+    ## list pod
+    kubectl get pods
+
+### Deleting a pod
+
+    kubectl delete pod xxx
