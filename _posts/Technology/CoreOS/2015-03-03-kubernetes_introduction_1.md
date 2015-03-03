@@ -9,7 +9,7 @@ keywords: CoreOS Docker Kubernetes
 
 ## 简介
 
-本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删减。有的地方没有翻译，或者因为不太确定，或者因为翻译成中文后就没有感觉了。
+本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删减。
 
 本文主要讲了Container Engine cluster和Pod的概念
 
