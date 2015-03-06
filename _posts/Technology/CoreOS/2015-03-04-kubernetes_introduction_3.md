@@ -28,10 +28,48 @@ As an example, consider an image-process backend which is running with 3 live re
 
 ### How do they work?
 
-Each node in a cluster runs a service proxy. This application watches the cluster master for the addition and removal of service objects. If a service's label selector matches the labels on a pod, the proxy opens a port on the local node for that service and forwards traffic to the pod.
-（每一个从节点监控master的service状态（新增或删除），如果一个新的service的label本节点的某个pod，那么本节点为那个service开一个端口，并将那个service传来的请求转发给该pod）
+Every node in a Kubernetes cluster runs a kube-proxy. **This application watches the Kubernetes master for the addition and removal of Service and Endpoints objects. For each Service it opens a port (random) on the local node. Any connections made to that port will be proxied to one of the corresponding backend Pods.（这句非常关键）** Which backend to use is decided based on the AffinityPolicy of the Service. Lastly, it installs iptables rules which capture traffic to the Service's Port on the Service's portal IP and redirects that traffic to the previously described port.
+
+The net result is that any traffic bound for the Service is proxied to an appropriate backend without the clients knowing anything about Kubernetes or Services or Pods.
 
 When a pod is scheduled, the master adds a set of environment variables for each active service.
+
+假设我运行一个apache2 pod和apache2 service，查看：
+
+    $ kubectl get service
+    NAME                LABELS                                    SELECTOR            IP                  PORT
+    apache2-service     <none>                                    name=apache2        10.100.62.248       9090
+    kubernetes          component=apiserver,provider=kubernetes   <none>              10.100.0.2          443
+    kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.100.0.1          80
+    
+    $ kubectl get pods
+    POD                 IP                  CONTAINER(S)        IMAGE(S)                     HOST                            LABELS              STATUS
+    apache2-pod         10.100.83.5         apache2             docker-registry.sh/apache2   192.168.56.102/192.168.56.102   name=apache2        Running
+    
+pod的ip是`10.100.83.5`，pod的ip是不可靠的，所以其它pod要通过pod对应的service `10.100.62.248:9090`来访问这个pod。kubernetes通过通过一系列机制来维护apache2 pod和apache2 service的映射关系。
+    
+我们可以看到这个pod被分配到了`192.168.56.102`这台主机上，查看这台主机的iptables。
+   
+    $ sudo iptables -nvL -t nat 
+    Chain KUBE-PORTALS-CONTAINER (1 references)
+    pkts bytes target     prot opt in     out     source               destination
+    0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.0.1           /* kubernetes-ro */ tcp dpt:80 redir ports 37483
+    0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.0.2           /* kubernetes */ tcp dpt:443 redir ports 46593
+    0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.62.248        /* apache2-service */ tcp dpt:9090 redir ports 36036
+    
+可以发现kube_proxy为其分配了36036端口，以后其它应用就可以通过`192.168.56.102  :36036`来访问`10.100.62.248:9090`，进而访问`10.100.83.5:80`
+
+查看etcd：
+
+    $ etcdctl get /registry/services/endpoints/default/apache2-service
+    {"kind":"Endpoints","id":"apache2-service","uid":"09a711e5-c3d0-11e4-b06e-0800272b69e4","creationTimestamp":"2015-03-06T07:11:41Z","selfLink":"/api/v1beta1/endpoints/apache2-service?namespace=default","resourceVersion":14119,"apiVersion":"v1beta1","namespace":"default","endpoints":["10.100.83.5:80"]}
+    
+    etcdctl get /registry/services/specs/default/apache2-service
+    {"kind":"Service","id":"apache2-service","uid":"07cc9702-c3d0-11e4-b06e-0800272b69e4","creationTimestamp":"2015-03-06T07:11:37Z","apiVersion":"v1beta1","namespace":"default","port":9090,"protocol":"TCP","selector":{"name":"apache2"},"containerPort":80,"portalIP":"10.100.62.248","sessionAffinity":"None"}
+    
+
+可以看到，一些相关信息都会被记录到etcd中。
+    
 
 A service, through its label selector, can resolve to 0 or more pods. Over the life of a service, the set of pods which comprise that service can grow, shrink, or turn over completely. Clients will only see issues if they are actively using a backend when that backend is removed from the service (and even then, open connections will persist for some protocols).
 
