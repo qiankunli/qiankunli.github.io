@@ -9,7 +9,7 @@ keywords: CoreOS Docker Kubernetes
 
 ## 简介
 
-本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删减。
+本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删改。
 
 本文主要讲了service组件
 
@@ -133,7 +133,8 @@ A successful get request returns all services that exist on the specified cluste
         0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.0.2           /* kubernetes */ tcp dpt:443 redir ports 48474
         0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.123.196       /* apache2-service */ tcp dpt:9090 redir ports 35788
         
-可以看到示例节点中，该结点通过35788端口来访问`10.100.123.196:9090`，其它节点不再赘述。
+可以看到示例节点中，该结点通过35788端口来访问`10.100.123.196:9090`，即我们可以通过`http://节点ip:35788`来访问pod服务，其它节点不再赘述。
+
 （换句话说，对于一个service（本例的10.100.123.196:9090），每个节点的kube_proxy会使用iptables为其映射一个端口（端口号随机生成））
     
 To return information about a specific service,
@@ -153,3 +154,13 @@ Details about the specific service are returned:
     $ kubectl delete service NAME
     
 A successful delete request returns the deleted service's name.
+
+## Other
+
+kubernetes启动时，默认有两个服务kubernetes和kubernetes-ro
+
+    $ kubectl get services
+    NAME                LABELS                                    SELECTOR            IP                  PORT
+    kubernetes          component=apiserver,provider=kubernetes   <none>              10.100.0.2          443
+    kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.100.0.1          80
+    
