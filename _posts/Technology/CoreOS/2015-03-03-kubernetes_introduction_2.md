@@ -120,6 +120,7 @@ Required fields are:
  - podTemplate contains the container manifest that defines the container configuration. The manifest is itself contained within a desiredState object.
 - labels: Arbitrary key:value pairs used to target or group this replication controller. These labels are not associated with the replicaSelector field or the podTemplate's labels field.
 (label标签是为Replication controller分组用的，跟pod没关系)
+
 #### Manifest
 
 Manifest部分的内容不再赘述（所包含字段，是否必须，以及其意义），可以参见文档

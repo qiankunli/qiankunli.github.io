@@ -15,12 +15,14 @@ keywords: CoreOS Docker Kubernetes
 
 ## What is a service?
 
-Container Engine pods are ephemeral. They can come and go over time, especially when driven by things like replication controllers. While each pod gets its own IP address, those IP addresses cannot be relied upon to be stable over time. This leads to a problem: if some set of pods (let's call them backends) provides functionality to other pods (let's call them frontends) inside a cluster, how do those frontends find the backends?
+Container Engine pods are ephemeral. They can come and go over time, especially when driven by things like replication controllers. While each pod gets its own IP address, **those IP addresses cannot be relied upon to be stable over time（直接通过一个pod的ip来访问它是不可靠的）**. This leads to a problem: if some set of pods (let's call them backends) provides functionality to other pods (let's call them frontends) inside a cluster, how do those frontends find the backends?
 (Pod组件的状态经常变化，也可能存在多个副本，那么其他组件如何来访问它呢)
 
 Enter services.
 
 A Container Engine service is an abstraction which defines a logical set of pods and a policy by which to access them. **The goal of services is to provide a bridge for non-Kubernetes-native applications to access backends without the need to write code that is specific to Kubernetes. A service offers clients an IP and port pair which, when accessed, redirects to the appropriate backends.** The set of pods targeted is determined by a label selector.
+
+![kubernete_service_model.png](/public/upload/kubernete_service_model.png "")
 
 As an example, consider an image-process backend which is running with 3 live replicas. Those replicas are fungible—frontends do not care which backend they use. While the actual pods that comprise the set may change, the frontend client(s) do not need to know that. The service abstraction enables this decoupling.
 
