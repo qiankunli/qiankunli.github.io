@@ -34,7 +34,7 @@ The net result is that any traffic bound for the Service is proxied to an approp
 
 When a pod is scheduled, the master adds a set of environment variables for each active service.
 
-假设我运行一个apache2 pod和apache2 service，查看：
+两台主机`192.168.56.101`和`192.168.56.102`，假设我运行一个apache2 pod和apache2 service，查看：
 
     $ kubectl get service
     NAME                LABELS                                    SELECTOR            IP                  PORT
@@ -46,9 +46,9 @@ When a pod is scheduled, the master adds a set of environment variables for each
     POD                 IP                  CONTAINER(S)        IMAGE(S)                     HOST                            LABELS              STATUS
     apache2-pod         10.100.83.5         apache2             docker-registry.sh/apache2   192.168.56.102/192.168.56.102   name=apache2        Running
     
-pod的ip是`10.100.83.5`，pod的ip是不可靠的，所以其它pod要通过pod对应的service `10.100.62.248:9090`来访问这个pod。kubernetes通过通过一系列机制来维护apache2 pod和apache2 service的映射关系。
+apache pod的ip是`10.100.83.5`，pod的ip是不可靠的，所以其它pod要通过pod对应的service `10.100.62.248:9090`来访问这个pod。kubernetes通过通过一系列机制来维护apache2 pod和apache2 service的映射关系。
     
-我们可以看到这个pod被分配到了`192.168.56.102`这台主机上，查看这台主机的iptables。
+那么外界如何访问这个pod呢？我们可以看到这个pod被分配到了`192.168.56.102`这台主机上，查看这台主机的iptables。（`192.168.56.101`也为该service做了映射，此处不再赘述）
    
     $ sudo iptables -nvL -t nat 
     Chain KUBE-PORTALS-CONTAINER (1 references)
@@ -163,19 +163,6 @@ A successful get request returns all services that exist on the specified cluste
 
     NAME                LABELS                                    SELECTOR            IP                  PORT
     apache2-service     <none>                                    name=apache2        10.100.123.196      9090
-
-    
-也就是`10.100.123.196:9090`将会代表这个服务，相对于经常变化状态的pod，这个是不变的。然后，对于cluster的每个节点，如果用`sudo iptables -nvL -t nat`查看一下:
-
-    Chain KUBE-PORTALS-CONTAINER (1 references)
-     pkts bytes target     prot opt in     out     source               destination
-        0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.0.1           /* kubernetes-ro */ tcp dpt:80 redir ports 39058
-        0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.0.2           /* kubernetes */ tcp dpt:443 redir ports 48474
-        0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.123.196       /* apache2-service */ tcp dpt:9090 redir ports 35788
-        
-可以看到示例节点中，该结点通过35788端口来访问`10.100.123.196:9090`，即我们可以通过`http://节点ip:35788`来访问pod服务，其它节点不再赘述。
-
-（换句话说，对于一个service（本例的10.100.123.196:9090），每个节点的kube_proxy会使用iptables为其映射一个端口（端口号随机生成））
     
 To return information about a specific service,
 
