@@ -97,7 +97,7 @@ The difference in the files is in how the service is accessed. The first file do
       "protocol": "TCP",
       "port": 8765
     }
-
+（一个服务有多个pod，如果我们想对其进行调度的话，可以使用gce）
 The second file uses Google Compute Engine network load balancing to create a single IP address that spreads traffic to all of the nodes in your cluster. This option is specified with the "createExternalLoadBalancer": true property.
 
     {
@@ -121,8 +121,20 @@ To access the service, a client connects to the external IP address, which forwa
     
 A successful get request returns all services that exist on the specified cluster:
 
-    NAME    LABELS   SELECTOR    IP              PORT
-    myapp   <none>   app=MyApp   10.123.255.83   8765
+    NAME                LABELS                                    SELECTOR            IP                  PORT
+    apache2-service     <none>                                    name=apache2        10.100.123.196      9090
+
+    
+也就是`10.100.123.196:9090`将会代表这个服务，相对于经常变化状态的pod，这个是不变的。然后，对于cluster的每个节点，如果用`sudo iptables -nvL -t nat`查看一下:
+
+    Chain KUBE-PORTALS-CONTAINER (1 references)
+     pkts bytes target     prot opt in     out     source               destination
+        0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.0.1           /* kubernetes-ro */ tcp dpt:80 redir ports 39058
+        0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.0.2           /* kubernetes */ tcp dpt:443 redir ports 48474
+        0     0 REDIRECT   tcp  --  *      *       0.0.0.0/0            10.100.123.196       /* apache2-service */ tcp dpt:9090 redir ports 35788
+        
+可以看到示例节点中，该结点通过35788端口来访问`10.100.123.196:9090`，其它节点不再赘述。
+（换句话说，对于一个service（本例的10.100.123.196:9090），每个节点的kube_proxy会使用iptables为其映射一个端口（端口号随机生成））
     
 To return information about a specific service,
 
