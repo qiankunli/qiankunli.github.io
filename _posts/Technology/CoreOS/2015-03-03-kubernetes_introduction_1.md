@@ -15,7 +15,7 @@ keywords: CoreOS Docker Kubernetes
 
 ##  Container Engine cluster
 
-A Container Engine cluster is a group of Compute Engine instances running Kubernetes. It consists of one or more node instances, and a Kubernetes master instance. A cluster is the foundation of a Container Engine application—pods, services, and replication controllers all run on top of a cluster.
+A Container Engine cluster is a group of Compute Engine instances running Kubernetes. It consists of one or more node instances, and a Kubernetes master instance. A cluster is the foundation of a Container Engine application—pods,(如果说在coreos中，一个应用用container（及相关的service文件）表示。那么kubernete中，一个应用由pod表示) services, and replication controllers all run on top of a cluster.
 
 （一个Container Engine cluster主要包含一个master和多个slave节点）
 
@@ -31,7 +31,7 @@ A cluster can have one or more node instances. These are managed from the master
 
 ## What is a pod?
 
-A pod models an application-specific "logical host(逻辑节点)" in a containerized environment. It may contain one or more containers which are relatively tightly coupled—in a pre-container world（包含多个紧密联系的容器）, they would have executed on the same physical or virtual host.
+A pod models an application-specific "logical host(逻辑节点)" in a containerized environment. It may contain one or more containers which are relatively tightly coupled—in a pre-container world（包含多个紧密联系的容器）, they would have executed on the same physical or virtual host.a pod has a single IP address.  Multiple containers that run in a pod all share that common network name space。（一个pod中包含ca cb两个container，ca暴露80端口，cb即可以`localhost:80`访问ca中的服务）
 
 Like running containers, pods are considered to be relatively ephemeral rather than durable entities. Pods are scheduled to nodes and remain there until termination (according to restart policy) or deletion. When a node dies, the pods scheduled to that node are deleted. Specific pods are never rescheduled to new nodes; instead, they must be replaced.
 

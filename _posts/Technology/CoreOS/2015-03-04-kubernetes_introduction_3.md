@@ -73,6 +73,18 @@ apache pod的ip是`10.100.83.5`，pod的ip是不可靠的，所以其它pod要�
 
 A service, through its label selector, can resolve to 0 or more pods. Over the life of a service, the set of pods which comprise that service can grow, shrink, or turn over completely. Clients will only see issues if they are actively using a backend when that backend is removed from the service (and even then, open connections will persist for some protocols).
 
+#### 小结
+
+在不同的层面，如何相互访问呢？
+
+2. 1. pod 内container的互访，通过`localhost:port`
+2. pod之间，通过彼此的service ip
+3. pod与外界，
+
+   3.1 外界访问pod，通过iptables（或`PublicIPs`）
+    
+   3.2 pod如何访问外界呢？
+
 ## Service Operations
 
 Services map a port on each cluster node to ports on one or more pods.The mapping uses a selector key:value pair in the service, and the labels property of pods. Any pods whose labels match the service selector are made accessible through the service's port.
@@ -184,6 +196,8 @@ A successful delete request returns the deleted service's name.
 
 ## Other
 
+### kubernetes和kubernetes-ro
+
 kubernetes启动时，默认有两个服务kubernetes和kubernetes-ro
 
     $ kubectl get services
@@ -191,3 +205,22 @@ kubernetes启动时，默认有两个服务kubernetes和kubernetes-ro
     kubernetes          component=apiserver,provider=kubernetes   <none>              10.100.0.2          443
     kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.100.0.1          80
     
+Kubernetes uses service definitions for the API service as well（kubernete中的pod可以通过`10.100.0.1:80/api/xxx`来访问api server中的数据，kubernetes-ro可操作的api应该都是只读的）.
+
+### PublicIPs
+
+service configure文件中有一个`PublicIPs`属性
+
+    {
+      "id": "myapp",
+      "kind": "Service",
+      "apiVersion": "v1beta1",
+      "selector": {
+        "app": "example"
+      },
+      "containerPort": 9376,
+      "port": 8765
+      "PublicIPs": [192.168.56.102,192.168.56.103]
+    }
+    
+在这里`192.168.56.102`和`192.168.56.103`是k8s集群从节点的ip（**主节点ip不行**）。这样，我们就可以通过`192.168.56.102:8765`和`192.168.56.102:8765`来访问这个service了。其好处是，kube-proxy为我们映射的端口是固定的。

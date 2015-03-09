@@ -45,7 +45,7 @@ Kubernetes supports 2 primary modes of finding a Service - environment variables
 
 When a Pod is run on a Node, the kubelet adds a set of environment variables for each active Service. It supports both Docker links compatible variables (see makeLinkVariables) and simpler {SVCNAME}_SERVICE_HOST and {SVCNAME}_SERVICE_PORT variables, where the Service name is upper-cased and dashes are converted to underscores.
 
-For example, the Service "redis-master" which exposes TCP port 6379 and has been allocated portal IP address 10.0.0.11 produces the following environment variables:
+For example, the Service "redis-master" which exposes TCP port 6379 and has been allocated portal IP address 10.0.0.11 produces the following environment variables:（我们可以`docker exec -it containerid bash`Pod中的一个container，使用`printenv`来查看其可以使用的环境变量）
 
     REDIS_MASTER_SERVICE_HOST=10.0.0.11
     REDIS_MASTER_SERVICE_PORT=6379
@@ -55,7 +55,9 @@ For example, the Service "redis-master" which exposes TCP port 6379 and has been
     REDIS_MASTER_PORT_6379_TCP_PORT=6379
     REDIS_MASTER_PORT_6379_TCP_ADDR=10.0.0.11
     
-This does imply an ordering requirement - any Service that a Pod wants to access must be created before the Pod itself, or else the environment variables will not be populated. DNS does not have this restriction.
+This does imply an ordering requirement - **any Service that a Pod wants to access must be created before the Pod itself**, or else the environment variables will not be populated. DNS does not have this restriction.
+
+
 
 ### DNS
 

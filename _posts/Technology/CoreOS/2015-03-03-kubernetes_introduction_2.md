@@ -47,7 +47,8 @@ Similarly, deleting a replication controller does not affect the pods it created
 #### Rescheduling
 
 Whether you have 1 pod you want to keep running, or 1,000, a replication controller will ensure that the specified number of pods exists, even in the event of node failure or pod termination (e.g., due to an action by another control agent).
-（确保数量）
+（确保pod总是我们设定的数量）
+（我们自己创建的pod和replication controller创建pod是不同的（哪怕replicas个数为1），因为当我们创建一个replication controller时，如果它发现已经有一个相同label的pod，便不会创建pod）
 
 #### Scaling
 
