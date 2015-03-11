@@ -84,3 +84,8 @@ socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程T
 ## 一次创建多个文件夹
 
     mkdir -p /etc/confd/{conf.d,templates}
+    
+## 创建并管理自己的后台程序
+
+/sbin/start-stop-daemon
+

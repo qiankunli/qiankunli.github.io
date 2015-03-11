@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Kubernetes —— The Google Container Engine(2)
+title: Kubernetes replication controller 组件
 category: 技术
 tags: CoreOS
 keywords: CoreOS Docker Kubernetes

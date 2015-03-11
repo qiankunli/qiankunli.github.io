@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Kubernetes —— The Google Container Engine(3)
+title: Kubernetes service 组件
 category: 技术
 tags: CoreOS
 keywords: CoreOS Docker Kubernetes
@@ -72,18 +72,6 @@ apache pod的ip是`10.100.83.5`，pod的ip是不可靠的，所以其它pod要�
     
 
 A service, through its label selector, can resolve to 0 or more pods. Over the life of a service, the set of pods which comprise that service can grow, shrink, or turn over completely. Clients will only see issues if they are actively using a backend when that backend is removed from the service (and even then, open connections will persist for some protocols).
-
-#### 小结
-
-在不同的层面，如何相互访问呢？
-
-2. 1. pod 内container的互访，通过`localhost:port`
-2. pod之间，通过彼此的service ip
-3. pod与外界，
-
-   3.1 外界访问pod，通过iptables（或`PublicIPs`）
-    
-   3.2 pod如何访问外界呢？
 
 ## Service Operations
 
@@ -223,4 +211,4 @@ service configure文件中有一个`PublicIPs`属性
       "PublicIPs": [192.168.56.102,192.168.56.103]
     }
     
-在这里`192.168.56.102`和`192.168.56.103`是k8s集群从节点的ip（**主节点ip不行**）。这样，我们就可以通过`192.168.56.102:8765`和`192.168.56.102:8765`来访问这个service了。其好处是，kube-proxy为我们映射的端口是固定的。
+在这里`192.168.56.102`和`192.168.56.103`是k8s集群从节点的ip（**主节点ip不行**）。这样，我们就可以通过`192.168.56.102:8765`和`192.168.56.102:8765`来访问这个service了。其好处是，kube-proxy为我们映射的端口是确定的。

@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Kubernetes —— The Google Container Engine(1)
+title: Kubernetes 基本概念和 pod 组件
 category: 技术
 tags: CoreOS
 keywords: CoreOS Docker Kubernetes
