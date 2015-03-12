@@ -127,6 +127,8 @@ contaienr主要通过暴露端口对外提供服务。
 	对docker主机上/home/docker/git的更改将同步到container的/root/git目录（或者container直接操作的就是`/home/docker/git`目录），反之亦然。
 
 
+Volumes enable data to survive container restarts and to be shared among the applications within the container(这句对volumn的用途的解释的非常精辟).
+
 ### 5.2 container之间的联系 ###
 
 
