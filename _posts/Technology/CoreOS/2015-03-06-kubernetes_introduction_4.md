@@ -156,8 +156,17 @@ etcd-endpoints.json
 
 在不同的层面，如何相互访问呢？
 
-1. pod内container的互访:通过`localhost:port`
-2. pod之间:通过彼此的service ip
+1. pod内container的互访
+
+    1.1 网络方面，通过通过`localhost:port`
+    
+    1.2 文件方面：通过volume（通过emptydir类型的volume即可）
+    
+2. pod之间
+
+    2.1 网络方面：通过彼此的service ip
+    2.2 文件方面：volume（通过hostdir类型的volume）
+    
 3. pod与外界
 
    3.1 外界访问pod

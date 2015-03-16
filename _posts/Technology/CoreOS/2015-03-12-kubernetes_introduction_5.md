@@ -54,36 +54,43 @@ Important: You must create a PD using gcloud or the GCE API before you can use i
 
 ## Sample
 
-    id: redis
-    kind: ReplicationController
-    apiVersion: v1beta1
+### EmptyDir
+
+    apiVersion: "v1beta1"
+    id: "share-apache2-controller"
+    kind: "ReplicationController"
     desiredState:
       replicas: 1
       replicaSelector:
-        name: redis
+        name: "share-apache2"
       podTemplate:
         desiredState:
           manifest:
-            version: v1beta1
-            id: redis
+            version: "v1beta1"
+            id: "share-apache2"
             containers:
-              - name: redis
-                image: kubernetes/redis:v1
-                cpu: 1000
+              - name: "share-apache2-1"
+                image: "docker-registry.sh/myapp"
                 ports:
-                  - name: api
-                    containerPort: 6379
+                  - containerPort: 8080
                 volumeMounts:
                   - name: data
-                    mountPath: /redis-master-data
+                    mountPath: /data
+              - name: "share-apache2-2"
+                image: "docker-registry.sh/apache2"
+                ports:
+                  - containerPort: 80
+                volumeMounts:
+                  - name: data
+                    mountPath: /data
             volumes:
               - name: data
                 source:
                   emptyDir: {}
         labels:
-          name: redis
-
-
-
-
+          name: "share-apache2"
+    labels:
+      name: "share-apache2"
+      
+此时，share-apache2-1 container对`/data`目录所做操作都将反映到 share-apache2-2的`/data`目录中。
 
