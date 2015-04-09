@@ -22,6 +22,18 @@ coreos的`/etc/profile`文件是自动生成的，不能更改，但是可以更
 
 ## cloud-config
 
-https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config/
+- 配置时区
+
+    - name: settimezone.service
+          command: start
+          content: |
+            [Unit]
+            Description=Set the timezone
+            [Service]
+            # 将CoreOS系统时区设置为东八区
+            ExecStart=/usr/bin/timedatectl set-timezone Asia/Shanghai
+            RemainAfterExit=yes
+            Type=oneshot
+
 
 cloud-config　语法有要求
