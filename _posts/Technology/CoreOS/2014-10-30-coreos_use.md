@@ -24,7 +24,7 @@ coreos的`/etc/profile`文件是自动生成的，不能更改，但是可以更
 
 - 配置时区
 
-    - name: settimezone.service
+        - name: settimezone.service
           command: start
           content: |
             [Unit]
