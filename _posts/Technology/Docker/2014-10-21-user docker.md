@@ -50,6 +50,14 @@ Container后台运行时，我们通常需要“SSH”进去，进行一些必�
     
 所以，不同的`docker save`，导致`docker load`时会有不同的结果。
 
+import/export
+
+    docker export container_id > xxxx.tar
+    cat xxx.tar | docker import – image_name:tag
+    docker import http://xxx.tar  image_name:tag
+
+用户既可以使用 docker load 来导入镜像存储文件到本地镜像库，也可以使用 docker import 来导入一个容器快照到本地镜像库。这两者的区别在于容器快照文件将丢弃所有的历史记录和元数据信息（即仅保存容器当时的快照状态），而镜像存储文件将保存完整记录，体积也要大。此外，从容器快照文件导入时可以重新指定标签等元数据信息。同时，“export/import”不会存储`CMD xxx`和`ENTRY xxx`的信息。
+
 
 ## 6 清除掉所有正在运行的container ##
 使用命令`docker rm -f $(docker ps -aq)`，便可以清除掉所有正在运行的contaienr，当然，这个命令比较暴力，小心“误伤”。
