@@ -154,7 +154,9 @@ keywords: Hadoop Eclipse
 7. maven项目创建完毕后，如下所示：
 
     ![Alt text](/public/upload/hadoop/demo.png)   
+    
+8. 可以使用` hadoop fs -cat  /user/hadoop/output/part-00000`参看输出文件内容。
         
-**NOTE:**多次运行时，请注意移除output目录` hadoop fs -ls  /user/hadoop/output`
+**NOTE1:**多次运行时，请注意移除output目录` hadoop fs -ls  /user/hadoop/output`
 
 [hadoop-core-1.2.1.jar]: http://qd.baidupcs.com/file/d7dab4a74da2edbde762ca2ab85bbb29?bkt=p2-qd-516&fid=2316180254-250528-756316007271925&time=1429521523&sign=FDTAXERLBH-DCb740ccc5511e5e8fedcff06b081203-3ss1%2BjucCIWVecmt3f68KUyGtWo%3D&to=qb&fm=Qin,B,T,t&newver=1&newfm=1&flow_ver=3&sl=70385743&expires=8h&rt=sh&r=865775724&mlogid=4218467014&vuk=3390168182&vbdid=3466943788&fin=hadoop-core-1.2.1.jar&fn=hadoop-core-1.2.1.jar&slt=pm&uta=0
