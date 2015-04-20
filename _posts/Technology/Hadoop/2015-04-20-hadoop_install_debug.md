@@ -1,0 +1,155 @@
+---
+layout: post
+title: Hadoop安装与调试
+category: 技术
+tags: Hadoop
+keywords: Hadoop Eclipse
+---
+
+## 前言 ##
+
+本教程以hadoop1.2.1版本为例，搭建一个伪分布集群，并在eclipse下编写WordCount代码并运行（eclipse无需安装插件）。
+
+## 安装hadoop集群
+
+这个就没什么要讲的了，搭建hadoop集群的例子网上有很多。简述一下本文的hadoop系统搭建完毕后的相关情况：
+
+OS ： ubuntu（在windows下virtualbox运行）
+Hostname: hadoop
+IP: 192.168.56.171
+操作hadoop集群的linux用户：hadoop
+
+集群搭建完毕后，运行状态如下所示：
+
+![Alt text](/public/upload/hadoop/hadoop_run.png)   
+
+**NOTE1:** hadoop相关组件监听的ip必须为“192.168.56.171”，如果读者此处显示的是“127.0.0.1”，那么请读者自行调整。
+
+**NOTE2:** 因为linux采用hadoop操作hadoop集群，hdfs中的文件默认也为hadoop用户所有，为避免windows端运行hadoop程序时因用户不一致带来的问题，在配置“hdfs-site.xml”时，加入以下代码：
+
+    <property>
+    	<name>dfs.permissions</name>
+    	# false表示不检查文件权限
+        <value>false</value> 
+    </property>
+
+## 向hdfs提交测试文件
+
+在hdfs中构建目录结构
+
+    hadoop@hadoop:~$ hadoop fs –mkdir /user
+    hadoop@hadoop:~$ hadoop fs –mkdir /user/hadoop
+    hadoop@hadoop:~$ hadoop fs –mkdir /user/hadoop/input
+    
+编写测试文件test并提交
+    hadoop@hadoop:/usr/local/hadoop/conf$ cd
+    hadoop@hadoop:~$ cat test
+    hello
+    world
+    hello world
+    hadoop@hadoop:~$ hadoop fs -put /home/hadoop/test /user/hadoop/input/test 
+    
+## 搭建windows端环境
+
+### 编辑hosts文件
+
+编辑`C:\Windows\System32\drivers\etc\hosts`，添加以下代码：
+
+    192.168.56.171 hadoop
+
+### 安装eclipse，maven
+### 创建demo项目
+1. 新建demo项目（new maven project）
+2. 配置pom.xml文件
+
+        <dependencies>
+    		<dependency>
+    			<groupId>org.apache.hadoop</groupId>
+    			<artifactId>hadoop-core</artifactId>
+    			<version>1.2.1</version>
+    		</dependency>
+    	</dependencies>
+    
+3. maven "update project"该项目以下载相关依赖（可能需要较长时间）
+4. 下载[hadoop-core-1.2.1.jar][]替换maven库中默认的`hadoop-core-1.2.1.jar`。因为mapreduce程序运行时会检查windows本地相关目录的权限，进而导致运行失败。
+
+    所以需要注释掉hadoop core源文件`/hadoop-1.2.1/src/core/org/apache/hadoop/fs/FileUtil.java`中的以下代码：
+    
+        685private static void checkReturnValue(boolean rv, File p,
+    
+        686 FsPermissionpermission
+        
+        687 )throws IOException {
+        
+        688 /*if (!rv) {
+        
+        689 throw new IOException("Failed toset permissions of path: " + p +
+        
+        690 " to " +
+        
+        691 String.format("%04o",permission.toShort()));
+        
+        692 }*/
+        
+        693 }
+        
+       修改完毕后，重新编译源码生成[hadoop-core-1.2.1.jar][]
+5. 创建`src/main/resources` source folder，并在该folder下创建`hadoop` folder，将linux中hadoop集群的`core-site.xml`,`hdfs-site.xml`,`mapred-site.xml`拷贝到hadoop folder中。
+
+6. 创建`WordCount`类
+
+        public class WordCount {
+        	public static String INPUT = "hdfs://192.168.56.171:9000/user/hadoop/input/";
+        	public static String OUTPUT = "hdfs://192.168.56.171:9000/user/hadoop/output/";
+        	public static class WordCountMapper extends MapReduceBase implements
+        			Mapper<LongWritable, Text, Text, IntWritable> {
+        		private final static IntWritable one = new IntWritable(1);
+        		private Text word = new Text();
+        
+        		public void map(LongWritable key, Text value,
+        				OutputCollector<Text, IntWritable> output, Reporter reporter)
+        				throws IOException {
+        			String line = value.toString();
+        			StringTokenizer tokenizer = new StringTokenizer(line);
+        			while (tokenizer.hasMoreTokens()) {
+        				word.set(tokenizer.nextToken());
+        				output.collect(word, one);
+        			}
+        		}
+        	}
+        	public static class WordCountReducer extends MapReduceBase implements
+        			Reducer<Text, IntWritable, Text, IntWritable> {
+        		public void reduce(Text key, Iterator<IntWritable> values,
+        				OutputCollector<Text, IntWritable> output, Reporter reporter)
+        				throws IOException {
+        			int sum = 0;
+        			while (values.hasNext()) {
+        				sum += values.next().get();
+        			}
+        			output.collect(key, new IntWritable(sum));
+        		}
+        	}
+    	    public static void main(String[] args) throws Exception {
+        		JobConf conf = new JobConf(WordCount.class);
+        		conf.setJobName("WordCount");
+        		# 很有可能通过这三个配置文件确定hadoop环境不是在本地
+        		conf.addResource("classpath:/hadoop/core-site.xml");
+        		conf.addResource("classpath:/hadoop/hdfs-site.xml");
+        		conf.addResource("classpath:/hadoop/mapred-site.xml");
+        		conf.setOutputKeyClass(Text.class);
+        		conf.setOutputValueClass(IntWritable.class);
+        		conf.setMapperClass(WordCountMapper.class);
+        		conf.setCombinerClass(WordCountReducer.class);
+        		conf.setReducerClass(WordCountReducer.class);
+        		conf.setInputFormat(TextInputFormat.class);
+        		conf.setOutputFormat(TextOutputFormat.class);
+        		FileInputFormat.setInputPaths(conf,new Path(INPUT));
+        		FileOutputFormat.setOutputPath(conf,new Path(OUTPUT));
+        		JobClient.runJob(conf);
+        		System.exit(0);
+        	}
+        }
+        
+**NOTE:**多次运行时，请注意移除output目录` hadoop fs -ls  /user/hadoop/output`
+
+[hadoop-core-1.2.1.jar]: http://qd.baidupcs.com/file/d7dab4a74da2edbde762ca2ab85bbb29?bkt=p2-qd-516&fid=2316180254-250528-756316007271925&time=1429521523&sign=FDTAXERLBH-DCb740ccc5511e5e8fedcff06b081203-3ss1%2BjucCIWVecmt3f68KUyGtWo%3D&to=qb&fm=Qin,B,T,t&newver=1&newfm=1&flow_ver=3&sl=70385743&expires=8h&rt=sh&r=865775724&mlogid=4218467014&vuk=3390168182&vbdid=3466943788&fin=hadoop-core-1.2.1.jar&fn=hadoop-core-1.2.1.jar&slt=pm&uta=0
