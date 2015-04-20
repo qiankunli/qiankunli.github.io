@@ -8,24 +8,24 @@ keywords: Hadoop Eclipse
 
 ## 前言 ##
 
-本教程以hadoop1.2.1版本为例，搭建一个伪分布集群，并在eclipse下编写WordCount代码并运行（eclipse无需安装插件）。
+本教程以hadoop1.2.1版本为例，搭建一个伪分布式集群，并在eclipse下编写WordCount代码并运行（eclipse无需安装插件）。
 
 ## 安装hadoop集群
 
-这个就没什么要讲的了，搭建hadoop集群的例子网上有很多。简述一下本文的hadoop系统搭建完毕后的相关情况：
+这个就没什么要讲的了，搭建hadoop集群的教程网上有很多。简述一下本文的hadoop环境搭建完毕后的相关情况：
 
-OS ： ubuntu（在windows下virtualbox运行）
-Hostname: hadoop
-IP: 192.168.56.171
-操作hadoop集群的linux用户：hadoop
+    OS：                            ubuntu（在windows下virtualbox运行）
+    Hostname:                       hadoop
+    IP:                             192.168.56.171
+    操作hadoop集群的linux用户：      hadoop
 
 集群搭建完毕后，运行状态如下所示：
 
 ![Alt text](/public/upload/hadoop/hadoop_run.png)   
 
-**NOTE1:** hadoop相关组件监听的ip必须为“192.168.56.171”，如果读者此处显示的是“127.0.0.1”，那么请读者自行调整。
+**NOTE1:** hadoop相关组件监听的ip必须为“192.168.56.171”，如果读者此处显示的是“127.0.0.1”，请自行调整。
 
-**NOTE2:** 因为linux采用hadoop操作hadoop集群，hdfs中的文件默认也为hadoop用户所有，为避免windows端运行hadoop程序时因用户不一致带来的问题，在配置“hdfs-site.xml”时，加入以下代码：
+**NOTE2:** 因为linux采用hadoop用户操作hadoop集群，hdfs中的文件默认也以hadoop用户作为owner，为避免windows端运行hadoop程序时因用户不一致带来的权限问题，在配置“hdfs-site.xml”时，加入以下代码：
 
     <property>
     	<name>dfs.permissions</name>
@@ -33,7 +33,7 @@ IP: 192.168.56.171
         <value>false</value> 
     </property>
 
-## 向hdfs提交测试文件
+## 向hdfs提交测试文件（示例程序以此为输入）
 
 在hdfs中构建目录结构
 
@@ -41,7 +41,8 @@ IP: 192.168.56.171
     hadoop@hadoop:~$ hadoop fs –mkdir /user/hadoop
     hadoop@hadoop:~$ hadoop fs –mkdir /user/hadoop/input
     
-编写测试文件test并提交
+编写测试文件`/home/hadoop/test`并提交
+
     hadoop@hadoop:/usr/local/hadoop/conf$ cd
     hadoop@hadoop:~$ cat test
     hello
@@ -56,6 +57,7 @@ IP: 192.168.56.171
 编辑`C:\Windows\System32\drivers\etc\hosts`，添加以下代码：
 
     192.168.56.171 hadoop
+这样，示例程序便可以以hostname为`hadoop`的字符串代替linux虚拟机的IP。
 
 ### 安装eclipse，maven
 ### 创建demo项目
@@ -70,10 +72,8 @@ IP: 192.168.56.171
     		</dependency>
     	</dependencies>
     
-3. maven "update project"该项目以下载相关依赖（可能需要较长时间）
-4. 下载[hadoop-core-1.2.1.jar][]替换maven库中默认的`hadoop-core-1.2.1.jar`。因为mapreduce程序运行时会检查windows本地相关目录的权限，进而导致运行失败。
-
-    所以需要注释掉hadoop core源文件`/hadoop-1.2.1/src/core/org/apache/hadoop/fs/FileUtil.java`中的以下代码：
+3. maven "update project"该项目以下载相关依赖的jar（可能需要较长时间）
+4. 下载[hadoop-core-1.2.1.jar][]替换maven库中默认的`hadoop-core-1.2.1.jar`。因为mapreduce程序运行时会检查windows本地相关目录的权限，windows与linux文件权限的不同会导致运行失败。所以注释掉hadoop core源文件`/hadoop-1.2.1/src/core/org/apache/hadoop/fs/FileUtil.java`中的以下代码：
     
         685private static void checkReturnValue(boolean rv, File p,
     
@@ -94,7 +94,8 @@ IP: 192.168.56.171
         693 }
         
        修改完毕后，重新编译源码生成[hadoop-core-1.2.1.jar][]
-5. 创建`src/main/resources` source folder，并在该folder下创建`hadoop` folder，将linux中hadoop集群的`core-site.xml`,`hdfs-site.xml`,`mapred-site.xml`拷贝到hadoop folder中。
+       
+5. 创建`src/main/resources` source folder，并在该source folder下创建`hadoop` folder，将linux中hadoop集群的`core-site.xml`,`hdfs-site.xml`,`mapred-site.xml`拷贝到hadoop folder中。
 
 6. 创建`WordCount`类
 
@@ -149,6 +150,10 @@ IP: 192.168.56.171
         		System.exit(0);
         	}
         }
+        
+7. maven项目创建完毕后，如下所示：
+
+    ![Alt text](/public/upload/hadoop/demo.png)   
         
 **NOTE:**多次运行时，请注意移除output目录` hadoop fs -ls  /user/hadoop/output`
 
