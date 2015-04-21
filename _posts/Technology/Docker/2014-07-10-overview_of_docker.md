@@ -97,7 +97,9 @@ image和container的关系很像程序和进程之间的关系。
 如果docker run 算是增加container的话，其他相关命令如下：
 
 1. `docker ps -a`，列出所有container
-	![Alt text](/public/upload/docker_ps_a.png)<br/>
+
+	![Alt text](/public/upload/docker_ps_a.png)
+	
 2. `docker rm dc126312903f`，删除containerId对应的container
 3. `docker start dc126312903f`，启动一个已经exited的container
 4. `docker attach dc126312903f`，从docker主机进入一个已exited的container
