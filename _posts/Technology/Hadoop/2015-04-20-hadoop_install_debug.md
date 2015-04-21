@@ -54,7 +54,7 @@ keywords: Hadoop Eclipse
 
 ### 编辑hosts文件
 
-编辑`C:\Windows\System32\drivers\etc\hosts`，添加以下代码：
+**以管理员权限**打开并编辑`C:\Windows\System32\drivers\etc\hosts`，添加以下代码：
 
     192.168.56.171 hadoop
 这样，示例程序便可以以hostname为`hadoop`的字符串代替linux虚拟机的IP。
@@ -72,7 +72,7 @@ keywords: Hadoop Eclipse
     		</dependency>
     	</dependencies>
     
-3. maven "update project"该项目以下载相关依赖的jar（可能需要较长时间）
+3. maven "update project"该项目以下载依赖的jar文件（因为hadoop-core-1.2.1.jar依赖较多，此过程可能需要耗费较长时间）
 4. 下载[hadoop-core-1.2.1.jar][]替换maven库中默认的`hadoop-core-1.2.1.jar`。因为mapreduce程序运行时会检查windows本地相关目录的权限，windows与linux文件权限的不同会导致运行失败。所以注释掉hadoop core源文件`/hadoop-1.2.1/src/core/org/apache/hadoop/fs/FileUtil.java`中的以下代码：
     
         685private static void checkReturnValue(boolean rv, File p,
@@ -95,7 +95,7 @@ keywords: Hadoop Eclipse
         
        修改完毕后，重新编译源码生成[hadoop-core-1.2.1.jar][]
        
-5. 创建`src/main/resources` source folder，并在该source folder下创建`hadoop` folder，将linux中hadoop集群的`core-site.xml`,`hdfs-site.xml`,`mapred-site.xml`拷贝到hadoop folder中。
+5. （此过程可选）创建`src/main/resources` source folder，并在该source folder下创建`hadoop` folder，将linux中hadoop集群的`core-site.xml`,`hdfs-site.xml`,`mapred-site.xml`拷贝到hadoop folder中。
 
 6. 创建`WordCount`类
 
@@ -133,10 +133,10 @@ keywords: Hadoop Eclipse
     	    public static void main(String[] args) throws Exception {
         		JobConf conf = new JobConf(WordCount.class);
         		conf.setJobName("WordCount");
-        		# 很有可能通过这三个配置文件确定hadoop环境不是在本地
-        		conf.addResource("classpath:/hadoop/core-site.xml");
-        		conf.addResource("classpath:/hadoop/hdfs-site.xml");
-        		conf.addResource("classpath:/hadoop/mapred-site.xml");
+        		# 注释代码可选
+        		//conf.addResource("classpath:/hadoop/core-site.xml");
+        		//conf.addResource("classpath:/hadoop/hdfs-site.xml");
+        		//conf.addResource("classpath:/hadoop/mapred-site.xml");
         		conf.setOutputKeyClass(Text.class);
         		conf.setOutputValueClass(IntWritable.class);
         		conf.setMapperClass(WordCountMapper.class);
@@ -158,5 +158,20 @@ keywords: Hadoop Eclipse
 8. 可以使用` hadoop fs -cat  /user/hadoop/output/part-00000`参看输出文件内容。
         
 **NOTE1:**多次运行时，请注意移除output目录` hadoop fs -ls  /user/hadoop/output`
+
+**NOTE2:**驱动代码有多种编写方式，如下代码所示：
+
+    public static void main(String[] args) throws IOException,
+    		ClassNotFoundException, InterruptedException {
+    	Configuration conf = new Configuration();
+    	Job job = new Job(conf, WordCount.class.getSimpleName());
+    	FileInputFormat.setInputPaths(job, INPUT_PATH);
+    	job.setMapperClass(MyMapper.class);
+    	job.setReducerClass(MyReducer.class);
+    	job.setOutputKeyClass(Text.class);
+    	job.setOutputValueClass(LongWritable.class);
+    	FileOutputFormat.setOutputPath(job, new Path(OUT_PATH));
+    	job.waitForCompletion(true);
+    }
 
 [hadoop-core-1.2.1.jar]: http://qd.baidupcs.com/file/d7dab4a74da2edbde762ca2ab85bbb29?bkt=p2-qd-516&fid=2316180254-250528-756316007271925&time=1429521523&sign=FDTAXERLBH-DCb740ccc5511e5e8fedcff06b081203-3ss1%2BjucCIWVecmt3f68KUyGtWo%3D&to=qb&fm=Qin,B,T,t&newver=1&newfm=1&flow_ver=3&sl=70385743&expires=8h&rt=sh&r=865775724&mlogid=4218467014&vuk=3390168182&vbdid=3466943788&fin=hadoop-core-1.2.1.jar&fn=hadoop-core-1.2.1.jar&slt=pm&uta=0
