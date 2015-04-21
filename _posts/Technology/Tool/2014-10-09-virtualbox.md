@@ -1,9 +1,11 @@
 ---
+
 layout: post
 title: virtualbox 使用
 category: 技术
 tags: Tool
 keywords: virtualbox 虚拟机
+
 ---
 
 ## 使用VBoxManage.exe ##
