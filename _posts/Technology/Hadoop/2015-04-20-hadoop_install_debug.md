@@ -72,7 +72,7 @@ keywords: Hadoop Eclipse
     		</dependency>
     	</dependencies>
     
-3. maven "update project"该项目以下载依赖的jar文件（因为hadoop-core-1.2.1.jar依赖较多，此过程可能需要耗费较长时间）
+3. 右键项目，maven ，update project，下载依赖的jar文件（因为hadoop-core-1.2.1.jar依赖较多，此过程可能需要耗费较长时间）
 4. 下载[hadoop-core-1.2.1.jar][]替换maven库中默认的`hadoop-core-1.2.1.jar`。因为mapreduce程序运行时会检查windows本地相关目录的权限，windows与linux文件权限的不同会导致运行失败（此问题还可以通过为windows安装cygwin来伪装成linux解决）。所以注释掉hadoop core源文件`/hadoop-1.2.1/src/core/org/apache/hadoop/fs/FileUtil.java`中的以下代码：
     
         685private static void checkReturnValue(boolean rv, File p,
@@ -93,7 +93,8 @@ keywords: Hadoop Eclipse
         
         693 }
         
-       修改完毕后，重新编译源码生成[hadoop-core-1.2.1.jar][]
+       
+    修改完毕后，重新编译源码生成[hadoop-core-1.2.1.jar][]
        
 5. （此过程可选）创建`src/main/resources` source folder，并在该source folder下创建`hadoop` folder，将linux中hadoop集群的`core-site.xml`,`hdfs-site.xml`,`mapred-site.xml`拷贝到hadoop folder中。
 
