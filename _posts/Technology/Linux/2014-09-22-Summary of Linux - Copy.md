@@ -39,6 +39,12 @@ keywords: Linux
 
 ## socket文件 ##
 
+socket API原本是为网络通讯设计的，但后来在socket的框架上发展出一种IPC机制，就是UNIXDomain Socket。虽然网络socket也可用于同一台主机的进程间通讯（通过loopback地址127.0.0.1），但是UNIX Domain Socket用于IPC更有效率：不需要经过网络协议栈，不需要打包拆包、计算校验和、维护序号和应答等，只是将应用层数据从一个进程拷贝到另一个进程。这是因为，IPC机制本质上是可靠的通讯，而网络协议是为不可靠的通讯设计的。UNIX Domain Socket也提供面向流和面向数据包两种API接口，类似于TCP和UDP，但是面向消息的UNIX Domain Socket也是可靠的，消息既不会丢失也不会顺序错乱。
+
+UNIX Domain Socket是全双工的，API接口语义丰富，相比其它IPC机制有明显的优越性，目前已成为使用最广泛的IPC机制，比如X Window服务器和GUI程序之间就是通过UNIX Domain Socket通讯的。
+
+来源于：[本地socket unix domain socket][]
+
 socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程TCP通信（AF_INET）来说，是不存在sock文件一说的。以mysql.sock文件为例，假定AB两台主机，mysql服务运行在B主机上。
 
 - 那么对于A主机来说，访问mysql服务只能通过`ip:port`的方式。
@@ -89,3 +95,6 @@ socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程T
 
 /sbin/start-stop-daemon
 
+
+
+[本地socket unix domain socket]: http://blog.csdn.net/bingqingsuimeng/article/details/8470029
