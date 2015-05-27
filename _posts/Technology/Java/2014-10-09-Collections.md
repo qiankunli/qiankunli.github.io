@@ -1,9 +1,11 @@
 ---
+
 layout: post
 title: 容器类概述
 category: 技术
 tags: Java
 keywords: 容器类 JAVA
+
 ---
 
 ## 前言 ##
@@ -22,7 +24,7 @@ java中的容器主要分为三种：长度(大小)固定的Array(即数组)、�
 
 当学到set的时候，其实我就很困惑，为什么hashset底层是用hashmap来实现的，用一个数组来实现不好么？其实反过来想一下，如果这样做，hashset还跟arraylist有什么不同？回想我的程序中用到ArrayList的地方，我难道真的关心元素存储的先后顺序么？这时候，用linkedhashset是不是效率更高呢？
 
-![Alt text](/public/upload/collections_diagram.png)
+![Alt text](/public/upload/java/collections_diagram.png)
 
 ##Array 和 Arrays ##
 

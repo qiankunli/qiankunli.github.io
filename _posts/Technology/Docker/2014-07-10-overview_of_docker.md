@@ -1,9 +1,11 @@
 ---
+
 layout: post
 title: docker快速入门
 category: 技术
 tags: Docker
 keywords: Docker Container Image
+
 ---
 
 ## 1 前言 ##
@@ -31,7 +33,7 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 	2. 安装过程中会附带安装virtualbox和git，如果您已安装此软件，可以取消选中
 	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：`docker@bootdocker~$`
 	
-		![Alt text](/public/upload/boot2docker_start.png)
+		![Alt text](/public/upload/docker/boot2docker_start.png)
 
 ## 4 docker操作 ##
 ### 4.1 image和container ###
@@ -65,7 +67,7 @@ dockerfile方便了image的传播，只要是同一个base image，我们下载�
 
 1. `docker images`，列出已有的images
 
-    ![Alt text](/public/upload/docker_images.png)
+    ![Alt text](/public/upload/docker/docker_images.png)
 
 2. `docker rmi redhat-base:6.4`，删除image，前提所有运行该image的container已被删除掉
 3. `docker build -t redhat-base:6.4 /path`，根据path下的Dockerfile创建新的image
@@ -98,7 +100,7 @@ image和container的关系很像程序和进程之间的关系。
 
 1. `docker ps -a`，列出所有container
 
-	![Alt text](/public/upload/docker_ps_a.png)
+	![Alt text](/public/upload/docker/docker_ps_a.png)
 	
 2. `docker rm dc126312903f`，删除containerId对应的container
 3. `docker start dc126312903f`，启动一个已经exited的container
