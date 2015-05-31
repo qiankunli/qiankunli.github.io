@@ -70,6 +70,7 @@ keywords: Go
     $ // 在server包下创建server.go文件
     $ cd ../bin
     $ go build server   // 编译server.go文件（如果server.go引入了其它包的文件，则编译其它包）
+    // 此时bin目录下便生成了该项目的可执行文件
     $ ./server            // 运行server
     
 ** 注意： ** 为了构建这个工程，必须将"E:\\workspaces\\golang\\myweb"加入到GOPATH环境变量中。
@@ -81,6 +82,8 @@ keywords: Go
     		"GOPATH":"E:\\workspaces\\golang\\myweb"
     	}
     }
+    
+当然，如果只是编译一个go文件，那么可以进入文件所在目录，`go build 文件名.go`，在该目录下将生成对应的可执行文件。
 
     
 
