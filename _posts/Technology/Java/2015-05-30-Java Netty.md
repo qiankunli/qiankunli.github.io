@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: java mina
+title: java netty
 category: 技术
 tags: Java
 keywords: JAVA netty
@@ -97,9 +97,9 @@ netty中的IOHandler组件，便类似上述三个组件。
     
 handler可以形成一个pipeline，依次对数据进行处理。比如在pipeline中可以添加一个encoder（也继承自ChannelHandlerAdapter），在对数据进行处理前，先进行编码。
 
-说了这些，其实想结合http和netty说明一下，网络通信框架在做什么，一般提供什么样的封装等等。
+说了这些，其实想结合http server和netty（两者其实本质上是一样的东西）说明一下，网络通信框架在做什么，一般提供什么样的封装等等。
 
-## 引用
+## 四 引用
 
 [Netty初步][]
 

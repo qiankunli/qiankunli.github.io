@@ -45,12 +45,12 @@ keywords: Go
         改为
 
             "env":{
-		         "path":"E:\\GoRepo\\gocode\\bin"
+		         "path":"E:\\GoRepo\\bin"
 		         },
 		         
-        其中，`E:\\GoRepo`是笔者存放下载的go库的总目录，E:\\GoRepo\\gocode\\bin`包含了gocode的可执行文件。
+        其中，`E:\\GoRepo`是笔者存放下载的go库的总目录（`go get`前要将该路径添加到GOPATH环境变量中（如果GOPATH包含多个路径，则该路径必须是第一位的（因为`go get`只会向GOPATH指向的第一个路径里存放文件））），`E:\\GoRepo\\bin`包含了gocode的可执行文件。
         
-4. 编写hello文件
+4. 编写`hello.go`文件
 5. `ctrl + b` 切换到侧边栏显示状态
 
         [ E:/workspaces/golang/hello/ ] go build hello.go
@@ -61,17 +61,17 @@ keywords: Go
 比如在`E:\\workspaces\\golang`中新建一个web项目：
 
     $ cd /e/workspaces/golang
+    // 创建以下目录结构
     $ mkdir myweb
-    $ cd myweb
-    $ mkdir src
-    $ mkdir bin
-    $ cd src
-    $ mkdir server      // 弄个server包
-    $ // 在server包下创建server.go文件
-    $ cd ../bin
-    $ go build server   // 编译server.go文件（如果server.go引入了其它包的文件，则编译其它包）
+    $ mkdir myweb/src
+    $ touch myweb/src/server.go 
+    $ mkdir myweb/bin
+    
+    // 进入bin目录下编译源文件
+    $ cd myweb/bin
+    $ go build server   // 编译server.go文件
     // 此时bin目录下便生成了该项目的可执行文件
-    $ ./server            // 运行server
+    $ ./bin/server            // 运行server
     
 ** 注意： ** 为了构建这个工程，必须将"E:\\workspaces\\golang\\myweb"加入到GOPATH环境变量中。
 
@@ -85,8 +85,33 @@ keywords: Go
     
 当然，如果只是编译一个go文件，那么可以进入文件所在目录，`go build 文件名.go`，在该目录下将生成对应的可执行文件。
 
+## 四 引入第三方包
+假设所有第三方库文件存放在`E:\\GoRepo`目录下，将该路径加入到GOPATH环境变量中（注意，如果存在其他路径，要将其放在第一的位置）
+
+    $ go get github.com/cihub/seelog
+    
+执行完毕后，`E:\\GoRepo`将包含如下内容:
+
+    /e/GoRepo/pkg
+    /e/GoRepo/src/github.com/cihub/seelog
+    
+接着执行
+    
+    $ go get github.com/go-sql-driver/mysql
+    
+执行完毕后，`E:\\GoRepo`将包含如下内容:
+
+    /e/GoRepo/pkg
+    /e/GoRepo/src/github.com/cihub/seelog
+    /e/GoRepo/src/github.com/go-sql-driver/mysql
+    
+一般，go代码托管网站除了github.com外，还有code.google.com，而国内无法直接下载code.google.com上的库，需要时可以到[golang中国][]下载。
+
     
 
     
 
 
+
+
+[golang中国]: http://www.golangtc.com/download/package
