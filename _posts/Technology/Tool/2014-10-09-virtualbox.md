@@ -36,3 +36,13 @@ VBoxManage.exe一般在virtualbox 安装目录下，以为virtualbox vm 添加sh
 
     - 传统方式，你需要下载一个iso，然后一步步安装，配置
     - 使用vagrant，使用vagrant命令从网络上下载镜像，使用vagrant一键安装和登陆
+
+## host和vm共享文件夹
+
+![Alt text](/public/upload/tool/share_folder1.png) 
+
+![Alt text](/public/upload/tool/share_folder2.png) 
+
+mount命令格式: mount [-参数][设备名称][挂载点]
+
+sudo mount -t vboxsf git /home/docker/git

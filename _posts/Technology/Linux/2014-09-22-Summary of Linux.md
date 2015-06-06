@@ -52,6 +52,14 @@ socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程T
 
 另外，指定socket文件url一个例子：`unix:///home/docker/docker.sock`，其中`unix://`类似于`tcp://`，后面的`/home/docker/docker.sock`表明socket文件的路径。
 
+某些linux应用运行前，我们要为其配置监听的ip和端口，而支持sock文件后，我们只需为其配置sock文件即可，比如：
+
+    $ sudo /usr/bin/docker –d –H unix:///home/docker/docker.sock &
+
+而docker client在访问docker daemon时，需要：
+
+    $ docker –H unix:///home/docker/docker.sock ps –a
+
 ## rsync
 
 负责进行文件同步的
@@ -94,6 +102,14 @@ socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程T
 ## 创建并管理自己的后台程序
 
 /sbin/start-stop-daemon
+
+## inotifywait
+
+监控某个文件或目录的改变
+
+## expect
+
+进行自动化的人机交互，对于设定好的特定匹配形式，以相匹配的动作以应对。
 
 
 

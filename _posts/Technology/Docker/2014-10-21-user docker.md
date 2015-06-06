@@ -9,6 +9,8 @@ keywords: Docker Container Image
 ## 1 前言 ##
 下面讲述的是我在使用docker的过程中一些小技巧，不太系统。
 
+除了命令行方式外，docker client也提供Restful API来访问docker daemon。
+
 ## 2 查看后台运行的container相关情况##
 
 Container后台运行时，都会执行一个启动脚本，我们可以使用`docker logs ContainerID`来跟踪这个脚本的执行情况。当然，这个脚本需要有一些必要的输出，来为我们提供判断。
@@ -94,6 +96,18 @@ containre在实际应用中，通常是后台运行，多个container相互配�
 1. 如果添加了tar.gz,那么解压缩完毕后，可以删除原来的压缩文件
 2. 如果tar.gz是从网络上获取的，则可以直接  `curl xxx.tar.gz | tar -C destinationdir -zxvf`
 3. 安装软件尽量通过yum apt-get install等方式  
+
+## 12 `docker pull`私有仓库
+
+Docker新的版本默认是以https访问私有库（https需要我们提供验证手段）。因此，我们需要进行一定的配置，使docker使用http方式访问私有库。
+
+将以下内容加入到`/var/lib/boot2docker/profile`中，并重启docker daemon
+
+    EXTRA_ARGS="--insecure-registry 私有仓库hostname或ip“
+
+If using fig, you also need Fig 1.0.1 and do:
+
+    $ fig up --allow-insecure-ssl
 
 
 

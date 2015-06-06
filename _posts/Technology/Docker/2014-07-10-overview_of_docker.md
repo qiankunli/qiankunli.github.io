@@ -84,16 +84,24 @@ docker的开发团队不只是要做一个软件，还想做一个社区。我�
 ### 4.3 container管理 ###
 image和container的关系很像程序和进程之间的关系。
 #### 4.3.1 运行container ####
-* 简单运行，执行完命令后退出<br/>
-	`docker run redhat-base:6.4 echo "hello world"`<br/>
-* 运行image并进入bash，通过bash控制container<br/>
-	`docker run -i -t redhat-base:6.4 /bin/bash`<br/>
-* 运行image并对外映射端口<br/>
-	`docker run -i -t -p 2022:22 redhat-base:6.4 /bin/bash`<br/>
-	由此，即可以在docker本机的2022端口访问container的22端口。<br/>
-* 以后台方式运行image<br/>
-	`docker run -d -p 41880:80 redhat-base:6.4 apache2ctl start FOREGROUND`<br/>
+* 简单运行，执行完命令后退出
+
+	    $ docker run redhat-base:6.4 echo "hello world"
+	
+* 运行image并进入bash，通过bash控制container
+
+        docker run -i -t redhat-base:6.4 /bin/bash
+        
+* 运行image并对外映射端口
+
+	    docker run -i -t -p 2022:22 redhat-base:6.4 /bin/bash
+	由此，即可以在docker本机的2022端口访问container的22端口。
+* 以后台方式运行image
+
+	    docker run -d -p 41880:80 redhat-base:6.4 apache2ctl start FOREGROUND
     这时，container运行后，将不提供tty与用户交互。用户可以通过docker主机的41880端口访问container的apache2服务。
+      
+    在新的版本中，用户可以通过`docker exec -it container_id`与后台容器交互。
 
 #### 4.3.2 增删改查container ####
 如果docker run 算是增加container的话，其他相关命令如下：
@@ -162,11 +170,26 @@ virtualbox使用docker自带的iso无法使docker虚拟机与windows主机共享
 这个问题在新版本中貌似已被解决！
 
 ## 7 我们可以用docker做什么 ##
-这是一个很开放的问题，这里我揣测两点：
-
+这是一个很开放的问题，这里我揣测几点：
 
 1. 计算机界的先驱们呕心沥血的解决了程序的可移植性，比如java的“一次编写，处处运行”。但随着系统越来越复杂，节点越来越多，配置越来越多，移植一套系统到新的环境上也慢慢成为一个“很有含量”的工作。举个最简单的例子，笔者为了在github上写这个博客，需要一套装有jekyll环境的系统。jekyll依赖ruby和其它不知道干啥的程序，windows下安装jekyll，那是各种坑。linux下，配repo源，install各种程序，别说不好找这样的网页来参考，就算找到了，各种莫名其妙的错，你懂的呀！最后，我找了一个配好jekyll环境的image，docker run一下，直接ok!我是写博客的，可不是来搭环境的。
 
 2. 启动一个虚拟机需要多长时间？一个真实的linux启动一次需要多长时间？你的笔记本可以同时运行几个虚拟机？运行了虚拟机之后，还能流畅的运行其他程序么？要不要体验一下一两秒中进入“虚拟机”感觉？要不要看看同时运行十几个“虚拟机”是什么样子？你想不想用自己的笔记本搭一个小集群？
 
 3. 系统“污染”问题，笔者有一个redhat虚拟机，平时用来运行hadoop，其jdk是根据源码安装的sun版本。后因工作需要装另外一个软件，该软件默认依赖openjdk。jdk版本不同，导致我下次使用hadoop时产生了很多困扰。如果使用docekr，这个新的软件便可以安装在一个container中，对现有环境没有任何影响。so，这便是docker提供应用隔离的好处所在。
+
+**2015.06.03更新**
+
+目前日趋成熟的Iaas平台，比如OpenStack等，解决了以自动化方式组织、管理和使用大规模硬件资源方面的需求（管理硬件，按需提供资源）。如计算机操作系统分为Linux、Windows、Macos一样，云平台也是各有各家，并且相互的兼容性不是很好。这和以前单机操作系统时代有什么分别，只不过是一个云平台管理的资源更多了。为什么各家会抢云平台？这是未来的“操作系统”啊。
+
+此时应用以容器为单位开发，测试和发布，云平台的界限就很模糊了。
+
+那么，自docker推出以来，docker都做了什么？
+
+1. 新的LXC实现库
+2. 解决容器的互联互通
+3. 抽象了应用部署和集群管理的细节（docker swarm）
+4. 像OpenStack那样，自由管理硬件资源，并形成监控、可视化等一系列工具。
+
+
+
