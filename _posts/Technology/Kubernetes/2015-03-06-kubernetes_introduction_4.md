@@ -1,19 +1,17 @@
 ---
+
 layout: post
 title: Kubernetes 其它特性
 category: 技术
-tags: CoreOS
+tags: Kubernetes
 keywords: CoreOS Docker Kubernetes
+
 ---
 
 ## 简介
 
 
-本文主要讲了service组件一些其它特性，以及kubernete的pod之间协作的时候的一些问题
-
-## Discovering services
-
-Kubernetes supports 2 primary modes of finding a Service - environment variables and DNS.（pod组件实际通过service组件对外服务，那么如何发现这个service呢？）
+本文主要讲了service组件一些其它特性，以及kubernete的pod之间协作的时候的一些问题。
 
 ### Environment variables
 

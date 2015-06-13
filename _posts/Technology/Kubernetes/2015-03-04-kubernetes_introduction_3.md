@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes service 组件
 category: 技术
-tags: CoreOS
+tags: Kubernetes
 keywords: CoreOS Docker Kubernetes
 ---
 
@@ -46,7 +46,12 @@ When a pod is scheduled, the master adds a set of environment variables for each
     POD                 IP                  CONTAINER(S)        IMAGE(S)                     HOST                            LABELS              STATUS
     apache2-pod         10.100.83.5         apache2             docker-registry.sh/apache2   192.168.56.102/192.168.56.102   name=apache2        Running
     
-apache pod的ip是`10.100.83.5`，pod的ip是不可靠的，所以其它pod要通过pod对应的service `10.100.62.248:9090`来访问这个pod。kubernetes通过通过一系列机制来维护apache2 pod和apache2 service的映射关系。
+Kubernetes内部如何访问这个Pod对应的Service？
+
+1. 通过DNS
+2. 环境变量
+
+    apache pod的ip是`10.100.83.5`，pod的ip是不可靠的，所以其它pod要通过pod对应的service `10.100.62.248:9090`来访问这个pod。Kubernetes为minion节点添加iptables规则（将`10.100.62.248:9090`转发到一个任意端口），当minion收到来自`10.100.62.248:9090`请求时，将请求转发到任意端口，Kube-proxy进程再将其转发（根据一定的分发策略）到Pod上。
     
 那么外界如何访问这个pod呢？我们可以看到这个pod被分配到了`192.168.56.102`这台主机上，查看这台主机的iptables。（`192.168.56.101`也为该service做了映射，此处不再赘述）
    
@@ -193,7 +198,7 @@ kubernetes启动时，默认有两个服务kubernetes和kubernetes-ro
     kubernetes          component=apiserver,provider=kubernetes   <none>              10.100.0.2          443
     kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.100.0.1          80
     
-Kubernetes uses service definitions for the API service as well（kubernete中的pod可以通过`10.100.0.1:80/api/xxx`来访问api server中的数据，kubernetes-ro可操作的api应该都是只读的）.
+Kubernetes uses service definitions for the API service as well（kubernete中的pod可以通过`10.100.0.1:80/api/xxx`来向api server发送控制命令，kubernetes-ro可操作的api应该都是只读的）.
 
 ### PublicIPs
 

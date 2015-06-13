@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes 基本概念和 pod 组件
 category: 技术
-tags: CoreOS
+tags: Kubernetes
 keywords: CoreOS Docker Kubernetes
 ---
 
@@ -48,6 +48,15 @@ The containers in the pod all use the same network namespace/IP and port space, 
 In addition to defining the containers that run in the pod, the pod specifies a set of shared storage volumes. Volumes enable data to survive container restarts and to be shared among the containers within the pod.
 
 （Pod还定义了一系列volumes用于数据共享）
+
+#### pod实现原理
+
+容器是基于linux namespace实现资源隔离的，但是一个pod中的所有容器则共享部分namespace，没有完全隔离。
+
+1. 网络名字空间，在同一Pod中的多个容器访问同一个IP和端口空间，即可能访问同一个network namespace。
+2. IPC名字空间，同一个Pod中的应用能够使用SystemV IPC和POSIX消息队列进行通信。
+3. UTS名字空间，同一个Pod中的应用共享一个主机名。
+4. mount命名空间，Pod中的各个容器应用还可以访问Pod级别定义的共享卷。
 
 #### Management
 

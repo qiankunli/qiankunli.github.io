@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes volume
 category: 技术
-tags: CoreOS
+tags: Kubernetes
 keywords: CoreOS Docker Kubernetes Volume
 ---
 

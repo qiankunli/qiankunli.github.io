@@ -2,7 +2,7 @@
 layout: post
 title: Kubernetes replication controller 组件
 category: 技术
-tags: CoreOS
+tags: Kubernetes
 keywords: CoreOS Docker Kubernetes
 ---
 
