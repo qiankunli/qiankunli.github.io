@@ -99,9 +99,39 @@ handler可以形成一个pipeline，依次对数据进行处理。比如在pipel
 
 说了这些，其实想结合http server和netty（两者其实本质上是一样的东西）说明一下，网络通信框架在做什么，一般提供什么样的封装等等。
 
+## 其它
+
+netty既然可以实现tcp数据的接收和发送，自然也可以实现其它在tcp基础上的各种协议，比如http、websocket和rpc（hadoop中的rpc组件，便是基于netty实现的）等。
+
+![Alt text](/public/upload/java/netty_http.png) 
+
+基于netty实现的http协议与tomcat等web容器有以下优势：
+
+1. 不必遵守servlet规范
+
+    - 接收数据
+    - 解析符合http协议格式的请求数据
+    - 处理请求
+    - 将处理结果编码为符合http协议规范的格式
+    - 返回响应
+
+2. 可以使用异步io模型
+
+我们见到的一些软件（比如docker，当然docker是基于go语言实现的），接受restful api，并且数据部分采用json格式。如果用java实现，便可以在上述netty+http的基础上，增加对请求数据与json的转换过程。
+
+
+http只是一种半双工协议，在实际的分布式应用中，我们也可以实现一个全双工的协议，包括以下部分：
+
+1. 数据通讯格式
+2. 提高可靠性，比如每隔一定时间发送心跳包
+3. 增加安全机制，在处理客户端发来的请求时，先对客户端信息进行验证。
+
 ## 四 引用
 
 [Netty初步][]
 
+[Netty原理和使用][]
+
 
 [Netty初步]: http://xpenxpen.iteye.com/blog/2041781
+[Netty原理和使用]: http://www.jdon.com/concurrent/netty.html
