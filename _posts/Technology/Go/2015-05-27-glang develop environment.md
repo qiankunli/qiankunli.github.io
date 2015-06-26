@@ -21,6 +21,18 @@ keywords: Go
 ## 二 步骤
 
 1. 安装go环境，配置GOROOT和GOPATH，添加PATH变量
+
+    - 在ubuntu下安装
+
+            $ sudo apt-get install golang
+            # 在/etc/profile下配置环境变量
+                
+            GOROOT=/usr/lib/go
+            GOBIN=/usr/bin/go
+            # go get 得到的第三方库就存在/usr/local/gorepo路径下
+            GOPATH=/usr/local/gorepo
+            export GOPATH GOBIN GOROOT
+
 2. 安装package controll    （` crtrl + 反引号`进入命令）
     
     输入以下内容并回车（不同版本的sublime，该内容貌似不一样）。

@@ -29,18 +29,19 @@ golang中涉及到日志的库有很多，除了golang自带的log外，还有gl
     func main() {
         // xml格式的字符串，xml配置了如何输出日志
     	testConfig := `
-    <seelog type="sync">
-        // 配置输出项，本例表示同时输出到控制台和日志文件中
-    	<outputs formatid="main">
-    		<console/>
-    		<file path="log.log"/>
-    	</outputs>
-    	<formats>
-    	    // 日志格式，outputs中的输出项可以通过id引用该格式
-    		<format id="main" format="[%LEVEL] [%Time] [%FuncShort @ %File.%Line] %Msg%n"/>
-    	</formats>
-    </seelog>
-    `   // 根据配置信息生成logger（应该是配置信息的对象表示）
+        <seelog type="sync">
+            // 配置输出项，本例表示同时输出到控制台和日志文件中
+        	<outputs formatid="main">
+        		<console/>
+        		<file path="log.log"/>
+        	</outputs>
+        	<formats>
+        	    // 日志格式，outputs中的输出项可以通过id引用该格式
+        		<format id="main" format="[%LEVEL] [%Time] [%FuncShort @ %File.%Line] %Msg%n"/>
+        	</formats>
+        </seelog>`   
+    
+        // 根据配置信息生成logger（应该是配置信息的对象表示）
     	logger, err := log.LoggerFromConfigAsBytes([]byte(testConfig))
     	if err != nil {
     		fmt.Println(err)
@@ -54,7 +55,9 @@ golang中涉及到日志的库有很多，除了golang自带的log外，还有gl
 
 ## 三 json字符串与结构体的转换
 
-笔者在使用java语言时，常用org.json包来解析json包。在go语言中，如果只是想获取json串中某个key的值，可以使用`github.com/bitly/go-simplejson`
+Go中的json处理，跟结构体是密切相关的，一般要为json字符串建好相对应的struct。
+
+如果只是想获取json串中某个key的值，可以使用`github.com/bitly/go-simplejson`
 
     js, err := simplejson.NewJson([]byte(inputStr))
 	path := js.Get("path").MustString()

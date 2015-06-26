@@ -37,3 +37,38 @@ VBoxManage.exe一般在virtualbox 安装目录下，以为virtualbox vm 添加sh
 mount命令格式: mount [-参数][设备名称][挂载点]
 
 sudo mount -t vboxsf git /home/docker/git
+
+## 虚拟机网络设置
+
+- 实现主机与虚拟机互访，则需要配置host-only
+- 实现虚拟机访问互联网，则需要配置nat
+
+所以，在virtualbox中，虚拟机一般配置双网卡（nat + host-only），bridge虽然是两者皆可，但会占用现有局域网的ip资源，不建议使用。
+
+![Alt text](/public/upload/tool/network.png) 
+
+virtualbox host-only的网络地址一般为`192.168.56.0/24`，并且按照上图的配置，virtualbox**有时**会将虚拟机的默认网关设置为`192.168.56.1`，导致vm无法访问互联网，所以需要更改路由表设置，ubuntu下`/etc/network/interfaces`文件内容如下所示：
+
+    # This file describes the network interfaces available on your system
+    # and how to activate them. For more information, see interfaces(5).
+    # The loopback network interface
+    auto lo
+    iface lo inet loopback
+    # The primary network interface
+    auto eth0
+    iface eth0 inet dhcp
+    gateway 10.0.2.2
+    netmask 255.255.255.0
+    
+    # 如果路由表配置正常，则不需要以下两行配置
+    # 删除默认网关
+    up sudo route del default
+    # 添加nat网关
+    up sudo route add default gw 10.0.2.2
+    
+    auto eth1
+    iface eth1 inet static
+    address 192.168.56.151
+    gateway 192.168.56.1
+    netmask 255.255.255.0
+
