@@ -3,7 +3,7 @@
 layout: post
 title: 缓存系统
 category: 技术
-tags: WEB
+tags: Architecture
 keywords: 缓存 redis
 
 ---
