@@ -111,6 +111,41 @@ socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程T
 
 进行自动化的人机交互，对于设定好的特定匹配形式，以相匹配的动作以应对。
 
+## 测试某个远程主机的特定端口是否开放
+
+1. telnet
+
+    在终端使用者的电脑上使用telnet程序，用它连接到服务器。终端使用者可以在telnet程序中输入命令，这些命令会在服务器上运行，就像直接在服务器的控制台上输入一样。
+    
+    - 使用telnet操作`192.168.56.153`上的redis服务
+    
+            user@ubuntu:~$ telnet 192.168.56.153 6379
+            Trying 192.168.56.153...
+            Connected to 192.168.56.153.
+            Escape character is '^]'.
+            get name
+            $3
+            lqk
+            
+    - 直接在`192.168.56.153`上操作redis
+
+            user@ubuntu:~$ redis-cli get name
+            "lqk"
+            
+    - 退出telnet
+
+        1. ctrl + ]
+        2. telnet > quit    // 回车
+
+
+2. 使用nc命令
+
+        user@ubuntu:~$ nc -z 192.168.56.153 6379
+        user@ubuntu:~$ echo $?
+        0
+        
+    返回1 表示连接失败（或者说，端口没有开启）
+
 
 
 [本地socket unix domain socket]: http://blog.csdn.net/bingqingsuimeng/article/details/8470029
