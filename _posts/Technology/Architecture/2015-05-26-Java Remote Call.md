@@ -34,6 +34,9 @@ keywords: JAVA rpc rmi
 
 在远程通讯领域中，涉及的知识点还是相当的多的，例如有：通信协议(Socket/tcp/http/udp /rmi/xml-rpc etc.)、消息机制、网络IO（BIO/NIO/AIO）、MultiThread、本地调用与远程调用的透明化方案（涉及java classloader、Dynamic Proxy、Unit Test etc.）、异步与同步调用、网络通信处理机制（自动重连、广播、异常、池处理等等）、Java Serialization (各种协议的私有序列化机制等)、各种框架的实现原理（传输格式、如何将传输格式转化为流的、如何将请求信息转化为传输格式的、如何接收流的、如何将流还原为传输格式的等等）
 
+## 分布式key-value存储系统
+
+跨主机间进程通信，彼此除了直接或间接用tcp联系外，还可以使用分布式key-value存储系统，比如etcd和zookeeper等工具。相当于两个进程通过第三方沟通，将通信部分从本身转移到外界，减少了复杂性。
 
 
 ## 引用
