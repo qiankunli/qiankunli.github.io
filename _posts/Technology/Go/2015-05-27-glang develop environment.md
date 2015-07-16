@@ -22,7 +22,7 @@ keywords: Go
 
 1. 安装go环境，配置GOROOT和GOPATH，添加PATH变量
 
-    - 在ubuntu下安装
+    - （题外话）在ubuntu下安装
 
             $ sudo apt-get install golang
             # 在/etc/profile下配置环境变量

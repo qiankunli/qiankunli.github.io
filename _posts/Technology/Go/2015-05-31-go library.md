@@ -95,3 +95,40 @@ Go中的json处理，跟结构体是密切相关的，一般要为json字符串�
         // 根据字符串生成结构体
         err := json.Unmarshal([]byte(jsonStr), &u2)
     }
+
+## 读写锁
+
+    package main
+    import (
+    	"errors"
+    	"fmt"
+    	"sync"
+    )
+    var (
+    	pcodes         = make(map[string]string)
+    	mutex          sync.RWMutex
+    	ErrKeyNotFound = errors.New("Key not found in cache")
+    )
+    func Add(address, postcode string) {
+        // 写入的时候要完全上锁
+    	mutex.Lock()
+    	pcodes[address] = postcode
+    	mutex.Unlock()
+    }
+    func Value(address string) (string, error) {
+        // 读取的时候，只用读锁就可以
+    	mutex.RLock()
+    	pcode, ok := pcodes[address]
+    	mutex.RUnlock()
+    	if !ok {
+    		return "", ErrKeyNotFound
+    	}
+    	return pcode, nil
+    }
+    func main() {
+    	Add("henan", "453600")
+    	v, err := Value("henan")
+    	if err == nil {
+    		fmt.Println(v)
+    	}
+    }
