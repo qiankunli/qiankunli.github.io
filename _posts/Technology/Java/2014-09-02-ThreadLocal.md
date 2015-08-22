@@ -11,9 +11,9 @@ keywords: ThreadLocal 线程安全
 本文的很多观点来自《深入理解java虚拟机》。
 
 ## 线程安全 ##
-我们很难想象在计算机的世界，程序执行时，被不停地中断，共享的数据可能会被修改和变“脏”。为保证程序的正确性，通常我们会想到，确保共享数据在某一时刻只能被一个线程访。一个常用手段便是“互斥”，具体到java代码，通常是使用synchronized关键字。“互斥”后，线程访问是安全了，但并发执行的效率下降了，怎么办？
+我们很难想象在计算机的世界，程序执行时，被不停地中断，共享的数据可能会被修改和变“脏”。为保证程序的正确性，通常我们会想到，确保共享数据在某一时刻只能被一个线程访问。一个常用手段便是“互斥”，具体到java代码，通常是使用synchronized关键字。“互斥”后，线程访问是安全了，但并发执行的效率下降了，怎么办？
 
-“互斥”之所以会引起效率下降，是因为就解决“线程安全”这个问题而言，它太“重量级”了，考虑的太过直接和全面。比如，线程A和线程B共享数据data，线程B访问data时，需要先申请锁，但发现锁已经“锁住”，怎么办？
+“互斥”之所以会引起效率下降，是因为就解决“线程安全”这个问题而言，它太“重量级”了（或者说，粒度），考虑的太过直接和全面。比如，线程A和线程B共享数据data，线程B访问data时，需要先申请锁，但发现锁已经“锁住”，怎么办？
 
 1. 挂起线程B。
 
@@ -43,27 +43,70 @@ keywords: ThreadLocal 线程安全
 	}  
 
 
-ThreadLocalMap是一个以ThreadLocal为key，Object为值的map，由ThreadLocal维护。
+ThreadLocalMap存储线程的（一个或多个）私有变量，ThreadLocal则作为存取某个变量的工具（因为Thread本身不提供api来操作map）。
 
     threadLocals ==> <ThreadLocal1,value1>
 	                 <ThreadLocal2,value2>
 	                 <ThreadLocal3,value3>
 
+运行时，线程通过ThreadLocal拿到ThreadLocalMap。如果ThreadLocalMap为空，便创建一个ThreadLocalMap挂接到线程的（threadLocals）上。创建对象，存入到ThreadLocalMap中，并返回。
 
-	线程运行{
-	//	运行时，线程想通过ThreadLocal拿到这个本地化对象。如果ThreadLocalMap为空，便创建一个ThreadLocalMap挂接到threadLocals上。创建对象，存入到threadLocals中，并返回。
-		本地化对象 =  xxx(ThreadLocal)
-	//	这个xxx的过程本该由线程负责，但线程往往是预定义好的。便将这部分代码归到了ThreadLocal名下，从而使ThreadLocal不只是作为一个key值存在了。
 	
-	}
-
-这里，有一个跟寻常开发习惯不同的地方，一般，一个类的成员变量由这个类自己负责初始化，而在Thread类中，由ThreadLocal类负责对其threadLocals成员初始化，对我来讲，了解了这点，ThreadLocal就没有什么神秘了。
-
-目前，我还没有找到解释这个方案的更通俗易懂的方式，真奇怪，想出这个方法的人，怎么不整一个设计模式呢？
+这里，有一个跟寻常开发习惯不同的地方，一般，一个类的成员变量由这个类自己负责初始化，而在Thread类中，由ThreadLocal类负责对其ThreadLocalMap成员初始化。
 
 
-## 使用限制 ##
-待续
+
+## 使用模式 ##
+
+变相传递参数的一个例子（实现变量在同一线程内，跨类使用）
+
+    MyContext{
+        public static ThreadLocal<Integer> numThreadLocal = new ThreadLocal<Integer>();
+        public void set(Integer num){
+            numThreadLocal.set(num);
+        }
+        public Integer get(){
+            return numThreadLocal.get();
+        }
+        public void close(){
+            numThreadLocal.remove();
+        }
+    }
+    MyComponent{
+        public void say(){
+            System.out.println("num ==> " + MyContext.get())
+        }
+    }
+    Main{
+        public static void main(String[] args){
+            for(int i=0;i<10;i++){
+                final int num = i;
+                new Thread(){
+                    public void run(){
+                        MyContext.set(num);
+                        new MyComponent().say();
+                        MyContext.close();
+                    }
+                }.start();
+            }
+        }
+    }
+
+使用ThreadLocal时，要注意释放资源，对于一个正常的线程，线程运行结束后，ThreadLocal数据会自动释放。而对于线程池提供的线程，有时很长时间都不会释放（线程是被复用的），ThreadLocal变量的积累会导致线程占用资源过多。
+
+在这个例子中，如果将MyContext按如下方式书写：
+
+    MyContext{
+        public static Integer num = new Integer();
+        public void set(Integer num){
+            this.num = num;
+        }
+        public Integer get(){
+            return this.num;
+        }
+    }
+
+那么输出的内容，就很有可能相互干扰了。
 
 ## 引用
 
