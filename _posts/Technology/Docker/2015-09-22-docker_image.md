@@ -26,6 +26,17 @@ keywords: Docker image registry
 
 两者效果一样，但COPY方式将占用三个layer，并大大增加image的size，因此要纠正这个陋习。
 
+## tag
+
+假设tomcat镜像有两个tag
+
+- tomcat:7
+- tomcat:6
+
+当你`docker push tomcat`，docker会将`tomcat:7`和`tomcat:6`都push到registry上。
+
+所以，当你打算让docker image name携带版本信息时，版本信息加在name上还是tag上，要慎重。
+
 
 ## image的存储格式
 
