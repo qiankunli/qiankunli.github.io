@@ -51,19 +51,38 @@ shipyard最新的是3.0.0版，基于docker swarm，其所有组件以docker容�
 2. 为`192.168.56.154`,`192.168.56.155`搭建zookeeper集群（也可以使用现成的zookeeper集群，其它配置工具etcd等也可）
 3. 为`192.168.56.154`,`192.168.56.155`搭建docker swarm
 
-   - root@192.168.56.155 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.155:2375`
-   - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.154:2375`
-   - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-manager swarm manage zk://192.168.56.154,192.168.56.155/swarm --host tcp://0.0.0.0:2376`
+    - root@192.168.56.155 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.155:2375`
+    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.154:2375`
+    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-manager -p 2376:2376 swarm manage zk://192.168.56.154,192.168.56.155/swarm --host tcp://0.0.0.0:2376`
 
-    至此，docker swarm将以`192.168.56.154:2376`对外提供web服务
+        ` --host tcp://0.0.0.0:2376`是设置容器中swarm的http server监听2376端口，`-p 2376:2376`是将容器的2376端口映射出来，**注意2376端口是随意弄的，但该端口不能命名为2375**。至此，docker swarm将以`192.168.56.154:2376`对外提供web服务
     
 4. 为`192.168.56.154`安装shipyard
 
     需要安装rethinkdb存储服务和shipyard-controller
+    
+    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-rethinkdb -v /root/shipyard/data:/data rethinkdb`
 
-   - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-rethinkdb rethinkdb`
-   - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-controller --link shipyard-rethinkdb:rethinkdb --link shipyard-swarm-manager:swarm \
+        通过`/root/shipyard/data`持久化数据库中的数据 
+    
+    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-controller --link shipyard-rethinkdb:rethinkdb --link shipyard-swarm-manager:swarm \
    -p 8080:8080 shipyard/shipyard:latest server -d tcp://swarm:2376` 
+   
+## 需要注意的问题
+
+### docker容器一定可以访问宿主机么
+
+理论上是可以访问的，但如果你的宿主机打开了防火墙，对于`192.168.56.154`执行`docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.154:2375`时，可能会失败，因为swarm容器无法访问`192.168.56.154`的2376端口
+
+### 清掉过时的镜像和容器
+
+对于测试环境，业务代码经常更新，因此会产生非常多的docker镜像和容器，需要在合适的实际将其干掉。这涉及到
+
+1. 镜像的命名策略
+2. 干掉old镜像以及对应container的时机
+
+我采用以下策略：镜像名与jenkins的JOB_NAME相同，在使用jenkins build镜像时，便通过swarm/docker remote RESTFUL API干掉原有的镜像和容器。
+
 
 ## 优势
 
