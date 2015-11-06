@@ -61,7 +61,7 @@ keywords: Java Spring
 	    }
     }
     
-是不是已经有spring的感觉啦，不过，我们还需要将创建好的bean保存起来，同时，将上述代码包装为一个util类。
+是不是已经有spring的感觉啦，不过，我们还需要将创建好的bean保存起来，同时，将上述代码包装为一个util类。这里，比较重要的一个思想就是：Bean是执行getBean时，才开始尝试构建的。
 
     public class BeanUtil {
         public static Beans beans;
