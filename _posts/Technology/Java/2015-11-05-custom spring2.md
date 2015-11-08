@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 自己动手写spring（二） 创建一个工厂bean
+title: 自己动手写spring（二） 创建一个bean工厂
 category: 技术
 tags: Java
 keywords: Java Spring
@@ -14,7 +14,9 @@ keywords: Java Spring
 
 ## 处理类之间的关系
 
-前文的例子只创建了较为简单的beanB类，现在我们创建beanA类。从模仿spring beanFactory的getBean方法开始。
+前文的例子只创建了较为简单的beanB类，现在我们创建beanA类。从模仿spring beanFactory的getBean方法开始。getBean方法体现了spring的一个点：bean只有在使用时才会真正被创建。
+
+getBean的基本思路是，根据bean的“元信息”创建bean的实例，所以这个“元信息”必须提前从配置文件中采集并加载到内存中，此处，我们以map的形式来管理它。
 
     public class Main3 {
         // 根据beans类构建id到bean对象（注意不是beanA和beanB）的映射。不然根据id获取Bean对象太麻烦
