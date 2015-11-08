@@ -77,7 +77,7 @@ keywords: Java Spring
     
 ## 到此为止了么？
 
-在示例中，beanA使用了xml文件方式，beanB使用了注解方式，BeanFactory正常工作啦。但旋即，笔者注意到一个问题，**粒度**。目前的粒度，是以Bean为单位，一个Bean要么全注解方式，要么全配置文件方式。但经常使用spring的人，会知道有一种情况：在配置文件中声明bean，然后在类中使用@autowire注入属性，因此我们要调整getBean方法。
+在示例中，beanA使用了xml文件方式，beanB使用了注解方式，BeanFactory正常工作啦。但旋即，笔者注意到一个问题，**粒度**。目前的粒度，是以Bean为单位，一个Bean要么全注解方式，要么全配置文件方式。但经常使用spring的人，会知道有一种情况：在配置文件中声明bean，然后在类中使用`@autowire`注入属性，因此我们要调整getBean方法。
 
 	public Object getBean(String beanId) throws Exception{
 		Object obj = beanId2Class.get(beanId);
