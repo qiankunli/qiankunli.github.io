@@ -69,6 +69,7 @@ ThreadLocal有以下方法：
 变相传递参数的一个例子（实现变量在同一线程内，跨类使用）
 
     MyContext{
+        // 既然ThreadLocal对象和numThreadLocal作为keyvalue搭伙，numThreadLocal作为线程作用域存在，那么ThreadLocal对象也必须只多不少，所以就弄成静态的了。
         public static ThreadLocal<Integer> numThreadLocal = new ThreadLocal<Integer>();
         public void set(Integer num){
             numThreadLocal.set(num);
