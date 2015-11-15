@@ -146,3 +146,20 @@ keywords: Java Spring annotation
     }
 
 至此，我们已经完全使用注解方式创建了一个bean工厂，下文将会尝试把注解和配置文件两种方式整合到一块儿。
+
+## 类之间的关系图
+
+    org.lqk.lspring
+        BeanUtil
+        Main
+    org.lqk.lspring.annotation
+        Component
+        Value
+    org.lqk.lspring.tag
+        Beans
+        Bean
+        Property
+        Scan
+    org.lqk.lspring.bean
+        BeanA
+        BeanB

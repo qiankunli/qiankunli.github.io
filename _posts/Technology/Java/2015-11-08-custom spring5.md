@@ -114,3 +114,26 @@ bean生命周期管理，主要涉及到标签中的init-method,destroy-method�
 DisposableBeanProcessor与InitializingBeanProcessor的逻辑类似，此处不在赘述。
 
 下文，我们将讨论工厂bean的实现。
+
+## 类之间的关系图
+
+    org.lqk.lspring.framework
+        BeanFactory
+        DisposableBean
+        DisposableBeanProcessor
+        InitializingBean
+        InitializingBeanProcessor
+    org.lqk.lspring.annotation
+        Component
+        Value
+    org.lqk.lspring.tag
+        Beans
+        Bean
+        Scan
+        Property
+    org.lqk.lspring.bean
+        BeanA
+        BeanB
+    org.lqk.lspring.util
+        StringUtil
+        ReflectUtil

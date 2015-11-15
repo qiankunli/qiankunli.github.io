@@ -114,3 +114,19 @@ keywords: Java Spring
 当然，按照代码重构的逻辑，BeanFactory的很多方法，可以独立为一个组件，这样BeanFactory就不会很臃肿。
 
 在下文中，我们将提供对bean生命周期的管理。
+
+## 类之间的关系图
+
+    org.lqk.lspring.framework
+        BeanFactory
+    org.lqk.lspring.annotation
+        Component
+        Value
+    org.lqk.lspring.tag
+        Beans
+        Bean
+        Property
+        Scan
+    org.lqk.lspring.bean
+        BeanA
+        BeanB

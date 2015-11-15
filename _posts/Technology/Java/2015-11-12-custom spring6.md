@@ -23,7 +23,7 @@ FactoryBean也是一个bean，也有生命周期（比如实现InitializingBean�
 1. beanId2Bean，beanId对xml tag对象Bean的映射
 2. beanId2Clazz，beanId对Class对象的映射
 
-并使用beanId2Class（beanId与对象实例的映射）来保存已经创建好的对象实例。
+并使用beanId2Class（beanId与对象实例的映射）来保存已经创建好的对象实例。我们在使用getBean获取对象实例时，需要检查下当前对象实例是否实现了FactoryBean接口，如果是，则需要进行对象实例的替换。
 
     public class BeanFactory{
         public Object getBean(String beanId) throws Exception {
@@ -95,4 +95,29 @@ FactoryBean也是一个bean，也有生命周期（比如实现InitializingBean�
 
 ## 小结
 
-下文我们将提供对AOP的支持
+因为目前支持的特性较多，BeanFactory已经非常臃肿，下文我们将目前涉及到的所有类进行架构的上的调整，比如将BeanFactory部分方法剥离出来。
+
+## 类之间的关系图
+
+    org.lqk.lspring.framework
+        BeanFactory
+        DisposableBean
+        DisposableBeanProcessor
+        FactoryBean
+        FactoryBeanProcessor
+        InitializingBean
+        InitializingBeanProcessor
+    org.lqk.lspring.annotation
+        Component
+        Value
+    org.lqk.lspring.tag
+        Beans
+        Bean
+        Scan
+        Property
+    org.lqk.lspring.bean
+        BeanA
+        BeanB
+    org.lqk.lspring.util
+        StringUtil
+        ReflectUtil

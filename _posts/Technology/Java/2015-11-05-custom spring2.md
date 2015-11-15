@@ -63,7 +63,7 @@ getBean的基本思路是，根据bean的“元信息”创建bean的实例，�
 	    }
     }
     
-是不是已经有spring的感觉啦，不过，我们还需要将创建好的bean保存起来，同时，将上述代码包装为一个util类。这里，比较重要的一个思想就是：Bean是执行getBean时，才开始尝试构建的。
+是不是已经有spring的感觉啦，不过，我们还需要将创建好的bean保存起来，同时，将上述代码包装为一个util类。
 
     public class BeanUtil {
         public static Beans beans;
@@ -108,3 +108,16 @@ getBean的基本思路是，根据bean的“元信息”创建bean的实例，�
 
 1. 对于类的对象成员，只能严格按照类型注入，没有考虑类之间的父子关系。
 2. 对于类的一般成员，只能注入字符串属性，没有进行类型转换。
+
+## 类之间的关系图
+
+    org.lqk.lspring
+        BeanUtil
+        Main
+    org.lqk.lspring.tag
+        Beans
+        Bean
+        Property
+    org.lqk.lspring.bean
+        BeanA
+        BeanB

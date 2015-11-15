@@ -184,3 +184,16 @@ digester代码
     }
 
 我们真的弄了一个类出来，虽然对经常用spring的人来说有点大惊小怪，但亲身体验一把，还是很有意义的。
+
+## 类之间的关系图
+
+    org.lqk.lspring
+        Main
+    org.lqk.lspring.tag
+        Beans
+        Bean
+        Property
+    org.lqk.lspring.bean
+        BeanA
+        BeanB
+    
