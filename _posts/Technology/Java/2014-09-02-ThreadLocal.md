@@ -62,7 +62,7 @@ ThreadLocal有以下方法：
 
 这里，有一个跟寻常开发习惯不同的地方，一般，一个类的成员变量由这个类自己负责初始化，而在Thread类中，由ThreadLocal类负责对其ThreadLocalMap成员初始化。由于一个ThreadLocal包装一个value，所以ThreadLocal对象也可以和value形成一对一映射。
 
-换句话说，变量有类作用域，对象作用域和线程作用域。只要将一个变量放在线程的threadLocals成员中，这个变量便有了线程作用域。与类作用域和对象作用域不同，这两种作用域的变量直接用关键字注明即可。一个变量要想拥有线程作用域，也就是要进入threadLocals这个map中，必须通过ThreadLocal类的操作（ThreadLocal类和Thread类一个包，可以直接操作threadLocals成员），同时还要一个key搭伙，ThreadLocal类对象也可以代劳。
+换句话说，变量有类作用域，对象作用域和线程作用域(作为Thread类的成员，或者被其成员引用，就具备了线程作用域)。只要将一个变量放在线程的threadLocals成员中，这个变量便有了线程作用域。与类作用域和对象作用域不同，这两种作用域的变量直接用关键字注明即可。一个变量要想拥有线程作用域，也就是要进入threadLocals这个map中，必须通过ThreadLocal类的操作（ThreadLocal类和Thread类一个包，可以直接操作threadLocals成员），同时还要一个key搭伙，ThreadLocal类对象也可以代劳。
 
 ## 使用模式 ##
 
