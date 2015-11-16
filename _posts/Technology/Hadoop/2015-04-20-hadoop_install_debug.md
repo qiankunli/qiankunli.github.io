@@ -176,3 +176,43 @@ keywords: Hadoop Eclipse
     }
 
 [hadoop-core-1.2.1.jar]: http://qd.baidupcs.com/file/d7dab4a74da2edbde762ca2ab85bbb29?bkt=p2-qd-516&fid=2316180254-250528-756316007271925&time=1429521523&sign=FDTAXERLBH-DCb740ccc5511e5e8fedcff06b081203-3ss1%2BjucCIWVecmt3f68KUyGtWo%3D&to=qb&fm=Qin,B,T,t&newver=1&newfm=1&flow_ver=3&sl=70385743&expires=8h&rt=sh&r=865775724&mlogid=4218467014&vuk=3390168182&vbdid=3466943788&fin=hadoop-core-1.2.1.jar&fn=hadoop-core-1.2.1.jar&slt=pm&uta=0
+
+## 建议
+
+在windows上调试hadoop，怎么搞都不太爽，上述教程也只适用于特定的版本，还是建议打成可执行jar包，传送到hadoop所在主机上，使用`hadoop jar xxxx.jar`运行。
+
+hadoop 2.x maven配置
+
+    <dependencies>
+    		<dependency>
+    			<groupId>org.apache.hadoop</groupId>
+    			<artifactId>hadoop-common</artifactId>
+    			<version>2.6.0</version>
+    			<exclusions>
+    				<exclusion>
+    					<groupId>jdk.tools</groupId>
+    					<artifactId>jdk.tools</artifactId>
+    				</exclusion>
+    			</exclusions>
+    		</dependency>
+    		<dependency>
+    			<groupId>org.apache.hadoop</groupId>
+    			<artifactId>hadoop-hdfs</artifactId>
+    			<version>2.6.0</version>
+    		</dependency>
+    		<dependency>
+    			<groupId>org.apache.hadoop</groupId>
+    			<artifactId>hadoop-client</artifactId>
+    			<version>2.6.0</version>
+    		</dependency>
+    		<dependency>
+    			<groupId>jdk.tools</groupId>
+    			<artifactId>jdk.tools</artifactId>
+    			<version>1.6</version>
+    			<scope>system</scope>
+    			<systemPath>${JAVA_HOME}/lib/tools.jar</systemPath>
+    		</dependency>
+    </dependencies>
+    
+
+hadoop 运行时，使用`xxx-jar-with-dependencies.jar`
