@@ -28,6 +28,73 @@ keywords: tcp ip socket
 
 也就是说，参数不一定是被利用的对象，也可能是受益的对象。
 
+
+## 抽取一个类
+
+假设原来有一个比较复杂的类
+
+    class A{
+        void func(){
+            1.xx
+            2.xx
+            3.xx
+            4.xx
+            5.xx
+        }
+    }
+    
+现在我们代码重构，要将步骤234抽出一个类B来，类B需要A的数据初始化，类A需要类B的计算结果。一般有两种方案
+
+    class A{
+        void func(){
+            1.xx
+            2.B b = new B(xx);    // b作为A的类成员跟这个差不多
+            3.xx = b.func();
+            4.xx
+        }
+    }
+    
+但一些框架经常
+
+    class A{
+        void func(){
+            1. xx
+            2. xx
+        }
+    }
+    class B{
+        void func(A a){
+            1. xx = a.getxx();
+            2. xx
+            3. a.setxx();
+        }
+    }
+    class Main{
+        main{
+            A a = new A();
+            B b = new B();
+            b.func(a);
+        }
+    }
+    
+比如spring ioc初始化的一段代码便是如此
+
+    // 定义配置文件    
+    ClassPathResource res = new ClassPathResource(“beans.xml”);
+    // 创建bean工厂
+    DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+    // 定义读取配置文件的类
+    XmlBeanDefinitionReader reader = new XmlBeanDefinitionReader(factory);
+    // 加载文件中的信息到bean工厂中
+    reader.loadBeanDefinitions(res);
+    
+
+两种方式的不同在于：
+
+1. 前者只是将相关代码抽取为一个函数，然后到了另一个类里。（本质上只算是抽取了一个函数）
+2. 后者将相关代码完全抽出来，A类中不用保有任何痕迹，可以算是抽取出了一个类
+
+
 ## 代码的运行流程由我们控制么
 
 对于一个小程序，代码的功能跟它呈现给我们的感觉是一致的（有main方法，有初始化和close等）。而对于一些框架程序，我们只是填几个方法，整个功能就实现了。就好比，唐代的诗人，写诗，从头到尾自己斟酌。宋代的诗人作词，曲牌韵律已定，填词就好了。现在程序的主体，是一个叫“容器”的东西。而我们所写的类，只是其中的一个部件而已。
