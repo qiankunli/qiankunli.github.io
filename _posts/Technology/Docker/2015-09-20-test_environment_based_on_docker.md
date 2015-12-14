@@ -49,11 +49,15 @@ shipyard最新的是3.0.0版，基于docker swarm，其所有组件以docker容�
 
 1. 为`192.168.56.154`,`192.168.56.155`安装docker，并配置其`DOCKER_OPTS="--insecure-registry 私服ip:5000 -H 0.0.0.0:2375 -H unix:///var/run/docker.sock"`
 2. 为`192.168.56.154`,`192.168.56.155`搭建zookeeper集群（也可以使用现成的zookeeper集群，其它配置工具etcd等也可）
-3. 为`192.168.56.154`,`192.168.56.155`搭建docker swarm
+3. 为`192.168.56.154`,`192.168.56.155`搭建docker swarm（zookeeper只是其中一种服务发现的方式）
 
-    - root@192.168.56.155 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.155:2375`
-    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.154:2375`
-    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-manager -p 2376:2376 swarm manage zk://192.168.56.154,192.168.56.155/swarm --host tcp://0.0.0.0:2376`
+   - root@192.168.56.155 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.155:2375`
+        这容器工作就是：不停的向zookeeper注册该节点的信息，进入zookeeper命令行可以看到
+        
+        [zk: 192.168.56.154:2181(CONNECTED) 5] ls /swarm/docker/swarm/nodes
+		[192.168.56.155:2375]
+   - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.154:2375`
+   - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-manager -p 2376:2376 swarm manage zk://192.168.56.154,192.168.56.155/swarm --host tcp://0.0.0.0:2376`
 
         ` --host tcp://0.0.0.0:2376`是设置容器中swarm的http server监听2376端口，`-p 2376:2376`是将容器的2376端口映射出来，**注意2376端口是随意弄的，但该端口不能命名为2375**。至此，docker swarm将以`192.168.56.154:2376`对外提供web服务
     
