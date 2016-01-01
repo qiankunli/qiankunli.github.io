@@ -36,41 +36,44 @@ jenkin与docker的整合参见:[使用Jenkins来构建Docker容器](http://www.c
 
 该测试环境使用shipyard管理docker镜像和容器（运行web实例）。shipyard, Built on Docker Swarm, Shipyard gives you the ability to manage Docker resources including containers, images, private registries and more.
 
+示例环境描述：在`192.168.56.154`,`192.168.56.155`上搭建docker swarm集群，并在`192.168.56.154`上运行shipyard controller。
+
+## 安装docker registry
+
+    docker run -d -p 5000:5000 -v /root/registry:/tmp/registry registry
+
+### 安装docker swarm
+
+1. 为`192.168.56.154`,`192.168.56.155`安装docker，并配置其`DOCKER_OPTS="--insecure-registry 私服ip:5000 -H 0.0.0.0:2375 -H unix:///var/run/docker.sock"`
+2. 为`192.168.56.154`,`192.168.56.155`搭建zookeeper集群（也可以使用现成的zookeeper集群，其它配置工具etcd等也可）
+3. 为`192.168.56.154`,`192.168.56.155`搭建docker swarm（zookeeper只是其中一种服务发现的方式）
+
+    - root@192.168.56.155 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.155:2375`
+        这容器工作就是：不停的向zookeeper注册该节点的信息，进入zookeeper命令行可以看到
+        
+        [zk: 192.168.56.154:2181(CONNECTED) 5] ls /swarm/docker/swarm/nodes
+		[192.168.56.155:2375]
+    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.154:2375`
+    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-manager -p 2376:2376 swarm manage zk://192.168.56.154,192.168.56.155/swarm --host tcp://0.0.0.0:2376`
+
+        ` --host tcp://0.0.0.0:2376`是设置容器中swarm的http server监听2376端口，`-p 2376:2376`是将容器的2376端口映射出来，**注意2376端口是随意弄的，但该端口不能命名为2375**。至此，docker swarm将以`192.168.56.154:2376`对外提供web服务
+        
+### shipyard 手动安装步骤
 
 shipyard最新的是3.0.0版，基于docker swarm，其所有组件以docker容器方式运行，有两种部署方式
 
 1. 自动部署，命令：`curl -sSL https://shipyard-project.com/deploy | bash -s`
 2. 手动部署,手动依次启动必须的容器组件。
 
-### shipyard 手动安装步骤
-
-
-示例环境描述：在`192.168.56.154`,`192.168.56.155`上搭建docker集群，并在`192.168.56.154`上运行shipyard controller。
-
-1. 为`192.168.56.154`,`192.168.56.155`安装docker，并配置其`DOCKER_OPTS="--insecure-registry 私服ip:5000 -H 0.0.0.0:2375 -H unix:///var/run/docker.sock"`
-2. 为`192.168.56.154`,`192.168.56.155`搭建zookeeper集群（也可以使用现成的zookeeper集群，其它配置工具etcd等也可）
-3. 为`192.168.56.154`,`192.168.56.155`搭建docker swarm（zookeeper只是其中一种服务发现的方式）
-
-   - root@192.168.56.155 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.155:2375`
-        这容器工作就是：不停的向zookeeper注册该节点的信息，进入zookeeper命令行可以看到
-        
-        [zk: 192.168.56.154:2181(CONNECTED) 5] ls /swarm/docker/swarm/nodes
-		[192.168.56.155:2375]
-   - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-agent swarm join zk://192.168.56.154,192.168.56.155/swarm --addr=192.168.56.154:2375`
-   - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-swarm-manager -p 2376:2376 swarm manage zk://192.168.56.154,192.168.56.155/swarm --host tcp://0.0.0.0:2376`
-
-        ` --host tcp://0.0.0.0:2376`是设置容器中swarm的http server监听2376端口，`-p 2376:2376`是将容器的2376端口映射出来，**注意2376端口是随意弄的，但该端口不能命名为2375**。至此，docker swarm将以`192.168.56.154:2376`对外提供web服务
+安装过程
     
-4. 为`192.168.56.154`安装shipyard
+1. 通过`/root/shipyard/data`持久化数据库中的数据 
 
-    需要安装rethinkdb存储服务和shipyard-controller
+        root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-rethinkdb -v /root/shipyard/data:/data rethinkdb`
     
-    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-rethinkdb -v /root/shipyard/data:/data rethinkdb`
+2. 安装shipyard-controller
 
-        通过`/root/shipyard/data`持久化数据库中的数据 
-    
-    - root@192.168.56.154 # `docker run -ti -d --restart=always --name shipyard-controller --link shipyard-rethinkdb:rethinkdb --link shipyard-swarm-manager:swarm \
-   -p 8080:8080 shipyard/shipyard:latest server -d tcp://swarm:2376` 
+        root@192.168.56.154 # docker run -ti -d --restart=always --name shipyard-controller --link shipyard-rethinkdb:rethinkdb --link shipyard-swarm-manager:swarm -p 8080:8080 shipyard/shipyard:latest server -d tcp://swarm:2376
    
 ## 需要注意的问题
 
