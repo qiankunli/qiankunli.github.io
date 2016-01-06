@@ -20,3 +20,6 @@ keywords: proxyFactoryBean
 
 ## 引用
 
+[Spring AOP源码分析（七）ProxyFactoryBean介绍][]
+
+[Spring AOP源码分析（七）ProxyFactoryBean介绍]: http://m.oschina.net/blog/376308

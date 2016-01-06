@@ -38,3 +38,8 @@ keywords: Java Spring
 1. clazz.newInstance, 直接根据Class对象创建
 2. factoryBean.getObject，向其它工厂"订货"
 3. Proxy.xxxx，由Proxy组装
+
+## 该框架可以优化的地方
+
+1. 为BeanFactory添加生命周期管理，使各个组件可以感知“工厂”的初始化、销毁等事件
+2. 使用Resources来封装Bean信息来源，使用Reader将Bean信息转化为map（这些工作原来是写死在BeanFactory中的）
