@@ -147,6 +147,40 @@ advice加载进内存后，会根据方法的不同组成不同的拦截链（�
             4.	返回chain并加入缓存
         }
     }
+    
+## 拦截链的执行
+
+刚才提到，虽然同是责任链模式，但aop拦截器链跟一般的责任链模式还是有所不同的。aop的拦截器分为前置，后置和异常时拦截。而在一般的责任链模式中，前置、后置和异常时拦截是通过代码实现来区分的。
+
+    // 链的执行
+    class ReflectiveMethodInvocation implements ProxyMethodInvocation{
+    	// 目标方法、参数和类型
+        protected final Object target,Method method,Object[] arguments,Class targetClass;
+        // 当前拦截器的索引
+        private int currentInterceptorIndex = -1;
+        protected final List interceptorsAndDynamicMethodMatchers;// 拦截器链（已经从advice转化为了interceptor（适配器模式））
+        public Object proceed() throws Throwable {
+        		// 如果执行到链的最后，则直接执行目标方法
+        		// 获取当前interceptor
+        		Object interceptorOrInterceptionAdvice =
+        		    this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
+        		if (interceptorOrInterceptionAdvice符合特定类型) {
+        			// 执行特定逻辑
+        		}else {
+        			// 执行拦截器
+        			return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
+        		}
+        	}
+    }
+
+aop拦截器链的执行逻辑如下
+
+1.	执行所有的前置通知，如果碰到后置通知，则方法入栈（递归调用）。
+2.	执行目标方法
+3.	执行后置通知（原来压栈的方法出栈）
+4.	异常通知（与后置通知类似（都是在方法的后边执行嘛），不过，貌似一个方法的异常通知只能有一个）
+
+
 
 ## spring aop的应用场景
 
