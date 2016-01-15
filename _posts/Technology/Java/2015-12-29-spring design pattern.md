@@ -15,6 +15,11 @@ pojo
 FactoryBean 
 
 
+spring 与与线程池的整合，实现多线程程序的开发
+
+
+
+
 
 ## 引用
 
