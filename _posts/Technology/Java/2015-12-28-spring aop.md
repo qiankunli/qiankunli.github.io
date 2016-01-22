@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: spring aop实现原理简述
+title: spring aop 实现原理简述
 category: 技术
 tags: Java
 keywords: proxyFactoryBean
@@ -12,13 +12,13 @@ keywords: proxyFactoryBean
 
 AOP是一套编程思想，是一种功能分解的方法，类似于责任链模式中的横切（具体的实现还真用了责任链模式）。在展开叙述之前，先介绍一些概念及名词。
 
-aspectj和jboss AOP对于Aop模型进行了具体的实现。Spring AOP则将aspectj的实现加入到Spring平台中，使得AOP与Spring可以更好的融合起来为开发提供方便的服务。具体的说，spring aop本身不做aop的事，只是提供一种手段（封装和引入），将aop与spring ioc整合在一起。
+AOP是一个编程模型，aspectj和jboss AOP对于Aop模型进行了具体的实现。Spring AOP则将aspectj的实现加入到Spring平台中，使得AOP与Spring可以更好的融合起来为开发提供方便的服务。具体的说，spring aop本身不做aop的事，只是提供一种手段（封装和引入），将aop与spring ioc整合在一起。
 
 Aop的实现用到了动态代理技术，动态代理技术主要有两套实现：jdk和cglib。
 
 ## 从一个项目开始说起
 
-笔者曾经实现过一个项目，根据用户的收听记录，为用户推送消息，以达到挽留用户的目的，具体情况是：
+笔者曾经实现过一个个性化推送项目，根据用户的收听记录，为用户推送消息，以达到挽留用户的目的，具体情况是：
 
 1.	根据用户的最后收听时间，将用户分为不同的组
 2.	每个组有一个推送策略。比如用户已经7天没有登录app，则为用户推送一些文案，推送选项包括：订阅专辑更新、推荐专辑（根据机器学习得到）以及默认推送文案。
@@ -31,11 +31,11 @@ Aop的实现用到了动态代理技术，动态代理技术主要有两套实�
 
 今天笔者拜读《Spring技术内幕》，看到spring aop的源码分析，其实现与笔者项目真是异曲同工（当然，多少还有点不一样），对应关系如下：
 
-    推送项目	                    Spring AOP
-    用户	                        目标对象要增强的方法
+    个性化推送                        Spring AOP
+    用户	                            目标对象要增强的方法
     推送选项，比如“订阅专辑更新”	    Advice
-    推送策略	                    拦截链
-    推送策略工厂	                拦截链工厂
+    推送策略	                        拦截链
+    推送策略工厂	                    拦截链工厂
     
 希望这可以作为引子，可以让读者更容易理解下面的内容。
 
@@ -87,18 +87,31 @@ Pointcut和advice在spring aop中都是一套类图（较多的父子层级关�
 代理对象由ProxyFactoryBean获取，ProxyFactoryBean是一个工厂bean，其getObject方法主要做了两件事：
 
 1.	加载配置；
-2.	创建并调用AopProxy返回代理对象。Spring通过AopProxy接口类把Aop代理对象的实现与框架的其它部分有效的分离开来。ProxyFactoryBean倒像是一个桥梁，准备了必要的环境，真正的代理对象靠AopProxy生成。
-3.	AopProxy的getProxy()方法中调用Proxy.newProxyInstance(xx,xx,Invocationhanlder)创建代理对象，当然了，要为这个调用准备一个InvocationHanlder实现（AopProxy实现类同时也实现了InvocationHanlder接口）。在invoke方法里，AopProxy又把活交给了ReflectiveMethodInvocation对象（具体的说是该对象的proceed方法），在proceed方法中，触发目标对象方法对应的拦截链（AopProxy传入的）的执行。（拦截链的获取下文会提到）
+2.	创建并调用AopProxy返回代理对象。
+
+Spring通过AopProxy接口类把Aop代理对象的实现与框架的其它部分有效的分离开来。ProxyFactoryBean倒像是一个桥梁，准备了必要的环境（比如将配置文件上的配置加载到属性上），真正的代理对象靠AopProxy生成。
+
+AopProxy的getProxy()方法中调用Proxy.newProxyInstance(xx,xx,Invocationhanlder)创建代理对象，当然了，要为这个调用准备一个InvocationHanlder实现（AopProxy实现类同时也实现了InvocationHanlder接口）。在invoke方法里，触发目标对象方法对应的拦截链的执行。（拦截链的获取下文会提到）
 
 AopProxy实例由AopProxyFactory创建，相关接口描述如下：
 
-    Interface AopProxy{
+    public interface AopProxy {
     	Object getProxy();
     	Object getProxy(ClassLoader classLoader);
     }
-    Interface AopProxyFactory{
-    	AopProxy createAopProxy(AdvisedSupport config) throws AopConfigException;
-    	// 根据config决定生成哪种AopProxy，包括JdkDynamicAopProxy和CglibProxyFactory(通过CglibProxyFactory创建Cglib2AopProxy)
+    class JdkDynamicAopProxy implements AopProxy, InvocationHandler{
+        private final AdvisedSupport advised;   // 包含大量配置信息
+        public Object getProxy(ClassLoader classLoader) {
+    		Class[] proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised);
+    		findDefinedEqualsAndHashCodeMethods(proxiedInterfaces);
+    		// 返回代理对象
+    		return Proxy.newProxyInstance(classLoader, proxiedInterfaces, this);
+	    }
+	    // InvocationHandler接口方法实现
+	    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+            1. 根据method拿到对应的拦截器链
+            2. 执行拦截器链
+	    }
     }
     
 ## 加载AOP配置
@@ -117,7 +130,8 @@ AOP的配置主要包括两个方面：哪些类的哪些方法需要增强，�
 其中initializeAdvisorChain方法的主要思路
 
     initializeAdvisorChain(){
-    	根据interceptorNames拿到每一个interceptor（即advice）的名字，根据名字通过ioc拿到advice实例，并将其加入到advisors成员中。
+    	根据interceptorNames拿到每一个interceptor（即advice）的名字
+    	根据名字通过ioc拿到advice实例，并将其加入到advisors成员中
     }
     
 
@@ -143,7 +157,7 @@ advice加载进内存后，会根据方法的不同组成不同的拦截链（�
         getInterceptorsAndDynamicInterceptionAdvice(method, targetClass){
             1.	先从缓存里看看
             2.  如果缓存中没有
-            3.	遍历advisors（依据配置加载的所有advisors（advisor=advice + pointcut）），通过当前advisor中的pointcut的matches方法判断advisor是否使用这个method，使用则加入到chain中
+            3.	遍历advisors（依据配置加载的所有advisors（advisor=advice + pointcut）），通过当前advisor中的pointcut的matches方法判断advisor是否使用这个method，使用则将其转换为Interceptor，加入到chain中
             4.	返回chain并加入缓存
         }
     }
@@ -182,15 +196,16 @@ aop拦截器链的执行逻辑如下
 
 ## 总的执行逻辑（待确认）
 
-在所有数据已加载完毕的基础上，spring aop的执行逻辑
+在所有数据已加载完毕的基础上（比如初始化拦截器链），spring aop的执行逻辑
 
-1. 对象执行某个方法，实际触发的是代理对象执行某个方法
-2. 找到拦截链工厂，获取该方法对应的拦截链
-3. 执行拦截链
-
-`代理对象的方法逻辑 = 根据拦截链工厂找到对应的拦截链 + 执行拦截链`，`执行拦截链 = 前置通知 + 方法本身 + 后置通知（+ 可能的异常通知）`
+1. 获取代理对象
+2. 如何获取代理对象？`Proxy.newProxyInstance(classLoader, proxiedInterfaces, invocationHandler)`
+3. 在invocationHandler的invoke方法中实现代理类的方法逻辑
+4. 找到拦截链工厂，获取该方法对应的拦截链
+5. 执行拦截链
 
 我以前的理解，`代理方法的逻辑 = 各种通知 + 方法本身`，这个不能说错，但不够准确。
+`代理对象的方法逻辑 = 根据拦截链工厂找到对应的拦截链 + 执行拦截链`，`执行拦截链 = 前置通知 + 方法本身 + 后置通知（+ 可能的异常通知）`
 
 ## spring aop的应用场景
 
