@@ -10,7 +10,27 @@ keywords: Docker
 
 ## 前言
 
-## 基础知识
+本文介绍下Docker网络的相关知识
+
+## Linux中的网络
+
+Linux 用户想要使用网络功能，不能通过直接操作硬件完成，而需要直接或间接的操作一个Linux 为我们抽象出来的设备，即通用的 Linux 网络设备来完成。“eth0”并不是网卡，而是Linux为我们抽象（或模拟）出来的“网卡”。除了网卡，现实世界中存在的网络元素Linux都可以模拟出来，包括但不限于：电脑终端、二层交换机、路由器、网关、支持 802.1Q VLAN 的交换机、三层交换机、物理网卡、支持 Hairpin 模式的交换机。
+
+既然**Linux可以模拟网络设备**，那么现实世界中的网络拓扑结构，Linux自然也可以在一台（或多台）主机中模拟出来。用虚拟网络来模拟现实网络，这是虚拟化技术的重要一环。
+    
+## Linux 上虚拟网络与真实网络的映射
+
+Linux 上虚拟网络与真实网络的映射示例比较多，本文举一个较为简单的例子。内容摘自[Linux 上虚拟网络与真实网络的映射][]
+
+现实世界中一个常见的网络环境，小公司的局域网经常这么干。
+
+![Alt text](/public/upload/docker/traditional_lan_architecture.jpg)
+
+在一台Linux主机上进行虚拟化模拟
+
+![Alt text](/public/upload/docker/virtual_lan_architecture.jpg)
+
+四台虚拟机通过 TAP 设备连接到接入层 Bridge 设备，接入层 Bridge 设备通过一对 VETH 设备连接到二级 Bridge 设备，主机通过一对 VETH 设备接入二级 Bridge 设备。二级 Bridge 设备进一步通过 IP Tables 、Linux 路由表与物理网卡形成数据转发关系，最终和外部物理网络连接。或者说，物理网卡接着网桥，某个容器发送数据，bridge收到，物理网卡便接收到了数据并发出。其中，物理网卡接收数据时，数据经过网络协议栈，数据包内容被修改。具体的讲，是在网络协议栈的传输层与链路层之间，linux根据iptables和route tables改变了数据包的相关内容，比如将数据包中的源ip由虚拟机的ip改为物理网卡的ip。
 
 ### 网桥
 
@@ -18,7 +38,7 @@ keywords: Docker
 
 1. 如果两台计算机想要互联
 
-    1. 利用计算机的串并口连接
+    1. 利用计算机的串口连接
 
     2. 利用两台计算机的网卡互联（网线的两端插到网卡的插槽上么？）
 
@@ -30,7 +50,7 @@ keywords: Docker
     
     2. 使用集线器。
 
-    3. 网桥
+    3. 网桥，可以使用独立设备，也可以在单个计算机内模拟。
 
         host A ： 网卡1，网卡2，eth0（eth0连通外网）
     
@@ -40,28 +60,23 @@ keywords: Docker
 
         此时hosta分别和hostb、hostc彼此互访，因为网卡1和网卡2之家没有形成通路（在一个主机上，你是不是觉得默认应该是连通的？），hostb和hostc不能互相访问，所以弄一个网桥，将网卡1和网卡2“连通”。
         
-    使用网桥和集线器都可以比较简单的实现连通效果，但网桥可以分割两个网络，集线器则将所有主机纳入到一个网络中。
+使用集线器连接局域网中的pc时，一个重要缺点是：任何一个pc发数据，其它pc都会收到，无用不说，还导致物理介质争用。网桥与交换机类似（其不同不足以影响对docker网络的理解），会学习mac地址与端口（串口）的映射。使用交换机替换集线器后，pc1发给pc2的数据只有pc2才会接收到。
 
 ### docker 网桥
 
-类似地，docker host类似于上例中的hosta，容器类似于上例的hostb和hostc，主机与容器之间由veth pair（两个network namespace之间的通信手段之一）连接，主机与容器可以互访，容器之间通信则需要网桥的帮助，容器通过网桥连通外网也是如此。
-
-
-## docker如何实现与外界的相互访问
+使用docker后，容器之间、容器与host之间的网络拓扑模型就毋庸赘言了。
 
 docker容器和外界的交互，主要包含以下情况：
 
 1. 同一主机的容器之间（两个network namespace之间如何通信 ）
-
-    对于一个没有设置网络模式的容器，为这个容器绑定一个网卡。在宿主机上创建一个网桥，然后把网卡绑定到网桥上。这时，谁接到这个网桥，谁就可以跟容器通信。（包括宿主机本身的网卡）
-2. 主机与宿主机之间（root network namespace与某个network namespace通信，本质上还是两个namespace通信）
-3. 主机与宿主机所在网络的其它主机之间（实际通过端口转发，通过向iptables添加nat规则实现）
-4. 主机与宿主机所在网络的其它主机的容器之间（使用覆盖网络，或OpenVswitch和pipework等）
+2. 容器与宿主机之间（root network namespace与某个network namespace通信，本质上还是两个namespace通信）
+3. 容器与宿主机所在网络的其它主机之间（实际通过端口转发，通过向iptables添加nat规则实现）
+4. 容器与宿主机所在网络的其它主机的容器之间（使用覆盖网络，或OpenVswitch和pipework等）
 
 下面主要介绍第三种情况的实现原理：NAT（通过添加iptables规则实现网络地址转换）
 
 
-    root@ubuntu1:~# docker run -d -P 4b0eb499efbd
+    root@ubuntu1:~# docker run -d -P imageid
     
     root@ubuntu1:~# docker ps
     CONTAINER ID        IMAGE                             COMMAND                CREATED             STATUS              PORTS                     NAMES
@@ -80,8 +95,9 @@ docker容器和外界的交互，主要包含以下情况：
      pkts bytes target     prot opt in     out     source               destination
         2   104 DNAT       tcp  --  !docker0 *       0.0.0.0/0            0.0.0.0/0            tcp dpt:49153 to:172.17.0.2:8080
 
-Chain POSTROUTING规则会将源地址为172.17.0.0/16的包（也就是从Docker容器产生的包），并且不是从docker0网卡发出的，进行源地址转换，转换成主机网卡的地址。
-Chain DOCKER规则就是对主机eth0收到的目的端口为80的tcp流量进行DNAT转换，将流量发往172.17.0.5:80，也就是我们上面创建的Docker容器。
+Chain POSTROUTING规则会将源地址为172.17.0.0/16的包（也就是从Docker容器产生的包），并且不是从docker0网卡发出的，进行源地址转换，容器ip转换成主机网卡的ip。
+
+Chain DOCKER规则就是对主机eth0收到的目的端口为80的tcp流量进行DNAT转换，数据包目的ip由主机ip转换为容器ip，将流量发往172.17.0.5:80，也就是我们上面创建的docker容器。
 
 a “routing process” must be running in the global network namespace to receive traffic from the physical interface, and route it through the appropriate virtual interfaces to to the correct child network namespaces. 
 
@@ -94,4 +110,8 @@ a “routing process” must be running in the global network namespace to recei
 
 [Docker 网络配置][]
 
+[Linux 上虚拟网络与真实网络的映射][]
+
 [Docker 网络配置]: http://www.oschina.net/translate/docker-network-configuration
+[Linux 上的基础网络设备详解]: https://www.ibm.com/developerworks/cn/linux/1310_xiawc_networkdevice/
+[Linux 上虚拟网络与真实网络的映射]: https://www.ibm.com/developerworks/cn/linux/1312_xiawc_linuxvirtnet/

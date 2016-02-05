@@ -88,7 +88,12 @@ binlog是一种类型的文件，记录对数据发生或潜在发生更改的SQ
 
 java客户端使用binlog时，相当于该客户端是目标数据库（master）的一个slave。
 
-binlog的java客户端采用github上大牛的开源作品`https://github.com/shyiko/mysql-binlog-connector-java`。mysql-binlog-connector-java的api比较简单，此处不再详谈。
+binlog的java客户端采用github上大牛的开源作品`https://github.com/shyiko/mysql-binlog-connector-java`。mysql-binlog-connector-java的api比较简单，此处不再详谈。主要有以下几个概念：
+
+1. BinaryLogClient，使用binlog的客户端
+2. Event，数据增删改查等都被抽象为一个事件
+3. EventListener，事件监听者，当事件发生时得到通知
+4. EventFilter，事件过滤器，这样EventListener就可以只监听符合条件的事件
 
 我在巨人的肩膀上做了进一步的封装，将原来的BinaryLogClient,EventListener和EventFilter等“配置化”，并实现了AbstractCudEventListener。AbstractCudEventListener负责监听create，update和delete event，并将源event数据转化为源表的model，用户可以在此基础上做进一步处理。经过封装后，用户无需再了解binlog的相关细节。
 
