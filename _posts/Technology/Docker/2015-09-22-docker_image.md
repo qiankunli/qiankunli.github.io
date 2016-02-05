@@ -55,7 +55,7 @@ aufs和vfs，一个是文件系统，一个是文件系统接口，从上图每�
 
 
 
-## remote storage
+## remote storage （未完待续）
 
 ## docker registry remote api
    

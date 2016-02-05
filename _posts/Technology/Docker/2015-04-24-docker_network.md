@@ -14,7 +14,7 @@ keywords: Docker
 
 ## Linux中的网络
 
-Linux 用户想要使用网络功能，不能通过直接操作硬件完成，而需要直接或间接的操作一个Linux 为我们抽象出来的设备，即通用的 Linux 网络设备来完成。“eth0”并不是网卡，而是Linux为我们抽象（或模拟）出来的“网卡”。除了网卡，现实世界中存在的网络元素Linux都可以模拟出来，包括但不限于：电脑终端、二层交换机、路由器、网关、支持 802.1Q VLAN 的交换机、三层交换机、物理网卡、支持 Hairpin 模式的交换机。
+Linux 用户想要使用网络功能，不能通过直接操作硬件完成，而需要直接或间接的操作一个Linux 为我们抽象出来的设备，即通用的 Linux 网络设备来完成。“eth0”并不是网卡，而是Linux为我们抽象（或模拟）出来的“网卡”。除了网卡，现实世界中存在的网络元素Linux都可以模拟出来，包括但不限于：电脑终端、二层交换机、路由器、网关、支持 802.1Q VLAN 的交换机、三层交换机、物理网卡、支持 Hairpin 模式的交换机。同时，既然linux可以模拟网络设备，自然提供了操作这些虚拟的网络设备的命令或接口。
 
 既然**Linux可以模拟网络设备**，那么现实世界中的网络拓扑结构，Linux自然也可以在一台（或多台）主机中模拟出来。用虚拟网络来模拟现实网络，这是虚拟化技术的重要一环。
     
@@ -30,7 +30,7 @@ Linux 上虚拟网络与真实网络的映射示例比较多，本文举一个�
 
 ![Alt text](/public/upload/docker/virtual_lan_architecture.jpg)
 
-四台虚拟机通过 TAP 设备连接到接入层 Bridge 设备，接入层 Bridge 设备通过一对 VETH 设备连接到二级 Bridge 设备，主机通过一对 VETH 设备接入二级 Bridge 设备。二级 Bridge 设备进一步通过 IP Tables 、Linux 路由表与物理网卡形成数据转发关系，最终和外部物理网络连接。或者说，物理网卡接着网桥，某个容器发送数据，bridge收到，物理网卡便接收到了数据并发出。其中，物理网卡接收数据时，数据经过网络协议栈，数据包内容被修改。具体的讲，是在网络协议栈的传输层与链路层之间，linux根据iptables和route tables改变了数据包的相关内容，比如将数据包中的源ip由虚拟机的ip改为物理网卡的ip。
+四台虚拟机通过 TAP 设备连接到接入层 Bridge 设备，接入层 Bridge 设备通过一对 VETH 设备连接到二级 Bridge 设备，主机通过一对 VETH 设备接入二级 Bridge 设备。二级 Bridge 设备进一步通过 IP Tables 、Linux 路由表与物理网卡形成数据转发关系，最终和外部物理网络连接。或者说，物理网卡接着网桥，某个容器发送数据，bridge收到，物理网卡便接收到了数据并发出。其中，物理网卡接收数据时，数据经过网络协议栈，数据包内容被修改。具体的讲，是在**网络协议栈的传输层与链路层之间**，linux根据iptables和route tables改变了数据包的相关内容，比如将数据包中的源ip由虚拟机的ip改为物理网卡的ip。
 
 ### 网桥
 
@@ -101,10 +101,28 @@ Chain DOCKER规则就是对主机eth0收到的目的端口为80的tcp流量进�
 
 a “routing process” must be running in the global network namespace to receive traffic from the physical interface, and route it through the appropriate virtual interfaces to to the correct child network namespaces. 
 
-这样就实现了容器与外界的相互访问。
+这样就实现了容器与外界的相互访问。其本质是，发包进行数据包源ip转换，接包通过（端口与容器ip的）映射关系进行目的ip转换。
 
 在docker的网络世界里，与其说docker“容器”是如何与外界（容器，物理机，网络上的其它主机）交流的，不如说linux的 内部的network namespace是如何与外界（其它network namespace，根network namespace）交流的。
 
+## 容器跨主机通信
+
+假设containerA（172.17.1.2）和containerB（172.17.2.2）分别在hostA（192.168.3.2）和hostB（192.168.3.3）上。根据上文，containerA可以和hostB发送通信，那么容器间实现通信的关键就是：**一个数据包（源ip=172.17.1.2，目的ip=172.17.2.2）经过hostA的网卡时，hosta能够将目的ip转换为hostb的ip（192.168.3.3）**
+
+这个映射关系可以简单的通过增加hosta的路由来实现，但依赖手工。ovs和Libnetwork可以解决这个问题，将在单独的文章中阐述。
+
+
+## Libnetwork
+
+Libnetwork是Docker官方近一个月来推出的新项目，旨在将Docker的网络功能从Docker核心代码中分离出去，形成一个单独的库。 Libnetwork通过**插件的形式**为Docker提供网络功能。 使得用户可以根据自己的需求实现自己的Driver来提供不同的网络功能。 
+
+官方目前计划实现以下Driver：
+
+1. Bridge ： 这个Driver就是Docker现有网络Bridge模式的实现。 （基本完成，主要从之前的Docker网络代码中迁移过来）
+2. Null ： Driver的空实现，类似于Docker 容器的None模式。
+3. Overlay ： 隧道模式实现多主机通信的方案。 
+
+“Libnetwork所要实现的网络模型基本是这样的： 用户可以创建一个或多个网络（一个网络就是一个网桥或者一个VLAN ），一个容器可以加入一个或多个网络。 同一个网络中容器可以通信，不同网络中的容器隔离。”**我觉得这才是将网络从docker分离出去的真正含义，即在创建容器之前，我们可以先创建网络，然后决定让容器加入哪个网络。**
     
 ## 参考文献
 

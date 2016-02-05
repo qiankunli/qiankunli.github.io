@@ -1,15 +1,16 @@
 ---
 layout: post
-title: docker进一步学习
+title: docker 实践中用到的一些工具
 category: 技术
 tags: Docker
 keywords: Docker Container Image
 ---
 
 ## 前言 ##
+
 下面讲述的是我在使用docker的过程中一些小技巧，不太系统。
 
-## 1 使用fig（现在叫docker compose） ##
+## 使用fig（现在叫docker compose） ##
 如果为模拟一个系统，需要启动多个Container，那就得写一个脚本，执行多个`docker run`命令了，然而，这样做或许不太清晰。于是就有了fig工具，我们可以使用`fig.yml`来表示需要执行的image，示例如下:
 
 	postgresql:  
@@ -41,19 +42,8 @@ keywords: Docker Container Image
 
 ## expect
 
-docker中推荐一个contaienr只运行一个service。这样，对于一个复杂的系统，就需要多个container去协调运行。而我们在使用时，往往希望只进入一个container，便完成对整个系统的操作，所以expect必不可少。
+docker中推荐一个contaienr只运行一个service。但对于一个复杂的系统，就需要多个container去协调运行。与此同时，我们在使用这个复杂系统时，往往希望只进入一个container，便完成对整个系统的操作，所以expect必不可少。
 
-## dockerize ##
-
-http://jasonwilder.com/blog/2014/10/13/a-simple-way-to-dockerize-applications/
-
-## pipework
-
-pipework基本思路是把docker挂载到主机上的另外一个网桥（非docker自用的网桥）或者物理网卡设备上并指定一个新的IP地址。如果两台主机之间的网桥或者物理网卡设备可以互通，那么两台主机上的docker容器就可以相互访问。
-
-## Coreos ##
-
-http://www.blogjava.net/yongboy/archive/2013/08/26/403325.html
 
 ## 引用
 
