@@ -191,5 +191,8 @@ virtualbox使用docker自带的iso无法使docker虚拟机与windows主机共享
 3. 抽象了应用部署和集群管理的细节（docker swarm）
 4. 像OpenStack那样，自由管理硬件资源，并形成监控、可视化等一系列工具。
 
+## 8 手工安装
 
+`https://apt.dockerproject.org/repo/pool/main/d/docker-engine/`
 
+在这里，可以找到docker各个版本针对ubuntu各个发行版的deb安装文件。
