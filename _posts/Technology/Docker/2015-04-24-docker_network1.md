@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: docker 网络
+title: Docker网络一,Linux虚拟网络
 category: 技术
 tags: Docker
 keywords: Docker
@@ -110,19 +110,6 @@ a “routing process” must be running in the global network namespace to recei
 假设containerA（172.17.1.2）和containerB（172.17.2.2）分别在hostA（192.168.3.2）和hostB（192.168.3.3）上。根据上文，containerA可以和hostB发送通信，那么容器间实现通信的关键就是：**一个数据包（源ip=172.17.1.2，目的ip=172.17.2.2）经过hostA的网卡时，hosta能够将目的ip转换为hostb的ip（192.168.3.3）**
 
 这个映射关系可以简单的通过增加hosta的路由来实现，但依赖手工。ovs和Libnetwork可以解决这个问题，将在单独的文章中阐述。
-
-
-## Libnetwork
-
-Libnetwork是Docker官方近一个月来推出的新项目，旨在将Docker的网络功能从Docker核心代码中分离出去，形成一个单独的库。 Libnetwork通过**插件的形式**为Docker提供网络功能。 使得用户可以根据自己的需求实现自己的Driver来提供不同的网络功能。 
-
-官方目前计划实现以下Driver：
-
-1. Bridge ： 这个Driver就是Docker现有网络Bridge模式的实现。 （基本完成，主要从之前的Docker网络代码中迁移过来）
-2. Null ： Driver的空实现，类似于Docker 容器的None模式。
-3. Overlay ： 隧道模式实现多主机通信的方案。 
-
-“Libnetwork所要实现的网络模型基本是这样的： 用户可以创建一个或多个网络（一个网络就是一个网桥或者一个VLAN ），一个容器可以加入一个或多个网络。 同一个网络中容器可以通信，不同网络中的容器隔离。”**我觉得这才是将网络从docker分离出去的真正含义，即在创建容器之前，我们可以先创建网络，然后决定让容器加入哪个网络。**
     
 ## 参考文献
 
