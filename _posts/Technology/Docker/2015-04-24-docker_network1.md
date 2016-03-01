@@ -12,26 +12,6 @@ keywords: Docker
 
 本文介绍下Docker网络的相关知识
 
-## Linux中的网络
-
-Linux 用户想要使用网络功能，不能通过直接操作硬件完成，而需要直接或间接的操作一个Linux 为我们抽象出来的设备，即通用的 Linux 网络设备来完成。“eth0”并不是网卡，而是Linux为我们抽象（或模拟）出来的“网卡”。除了网卡，现实世界中存在的网络元素Linux都可以模拟出来，包括但不限于：电脑终端、二层交换机、路由器、网关、支持 802.1Q VLAN 的交换机、三层交换机、物理网卡、支持 Hairpin 模式的交换机。同时，既然linux可以模拟网络设备，自然提供了操作这些虚拟的网络设备的命令或接口。
-
-既然**Linux可以模拟网络设备**，那么现实世界中的网络拓扑结构，Linux自然也可以在一台（或多台）主机中模拟出来。用虚拟网络来模拟现实网络，这是虚拟化技术的重要一环。
-    
-## Linux 上虚拟网络与真实网络的映射
-
-Linux 上虚拟网络与真实网络的映射示例比较多，本文举一个较为简单的例子。内容摘自[Linux 上虚拟网络与真实网络的映射][]
-
-现实世界中一个常见的网络环境，小公司的局域网经常这么干。
-
-![Alt text](/public/upload/docker/traditional_lan_architecture.jpg)
-
-在一台Linux主机上进行虚拟化模拟
-
-![Alt text](/public/upload/docker/virtual_lan_architecture.jpg)
-
-四台虚拟机通过 TAP 设备连接到接入层 Bridge 设备，接入层 Bridge 设备通过一对 VETH 设备连接到二级 Bridge 设备，主机通过一对 VETH 设备接入二级 Bridge 设备。二级 Bridge 设备进一步通过 IP Tables 、Linux 路由表与物理网卡形成数据转发关系，最终和外部物理网络连接。或者说，物理网卡接着网桥，某个容器发送数据，bridge收到，物理网卡便接收到了数据并发出。其中，物理网卡接收数据时，数据经过网络协议栈，数据包内容被修改。具体的讲，是在**网络协议栈的传输层与链路层之间**，linux根据iptables和route tables改变了数据包的相关内容，比如将数据包中的源ip由虚拟机的ip改为物理网卡的ip。
-
 ### 网桥
 
 如果对网络不太熟悉，对于网桥的概念其实是很困惑的，下面试着简单解释一下。
@@ -58,13 +38,33 @@ Linux 上虚拟网络与真实网络的映射示例比较多，本文举一个�
     
         host C ： 网卡4（连接网卡2）
 
-        此时hosta分别和hostb、hostc彼此互访，因为网卡1和网卡2之家没有形成通路（在一个主机上，你是不是觉得默认应该是连通的？），hostb和hostc不能互相访问，所以弄一个网桥，将网卡1和网卡2“连通”。
+        此时hosta分别和hostb、hostc彼此互访，因为网卡1和网卡2之间没有形成通路（在一个主机上，你是不是觉得默认应该是连通的？），hostb和hostc不能互相访问，所以弄一个网桥，将网卡1和网卡2“连通”。
         
 使用集线器连接局域网中的pc时，一个重要缺点是：任何一个pc发数据，其它pc都会收到，无用不说，还导致物理介质争用。网桥与交换机类似（其不同不足以影响对docker网络的理解），会学习mac地址与端口（串口）的映射。使用交换机替换集线器后，pc1发给pc2的数据只有pc2才会接收到。
 
-### docker 网桥
+## Linux 上虚拟网络与真实网络的映射
 
-使用docker后，容器之间、容器与host之间的网络拓扑模型就毋庸赘言了。
+Linux 用户想要使用网络功能，不能通过直接操作硬件完成，而需要直接或间接的操作一个Linux 为我们抽象出来的设备，即通用的 Linux 网络设备来完成。“eth0”并不是网卡，而是Linux为我们抽象（或模拟）出来的“网卡”。除了网卡，现实世界中存在的网络元素Linux都可以模拟出来，包括但不限于：电脑终端、二层交换机、路由器、网关、支持 802.1Q VLAN 的交换机、三层交换机、物理网卡、支持 Hairpin 模式的交换机。同时，既然linux可以模拟网络设备，自然提供了操作这些虚拟的网络设备的命令或接口。
+
+既然**Linux可以模拟网络设备**，那么现实世界中的网络拓扑结构，Linux自然也可以在一台（或多台）主机中模拟出来。用虚拟网络来模拟现实网络，这是虚拟化技术的重要一环。
+
+传统以太网路与docker网桥及其网络模型，vlan网络与docker容器跨主机通信网络模型，其实有很大的相关性。本文举一个较为简单的例子。内容摘自[Linux 上虚拟网络与真实网络的映射][]
+
+## 传统以太网络
+
+现实世界中一个常见的网络环境，小公司的局域网经常这么干（蓝色图标表示交换机），以下称图1。
+
+![Alt text](/public/upload/docker/traditional_lan_architecture.jpg)
+
+在一台Linux主机上进行虚拟化模拟，以下称图2.
+
+![Alt text](/public/upload/docker/virtual_lan_architecture.jpg)
+
+四台虚拟机通过 TAP 设备连接到接入层 Bridge 设备，接入层 Bridge 设备通过一对 VETH 设备连接到二级 Bridge 设备，主机通过一对 VETH 设备接入二级 Bridge 设备。二级 Bridge 设备进一步通过 IP Tables 、Linux 路由表与物理网卡形成数据转发关系，最终和外部物理网络连接。或者说，物理网卡接着网桥，某个容器发送数据，bridge收到，物理网卡便接收到了数据并发出。其中，物理网卡接收数据时，数据经过网络协议栈，数据包内容被修改。具体的讲，是在**网络协议栈的传输层与链路层之间**，linux根据iptables和route tables改变了数据包的相关内容，比如将数据包中的源ip由虚拟机的ip改为物理网卡的ip。
+
+### docker网桥及其网络模型
+
+使用docker后，容器之间、容器与host之间的网络拓扑模型就毋庸赘言了。容器之间通信通过网桥连接。容器与外界的通信。容器发包时，数据从容器出发，经过docker0，“iptables规则”实现类似图1的路由器的功能，**根据ip信息**对数据包进行调整，经eth0发出。收包过程类似。
 
 docker容器和外界的交互，主要包含以下情况：
 
@@ -95,9 +95,9 @@ docker容器和外界的交互，主要包含以下情况：
      pkts bytes target     prot opt in     out     source               destination
         2   104 DNAT       tcp  --  !docker0 *       0.0.0.0/0            0.0.0.0/0            tcp dpt:49153 to:172.17.0.2:8080
 
-Chain POSTROUTING规则会将源地址为172.17.0.0/16的包（也就是从Docker容器产生的包），并且不是从docker0网卡发出的，进行源地址转换，容器ip转换成主机网卡的ip。
+Chain POSTROUTING规则会将源地址为172.17.0.0/16的包（也就是从Docker容器产生的包），并且目的地不是docker0的包，进行源地址转换，容器ip转换成主机网卡的ip。
 
-Chain DOCKER规则就是对主机eth0收到的目的端口为80的tcp流量进行DNAT转换，数据包目的ip由主机ip转换为容器ip，将流量发往172.17.0.5:80，也就是我们上面创建的docker容器。
+Chain DOCKER规则就是对主机eth0收到的目的端口为80的tcp流量（不是来自docker0的包）进行DNAT转换，数据包目的ip由主机ip转换为容器ip，将流量发往172.17.0.5:80，也就是我们上面创建的docker容器。
 
 a “routing process” must be running in the global network namespace to receive traffic from the physical interface, and route it through the appropriate virtual interfaces to to the correct child network namespaces. 
 
@@ -105,11 +105,19 @@ a “routing process” must be running in the global network namespace to recei
 
 在docker的网络世界里，与其说docker“容器”是如何与外界（容器，物理机，网络上的其它主机）交流的，不如说linux的 内部的network namespace是如何与外界（其它network namespace，根network namespace）交流的。
 
+## 802.1Q VLAN 以太网
+
+在一台Linux主机上进行虚拟化模拟，以下称图3.
+
+![Alt text](/public/upload/docker/traditional_vlan_architecture.jpg)
+
+图3所示为一个现实世界中的 802.1Q VLAN 网络。六台电脑终端通过一级交换机接入网络，分属 VLAN 10、VLAN 20、VLAN 30。做为例子，图中左侧的交换机不支持 802.1Q VLAN，导致其连接的两台终端处于一个广播域中，尽管它们属于不同子网。作为对比，图中右侧的交换机支持 802.1Q VLAN，通过正确配置正确切割了子网的广播域，从而隔离了分属不同网段的终端。在连接外网之间，需要一个支持 802.1Q VLAN 的三层交换机，在进行数据外发时剥离 VLAN Tag，收到数据时根据IP信息转发到正确的VLAN子网。路由器根据IP信息进行NAT转换最终连接外网。
+
 ## 容器跨主机通信
 
-假设containerA（172.17.1.2）和containerB（172.17.2.2）分别在hostA（192.168.3.2）和hostB（192.168.3.3）上。根据上文，containerA可以和hostB发送通信，那么容器间实现通信的关键就是：**一个数据包（源ip=172.17.1.2，目的ip=172.17.2.2）经过hostA的网卡时，hosta能够将目的ip转换为hostb的ip（192.168.3.3）**
+假设containerA（172.17.1.2）和containerB（172.17.2.2）分别在hostA（192.168.3.2）和hostB（192.168.3.3）上。根据上文，containerA可以和hostB发送通信，那么容器间实现通信的关键就是：**一个数据包（源ip=172.17.1.2，目的ip=172.17.2.2），经过虚拟网桥或网关等网络设备，到hostA的网卡时，hosta能够将目的ip转换为hostb的ip（192.168.3.3）**
 
-这个映射关系可以简单的通过增加hosta的路由来实现，但依赖手工。ovs和Libnetwork可以解决这个问题，将在单独的文章中阐述。
+这个映射关系可以简单的通过增加hosta的iptable规则来实现，但依赖手工。ovs和Libnetwork可以解决这个问题，将在单独的文章中阐述。
     
 ## 参考文献
 

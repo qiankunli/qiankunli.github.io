@@ -75,6 +75,12 @@ keywords: 分布式配置系统 zookeeper etcd Consul
 
 etcd启动时，有三种模式`static`,`etcd Discovery`和`DNS Discovery`三种模式来确定哪些节点是“自己人”，参见`https://coreos.com/etcd/docs/latest/clustering.html`
 
+存储结构，键值对，键以文件夹的形式组织，例如
+
+    root@docker1:~# etcdctl ls /network/docker/nodes
+    /network/docker/nodes/192.168.56.101:2375
+    /network/docker/nodes/192.168.56.102:2375
+
 ### zookeeper
 
 针对每个主机
@@ -120,3 +126,9 @@ etcd启动时，有三种模式`static`,`etcd Discovery`和`DNS Discovery`三种
 1. 假设一个系统有多个后端，后端的状态在不断变化（后端可能会宕机，也可能有新的后端加入）。那么每个节点就需要感知到这种变化，并作出反应。
 2. 动态配置中心。假设系统的运行受一个参数的影响，那么可以在etcd等应用中更改这个参数，并将参数变化推送到各个节点，各节点据此更改内存中的状态信息，无需重启。
 3. 分布式锁。对于同一主机共享资源的访问，可以用锁来协调同一主机的多个进程（或线程）。对于跨主机共享资源的访问，etcd等工具提供相应的工具。
+
+## 引用
+
+[ZooKeeper 基础知识、部署和应用程序][]
+
+[ZooKeeper 基础知识、部署和应用程序]: http://www.ibm.com/developerworks/cn/data/library/bd-zookeeper/
