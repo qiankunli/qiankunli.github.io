@@ -107,7 +107,7 @@ a “routing process” must be running in the global network namespace to recei
 
 ## 802.1Q VLAN 以太网
 
-在一台Linux主机上进行虚拟化模拟，以下称图3.
+使用802.1QVLAN 技术，可以把逻辑上的子网和物理上的子网分割开来，即物理上连接在同一交换机上的终端可以属于不同逻辑子网（这个子网，跟同属于一个网段“子网”（比如`192.168.3.0/24`）不是一回事），处于不同逻辑子网的终端相互隔离，从而解决广播域混乱问题。以下称图3.
 
 ![Alt text](/public/upload/docker/traditional_vlan_architecture.jpg)
 
