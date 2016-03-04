@@ -45,10 +45,10 @@ Libnetwork是Docker团队将Docker的网络功能从Docker核心代码中分离�
 ### 直接使用
 
 1. 主机`192.168.56.101`,`192.168.56.102`
-2. docker启动参数`DOCKER_OPTS=--insecure-registry 192.168.3.56:5000 -H 0.0.0.0:2375 --cluster-store=etcd://192.168.56.101:4001/network --cluster-advertise=192.168.56.101:2375`
-3. docker创建overlay网络net1和net2，`192.168.56.101`运行容器net1c1,net2c1,`192.168.56.102`运行容器net1c2,net2c2。
+2. 修改每个主机的docker启动参数`DOCKER_OPTS=--insecure-registry 192.168.3.56:5000 -H 0.0.0.0:2375 --cluster-store=etcd://192.168.56.101:4001/network --cluster-advertise=192.168.56.101:2375`，重启docker。
+3. docker创建overlay网络net1和net2`docker network create -d overlay net1`，`192.168.56.101`运行容器net1c1,net2c1`docker run -itd --name net1c1 --net net1 ubuntu:14.04`,`192.168.56.102`运行容器net1c2,net2c2。
 
-### 通过docker compose使用
+### 通过docker compose使用(未完待续)
 
 
 

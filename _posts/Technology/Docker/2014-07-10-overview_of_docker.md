@@ -193,6 +193,4 @@ virtualbox使用docker自带的iso无法使docker虚拟机与windows主机共享
 
 ## 8 手工安装
 
-`https://apt.dockerproject.org/repo/pool/main/d/docker-engine/`
-
-在这里，可以找到docker各个版本针对ubuntu各个发行版的deb安装文件。
+`https://apt.dockerproject.org/repo/pool/main/d/docker-engine/`这里，可以找到docker各个版本针对ubuntu各个发行版的deb安装文件。也可以到`https://github.com/docker/docker/releases`直接下载docker的安装程序。
