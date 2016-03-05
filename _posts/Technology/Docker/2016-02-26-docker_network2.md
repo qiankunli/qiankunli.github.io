@@ -91,17 +91,17 @@ Libnetwork是Docker团队将Docker的网络功能从Docker核心代码中分离�
 
     docker-swarm启动建议做成systemd的形式，并配置docker DOCKER_HOST环境变量
 
-3. `192.168.56.101`上创建网络net2并启动容器
+3. `192.168.56.101`上创建网络net3并启动容器
 
-    `docker -H tcp://localhost:3375 network create -d overlay net2`
+    `docker -H tcp://localhost:3375 network create -d overlay net3`
 
-    `docker -H tcp://localhost:3375 run -it --net net2 ubuntu bash`
+    `docker -H tcp://localhost:3375 run -it --net net3 ubuntu bash`
 
-4. `192.168.56.101`上创建网络net3并启动容器，并且指定容器的ip，**这个效果在实际场景中很有用**
+4. `192.168.56.101`上创建网络net4并启动容器，并且指定容器的ip，**这个效果在实际场景中很有用**
 
-    `docker -H tcp://localhost:3375 network create -d overlay net3  --subnet 172.19.0.0/16`
+    `docker -H tcp://localhost:3375 network create -d overlay net4 --subnet 172.19.0.0/16`
 
-    `docker -H tcp://localhost:3375 run -it --net net3 --ip=172.19.0.6  ubuntu bash`
+    `docker -H tcp://localhost:3375 run -it --net net4 --ip=172.19.0.6  ubuntu bash`
 
 **使用`--ip`参数时，必须值定特定的子网**，参见`https://github.com/docker/docker/issues/20547`
 
