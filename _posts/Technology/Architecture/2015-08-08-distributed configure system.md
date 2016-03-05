@@ -45,7 +45,7 @@ keywords: 分布式配置系统 zookeeper etcd Consul
 
 以ubuntu15.04 为例，用Systemd管理etcd，针对每个主机
 
-1. 下载文件  ` https://github.com/coreos/etcd/releases`
+1. 下载文件  `https://github.com/coreos/etcd/releases`
 2. 拷贝可执行文件etcd,etcdctl到path目录
 3. 准备`/etc/systemd/system/etcd.service`文件
 

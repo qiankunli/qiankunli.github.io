@@ -58,6 +58,16 @@ aufs和vfs，一个是文件系统，一个是文件系统接口，从上图每�
 ## remote storage （未完待续）
 
 ## docker registry remote api
+
+
+## docker 镜像下载加速
+
+两种方案
+
+1. 使用private registry
+2. 使用registry mirror,以使用daocloud的registry mirror为例，假设你的daocloud的用户名问`lisi`，则`DOCKER_OPTS=--registry-mirror=http://lisi.m.daocloud.io`
+
+    
    
 ## 引用
 

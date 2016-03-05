@@ -8,9 +8,11 @@ keywords: Docker,libnetwork
 
 ---
 
-## 前言（未完待续）
+## 前言
 
 我们搭建一个网络环境，一般遵循一定的网络拓扑结构。由于Linux可以模拟相应的网络设备，并可以创建“虚拟机”（也就是容器），因此在Linux系统内，我们也可以遵循一定的网路拓扑结构，设计一个“内网”，实现容器之间的通信。
+
+本文主要讲述容器跨主机网络通信。
 
 ## 实现方式
 
@@ -44,13 +46,72 @@ Libnetwork是Docker团队将Docker的网络功能从Docker核心代码中分离�
 
 ### 直接使用
 
-1. 主机`192.168.56.101`,`192.168.56.102`
-2. 修改每个主机的docker启动参数`DOCKER_OPTS=--insecure-registry 192.168.3.56:5000 -H 0.0.0.0:2375 --cluster-store=etcd://192.168.56.101:4001/network --cluster-advertise=192.168.56.101:2375`，重启docker。
-3. docker创建overlay网络net1和net2`docker network create -d overlay net1`，`192.168.56.101`运行容器net1c1,net2c1`docker run -itd --name net1c1 --net net1 ubuntu:14.04`,`192.168.56.102`运行容器net1c2,net2c2。
+1. 假设存在主机`192.168.56.101`,`192.168.56.102`
+2. 修改每个主机的docker启动参数`DOCKER_OPTS=--insecure-registry 192.168.3.56:5000 -H 0.0.0.0:2375 --cluster-store=etcd://192.168.56.101:2379/ --cluster-advertise=192.168.56.101:2375`，重启docker。
+3. docker创建overlay网络net1和net2
+    
+    - `192.168.56.101`或`192.168.56.102`执行`docker network create -d overlay net1``docker network create -d overlay net2`
+    - `192.168.56.101`运行容器net1c1,net2c1`docker run -itd --name net1c1 --net net1 ubuntu:14.04`
+    - `192.168.56.102`运行容器net1c2,net2c2。
 
-### 通过docker compose使用(未完待续)
+### 通过docker compose使用
+
+1. 启动etcd集群，存储docker swarm节点信息
+
+    `192.168.56.101`上etcd配置
+
+        ETCD_OPTS=--data-dir=/var/lib/etcd/ \
+                  --name wily1 \
+                  --initial-advertise-peer-urls http://192.168.56.101:2380 \
+                  --listen-peer-urls http://192.168.56.101:2380 \
+                  --listen-client-urls http://192.168.56.101:2379,http://127.0.0.1:2379 \
+                  --advertise-client-urls http://192.168.56.101:2379 \
+                  --initial-cluster-token etcd-cluster-1 \
+                  --initial-cluster-state new \
+                  --initial-cluster wily1=http://192.168.56.101:2380,wily2=http://192.168.56.102:2380
+          
+    `192.168.56.102`上etcd配置
+
+        ETCD_OPTS=--data-dir=/var/lib/etcd/ \
+                  --name wily1 \
+                  --initial-advertise-peer-urls http://192.168.56.102:2380 \
+                  --listen-peer-urls http://192.168.56.102:2380 \
+                  --listen-client-urls http://192.168.56.102:2379,http://127.0.0.1:2379 \
+                  --advertise-client-urls http://192.168.56.102:2379 \
+                  --initial-cluster-token etcd-cluster-1 \
+                  --initial-cluster-state new \
+                  --initial-cluster wily1=http://192.168.56.101:2380,wily2=http://192.168.56.102:2380
 
 
+2. 启动 docker swarm
+
+    - `192.168.56.101`执行`docker run --name swarm-agent -d swarm join --addr=192.168.56.101:2375 etcd://192.168.56.101:2379/swarm`
+    - `192.168.56.102`执行`docker run --name swarm-agent -d swarm join --addr=192.168.56.102:2375 etcd://192.168.56.102:2379/swarm`
+    - `192.168.56.101`上启动swarm-manager`docker run --name swarm-manager -d -p 3375:2375 swarm manage etcd://192.168.56.101:2379/swarm`
+
+    docker-swarm启动建议做成systemd的形式，并配置docker DOCKER_HOST环境变量
+
+3. `192.168.56.101`上创建网络net2并启动容器
+
+    `docker -H tcp://localhost:3375 network create -d overlay net2`
+
+    `docker -H tcp://localhost:3375 run -it --net net2 ubuntu bash`
+
+4. `192.168.56.101`上创建网络net3并启动容器，并且指定容器的ip，**这个效果在实际场景中很有用**
+
+    `docker -H tcp://localhost:3375 network create -d overlay net3  --subnet 172.19.0.0/16`
+
+    `docker -H tcp://localhost:3375 run -it --net net3 --ip=172.19.0.6  ubuntu bash`
+
+**使用`--ip`参数时，必须值定特定的子网**，参见`https://github.com/docker/docker/issues/20547`
+
+## 一些坑
+
+如果你使用virtual box虚拟了两个主机`192.168.56.101`和`192.168.56.102`，并且`192.168.56.102`是由`192.168.56.101`克隆而来，则你需要清除`xx/docker/key.json`（不同系统位置不同），并重启docker。否则两个主机启动的容器可能具有同一个id，进而导致使用docker swarm时出现问题。参见`https://github.com/docker/swarm/issues/380`
+
+## 小结
+
+docker 真是做的越来越全面了，如果仅仅是用用，一切都是参数配置，搞得人家很没有成就感嘛。
 
     
 ## 参考文献
