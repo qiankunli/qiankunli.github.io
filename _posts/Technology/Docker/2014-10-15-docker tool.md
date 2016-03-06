@@ -10,7 +10,7 @@ keywords: Docker Container Image
 
 下面讲述的是我在使用docker的过程中一些小技巧，不太系统。
 
-## 使用fig（现在叫docker compose） ##
+## 使用fig（2014.10.15所写，现在基本停止使用） ##
 如果为模拟一个系统，需要启动多个Container，那就得写一个脚本，执行多个`docker run`命令了，然而，这样做或许不太清晰。于是就有了fig工具，我们可以使用`fig.yml`来表示需要执行的image，示例如下:
 
 	postgresql:  
@@ -39,6 +39,18 @@ keywords: Docker Container Image
 注意，fig是由python编写完成，所以`fig.yml`文件内容应符合python语法要求，尤其是缩进。
 
 **小结：**fig实际上是一个**容器托管**工具，就是容器的运行、状态展示、日志查看等，它都替你包装了一层。fig目前还是在单机层面，那么在集群层面，如果再解决跨主机的容器通信问题，那么就可以形成一个mini-Paas。
+
+## docker-compose
+
+The Compose file is a YAML file defining services, networks and volumes. The default path for a Compose file is `./docker-compose.yml`.
+
+A service definition contains configuration which will be applied to each container started for that service, much like passing command-line parameters to `docker run`. Likewise, network and volume definitions are analogous to `docker network create` and `docker volume create`.
+
+假设要运行一个apache2容器，
+
+1. 创建apache2文件夹
+2. 编写docker-compose.yml文件，***一定要符合yml文件的规范*
+3. 运行`docker-compose up`
 
 ## expect
 

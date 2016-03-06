@@ -54,7 +54,7 @@ Libnetwork是Docker团队将Docker的网络功能从Docker核心代码中分离�
     - `192.168.56.101`运行容器net1c1,net2c1`docker run -itd --name net1c1 --net net1 ubuntu:14.04`
     - `192.168.56.102`运行容器net1c2,net2c2。
 
-### 通过docker compose使用
+### 通过docker swarm使用
 
 1. 启动etcd集群，存储docker swarm节点信息
 
@@ -89,8 +89,6 @@ Libnetwork是Docker团队将Docker的网络功能从Docker核心代码中分离�
     - `192.168.56.102`执行`docker run --name swarm-agent -d swarm join --addr=192.168.56.102:2375 etcd://192.168.56.102:2379/swarm`
     - `192.168.56.101`上启动swarm-manager`docker run --name swarm-manager -d -p 3375:2375 swarm manage etcd://192.168.56.101:2379/swarm`
 
-    docker-swarm启动建议做成systemd的形式，并配置docker DOCKER_HOST环境变量
-
 3. `192.168.56.101`上创建网络net3并启动容器
 
     `docker -H tcp://localhost:3375 network create -d overlay net3`
@@ -103,7 +101,71 @@ Libnetwork是Docker团队将Docker的网络功能从Docker核心代码中分离�
 
     `docker -H tcp://localhost:3375 run -it --net net4 --ip=172.19.0.6  ubuntu bash`
 
-**使用`--ip`参数时，必须值定特定的子网**，参见`https://github.com/docker/docker/issues/20547`
+    **使用`--ip`参数时，必须值定特定的子网**，参见`https://github.com/docker/docker/issues/20547`
+
+5. 用`docker-compose`试试。docker-compose文件
+
+        version: '2'
+        services:
+          web:
+            image: reinblau/php-apache2
+            networks: 
+              - net5
+        
+        networks: 
+          net5:
+            driver: overlay
+
+
+## 使用systemd配置docker swarm
+
+1. `192.168.56.101`和`192.168.56.102`配置swarm-agent.service
+
+        [Unit]
+        Description=Docker Swarm Agent Container
+        Documentation=https://docs.docker.com
+        Requires=etcd.service
+        Requires=docker.service
+        After=etcd.service
+        After=docker.service
+        
+        [Service]
+        Type=simple
+        EnvironmentFile=/etc/default/swarm-agent
+        ExecStartPre=-/usr/bin/docker stop ${CONTAINER_NAME}
+        ExecStartPre=-/bin/echo "/usr/bin/docker stop ${CONTAINER_NAME}"
+        ExecStartPre=-/usr/bin/docker rm ${CONTAINER_NAME}
+        ExecStartPre=/usr/bin/docker pull swarm
+        ExecStart=/usr/bin/docker run --rm --name ${CONTAINER_NAME} swarm join --addr=${DOCKER_ADDRESS} ${ETCD_SWARM_URL}
+        ExecStartPre=-/bin/echo "/usr/bin/docker run --rm --name ${CONTAINER_NAME} swarm join --addr=${DOCKER_ADDRESS} ${ETCD_SWARM_URL}"
+        
+        [Install]
+        WantedBy=multi-user.target
+        
+2. `192.168.56.101`配置swarm-manager.service
+
+        [Unit]
+        Description=Docker Swarm Manager Container
+        Documentation=https://docs.docker.com
+        Requires=etcd.service
+        Requires=docker.service
+        After=etcd.service
+        After=docker.service
+        
+        [Service]
+        Type=simple
+        EnvironmentFile=/etc/default/swarm-manager
+        ExecStartPre=-/usr/bin/docker stop ${CONTAINER_NAME}
+        ExecStartPre=-/bin/echo "/usr/bin/docker stop ${CONTAINER_NAME}"
+        ExecStartPre=-/usr/bin/docker rm ${CONTAINER_NAME}
+        ExecStartPre=/usr/bin/docker pull swarm
+        ExecStart=/usr/bin/docker run --name ${CONTAINER_NAME} -p ${SWARM_PORT}:2375 swarm manage ${ETCD_SWARM_URL}
+        ExecStartPre=-/bin/echo "/usr/bin/docker run --rm --name ${CONTAINER_NAME} -p ${SWARM_PORT}:2375 swarm manage ${ETCD_SWARM_URL}"
+        
+        [Install]
+        WantedBy=multi-user.target
+
+
 
 ## 一些坑
 
