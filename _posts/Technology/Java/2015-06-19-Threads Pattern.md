@@ -8,7 +8,7 @@ keywords: 多线程 JAVA
 
 ---
 
-## 前言（未完待续）
+## 前言
 
 java性能的提高，io和多线程是其中两个重要部分，io方面java实现了nio和aio，后者则有一系列的设计模式和lambda表达式的支持，相信java在以后的很长一段时间，还会继续发光发热的。
 
@@ -44,9 +44,95 @@ AQS，线程申请锁时，如果拿不到，不是被挂起等待，而是按�
 
 传统的方式，有一整套的工具类，进而在编写线程安全的程序时，有一套代码模式。AQS也是如此。
 
-## 其它
+## 线程之间如何发生关系
 
-FutureTask的实现原理
+线程之间影响彼此的办法，根本上就是共享数据，具体的说是，相关线程操作数据来影响彼此（前提是相关线程，都有操作共享数据数据的手段）。同步和锁，本质上也是如此。
+
+此处以两个线程为例
+
+### 显式的共享数据
+
+1. 异构方式（以不同的逻辑处理共享数据）
+
+        main(){
+            Data data;
+            New ThreadA(data).start();
+            New ThreadB(data).start();  
+        }
+    
+2. 同构方式（以相同的逻辑处理共享数据）
+
+        class MyTask implement Runnable{
+        	Data data;
+        	run(){}
+        }
+        main(){
+            MyTask task = new MyTask();
+            New Thread(task).start();
+            New Thread(task).start();
+        }
+        
+### 隐式的共享数据
+
+数据虽然保有在threadB中，但threadA有操作它的手段。
+
+1. 直接操作
+
+        class ThreadA{
+        	TheadB threadB;
+            run(){
+            	theadB.opt();
+            }
+        }
+    
+2. 间接操作
+
+        DataObj dataObj{
+            Data data;
+            ThreadB threadB;
+            func(){
+                threadB.opt();
+            }
+        }
+        class ThreadA{
+            DataObj dataObj
+            run(){
+                dataObj.func();
+            }
+        }
+        main(){
+            new ThreadA().start();
+        }
+
+
+        
+共享对象的形式有以下几种：
+
+1. 两个线程都会访问共享对象的所有成员，用来同步状态（比如锁），分担任务（比如共享一个队列，两个线程不停的从队列中取任务）等。
+2. 两个线程访问共享对象的成员没有“严格的”交叉
+
+    这里谈一个很有意思的Future类，整个Future、Callable、Executor这一套体系的本质是有一个Sync对象，该对象简单说：
+
+        class Sync{
+            Callable callable;
+            V result;
+            Exception execption;
+        }
+
+    调用线程来这里拿结果result，被调用线程来这里拿任务callable，并把执行结果放到result中。
+
+3. 两个线程访问共享对象的成员有交叉
+
+
+这里着重谈一下第二点。生产者和消费者模式的本质是中间一个队列，从而**将线程之间的共享数据转化了收发消息**。Future、Callable、Executor这一套体系更进一步，解决了消费者处理完消息（也就是task）之后的返回值问题。封装了“数据从调度线程发到工作线程，返回结果从工作线程发到调度线程”的过程，为java的并发编程提供了新的“设计模式”。
+
+## 目标对象和线程的关系
+
+以对象之间关系的角度（继承，依赖，组合等），来理解对象和线程。
+
+1. 目标对象不保有使用它的线程的引用。类似于上节“显式的共享数据”
+2.	目标对象保有使用它数据的线程的引用。这类似于上节"隐式的共享数据"，因为object的func方法中操作了threada，这个fun方法必然被某个threadb执行。
+
 
 ## 引用
 
