@@ -66,6 +66,68 @@ keywords: proxyFactoryBean
 2. 加入Zookeeper，服务端定期向zookeeper注册自己的状态。一旦状态发生变更，即由zookeeper通知客户端做出反应。
 3. 为请求做负载均衡，请求被转向不同的后端处理。
 
+## 获取不同类型的对象
+
+    interface IHandler{
+        void handle(args);
+    }
+    class Service{
+        IHandler handler;
+        func(){
+            Type type = xx;
+            // 根据type获取不同的handler并处理
+        }
+    }
+    
+IHandler有多个实现类，func方法中要根据type去选择一个IHandler实现类，然后执行handle方法。
+
+1. 最笨的方法
+    
+        class Service{
+            IHandler handlerA;
+            IHandler handlerB;
+            func(){
+                Type type = xx;
+                if(type == xx){
+                    handlerA.handle();
+                }
+            }
+        }
+    
+2. 创建一个HandlerConfig和HandlerFactory
+
+        class HandlerConfig{
+            IHandler handler;
+            Type type;
+        }
+        class HandlerFactory{
+            List<HandlerConfig> configs;
+            IHandler getHandler(Type type);
+        }
+        class Service{
+            HandlerFactory factory;
+            func(){
+                Type type = xx;
+                Ihandler handler = factory.getHandler(type);
+                handlerA.handle();
+            }
+        }
+        
+3. 弄一个默认的handler实现类，替代Handler工厂的作用
+
+    class DefaultHandler implements IHandler,BeanFactoryAware{
+        private BeanFactory beanFactory;
+        handle(args){
+            // 从args中提取出type
+            // 根据type确定handler实现类在ioc中的唯一标识
+            // 通过beanFactory拿到实现类
+            // 还行实现类的handle方法
+        }
+    }
+    
+
+
+
 ## 小结
 
 Spring的两个基本特性，ioc管理pojo对象以及它们之间的耦合关系。以前java对象随意存储在堆中，有了spring之后，还是如此，但有一个容器（说白了是个map）来保有对象的引用。另一方面，通过aop以动态和非侵入的方式来增强服务的功能，原先，增强一个方法的功能要改变原有的代码，现在新增的功能可以单独编写，然后织入（甚至是替换）。这完全改变了我们编写代码的方式，最终的目的就是：简化业务模型，以pojo类为基础实现项目。
