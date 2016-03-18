@@ -87,5 +87,11 @@ internal network让各台虚拟机处于隔离的局域网内，只让它们相�
 
 http://superuser.com/questions/237057/how-do-i-make-ubuntu-server-get-ipv4-address
 
+## ubuntu 下使用Host-only网络
+
+ubuntu下使用virtualbox，默认是无法直接使用Host-only网络的，需要
+
+![Alt text](/public/upload/tool/add_host_only_driver.png) 
+
 
 
