@@ -9,6 +9,15 @@ keywords: Docker image registry
 ---
 ## 简介
 
+## build 过程
+
+    cid=$(docker run -v /foo/bar debian:jessie) 
+    image_id=$(docker commit $cid) 
+    cid=$(docker run $image_id touch /foo/bar/baz) 
+    docker commit $(cid) my_debian
+
+image的build过程，粗略的说，就是以容器执行命令（`docker run`）和提交更改（`docker commit`）的过程
+
 ## COPY VS ADD
 
 将文件添加到镜像中有以下两种方式：
@@ -33,7 +42,7 @@ keywords: Docker image registry
 - tomcat:7
 - tomcat:6
 
-当你`docker push tomcat`，docker会将`tomcat:7`和`tomcat:6`都push到registry上。
+当你`docker push tomcat`，不明确指定tag时，docker会将`tomcat:7`和`tomcat:6`都push到registry上。
 
 所以，当你打算让docker image name携带版本信息时，版本信息加在name还是tag上，要慎重。
 
