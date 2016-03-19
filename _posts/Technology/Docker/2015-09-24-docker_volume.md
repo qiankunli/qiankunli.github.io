@@ -41,7 +41,18 @@ keywords: Docker volume
 
 ## 为什么要有volumn 
 
-为了能够保存（持久化）数据以及共享容器间的数据，Docker提出了Volume的概念。简单来说，Volume就是目录或者文件，它可以**绕过默认的联合文件系统**，而以正常的文件或者目录的形式存在于宿主机上。换句话说，宿主机和容器建立`/a:/b`的映射，那么对容器`/b`的写入即对宿主机`/a`的写入（反之也可）。
+简单来说，Volume就是目录或者文件，它可以**绕过默认的联合文件系统**，而以正常的文件或者目录的形式存在于宿主机上。换句话说，宿主机和容器建立`/a:/b`的映射，那么对容器`/b`的写入即对宿主机`/a`的写入（反之也可）。
+
+volumn的作用：
+
+- 将容器以及容器产生的数据分离开来
+
+    人们很容易想到volumn是为了持久化数据，其实容器只要你不删除，它就在那里，停掉的容器也可以重新启动运行，所以容器是持久的。
+    
+    估计也正是因为如此，`docker cp`、`docker commit`和`docker export`还不支持Volume（只是对容器本身的数据做了相应处理）。
+    
+
+- 容器间共享数据
 
 ## docker volume
 
@@ -50,12 +61,26 @@ keywords: Docker volume
     $ docker run -v /var/volume1 -v /var/volume2 -name Volume_Container ubuntu14.04 linux_command
     // 创建App_Container容器，挂载Volume_Container容器中的数据卷
     $ docker run -t -i -rm -volumes-from Volume_Container -name App_Container ubuntu14.04  linux_command
-    // 这样两个容器就可以共用这个数据卷了
-    
+    // 这样两个容器就可以共用这个数据卷了    
     // 最后可以专门安排一个容器，在应用结束时，将数据卷中的内容备份到主机上
     docker run -rm --volumes-from DATA -v $(pwd):/backup busybox tar cvf /backup/backup.tar /data
     
 在默认方式下，volume就是在`/var/lib/docker/volumes`目录下创建一个文件夹，并将该文件夹挂载到容器的某个目录下（以UFS文件系统的方式挂载）。当然，我们也可以指定将主机的某个特定目录（该目录要显式指定）挂载到容器的目录中。
 
+到目前为止，容器的创建/销毁期间来管理Volume（创建/销毁）是唯一的方式。
+
+- 该容器是用`docker rm －v`命令来删除的（-v是必不可少的）。
+- `docker run`中使用了`--rm`参数
+
+即使用以上两种命令，也只能删除没有容器连接的Volume。连接到用户指定主机目录的Volume永远不会被docker删除。
+
 ## 基于分布式文件系统的volume
 
+## 引用
+
+[深入理解Docker Volume（一）][]
+
+[深入理解Docker Volume（二）][]
+
+[深入理解Docker Volume（二）]: http://dockone.io/article/129
+[深入理解Docker Volume（一）]: http://dockone.io/article/128
