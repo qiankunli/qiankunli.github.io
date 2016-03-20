@@ -8,7 +8,7 @@ keywords: Docker volume
 
 ---
 
-## 简介（未完待续）
+## 简介
 
 
 ## 从AUFS说起
@@ -76,11 +76,33 @@ volumn的作用：
 
 ## 基于分布式文件系统的volume
 
+与docker容器在网络方面碰到的问题一样，在存储方面docker容器存在着
+
+1. 同一主机两个容器如何共享volume。与网络一样，docker本身就支持
+2. 同一个容器跨主机，如何使用先前的volume。新版docker使用overlay网络，可以确保跨主机后，容器的ip不变。
+
+	- volume文件夹同步。比如rsync
+	- volume直接使用分布式文件系统，比如glusterfs和ceph。这也可以解决第三个问题
+    
+3. 跨主机两个容器如何共享volume
+
+
+在volume使用分布式文件系统，有以下两种方式
+
+1. 如果文件系统支持NFS，则可以将dfs挂载到本地操作系统目录上，docker使用传统方式创建volume
+2. 直接使用docker volume plugin,docker通过volumn plugin与dfs交互
+
+	比如`sudo docker run --volume-driver glusterfs --volume datastore:/data alpine touch /data/hello`,具体参见[Docker volume plugin for GlusterFS](https://github.com/calavera/docker-volume-glusterfs)
+    
+据我估计，假如以前volume直接是通过aufs挂载的方式实现的话，那么现在docker则是通过volume plugin来访问volume数据，只不过通过aufs挂载是volume plugin的一个最简单实现而已。
+
 ## 引用
 
 [深入理解Docker Volume（一）][]
 
 [深入理解Docker Volume（二）][]
+
+[Persistence With Docker Containers - Team 1: GlusterFS](http://blog.xebia.com/persistence-with-docker-containers-team-1-glusterfs-2/)
 
 [深入理解Docker Volume（二）]: http://dockone.io/article/129
 [深入理解Docker Volume（一）]: http://dockone.io/article/128
