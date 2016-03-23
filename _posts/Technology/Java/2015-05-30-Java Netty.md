@@ -14,7 +14,7 @@ netty和mina其实是一个人写的，所以风格非常类似。而在了解�
 
 ## 二 netty架构
 
-从使用上将，netty最后该来的“效果”很像http编程（据说tomcat的实现也跟netty有关，至少跟java nio有关）。
+从使用上将，netty最后带来的“效果”很像http编程（据说tomcat的实现也跟netty有关，至少跟java nio有关）。
 
 ![Alt text](/public/upload/java/netty.png) 
 
@@ -69,11 +69,11 @@ netty和mina其实是一个人写的，所以风格非常类似。而在了解�
 1. 屏蔽了底层tcp的通信细节。（因为操作中看不到一点socket的痕迹，很容易让人认为web服务器是一个“独立的”高大上的技术）
 2. 规范了数据处理。（数据接收，数据转换，数据处理，数据输出）
 3. 简化复杂性。封装了连接处理、协议编解码、超时等机制等
-3. 提供了事件通知等机制，可以让代码及时通信转台变化做出反应。
+3. 提供了事件通知等机制，将通信步骤分解为一个个生命周期函数
 
 总之，我们有很多办法实现两个系统间的相互访问，比如http client访问http server。但http并没有覆盖所有场景，比如无法处理大文件、近实时消息（比如聊天或财务数据）。socket肯定可以实现上述功能，但它太麻烦了。而netty作为一个“网络通讯框架”，就是用来解决这个问题。
 
-netty中的IO Handler组件，便整合了上述三个组件。
+netty中的IO Handler组件，便整合了上述三个组件（Servlet，Filter和Listener）。
 
     public class MyHandler extends ChannelHandlerAdapter{
         // 连接建立时，类似于listener
@@ -99,14 +99,15 @@ netty中的IO Handler组件，便整合了上述三个组件。
     		super.channelReadComplete(ctx);
     	}
     }
-    
+
+
 handler可以形成一个pipeline，依次对数据进行处理。比如在pipeline中可以添加一个encoder（也继承自ChannelHandlerAdapter），在对数据进行处理前，先进行编码。
 
 说了这些，其实想结合http server和netty（两者其实本质上是一样的东西）说明一下，网络通信框架在做什么，一般提供什么样的封装等等。
 
 ## 其它
 
-netty既然可以实现tcp数据的接收和发送，自然也可以实现其它在tcp基础上的各种协议，比如http、websocket和rpc（hadoop中的rpc组件，便是基于netty实现的）等。
+netty既然可以实现tcp数据的接收，处理和发送（j2ee实现对http数据的接收，处理和发送），自然也可以实现其它在tcp基础上的各种协议，比如http、websocket和rpc（hadoop中的rpc组件，便是基于netty实现的）等。
 
 ![Alt text](/public/upload/java/netty_http.png) 
 
