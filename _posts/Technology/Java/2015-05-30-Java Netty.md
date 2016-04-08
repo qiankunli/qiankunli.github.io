@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: java netty
+title: Netty（一）初步了解
 category: 技术
 tags: Java
 keywords: JAVA netty
@@ -121,13 +121,10 @@ netty既然可以实现tcp数据的接收，处理和发送（j2ee实现对http�
     - 解析符合http协议格式的请求数据（EncodingHanlder）
     - 处理请求，将处理结果编码为符合http协议规范的格式，返回响应（RequestHandler）
 
-2. netty使用的io通信模型（比如IO复用）相对于tomcat等更好
-
-我们见到的一些软件（比如docker，当然docker是基于go语言实现的），接受restful api，并且数据部分采用json格式。如果用java实现，便可以在上述netty+http的基础上，增加对请求数据与json的转换过程。
-
+2. netty使用的io通信模型（比如IO复用）相对于tomcat等效率更高。
 
 http只是一种半双工协议，在实际的分布式应用中，我们也可以实现一个全双工的协议，包括以下部分：
-
+    
 1. 数据通讯格式
 2. 提高可靠性，比如每隔一定时间发送心跳包
 3. 增加安全机制，在处理客户端发来的请求时，先对客户端信息进行验证。
