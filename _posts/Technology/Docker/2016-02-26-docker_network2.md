@@ -171,6 +171,27 @@ Libnetwork是Docker团队将Docker的网络功能从Docker核心代码中分离�
 
 如果你使用virtual box虚拟了两个主机`192.168.56.101`和`192.168.56.102`，并且`192.168.56.102`是由`192.168.56.101`克隆而来，则你需要清除`xx/docker/key.json`（不同系统位置不同），并重启docker。否则两个主机启动的容器可能具有同一个id，进而导致使用docker swarm时出现问题。参见`https://github.com/docker/swarm/issues/380`
 
+## 使用pipework设置容器的ip
+
+在overlay（较高的docker版本）网络下，可以通过参数设置容器的ip。较低的docker版本，可以通过pipework设置容器ip。
+
+1. 安装pipework
+
+        $ git clone https://github.com/jpetazzo/pipework.git
+        $ sudo cp -rp pipework/pipework /usr/local/bin/
+    
+2. 升级iproute（对于centos）
+
+        $ yum install -y http://rdo.fedorapeople.org/rdo-release.rpm
+        $ vim /etc/yum.repo.d/rdo-release.repo
+        # 将baseurl更新为https://repos.fedorapeople.org/repos/openstack/EOL/openstack-icehouse/epel-6/
+        # 更改gpgcheck为0
+        $ yum update iproute
+        
+3. 设置容器的ip
+
+        pipework bridge_name containerid ip/24
+
 ## 小结
 
 docker 真是做的越来越全面了，如果仅仅是用用，一切都是参数配置，搞得人家很没有成就感嘛。

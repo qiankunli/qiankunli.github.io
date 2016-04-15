@@ -216,3 +216,7 @@ hadoop 2.x maven配置
     
 
 hadoop 运行时，使用`xxx-jar-with-dependencies.jar`
+
+## 源码分析
+
+源码分析时可以下载`https://github.com/shot/hadoop-source-reading.git`
