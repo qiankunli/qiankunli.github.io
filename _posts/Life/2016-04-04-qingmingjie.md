@@ -30,3 +30,4 @@ keywords: 生活 程序员 户外
 
 ![Alt text](/public/upload/life/wuyuan_6.jpg)
 
+![Alt text](/public/upload/life/wuyuan_7.JPG)
