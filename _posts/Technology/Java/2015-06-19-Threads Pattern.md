@@ -47,7 +47,7 @@ java性能的提高，io和多线程是其中两个重要部分，io方面java�
 
 ### 显式的共享数据
 
-1. 异构方式（以不同的逻辑处理共享数据）
+1. 数据作为双方的参数
 
         main(){
             Data data;
@@ -55,23 +55,31 @@ java性能的提高，io和多线程是其中两个重要部分，io方面java�
             New ThreadB(data).start();  
         }
     
-2. 同构方式（以相同的逻辑处理共享数据）
+2. 数据作为参数或返回值的方式共享
 
-        class MyTask implement Runnable{
-        	Data data;
-        	run(){}
-        }
-        main(){
-            MyTask task = new MyTask();
-            New Thread(task).start();
-            New Thread(task).start();
+        threadA{
+			Data data;
+            New ThreadB(data).start();  
+            opt(data)
         }
         
+        threadA{
+            threadb = New ThreadB(data)；
+			Data data = new Task().submit(threadb);
+            opt(data)
+        }
+        
+        Task{
+        	Data data
+        	Data submit(thread){
+            	thread.setdata(data).start();
+            	retutn data;
+            }
+        }
+
 ### 隐式的共享数据
 
-数据虽然保有在threadB中，但threadA有操作它的手段。
-
-1. 直接操作
+1. 线程直接互操作
 
         class ThreadA{
         	TheadB threadB;
@@ -79,55 +87,102 @@ java性能的提高，io和多线程是其中两个重要部分，io方面java�
             	theadB.opt();
             }
         }
-    
-2. 间接操作
 
-        DataObj dataObj{
-            Data data;
-            ThreadB threadB;
-            func(){
-                threadB.opt();
+
+
+## 回调
+
+我们先来用模板模式实现一个功能，下面的B类可以看成是现实中的HibernateTemplate类
+
+    public abstract class B{  
+        public void execute(){   
+            getConnection();    
+            doCRUD();    
+            releaseConnection();    
+    	}    
+        public abstract void doCRUD();  
+        public void getConnection(){    
+            System.out.println("获得连接...");    
+        }    
+        public void releaseConnection(){    
+            System.out.println("释放连接...");    
+        }    
+    }  
+    public class A extends B{  
+        public void doCRUD(){    
+        	add()
+        }    
+        public void add(){    
+        	...
+        }    
+    }  
+    public class C extends B{  
+        public void doCRUD(){    
+        	delete()
+        }    
+        public void delete(){    
+        	...
+        }    
+    }  
+
+用回调的办法实现下
+
+    interface CallBack{   
+        public void doCRUD();     
+    }    
+    class A{
+        private B b;
+        public void add(){    
+           b.execute(new CustomCallBack(){
+                public void doCRUD(){    
+                    System.out.println("执行add操作...");    
+                }
+           });
+        }    
+    }
+    public class B{  
+        public void execute(CallBack action){ 
+            getConnection();    
+            action.doCRUD(); 
+            releaseConnection();    
+        }    
+        public void getConnection(){    
+            System.out.println("获得连接...");    
+        }    
+        public void releaseConnection(){    
+            System.out.println("释放连接...");    
+        }    
+    } 
+
+可以看到，使用回调后，AB从模板模式中的父子关系，变成了依赖关系。
+
+在多线程领域，回调是异步调用的基础
+
+
+生产者和消费者模式的本质是中间一个队列，从而**将线程之间的共享数据转化了收发消息**。Future、Callable、Executor这一套体系更进一步，解决了消费者处理完消息（也就是task）之后的返回值问题。封装了“数据从调度线程发到工作线程，返回结果从工作线程发到调度线程”的过程，为java的并发编程提供了新的“设计模式”。
+
+线程之间的回调（异步调用），则是调用线程向被调用线程发送一个callback接口，该接口标注了一个待执行方法。
+
+	logthread(){
+    	sumtread;
+    	func(){
+        	sumtread.sum(a,b,callback);
+        }
+    }
+    sumtread{
+    	callbacks
+        sum(int a,int b,callback){
+        	opt(a,b)
+        	callbacks.add(callback)
+        }
+   		run(){
+        	for(;;){
+				callback = callbacks.get(xx);
+            	callback.run();
             }
-        }
-        class ThreadA{
-            DataObj dataObj
-            run(){
-                dataObj.func();
-            }
-        }
-        main(){
-            new ThreadA().start();
-        }
-
-
         
-共享对象的形式有以下几种：
-
-1. 两个线程都会访问共享对象的所有成员，用来同步状态（比如锁），分担任务（比如共享一个队列，两个线程不停的从队列中取任务）等。
-2. 两个线程访问共享对象的成员没有“严格的”交叉
-
-    这里谈一个很有意思的Future类，整个Future、Callable、Executor这一套体系的本质是有一个Sync对象，该对象简单说：
-
-        class Sync{
-            Callable callable;
-            V result;
-            Exception execption;
         }
-
-    调用线程来这里拿结果result，被调用线程来这里拿任务callable，并把执行结果放到result中。
-
-3. 两个线程访问共享对象的成员有交叉
-
-
-这里着重谈一下第二点。生产者和消费者模式的本质是中间一个队列，从而**将线程之间的共享数据转化了收发消息**。Future、Callable、Executor这一套体系更进一步，解决了消费者处理完消息（也就是task）之后的返回值问题。封装了“数据从调度线程发到工作线程，返回结果从工作线程发到调度线程”的过程，为java的并发编程提供了新的“设计模式”。
-
-## 目标对象和线程的关系
-
-以对象之间关系的角度（继承，依赖，组合等），来理解对象和线程。
-
-1. 目标对象不保有使用它的线程的引用。类似于上节“显式的共享数据”
-2.	目标对象保有使用它数据的线程的引用。这类似于上节"隐式的共享数据"，因为object的func方法中操作了threada，这个fun方法必然被某个threadb执行。
-
+    }
 
 ## 引用
 

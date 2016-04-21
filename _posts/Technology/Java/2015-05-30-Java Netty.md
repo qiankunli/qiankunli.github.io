@@ -105,6 +105,14 @@ handler可以形成一个pipeline，依次对数据进行处理。比如在pipel
 
 说了这些，其实想结合http server和netty（两者其实本质上是一样的东西）说明一下，网络通信框架在做什么，一般提供什么样的封装等等。
 
+## 由事件驱动想到的
+
+netty是基于事件驱动的，比如对于server端，有acceptable，reable，writable事件。
+
+最开始学网络开发的时候，总是在想，为什么客户端用一个Socket就好了，而服务端要包括ServerSocket和Socket
+
+1. 我们知道，两个主机的通信需要唯一确定`sourcehost，sourcepost，destinationhost，destinationport`。对于客户端
+
 ## 其它
 
 netty既然可以实现tcp数据的接收，处理和发送（j2ee实现对http数据的接收，处理和发送），自然也可以实现其它在tcp基础上的各种协议，比如http、websocket和rpc（hadoop中的rpc组件，便是基于netty实现的）等。
@@ -128,6 +136,8 @@ http只是一种半双工协议，在实际的分布式应用中，我们也可�
 1. 数据通讯格式
 2. 提高可靠性，比如每隔一定时间发送心跳包
 3. 增加安全机制，在处理客户端发来的请求时，先对客户端信息进行验证。
+
+读者可以到`https://github.com/netty/netty.git`下载netty源码进行学习，这里有非常丰富的example
 
 ## 四 引用
 
