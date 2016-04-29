@@ -191,6 +191,8 @@ virtualbox使用docker自带的iso无法使docker虚拟机与windows主机共享
 3. 抽象了应用部署和集群管理的细节（docker swarm）
 4. 像OpenStack那样，自由管理硬件资源，并形成监控、可视化等一系列工具。
 
-## 8 手工安装
+## 8 其它
 
 `https://apt.dockerproject.org/repo/pool/main/d/docker-engine/`这里，可以找到docker各个版本针对ubuntu各个发行版的deb安装文件。也可以到`https://github.com/docker/docker/releases`直接下载docker的安装程序。
+
+docker daemon 默认以root用户运行，如果非root用户想使用docker，则需要将非root用户添加到docker group（通常会在安装docker时创建），重启OS后生效。
