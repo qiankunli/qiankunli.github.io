@@ -3,7 +3,7 @@
 layout: post
 title: Scala初识
 category: 技术
-tags: Java
+tags: Scala
 keywords: Scala 
 
 ---
