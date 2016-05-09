@@ -14,8 +14,8 @@ java跨节点通信方式：
 
 1. 通过Java的Socket+Java序列化的方式进行跨界点调用（这种方式，其实只是约定了数据传输，并没有约定调用细节）
 2. 通过RMI进行远程服务调用
-3. 利用一些开源的RPC框架进行远程服务调用，比如thrift
-4. 利用标准的公有协议进行跨节点服务调用，比如http，RESTful + JSON等 
+3. 利用一些开源的RPC框架进行远程服务调用，比如Thrift
+4. 利用标准的公有协议进行跨节点服务调用，比如Http，RESTful + JSON等 
 
 
 ## 共同点
@@ -35,7 +35,7 @@ java跨节点通信方式：
 
 1. 通讯协议（tcp、http等）
 2. 通讯模型（NIO、AIO等）
-3. 数据与流如何转换
+3. 数据与流如何转换(即数据的编解码)
 
 无论哪种远程调用技术，基本的道理都是一样的：服务端监听请求，处理请求，返回结果；客户端调用代理类，访问调用服务。
 
@@ -43,28 +43,17 @@ java跨节点通信方式：
 
 在远程通讯领域中，涉及的知识点还是相当的多的，例如：
 
-- 通信协议(Socket/tcp/http/udp /rmi/xml-rpc etc.)
-- 消息机制
-- 网络IO（BIO/NIO/AIO）、MultiThread
-- 本地调用与远程调用的透明化方案（涉及java classloader、Dynamic Proxy、Unit Test etc.）
+- 通信协议(socket/tcp/http/udp /rmi/xml-rpc etc.)
+- 网络IO（biO/nio/aio）以及对应线程模型
+- 本地调用与远程调用的透明化方案（涉及java classloader、Dynamic Proxy etc.）
 - 异步与同步调用
 - 网络通信处理机制（自动重连、广播、异常、池处理等等）
-- Java Serialization (各种协议的私有序列化机制等)
+- Java Object Serialization (各种协议的私有序列化机制等)
 
-## 分布式key-value存储系统
-
-跨主机间进程通信，彼此除了直接或间接用tcp联系外，还可以使用分布式key-value存储系统，比如etcd和zookeeper等工具。进程只需与本机的etcd通信，另一主机的进程通过本机的etcd即可感知到数据变化。
-
-当然，这种方式在通信效率等方面，不如专门的解决方案。
 
 
 ## 引用
 
 [远程调用原理与对比RMI、MINA、ESB、Burlap、Hessian、SOAP、EJB][]
-
-
-
-
-
 
 [远程调用原理与对比RMI、MINA、ESB、Burlap、Hessian、SOAP、EJB]: http://blog.sina.com.cn/s/blog_5f53615f01014xfj.html
