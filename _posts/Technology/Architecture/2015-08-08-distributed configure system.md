@@ -106,7 +106,18 @@ etcd启动时，有三种模式`static`,`etcd Discovery`和`DNS Discovery`三种
 
 集群配置时，集群有哪些节点，已在所有节点的配置文件中讲明，比如这里的`server.1,server.2,server.3`
 
-### 小结
+
+## 数据模型
+
+### zookeeper
+
+ZooKeeper的数据结构, 与普通的文件系统类似，每个节点称为一个znode. 每个znode由3部分组成:
+
+1. stat. 此为状态信息, 描述该znode的版本, 权限等信息.
+2. data. 与该znode关联的数据.
+3. children. 该znode下的子节点.
+
+## 小结
 
 分布式配置系统一般有以下不同：
 
