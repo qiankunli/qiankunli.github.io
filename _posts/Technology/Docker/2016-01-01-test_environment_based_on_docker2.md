@@ -181,6 +181,11 @@ keywords: Docker jenkins python
           jenkinsCli.close()
           swarmCli.close()
     main()
+    
+
+## 回滚
+
+基于docker ci的回滚。其实就是docker镜像保存最后一次正确的历史版本（需要将hudson build序号跟镜像的tag联系起来），一旦最新代码运行有问题，就找到最后一次正确的docker镜像，部署该镜像即可。
 
 ## 小结
 
