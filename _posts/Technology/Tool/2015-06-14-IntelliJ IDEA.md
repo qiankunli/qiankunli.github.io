@@ -32,3 +32,7 @@ file ==> settings 搜索 encoding，找到file encoding 改为utf-8
 ![Alt text](/public/upload/tool/intellij_maven.png) 
 
 通常情况下，先用maven命令行创建完项目，再使用intellij导入，也是比较方便的。
+
+## ubuntu下输入法无法显示问题
+
+参见`http://dachengxi.blog.51cto.com/4658215/1747124`，注意脚本插入的位置。
