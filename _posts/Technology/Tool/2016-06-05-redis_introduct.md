@@ -57,3 +57,14 @@ Redis算是一种内存数据库，即便它支持持久化特性，将所有数
 1. 服务器端Sharding，服务端Redis集群拓扑结构变化时，客户端不需要感知，客户端像使用单Redis服务器一样使用Redis集群
 2. 客户端Sharding，客户端sharding技术其优势在于服务端的Redis实例彼此独立，相互无关联
 3. sharding中间件，结合了前两种优势，规避了前两种缺点，不过客户端到服务端中间多一个到中间件的通信过程。
+
+
+## 对redis操作的再封装
+
+先回顾下数据库访问的情况。web项目数据库的访问最后基本稳定成了“controller，service，dao”三级模式。service封装了数据访问的复杂性（比如一个service方法中有多个dao操作），controller一般不直接操作dao来使用数据。数据操作的动作也比较稳定：CRUD。
+
+有了redis之后，算是可以“跨主机访问内存”了。我们往往将redis操作与db操作结合起来，其基本动作是：“先取redis，没有则查db并加入到redis”，如果把直接“redisTemplate.set(xx,xx)”比作redis的“dao”的话，那么我们也需要一个类似“service”的包装，来封装对redis和db的复合操作。并在这个redis的“service”操作中解决以下问题：
+
+1. 请求合并。对于同一个key，a线程在cache中没找到，发起了数据库查询操作。那么b线程在这个过程中，应该等待a线程完成数据库查询，在开始对cache和db的查询。
+2. 对redis做shard
+3. 当某个shard新增和移除时，能够实现cache数据的均衡分布（这个需求有时候没有必要）。
