@@ -32,59 +32,6 @@ keywords: 缓存 redis
 
 使用时，事先设定缓存的大概容量，可以有效地提高性能。      
 
-## 另一种"缓存系统" 对象池
-
-我曾经有一种潜意识，缓存只用于两个速度不同的组件之间，其实缓存也可以作为一个临时的存储区域，存储一些创建开销比较大的对象（比如，线程、数据库连接、tcp连接等）。成熟的开源框架有很多，例如Apache Commons Pool。
-
-    package pool;  
-    import org.apache.commons.pool.BasePoolableObjectFactory;  
-    import org.apache.commons.pool.impl.GenericObjectPool;  
-    public class Test {  
-        public static void main(String[] args) {  
-            // GenericObjectPool把我们需要的东西基本都实现了，可能我们要做的只是了解其中的参数含义，然后具体设置一下就行了  
-            final GenericObjectPool pool = new GenericObjectPool(  
-                    new TestPoolableObjectFactory());  
-            pool.setMaxActive(20);  
-            // pool.setMaxWait(1000);  
-            for (int i = 0; i < 40; i++) {  
-                new Thread(new Runnable() {  
-                    @Override  
-                    public void run() {  
-                        try {  
-                            // 注意，如果对象池没有空余的对象，那么这里会block，可以设置block的超时时间  
-                            Object obj = pool.borrowObject();
-                            System.out.println(obj);  
-                            Thread.sleep(5000);  
-                            // 申请的资源用完了记得归还 
-                            pool.returnObject(obj);
-                        } catch (Exception e) {  
-                            e.printStackTrace();  
-                        }  
-                    }  
-                }).start();  
-            }  
-        }  
-        static class TestPoolableObjectFactory extends BasePoolableObjectFactory {  
-            public Object makeObject() throws Exception {  
-                return new Resource();  
-            }  
-        } 
-        // 代表复用的对象 
-        static class Resource {  
-            private int rid;  
-            public Resource() {  
-            }  
-            public int getRid() {  
-                return rid;  
-            }  
-            @Override  
-            public String toString() {  
-                return "id:" + rid;  
-            }  
-        }  
-    }  
-
-使用池的时候要慎重，因为从线程安全的角度考虑，通常池都是会被并发访问的，那么你就需要处理好同步的问题，这又是一个大坑，并且同步带来的开销，未必比你重新创建一个对象小。
 
 ## 单机缓存系统
 

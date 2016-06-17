@@ -74,6 +74,8 @@ pipework的主要功能就是容器网络的一些设置，容器以容器id（�
 
 brctl和ovs都有interface和port的概念，并且interface和port往往是一起设置的（将网卡连在某个port上嘛）
 
+ovs的安装在centos上较为麻烦，需要将某些代码注释掉。
+
 ## ovs-docker
 
 

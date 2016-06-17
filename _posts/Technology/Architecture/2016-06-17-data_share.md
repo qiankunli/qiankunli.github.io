@@ -1,0 +1,36 @@
+---
+
+layout: post
+title: 池
+category: 技术
+tags: Architecture
+keywords: mysql binlog
+
+---
+
+## 简介
+
+我们都有听过单例模式，即通过控制对象的创建（构造函数私有化）将对象的个数限制为1个。实际场景下，单例的场景毕竟是有限的。
+
+在java程序中，要提供应用的性能，关键就是减少内存的分配与回收，具体的说就是对象和线程的分配和回收。因为对象的过多分配会引起Full GC，而GC期间，整个应用程序是不能工作的。
+
+所以最好的办法是，我们一开始创建一定数量的对象，然后复用这些对象。
+
+
+## 对象池
+
+内存是byte\[]级的复用，对象池是对象级的内存复用。对象池就相当于内存管理器，只不过内存分配和回收的级别是对象。
+
+## 享元模式，另一种池技术
+
+在对象池中，对象的实例个数往往是由程序人员根据应用负载做调整。
+
+假设有一个考试信息类TestInfo
+
+class{
+    String id;// 报名人员id
+    String location;// 考场
+    String subject; // 考试科目
+}
+
+这其中，location和subject的组合是有限的，因为我们可以将TestInfo信息分为共享信息（比如location和subject）和非共享信息（比如id）。对象池对外提供服务的接口变为`pool.get(String key)`，key由location和subject组成，这样对象池中对象实例的个数与key的可能值构成线性关系。
