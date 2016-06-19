@@ -78,6 +78,8 @@ ovs的安装在centos上较为麻烦，需要将某些代码注释掉。
 
 ## ovs-docker
 
+wget https://github.com/openvswitch/ovs/raw/master/utilities/ovs-docker
+
 
 ## 引用
 
