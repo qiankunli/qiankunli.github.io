@@ -89,6 +89,7 @@ docker 1.10以上版本的内置overlay网络挺好用的，奈何公司的线�
 3. 部分操作脚本化
 4. 系统重启后，docker容器重启需要做什么样的工作
 5. 根据本文的操作，一个容器有两个网卡（eth0对应docker0网桥，eth1对应ovs网桥）进入容器内部后，路由包访问外网的数据被导向了eth1，导致无法访问外网，想要更改路由表，但权限不允许，怎么破？
+6. 这套办法想办法直接做成docker的network plugin
 
 
 [Docker 使用 OpenvSwitch 网桥]: http://blog.csdn.net/yeasy/article/details/42555431
