@@ -116,12 +116,10 @@ docker 1.10以上版本的内置overlay网络挺好用的，奈何公司的线�
 ## 其它要做的
 
 1. 移除docker的时候，记得用ovs-docker删除一下port
-2. 基于两个主机，完整验证上述步骤的可用性
-3. 部分操作脚本化
-4. 系统重启后，docker容器重启需要做什么样的工作
-5. 根据本文的操作，一个容器有两个网卡（eth0对应docker0网桥，eth1对应ovs网桥）进入容器内部后，路由包访问外网的数据被导向了eth1，导致无法访问外网，想要更改路由表，但权限不允许，怎么破？
-6. 这套办法想办法直接做成docker的network plugin
-7. 清除`/var/run/netns/`下的软链接
+2. 部分操作脚本化
+3. 系统重启后，docker容器重启需要做什么样的工作
+4. 这套办法想办法直接做成docker的network plugin
+5. 清除`/var/run/netns/`下的软链接
 
 
 [Docker 使用 OpenvSwitch 网桥]: http://blog.csdn.net/yeasy/article/details/42555431
