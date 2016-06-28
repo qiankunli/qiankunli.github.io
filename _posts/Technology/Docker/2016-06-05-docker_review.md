@@ -28,12 +28,31 @@ docker和vm的最主要区别就是
 
 我们知道，Host OS中的进程，申请内存往往是没有限制的，cgroup则提供了解决了这个问题。
 
-对于隔离，什么叫隔离，隔离了什么呢？隔离就是不能相互访问，甚至感知不到彼此的存在。对于Host OS中的进程，OS保证不能访问彼此的地址空间（存储程序和程序），但更大的资源范围，比如内存、cpu、文件系统，则是共享的，有时也能感知到对方的存在，否则也没办法rpc。namespace能做到在更大的资源范围内隔离彼此。举个例子，不同namespace的进程可以具备相同的进程id。
+对于隔离，什么叫隔离，隔离了什么呢？隔离就是不能相互访问，甚至感知不到彼此的存在。对于Host OS中的进程，**OS只保证不能访问彼此的地址空间（存储程序和程序）**，但更大的资源范围，比如内存、cpu、文件系统，则是共享的，有时也能感知到对方的存在，否则也没办法rpc。**namespace能做到在更大的资源范围内隔离进程**。举个例子，不同namespace的进程可以具备相同的进程id。
 
 ## Docker的三大概念
 
 镜像、容器和仓库。其实跟VirtualBox对比就是：box文件，vm运行实例和`http://www.vagrantbox.es/`。docker在这里的作用就类似于vagrant。
 
+## docker实现架构
+
+参见孙宏亮童鞋的docker源码分析
+
+docker架构采用C/S模式：docker client和docker daemon。和其它C/S程序没什么两样
+
+1. 解决通信问题。约定协议，client将协议转换为二进制流，server/daemon将二进制流转换成协议。每个协议约定了几个动作/命令（参看ftp和redis），会有一个dispatcher将动作调度到不同的handler中。handler可以是一个task，然后由类似redis的单线程模型执行。也可以是一个线程，有一个线程池执行（类似tomcat）。
+
+
+2. 解决业务问题。不同的软件业务不同。从代码管理的角度，docker daemon将动作/命令分为三块，每一块称为一个driver。
+
+    a. image的下载、存储、管理和查询，因为image之间是多对多关系（也或者是layer与image之间，这个描述待确认）就是一个或多个图节点的下载、存储和查询，所以叫GraphDriver。
+    
+    b. NetworkDriver，网络设备的创建和配置。在docker网络中，网络设备主要用的linux虚拟设备，倒不是像内存一样靠隔离出来的。
+    
+    c. ExecDriver，负责创建容器的命名空间、容器资源使用的限制与统计和内部进程的真正运行。
+    
+三个driver（除GraphDriver外）也只是调用libcontainer的接口，libcontainer是一个go语言库，符合一套接口标准（有点类似jvm规范）。我们知道，windows和mac也支持go语言，如果它们也提供对这套标准接口的支持，那么上述的docker client/daemon也可以完美运行。**所以从某种角度看，docker不是一个具体的软件，而是一种理念，通过资源限制和隔离（扩大一个线程（组）独有的资源范围）来使用计算机资源。
+**
 ## 使用Docker要解决的几个基本问题
 
 完全的隔离并不是好事，免不了要通信和共享

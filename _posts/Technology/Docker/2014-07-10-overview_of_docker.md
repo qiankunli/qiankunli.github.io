@@ -104,7 +104,8 @@ image和container的关系很像程序和进程之间的关系。
     在新的版本中，用户可以通过`docker exec -it container_id`与后台容器交互。
 
 #### 4.3.2 增删改查container ####
-如果docker run 算是增加container的话，其他相关命令如下：
+
+`docker run`的作用是在一个全新的Docker容器（如果没有则创建）内部运行一条指令。
 
 1. `docker ps -a`，列出所有container
 
