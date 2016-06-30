@@ -43,9 +43,9 @@ docker是client与daemon合二为一，通过flag区分。其server部分源码�
     	return nil
     }
 
-这跟我们常写的通信代码一样一样的，笔者看到这，就对java代码的畏惧感小了很多。
+这跟我们常写的通信代码一样一样的，甚至还没有netty的nio来的复杂。笔者看到这，就对docker代码的畏惧感小了很多。
 
-通过跟踪Serve的执行，我们会发现docker会解析请求中的数据，根据请求中的参数执行相应的方法。（用到了go里的反射）
+通过跟踪Serve的执行，我们会发现docker会解析请求中的数据，根据请求中的参数执行相应的方法。（用到了go里的反射），比如一个`docker ps`命令，commands.go中就会有一个CmdPs方法。
 
     // types.go
     func LocalCall(service Service, stdin io.ReadCloser, stdout io.Writer, args ...string) error {
@@ -124,7 +124,7 @@ docker是client与daemon合二为一，通过flag区分。其server部分源码�
     	// 其它后续工作
     }
     
-如果你跟踪这些方法，你会发现，运行一个容器之前的所有工作都是为`/usr/bin/lxc-start`准备各种数据。有些地方看不懂，应该是对go语言操作lxc不太懂（主要是cgroup和namespace特性，笔者没怎么用过go语言，更别提用go操作os的高级特性了，从这个角度看，docker基本不可能用java实现，除非jvm支持），整体的实现流程是清晰的。
+如果你跟踪这些方法，你会发现，运行一个容器之前的所有工作都是为`/usr/bin/lxc-start`准备各种数据。有些地方看不懂，应该是对lxc提供的接口及实现不太懂（主要是cgroup和namespace特性，笔者没怎么用过go语言，更别提用go操作os的高级特性了，从这个角度看，docker基本不可能用java实现，除非jvm支持），整体的实现流程是清晰的。
 
 
 ## 重要的结构体
