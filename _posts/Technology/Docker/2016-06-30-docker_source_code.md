@@ -162,6 +162,8 @@ docker是client与daemon合二为一，通过flag区分。其server部分源码�
     	runtime   *Runtime
     }
     
+看每个文件中的struct以及对应的方法，将docker复杂的功能分解成一个个小模块，或者说，将lxc的复杂使用（参数配置、文件、网卡等环境准备等）如何向上简化，程序设计真的是一门艺术。
+    
 ## go语言写大型项目的基本特点
 
 1. 一个文件有一个主要的struct，以及这个struct相关的操作。类似java的一个类文件
