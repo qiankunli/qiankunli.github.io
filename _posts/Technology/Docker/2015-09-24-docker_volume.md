@@ -17,7 +17,9 @@ keywords: Docker volume
 
 先谈下Docker的文件系统是如何工作的。Docker镜像是由多个文件系统（只读层）叠加而成。当我们启动一个容器的时候，Docker会加载只读镜像层并在其上添加一个读写层。如果运行中的容器修改了现有的一个已经存在的文件，那该文件将会从读写层下面的只读层复制到读写层，该文件的只读版本仍然存在，只是已经被读写层中该文件的副本所隐藏。当删除Docker容器，并通过该镜像重新启动时，之前的更改将会丢失。在Docker中，只读层及在顶部的读写层的组合被称为Union File System（联合文件系统）。
 
-那么容器为什么使用AUFS作为文件系统呢？假设容器不使用AUFS作为文件系统，那么根据image创建container时，便类似于Virtualbox根据box文件生成vm实例，将box中的关于Linux文件系统数据整个复制一套，这个过程的耗时还是比较长的。想要复用image中的文件数据，就得使用类似UFS系统。这样看来，docker启动容器速度快是因为实际启动的是进程。能够快速创建新的实例，则是因为所有（基于共同image的）容器共享了image的文件。
+那么容器为什么使用AUFS作为文件系统呢？
+
+假设容器不使用AUFS作为文件系统，那么根据image创建container时，便类似于Virtualbox根据box文件生成vm实例，将box中的关于Linux文件系统数据整个复制一套（要是不复制，a容器更改了fs的内容，就会影响到b容器），这个过程的耗时还是比较长的。想要复用image中的文件数据，就得使用类似UFS系统。**这也是docker启动速度快的一个重要因素（**除了实际启动的是一个进程）。
 
 
 	# 假设存在以下目录结构
@@ -95,6 +97,60 @@ volumn的作用：
 	比如`sudo docker run --volume-driver glusterfs --volume datastore:/data alpine touch /data/hello`,具体参见[Docker volume plugin for GlusterFS](https://github.com/calavera/docker-volume-glusterfs)
     
 据我估计，假如以前volume直接是通过aufs挂载的方式实现的话，那么现在docker则是通过volume plugin来访问volume数据，只不过通过aufs挂载是volume plugin的一个最简单实现而已。
+
+## 一些基础知识（待整理）
+
+linux系统的进程结构体有以下几个字段
+
+    struct task_struct {
+        struct m_inode * pwd;
+    	struct m_inode * root;
+    	struct m_inode * executable;				//进程对应可执行文件的i节点
+    }
+    
+
+### 传统的linux fs加载过程
+
+参见`https://www.kernel.org/doc/Documentation/filesystems/ramfs-rootfs-initramfs.txt`
+
+What is rootfs?
+
+Rootfs is a special instance of ramfs (or tmpfs, if that's enabled), which is
+always present in 2.6 systems.it's smaller and simpler for the kernel
+to just make sure certain lists can't become empty.Most systems just mount another filesystem over rootfs and ignore it（一般情况下，通过某种文件系统挂载内容至挂载点的话，挂载点目录中原先的内容将会被隐藏）.
+
+
+What is initramfs?
+
+All 2.6 Linux kernels contain a gzipped "cpio" format archive, which is
+extracted into rootfs when the kernel boots up.  After extracting, the kernel
+checks to see if rootfs contains a file "init", and if so it executes it as PID
+1.  If found, this init process is responsible for bringing the system the
+rest of the way up, including locating and mounting the real root device (if
+any).  If rootfs does not contain an init program after the embedded cpio
+archive is extracted into it, the kernel will fall through to the older code
+to locate and mount a root partition, then exec some variant of /sbin/init
+out of that.
+
+所以一个linux的启动过程经历了rootfs ==> 挂载initramfs ==> 挂载磁盘上的真正的fs
+
+为什么要有initrd？
+
+linux系统在启动时，会执行文件系统中的`/sbin/init`进程完成linux系统的初始化，执行`/sbin/init`进程的前提是linux内核已经拿到了存在硬盘上的系统镜像文件（加载设备驱动，挂载文件系统）。linux 发行版必须适应各种不同的硬件架构，将所有的驱动编译进内核是不现实的。Linux发行版在内核中只编译了基本的硬件驱动
+，在 linux内核启动前，boot loader会将存储介质中的initrd文件(cpio是其中的一种)加载到内存，内核启动时会在访问真正的根文件系统前先访问该内存中的initrd文件系统，执行initrd文件系统的某个文件（不同的linux版本差异较大），扫描设备，加载驱动。
+
+### docker container fs的加载过程
+
+docker cotainer fs的演化过程:rootfs(read only image) ==> read-write filesystem（初始状态下是空的） ==> volume（这就不是一个文件系统，只是部分目录的覆盖了）
+
+## 小结
+
+上述谈的内容比较杂，上述说这么东西，主要是为了三点，这两点之间没什么必然关系
+
+1. 隔离，mount namespace。你在新的namespace中执行mount命令，不会影响其它namespace。上述docker container fs挂载的演化才不会影响其它container。
+2. 分层，分层是为了复用
+3. 保存容器数据，volume
+
 
 ## 引用
 

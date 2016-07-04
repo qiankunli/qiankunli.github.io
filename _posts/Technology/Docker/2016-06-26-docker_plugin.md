@@ -55,9 +55,26 @@ keywords: Docker,plugin
 
 插件只需要提供指定接口的http服务就可以，那么插件就不用非得是go语言写的喽。
 
-## 其它
+## go-plugins-helpers(待整理)
 
 上面提到，插件要支持http服务，go语言有一个docker插件助手[docker/go-plugins-helpers][]，已经完成了http服务等大部分工作，只需要在指定接口上实现自己的逻辑即可。
+
+`docker/go-plugins-helpers`包括authorization、ipam、network、volume、sdk包。sdk负责公共部分并提供基本结构，http请求数据与业务model的序列化和反序列化、服务端口的监听等（docker plugin要提供Http服务嘛），其它包负责某个业务块api的抽象，最终我们自己的包中实现一个docker plugin。
+
+handler.go中用到了"net"和"net/http"包，分别负责提供tcp和http服务。在sdk包中提供的抽象是`HandleFunc(path string, fn func(w http.ResponseWriter, r *http.Request))`，具体到各个业务包，比如volume，则将抽象细化到只实现Driver接口就可以，请求与方法的对应关系已经被封装好了。
+
+    type Driver interface {
+    	Create(Request) Response
+    	List(Request) Response
+    	Get(Request) Response
+    	Remove(Request) Response
+    	Path(Request) Response
+    	Mount(Request) Response
+    	Unmount(Request) Response
+    	Capabilities(Request) Response
+    }
+    
+也就是说`docker/go-plugins-helpers`最终处理好了tcp/http服务的启动以及请求与请求处理函数的映射，我们只需实现其抽象好的接口即可。
 
 ## 引用
 
