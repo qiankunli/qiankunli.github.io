@@ -58,7 +58,6 @@ volumn的作用：
 
 ## docker volume
 
-
     // 创建一个容器，包含两个数据卷
     $ docker run -v /var/volume1 -v /var/volume2 -name Volume_Container ubuntu14.04 linux_command
     // 创建App_Container容器，挂载Volume_Container容器中的数据卷
@@ -68,6 +67,12 @@ volumn的作用：
     docker run -rm --volumes-from DATA -v $(pwd):/backup busybox tar cvf /backup/backup.tar /data
     
 在默认方式下，volume就是在`/var/lib/docker/volumes`目录下创建一个文件夹，并将该文件夹挂载到容器的某个目录下（以UFS文件系统的方式挂载）。当然，我们也可以指定将主机的某个特定目录（该目录要显式指定）挂载到容器的目录中。
+
+    docker run -v /container/dir imagename command
+    docker run -v /host/dir:/container/dir imagename command
+    docker run -v dir:/container/dir imagename command
+    
+第三种方式相当于`docker run -v /var/lib/docker/volumes/dir:/container/dir imagename command`
 
 到目前为止，容器的创建/销毁期间来管理Volume（创建/销毁）是唯一的方式。
 
@@ -149,7 +154,7 @@ docker cotainer fs的演化过程:rootfs(read only image) ==> read-write filesys
 
 1. 隔离，mount namespace。你在新的namespace中执行mount命令，不会影响其它namespace。上述docker container fs挂载的演化才不会影响其它container。
 2. 分层，分层是为了复用
-3. 保存容器数据，volume
+3. 分离容器数据与容器产生的数据，volume。docker doc的说法是bypasses the Union File System, independent of the container’s life cycle.Docker therefore never automatically deletes volumes when you remove a container, nor will it “garbage collect” volumes that are no longer referenced by a container.
 
 
 ## 引用

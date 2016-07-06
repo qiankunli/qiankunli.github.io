@@ -41,10 +41,7 @@ keywords: Docker,plugin
     
         docker engine会检查`/run/docker/plugins/myplugin.sock`
        
-    b. docker plugin和docker engine不在一个主机
-    
-        
-        docker engine会检查`/etc/docker/plugins`或者`/usr/lib/docker/plugins`目录下的`.spec`（一种纯文本文件，可以参见相关文档）和`.json`文件。比如
+    b. docker plugin和docker engine不在一个主机,docker engine会检查`/etc/docker/plugins`或者`/usr/lib/docker/plugins`目录下的`.spec`（一种纯文本文件，可以参见相关文档）和`.json`文件。比如
         
         {
             "Name": "myplugin",
@@ -57,11 +54,11 @@ keywords: Docker,plugin
 
 ## go-plugins-helpers(待整理)
 
-上面提到，插件要支持http服务，go语言有一个docker插件助手[docker/go-plugins-helpers][]，已经完成了http服务等大部分工作，只需要在指定接口上实现自己的逻辑即可。
+上面提到，插件本身是一个http服务。现在用java开发http服务肯定不会直接基于servlet，太麻烦。同理，go语言有一个docker插件助手[docker/go-plugins-helpers][]，已经完成了http服务等大部分工作，只需要在指定接口上实现自己的逻辑即可。
 
-`docker/go-plugins-helpers`包括authorization、ipam、network、volume、sdk包。sdk负责公共部分并提供基本结构，http请求数据与业务model的序列化和反序列化、服务端口的监听等（docker plugin要提供Http服务嘛），其它包负责某个业务块api的抽象，最终我们自己的包中实现一个docker plugin。
+`docker/go-plugins-helpers`包括authorization、ipam、network、volume、sdk包。sdk负责公共部分并提供基本结构，http请求数据与业务model的序列化和反序列化、服务端口的监听等（docker plugin要提供Http服务嘛），其它包负责提供本业务块api的抽象，最终我们在自己的包中实现这些抽象。
 
-handler.go中用到了"net"和"net/http"包，分别负责提供tcp和http服务。在sdk包中提供的抽象是`HandleFunc(path string, fn func(w http.ResponseWriter, r *http.Request))`，具体到各个业务包，比如volume，则将抽象细化到只实现Driver接口就可以，请求与方法的对应关系已经被封装好了。
+具体的说，handler.go中用到了"net"和"net/http"包，分别负责提供tcp和http服务。在sdk包中提供的抽象是`HandleFunc(path string, fn func(w http.ResponseWriter, r *http.Request))`，即提供url到方法的映射。具体到各个业务包，比如volume，则已经建立了url与本接口方法的映射，开发者只实现Driver接口。
 
     type Driver interface {
     	Create(Request) Response
@@ -74,7 +71,8 @@ handler.go中用到了"net"和"net/http"包，分别负责提供tcp和http服务
     	Capabilities(Request) Response
     }
     
-也就是说`docker/go-plugins-helpers`最终处理好了tcp/http服务的启动以及请求与请求处理函数的映射，我们只需实现其抽象好的接口即可。
+    
+这里有一个比较困惑的地方，笔者以前以为volume plugin会接管container对某个目录的读写，但现在看，它只是做了一些数据的增删改查，并不涉及文件数据读写本身，所以具体细节还有待学习。
 
 ## 引用
 
