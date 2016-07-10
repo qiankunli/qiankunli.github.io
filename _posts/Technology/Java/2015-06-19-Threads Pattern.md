@@ -65,13 +65,6 @@ java性能的提高，io和多线程是其中两个重要部分，io方面java�
 Future、Callable、Executor这一套体系解决了消费者处理完消息（也就是task）之后的返回值问题。封装了“数据从生产者线程发到消费者线程，返回结果从消费者线程发到生产者线程”的过程，为java的并发编程提供了新的“设计模式”。
 
 
-## 待定
-
-几个执行体如何触发执行
-
-1. Runnable，new Thread(xx).start()
-2. Callable，ExecutorService.submit(xx)
-3. FutureTask,new Thread(xx).start
 
 ## 引用
 
