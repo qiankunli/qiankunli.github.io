@@ -81,6 +81,17 @@ ovs的安装在centos上较为麻烦，需要将某些代码注释掉。
 wget https://github.com/openvswitch/ovs/raw/master/utilities/ovs-docker
 
 
+## iptables
+
+iptbales -L -vn --line-number
+
+iptables -D INPUT 7
+
+iptables -D FORWARD 4
+
+这样按序号删规则很方便
+
+
 ## 引用
 
 http://fishcried.com/2016-02-09/openvswitch-ops-guide/

@@ -36,6 +36,7 @@ docker 1.10以上版本的内置overlay网络挺好用的，奈何公司的线�
          // 获取容器进程id
         docker inspect --format "{{ \.State.Pid }}" fe8d1b02dc90
         1915
+        ln -s /proc/1915/ns/net /var/run/netns/1915
         ip netns exec 1935 ifconfig eth1 10.1.2.3/24
     
     
