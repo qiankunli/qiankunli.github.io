@@ -23,8 +23,9 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 各位都用过虚拟机软件（例如Vmware等），想必都对其资源占用情况颇有微词。其提供的功能还是比较全的，基本上整了一台新的主机出来。但如果我们不需要那么多的功能，比如宿主机和虚拟机都限定为linux，那就有机会减少一些设计，最终减少资源占用，提高效率。docker就是这样，它只提供一部分“虚拟机”的功能，没有传统虚拟机全面，但比它们更高效。
 
 
-## 3 docker安装 ##
-### 3.1 windows下v1.1.1安装 ###
+## 3 docker安装 
+
+### 3.1 windows下v1.1.1安装 
 1. 准备
 	* windows7
 	* docker-install.exe，下载地址[https://github.com/boot2docker/windows-installer/releases](https://github.com/boot2docker/windows-installer/releases)
@@ -33,9 +34,10 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 	2. 安装过程中会附带安装virtualbox和git，如果您已安装此软件，可以取消选中
 	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：`docker@bootdocker~$`
 	
-		![Alt text](/public/upload/docker/boot2docker_start.png)
+	![Alt text](/public/upload/docker/boot2docker_start.png)
 
 ## 4 docker操作 ##
+
 ### 4.1 image和container ###
 image和container是docker中很重要的两个概念，docker程序提供的docker命令，主要就是对这两个“实体”进行操作。
 
@@ -44,6 +46,7 @@ image和container是docker中很重要的两个概念，docker程序提供的doc
 我们运行一个image，会产生一个container。就像我们用一键ghost还原一个GHO，就会有一个操作系统可以运行一样。container就是docker虚拟出来的linux，操作container和操作一般的linux系统是一样一样的。
 
 ### 4.2 image管理 ###
+
 #### 4.2.1 什么是Dockerfile ####
 
 “Dockerfile是一个image的表示，可以通过Dockerfile来描述构建image的步骤。”说的接地气点，dockerfile类似于数据库的日志。根据日志我们知道数据库从时刻1到时刻2发生了什么，由此可以恢复或到达数据库某个时刻的状态。对应的，已知image1，我们在dockerfile中记录对image1的改动，便可以根据dockerfile 构建出image2。也因为dockerfile，image1和image2便具备了父子关系。有了父子关系，自然也可以搞出来兄弟关系，我们可以使用`docker images --tree`查看image之间的树形家族结构。
@@ -82,7 +85,9 @@ docker的开发团队不只是要做一个软件，还想做一个社区。我�
 3. `docker push larrycai/postgresql`，将imageName上传到库中
 
 ### 4.3 container管理 ###
+
 image和container的关系很像程序和进程之间的关系。
+
 #### 4.3.1 运行container ####
 * 简单运行，执行完命令后退出
 
