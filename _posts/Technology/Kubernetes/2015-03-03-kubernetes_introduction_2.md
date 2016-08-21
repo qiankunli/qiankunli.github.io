@@ -11,7 +11,7 @@ keywords: CoreOS Docker Kubernetes
 
 本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删减。
 
-本文主要讲了replication controller
+本文主要讲了replication controller（部分地方简称RC）
 
 ## What is a replication controller?
 
@@ -19,23 +19,25 @@ A replication controller ensures that a specified number of pod "replicas" are r
 
 A replicationController is only appropriate for pods with RestartPolicy = Always.
 
-A replication controller will never terminate on its own, but it isn't expected to be as long-lived as services. Services may be comprised of pods controlled by multiple replication controllers, and it is expected that many replication controllers may be created and destroyed over the lifetime of a service. Services and their clients should remain oblivious to the replication controllers that maintain the pods of the services.（这段不大懂）
 
 ### How does a replication controller work?
+
+replication controller中的几个概念（与replication controller config file中都有对应），RC与pod之间的关系。
+
+
 
 #### Pod template
 
 A replication controller creates new pods from a template.
 
-Rather than specifying the current desired state of all replicas, pod templates are like cookie cutters. Once a cookie has been cut, the cookie has no relationship to the cutter. Subsequent changes to the template or even a switch to a new template has no direct effect on the pods already created.
+Rather than specifying the current desired state of all replicas, pod templates are like cookie cutters（饼干模型切割刀）. Once a cookie（饼干） has been cut, the cookie has no relationship to the cutter. Subsequent changes to the template or even a switch to a new template has no direct effect on the pods already created.
 
-（replication controller根据pod template生成pod，template的更新将不对根据原有template生成的pod产生影响）
 
 #### Labels
 
-The population of pods that a replication controller monitors is defined with a label selector, which creates a loosely coupled relationship between the controller and the pods controlled.（replication controller有一个label，一个replication controller监控的所有pod（controller's target set）也都包含同一个label，两者以此建立联系）
+The population of pods that a replication controller monitors is defined with a label selector（A key:value pair）, which creates a loosely coupled relationship between the controller and the pods controlled.（replication controller有一个label，一个replication controller监控的所有pod（controller's target set）也都包含同一个label，两者以此建立联系）
 
-So that only one replication controller controls any given pod, ensure that the label selectors of replication controllers do not target overlapping sets.
+So that only one replication controller controls any given pod, ensure that the label selectors of replication controllers do not target overlapping（重叠） sets.
 
 To remove a pod from a replication controller's target set, change the pod's label（改变一个pod的label，可以将该pod从controller's target set中移除）. Use this technique to remove pods from service for debugging, data recovery, etc. Pods that are removed in this way will be replaced automatically (assuming that the number of replicas is not also changed).
 
@@ -47,8 +49,7 @@ Similarly, deleting a replication controller does not affect the pods it created
 #### Rescheduling
 
 Whether you have 1 pod you want to keep running, or 1,000, a replication controller will ensure that the specified number of pods exists, even in the event of node failure or pod termination (e.g., due to an action by another control agent).
-（确保pod总是我们设定的数量）
-（我们自己创建的pod和replication controller创建pod是不同的（哪怕replicas个数为1），因为当我们创建一个replication controller时，如果它发现已经有一个相同label的pod，便不会创建pod）
+
 
 #### Scaling
 
@@ -119,7 +120,7 @@ Required fields are:
  - replicas: The number of pods to create and maintain.
  - **replicaSelector**: A key:value pair assigned to the set of pods that this replication controller is responsible for managing. This must match the key:value pair in the podTemplate's labels field.
  - podTemplate contains the container manifest that defines the container configuration. The manifest is itself contained within a desiredState object.
-- labels: Arbitrary key:value pairs used to target or group this replication controller. These labels are not associated with the replicaSelector field or the podTemplate's labels field.
+- labels: Arbitrary（任意的） key:value pairs used to target or group this replication controller. These labels are not associated with the replicaSelector field or the podTemplate's labels field.
 (label标签是为Replication controller分组用的，跟pod没关系)
 
 #### Manifest

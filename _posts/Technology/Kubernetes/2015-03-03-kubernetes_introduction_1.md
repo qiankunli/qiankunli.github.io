@@ -4,6 +4,7 @@ title: Kubernetes 基本概念和 pod 组件
 category: 技术
 tags: Kubernetes
 keywords: CoreOS Docker Kubernetes
+
 ---
 
 
@@ -21,7 +22,7 @@ A Container Engine cluster is a group of Compute Engine instances running Kubern
 
 ### The Kubernetes master
 
-Every cluster has a single master instance. The master provides a unified view into the cluster and, through its publicly-accessible endpoint, is the doorway for interacting with the cluster.
+Every cluster has a single master instance. The master provides a unified view into the cluster and, through its publicly-accessible endpoint, is the doorway(途径) for interacting with the cluster.
 
 **The master runs the Kubernetes API server, which services REST requests, schedules pod creation and deletion on worker nodes, and synchronizes pod information (such as open ports and location) with service information.**
 
@@ -31,7 +32,7 @@ A cluster can have one or more node instances. These are managed from the master
 
 ## What is a pod?
 
-A pod models an application-specific "logical host(逻辑节点)" in a containerized environment. It may contain one or more containers which are relatively tightly coupled—in a pre-container world（包含多个紧密联系的容器）, they would have executed on the same physical or virtual host.a pod has a single IP address.  Multiple containers that run in a pod all share that common network name space。（一个pod中包含ca cb两个container，ca暴露80端口，cb即可以`localhost:80`访问ca中的服务）
+A pod models an application-specific "logical host(逻辑节点)" in a containerized environment. It may contain one or more containers which are relatively tightly coupled—in a pre-container world（包含多个紧密联系的容器）, they would have executed on the same physical or virtual host.a pod has a single IP address.  Multiple containers that run in a pod all share that common network name space。
 
 Like running containers, pods are considered to be relatively ephemeral rather than durable entities. Pods are scheduled to nodes and remain there until termination (according to restart policy) or deletion. When a node dies, the pods scheduled to that node are deleted. Specific pods are never rescheduled to new nodes; instead, they must be replaced.
 
@@ -39,28 +40,25 @@ Like running containers, pods are considered to be relatively ephemeral rather t
 
 #### Resource sharing and communication
 
-Pods facilitate data sharing and communication among their constituents.（pods（概念）促进了其组件的数据共享和交流）
+1. Pods facilitate data sharing and communication among their constituents.
 
-The containers in the pod all use the same network namespace/IP and port space, and can find and communicate with each other using localhost. Each pod has an IP address in a flat shared networking namespace that has full communication with other physical computers and containers across the network. The hostname for each container within the pod is set to the pod's name.
+    The containers in the pod all use the same network namespace/IP and port space, and can find and communicate with each other using localhost. Each pod has an IP address in a flat shared networking namespace that has full communication with other physical computers and containers across the network. The hostname for each container within the pod is set to the pod's name.
 
-（Pod内的每个容器有一个套IP及PORT命名空间，每个Pod有一个IP（在另一个命名空间内）来同外界交流，（以IP来标记这个Pod及其提供的服务））
-
-In addition to defining the containers that run in the pod, the pod specifies a set of shared storage volumes. Volumes enable data to survive container restarts and to be shared among the containers within the pod.
-
-（Pod还定义了一系列volumes用于数据共享）
+2. In addition to defining the containers that run in the pod, the pod specifies a set of shared storage volumes. Volumes enable data to survive container restarts and to be shared among the containers within the pod.
 
 #### pod实现原理
 
-容器是基于linux namespace实现资源隔离的，但是一个pod中的所有容器则共享部分namespace，没有完全隔离。
+容器是基于linux namespace实现资源隔离的，但是一个pod中的所有容器则共享部分namespace，没有完全隔离（**一个container独立拥有所有种类的namespace过于极端，大多数时候并不必要**）。
 
 1. 网络名字空间，在同一Pod中的多个容器访问同一个IP和端口空间，即可能访问同一个network namespace。
 2. IPC名字空间，同一个Pod中的应用能够使用SystemV IPC和POSIX消息队列进行通信。
 3. UTS名字空间，同一个Pod中的应用共享一个主机名。
 4. mount命名空间，Pod中的各个容器应用还可以访问Pod级别定义的共享卷。
 
+
 #### Management
 
-Pods also simplify application deployment and management by providing a higher-level abstraction than the raw, low-level container interface（通过提出Pod这个更高抽象来简化应用的部署和管理）. Pods serve as units of deployment and horizontal scaling/replication. Co-location, fate sharing, coordinated replication, resource sharing, and dependency management are handled automatically.
+Pods also simplify application deployment and management by providing a higher-level abstraction than the raw, low-level container interface（通过提出Pod这个更高抽象来简化应用的部署和管理）. **Pods serve as units of deployment and horizontal scaling/replication. Co-location, fate sharing, coordinated replication, resource sharing, and dependency management are handled automatically.**
 
 ### Uses of pods（应用场景）
 
@@ -71,11 +69,18 @@ Log and checkpoint backup, compression, rotation, snapshotting, etc.
 Data-change watchers, log tailers, logging and monitoring adapters, event publishers, etc.
 Proxies, bridges, and adapters.
 Controllers, managers, configurators, and updaters.
-Individual pods are not intended to run multiple instances of the same application, in general.
+
+**Individual pods are not intended to run multiple instances of the same application**, in general.
+
+## 小结
+
+A pod is a relatively tightly coupled group of containers that are scheduled onto the same host. 
+
+1. It models an application-specific(面向应用) "virtual host" in a containerized environment. 
+2. Pods serve as units of scheduling, deployment, and horizontal scaling/replication. 
+3. Pods share fate, and share some resources, such as storage volumes and IP addresses.(网络通信和数据交互就非常方便且高效)
 
 ## Pod Operations
-
-**A pod is a relatively tightly coupled group of containers that are scheduled onto the same host. It models an application-specific "virtual host" in a containerized environment. Pods serve as units of scheduling, deployment, and horizontal scaling/replication. Pods share fate, and share some resources, such as storage volumes and IP addresses.**
 
 ### Creating a pod
 

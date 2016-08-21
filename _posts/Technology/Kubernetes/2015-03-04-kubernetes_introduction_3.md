@@ -15,7 +15,7 @@ keywords: CoreOS Docker Kubernetes
 
 ## What is a service?
 
-Container Engine pods are ephemeral. They can come and go over time, especially when driven by things like replication controllers. While each pod gets its own IP address, **those IP addresses cannot be relied upon to be stable over time（直接通过一个pod的ip来访问它是不可靠的）**. This leads to a problem: if some set of pods (let's call them backends) provides functionality to other pods (let's call them frontends) inside a cluster, how do those frontends find the backends?
+Container Engine pods are ephemeral（短暂的）. They can come and go over time, especially when driven by things like replication controllers. While each pod gets its own IP address, **those IP addresses cannot be relied upon to be stable over time（直接通过一个pod的ip来访问它是不可靠的）**. This leads to a problem: if some set of pods (let's call them backends) provides functionality to other pods (let's call them frontends) inside a cluster, how do those frontends find the backends?
 (Pod组件的状态经常变化，也可能存在多个副本，那么其他组件如何来访问它呢)
 
 Enter services.
@@ -69,14 +69,14 @@ Kubernetes内部如何访问这个Pod对应的Service？
     $ etcdctl get /registry/services/endpoints/default/apache2-service
     {"kind":"Endpoints","id":"apache2-service","uid":"09a711e5-c3d0-11e4-b06e-0800272b69e4","creationTimestamp":"2015-03-06T07:11:41Z","selfLink":"/api/v1beta1/endpoints/apache2-service?namespace=default","resourceVersion":14119,"apiVersion":"v1beta1","namespace":"default","endpoints":["10.100.83.5:80"]}
     
-    etcdctl get /registry/services/specs/default/apache2-service
+    $ etcdctl get /registry/services/specs/default/apache2-service
     {"kind":"Service","id":"apache2-service","uid":"07cc9702-c3d0-11e4-b06e-0800272b69e4","creationTimestamp":"2015-03-06T07:11:37Z","apiVersion":"v1beta1","namespace":"default","port":9090,"protocol":"TCP","selector":{"name":"apache2"},"containerPort":80,"portalIP":"10.100.62.248","sessionAffinity":"None"}
     
 
 可以看到，一些相关信息都会被记录到etcd中。
     
 
-A service, through its label selector, can resolve to 0 or more pods. Over the life of a service, the set of pods which comprise that service can grow, shrink, or turn over completely. Clients will only see issues if they are actively using a backend when that backend is removed from the service (and even then, open connections will persist for some protocols).
+A service, through its label selector(a key:value pair), can resolve to 0 or more pods. Over the life of a service, the set of pods which comprise that service can grow, shrink, or turn over completely. Clients will only see issues if they are actively using a backend when that backend is removed from the service (and even then, open connections will persist for some protocols).
 
 ## Service Operations
 
