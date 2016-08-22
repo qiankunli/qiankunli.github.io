@@ -13,6 +13,12 @@ keywords: Jenkins Docker Kubernetes
 
 ![kubernetes_demo_project_structure.png](/public/upload/kubernetes/kubernetes_demo_project_structure.png)
 
+k8s-web-demo是一个很简单的j2ee示例程序，运行成功后，可以访问`/hello`，返回`hello world`
+
+主要有以下几个点：
+
+1. Dockerfile在项目根目录。以为Dockerfile所在的目录作为docker build容器的root目录，必须包含build时所有必要的资源（这里主要是target目录下的war包）。
+2. 在k8s目录下创建项目的rc文件和service文件。
 
 ## jenkins
 
