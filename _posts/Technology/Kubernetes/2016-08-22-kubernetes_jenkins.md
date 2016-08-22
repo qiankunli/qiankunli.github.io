@@ -10,7 +10,8 @@ keywords: Jenkins Docker Kubernetes
 
 ## 项目结构
 
-![kubernetes_demo_project_structure.png](/public/upload/kubernetes/kubernetes_demo_project_structure.png "")
+
+![kubernetes_demo_project_structure.png](/public/upload/kubernetes/kubernetes_demo_project_structure.png)
 
 
 ## jenkins
@@ -20,9 +21,11 @@ jenkins涉及到的配置如下
 ### git
 	
     git@xxx:bert/k8s-web-demo.git
+    
 ### maven
 
 	clean install -Ptest-out -Dmaven.test.skip=true 
+    
 ### shell
 
 	#!/bin/bash
