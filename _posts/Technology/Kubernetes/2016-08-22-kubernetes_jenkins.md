@@ -8,6 +8,37 @@ keywords: Jenkins Docker Kubernetes
 
 ## 简介（待整理）
 
+环境描述
+
+||node1|node2|node3|
+|-|-|-|-|
+|ip|192.168.3.57|192.168.3.58|192.168.3.59|
+|role|node|node|master|
+|subnet|172.17.10.0/24|172.17.20.0/24|172.17.30.0/24|
+
+private registry:`192.168.3.56:5000`
+
+
+
+## 各种网络方案的特点
+
+||物理机如何访问pod|缺点|其它|
+|-|-|-||
+|路由方式|物理机直接以pod ip访问pod|pod ip可能会改变|ip易改变的解决方案：容器网络使用service，外部网络使用 ingress + nginx|
+|etcd + flannel/ovs|物理机以physical ip + service node port的方式访问pod|同上|同上|
+|docker overlay||container ip可指定||
+
+## k8s网络选择
+
+采用直接路由方式，以node1为例，路由表要加上：
+
+    Kernel IP routing table
+    Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+    172.17.30.0     192.168.3.59    255.255.255.0   UG    20     0        0 em1
+    172.17.20.0     192.168.3.58    255.255.255.0   UG    20     0        0 em1
+
+也可以使用quagga之类的软件动态添加。
+
 ## 项目结构
 
 
