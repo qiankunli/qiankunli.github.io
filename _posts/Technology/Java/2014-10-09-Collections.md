@@ -69,3 +69,16 @@ Queue是先进行出的，而PriorityQueue通过设置优先级以使需要的�
 存储的是key value对
 
 HashMap，关于HashMap的细节，基本上可以另开一个主题，写一篇文章。
+
+## 线程安全的容器类
+
+http://www.blogjava.net/BucketLi/archive/2010/11/25/335623.html JAVA并发容器代码随读
+
+CopyOnWriteList是线程安全的List实现，其底层数据存储结构为数组(Object[] array),它在读操作远远多于写操作的场景下表现良好，这其中的原因在于其读操作(get(),indexOf(),isEmpty(),contains())不加任何锁，而写操作(set(),add(),remove())通过Arrays.copyOf()操作拷贝当前底层数据结构(array)，在其上面做完增删改等操作，再将新的数组置为底层数据结构，同时为了避免并发增删改， CopyOnWriteList在这些写操作上通过一个ReetranLock进行并发控制。
+
+很多线程安全的容器类的实现，离不开ReetranLock
+
+ReetranLock主要有两点
+
+1. 同一个线程多次试图获取它所占有的锁。比如一个对象有多个方法加锁，并且加锁的方法还存在调用关系时。在表现上跟synchronized是一样的。
+2. ReentrantLock功能性方面更全面，比如时间锁等，可中断，锁投票等，性能上也比synchronized好些。
