@@ -88,6 +88,8 @@ http://blog.csdn.net/kongqz/article/details/6695417
 
 ## 引用
 
+[分布式系统的数据一致性和处理顺序问题](http://www.nginx.cn/4331.html)
+
 [初识分布式系统](http://www.hollischuang.com/archives/655)
 
 [关于分布式一致性的探究](http://www.hollischuang.com/archives/663)
