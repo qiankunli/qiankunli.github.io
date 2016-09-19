@@ -10,9 +10,24 @@ keywords: 分布式配置系统 zookeeper etcd Consul
 
 ## 简介
 
+
+Zookeeper is a **distributed storage** that provides the following guarantees
+
+1. Sequential Consistency - Updates from a client will be applied in the order that they were sent.
+2. Atomicity - Updates either succeed or fail. No partial results.
+3. Single System Image - A client will see the same view of the service regardless of the server that it connects to.
+4. Reliability - Once an update has been applied, it will persist from that time forward until a client overwrites the update.
+5. Timeliness - The clients view of the system is guaranteed to be up-to-date within a certain time bound.
+
+You can use these to implement different **recipes** that are required for cluster management like locks, leader election etc.
+
+从这段描述中，我们就可以知道，什么是本质（distributed storage + guarantees），什么是recipes。
+
+## 现有产品
+
 分布式配置系统一般有zookeeper,etcd,Consul等
 
-分布式配置中心一般有以下要求：
+分布式配置中心一般有以下特点：
 
 1. 集中管理外部依赖的服务配置和服务内部配置
 2. 提供web管理平台进行配置和查询
