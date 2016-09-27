@@ -42,6 +42,41 @@ keywords: 分布式系统
 
 题外话，在mysql中，事务是默认开启的，即执行一条命令就是一个事务。即，命令执行时对数据的独占等环境准备，是事务帮它做的。
 
+## 一致性算法（待整理）
+
+两阶段提交、三阶段提交，paxos
+
+这里重点提一下paxos
+
+[一步一步理解Paxos算法](http://mp.weixin.qq.com/s?__biz=MjM5MDg2NjIyMA==&mid=203607654&idx=1&sn=bfe71374fbca7ec5adf31bd3500ab95a&key=8ea74966bf01cfb6684dc066454e04bb5194d780db67f87b55480b52800238c2dfae323218ee8645f0c094e607ea7e6f&ascene=1&uin=MjA1MDk3Njk1&devicetype=webwx&version=70000001&pass_ticket=2ivcW%2FcENyzkz%2FGjIaPDdMzzf%2Bberd36%2FR3FYecikmo%3D)
+
+paxos侧重于快速且正确的在分布式系统中对某个数据的值达成一致。
+
+首先，paxos将角色分为proposer和acceptor。
+
+proposer提交值，acceptor最终只能批准一个值，最后proposer从acceptor中拿到确定的值。
+
+1. 最简单场景，一个acceptor，每个proposer将自己的值发给acceptor，acceptor看谁选的多，就告诉所有proposer选定的值（或者proposer再问一次）。很明显，acceptor存在单点问题。
+
+	 此问题是2pc和3pc的翻版，2pc和3pc面向的是资源调用方和多个资源提供方，资源提供方告诉资源调用方自己的操作状态，资源调用方告诉它执行还是回滚。只不过2pc和3pc面向的场景更具体，根据acceptor（资源调用方）的反应进行操作，而不是设定值。
+
+2. 多个acceptor，每个proposer将自己的值发给所有的acceptor。acceptor会接到多个值，以谁为准呢？
+
+	a. 第一次接到的值为准
+
+3. 这种单向的提交，无论采取什么策略，都可能acceptor对proposer提交的多个值的批准数一样。所以，proposer向acceptor提交前，先询问acceptor有没有被批准的值，有则提交该值，无则提交自己的值。但因为存在通信延迟的问题，proposer1和proposer2在询问阶段都得知acceptor还没有批准值，因此提交了自己的值。而因为网络延迟，无法判定谁第一次提交。
+4. 现在呢，我们可以意识到：
+
+	   1. proposer和acceptor是一个多对多的关系
+	   2. proposer和acceptor的策略不再是单一的提交和批准，还涉及到比较复杂的逻辑判断和策略。
+
+	  ![Alt text](/public/upload/architecture/paxos_flow.png)
+	  
+	 
+现在我们在回过头看下paxos解决的问题（paxos议会问题），大家在一个厅里投票和在一个分布的环境的里传信，所面临的问题是有所不同的。proposer之间和acceptor之间不用交互，仅通过proposer和acceptor的多对多交互（类似于2pc）即可协商一致。
+
+
+
 ## 一些实例
 
 ### mesos/mapreduce等
