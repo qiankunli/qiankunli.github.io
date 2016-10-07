@@ -50,7 +50,7 @@ keywords: 分布式系统
 
 [一步一步理解Paxos算法](http://mp.weixin.qq.com/s?__biz=MjM5MDg2NjIyMA==&mid=203607654&idx=1&sn=bfe71374fbca7ec5adf31bd3500ab95a&key=8ea74966bf01cfb6684dc066454e04bb5194d780db67f87b55480b52800238c2dfae323218ee8645f0c094e607ea7e6f&ascene=1&uin=MjA1MDk3Njk1&devicetype=webwx&version=70000001&pass_ticket=2ivcW%2FcENyzkz%2FGjIaPDdMzzf%2Bberd36%2FR3FYecikmo%3D)
 
-paxos侧重于快速且正确的在分布式系统中对某个数据的值达成一致。
+paxos侧重于快速且正确的在分布式系统中对某个数据的值达成一致。此处说句题外话，java的concurrent包的核心是AQS类，而AQS的本质就是线程安全的操作一个值（换个说话就是：对某个数据的值达成一致），至于值操作的具体意义则由子类赋予。想来**有异曲同工之处**。
 
 首先，paxos将角色分为proposer和acceptor。
 
