@@ -72,8 +72,13 @@ proposer提交值，acceptor最终只能批准一个值，最后proposer从accep
 
 	  ![Alt text](/public/upload/architecture/paxos_flow.png)
 	  
-	 
-现在我们在回过头看下paxos解决的问题（paxos议会问题），大家在一个厅里投票和在一个分布的环境的里传信，所面临的问题是有所不同的。proposer之间和acceptor之间不用交互，仅通过proposer和acceptor的多对多交互（类似于2pc）即可协商一致。
+proposer之间和acceptor之间不用交互，仅通过proposer和acceptor的多对多交互（**类似于多个2pc**）即可协商一致。
+
+## 角色组成
+
+通常在分布式系统中，最典型的是master/slave模式（主备模式），在这种模式中，我们把能够处理所有写操作的机器称为master，把所有通过异步复制方式获取最新数据，并提供读服务的机器称为slave机器。
+
+而有些软件，比如zookeeper，这些概念被颠覆了。zk引入leader，follower和observer三种角色，所有机器通过选举过程选定一台称为leader的机器，为客户端提供读和写服务。follower和observer都能提供读服务，区别在于，observer不参与leader选举过程，也不参与写操作的“过半写成功”策略，因此observer可以在不影响写性能的情况下（leader写入的数据要同步到follower才算写成功）提升集群的读性能。摘自《从paxos到zookeeper》
 
 
 
