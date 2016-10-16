@@ -48,19 +48,3 @@ maven配置一下
 
 将这两者结合起来，就可以快速部署一个微服务。
 
-## docker的源码分析
-
-一般学习一个较早版本的源码，有助于我们忽略非核心细节，学习一个工具的基本使用。
-
-下载某个版本的源码，进入`https://github.com/docker/docker`,进入release或tag，就可以看到可以下载`tar.gz`或`zip`的按钮。
-
-type Runtime struct {
-	root           string
-	repository     string
-	containers     *list.List
-	networkManager *NetworkManager
-	graph          *Graph
-	repositories   *TagStore
-	authConfig     *auth.AuthConfig
-}
-

@@ -151,6 +151,9 @@ socket文件，只有在本级通信（AF_UNIX）时才会用到；对于远程T
         
     返回1 表示连接失败（或者说，端口没有开启）
 
+## 引用
 
+[本地socket unix domain socket](http://blog.csdn.net/bingqingsuimeng/article/details/8470029)
 
-[本地socket unix domain socket]: http://blog.csdn.net/bingqingsuimeng/article/details/8470029
+[让进程在后台可靠运行的几种方法
+](https://www.ibm.com/developerworks/cn/linux/l-cn-nohup/)
