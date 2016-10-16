@@ -102,6 +102,6 @@ A configuration is to connect any container to the created network. This one has
 
 ## 引用
 
-[最新实践 | 将Docker网络方案进行到底](http://blog.dataman-inc.com/shurenyun-docker-133/)
+[最新实践:将Docker网络方案进行到底](http://blog.dataman-inc.com/shurenyun-docker-133/)
 
 [Docker Networking Design Philosophy](https://blog.docker.com/2016/03/docker-networking-design-philosophy/)
