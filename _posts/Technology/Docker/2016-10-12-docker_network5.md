@@ -80,7 +80,7 @@ A configuration is to connect any container to the created network. This one has
 
 ### 实现方案
 
-参见[最新实践 | 将Docker网络方案进行到底](http://blog.dataman-inc.com/shurenyun-docker-133/)
+参见[最新实践:将Docker网络方案进行到底](http://blog.dataman-inc.com/shurenyun-docker-133/)
 
 类似于一个线性表可以数组存储，也可以链表存储。docker网络就实现方案划分，有以下两种：
 
