@@ -8,7 +8,7 @@ keywords: Docker,OVS
 
 ---
 
-## 前言
+## 前言(就目前docker network发展看，已有些过时)
 
 docker 1.10以上版本的内置overlay网络挺好用的，奈何公司的线上环境必须是centos6.6，内核版本不够，只能基于ovs另搭建一套网络环境，使容器能够跨主机互通。
 

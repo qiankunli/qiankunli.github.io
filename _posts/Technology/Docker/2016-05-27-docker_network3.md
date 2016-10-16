@@ -8,7 +8,7 @@ keywords: Docker,OVS
 
 ---
 
-## 前言
+## 前言(就目前docker network发展看，已有些过时)
 
 docker libnetwork已经有跨主机容器互通的方案了，那么为什么还要介绍OVS呢？因为大部分公司的线上环境都是CentOS6，其内核版本不能支持较为高级的docker特性，因此还是要基于OVS搞一套跨主机容器互通的方案。
 
