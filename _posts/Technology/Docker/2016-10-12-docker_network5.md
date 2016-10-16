@@ -84,7 +84,7 @@ A configuration is to connect any container to the created network. This one has
 
 类似于一个线性表可以数组存储，也可以链表存储。docker网络就实现方案划分，有以下两种：
 
-####隧道方案
+#### 隧道方案
 
 通过隧道，或者说Overlay Networking的方式：
 
@@ -93,7 +93,7 @@ A configuration is to connect any container to the created network. This one has
 3. Flannel，UDP广播，VxLan。
 隧道方案在IaaS层的网络中应用也比较多，大家共识是随着节点规模的增长复杂度会提升，而且出了网络问题跟踪起来比较麻烦，大规模集群情况下这是需要考虑的一个点。
 
-###路由方案
+#### 路由方案
 还有另外一类方式是通过路由来实现，比较典型的代表有：
 
 1. Calico，基于BGP协议的路由方案，支持很细致的ACL控制，对混合云亲和度比较高。
