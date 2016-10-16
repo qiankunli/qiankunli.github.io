@@ -61,7 +61,7 @@ A Docker container created using an image works the same regardless of where it 
 
 cnm将上述不同的知识点进行了划分。
 
-![Alt text](/public/upload/docker/cnm)
+![Alt text](/public/upload/docker/cnm.jpeg)
 
 - Sandbox：对应一个**容器内的网络环境**（没有实体），包括相应的网卡配置、路由表、DNS配置等。CNM很形象的将它表示为网络的『沙盒』，因为这样的网络环境是随着容器的创建而创建，又随着容器销毁而不复存在的； 对应的实现如：Linux Network Namespace；一个Sandbox可以包含多个Network；
 - Endpoint：实际上就是一个容器中的虚拟网卡，做为Sandbox接入Network的介质，对应的实现如：veth pair、TAP；一个Endpoint只能属于一个Network，也只能属于一个Sandbox； 
