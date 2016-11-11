@@ -63,17 +63,13 @@ idea64.exe.vmoptions
     
 ## 配置go语言开发环境
 
-基本环境，windows下如果使用goxxx.msi安装，则会自动添加GOROOT和GOPATH环境变量，这两个变量很重要，作用参见其它文档。
-
 intellij 安装 go语言插件，这个网上有很多，可以参见`http://blog.csdn.net/qinxiandiqi/article/details/50319953`
 
-插件安装完毕后，创建一个go project，并创建相关目录。
+基本环境，windows下如果使用goxxx.msi安装，新建项目时，idea则会自动添加GOROOT和GOPATH环境变量，这两个变量很重要，作用参见其它文档。
 
-    projectA
-        src
-        pkg
-        bin
+运行main函数时
 
-进入project structure,将src设置为Sources目录
+1. 针对单个go文件(比如main.go)的运行，直接点击main函数左侧的运行按钮，实际执行`go run main.go`。
 
-将projectA的目录添加到该project的GOPATH变量中，`project settting ==> Go ==> Go Libraries ==> Project libraries ==> + ==> projectA dir`此时，该GOPATH值只对projectA生效。
+2. 如果运行的go文件引用了其它go文件中的内容（go还不能自动对main.go引用的其它go文件进行编译），则可在idea terminal中直接运行`go run *.go`
+
