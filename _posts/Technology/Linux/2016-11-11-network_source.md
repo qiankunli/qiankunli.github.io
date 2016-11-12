@@ -8,9 +8,9 @@ keywords: network
 
 ---
 
-## 简介（未完待续）
+## 简介
 
-以下来自linux1.2.13源码
+以下来自linux1.2.13源码，算是参见[Linux1.0](https://github.com/wanggx/Linux1.0.git)的学习笔记。
 
 linux的网络部分由网卡的驱动程序和kernel的网络协议栈部分组成，它们相互交互，完成数据的接收和发送。
 
@@ -117,3 +117,59 @@ ei开头的都是驱动程序自己的函数。
 2. 发送数据，由网络协议栈调用hard_start_xmit(初始化时，驱动程序将ei_start_xmit函数挂到其上)
 
 总的来说，kernel有几个extern的struct、pointer和func，驱动程序初始化完毕后，为linux内核准备了一个device struct list（驱动程序自己有一些功能函数，挂到device struct的函数成员上）。收到数据时，**kernel的extern func(比如netif_rx)在中断环境下被驱动程序调用**。发送数据时，则由内核网络协议栈调用device.hard_start_xmit，进而执行驱动程序函数。
+
+## 网络协议栈
+
+socket分为多种，除了inet还有unix。反应在代码结构上，就是net包下只有net/unix,net/inet两个文件夹。之所以叫unix域，可能跟描述其地址时，使用`unix://xxx`有关
+
+The difference is that an INET socket is bound to an IP address-port tuple, while a UNIX socket is "bound" to a special file on your filesystem. Generally, only processes running on the same machine can communicate through the latter.
+
+本文重点是inet,net/inet下有以下几个比较重要的文件，这跟网络书上的知识就对上了。
+
+	arp.c
+	eth.c
+	ip.c
+	route.c
+	tcp.c
+	udp.c
+	datalink.h		// 应该是数据链路层
+
+|各层之间的桥梁|备注|
+|---|---|
+|应用层||
+|struct socket||
+|BSD socket|socket函数集，比如socket、bind、accept|
+|struct net_proto|inet,unix,ipx等|
+|INET||
+|struct proto|tcp_proto,udp_proto,raw_proto|
+|传输层||
+|struct inet_protocol,header为inet_protocol_base|tcp_protocol,udp_protocol ,icmp_protocol,igmp_protocol|
+|网络层||
+|struct packet_type，header为ptype_base|ip_packet_type,arp_packet_type|
+|链路层||
+|struct device|loopback_dev等|
+|驱动层|  |
+
+怎么理解整个表格呢？以ip.c为例，在该文件中定义了ip_rcv、ip_queue_xmit(用于写数据)，链路层收到数据后，通过ptype_base找到ip_packet_type,进而执行ip_rcv。tcp发送数据时，通过tcp_proto找到ip_queue_xmit并执行。
+
+tcp_protocol是为了从下到上的数据接收，tcp_proto是为了从上到下的数据发送。为什么卡在传输层呢，因为在传输层在开始真正进行用户数据的处理（归功于tcp的复杂和重要，比如拥塞控制等）
+
+主要要搞清楚三个问题，具体可以参见相关的书籍，此处不详述。参见[Linux1.0](https://github.com/wanggx/Linux1.0.git)中的Linux1.2.13内核网络栈源码分析的第四章节。
+
+1. 这些结构如何初始化。有的结构直接就是定义好的，比如tcp_protocol等
+2. 如何接收数据。由中断程序触发。接收数据的时候，可以得到device，从数据中可以取得协议数据，进而从ptype_base及inet_protocol_base执行相应的rcv
+3. 如何发送数据。通常不直接发送，先发到queue里。可以从socket初始化时拿到protocol类型（比如tcp）、目的ip，通过route等决定device，于是一路向下执行xx_write方法
+
+## 小结
+
+**重要的不是细节**，这个过程让我想到了web编程中的controller,service,dao。都是分层，区别是web请求要立即返回，网络通信则不用。
+
+1. mac ==> device  ==> ip_rcv ==> tcp_rcv ==> 上层
+2. url ==》 controller ==> service ==> dao ==> 数据库
+
+想一想，整个网络协议栈，其实就是一群loopbackController、eth0Controller、ipService、TcpDao组成，该是一件多么有意思的事。
+
+|类别|依赖关系的存储或表示|如何找依赖|依赖关系建立的时机是集中的|
+|---|---|---|---|
+|web|由spring管理，springmvc建立`<url,beanid>`,ioc建立`<beanId,bean>`|根据request信息及自身逻辑决定一步步如何往下走。|依赖关系建立的代码是集中的|
+|linux|所谓的“依赖关系”是通过一个个struct及其数组（或链表）header，下层持有上层的struct header以完成接收，发送时则直接指定下层函数|接收时根据packet的一些字段，发送时根据socket参数及路由|依赖关系建立的代码是分散的，就好比有个全局的map，所有service(或者dao)自己向map注入自己的信息|
