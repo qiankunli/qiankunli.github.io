@@ -62,7 +62,60 @@ Linux 用户想要使用网络功能，不能通过直接操作硬件完成，�
 
 四台虚拟机通过 TAP 设备连接到接入层 Bridge 设备，接入层 Bridge 设备通过一对 VETH 设备连接到二级 Bridge 设备，主机通过一对 VETH 设备接入二级 Bridge 设备。二级 Bridge 设备进一步通过 IP Tables 、Linux 路由表与物理网卡形成数据转发关系，最终和外部物理网络连接。或者说，物理网卡接着网桥，某个容器发送数据，bridge收到，物理网卡便接收到了数据并发出。其中，物理网卡接收数据时，数据经过网络协议栈，数据包内容被修改。具体的讲，是在**网络协议栈的传输层与链路层之间**，linux根据iptables和route tables改变了数据包的相关内容，比如将数据包中的源ip由虚拟机的ip改为物理网卡的ip。
 
-### docker网桥及其网络模型
+
+## linux网桥
+
+本文所说的网桥，主要指的是linux 虚拟网桥。
+
+A bridge transparently relays traffic between multiple network interfaces. **In plain English this means that a bridge connects two or more physical Ethernets together to form one bigger (logical) Ethernet** 
+
+
+<table>
+	<tr>
+		<td>network layer</td>
+		<td colspan="3">iptables rules</td>
+	</tr>
+	<tr>
+		<td>func</td>
+		<td>netif_receive_skb/dev_queue_xmit</td>
+		<td colspan=2>netif_receive_skb/dev_queue_xmit</td>
+	</tr>
+	<tr>
+		<td rowspan="2">data link layer</td>
+		<td rowspan="2">eth0</td>
+		<td colspan="2">br0</td>
+	</tr>
+	<tr>
+		<td>eth1</td>
+		<td>eth2</td>
+	</tr>
+	<tr>
+		<td>func</td>
+		<td>rx_handler/hard_start_xmit</td>
+		<td>rx_handler/hard_start_xmit</td>
+		<td>rx_handler/hard_start_xmit</td>
+	</tr>
+	<tr>
+		<td>phsical layer</td>
+		<td>device driver</td>
+		<td>device driver</td>
+		<td>device driver</td>
+	</tr>
+</table>
+
+通俗的说，网桥屏蔽了eth1和eth2的存在。正常情况下，每一个linux 网卡都有一个device or net_device struct.这个struct有一个rx_handler。
+
+eth0驱动程序收到数据后，会执行rx_handler。rx_handler会把数据包一包，交给network layer。从源码实现就是，接入网桥的eth1，在其绑定br0时，其rx_handler会换成br0的rx_handler。等于是eth1网卡的驱动程序拿到数据后，直接执行br0的rx_handler往下走了。所以，eth1本身的ip和mac，network layer已经不知道了，只知道br0。
+
+br0的rx_handler会决定将收到的报文转发、丢弃或提交到协议栈上层。如果是转发，br0的报文转发在数据链路层，但也会执行一些本来属于network layer的钩子函数。也有一种说法是，网桥处于forwarding状态时，报文必须经过layer3转发。这些细节的确定要通过学习源码来达到，此处先不纠结。
+
+读了上文，应该能明白以下几点。
+
+1. 为什么要给网桥配置ip，或者说创建br0 bridge的同时，还会创建一个br0 iface。
+2. 为什么eth0和eth1在l2,连上br0后，eth1和eth0的连通还要受到iptables rule的控制。
+3. 网桥首先是为了屏蔽eth0和eth1的，其次是才是连通了eth0和eth1。
+
+### docker单机网络模型
 
 使用docker后，容器之间、容器与host之间的网络拓扑模型就毋庸赘言了。
 
@@ -116,17 +169,7 @@ a “routing process” must be running in the global network namespace to recei
 
 图3所示为一个现实世界中的 802.1Q VLAN 网络。六台电脑终端通过一级交换机接入网络，分属 VLAN 10、VLAN 20、VLAN 30。做为例子，图中左侧的交换机不支持 802.1Q VLAN，导致其连接的两台终端处于一个广播域中，尽管它们属于不同子网。作为对比，图中右侧的交换机支持 802.1Q VLAN，通过正确配置正确切割了子网的广播域，从而隔离了分属不同网段的终端。在连接外网之间，需要一个支持 802.1Q VLAN 的三层交换机，在进行数据外发时剥离 VLAN Tag，收到数据时根据IP信息转发到正确的VLAN子网。路由器根据IP信息进行NAT转换最终连接外网。
 
-## 容器跨主机通信
 
-容器跨主机通信主要有以下几个方面
-
-1. 如何实现跨主机通信本身
-
-    假设containerA（172.17.1.2）和containerB（172.17.2.2）分别在hostA（192.168.3.2）和hostB（192.168.3.3）上。根据上文，containerA可以和hostB发送通信，那么容器间实现通信的关键就是：**一个数据包（源ip=172.17.1.2，目的ip=172.17.2.2），经过虚拟网桥或网关等网络设备，到hostA的网卡时，hosta能够将目的ip转换为hostb的ip（192.168.3.3）**
-
-    这个映射关系可以简单的通过增加hosta的iptable规则来实现，但依赖手工。ovs和Libnetwork可以解决这个问题，将在单独的文章中阐述。
-    
-2. 如何实现划分子网（即隔离容器通信）。这包括单个主机内所有容器子网隔离；跨主机网络子网隔离。
     
 ## 参考文献
 

@@ -11,7 +11,9 @@ keywords: Docker,graphdriver
 ## 简介
 
 
-docker关于存储方面的总体的理念是`分层（因为不想像virtualbox一样copy），层之间有父子关系`。分层内容的“镜像图（image graph）”代表了各种分层之间的关系，用来处理这些分层的驱动就被叫做“图驱动（graphdriver）”。docker1.2.0 源码中，驱动接口如下
+docker关于存储方面的总体的理念是：**分层（因为不想像virtualbox一样copy整个镜像），层之间有父子关系。**
+
+分层内容的“镜像图（image graph）”代表了各种分层之间的关系，用来处理这些分层的驱动就被叫做“图驱动（graphdriver）”。docker1.2.0 源码中，驱动接口如下
 
 
 	type Driver interface {
@@ -25,18 +27,24 @@ docker关于存储方面的总体的理念是`分层（因为不想像virtualbox
 		Cleanup() error
 	}
 	
-换句话说，接口表述了docker上层操作的要求。“用到的数据都在这里了，但实现这个Driver interface，根据文件系统的不同，算法是不同的，这个算法，就是graphdriver”
+换句话说，接口表述了docker上层操作的要求。基于docker的分层理念，镜像数据以层为单位来组织，根据文件系统的不同，数据的内容不同，实现Driver interface的算法不同，这就是graphdriver。
 
 
 ## 一些基础知识
 
 ### 挂载/mount
 
-本质上，Ext3 mount的过程实际上是inode被替代的过程。例如，`/dev/sdb`块设备被mount到`/mnt/alan`目录。命令：`mount -t ext3 /dev/sdb /mnt/alan`。
+例如，`/dev/sdb`块设备被mount到`/mnt/alan`目录。命令：`mount -t ext3 /dev/sdb /mnt/alan`。
 
-那么mount这个过程所需要解决的问题就是将/mnt/alan的dentry目录项所指向的inode屏蔽掉，然后重新定位到/dev/sdb所表示的inode索引节点。(实际实现略有不同)[linux文件系统之mount流程分析](http://www.cnblogs.com/cslunatic/p/3683117.html)
+那么mount这个过程所需要解决的问题就是将/mnt/alan的dentry目录项所指向的inode屏蔽掉，重新定位到/dev/sdb所表示的inode索引节点。这个描述并不准确，但有利于简化理解。参见[linux文件系统之mount流程分析](http://www.cnblogs.com/cslunatic/p/3683117.html)
 
-但除了将设备mount到rootfs上，mount的花样可多了。
+**如果将mount的过程理解为：inode被替代的过程。**除了将设备mount到rootfs上，根据被替代方式的不同，mount的花样可多了。
+
+||一般用途|备注|
+|---|---|---|
+|mount|挂载设备|**需要加载设备的super block**，关联到inode| 
+|bind mount|挂载目录|替代inode| 
+|union mount|合并目录|有机的整合几个inode为一个新的inode，替代原来的inode| 
 
 ### bind mount
 
