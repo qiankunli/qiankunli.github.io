@@ -9,7 +9,9 @@ keywords: Docker Container Image
 ---
 
 ## 1 前言 ##
-本文是关于我对docker的一些理解，将持续更新，如有错误和建议，请及时反馈到qiankun.li@qq.com。本文更类似于一个知识点的总结，具体的细节请参见官方文档 [https://docs.docker.com](https://docs.docker.com) 。如果你事先对docker并不了解，建议先完成[http://www.slideshare.net/larrycai/learn-docker-in-90-minutes](http://www.slideshare.net/larrycai/learn-docker-in-90-minutes)的内容，通过实际操作对docker有一个感性的认识。
+本文类似于一个知识点的总结，具体的细节请参见官方文档 [https://docs.docker.com](https://docs.docker.com) 。
+
+如果你事先对docker并不了解，建议先完成[http://www.slideshare.net/larrycai/learn-docker-in-90-minutes](http://www.slideshare.net/larrycai/learn-docker-in-90-minutes)的内容，通过实际操作对docker有一个感性的认识。
 
 文中提到的“docker主机”、“docker虚拟机”等可以认为是安装docker服务的linux主机/虚拟机。
 
@@ -21,25 +23,12 @@ Docker是一个开源的引擎，可以轻松的为任何应用创建一个轻�
 各位都用过虚拟机软件（例如Vmware等），想必都对其资源占用情况颇有微词。其提供的功能还是比较全的，基本上整了一台新的主机出来。但如果我们不需要那么多的功能，比如宿主机和虚拟机都限定为linux，那就有机会减少一些设计，最终减少资源占用，提高效率。docker就是这样，它只提供一部分“虚拟机”的功能，没有传统虚拟机全面，但比它们更高效。
 
 
-## 3 docker安装 
-
-### 3.1 windows下v1.1.1安装 
-1. 准备
-	* windows7
-	* docker-install.exe，下载地址[https://github.com/boot2docker/windows-installer/releases](https://github.com/boot2docker/windows-installer/releases)
-2. 安装过程
-	1. 运行安装程序
-	2. 安装过程中会附带安装virtualbox和git，如果您已安装此软件，可以取消选中
-	3. 安装完毕后，可以运行程序。如果成功，可以看到命令行：`docker@bootdocker~$`
-	
-	![Alt text](/public/upload/docker/boot2docker_start.png)
-
 ## 4 docker操作 ##
 
 ### 4.1 image和container ###
 image和container是docker中很重要的两个概念，docker程序提供的docker命令，主要就是对这两个“实体”进行操作。
 
-还记得上大学的时候，很流行用一键ghost装系统，GHO镜像还原到系统后，除了windows系统本身，还自动装好了许多软件，做了一些配置（比如将my documents设置到D盘），真是非常方便。docker中的image也有这么点意思。首先会有一个base image（类似于windows纯净版ISO），在base image的基础上做一些改动，比如装个软件啥的，就形成了新的有个人特色的image（类似上述的GHO），新的image的可以传给别人使用。
+还记得上大学的时候，很流行用一键ghost装系统，GHO镜像还原到系统后，除了windows系统本身，还自动装好了许多软件，做了一些配置（比如将my documents设置到D盘），非常方便。docker中的image也有这么点意思。首先会有一个base image（类似于windows纯净版ISO），在base image的基础上做一些改动，比如装个软件啥的，就形成了新的有个人特色的image（类似上述的GHO），新的image的可以传给别人使用。
 
 我们运行一个image，会产生一个container。就像我们用一键ghost还原一个GHO，就会有一个操作系统可以运行一样。container就是docker虚拟出来的linux，操作container和操作一般的linux系统是一样一样的。
 
@@ -47,7 +36,7 @@ image和container是docker中很重要的两个概念，docker程序提供的doc
 
 #### 4.2.1 什么是Dockerfile ####
 
-“Dockerfile是一个image的表示，可以通过Dockerfile来描述构建image的步骤。”说的接地气点，dockerfile类似于数据库的日志。根据日志我们知道数据库从时刻1到时刻2发生了什么，由此可以恢复或到达数据库某个时刻的状态。对应的，已知image1，我们在dockerfile中记录对image1的改动，便可以根据dockerfile 构建出image2。也因为dockerfile，image1和image2便具备了父子关系。有了父子关系，自然也可以搞出来兄弟关系，我们可以使用`docker images --tree`查看image之间的树形家族结构。
+Dockerfile是一个image的表示，可以通过Dockerfile来描述构建image的步骤。”说的接地气点，dockerfile类似于数据库的日志。根据日志我们知道数据库从时刻1到时刻2发生了什么，由此可以恢复或到达数据库某个时刻的状态。对应的，已知image1，我们在dockerfile中记录对image1的改动，便可以根据dockerfile 构建出image2。也因为dockerfile，image1和image2便具备了父子关系。有了父子关系，自然也可以搞出来兄弟关系，我们可以使用`docker images --tree`查看image之间的树形家族结构。
 
 
 dockerfile方便了image的传播，只要是同一个base image，我们下载一个“日志文件”，便可以利用这个文件build出相应的image。“一个不包括恶意行为的dockerfile” + “一个可靠地base image” = “一个可靠好用的image”。
@@ -56,9 +45,11 @@ dockerfile方便了image的传播，只要是同一个base image，我们下载�
 制作image有两种方式：
 
 1. 通过Dockerfile
-    dockerfile记录了目标image所属的初始image，以及对初始image所做的操作及改动。通过dockerfile文件，我们可以docker build出一个新的image文件。dockerfile的语法可以参见相关文档。
+    
+    dockerfile记录了目标image所属的初始image，以及对初始image所做的操作及改动。通过dockerfile文件，我们可以`docker build`出一个新的image文件。dockerfile的语法可以参见相关文档。
 2. 通过commit container
-	我们可以先docker run运行一个image，在对应的container中进行个性化更改，然后docker commit该container。contaienr可以跟踪我们对其做的改动，并在原来image的基础上生成新的image。
+	
+	我们可以先`docker run`运行一个image，在对应的container中进行个性化更改，然后`docker commit`该container。contaienr可以跟踪我们对其做的改动，并在原来image的基础上生成新的image。
 
 
 #### 4.2.3 增删改查image ####
@@ -75,12 +66,12 @@ dockerfile方便了image的传播，只要是同一个base image，我们下载�
 4. `docker tag redhat-base:6.4`，更改某个image的tag
 
 #### 4.2.4 image库 ####
-docker的开发团队不只是要做一个软件，还想做一个社区。我们可以在github上分享我们的dockfile或image，寻找并pull我们需要的image（这一点跟git很像）。下面是相关的一些操作：
+docker的开发团队不只是要做一个软件，还想做一个社区。类似于程序猿通过github存储和分享代码，我们可以在docker hub上分享我们的dockfile或image，寻找并`docker pull`我们需要的image（这一点跟git很像）。下面是相关的一些操作：
 
 
-1. `docker search larrycai/postgresql`，查询库中关于imageName的库
-2. `docker pull larrycai/postgresql`，从库中拉取iamgeName到本地
-3. `docker push larrycai/postgresql`，将imageName上传到库中
+1. `docker search larrycai/postgresql`，查询docker hub中关于larrycai/postgresql的库
+2. `docker pull larrycai/postgresql`，从docker hub中拉取larrycai/postgresql到本地
+3. `docker push larrycai/postgresql`，将larrycai/postgresql上传到docker hub中
 
 ### 4.3 container管理 ###
 
@@ -182,21 +173,6 @@ virtualbox使用docker自带的iso无法使docker虚拟机与windows主机共享
 
 3. 隔离性。系统“污染”问题，笔者有一个redhat虚拟机，平时用来运行hadoop，其jdk是根据源码安装的sun版本。后因工作需要装另外一个软件，该软件默认依赖openjdk。jdk版本不同，导致我下次使用hadoop时产生了很多困扰。如果使用docekr，这个新的软件便可以安装在一个container中，对现有环境没有任何影响。so，这便是docker提供应用隔离的好处所在。
 
-**2015.06.03更新**
-
-目前日趋成熟的Iaas平台，比如OpenStack等，解决了以自动化方式组织、管理和使用大规模硬件资源方面的需求（管理硬件，按需提供资源）。如计算机操作系统分为Linux、Windows、Macos一样，云平台也是各有各家，并且相互的兼容性不是很好。这和以前单机操作系统时代有什么分别，只不过是一个云平台管理的资源更多了。为什么各家会抢云平台？这是未来的“操作系统”啊。
-
-此时应用以容器为单位开发，测试和发布，云平台的界限就很模糊了。
-
-那么，自docker推出以来，docker都做了什么？
-
-1. 新的LXC实现库
-2. 解决容器的互联互通
-3. 抽象了应用部署和集群管理的细节（docker swarm）
-4. 像OpenStack那样，自由管理硬件资源，并形成监控、可视化等一系列工具。
-
 ## 8 其它
-
-`https://apt.dockerproject.org/repo/pool/main/d/docker-engine/`这里，可以找到docker各个版本针对ubuntu各个发行版的deb安装文件。也可以到`https://github.com/docker/docker/releases`直接下载docker的安装程序。
 
 docker daemon 默认以root用户运行，如果非root用户想使用docker，则需要将非root用户添加到docker group（通常会在安装docker时创建），重启OS后生效。
