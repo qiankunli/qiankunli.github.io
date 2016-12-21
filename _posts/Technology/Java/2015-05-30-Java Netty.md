@@ -12,14 +12,14 @@ keywords: JAVA netty
 
 为什么学习netty?
 
-我们有很多办法实现两个系统间的相互访问，比如http client访问http server。但http并没有覆盖所有场景，比如无法处理大文件、近实时消息（比如聊天或财务数据）。socket肯定可以实现上述功能，但它太麻烦了。netty作为一个“网络通讯框架”，就是用来解决这个问题。http只是一种半双工协议，在实际的分布式应用中，我们通常需要一个全双工的协议。
+我们有很多办法实现两个系统间的相互访问，比如http client访问http server。但http并没有覆盖所有场景，比如无法处理大文件、近实时消息（比如聊天或财务数据）。http只是一种半双工协议，在实际的分布式应用中，我们通常需要一个全双工的协议。
 
-基于tcp的通信有AIO、NIO和AIO，《Netty权威指南》中提到了不使用java原生nio编程的原因：
+socket肯定可以实现上述功能，但它太麻烦了。基于tcp的通信有AIO、NIO和AIO，《Netty权威指南》中提到了不使用java原生nio编程的原因：
 
 1. 需要熟练掌握Selector、ServerSocketChannel、SocketChannel和ByteBuffer的使用
 2. 需要掌握额外的技能做铺垫，例如熟悉Java多线程编程。
 
-**netty通过对java原生nio的封装，提供能力更强的Channel与ByteBuffer实现，隐藏了Selector的使用，以及较好的线程模型实践**。
+netty作为一个“网络通讯框架”，就是用来解决这个问题。**netty通过对java原生nio的封装，提供能力更强的Channel与ByteBuffer实现，以及较好的线程模型实践，隐藏了Selector的使用**。
 
 netty和mina其实是一个人写的，所以风格非常类似。而在了解了netty和mina之后，笔者真是了解了Java框架的“高大全”。框架嘛，就是将通用的部分固定下来，我们在固定的位置填自己的逻辑代码就可以了。写代码从“写程序”变成了“填程序”。
 
@@ -32,7 +32,7 @@ netty和mina其实是一个人写的，所以风格非常类似。而在了解�
 
 ## 三 普通的java web开发与Netty的对比（从这个角度来理解netty如何简化了我们的工作）
 
-如果不谈struts或spring mvc等上层组件，使用最原始的servlet来构建web项目，我们通常会用到servlet、listener和filter等三个组件。
+如果不谈struts或spring mvc等上层组件，使用最原始的servlet来构建web项目，我们通常会用到servlet、listener和filter三个组件。
 
     public class HelloServlet extends HttpServlet  {
     	@Override
@@ -43,7 +43,7 @@ netty和mina其实是一个人写的，所以风格非常类似。而在了解�
     	}
     }
 
-我们知道，http的底层实现仍然是tcp，亦或者说，browser与web server底层仍然是socket通信。而通过j2ee，呈现在我们面前的是一个servlet。从HttpServletRequest可以拿到请求数据，通过HttpServletResponse可以写回响应。至于数据的encode与decode、socket通信、socket阻塞等细节完全不用关心。
+我们知道，http的底层实现仍然是tcp，亦或者说，browser与web server底层仍然是socket通信。而通过j2ee，服务端呈现在我们面前的是一个servlet。从HttpServletRequest可以拿到请求数据，通过HttpServletResponse可以写回响应。至于数据的encode与decode、socket通信、socket阻塞等细节完全不用关心。
 
 与此同时，j2ee支持**事件驱动**，那就是listener。
 
@@ -79,7 +79,7 @@ netty和mina其实是一个人写的，所以风格非常类似。而在了解�
 
 1. 屏蔽了底层tcp的通信细节。（因为操作中看不到一点socket的痕迹，很容易让人认为web服务器是一个“独立的”高大上的技术）
 2. 规范了数据处理。（数据接收，数据转换，数据处理，数据输出）
-3. 提供了对HTTP协议。封装了连接处理、协议编解码、超时等机制等
+3. HTTP协议。封装了连接处理、协议编解码、超时等机制等
 3. 提供了事件通知等机制，将通信步骤分解为一个个生命周期函数
 
 netty中的IO Handler组件，便整合了上述三个组件（Servlet，Filter和Listener）。
