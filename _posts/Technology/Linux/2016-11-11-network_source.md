@@ -14,11 +14,74 @@ keywords: network
 
 linux的网络部分由网卡的驱动程序和kernel的网络协议栈部分组成，它们相互交互，完成数据的接收和发送。
 
+
+## 网络操作的开始
+
+	linux-1.2.13
+	|
+	|---net
+		  |
+		  |---protocols.c
+		  |---socket.c
+		  |---unix
+		  |	     |
+		  |	     |---proc.c
+		  |	     |---sock.c
+		  |	     |---unix.h
+		  |---inet
+		  		  |
+		  		  |---af_inet.c
+		  		  |---arp.h,arp.c
+		  		  |---...
+		  		  |---udp.c,utils.c
+		  		 
+
+其中 unix 子文件夹中三个文件是有关 UNIX 域代码， UNIX 域是模拟网络传输方式在本机范围内用于进程间数据传输的一种机制。
+
+系统调用通过 INT $0x80 进入内核执行函数，该函数根据 AX 寄存器中的系统调用号，进一步调用内核网络栈相应的实现函数。
+
+file_operations 结构定义了普通文件操作函数集。系统中每个文件对应一个 file 结构， file 结构中有一个 file_operations 变量，当使用 write，read 函数对某个文件描述符进行读写操作时，系统首先根据文件描述符索引到其对应的 file 结构，然后调用其成员变量 file_operations 中对应函数完成请求。
+
+	// 参见socket.c
+	static struct file_operations socket_file_ops = {
+		sock_lseek,		// Î´ÊµÏÖ
+		sock_read,
+		sock_write,
+		sock_readdir,	// Î´ÊµÏÖ
+		sock_select,
+		sock_ioctl,
+		NULL,			/* mmap */
+		NULL,			/* no special open code... */
+		sock_close,
+		NULL,			/* no fsync */
+		sock_fasync
+	};
+	
+以上 socket_file_ops 变量中声明的函数即是**网络协议对应的普通文件操作函数集合**。从而使得read， write， ioctl 等这些常见普通文件操作函数也可以被使用在网络接口的处理上。kernel维护一个struct file list，通过fd ==> struct file ==> file->ops ==> socket_file_ops,便可以以文件接口的方式进行网络操作。同时，每个 file 结构都需要有一个 inode 结构对应。用于存储struct file的元信息
+
+	struct inode{
+		...
+		union {
+		   ...
+			struct ext_inode_info ext_i;
+			struct nfs_inode_info nfs_i;
+			struct socket socket_i;
+		}u
+	}
+
+也就是说，对linux系统，一切皆文件，由struct file描述，通过file->ops指向具体操作，由file->inode 存储一些元信息。对于ext文件系统，是载入内存的超级块、磁盘块等数据。对于网络通信，则是待发送和接收的数据块、网络设备等信息。从这个角度看，**struct socket和struct ext_inode_info 等是类似的。**
+
+
+![](/public/upload/linux/linux_network.png)
+
+从这个图中，可以看到，到传输层时，横生枝节，**代码不再针对任何数据包都通用**。从上到下，数据包的发送使用什么传输层协议，由socket初始化时确定。从下到上，收到的数据包由哪个传输层协议处理，根据从数据包传输层header中解析的数据确定。
+
+
+## 网络驱动程序
+
 首先，我们从device struct开始。struct反映了很多东西，比如看一下linux的进程struct，就很容易理解进程为什么能干那么多事情。
 
 linux会维护一个device struct list，通过它能找到所有的网络设备。device struct 和设备不是一对一关系。
-
-## 网络驱动程序
 	
 	include/linux/netdevice.h
 	struct device{
@@ -118,6 +181,8 @@ ei开头的都是驱动程序自己的函数。
 
 总的来说，kernel有几个extern的struct、pointer和func，驱动程序初始化完毕后，为linux内核准备了一个device struct list（驱动程序自己有一些功能函数，挂到device struct的函数成员上）。收到数据时，**kernel的extern func(比如netif_rx)在中断环境下被驱动程序调用**。发送数据时，则由内核网络协议栈调用device.hard_start_xmit，进而执行驱动程序函数。
 
+
+
 ## 网络协议栈
 
 socket分为多种，除了inet还有unix。反应在代码结构上，就是net包下只有net/unix,net/inet两个文件夹。之所以叫unix域，可能跟描述其地址时，使用`unix://xxx`有关
@@ -134,31 +199,35 @@ The difference is that an INET socket is bound to an IP address-port tuple, whil
 	udp.c
 	datalink.h		// 应该是数据链路层
 
-|各层之间的桥梁|备注|
-|---|---|
-|应用层||
-|struct socket||
-|BSD socket|socket函数集，比如socket、bind、accept|
-|struct net_proto|inet,unix,ipx等|
-|INET||
-|struct proto|tcp_proto,udp_proto,raw_proto|
-|传输层||
-|struct inet_protocol,header为inet_protocol_base|tcp_protocol,udp_protocol ,icmp_protocol,igmp_protocol|
-|网络层||
-|struct packet_type，header为ptype_base|ip_packet_type,arp_packet_type|
-|链路层||
-|struct device|loopback_dev等|
-|驱动层|  |
 
-怎么理解整个表格呢？以ip.c为例，在该文件中定义了ip_rcv、ip_queue_xmit(用于写数据)，链路层收到数据后，通过ptype_base找到ip_packet_type,进而执行ip_rcv。tcp发送数据时，通过tcp_proto找到ip_queue_xmit并执行。
+||数据struct|数据struct 例子|协议struct|协议struct例子|
+|---|---|---|---|---|
+|应用层|struct file||struct file_operations|struct socket_file_ops|
+|bsd socket 层|struct socket,struct sk_buff||struct proto_ops,struct net_proto(for init)|inet,unix,ipx等||
+|inet socket 层|struct sock||struct prot|tcp_prot,udp_prot,raw_prot|
+|传输层|||struct inet_protocol|tcp_protocol,udp_protocol ,icmp_protocol,igmp_protocol|
+|网络层|||struct packet_type |ip_packet_type,arp_packet_type|
+|链路层| device | loopback_dev |||
+|硬件层|||
 
-tcp_protocol是为了从下到上的数据接收，tcp_proto是为了从上到下的数据发送。为什么卡在传输层呢，因为在传输层在开始真正进行用户数据的处理（归功于tcp的复杂和重要，比如拥塞控制等）
+怎么理解整个表格呢？协议struct和数据struct有何异同？
+
+1. struct一般由一个数组或链表组织，数组用index，链表用header(比如packet_type_base、inet_protocol_base)指针查找数据。
+2. **协议struct是怎么回事呢？通常是一个函数操作集，类似于controller-server-dao之间的interface定义**，类似于本文开头的file_operations，有open、close、read等方法，但对ext是一回事，对socket操作是另一回事。
+3. 数据struct实例可以有很多，比如一个主机有多少个连接就有多少个struct sock，而协议struct个数由协议类型个数决定，具体的协议struct比如tcp_prot就只有一个。比较特别的是，通过tcp_prot就可以找到所有的struct sock实例。
+
+以ip.c为例，在该文件中定义了ip_rcv（读数据）、ip_queue_xmit(用于写数据)，链路层收到数据后，通过ptype_base找到ip_packet_type,进而执行ip_rcv。tcp发送数据时，通过tcp_proto找到ip_queue_xmit并执行。
+
+tcp_protocol是为了从下到上的数据接收，其函数集主要是handler、frag_handler和err_handler，对应数据接收后的处理。tcp_prot是为了从上到下的数据发送(所以struct proto没有icmp对应的结构)，其函数集connect、read等主要对应上层接口方法。
+
+到bsd socket层，相关的结构在`/include/linux`下定义，而不是在net包下。这就对上了，bsd socket是一层接口规范，而net包下的相关struct则是linux自己的抽象了。
 
 主要要搞清楚三个问题，具体可以参见相关的书籍，此处不详述。参见[Linux1.0](https://github.com/wanggx/Linux1.0.git)中的Linux1.2.13内核网络栈源码分析的第四章节。
 
 1. 这些结构如何初始化。有的结构直接就是定义好的，比如tcp_protocol等
 2. 如何接收数据。由中断程序触发。接收数据的时候，可以得到device，从数据中可以取得协议数据，进而从ptype_base及inet_protocol_base执行相应的rcv
 3. 如何发送数据。通常不直接发送，先发到queue里。可以从socket初始化时拿到protocol类型（比如tcp）、目的ip，通过route等决定device，于是一路向下执行xx_write方法
+
 
 ## 小结
 
