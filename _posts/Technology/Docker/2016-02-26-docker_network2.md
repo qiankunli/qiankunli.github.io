@@ -169,7 +169,7 @@ Libnetwork是Docker团队将Docker的网络功能从Docker核心代码中分离�
         [Install]
         WantedBy=multi-user.target
 
-
+这样就可以使用systemctl来控制docker swarm的启动和关闭了。
 
 ## 一些坑
 

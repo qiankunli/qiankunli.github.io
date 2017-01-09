@@ -119,11 +119,6 @@ keywords: Go
     
 一般，go代码托管网站除了github.com外，还有code.google.com，而国内无法直接下载code.google.com上的库，需要时可以到[golang中国][]下载。
 
-    
-
-    
-
-
-
+对于golang.org/x上的代码，github上也有一份，可以`go get github.com/golang`,然后再`GOPATH/src/golang`下建一个软件链接，`x ==> GOPATH/github.com/golang`
 
 [golang中国]: http://www.golangtc.com/download/package

@@ -132,3 +132,13 @@ Go中的json处理，跟结构体是密切相关的，一般要为json字符串�
     		fmt.Println(v)
     	}
     }
+    
+## command app
+
+[urfave/cli](https://github.com/urfave/cli)
+
+cli is a simple, fast, and fun package for building command line apps in Go. The goal is to enable developers to write fast and distributable command line applications in an expressive way.
+
+Things like generating help text and parsing command flags/options should not hinder productivity when writing a command line app.This is where cli comes into play. cli makes command line programming fun, organized, and expressive!
+
+go语言中的`github.com/gorilla`可以方便的进行http url 到处理方法的dispatch，`github.com/urfave/cli` 则实现了用户输入命令到处理方法的dispatch。
