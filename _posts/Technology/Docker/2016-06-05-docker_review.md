@@ -28,7 +28,34 @@ docker和vm的最主要区别就是
 
 我们知道，Host OS中的进程，申请内存往往是没有限制的，cgroup则提供了解决了这个问题。
 
-对于隔离，什么叫隔离，隔离了什么呢？隔离就是不能相互访问，甚至感知不到彼此的存在。对于Host OS中的进程，**OS只保证不能访问彼此的地址空间（存储程序和程序）**，但更大的资源范围，比如内存、cpu、文件系统，则是共享的，有时也能感知到对方的存在，否则也没办法rpc。**namespace能做到在更大的资源范围内隔离进程**。从表现上看，举个例子，不同namespace的进程可以具备相同的进程id。从实现上看，以mount namespace为例：
+对于隔离，什么叫隔离，隔离了什么呢？隔离就是不能相互访问，甚至感知不到彼此的存在。对于Host OS中的进程，**OS只保证不能访问彼此的地址空间（存储程序和程序）**，但更大的资源范围，比如内存、cpu、文件系统，则是共享的，有时也能感知到对方的存在，否则也没办法rpc。**namespace能做到在更大的资源范围内隔离进程**。
+
+从表现上看，举个例子，不同namespace的进程可以具备相同的进程id。又比如network namespace
+
+    #ip netns add ns1
+    #ip netns list
+        ns1
+    #ip link list
+    #ip link add veth0 type veth peer name veth1
+    #ip link list
+        1: lo:  mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT 
+            link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+        2: eth0:  mtu 1500 qdisc pfifo_fast state UNKNOWN mode DEFAULT qlen 1000
+            link/ether 00:0c:29:65:25:9e brd ff:ff:ff:ff:ff:ff
+        3: veth1:  mtu 1500 qdisc noop state DOWN mode DEFAULT qlen 1000
+            link/ether d2:e9:52:18:19:ab brd ff:ff:ff:ff:ff:ff
+        4: veth0:  mtu 1500 qdisc noop state DOWN mode DEFAULT qlen 1000
+            link/ether f2:f7:5e:e2:22:ac brd ff:ff:ff:ff:ff:ff
+    #ip link set veth1 netns ns1
+    #ip netns exec ns1 ip link list
+        1: lo:  mtu 65536 qdisc noop state DOWN mode DEFAULT 
+        link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+        3: veth1:  mtu 1500 qdisc noop state DOWN mode DEFAULT qlen 1000
+        link/ether d2:e9:52:18:19:ab brd ff:ff:ff:ff:ff:ff
+        
+这个与`docker exec container cmd`异曲同工，不过一个只限于网络的隔离，一个是全方位的隔离。
+
+从实现上看，以mount namespace为例：
 
 linux 进程结构体 task_struct 中保有了一个进程用到的各种资源的指针。引入了nsproxy概念后，task_struct 有一个nsproxy 成员。
 
