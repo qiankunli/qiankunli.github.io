@@ -28,7 +28,35 @@ docker和vm的最主要区别就是
 
 我们知道，Host OS中的进程，申请内存往往是没有限制的，cgroup则提供了解决了这个问题。
 
-对于隔离，什么叫隔离，隔离了什么呢？隔离就是不能相互访问，甚至感知不到彼此的存在。对于Host OS中的进程，**OS只保证不能访问彼此的地址空间（存储程序和程序）**，但更大的资源范围，比如内存、cpu、文件系统，则是共享的，有时也能感知到对方的存在，否则也没办法rpc。**namespace能做到在更大的资源范围内隔离进程**。举个例子，不同namespace的进程可以具备相同的进程id。
+对于隔离，什么叫隔离，隔离了什么呢？隔离就是不能相互访问，甚至感知不到彼此的存在。对于Host OS中的进程，**OS只保证不能访问彼此的地址空间（存储程序和程序）**，但更大的资源范围，比如内存、cpu、文件系统，则是共享的，有时也能感知到对方的存在，否则也没办法rpc。**namespace能做到在更大的资源范围内隔离进程**。从表现上看，举个例子，不同namespace的进程可以具备相同的进程id。从实现上看，以mount namespace为例：
+
+linux 进程结构体 task_struct 中保有了一个进程用到的各种资源的指针。引入了nsproxy概念后，task_struct 有一个nsproxy 成员。
+
+
+
+	struct nsproxy {
+		atomic_t count;               /* 被引用的次数 */
+		struct uts_namespace *uts_ns;
+		struct ipc_namespace *ipc_ns;
+		struct mnt_namespace *mnt_ns;
+		struct pid_namespace *pid_ns;
+		struct net 	     *net_ns;
+	};
+
+
+对于mnt namespace，
+
+	struct mnt_namespace {
+		atomic_t		count;
+		struct vfsmount *	root;///当前namespace下的根文件系统
+		struct list_head	list; ///当前namespace下的文件系统链表（vfsmount list）
+		wait_queue_head_t poll;
+		int event;
+	};
+	
+原来task_struct 会有一个 fs_struct成员（1.x内核），现在呢，则是task_struct ==> nsproxy ==> mnt_ns ==> vsfmount.
+
+我们说namespace实现资源隔离，为什么可以隔离，因为数据多了一层namespace的组织，只不过不同的资源，隔离形式不同，组织形式不同，namespace介入的形式不同。
 
 ## Docker的三大概念
 
