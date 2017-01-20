@@ -53,7 +53,7 @@ docker和vm的最主要区别就是
         3: veth1:  mtu 1500 qdisc noop state DOWN mode DEFAULT qlen 1000
         link/ether d2:e9:52:18:19:ab brd ff:ff:ff:ff:ff:ff
         
-这个与`docker exec container cmd`异曲同工，不过一个只限于网络的隔离，一个是全方位的隔离。
+本例中创建network namespace ns1，并连通root network namespace和ns1，可以看到，**linux可以跨namespace进行操作，且对两个namespace的操作互不影响。**这个与`docker exec container cmd`异曲同工，不过一个只限于网络的隔离，一个是全方位的隔离。
 
 从实现上看，以mount namespace为例：
 

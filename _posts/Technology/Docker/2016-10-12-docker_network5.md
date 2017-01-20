@@ -14,11 +14,10 @@ keywords: Docker,OVS
 
 本文章主要针对跨主机容器互联问题
 
-A Docker container created using an image works the same regardless of where it runs as long as the same image is used. Similarly, when the application developer defines their application stack as a set of distributed applications, it should work just the same whatever infrastructure it runs on. **This heavily depends on what abstractions we expose to the application developer and more importantly what abstractions we do not expose to the application developer.**
+A Docker container created using an image works the same regardless of where it runs as long as the same image is used. Similarly, when the application developer defines their application stack as a set of distributed applications, it should work just the same whatever infrastructure it runs on.（一个容器可以处处运行，延伸的说，我定义了一个分布式应用，也应能处处运行，而不管底层架构的差异） **This heavily depends on what abstractions we expose to the application developer and more importantly what abstractions we do not expose to the application developer.**
 
-## 涉及到的一些点
 
-### 单机网络模型
+## 单机网络模型
 
 [图解几个与Linux网络虚拟化相关的虚拟网卡-VETH/MACVLAN/MACVTAP/IPVLAN](http://blog.csdn.net/dog250/article/details/45788279)
 
@@ -28,13 +27,20 @@ Linux 用户想要使用网络功能，不能通过直接操作硬件完成，�
 <table border="1">
 <tr>
 	<td></td>
+	<td colspan="4">host1</td>
+	<td>host2</td>
+</tr>
+<tr>
+	<td></td>
 	<td>root network namespace</td>
 	<td>network namespace 1</td>
 	<td>network namespace 2</td>
 	<td>root network namespace</td>
+	<td>root network namespace</td>
 </tr>
 <tr>
 	<td>网络层</td>
+	<td>网络协议栈</td>
 	<td>网络协议栈</td>
 	<td>网络协议栈</td>
 	<td>网络协议栈</td>
@@ -46,15 +52,18 @@ Linux 用户想要使用网络功能，不能通过直接操作硬件完成，�
 	<td>MACVLAN网卡</td>
 	<td>虚拟网卡</td>
 	<td>物理网卡</td>
+	<td>物理网卡</td>
 </tr>
 <tr>
-	<td>连通网卡设备</td>
-	<td colspan="2">物理介质，双绞线 + 交换机</td>
+	<td>连通网卡设备/容器</td>
+	<td colspan="2">交换机(支持macvlan)</td>
 	<td colspan="2">网桥</td>
+	<td></td>
 </tr>
 <tr>
 	<td>跨主机网卡设备</td>
-	<td colspan="4">交换机</td>
+	<td colspan="5">交换机</td>
+
 </tr>
 </table>
 
@@ -68,12 +77,13 @@ Linux 用户想要使用网络功能，不能通过直接操作硬件完成，�
 |通过网桥连通|相当于内置switch|支持|通过下文的隧道或路由方案|
 |通过macvlan vepa连通|外置switch|支持|支持|
 
+## CNM
 
-### 知识点的准备
+
+### 涉及到的知识点
 
 1. 网络的基础知识，比如一些网络拓扑结构，网络节点的原理和作用
 2. 虚拟网络（或sdn）的基础知识，实现网络虚拟化的一些原理和手段
-
 3. linux网络的基础知识，网络协议栈、iptable表、路由表以及linux对网络设备的虚拟化
 4. docker网络的基础知识，network namespace,network driver等
 
