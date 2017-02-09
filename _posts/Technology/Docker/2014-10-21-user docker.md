@@ -6,12 +6,25 @@ tags: Docker
 keywords: Docker Container Image
 ---
 
-## 1 前言 ##
+##前言 ##
 下面讲述的是我在使用docker的过程中一些小技巧，不太系统。
 
 除了命令行方式外，docker client也提供Restful API来访问docker daemon。
 
-## 2 查看后台运行的container相关情况##
+## 二进制更新docker
+
+docker的yum或apt源通常滞后于实际的发布，因此第一次使用apt或yum安装，以得到一些配置文件（比如systemd的service文件），以后使用二进制文件覆盖升级。
+
+该方法适用于部分版本，比如1.12版本将docker拆分为了docker和dockerd，故而许多配置不能共用。以ubuntu为例：
+
+	# systemctl stop docker
+	# tar -zxvf docker-1.13.1.tgz ./docker
+	# cd ./docker
+	# cp -r * /usr/bin/
+	# systemctl start docker
+	
+
+##查看后台运行的container相关情况##
 
 Container后台运行时，都会执行一个启动脚本，我们可以使用`docker logs ContainerID`来跟踪这个脚本的执行情况。当然，这个脚本需要有一些必要的输出，来为我们提供判断。
 
@@ -20,15 +33,12 @@ Container后台运行时，都会执行一个启动脚本，我们可以使用`d
 1. container中运行sshd服务，并expose 22端口，在宿主机中使用ssh访问。
 2. 在docker1.3版本后，可以使用`docker exec -it ContainerId bash`进入container中并访问。
 
-## 3 查看container的IP地址 ##
 
-我们可以使用 `docker inspect ContainerID`来观察container的很多信息，其中经常使用的就是`docker inspect ContainerID | grep IPADDRESS`来查看Container的IP地址。
-
-## 4 为container设置root用户密码 ##
+##为container设置root用户密码 ##
 
 Container后台运行时，我们通常需要“SSH”进去，进行一些必要的操作，而Container root用户的密码实际是随机生成的。So，这就要求我们在制作Image时，加上这么一句`RUN echo 'root:docker' | chpasswd`，这样root用户的密码就固定了。
 
-## 5 保存image到本地 ##
+##保存image到本地 ##
 
 大多数情况下，我们可以从[docker官方registry](https://registry.hub.docker.com/ "")中下载image。同时，也可以将image保存在tar文件，方便在工作中，进行image的分发（当然，在企业中最好建立自己的docker私有registry）。
 
@@ -61,10 +71,10 @@ import/export
 用户既可以使用 docker load 来导入镜像存储文件到本地镜像库，也可以使用 docker import 来导入一个容器快照到本地镜像库。这两者的区别在于容器快照文件将丢弃所有的历史记录和元数据信息（即仅保存容器当时的快照状态），而镜像存储文件将保存完整记录，体积也要大。此外，从容器快照文件导入时可以重新指定标签等元数据信息。同时，“export/import”不会存储`CMD xxx`和`ENTRY xxx`的信息。
 
 
-## 6 清除掉所有正在运行的container ##
+##清除掉所有正在运行的container ##
 使用命令`docker rm -f $(docker ps -aq)`，便可以清除掉所有正在运行的contaienr，当然，这个命令比较暴力，小心“误伤”。
 
-## 7 Dockerfile中的ADD ##
+##Dockerfile中的ADD ##
 `ADD`可以将文件加入到Image中，但不要直接“ADD” “tar.gz”等文件，我也不知道为什么，但直接“ADD”后，运行image时，会发现“tar.gz”文件已被解压过。解决这个问题有两种办法：
 
 1. 我们可以将“tar.gz”放到一个文件夹下，“ADD”这个文件夹，这就避免了前述情况；
@@ -72,10 +82,8 @@ import/export
 
 读者可以根据自己的喜好自由选择。
 
-## 8 Dockerfile中的RUN ##
-如果有一两次编译Dockerfile文件的报错经历的话，你会发现“RUN”后的命令，实际是由“sh -c”负责具体执行的。并且，每一次RUN就会使文件系统有一个新的layer。知道这个有什么用呢？我们在写Dockerfile时，不可避免要对其进行更改，更改完后再重新编译，有时候就会很耗时。这时，可以将不会再修改的RUN操作写在Dockerfile的前面，还需要多次修改的RUN操作写在后面。这样，每次编译时，前面编译的cache会被利用到，节省时间。
 
-## 9 volume的速度问题 ##
+##volume的速度问题 ##
 在windows中运行boot2docker时，我们有时在container中运行一些软件，这些软件的运行需要windows宿主机提供一些文件(比如在`C:/Users/id/git`下)。此时，我们可以通过virtualbox的sharedfolder功能，将共享文件夹挂载到boot2docker-vm的`/mnt/git`下，然后将该目录映射到container的`/root/git`。比如以下指令:
 `docker run -it -v /mnt/git:/root/git centos:centos6 bash`。
 此时，contaienr操作`/root/git`就如同操作windows的`C:/Users/id/git` 。
@@ -84,20 +92,20 @@ import/export
 
 解决方案：将`/root/git`下的文件复制到另一个文件夹下，比如`/root/tmp`,使程序在`/root/tmp`下操作文件。麻烦的是，当windows下的文件发生改动时，需要重新复制。为了提高复制速度，在container中可以使用`rsync`命令，比如`rsync -vzrtopgu --delete zabbix-2.2.6/ /root/zabbix-2.2.6/`。
 
-## 10 Dockerfile和初始化脚本 ##
+##Dockerfile和初始化脚本 ##
 
 containre在实际应用中，通常是后台运行，多个container相互配合，模拟一个比较大的应用。这时，Dockerfile和初始化脚本要有一个平衡。
 
 未完待续
 
-## 11 尽量缩小image的大小 ##
+##尽量缩小image的大小 ##
 
 0. base image应该尽可能的小
 1. 如果添加了tar.gz,那么解压缩完毕后，可以删除原来的压缩文件
 2. 如果tar.gz是从网络上获取的，则可以直接  `curl xxx.tar.gz | tar -C destinationdir -zxvf`
 3. 安装软件尽量通过yum apt-get install等方式  
 
-## 12 `docker pull`私有仓库
+##`docker pull`私有仓库
 
 Docker新的版本默认是以https访问私有库（https需要我们提供验证手段）。因此，我们需要进行一定的配置，使docker使用http方式访问私有库。
 
