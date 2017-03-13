@@ -1,3 +1,9 @@
+table,th,td {
+  border: 1px solid black
+}
+
+
+
 /* 页面配置 */
 .container {
   width: 100%;
