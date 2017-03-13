@@ -17,7 +17,7 @@ keywords: Docker volume
 
 先谈下Docker的文件系统是如何工作的。Docker镜像是由多个文件系统（只读层）叠加而成。当我们启动一个容器的时候，Docker会加载只读镜像层并在其上添加一个读写层。如果运行中的容器修改了现有的一个已经存在的文件，那该文件将会从读写层下面的只读层复制到读写层，该文件的只读版本仍然存在，只是已经被读写层中该文件的副本所隐藏。当删除Docker容器，并通过该镜像重新启动时，之前的更改将会丢失。在Docker中，只读层及在顶部的读写层的组合被称为Union File System（联合文件系统）。
 
-那么容器为什么使用AUFS作为文件系统呢？
+那么**容器为什么使用AUFS作为文件系统呢？**
 
 假设容器不使用AUFS作为文件系统，那么根据image创建container时，便类似于Virtualbox根据box文件生成vm实例，将box中的关于Linux文件系统数据整个复制一套（要是不复制，a容器更改了fs的内容，就会影响到b容器），这个过程的耗时还是比较长的。想要复用image中的文件数据，就得使用类似UFS系统。**这也是docker启动速度快的一个重要因素（**除了实际启动的是一个进程）。
 
@@ -55,6 +55,8 @@ volumn的作用：
     
 
 - 容器间共享数据
+
+[DockOne技术分享（五十七）：Docker容器对存储的定义（Volume 与 Volume Plugin）](http://dockone.io/article/1257)提到：我们要深刻理解的是**Docker容器是承载应用的，是对应用环境的抽象而不是对OS运行环境的抽象。**Docker容器天生设计就是为了应用的运行环境打包，启动，迁移，弹性拓展，所以Docker容器一个最重要的特性就是disposable，是可以被丢弃处理，稍瞬即逝的。而应用访问的重要数据可不是disposable的，这些重要数据需要持久化的存储保持。Docker提出了Volume数据卷的概念就是来应对数据持久化的。
 
 ## docker volume
 
@@ -101,7 +103,14 @@ volumn的作用：
 
 	比如`sudo docker run --volume-driver glusterfs --volume datastore:/data alpine touch /data/hello`,具体参见[Docker volume plugin for GlusterFS](https://github.com/calavera/docker-volume-glusterfs)
     
-据我估计，假如以前volume直接是通过aufs挂载的方式实现的话，那么现在docker则是通过volume plugin来访问volume数据，只不过通过aufs挂载是volume plugin的一个最简单实现而已。
+
+从另一个角度划分
+
+|类型|单机|集群环境|优缺点|
+|---|---|---|---|
+|create volume|-v支持；Dockerfile支持|使用docker plugin driver|需要安装插件、但适用范围更大|
+|mount host dir|-v支持；Dockerfile不可以|类似于lizardfs，将分布式文件系统作为本机的一个host dir|简单，但docker file的中的volume就无法弄了|
+
 
 ## 一些基础知识（待整理）
 

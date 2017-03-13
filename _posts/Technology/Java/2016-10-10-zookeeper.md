@@ -32,15 +32,12 @@ keywords: zookeeper
 	zk.close();
 	
 
-|分层，从上到下发送数据|
-|---|
-|zookeeper，提供给用户的操作对象，提供各种api|
-|将api转化为各种业务对象，ClientCnxn.sendpacket|
-|ClientCnxnSocket.sendpacket|
+|分层|从上到下发送数据|概述|备注|
+|---|---|---|---|
+|api层|zookeeper，提供给用户的操作对象，提供各种api|||
+|业务层|将api转化为各种业务对象，ClientCnxn.sendpacket|包括两个线程子类，SendThead和EventThread。其作用《从paxos到zookeeper》有介绍||
+| transport 层|ClientCnxnSocket.sendpacket|A ClientCnxnSocket does the lower level communication with a socket implementation.|可以是nio、bio|
 
-ClientCnxnSocket,A ClientCnxnSocket does the lower level communication with a socket implementation.
-
-ClientCnxn比较有意思的是，包括两个线程子类，SendThead和EventThread。其作用《从paxos到zookeeper》有介绍，看源码也不是很复杂。底层transport层（`ClientCnxnSocket.sendpacket`）可以bio或nio（nio必然用到线程），ClientCnxn层也采用线程处理，除了不同的线程干不同的事外，跟zk的业务也有点关系。（待补充）
 
 ## 如何实现远程监听
 
