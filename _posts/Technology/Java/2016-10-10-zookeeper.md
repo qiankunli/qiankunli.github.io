@@ -38,7 +38,7 @@ keywords: zookeeper
 
 |分层|从上到下接口变化|从上到下数据变化|概述|本层作用|
 |---|---|---|---|---|---|
-|api层|zookeeper，提供给用户的操作对象，提供各种api:create,get,exist|string path,byte[] data||提供增删改查监操作api|
+|api层|zookeeper，提供给用户的操作对象，提供各种api:create,get,exist|string path,byte[] data||提供增删改查监操作api，作为一个操作对象，必须是线程安全的|
 |业务层|ClientCnxn.submitRequest/ClientCnxn.queuePacket|RequestHeader,Record, ReplyHeader |包括两个线程子类，SendThead和EventThread。其作用《从paxos到zookeeper》有介绍|1. 通过队列+线程封装异步操作；2. 针对packet中的数据进行有意义的操作|
 |transport 层|ClientCnxnSocket.sendpacket|Packet|A ClientCnxnSocket does the lower level communication with a socket implementation.|可以是nio、bio。提供packet抽象，负责数据通信|
 |socket层||byte[]|||
@@ -46,6 +46,20 @@ keywords: zookeeper
 从上到下是任务分解，从下到上是协议机制的实现。
 
 **我以前理解的分层，一方面是网络协议栈那种系统级的；另一方面是简单的理解为解封包，将字节流转换为有意义的model。那么观察这种业务级的zk client，可以看到，业务级分层可以实现更丰富的抽象，比如监听（要有协议数据的支持）、异步机制的实现。**
+
+
+//todo
+
+1. 客户端watcher的原理
+2. 如何优雅的处理客户端配置
+3. 想使用原生接口一样使用netty
+
+
+参见[ZooKeeper学习之关于Servers和Watches](http://damacheng009.iteye.com/blog/2085002)
+
+watch是由read operation设置的一次性触发器，由一个特定operation来触发。为了在server端管理watch，ZK的server端实现了watch manager。一个WatchManager类的实例负责管理当前已被注册的watch列表，并负责触发它们。
+
+在server端触发了一个watch，会传播到client。此类使用server cnxn对象来处理（参见ServerCnxn类），此对象管理client和server的连接并实现了Watcher接口。Watch.process方法序列化了watch event，并通过网络发送出去。client接收到了序列化数据，转换成watch event对象，并传递到应用程序。watch只会保存在内存，不会持久化到硬盘。当client断开与server的连接时，它的所有watch会从内存中清除。因为client的库也会维护一份watch的数据，在重连之后watch数据会再次被同步到server端。
 
 ## 服务端
 
