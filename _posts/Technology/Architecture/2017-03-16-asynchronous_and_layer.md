@@ -43,7 +43,7 @@ zookeeper、dubbo client端的基本套路
 |---|---|---|
 |使用(可选)|结合spring实现自动注入、自定义配置标签等||
 |api层|提供crud监及异步操作接口|业务自定义model|
-|业务层|根据协议数据，以框架业务model的形式存储有状态信息，实现协议要求的机制，比如服务降级（dubbo）、监听（zookeeper）等功能|框架业务model|
+|业务层（在不同的框架中可能继续分层）|根据协议数据，以框架业务model的形式存储有状态信息，实现协议要求的机制，比如服务降级（dubbo）、监听（zookeeper）等功能|框架业务model|
 |transport层|传输数据model，屏蔽netty、nio和bio使用差异|框架基本数据model，协议的对象化，负责序列化和反序列化|
 |socket||byte[]|
 
@@ -51,6 +51,31 @@ zookeeper、dubbo client端的基本套路
 
 ## 分层在代码上的表现（未完成）
 
+### 代码的跨层次调用
+
+### 分层代码的配置传递问题
+
+### 分层对接口设计的影响
+
+拿业务层和transport层举例，笔者公司内部有一个rpc服务通信及治理框架，其项目maven接口如下
+
+	framework
+		framework-business
+			framework-business-api
+			framework-business-impl
+		framework-transport
+			framework-transport-api
+			framework-transport-netty
+	
+初看这段代码时，笔者曾觉得每一层弄一个xx-api不是很有必要，比如说，位于framework-transport-netty的NettyClient类
+
+	public class NettyClient{
+		void connect(ip,port){}
+		response transport(request){}
+		void close(){}
+	}
+	
+因为既然选定transport层使用netty，以后基于framework-transport-api不会有其它实现了，业务层直接使用NettyClient就好了嘛。可后来笔者发现，`NettyClient.connect`不仅业务层会调用，framework-transport-netty自身也会调用，比如心跳机制检测到连接断开时自动重连。如果一个方法有多个调用方，首先调用方传入的参数可能不同，这就需要方法由多个实现，这个好说。其次，调用方对方法的具体逻辑要求可能不同，这个就比较麻烦。同时，按照“单一职责原则”，向上的调用最好存在一个独立的接口，这或许是framework-transport-api存在的另一层重要原因。
 	
 
 
