@@ -54,7 +54,11 @@ pigeon的作用，是在一个更复杂的、依赖通信框架中（比如dubbo
     buf.writeInt(PacketType.ping.getValue());
     ctx.writeAndFlush(buf);
 
+## 连接数管理
 
+### 基本实现
+
+### 连接数管理对心跳机制的影响
 	
 
 

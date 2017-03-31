@@ -88,7 +88,7 @@ zk client 实现中，netty收到数据后，只是简单的将字节流写入�
 
 ### 使用内部类
 
-一个类如果只是被某一个类引用的话，做成内部类也无妨，虽然外围类代码长了点，但少传了很多参数。比如，下文中ZKClientHandler 的messageReceived方法就像是ClientCnxnSocketNetty的方法一样操作incomingBuffer，便于清晰的观察数据读写的来龙去脉。
+一个类如果只是被某一个类引用的话，做成内部类也无妨，虽然外围类代码看起来长了点，但少传了很多参数。比如，下文中ZKClientHandler 的messageReceived方法就像是ClientCnxnSocketNetty的方法一样操作incomingBuffer，便于清晰的观察数据读写的来龙去脉。
 
 	ClientCnxnSocketNetty{
 		protected ByteBuffer incomingBuffer = lenBuffer;	// extend from ClientCnxnSocket
@@ -100,5 +100,12 @@ zk client 实现中，netty收到数据后，只是简单的将字节流写入�
 		}
 	}
 
+### 连接数管理
 
+你是不是觉得，一个netty client只能用一个channel？
 
+通过本文开头的netty client demo，人很容易想当然的认为，netty client 与 channel是一对一关系。事实上不是的，我们可以为client 维护一个channel pool，进而提高通信效率。毕竟只有一个channel，再怎么异步，性能还是有限的。
+
+对于服务端来说，能够支持的总连接数是有限的，如果一个客户端建立了大量的连接，将严重限制服务端可以服务的客户端数，因此服务端针对一个具体的客户端，要有一个连接数（主要是上限）管理。
+
+相关细节参见[通用transport层框架pigeon](http://qiankunli.github.io/2017/03/26/pigeon_design.html)

@@ -66,7 +66,10 @@ mesos + marathon + docker的文章很多，其实这才是本文的重点。
   1. 时区、tomcat PermGensize、编码等参数值的修正
   2. base image为了尽可能精简，使用了alpine。其一些文件的缺失，导致一些java代码无法执行。比如，当去掉`/etc/hosts`中ip和容器主机名的映射后，加上`/etc/sysconfig/network`的缺失，导致`InetAddress.getLocalHost()`执行失败。参见[ava InetAddress.getLocalHost() 在linux里实现](http://blog.csdn.net/raintungli/article/details/8191701)
 		
-2. Safe shutdown以及添加sshd对safe shutdown的影响（需要通过supervisord传导SIGTERM信号）
+2. Safe shutdown，部分服务退出时要保存状态数据
+3. 支持sshd，以方便大家查看日志文件（web console对查看大量日志时，还是不太好用）
+	1. 使用supervisord（管理ssh和tomcat），需要通过supervisord传导SIGTERM信号给tomcat，以确保tomcat可以safeshutdown。该方法比较low，经常发生supervisord让tomcat退出，但自己不退出的情况。
+	2. 每台机器启动跟一个专门的容器，映射一些必要的volume，以供大家查看日志等文件
 3. Marathon多机房主备问题
 4. ip/hostname变化对服务治理系统、nginx的影响
 
