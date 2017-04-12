@@ -8,7 +8,7 @@ keywords: JAVA netty ByteBuffer
 
 ---
 
-## 前言（未完成）
+## 前言
 
 笔者最近在重温netty的实现，收获很多，主要有两个方面：
 
@@ -35,6 +35,48 @@ keywords: JAVA netty ByteBuffer
 Pooled有助于提高效率，奈何也有瑕疵，参加下文。
 
 
+## netty的buffer管理
+
+[深入浅出Netty内存管理：PoolChunk](http://blog.jobbole.com/106001/)开篇说的太好了：多年之前，从C内存的手动管理上升到java的自动GC，是历史的巨大进步。然而多年之后，netty的内存实现又曲线的回到了手动管理模式，正印证了马克思哲学观：社会总是在螺旋式前进的，没有永远的最好。的确，就内存管理而言，GC给程序员带来的价值是不言而喻的，不仅大大的降低了程序员的负担，而且也极大的减少了内存管理带来的Crash困扰，不过也有很多情况，可能手动的内存管理更为合适。
+
+因为没有专门的gc线程，因此**buffer的回收是手动的**，只是netty替我们封装了我们看不到，但在一些复杂的业务逻辑里，还是需要我们注意忘记释放的问题。
+
+引用计数负责确定buffer回收的时机，池负责buffer对象的管理。
+
+### netty内存管理
+
+PooledArena和Recycler 是什么关系？
+
+	PooledByteBufAllocator.newHeapBuffer{
+	  	PoolArena.allocate {
+	  		PooledByteBuf<T> buf = newByteBuf(maxCapacity); ==> PooledHeapByteBuf.newInstance(maxCapacity); {
+	  			 PooledHeapByteBuf buf = RECYCLER.get();
+	  			 ...
+	  		}
+	  		allocate(cache, buf, reqCapacity);
+	  	}
+	}
+	
+Recycler负责对象的分配与回收，PooledArena负责buffer对象引用内存的分配与回收。
+
+
+### 对象池 基本实现
+
+Recycler ： Light-weight object pool based on a thread-local stack.
+
+参见[Netty轻量级对象池实现分析](http://www.cnblogs.com/hzmark/p/netty-object-pool.html)
+
+文章中提到几个核心的点：
+
+1. Stack相当于是一级缓存，同一个线程内的使用和回收都将使用一个Stack
+2. 每个线程都会有一个自己对应的Stack，如果回收的线程不是Stack的线程，将元素放入到Queue中
+3. 所有的Queue组合成一个链表，Stack可以从这些链表中回收元素（实现了多线程之间共享回收的实例）
+
+我比较关注的点是，为什么不使用common pool？
+
+1. common pool 从数据结构上限定线程安全，
+2. Recycler 则是通过ThreadLocal实现线程安全性，线程可以简单直接的访问该线程域下的Stack。
+
 ## 引用计数
 
 ### java内存回收的局限性
@@ -45,10 +87,12 @@ Pooled有助于提高效率，奈何也有瑕疵，参加下文。
 
 ### 引用计数的局限性
 
-使用引用计数之后，我们就有了自己的一套对象池（netty中学名叫Arena）、以及对象管理与分配机制，就会出现内存泄漏的可能：即java gc将对象回收了（java gc有自己的回收机制，不管Arena的引用计数是否为0），但以Arena角度看，该对象的引用计数不是0，故其占用的内存不会被Arena重新分配。参见[Netty文档之引用计数对象](http://www.wolfbe.com/detail/201609/377.html#)
+使用引用计数之后，我们就有了自己的一套对象池、以及对象管理与分配机制（netty中学名叫Arena），就会出现内存泄漏的可能：即java gc将对象回收了（java gc有自己的回收机制，不管Arena的引用计数是否为0），但以Arena角度看，该对象的引用计数不是0，故其占用的内存不会被Arena重新分配。参见[Netty文档之引用计数对象](http://www.wolfbe.com/detail/201609/377.html#)
 
 
 ## 引用
+
+[Netty学习之旅----源码分析内存分配与释放原理](http://46aae4d1e2371e4aa769798941cef698.devproxy.yunshipei.com/prestigeding/article/details/54692464)
 
 [《Netty官方文档》引用计数对象](http://ifeve.com/reference-counted-objects/)
 
