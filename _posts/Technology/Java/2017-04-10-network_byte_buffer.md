@@ -59,6 +59,8 @@ PooledArena和Recycler 是什么关系？
 	
 Recycler负责对象的分配与回收，PooledArena负责buffer对象引用内存的分配与回收。
 
+对象池、内存池
+
 
 ### 对象池 基本实现
 
