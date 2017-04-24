@@ -91,6 +91,12 @@ Recycler ： Light-weight object pool based on a thread-local stack.
 
 使用引用计数之后，我们就有了自己的一套对象池、以及对象管理与分配机制（netty中学名叫Arena），就会出现内存泄漏的可能：即java gc将对象回收了（java gc有自己的回收机制，不管Arena的引用计数是否为0），但以Arena角度看，该对象的引用计数不是0，故其占用的内存不会被Arena重新分配。参见[Netty文档之引用计数对象](http://www.wolfbe.com/detail/201609/377.html#)
 
+## netty内存泄露的防止
+
+[Netty之有效规避内存泄漏](http://calvin1978.blogcn.com/articles/netty-leak.html)
+
+直接内存是IO框架的绝配，但直接内存的分配销毁不易，所以使用内存池能大幅提高性能，也告别了频繁的GC。但，**要重新培养被Java的自动垃圾回收惯坏了的惰性。**
+
 
 ## 引用
 

@@ -20,7 +20,7 @@ keywords: ThreadLocal 线程安全
     然而，Java线程通常由内核线程实现，线程的挂起和切换等需要系统进行用户态和内核态的切换，太“费劲儿”了。而线程访问data的操作可能耗时很短，为此挂起线程会引起一些浪费。
 2. 使用读写锁，读操作之间是不互斥的。
 3. 线程B发现数据“锁住了”，就空转一下，等一会儿再试试可不可以访问。（这完全就是另外一种并发编程模型了，基于这个模型，也产生了一系列的组件，比如队列等）
-4. 在某些场景下，可以让线程A和线程B都保有一份data，就可以去掉竞争，“以空间换时间”。
+4. 在某些场景下，可以让线程A和线程B都保有一份data，就可以去掉竞争，“以空间换时间”。netty中就实现了一个基于threadlocal的轻量级对象池。对于common pool来说，每次请求对象要进行线程安全处理。而netty 的pool area则是每个线程先维护一个小对象池，每次线程先去自己的对象池中请求对象，不够了，再去线程公用的对象池里拿。线程的对象池和线程公用的对象池组成了netty的对象池。
 
 因此针对一些具体的使用场景，我们放宽要求甚至不采用互斥，也能达到“线程安全”，同时在效率上有所提高。
 
@@ -83,10 +83,11 @@ ThreadLocal有以下方法：
 
 ## 变相传参
 
-变相传递参数的一个例子（实现变量在同一线程内，跨类使用）
+变相传递参数的一个例子（实现变量在同一线程内，跨类使用）。MyContext在此处作为thread local变量的操作对象。
 
+    
     MyContext{
-        // 既然ThreadLocal对象和numThreadLocal作为keyvalue搭伙，numThreadLocal作为线程作用域存在，那么ThreadLocal对象也必须只多不少，所以就弄成静态的了。
+        // 既然numThreadLocal作为线程作用域存在，那么ThreadLocal对象的作用域也必须只大不小，所以就弄成静态的了。
         public static ThreadLocal<Integer> numThreadLocal = new ThreadLocal<Integer>();
         public void set(Integer num){
             numThreadLocal.set(num);
@@ -133,6 +134,8 @@ ThreadLocal有以下方法：
     }
 
 那么输出的内容，就很有可能相互干扰了。
+
+笔者碰到的一个thread local使用实例是：公司有一个通用的后台系统，负责通用的账号、权限管理等。每个人自己开发的业务系统，接入通用后台系统。通常，业务系统要记录操作人员的change log，即业务系统要获取操作人员id。如何实现呢？业务系统接入后台系统filter，在filter中获取用户id，并写入thread local中。随后，在业务系统的任意位置，即可通过工具类，从thread local获取到用户id信息。
 
 ## 引用
 

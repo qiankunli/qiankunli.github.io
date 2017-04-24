@@ -80,14 +80,14 @@ zookeeper、dubbo client端的基本套路
 
 ## 分层和线程
 
-笔者曾经实现的一个业务是这样的
 
-<table>
-<tr><td colspan="2">rabbitmq consumer</td><td rowspan="2">线程池负责消息的转换，转发给下层线程池，负载小，线程数可以配少一点</td></tr>
-<tr><td colspan="2">dispatcher</td></tr>
-<tr><td>sender1</td><td>sender2</td><td>线程池负责业务数据的发送，跟连接数有关系，为提高服务能力，线程数可以配大一点</td></tr>
-</table>
+|layer3||
+|---|---|
+|layer2||
+|layer1||
 
-rabbitmq consumer配了15个消费线程，后来负载增大，系统的消费能力需要提高，而提高rabbitmq的线程呢感觉不太合适，一直把精力放在sender的异步化。后来，突然发现自己“灯下黑”，为什么sender 层的线程数就一定要和rabbitmq 层的线程数一样？想通了这一点，一切都迎刃而解了。
 
+假设layer1是阻塞的，那么为layer2加上线程池后，在layer3看来，layer2接口就变成非阻塞的了（调用变成了任务，存在了layer2 executor的队列中）。
+
+假设layer1是阻塞的，那么layer2经过多线程及其它技巧，在layer3看来，layer2接口可以变成异步的，例如netty就做到了喔。
 

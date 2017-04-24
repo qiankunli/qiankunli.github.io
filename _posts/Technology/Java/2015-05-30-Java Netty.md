@@ -14,7 +14,7 @@ keywords: JAVA netty
 
 我们有很多办法实现两个系统间的相互访问，比如http client访问http server。但http并没有覆盖所有场景，比如无法处理大文件、近实时消息（比如聊天或财务数据）。http只是一种半双工协议，在实际的分布式应用中，我们通常需要一个全双工的协议。
 
-socket肯定可以实现上述功能，但它太麻烦了。基于tcp的通信有AIO、NIO和AIO，《Netty权威指南》中提到了不使用java原生nio编程的原因：
+socket肯定可以实现上述功能，但直接使用它太麻烦了。基于tcp的通信有AIO、NIO和AIO，《Netty权威指南》中提到了不使用java原生nio编程的原因：
 
 1. 需要熟练掌握Selector、ServerSocketChannel、SocketChannel和ByteBuffer的使用
 2. 需要掌握额外的技能做铺垫，例如熟悉Java多线程编程。
