@@ -179,7 +179,7 @@ mesos + marathon + docker的文章很多，其实这才是本文的重点。
 1. Base image的影响
 
   1. 时区、tomcat PermGensize、编码等参数值的修正
-  2. base image为了尽可能精简，使用了alpine。其一些文件的缺失，导致一些java代码无法执行。比如，当去掉`/etc/hosts`中ip和容器主机名的映射后，加上`/etc/sysconfig/network`的缺失，导致`InetAddress.getLocalHost()`执行失败。参见[ava InetAddress.getLocalHost() 在linux里实现](http://blog.csdn.net/raintungli/article/details/8191701)
+  2. base image为了尽可能精简，使用了alpine。其一些文件的缺失，导致一些java代码无法执行。比如，当去掉`/etc/hosts`中ip和容器主机名的映射后，加上`/etc/sysconfig/network`的缺失，导致java代码`InetAddress.getLocalHost()`执行失败。参见[ava InetAddress.getLocalHost() 在linux里实现](http://blog.csdn.net/raintungli/article/details/8191701)
 		
 2. Safe shutdown，部分服务退出时要保存状态数据
 3. 支持sshd（已解决，但对解决其他问题是个有益的参考），以方便大家查看日志文件（web console对查看大量日志时，还是不太好用）
@@ -202,7 +202,8 @@ mesos + marathon + docker的文章很多，其实这才是本文的重点。
 这样带来的问题是
 
 1. 对于运维人员人说，一些操作不能固化下来，比如回滚等，手工操作易出错。
-2. 对于用户来说，容易相当然的通过portainer进行增删改容器的操作，进而引起系统的不一致。
+2. 对于用户来说，容易想当然的通过portainer进行增删改容器的操作，进而引起系统的不一致。
+3. 因为是现成系统，很难加入我们自己的逻辑，这使得配置上经常出现一些语义冲突的情况。
 
 ## 引用
 
