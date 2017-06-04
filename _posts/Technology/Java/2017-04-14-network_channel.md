@@ -76,7 +76,7 @@ operations such as read, write, connect, and bind.
 
 所有的io操作都是异步，那么有channelFuture就是理所当然了。因为即便是异步，也得告诉你什么时候写完了，什么时候读完了，以及r/w之后做什么，这时就需要一个nexus对象（callback或future）。并且，对于异步来说，可能A线程触发读操作，而实际处理读到数据的是B线程。
 
-单纯的nio，是不支持异步的，这就意味一系列的封装操作。并且netty channel不同方法的封装方式是不一样的。比如，AbstractChannel有一些future成员，为什么呢？read、write、connect等操作的future的返回是AbstractChannel具体负责io的unsafe、pipeline等成员负责。剩下的close（channel作为一个facade类，聚合了多个组件，close操作涉及到多个组件）等操作，由AbstractChannel亲自维护future。
+单纯的nio，是不支持异步的（channel只是搬运buffer罢了，你并不能告诉channel，数据写完了通知你一声儿），这就意味一系列的封装操作。并且netty channel不同方法的封装方式是不一样的。比如，AbstractChannel有一些future成员，为什么呢？read、write、connect等操作的future的返回是AbstractChannel具体负责io的unsafe、pipeline等成员负责。剩下的close（channel作为一个facade类，聚合了多个组件，close操作涉及到多个组件）等操作，由AbstractChannel亲自维护future。
 
 ### hierarchical
 
@@ -115,12 +115,75 @@ netty channel作为对nio channel的增强，有两种增强方式：
 			java.nio.channel.write(buffer)
 			business2
 		}
+
 而netty channel却采用了聚合的方式，将实际的读写交给unsafe，有以下几个好处：
 
    1. 不跟netty channel（作为facade）的其它代码、成员放在一起。unsafe更纯粹的组织读写代码。
    2. netty channel除了网络io，还有线程模型(eventloop)、数据处理模型(pipeline)，rw代码交给unsafe后，netty读写就是unsafe、eventloop和pipeline的三国杀，netty channel在外边统筹兼顾。否则，netty channel和eventloop、pipeline就糅合在一起，纠缠不清了。
 	
 因此，理解netty channel，就要理解unsafe、pipeline和eventloop的三国杀。我们反过来想想，正是理清了这三者的关系，unsafe、pipeline和eventloop才有了自己的继承体系，最后被netty channel揉和在一起。
+
+## pipeline
+
+A list of ChannelHandlers which handles or intercepts inbound events and outbound operations of a Channel.  ChannelPipeline implements an advanced form of the Intercepting Filter pattern to give a user full control over how an event is handled and how the ChannelHandlers in a pipeline interact with each other.
+
+inbound 的被称作events， outbound 的被称作operations。
+
+
+![Alt text](/public/upload/java/netty_pipeline.png)
+
+从这个图就可以佐证，pipeline作为数据处理模型，不介入io模型，也不介入线程模型。
+
+## eventloop
+
+	SingleThreadEventExecutor{
+		 private volatile Thread thread;
+		 Queue<Runnable> taskQueue;
+		 protected abstract void run();
+		 private void doStartThread() {
+		 	  executor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    thread = Thread.currentThread();
+                    if (interrupted) {
+                        thread.interrupt();
+                    }
+                    ...
+                    SingleThreadEventExecutor.this.run();
+                }
+            }
+		 }
+		 public boolean inEventLoop() {
+            return this.thread == Thread.currentThread();
+    	 }
+	}
+	
+从SingleThreadEventExecutor代码中可以看到
+
+1. SingleThreadEventExecutor的基本逻辑就是执行run方法，run方法的基本工作是执行taskQueue中的任务。其子类NioEventLoop在run方法中加入了自己的私活：select(),并处理捕获的selectKey。
+2. SingleThreadEventExecutor虽然具备线程执行能力，但其只是Runable的一部分，**用来定义任务**，真正的线程驱动由executor（初始化EventLoopGroup时传入或默认初始化）负责。
+3. SingleThreadEventExecutor是一个executor，一个executor的基本实现就是：一个队列 + 一堆线程。对外的接口就是：提交runnable。
+4. SingleThreadEventExecutor记录了执行自己run方法的线程，这样可以区分操作调用来自自家线程还是外界。如果是外界，则将操作变成任务提交。操作的实际执行永远由自家线程负责，以达到线程安全的目的。
+
+我们复盘一下，如果我去实现一个nioeventloop，我会怎么写
+
+	NioEventLoop implements Runnable{
+		selector
+		Queue<Runnable> taskQueue;
+		public void run(){
+			selectKeys = selector.select();
+			process(selectKeys);
+			process(taskQueue);
+		}
+	}
+	
+系统怎么启动呢？
+
+    nioEventLoop = new NioEventLoop();
+    nioEventLoop关联channel等
+    Executots.execute(nioEventLoop);
+    
+但这样做有一个问题：这两者有什么优劣呢？
 
 ## channel 以及 unsafe pipeline eventloop 三国杀
 

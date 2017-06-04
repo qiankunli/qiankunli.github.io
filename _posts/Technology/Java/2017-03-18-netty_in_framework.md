@@ -39,7 +39,9 @@ keywords: JAVA netty pool
 	    }
 	}
 	
-首先，该代码启动一个进程，进程的目的是启动netty。而通常框架中，netty以及其实现的网络通信，只是框架功能的一个基础部分。我们如何对netty进行封装，使其“返璞归真”，回归到java socket原来的api，`socket.write(byte[])`，甚至于借助netty的特性，提供异步操作的api。或者说，**一个通用的通信分层框架是一个什么样的结构，而上述netty client demo代码如何分散或适配在这个框架中，这是一个很有意思的部分。**
+首先，该代码启动一个进程，进程的目的是启动netty。而通常框架中，netty以及其实现的网络通信，只是框架功能的一个基础部分。我们如何对netty进行封装，使其“返璞归真”，回归到java socket原来的api的使用感觉：`socket.write(byte[])`，甚至于借助netty的特性，提供异步操作的api。
+
+或者说，**一个通用的通信分层框架是一个什么样的结构，而上述netty client demo代码如何分散或适配在这个框架中，这是一个很有意思的部分。**
 
 最近在学习zookeeper的源码，zk client的transport层提供java原生nio和netty两种实现。基于zk中netty使用方式的借鉴和自己的思考，我实现了一个基于netty的、通用的transport层框架，参见[qiankunli/pigeon
 ](https://github.com/qiankunli/pigeon)
@@ -72,6 +74,11 @@ transport层负责的
 |推的方式|上层对下层传入callback,下层存储`<id,callback>`映射。在netty读取到响应的回调方法中，根据返回数据id找到并调用callback|request和response packet共用一个id维持关联关系|
 |拉的方式|上层与下层共用一个`<id,packet>`，这个map是上下层的接口之一。在netty读取到响应的回调方法中，根据id找到并给packet 的状态字段赋值。上层轮询packet的状态字段值|packet中要有一个状态字段|
 
+
+[浅谈TCP/IP网络编程中socket的行为](http://www.cnblogs.com/promise6522/archive/2012/03/03/2377935.html)提到：无论是磁盘io还是网络io，应用程序乃至r/w系统调用都不负责数据实际的读写（接收/发送），这些控制皆发生在TCP/IP栈中，对应用程序是透明的。系统调用及之上的应用程序和tcp协议栈就是通过send buffer和receive buffer沟通。
+
+而对于netty和上层框架来说，**netty本身是一个死循环的系统**：等待io事件然后处理，外界可以提交任务（比如写数据）交给这个循环系统执行。这个循环系统也会在读到数据时，执行设定的handler。执行设定的handler，里面可以做的文章就比较多了。
+
 ## zk 使用netty的一些特别之处
 
 zookeeper中采用“拉的方式”，但transport层并没有维护`<id，packet>`。因为zookeeper client确保了发送数据请求（ping等请求是另一种逻辑）的有序性，因此上下层共用一个packet queue即可。
@@ -82,6 +89,23 @@ zk client 实现中，netty收到数据后，只是简单的将字节流写入�
 ](https://github.com/qiankunli/pigeon)
 的过程中，发现zk client的抽象接口是`ReplyHeader submitRequest(RequestHeader h, Record request,
                 Record response, WatchRegistration watchRegistration)`，response对象是事先创建好的。若套用了netty的编解码流程，response对象将由netty框架生成，再利用其为用户创建的response对象赋值，就多费了一番波折，并且不是很有必要。
+                
+## pushy
+
+Pushy is a Java library for sending APNs (iOS, OS X, and Safari) push notifications.
+
+pushy 对netty的使用和zk有所不同
+
+1. zk client本身具备复杂的业务逻辑，netty只是作为transport
+2. 和apns交互用的是http2协议，而http2的编解码是可以作为netty 的一个handler“插件”存在的，同时，pushy对外提供的接口也完全是异步的。
+
+
+	    ApnsPayloadBuilder payloadBuilder = new ApnsPayloadBuilder();
+	    payloadBuilder.setAlertBody("Example!");
+	    String payload = payloadBuilder.buildWithDefaultMaximumLength();
+	    String token = TokenUtil.sanitizeTokenString("<efc7492 bdbd8209>");
+	    SimpleApnsPushNotification  pushNotification = new SimpleApnsPushNotification(token, "com.example.myApp", payload);
+		Future<PushNotificationResponse<SimpleApnsPushNotification>> sendNotificationFuture = apnsClient.sendNotification(pushNotification);
 
 
 ## 一些技巧

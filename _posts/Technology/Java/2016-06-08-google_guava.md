@@ -20,20 +20,17 @@ A traditional Future represents the result of an asynchronous computation: a com
 
 ## 系统的理下异步执行框架(未完成)
 
-调用线程和执行线程（执行线程可以是一个线程，可以是一个线程池）
+一些框架代码是在业务线程驱动下执行，而提供异步操作的框架则
 
-异步批量执行
+1. 提供操作对象，及异步接口
+2. 框架本身需要`xx.start()`或`xx = new xx()`触发执行
 
-
-异步执行框架在rpc（网络io）和线程方面的不同实现。
 
 ## RateLimiter
 
 `java.util.Semaphore` 限制了并发访问的数量而不是使用速率。RateLimiter 从概念上来讲，速率限制器会在可配置的速率下分配许可证。如果必要的话，每个`acquire()` 会阻塞当前线程直到许可证可用后获取该许可证。一旦获取到许可证，**不需要再释放许可证**。
 
 [Guava官方文档-RateLimiter类](http://ifeve.com/guava-ratelimiter/)
-
-
 
 ## 新用Function
 
@@ -52,3 +49,11 @@ A traditional Future represents the result of an asynchronous computation: a com
 	}
 
 就可以在这样一些场景，游刃有余了。
+
+## guava-retrying
+
+[rholder/guava-retrying](https://github.com/rholder/guava-retrying)是一位大牛基于guava写一个的重试框架，封装了重试的一些通用问题
+
+1. 什么时候重试，是否立即重试
+2. 重试几次、重试间隔
+

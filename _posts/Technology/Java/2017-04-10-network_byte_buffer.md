@@ -15,6 +15,28 @@ keywords: JAVA netty ByteBuffer
 1. 看到很多以前不太重视的部分
 2. 以前以一个初学者的角度来学习netty，更多看重术的部分；现在以一个熟练使用者的角度来看，更多看中里面的一些思想。这些解决问题的思想，体现了解决问题的思路。
 
+## linux 文件操作系统调用接口
+
+ 1. open：打开文件。
+ 2. read：从已打开的文件中读取数据。
+ 3. write：向已打开的文件中写入数据。
+ 4. close：关闭已打开的文件。
+ 5. ioctl：向文件传递控制信息或发出控制命令。
+
+以r/w为例
+
+	ssize_t read(int fd, void *buf, size_t count);
+	ssize_t write(int fd, const void *buf, size_t count);
+	
+另外还有一个不常备注意的
+
+ 	int ioctl(int fd, int request, ...);
+ 
+ioctl操作用于向文件发送控制命令，这些命令不能被视为是输入输出流的一部分，而只是影响文件的操作方式。
+
+与java io/nio通过socket/channel 作为文件io系统调用的nexus不同，java nio /netty byte buffer只是作为数据的载体。
+	
+
 ## byte buffer
 
 ### java nio byte buffer
@@ -36,6 +58,9 @@ Pooled有助于提高效率，奈何也有瑕疵，参加下文。
 
 
 ## netty的buffer管理
+
+为什么netty的buffer需要管理，java io/nio时期，怎么没有这样的事儿？因为，java io/nio对外的接口就是 `socket/channel.write(byte[]/byte buffer)`,byte[] 由jvm直接管理。这一部分，可以参见zk client的ClientCnxnSocketNIO实现。而netty则是`channel.unsafe.write(Object msg, ChannelPromise promise)`，bytebuffer直接由netty负责，因此netty可以直接采取一些手法，使其更高效.
+
 
 [深入浅出Netty内存管理：PoolChunk](http://blog.jobbole.com/106001/)开篇说的太好了：多年之前，从C内存的手动管理上升到java的自动GC，是历史的巨大进步。然而多年之后，netty的内存实现又曲线的回到了手动管理模式，正印证了马克思哲学观：社会总是在螺旋式前进的，没有永远的最好。的确，就内存管理而言，GC给程序员带来的价值是不言而喻的，不仅大大的降低了程序员的负担，而且也极大的减少了内存管理带来的Crash困扰，不过也有很多情况，可能手动的内存管理更为合适。
 

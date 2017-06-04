@@ -114,7 +114,11 @@ A factory class decouples the client and implementing class.
 
 驱动
 
-1. 框架本身有线程启动（或web容器启动时驱动）
+1. 框架本身有线程启动，start 框架内线程有以下几种方式
+
+	1. 框架线程启动代码注册到web容器中，web容器启动时驱动
+	2. 显式初始化框架提供的操作对象
+	3. 框架的操作对象在执行第一个任务时启动线程
 2. 通过业务调用驱动
 
 
