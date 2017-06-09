@@ -62,9 +62,14 @@ nio/netty的一些特点
 
 transport层负责的
 
-1. 通用数据请求model、响应model（可以是同一个）定义及其序列化逻辑。对应zk就是Packet。**为什么transport层还需要一个通用的model？**因为数据model的收发需要一些辅助字段，比如客户端收到一个响应model，要和其对应的请求model关联起来，这就需要一个id字段。**而transport层model通常和业务层协议model不是同一个**，因为层次之间共用model会导
+1. 通用数据请求model、响应model（可以是同一个）定义及其序列化逻辑。对应zk就是Packet。**为什么transport层还需要一个通用的model？**因为数据model的收发需要一些辅助字段，比如客户端收到一个响应model，要和其对应的请求model关联起来，这就需要一个id字段。**而transport层model通常和业务层协议model不是同一个**，因为层次之间共用model会导致transport层字段暴露到上层。
+
+	
 2. 连接的可靠性检测，比如收发ping/pong消息，如有异常，及时反馈到上层
-3. 异步机制的实现，callback/future
+3. transport client 接口异步机制的实现，callback/future，这个通常有两个实现方案
+
+	* 维护一个map及全局id产生器，每次请求`put<id,request>`，从响应中得到一个`<id,response>`,通过id将request和response关联起来。
+	* 
 
 
 我们经常说，分层，但分层的关键在哪里，如果层之间的接口设计不好，不仅上层会侵染下层，下层也会侵染上层，比如netty数据的读取是在回调方法中，此时上层要想获得响应

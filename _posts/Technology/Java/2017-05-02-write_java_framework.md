@@ -128,3 +128,7 @@ A factory class decouples the client and implementing class.
 
 
 
+## 其它
+
+* IdentityHashMap，This class implements the Map interface with a hash table, using reference-equality in place of object-equality when comparing keys (and values).  In other words, in an IdentityHashMap, two keys k1 and k2 are considered equal if and only if
+ (k1==k2)
