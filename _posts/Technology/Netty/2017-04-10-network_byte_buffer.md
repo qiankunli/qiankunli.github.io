@@ -3,7 +3,7 @@
 layout: post
 title: network byte buffer
 category: 技术
-tags: Java
+tags: Netty
 keywords: JAVA netty ByteBuffer
 
 ---

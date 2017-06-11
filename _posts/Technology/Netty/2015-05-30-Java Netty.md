@@ -3,7 +3,7 @@
 layout: post
 title: Netty（一）初步了解
 category: 技术
-tags: Java
+tags: Netty
 keywords: JAVA netty
 
 ---

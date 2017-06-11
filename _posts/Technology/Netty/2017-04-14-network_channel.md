@@ -3,7 +3,7 @@
 layout: post
 title: network channel
 category: 技术
-tags: Java
+tags: Netty
 keywords: JAVA netty channel
 
 ---

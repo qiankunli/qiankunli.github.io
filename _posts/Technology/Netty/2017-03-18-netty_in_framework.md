@@ -3,7 +3,7 @@
 layout: post
 title: netty（六）netty在框架中的使用套路
 category: 技术
-tags: Java
+tags: Netty
 keywords: JAVA netty pool
 
 ---
