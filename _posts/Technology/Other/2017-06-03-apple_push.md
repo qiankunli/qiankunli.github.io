@@ -43,10 +43,16 @@ keywords: apns
 
 网络环境差时，发送大批量推送，推送数据缓冲在socket send buffer，进而堆积在apns的receive buffer，apns receive buffer堆积到一定程度，那么整个处理过程就停止了。linux tcp的机制是，一定时间收不到ack就开会resend，resend次数超过阈值就会断连接。参见[Closing connection due to write timeout](https://github.com/relayrides/pushy/issues/433)和[JAVA Socket超时浅析](http://blog.csdn.net/sureyonder/article/details/5633647)中的"socket写超时"部分。[几种TCP连接中出现RST的情况](https://my.oschina.net/costaxu/blog/127394)
 
-## 和前段协作
+## 和前端协作
 
 1. 无论是否可以拿到token，都要发请求，告诉我客户端是否关了推送
 
+## 涉及的技术栈
+
+1. netty及其涉及的java nio
+2. http2
+3. ssl
+4. netty与ssl、http2的结合问题
 
 ## 办法
 

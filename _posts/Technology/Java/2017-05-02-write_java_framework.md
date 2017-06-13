@@ -73,6 +73,10 @@ java 平台对spi的支持可以参见java.util.ServiceLoader.A simple service-p
 
 而对于框架说，其主线非常明确，往往只有一个入口，一个入口操作对象对外提供服务。此时呢，通常有一个InterfaceA，然后是AbstractA，继而BaseA/DefaultA等，向下开枝散叶（自上而下）。此时呢，通常上级类更容易反映该系列类的作用，制定业务流程，而下级类则往往是某个流程步骤的具体实现了。
 
+还有一种父类，参见netty-codec-http2，父类HttpRequestDecoder处理了http协议所有可能的场景，子类只需为父类某些参数设置特定值即可。构造子类时，不需要传入父类构造函数一样多的参数。
+
+不同的继承形式，就好比不同的家庭。有的是富二代，父类把所有活儿都干完了。有的父类则是下个指示，交给各个子女去执行。甚至于还有，子类忙的要死，将公共的活儿匀给父类干。
+
 ## 重新理解工厂模式
 
 A factory class decouples the client and implementing class.
