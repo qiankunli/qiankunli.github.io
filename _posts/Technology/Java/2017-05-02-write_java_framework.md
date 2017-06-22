@@ -130,6 +130,10 @@ A factory class decouples the client and implementing class.
 
 1. 框架应该尽量减少依赖。除了上文提到的spring的版本兼容问题，一些框架功能的实现还依赖zk、mq等，这是要尽量减少的。
 
+## 框架和框架box 类
+
+学习一个框架，要分清楚框架的核心和边缘，比如《netty in action》中提到:**Netty provides an extensive set of predefined handlers that you can use out of the box.**including handlers for protocols such as HTTP and SSL/TLS. Internally ,Channel-Handlers use events and futures themselves,making them consumers of the same abstractions your applications will employ.
+
 
 
 ## 其它
