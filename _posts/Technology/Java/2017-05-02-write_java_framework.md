@@ -134,6 +134,9 @@ A factory class decouples the client and implementing class.
 
 学习一个框架，要分清楚框架的核心和边缘，比如《netty in action》中提到:**Netty provides an extensive set of predefined handlers that you can use out of the box.**including handlers for protocols such as HTTP and SSL/TLS. Internally ,Channel-Handlers use events and futures themselves,making them consumers of the same abstractions your applications will employ.
 
+## 依赖关系的管理
+
+一个稍微复杂的框架，必然伴随几个抽象以及抽象间的依赖关系，那么依赖的关系的管理，可以选择spring（像大多数j2ee项目那样），也可以硬编码。这就是我们看到的，每个抽象对象有一套自己的继承体系，然后抽象对象子类之间又彼此复杂的交织。比如Netty的eventloop、unsafe和pipeline，channel作为最外部操作对象，聚合这三者，根据聚合合的子类的不同，Channel也有多个子类来体现。
 
 
 ## 其它

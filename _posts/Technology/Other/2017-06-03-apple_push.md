@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: apple 推送的问题
+title: apple 推送那些事儿
 category: 技术
 tags: Other
 keywords: apns
@@ -77,7 +77,7 @@ keywords: apns
 
 用户推送开关、token的采集
 
-1. 无论是否可以拿到token，都要发请求，告诉我客户端是否关了推送
+1. 无论是否可以拿到token，都要发请求，告知服务端客户端是否关了推送
 
 推送送达数据的采集
 

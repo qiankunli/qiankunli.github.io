@@ -187,13 +187,15 @@ inbound 的被称作events， outbound 的被称作operations。
 
 ## channel 以及 unsafe pipeline eventloop 三国杀
 
-eventloop 有一个selector 成员，selector.select() 得到selectorKey，selectorKey 可以获取到channel（channel执行 `SelectionKey register(Selector sel, int ops, Object att)`时会将自己作为attr传入），进而通过channel得到unsafe进行读写操作。
+**Channel是netty提供的操作对象，其能力是通过聚合unsafe、pipeline和eventloop来实现的。 也即是说，channel只是外皮，分析unsafe、pipeline和eventloop的相互作用才是学习Netty的关键。**
+
+eventloop 有一个selector 成员，selector.select() 得到selectorKey，selectorKey 可以获取到channel（channel执行 `SelectionKey register(Selector sel, int ops, Object att)`时会将自己作为attr传入），进而通过channel得到unsafe进行读写操作。（channel提供的操作能力，一方面供coder使用，一方面供eventloop使用）
 
 对于读取，是eventloop ==> channel.unsafe.read ==>              channel.pipeline.fireChannelRead(byteBuf);
 
 对于实际的写，eventloop ==> unsafe.forceFlush()
 
-也就是说，三国杀里，eventloop只需负责在合适的时间通过channel操作unsafe即可。
+也就是说，三国杀里，eventloop只需负责在合适的时间通过channel操作unsafe==>pipeline或pipeline ==> unsafe即可。
 
 对于写，则是 channel.write ==> pipeline.writeAndFlush(msg) ==> HeadContext.write ==> unsafe.write ==> outboundBuffer.addMessage
 
@@ -202,3 +204,14 @@ java nio channel每次读写都要缓冲区。对于netty channel来说（具体
 
 一个channel自打注册到selector后，不是一直interest r/w事件的，比如out buffer有数据了才关心，没数据了就remove interest，这样可以提高性能。
 
+## 小结
+
+一个稍微复杂的框架，必然伴随几个抽象以及抽象间的依赖关系，那么依赖的关系的管理，可以选择spring（像大多数j2ee项目那样），也可以硬编码。这就是我们看到的，每个抽象对象有一套自己的继承体系，然后抽象对象子类之间又彼此复杂的交织。比如Netty的eventloop、unsafe和pipeline，channel作为最外部操作对象，聚合这三者，根据聚合的子类的不同，Channel也有多个子类来体现。
+
+同时，做一个粗略的对应
+
+|模型|代码抽象|
+|---|---|
+|io模型|unsafe|
+|线程模型|eventloop|
+|数据处理模型|pipeline|
