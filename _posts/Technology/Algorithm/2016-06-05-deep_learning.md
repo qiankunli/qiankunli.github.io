@@ -26,6 +26,8 @@ keywords: 深度学习
 
 三百多页ppt，就说比较好的学习材料[李宏毅 / 一天搞懂深度學習](https://www.slideshare.net/tw_dsconf/ss-62245351?qid=108adce3-2c3d-4758-a830-95d0a57e46bc)
 
+[Deep Learning](http://www.deeplearningbook.org/)
+
 ## 人工智能 ==> 机器学习 ==> 深度学习
 
 [「人工智能入门」AI 是什么？](https://zhuanlan.zhihu.com/p/24919118)
