@@ -58,7 +58,7 @@ in netty3,the threading model used in previous releases guaranteed only that inb
 
 数据处理模型与线程模型的结合，便是
 
-1. channel和eventloop是一对多关系
+1. channel和eventloop是多对一关系
 2. channel的inbound和outbound事件全部由eventloop处理
 3. 根据1和2，outbound事件可以由多个calling thread触发，但只能由一个eventloop处理。那么就需要将多线程调用转换为任务队列。
 
