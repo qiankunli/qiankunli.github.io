@@ -48,7 +48,7 @@ a ChannelHandler can belong to more than one ChannelPipeline,it can be bound to 
 
 in netty3,the threading model used in previous releases guaranteed only that inbound (previously called upstream) events would be executed in the so-called i/o thread(corresponding to netty4's eventloop).all outbound(downstream) events were handled by the calling thread,which might be the i/o thread or any other.netty3的问题就是，处理由多个calling thread线程触发的outbound事件时，要通过加锁等方式解决线程安全问题。
 
-同步io，线程和连接通常要维持一对一关系。异步io才可以一个线程处理多个io。
+**同步io，线程和连接通常要维持一对一关系。异步io才可以一个线程处理多个io。**
 
 首先，netty的数据处理模型
 
@@ -73,7 +73,10 @@ the basic idea of an event loop
 	
 ### 创建、分配和销毁
 
-创建、分配、运行(运行逻辑)和销毁和一个线程模型（线程池）的基本内容。对于创建、分配和销毁，或者线程自生自灭，或者由一个第三方类来管理或触发，比如Executor和EventloopGroup。
+当我说线程模型的时候，我在说什么？**如何创建、分配、运行(运行逻辑)和销毁一个线程，是一个线程模型（线程池）的基本内容。**
+
+1. 线程自生自灭
+2. 由一个第三方类来管理或触发，比如Executor和EventloopGroup。
 	
 java 线程池的常见用法
 
