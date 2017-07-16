@@ -64,8 +64,10 @@ ln分为软链接和硬链接
 
 union mount的使用场景，As an example application of union mounting, consider the need to update the information contained on a CD-ROM or DVD. While a CD-ROM is not writable, one can overlay the CD's mount point with a writable directory in a union mount. Then, updating files in the union directory will cause them to end up in the writable directory, giving the illusion that the CD-ROM's contents have been updated.
 
-Union FileSystem的核心逻辑是Union Mount，它支持把一个目录A叠加到另一个目录B之上；用户对目录B的读取就是A加上B的内容，而对B目录里文件写入和改写则会保存在目录A上，因为A在上一层。这个类似差分VHD的效果，但是是以文件为单位的。
+Union FileSystem的核心逻辑是Union Mount，它支持把一个目录A和另一个目录B union，提供一个虚拟的C目录（目录union的语义）。对于特定的权限设置策略，如果设置A目录可写，B目录只读。用户对目录C的读取就是A加上B的内容，而对C目录里文件写入和改写则会保存在目录A上。这样，就有了A在B上层的感觉。
+[DOCKER基础技术：AUFS](http://coolshell.cn/articles/17061.html)
 
+[Docker存储驱动简介](https://linux.cn/thread-16017-1-1.html)
 
 ## 几大文件系统
 
