@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 深度学习入门
+title: 深度学习是个什么鬼
 category: 技术
 tags: Algorithm
 keywords: 深度学习
