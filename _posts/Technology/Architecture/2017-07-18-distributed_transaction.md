@@ -121,4 +121,8 @@ XA 是 X/Open DTP 定义的交易中间件与数据库之间的接口规范（�
 
 tcc事务处理
 
-	
+## 异步、补偿
+
+[分布式系统事务一致性解决方案](http://www.infoq.com/cn/articles/solution-of-distributed-system-transaction-consistency)
+
+[以交易系统为例，看分布式事务架构的五大演进](http://www.sohu.com/a/134477290_487514)
