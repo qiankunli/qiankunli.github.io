@@ -12,6 +12,8 @@ keywords: tcp ip socket
 
 我们潜意识里的一些编程习惯，或许是从大一学C语言开始的
 
+计算机科学就是研究计算：如何表示和处理信息。[学会思考，而不只是编程](http://www.infoq.com/cn/news/2017/06/Dont-learn-code-Learn-think)
+
 ## 我们用参数做什么
 
 以java为例，一个方法有一个Object参数对象，
