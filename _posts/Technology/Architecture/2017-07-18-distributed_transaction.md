@@ -14,27 +14,21 @@ keywords: 分布式事务
 
 [JTA与TCC](http://qiankunli.github.io/2016/05/21/tcc.html)
 
-脉络
-
-1. 数据库事务
-2. 分布式事务
-3. XA
-4. 放弃强一致性、达到最终一致性 [分布式服务框架之服务化最佳实践](http://www.infoq.com/cn/articles/servitization-best-practice)
-
+其它引用
 
 [关于分布式事务、两阶段提交协议、三阶提交协议](http://www.hollischuang.com/archives/681)
 
 [分布式事务的典型处理方式:2PC、TCC、异步确保和最大努力型](http://kaimingwan.com/post/fen-bu-shi/fen-bu-shi-shi-wu-de-dian-xing-chu-li-fang-shi-2pc-tcc-yi-bu-que-bao-he-zui-da-nu-li-xing)
 
 
-github 案例项目[moonufo/galaxyLight](https://github.com/moonufo/galaxyLight)
+github 案例项目:
+
+1. [QNJR-GROUP/EasyTransaction](https://github.com/QNJR-GROUP/EasyTransaction)
+2. [moonufo/galaxyLight](https://github.com/moonufo/galaxyLight)
 
 ## 从一致性问题开始
 
 [关于分布式一致性的探究](http://www.hollischuang.com/archives/663)
-
-
-[分布式系统的CAP理论](http://www.hollischuang.com/archives/666): 一致性指“all nodes see the same data at the same time”，即更新操作成功并返回客户端完成后，所有节点在同一时间的数据完全一致。==> 当更新操作完成之后，任何多个（节点）后续进程或者线程的访问都会返回最新的更新过的值。
 
 从client和server的角度看
 
@@ -46,17 +40,30 @@ github 案例项目[moonufo/galaxyLight](https://github.com/moonufo/galaxyLight)
 1. 在数据库系统中，通常指关联数据之间的逻辑关系是否正确和完整。
 2. 在分布式系统中，指的是由于数据的复制，不同数据节点中的数据内容是否完整并且相同。
 
+[分布式系统的CAP理论](http://www.hollischuang.com/archives/666): 一致性指“all nodes see the same data at the same time”，即更新操作成功并返回客户端完成后，所有节点在同一时间的数据完全一致。==> 当更新操作完成之后，任何多个（节点）后续进程或者线程的访问都会返回最新的更新过的值。
+
 ## 一致性、XA、2pc/3pc paxos的关系
 
 [2PC/3PC到底是啥](http://www.bijishequ.com/detail/49467?p=)
 
 XA 是 X/Open DTP 定义的交易中间件与数据库之间的接口规范（即接口函数），交易中间件用它来通知数据库事务的开始、结束以及提交、回滚等。 XA 接口函数由数据库厂商提供。 
-二阶提交协议和三阶提交协议就是根据这一思想衍生出来的，而**分布式事务从广义上来讲也是一致性的一种表现，所以2PC/3PC也可以叫一致性协议**。
+二阶提交协议和三阶提交协议就是根据这一思想衍生出来的，而**分布式事务从广义上来讲也是一致性的一种表现：**事务是数据库特有的概念，分布式事务最初起源于处理多个数据库之间的数据一致性问题，但随着IT技术的高速发展，大型系统中逐渐使用SOA服务化接口替换直接对数据库操作，所以如何保证各个SOA服务之间的数据一致性也被划分到分布式事务的范畴。来自[以交易系统为例，看分布式事务架构的五大演进](http://www.sohu.com/a/134477290_487514)。所以2PC/3PC也可以叫一致性协议。
 
 在真实的应用中，尽管有系统使用2PC/3PC协议来作为数据一致性协议，但是比较少见，更多的是作为实现**数据更新原子性手段**出现。
 
-为什么2PC/3PC没有被广泛用在保证数据的一致性上，主要原因应该还是它本身的缺陷，所有经常看到这句话：there is only one consensus protocol, and that’s Paxos” – all other approaches are just broken versions of Paxos. 意即世上只有一种一致性算法，那就是Paxos。
+为什么2PC/3PC没有被广泛用在保证数据的一致性上？主要原因应该还是它本身的缺陷，所有经常看到这句话：there is only one consensus protocol, and that’s Paxos” – all other approaches are just broken versions of Paxos. 意即世上只有一种一致性算法，那就是Paxos。
 
+
+更新想要被其它node感知到，就要提交更新，各个一致性协议的不同、缺点，也主要体现在提交方式上：
+
+1. 单数据库事务
+2. 多数据库事务，一个数据源更新操作已提交，另一个数据源更新操作失败，则数据不一致。so，应该在所有数据源更新操作完之后，再提交。
+3. 基于后置提交的多数据库事务，一个数据源提交成功，另一个数据源提交失败，则数据不一致。
+3. XA事务，将提交分为两个步骤，预提交、确认提交。前一个步骤“重”，完成大部分提交操作。后一个步骤“轻”，失败概率很低。so，依然会有部分数据源确认提交失败的问题，不过因为概率低，数据量小，可以通过记录日志转向人工处理。
+4. 从数据库领域延伸到微服务领域，分布式事务，TCC。
+5. 放弃强一致性、达到最终一致性。初步解决一致性问题后，主要通过异步补偿机制进行部分妥协，提高性能。
+
+[分布式服务框架之服务化最佳实践](http://www.infoq.com/cn/articles/servitization-best-practice)
 
 ## 2PC/3PC
 
@@ -90,6 +97,9 @@ XA 是 X/Open DTP 定义的交易中间件与数据库之间的接口规范（�
 
 ### 在代码上的表现（待整理）
 
+1. 声明式事务
+2. 编程式事务
+
 本地事务处理
 
 	Connection conn = null; 
@@ -119,9 +129,34 @@ XA 是 X/Open DTP 定义的交易中间件与数据库之间的接口规范（�
 	
 代码的封装跟2pc的实际执行过程有所不同，可以参见[JTA与TCC](http://qiankunli.github.io/2016/05/21/tcc.html)
 
-tcc事务处理
+从代码实现上，一般到2pc就可以保证大部分场景的一致性，然后框架着重点开始转向，通过异步、补偿等机制提高调用性能。
 
-## 异步、补偿
+## 最终一致性
+
+主线程逻辑
+
+	func run(){
+		1. rpc1
+		2. send mq
+		3. write db
+		4. rpc2
+	}
+
+强一致性，主线程执行完run方法，即达到一致性，确切的说，是要么都成功，要么都失败。确切的说，对于每一个step，用户实现try、confirm、cancel逻辑，由框架负责这些方法在恰当的时间执行。
+
+对于具体的业务，会有一些变种和要求：
+
+1. 不需要confirm，比如send mq业务，try逻辑发就是了，没啥好confirm的。
+2. 主线程要尽可能的快，不能等try rpc1和try rpc2结束，再confirm依次搞完。而是try完了，主线程直接搞别的。至于confirm（可以没有）、cancel由异步线程解决。
+
+
+
+异步、补偿
+
+目前主流触发异步数据补偿的方式有两种：
+
+1. 使用消息队列实时触发数据补偿
+2. 使用定时任务周期性触发数据补偿
 
 [分布式系统事务一致性解决方案](http://www.infoq.com/cn/articles/solution-of-distributed-system-transaction-consistency)
 

@@ -3,7 +3,7 @@
 layout: post
 title: 自己动手写spring（七） 类结构设计调整
 category: 技术
-tags: Java
+tags: Spring
 keywords: Java Spring
 
 ---

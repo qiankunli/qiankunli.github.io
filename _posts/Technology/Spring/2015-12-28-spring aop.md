@@ -3,7 +3,7 @@
 layout: post
 title: spring aop 实现原理简述
 category: 技术
-tags: Java
+tags: Spring
 keywords: proxyFactoryBean
 
 ---

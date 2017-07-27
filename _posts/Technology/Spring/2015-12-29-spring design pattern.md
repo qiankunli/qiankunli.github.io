@@ -3,7 +3,7 @@
 layout: post
 title: Spring下的设计模式
 category: 技术
-tags: Java
+tags: Spring
 keywords: proxyFactoryBean
 
 ---

@@ -3,7 +3,7 @@
 layout: post
 title: 自己动手写spring（六） 支持FactoryBean
 category: 技术
-tags: Java
+tags: Spring
 keywords: Java Spring
 
 ---

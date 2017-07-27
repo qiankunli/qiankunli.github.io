@@ -3,7 +3,7 @@
 layout: post
 title: 自己动手写spring（八） 支持AOP
 category: 技术
-tags: Java
+tags: Spring
 keywords: Java Spring
 
 ---

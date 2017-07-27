@@ -3,7 +3,7 @@
 layout: post
 title: spring rmi和thrift
 category: 技术
-tags: Java
+tags: Spring
 keywords: spring rmi thrift
 
 ---

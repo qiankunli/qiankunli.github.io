@@ -3,7 +3,7 @@
 layout: post
 title: 自己动手写spring（一） 使用digester
 category: 技术
-tags: Java
+tags: Spring
 keywords: Java Spring
 
 ---

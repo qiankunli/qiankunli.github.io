@@ -3,7 +3,7 @@
 layout: post
 title: 自己动手写spring（四） 整合xml与注解方式
 category: 技术
-tags: Java
+tags: Spring
 keywords: Java Spring
 
 ---
