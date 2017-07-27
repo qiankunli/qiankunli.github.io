@@ -16,6 +16,10 @@ AOP是一个编程模型，aspectj和jboss AOP对于Aop模型进行了具体的�
 
 Aop的实现用到了动态代理技术，动态代理技术主要有两套实现：jdk和cglib。
 
+[spring源码分析之——spring aop原理](http://michael-softtech.iteye.com/blog/814047) 从代码上看，Spring AOP的原理大致如下： 
+
+实现一个InstantiationAwareBeanPostProcessor接口的bean。在每次bean初始化的时候找到所有advisor（spring ioc启动时，会采集类信息存储在BeanDefinition中），根据pointcut 判断是不是需要为将实例化的bean生成代理，如果需要，就把advice编制在代理对象里面。
+
 ## spring aop中的一些概念
 
 1. advice:如拦截到对应的某个方法后，我们要做写什么？advice就是拦截后要执行的动作。 类似于j2ee开发中的filter，举个例子
