@@ -4,7 +4,7 @@ layout: post
 title: 做配置中心要想好的几个基本问题
 category: 技术
 tags: Architecture
-keywords:config center
+keywords: config center
 
 ---
 
