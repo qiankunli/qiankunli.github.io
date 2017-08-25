@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: docker debug
+title: 一次docker debug过程
 category: 技术
 tags: Docker
 keywords: Docker
@@ -11,7 +11,9 @@ keywords: Docker
 
 ## 问题描述
 
-marathon + mesos + docker 集群，容器有时会莫名其妙重启
+环境：marathon + mesos + docker 集群
+
+现象：容器有时会莫名其妙重启
 
 
 ## debug过程
@@ -60,6 +62,8 @@ marathon + mesos + docker 集群，容器有时会莫名其妙重启
 可以看到，在mesos和docker containerd对812c82c5a7a5做出反应之前，kerner因为内存限制的缘故，kill掉了一个进程。
 
 如果有机会找到76513和812c82c5a7a5的对应关系，问题基本就可以确认了。
+
+解决方法：增加内存
 
 
 
