@@ -164,6 +164,11 @@ application of a curried function, such as f(3).
 
 就scala的学习路线来说，笔者还是建议粗略的了解语法后，尽快转入源码学习和项目实践。
 
+项目推荐
+
+[快学Scala+Playframework之增删改查——项目搭建（一）](https://beacelee.com/post/play-framework-scala-userlist.html) 对应项目代码
+[BeAce/scala-and-playframework-userlist](https://github.com/BeAce/scala-and-playframework-userlist)
+
 ## 引用
 
 [Scala 初学指南](https://windor.gitbooks.io/beginners-guide-to-scala/content/index.html)
