@@ -148,7 +148,7 @@ application of a curried function, such as f(3).
 2. Servlet技术栈： Web容器（比如tomcat）存在的必要性也被越来越多的人质疑。原因就在于人为的将应用与容器剥离， 虽然这种做法本意是好的，但是结果就是给开发测试部署带来一系列集成的问题，现在越来越多的项目开始使用内嵌的Jetty或Tomcat。
 3. 基于Netty实现了自己的 请求响应接口（Request/Result），Promise已经被Scala，JavaScript等语言大量使用，Actor模型也已经遍地开花， 这些你都可以直接在Play中使用
 
-笔者读完这一段的反应就是：原先感觉还不错的技术栈竟被说的这么不堪。
+笔者读完这一段的反应就是：原先感觉还不错的java技术栈竟被说的这么不堪。
 
 [玩转 Java Web 应用开发：Play 框架](https://www.ibm.com/developerworks/cn/java/j-lo-play/)
 
@@ -156,6 +156,10 @@ application of a curried function, such as f(3).
 [Scala Cookbook 关于xml、test和play的pdf](https://resources.oreilly.com/examples/9781449339616-files/blob/master/Scala_Cookbook_bonus_chapters.pdf)
 
 1.  A terrific thing about the Play architecture is that Play templates are compiled to Scala functions
+
+## slick
+
+[浅谈Slick（1）－ 基本功能描述](http://www.cnblogs.com/tiger-xc/p/5891758.html)
 
 
 ## 小结
@@ -168,6 +172,8 @@ application of a curried function, such as f(3).
 
 [快学Scala+Playframework之增删改查——项目搭建（一）](https://beacelee.com/post/play-framework-scala-userlist.html) 对应项目代码
 [BeAce/scala-and-playframework-userlist](https://github.com/BeAce/scala-and-playframework-userlist)
+
+[Play framework, Slick and MySQL Tutorial](http://pedrorijo.com/blog/play-slick/) 对应项目代码 [pedrorijo91/play-slick3-steps](https://github.com/pedrorijo91/play-slick3-steps/tree/step2)
 
 ## 引用
 

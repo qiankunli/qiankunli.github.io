@@ -65,6 +65,8 @@ keywords: Docker
 
 解决方法：增加内存
 
+但是!
+
 ## java项目增大内存是不解决问题的
 
 参见
@@ -72,6 +74,17 @@ keywords: Docker
 1. [在 Docker 里跑 Java，趟坑总结](http://blog.tenxcloud.com/?p=1894)， jvm无法感知到自己在容器中进行，默认，堆的上限是物理机内存的四分之一，当容器的jvm没有设置xmx，即便容器内存设置的很大，也没有解决问题，导致容器会周期性重启（没有gc，逐渐累积到容器内存的限制值）。结论：要管控jvm 堆大小等参数，或使用特殊镜像。
 
 2. [在docker中使用java的内存情况](http://www.jianshu.com/p/1bf938fd8d70)提到了容器内存与jvm堆内存的基本关系。`Max memory = [-Xmx] + [-XX:MaxPermSize] + number_of_threads * [-Xss]`.在设置jvm启动参数的时候 -Xmx的这个值一般要小于docker限制内存数，个人觉得  -Xmx:docker的比例为 4/5 - 3/4
+
+
+## 发现与预防
+
+如何评估docker集群的健康状态？具体的，对于笔者实践中应用的mesos集群？
+
+
+![](/public/upload/docker/docker_debug_completed_tasks)
+
+对于`http://mesos:5050/`的completed tasks列表，正常的开发同学更新代码，老的task会是killed状态。而非正常退出，比如上文说的内存不够问题，则是failed。因此当系统中发现大量的failed task时，即需要警惕并排查原因了。
+
 
 
 
