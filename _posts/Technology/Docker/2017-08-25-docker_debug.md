@@ -81,7 +81,7 @@ keywords: Docker
 如何评估docker集群的健康状态？具体的，对于笔者实践中应用的mesos集群？
 
 
-![](/public/upload/docker/docker_debug_completed_tasks)
+![](/public/upload/docker/docker_debug_completed_tasks.png)
 
 对于`http://mesos:5050/`的completed tasks列表，正常的开发同学更新代码，老的task会是killed状态。而非正常退出，比如上文说的内存不够问题，则是failed。因此当系统中发现大量的failed task时，即需要警惕并排查原因了。
 
