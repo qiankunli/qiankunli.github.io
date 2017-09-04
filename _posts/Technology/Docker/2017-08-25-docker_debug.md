@@ -75,6 +75,15 @@ keywords: Docker
 
 2. [在docker中使用java的内存情况](http://www.jianshu.com/p/1bf938fd8d70)提到了容器内存与jvm堆内存的基本关系。`Max memory = [-Xmx] + [-XX:MaxPermSize] + number_of_threads * [-Xss]`.在设置jvm启动参数的时候 -Xmx的这个值一般要小于docker限制内存数，个人觉得  -Xmx:docker的比例为 4/5 - 3/4
 
+## java项目的其它问题
+
+jdk6 编译的项目运行在jdk8上
+
+1. 代码本身经由jdk6编译，运行在jdk8上
+2. 代码依赖的jar由jdk6编译
+
+在docker-ce 1.3 以下会出现`docker ps`可以看到，但容器内jvm进程已经退出的情况。升级到docker-ce 1.7 则貌似解决了该问题。
+
 
 ## 发现与预防
 
