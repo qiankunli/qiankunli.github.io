@@ -10,7 +10,7 @@ keywords: IntelliJ IDEA
 
 ## 中文乱码
 
-C:\Program Files (x86)\JetBrains\IntelliJ IDEA Community Edition 14.1.2\bin\idea.exe.vmoptions
+`C:\Program Files (x86)\JetBrains\IntelliJ IDEA Community Edition 14.1.2\bin\idea.exe.vmoptions`
 
 添加`-Dfile.encoding=UTF-8`
 
