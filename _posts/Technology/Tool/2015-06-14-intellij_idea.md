@@ -16,6 +16,11 @@ keywords: IntelliJ IDEA
 
 file ==> settings 搜索 encoding，找到file encoding 改为utf-8
 
+## 查看类图
+
+![](/public/upload/tool/idea_diagram.png)
+
+这里uml图的生成是由子类找父类的
 
 ## 快捷键的选择
 
