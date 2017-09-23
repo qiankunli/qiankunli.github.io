@@ -58,6 +58,7 @@ Config和ConfigRepository两个继承体系，在DefaultConfig那里分叉，但
 
 ## 从中学习到的
 
+
 ### 分析代码
 
 一个类有很多种成员，但一定有一个（最多两三个）跟这个类的功能关系最大。
