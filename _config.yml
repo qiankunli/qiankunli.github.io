@@ -24,7 +24,7 @@ favicon: /public/upload/gavatar/favicon.ico
 # google analytics 设置
 google_analytics_tracking_id: UA-108442533-1
 ga:
-  id: 
+  id: UA-108442533-1
   url: 
 
 # disqus 设置
