@@ -17,6 +17,13 @@ keywords: java design pattern
 
 如果我们以第二个角度看待设计模式，就会有很多有意思的体会。
 
+补充，《Pattern Oriented Software Architecture》中提到，将模式分为三种类型：
+
+1. 体系结构模式，比如mvc
+2. 设计模式
+3. 惯用法，比如引用计数法
+
+
 本来主要描述java编程方面
 
 ## 抽取一个类
