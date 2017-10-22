@@ -16,7 +16,7 @@ keywords: log4j
 
 源码分析参见：[Log4j源码解析--框架流程+核心解析](http://blog.csdn.net/u011794238/article/details/50736331)，几个基本概念理的比较清楚。
 
-![](/public/upload/java/log4j.jpeg)
+![](/public/upload/java/log4j_1.jpeg)
 
 从中调整的几个误区
 
