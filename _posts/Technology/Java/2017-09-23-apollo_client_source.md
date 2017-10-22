@@ -30,11 +30,23 @@ apollo-client 的主要包括以下几个部分：
 
 ## 类图分析
 
+### config
+
 ![](/public/upload/java/apollo_client_config.png)
 
-Config 定义外界使用接口，AbstractConfig处理掉Cache并用m_executorService处理掉ConfigChangeListener回调。真正配置的获取工作由DefaultConfig来完成（AbstractConfig并没有实现Config的`String getProperty(name,defaultValue)`），DefaultConfig交给ConfigRepository来负责，自然带上RepositoryChangeListener，对Config RepositoryChange事件作出处理。
+Config 定义外界使用接口，AbstractConfig处理掉Cache并用m_executorService处理掉ConfigChangeListener回调。真正配置的获取工作由DefaultConfig来完成（AbstractConfig并没有实现Config的`String getProperty(name,defaultValue)`），DefaultConfig将获取配置的工作交给ConfigRepository来负责，自己带上RepositoryChangeListener，对Config RepositoryChange事件作出处理。
 
-**此处可以有一个问题，为什么是DefaultConfig实现RepositoryChangeListener，而不是AbstractConfig？**因为AbstractConfig重点在cache property和处理ConfigChangeListener回调。 其abstract 方法`String getProperty(name,defaultValue)` 并不要求底层跟ConfigRepository扯上关系，其简单实现可以是加载一个本地properties文件。
+或者说，从顶层设计上，`DefaultConfigFactory.create`将整体架构分为Config和ConfigRepository两个部分。
+
+	public Config create(String namespace) {
+	        DefaultConfig defaultConfig =
+	                new DefaultConfig(namespace, createLocalConfigRepository(namespace));
+	        return defaultConfig;
+	    }
+
+**此处可以有一个问题，为什么是DefaultConfig实现RepositoryChangeListener，而不是AbstractConfig实现RepositoryChangeListener？**因为AbstractConfig重点在cache property和处理ConfigChangeListener回调。 其abstract 方法`String getProperty(name,defaultValue)` 并不要求底层跟ConfigRepository扯上关系，其简单实现可以是加载一个本地properties文件。
+
+### ConfigRepository
 
 ![](/public/upload/java/apollo_client_config_repository.png)
 
@@ -42,7 +54,18 @@ ConfigRepository 定义外界使用接口`ConfigRepository`和`addChangeListener
 
 AbstractConfigRepository 处理RepositoryChangeListener回调，并提供了一个很有意义抽象trySync。对于LocalFileConfigRepository来说，其关联一个RemoteConfigRepository，sync逻辑就是将RemoteConfigRepository数据视情况同步到本地。对于RemoteConfigRepository，sync逻辑就是拉取远端配置。
 
-Config和ConfigRepository两个继承体系，在DefaultConfig那里分叉，但又**双向关联**，形成一个完善功能的整体，值得回味一下。
+### Config和ConfigRepository 的关系
+
+Config和ConfigRepository两个继承体系，在DefaultConfig那里分叉，但又**双向关联**，形成一个完善功能的整体。
+
+||说明|
+|---|---|
+|正向关联| DefaultConfig 操作 ConfigRepository |
+|反向关联| ConfigRepository 操作 RepositoryChangeListener。在Config 继承体系中，由子类DefaultConfig 实现RepositoryChangeListener |
+
+**这是一种常见的设计方式，一个继承体系的顶层接口定义该继承体系的基本功能。其子类在继承上层接口或父类的同时，还继承其它接口，作为与其它继承体系互操作的基本约定。一个类实现很多功能，但面向不同的角色，只希望暴露有限的功能，这是子类继承其它接口的初衷。**从另一个角度说，从一个继承体系抽离出另一个继承体系时，两个继承体系通过一个接口互操作。
+
+### ConfigService
 
 ![](/public/upload/java/apollo_client_config_service.png)
 
