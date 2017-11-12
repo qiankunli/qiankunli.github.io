@@ -4,7 +4,7 @@ layout: post
 title: 《mysql技术内幕》笔记1
 category: 技术
 tags: Architecture
-keywords: push
+keywords: mysql innodb
 
 ---
 
@@ -99,7 +99,7 @@ innodb引擎内存占用
 
 InnoDB存储B+Tree节点的方式确实非常精巧，MyISAM主要是记录了主键与对应记录地址（偏移）的映射关系。InnoDB引擎在页范围内查找一个记录，也“记录了主键与对应记录地址（偏移）的映射关系”，但还有些不一样，参见innodb page directory。[InnoDB备忘录 - 数据页结构](http://zhongmingmao.me/2017/05/09/innodb-table-page-structure/)
 
-## 磁盘文件（未完成）
+## 磁盘文件
 
 内存管理系统将内存条编址，对每个进程看到的都是0~n。文件系统相当于将离散的磁盘存储空间编址，对每个文件看到的都是0~n。当然，进程根据进程号查找就可以，文件要根据文件名查找，因此多了一些结构。
 
