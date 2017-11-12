@@ -14,7 +14,7 @@ keywords: 生活 滑翔伞
 
 到地方，排队，带上装备，等一个合适的风口，走你。
 
-![](/public/upload/life/huaxiangsan_1.png)
+![](/public/upload/life/huaxiangsan_1.jpg)
 
 不好意思，放错了，%_%
 
@@ -22,11 +22,11 @@ keywords: 生活 滑翔伞
 
 空中的感觉，奇怪而美妙，秋天的山原很美，害羞的枫叶还未完全变红，红绿混杂着像一幅油墨画；秋天的田野更美，交错有致的格子，柔和的黄色，比任何颜料拼凑出来的都舒服。更幸福的是，这一切，我都可以以一个全新的角度去欣赏，以至于忘记了恐惧，除了教练偶尔的几次特技导致的小眩晕，但我相信，这跟失重没有关系，那一定的美景导致的。
 
-![](/public/upload/life/huaxiangsan_3.png)
+![](/public/upload/life/huaxiangsan_3.jpeg)
 
 戏曲总会落幕，飞翔总会降落，一天的准备、辛劳、等待，只为那翱翔的六分钟，是否值得？但，我印象最深刻的是起飞时，要看好风向，迎着风，加油跑，使劲跑。前方什么都没有，有悬崖，有恐惧，有兴奋，有不甘引力束缚的心。
 
-![](/public/upload/life/huaxiangsan_4.png)
+![](/public/upload/life/huaxiangsan_4.jpeg)
 
 上面很美，你不想看看么？
 
