@@ -96,6 +96,12 @@ non-blocking network calls free us from having to wait for the completion of an 
 
 我们指定线程运行任务 ==> 提交任务，任务线程自己干自己的，不会眷顾某个任务。那么就产生了与任务线程交互的问题，也就引出了callback、future等组件。java的future可以存储异步操作的结果，但结果要手工检查（或者就阻塞），netty的future则通过listener机制
 
+## 小结
+
+异步为什么性能更好？
+
+1. 在开发层面给予更多选择，可以不让线程让出cpu。开发者往往比操作系统知道怎样更高效利用线程。这也是java、netty中一脉相承的思路，比如AQS、CAS来减少线程切换，common-pool、netty中的arena手动管理内存。
+2. 事件驱动引擎是一种编程模型，可以不处理io事件。但加入io事件的处理后，select集中等待，并可以在io任务和cpu任务中控制开销比例，进而可以做到更高效。
 
 ## 引用
 
