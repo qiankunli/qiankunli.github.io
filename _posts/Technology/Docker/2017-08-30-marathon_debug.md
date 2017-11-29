@@ -9,7 +9,7 @@ keywords: Docker
 ---
 
 
-## 问题描述
+## 问题一描述
 
 基础环境：
 
@@ -22,7 +22,7 @@ keywords: Docker
 
 一个app的某一个instance，配置了健康检查，但处于unknown状态。然后对该app进行更新或restart操作时，该app一直处于deploying状态，并无法响应后面的命令。直观感觉就是，该app卡住了。
 
-## debug过程
+### debug过程
 
 marathon 日志`/var/log/messages`
 
@@ -49,6 +49,15 @@ marathon 日志`/var/log/messages`
 
 办法：干掉docker容器对应的mesos-docker-executor及其子进程
 
+### 问题2
+
+集群明明有空闲资源，但waiting状态的项目就是不调度到空闲的主机上
+
+1. 分析marathon task的部署有没有
+
+[Marathon/Mesos 集群排错记录](http://www.ituring.com.cn/article/264014)
+
+根据Mesos state API (http://ip:5050/state)得到当前Mesos集群的所有状态信息的Json文件。
 
 ## 引用
 
