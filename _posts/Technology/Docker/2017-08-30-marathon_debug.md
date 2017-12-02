@@ -49,13 +49,19 @@ marathon 日志`/var/log/messages`
 
 办法：干掉docker容器对应的mesos-docker-executor及其子进程
 
-### 问题2
+### 类似问题
+
+marathon 部署一个新的task时，会先部署新的实例，然后干掉老的实例，但老的实例一直干不掉，导致task 一直处于deploying状态，并无法继续响应新的deploy请求。
+
+[Docker executor hangs forever if `docker stop` fails.](https://issues.apache.org/jira/browse/MESOS-6743)
+
+## 问题2
 
 集群明明有空闲资源，但waiting状态的项目就是不调度到空闲的主机上
 
-1. 分析marathon task的部署有没有
+1. 分析marathon task的部署有没有特殊的限定条件，符合限定条件的主机是否还有资源
 
-[Marathon/Mesos 集群排错记录](http://www.ituring.com.cn/article/264014)
+2. [Marathon/Mesos 集群排错记录](http://www.ituring.com.cn/article/264014)
 
 根据Mesos state API (http://ip:5050/state)得到当前Mesos集群的所有状态信息的Json文件。
 
