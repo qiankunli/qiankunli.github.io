@@ -67,7 +67,7 @@ keywords: Docker
 
 但是!
 
-## java项目增大内存是不解决问题的
+### java项目增大内存是不解决问题的
 
 参见
 
@@ -75,7 +75,7 @@ keywords: Docker
 
 2. [在docker中使用java的内存情况](http://www.jianshu.com/p/1bf938fd8d70)提到了容器内存与jvm堆内存的基本关系。`Max memory = [-Xmx] + [-XX:MaxPermSize] + number_of_threads * [-Xss]`.在设置jvm启动参数的时候 -Xmx的这个值一般要小于docker限制内存数，个人觉得  -Xmx:docker的比例为 4/5 - 3/4
 
-## java项目的其它问题
+## Container stuck, can't be stopped or killed, can't exec into it either
 
 jdk6 编译的项目运行在jdk8上
 
@@ -83,6 +83,33 @@ jdk6 编译的项目运行在jdk8上
 2. 代码依赖的jar由jdk6编译
 
 在docker-ce 1.3 以下会出现`docker ps`可以看到，但容器内jvm进程已经退出的情况。升级到docker-ce 1.7 则貌似解决了该问题。
+
+2017.12.05 更新
+
+现象描述：
+
+1. marathon ==> mesos 尝试杀死容器，但杀死失败
+1. `docker ps`可以看到容器
+2. `docker exec`无法进入容器
+3. `journalctl -xe -u docker.service` 可以看到：
+
+		time="2017-12-05T10:14:01.066063275+08:00" level=info msg="Container 8f8020e79b13bcbf40298d3c9680cd1a838e16dc810ef3b1357eb3e75f78ef99 failed to exit within 120 seconds
+		time="2017-12-05T10:14:01.066755930+08:00" level=warning msg="container kill failed because of 'container not found' or 'no such process': Cannot kill container 8f8020
+		time="2017-12-05T10:14:11.067151142+08:00" level=info msg="Container 8f8020e79b13 failed to exit within 10 seconds of kill - trying direct SIGKILL"
+		time="2017-12-05T12:52:58.017517865+08:00" level=error msg="Error running exec in container: containerd: container not found"
+		
+通过观察容器中运行的tomcat日志，可以看到，10:12，docker向容器发送 term signal，tomcat 开始stop，`docker logs --tail 200  8f8020e79b13`日志如下
+
+	[album-facade]10:12:02 420 INFO  org.springframework.beans.factory.support.DefaultListableBeanFactory:444 - Destroying singletons in org.springframework.beans.factory.support.DefaultListableBeanFactory@b342fcf: defining beans [mvcContentNegotiationManager,org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping#0,org.springframework.format.support.FormattingConversionServiceFactoryBean#0,org.springframework.web.servlet.mvc.method.annotation.RequestM...
+	Dec 5, 2017 10:12:05 AM org.apache.catalina.loader.WebappClassLoader checkThreadLocalMapForLeaks
+	SEVERE: The web application [/album-facade] created a ThreadLocal with key of type [java.lang.ThreadLocal] (value [java.lang.ThreadLocal@64de4a8c]) and a value of type [com.ibatis.sqlmap.engine.mapping.result.ResultObjectFactoryUtil.FactorySettings] (value [com.ibatis.sqlmap.engine.mapping.result.ResultObjectFactoryUtil$FactorySettings@70748134]) but failed to remove it when the web application was stopped. This is very likely to create a memory leak.
+	Dec 5, 2017 10:12:15 AM org.apache.coyote.http11.Http11Protocol destroy
+	INFO: Stopping Coyote HTTP/1.1 on http-8080
+	
+	
+tomcat花了12秒停掉，但是docker认为容器还未停掉，等了120s到10:14，尝试kill，10s后仍然失败，然后任何对容器的操作就`container not found`。可能原因：docker认为容器一直“活着”，但主进程已经退出了。所以，容器退出不等于主进程退出。主进程退出后，docker还要回收各种资源，比如volume等等，耗时太长，或者干脆操作失败。
+
+仍需解决！
 
 
 ## 发现与预防
