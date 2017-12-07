@@ -55,6 +55,12 @@ marathon 部署一个新的task时，会先部署新的实例，然后干掉老�
 
 [Docker executor hangs forever if `docker stop` fails.](https://issues.apache.org/jira/browse/MESOS-6743)
 
+但升级mesos slave版本中后，仍然无法解决，一个暂时妥协的方法是：
+
+1. `systemctl stop marathon`
+2. 在zookeeper中，`rmr /marathon/state/xx/marathon_app_name`
+3. `systemctl stop marathon`
+
 ## 问题2
 
 集群明明有空闲资源，但waiting状态的项目就是不调度到空闲的主机上
