@@ -133,6 +133,7 @@ A factory class decouples the client and implementing class.
 ## 框架和业务的几点不同
 
 1. 框架应该尽量减少依赖。除了上文提到的spring的版本兼容问题，一些框架功能的实现还依赖zk、mq等，这是要尽量减少的。
+2. 框架应该尽量减少对入参的更改。因为调用方可能复用入参。
 
 ## 框架和框架box 类
 
