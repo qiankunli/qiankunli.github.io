@@ -96,7 +96,10 @@ tus android端依赖java端，由此可见，各平台逻辑比较一致。
 
 ### 小结
 
-在tus中，File是第一个操作对象，所谓分片的归并，只是contact File而已。
+tus的基本理念：
+
+1. 在tus中，File是第一个操作对象，所谓分片的归并，只是contact File而已。contact file时，每个文件对应分片上传的分片。
+2. tus每一个文件/分块支持断点续传，断点信息存储在服务端。值得一提的是，如果你本来就想contact File，每个file的成功与失败还是要自己保证的，tus无法告诉你整个contact file的断点。
 
 可以学到的东西：
 
