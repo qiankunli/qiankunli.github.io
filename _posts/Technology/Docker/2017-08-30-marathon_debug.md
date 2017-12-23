@@ -71,6 +71,10 @@ marathon 部署一个新的task时，会先部署新的实例，然后干掉老�
 
 根据Mesos state API (http://ip:5050/state)得到当前Mesos集群的所有状态信息的Json文件。
 
+## 升级带来的api变化
+
+marathon从1.5.x版本开始支持单独的Networking 配置，该配置与原来的docker network配置不能共存。[Networking](https://mesosphere.github.io/marathon/docs/networking.html)
+
 ## 引用
 
 [Mesos源码分析](http://www.cnblogs.com/popsuper1982/p/5926724.html)

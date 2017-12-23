@@ -138,6 +138,8 @@ keywords: fileupload
 
 ### 服务端对分片的处理
 
+[服务器端文件分片合并的思考和实践](http://www.pchou.info/web/2014/10/16/chunk-upload-and-merge.html#)
+
 1. 对接收到的分片立即持久化，缺点：持久化工作较为耗时，影响服务端性能
 
 	1. 同一个分片存储在同一个文件中，缺点：并发访问文件
@@ -152,7 +154,7 @@ keywords: fileupload
 
 这里指带有完善的后端 + 前端套件
 
-1. [tus](https://tus.io/)，后端采用Go语言，基于http协议上传文件
+1. [tus](https://tus.io/)，后端采用Go语言，基于http协议上传文件。
 
 2. [haiwen/seafile](https://github.com/haiwen/seafile) 后端采用C+Python，文件上传协议http
 

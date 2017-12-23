@@ -91,6 +91,7 @@ jdk6 编译的项目运行在jdk8上
 1. marathon ==> mesos 尝试杀死容器，但杀死失败
 1. `docker ps`可以看到容器
 2. `docker exec`无法进入容器
+3. `docker rm`可以移除容器
 3. `journalctl -xe -u docker.service` 可以看到：
 
 		time="2017-12-05T10:14:01.066063275+08:00" level=info msg="Container 8f8020e79b13bcbf40298d3c9680cd1a838e16dc810ef3b1357eb3e75f78ef99 failed to exit within 120 seconds
@@ -107,9 +108,37 @@ jdk6 编译的项目运行在jdk8上
 	INFO: Stopping Coyote HTTP/1.1 on http-8080
 	
 	
-tomcat花了12秒停掉，但是docker认为容器还未停掉，等了120s到10:14，尝试kill，10s后仍然失败，然后任何对容器的操作就`container not found`。可能原因：docker认为容器一直“活着”，但主进程已经退出了。所以，容器退出不等于主进程退出。主进程退出后，docker还要回收各种资源，比如volume等等，耗时太长，或者干脆操作失败。
+tomcat花了12秒停掉，但是docker认为容器还未停掉，等了120s到10:14，尝试kill，10s后仍然失败，然后任何对容器的操作就`container not found`。可能原因：移除容器的操作确实开始执行，但到了某一个步骤卡住或失败，导致一部分数据结构显示docker还在，但另一个部分数据结构已经删掉了。
+
+docker认为容器一直“活着”，但主进程已经退出了。所以，容器退出不等于主进程退出。主进程退出后，docker还要回收各种资源，比如volume等等，耗时太长，或者干脆操作失败。
 
 仍需解决！
+
+## docker 停住
+环境：
+
+1. ubuntu 16.04
+2. kernel 4.4.0
+3. docker 17.09-ce
+
+
+12月13日下午排查时发现
+
+1. docker 日志停留在 12.12 18.52
+2. docker rm 容器无法remove掉
+3. docker 无法停掉，`systemctl stop docker`卡住
+4. kill docker 所有进程，`rm /var/lib/docker` 时，部分文件无法删除，`deivce or resource is busy`
+5. `/var/log/kern.log` 大量的
+
+		[1055520.745390] unregister_netdevice: waiting for veth54a2de6 to become free. Usage count = 1
+		Dec 13 15:53:58 test-a1-60-36 kernel: [1055530.985735] unregister_netdevice: waiting for veth54a2de6 to become free. Usage count = 1
+		Dec 13 15:54:09 test-a1-60-36 kernel: [1055541.226086] unregister_netdevice: waiting for veth54a2de6 to become free. Usage count = 1
+		Dec 13 15:54:19 test-a1-60-36 kernel: [1055551.466446] unregister_netdevice: waiting for veth54a2de6 to become free. Usage count = 1
+
+
+60.36 ad 项目日志打了4t
+
+解决 [Swarm Kernel Panic after "unregister_netdevice"](https://github.com/moby/moby/issues/35068)，升级了内核版本到4.14.5
 
 
 ## 发现与预防
