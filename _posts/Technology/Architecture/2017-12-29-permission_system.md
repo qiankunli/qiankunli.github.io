@@ -78,7 +78,7 @@ keywords: Permission
 							type:number
 						}
 					]
-					ip:and
+					op:and
 				}
 			]
 			op:or
