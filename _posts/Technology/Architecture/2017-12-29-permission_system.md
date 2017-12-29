@@ -14,7 +14,7 @@ keywords: Permission
 
 ### 材料1
 
-[产品 | 权限设计=功能权限+数据权限](https://www.jianshu.com/p/0ab125cf8258)
+[权限设计=功能权限+数据权限](https://www.jianshu.com/p/0ab125cf8258)
 
 基本主体：用户 角色 资源。为用户赋予角色，角色操作资源，角色将用户与资源隔离。
 
