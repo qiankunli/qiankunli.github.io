@@ -8,7 +8,7 @@ keywords: elasticsearch
 
 ---
 
-## 前言
+## 前言(未完成)
 
 compensable-transaction是一个类似于spring-tx的事务实现框架，并且比spring-tx 多了持久化事务数据的能力。
 
