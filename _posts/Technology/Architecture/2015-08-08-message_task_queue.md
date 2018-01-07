@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 消息队列
+title: 消息/任务队列
 category: 技术
 tags: Architecture
 keywords: 消息队列 rabbitmq kafka
@@ -19,6 +19,32 @@ keywords: 消息队列 rabbitmq kafka
 
 - 管道的中间介质是文件。
 - 消息队列是消息缓冲区，在内存中以队列的形式组织，传输时以消息（一个数据结构）为单位。
+
+## 本地队列
+
+本地队列的几种应用场景
+
+1. 存储数据，单纯的利用下先进先出特性
+2. 缓存任务/消息，缓解生产者和消费者的速度差异，便于消费者批量处理，通常用于消费者需要进行文件io或网络io的场景
+
+	1. log4j，调用线程将日志加入到队列中，由write线程批量写入日志
+	2. kafka producer
+
+一个功能完善的队列通常要解决以下问题：
+
+1. 有界队列还是无界队列
+2. 多生产者和消费者的并发生产和消费问题
+3. 性能问题
+
+java 提供内置的队列实现，同时有必要提到一个高性能队列实现[高性能队列——Disruptor](https://tech.meituan.com/disruptor.html)，要点如下：
+
+1. 队列要有界
+2. 队列采用数组存储有利于堆管理
+2. 有界队列的线程安全问题，java内置队列 都采用加锁方式实现线程安全，Disruptor采用cas实现线程安全
+3. cas玩了一些花活儿：
+
+	* 环形数组（ring buffer），这里环形不是首位相顾，数组通过下标访问，Disruptor的“下标”会一直递增，通过“下标%数组长度”得到实际的数组index。数组长度2^n
+	* 假设ring buffer长度为length，则还有一个length bit的数组available buffer，用于标记ring buffer 对应下标的元素是否被生产者占用。意图就是，java内置队列加锁，同一时刻数组只能被一个线程访问。而ring buffer允许多个线程同时访问，通过检查 available buffer是否被其他线程捷足先登（**通过新增数据结构，来感知竞争激烈程度**），然后重试。**将加锁  改为 探测-重试**
 
 ## 消息队列系统
 
