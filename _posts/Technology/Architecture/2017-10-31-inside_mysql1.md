@@ -85,6 +85,8 @@ innodb引擎内存占用
 
 各个环节环环相扣，像艺术品。
 
+[[转]MySQL日志——Undo | Redo](http://www.cnblogs.com/Bozh/archive/2013/03/18/2966494.html)中有一种非常贴切的描述：将redo log成为新数据（还未同步到磁盘）的备份儿，重做的时候好知道怎么做。将undo log称为老数据的备份儿，恢复的时候好知道怎么恢复。
+
 ## 索引
 
 [MySQL索引背后的数据结构及算法原理](http://blog.codinglabs.org/articles/theory-of-mysql-index.html) 基本要点：

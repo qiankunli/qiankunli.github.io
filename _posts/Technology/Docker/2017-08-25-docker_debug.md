@@ -141,6 +141,41 @@ docker认为容器一直“活着”，但主进程已经退出了。所以，�
 解决 [Swarm Kernel Panic after "unregister_netdevice"](https://github.com/moby/moby/issues/35068)，升级了内核版本到4.14.5
 
 
+## docker pull 镜像失败
+
+一开始认为是权限不够，后来发现同样配置的其它机器没有问题，同时将images server地址配置为了insecurity-registry。后来一个很偶然的原因发现整个物理机的磁盘都满了。
+
+`df -h` 查看整个磁盘的占用情况。docker 还有一个现象
+
+	Filesystem      Size  Used Avail Use% Mounted on
+	udev             32G     0   32G   0% /dev
+	tmpfs           6.3G  675M  5.7G  11% /run
+	/dev/sda3       7.1T  217G  6.5T   4% /
+	tmpfs            32G   12K   32G   1% /dev/shm
+	tmpfs           5.0M     0  5.0M   0% /run/lock
+	tmpfs            32G     0   32G   0% /sys/fs/cgroup
+	/dev/sda2       181M  126M   43M  75% /boot
+	overlay         7.1T  217G  6.5T   4% /var/lib/docker/overlay2/45cdd4a0e6f230a0018ed098edb136b56b4994143eb585f9f5fa5eb36921825d/merged
+	shm              64M     0   64M   0% /var/lib/docker/containers/7ec38089c44abdd72b4fa208f66415bbd6fe49d1bf468419764ed50724f932a2/shm
+	overlay         7.1T  217G  6.5T   4% /var/lib/docker/overlay2/49f77221ecc6424de4a3523862a16b1a061621f25f1d1537f519eb33ac2d9e55/merged
+	shm              64M     0   64M   0% /var/lib/docker/containers/4d50cb3eb2cd73c0e951df190299c0e0fdff87dd51c4a371c5b8a0c15706435b/shm
+	overlay         7.1T  217G  6.5T   4% /var/lib/docker/overlay2/0f5d0f0db15bb500ad4c881ad200934d0ab9f2511e2be17dca3ec456e0ea5829/merged
+	shm              64M     0   64M   0% /var/lib/docker/containers/ae687ad77a157b2b1e1ad8137a1fec92f65926c66fd0675eac6f1b908d98eedf/shm
+
+具体到某一个`/var/lib/docker/overlay2/45cdd4a0e6f230a0018ed098edb136b56b4994143eb585f9f5fa5eb36921825d/merged` 之类的文件夹，其磁盘使用情况与物理机磁盘`/dev/sda3 `是一致的。笔者一开始不知道这个情况，尝试分析 45cdd4a0e6f 归哪个容器所有：`docker ps | awk '{print $1}' | xargs docker inspect | grep 45cdd4a0e6f `
+
+
+发现磁盘占满后，`du -sh *` 逐步查看耗费空间最大的文件（不要直接使用`du -sh /`）
+
+	$ cd /
+	$ du -sh *
+	$ cd /var
+	$ du -sh *
+	$ cd /var/log
+	$ du -sh *
+	
+后来发现是某一个项目日志打的太多了，在此建议测试环境配置定时任务，周期性的清理掉项目的日志。
+
 ## 发现与预防
 
 如何评估docker集群的健康状态？具体的，对于笔者实践中应用的mesos集群？
