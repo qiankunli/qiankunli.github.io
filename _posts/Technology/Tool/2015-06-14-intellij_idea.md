@@ -8,6 +8,13 @@ keywords: IntelliJ IDEA
 
 ---
 
+## war 和 war exploded
+
+1. war 模式，将web 工程以包的形式上传到服务器（也就是你本地的tomcat 文件夹）。
+
+	* 当项目比较大，有复杂的包依赖关系，想检查包冲突时，建议使用这种方式
+2. war explored 模式，将web 工程以当前文件夹的位置关系上传到服务器 
+
 ## 中文乱码
 
 `C:\Program Files (x86)\JetBrains\IntelliJ IDEA Community Edition 14.1.2\bin\idea.exe.vmoptions`

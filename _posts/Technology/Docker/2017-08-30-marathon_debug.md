@@ -75,6 +75,30 @@ marathon 部署一个新的task时，会先部署新的实例，然后干掉老�
 
 marathon从1.5.x版本开始支持单独的Networking 配置，该配置与原来的docker network配置不能共存。[Networking](https://mesosphere.github.io/marathon/docs/networking.html)
 
+## 通过restful api 控制marathon和messos
+
+[如何用curl 来访问MESOS Scheduler HTTP API](http://geek.csdn.net/news/detail/68985)
+
+teardown framework。该操作非常危险，但执行完毕，将marathon 重新启动后，很多mesos 和marathon 数据不一致的问题，都解决了
+
+	curl -XPOST http://192.168.60.8:5050/master/teardown -d 'frameworkId='$@''
+	
+
+
+mesos kill task（执行失败，还在找原因）
+
+	curl -vv --no-buffer -XPOST -H "Content-Type:application/json" -H "Mesos-Stream-Id:3f055808-1fad-4400-ba9f-9817bfb1df2f-0000" -d '{"framework_id":{"value" : "3f055808-1fad-4400-ba9f-9817bfb1df2f-0000"},"type":"KILL","kill":{"task_id":{"value":"docker-war-demo2.06c168dc-01bf-11e8-bcd1-2a0c412ba8a6"},"agent_id":{"value":"e357a322-224e-4fe3-9a7e-69e9eb5642d1-S14"}}}' http://192.168.60.8:5050/api/v1/scheduler
+ 
+ marathon kill task
+ 
+	curl -XPOST  -H "Content-Type:application/json" -d '{"ids":["docker-war-demo2.06c168dc-01bf-11e8-bcd1-2a0c412ba8a6"]}' http://192.168.60.8:8080/v2/tasks/delete
+
+## 反例操作
+
+marathon 显示一个 task 是unhealthy，但对应物理机docker 容器及mesos 进程都找不到，笔者的土方法是：到marathon的zk上删除对应app的数据，然后restart marathon。然后有一次公司停电，unhealthy 的任务太多，笔者干脆zk 操作`rmr /marathon`，然后所有的任务都不见了。后来没办法，根据zk snapshot恢复的zk。
+
+针对集群的么一个节点，恢复zk时，先备份zk data目录，然后查看集群上的所有snapshot，根据snapshot的创建时间，找到合适的文件。删除集群所有节点 data目录中其它的snapshot，启动所有节点zkServer 服务
+
 ## 引用
 
 [Mesos源码分析](http://www.cnblogs.com/popsuper1982/p/5926724.html)

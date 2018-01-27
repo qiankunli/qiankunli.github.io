@@ -10,6 +10,16 @@ keywords: JAVA exception
 
 ## 前言（未完成）
 
+## 其它
+
+异常有两种：
+
+1. 非运行时异常（Checked Exception）: 这种异常必须在方法声明的throws语句指定，或者在方法体内捕获。例如：IOException和ClassNotFoundException。**《clean code》建议在写代码时不使用Checked Exception，因为catch语句和抛出异常语句经常隔的很远，而你必须在它们之间的每个方法签名中声明该异常。**
+2. 运行时异常（Unchecked Exception）：这种异常不必在方法声明中指定，也不需要在方法体中捕获。例如：NumberFormatException
+
+因为run()方法不支持throws语句，所以当线程对象的run()方法抛出非运行异常时，我们必须捕获并且处理他们。当运行时异常从run()方法中抛出时，默认行为是在控制台输出堆栈记录并且退出程序。
+
+## 打印异常
 
 Throwable.printStackTrace的实现：
 

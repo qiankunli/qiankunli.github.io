@@ -39,6 +39,12 @@ keywords: javascript
 
 [Nginx通过CORS实现跨域](http://www.yunweipai.com/archives/9381.html)
 
+在nginx server 配置下新增
+
+	add_header 'Access-Control-Allow-Origin' $http_origin;
+	add_header 'Access-Control-Allow-Credentials' 'true';
+	add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
+
 ### 代码实现
 
 [Spring MVC通过CROS协议解决跨域问题](http://www.imooc.com/article/7719)
