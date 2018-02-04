@@ -11,7 +11,7 @@ keywords: Jenkins Docker Kubernetes
 环境描述
 
 ||node1|node2|node3|
-|-|-|-|-|
+|---|---|---|---|
 |ip|192.168.3.57|192.168.3.58|192.168.3.59|
 |role|node|node|master|
 |subnet|172.17.10.0/24|172.17.20.0/24|172.17.30.0/24|

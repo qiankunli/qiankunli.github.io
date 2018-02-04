@@ -11,6 +11,19 @@ keywords: Docker,macvlan
 
 ## 简介
 
+
+
+将一个web app部署到docker 容器上。除了编排问题之外
+
+1. 网络模型的选择。公司测试环境遍布两三个办公楼，macvlan直接依赖两层，对交换机配置要求较高。
+2. docker+os 对swap 分区的支持。现在的表现是，同样规模的物理机，直接部署比通过docker部署支持的服务更多，后者比较吃资源。
+3. marathon + mesos 方案通过zk 沟通，mesos-slave 有时无法杀死docker-slave
+
+mesos+marathon方案也取得很多经验：
+
+1. macvlan 直接在ip 上打通 容器与物理机的访问，使用起来比较便捷。
+2. marathon app + instance + cpu + memory 对app的抽象与控制比较直观，用户输入与实际marathon.json 映射比较直观。
+
 应用背景：web项目，将war包拷贝到tomcat上，启动tomcat运行
 
 
@@ -43,3 +56,16 @@ build 慢的解决办法
 
 	
 [Docker 持续集成过程中的性能问题及解决方法](http://oilbeater.com/docker/2016/01/02/use-docker-performance-issue-and-solution.html)
+
+## 性能不及物理机(未完成)
+
+表现为过快的耗尽物理机资源：
+
+cpu设置问题
+
+[Docker: 限制容器可用的 CPU](https://www.cnblogs.com/sparkdev/p/8052522.html)
+
+[Docker 运行时资源限制](http://blog.csdn.net/candcplusplus/article/details/53728507)
+
+## 网络方案选择与多机房扩展问题（未完成）
+
