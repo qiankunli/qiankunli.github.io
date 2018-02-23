@@ -66,3 +66,11 @@ LogManager
 自定义初始化过程
 
 通过初始化过程分析，那么自定义log4j的初始化过程的本质便是：自己触发执行`doConfigure(Properties properties, LoggerRepository hierarchy)`，doConfigure多次执行，会覆盖先前的配置。
+
+## 日志系统使用规范（未完成）
+
+兼容性问题
+
+[slf4j兼容commons-logging,log4j,java.util.logging,支持log4j.xml和log4j.properties配置](http://blog.csdn.net/wayfoon322/article/details/4312012)
+
+如果你开发的是类库或者嵌入式组件，那么就应该考虑采用SLF4J，因为不可能影响最终用户选择哪种日志系统。
