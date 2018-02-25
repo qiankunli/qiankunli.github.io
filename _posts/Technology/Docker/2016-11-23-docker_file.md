@@ -69,7 +69,7 @@ Union FileSystem的核心逻辑是Union Mount，它支持把一个目录A和另�
 
 [Docker存储驱动简介](https://linux.cn/thread-16017-1-1.html)
 
-## 几大文件系统
+### 几大文件系统
 
 aufs,vfs,devicemapper,btrfs,它们之间的关系。参见[容器（Docker）概念中存储驱动的深入解析](http://weibo.com/ttarticle/p/show?id=2309404039168383667054)
 
@@ -85,7 +85,21 @@ aufs,vfs,devicemapper,btrfs,它们之间的关系。参见[容器（Docker）概
 
 All backends except the vfs one shares diskspace between base images. However, they work on different levels, so the behaviour is somewhat different. Both devicemapper and btrfs share data on the **block level**, so a single change in a file will cause just the block containing that byte being duplicated. However the aufs backend works on the **file level**, so any change to a file means the entire file will be copied to the top layer and then changed there. The exact behaviour here therefore depends on what kind of write behaviour an application does.
 
-However, any kind of write-heavy load(写负载比较大) inside a container (such as databases or large logs) should generally be done to a volume.（共享文件系统有共享文件系统的问题，所以写负载比较大的操作，还要弄到volume中） A volume is a plain directory from the host mounted into the container, which means it has none of the overhead that the storage backends may have. It also means you can easily access the data from a new container if you update the image, or if you want to access the same data from multiple concurrent containers.（这段解释了我们为什么要用volume）
+However, any kind of write-heavy load(写负载比较大) inside a container (such as databases or large logs) should generally be done to a volume.（共享文件系统有共享文件系统的问题，所以写负载比较大的操作，还要弄到volume中） A volume is a plain directory from the host mounted into the container, which means it has none of the overhead(天花板) that the storage backends may have. It also means you can easily access the data from a new container if you update the image, or if you want to access the same data from multiple concurrent containers.（这段解释了我们为什么要用volume）
+
+## docker volume plugin
+
+[Docker使用OpenStack Cinder持久化volume原理分析及实践](https://zhuanlan.zhihu.com/p/29905177)，几个要点
+
+1. Docker通过volume实现数据的持久化存储以及共享
+2. Docker创建的volume只能用于当前宿主机的容器使用，不能挂载到其它宿主机的容器中，这种情况下只能运行些无状态服务，对于需要满足HA的有状态服务，则需要使用分布式共享volume持久化数据，保证宿主机挂了后，容器能够迁移到另一台宿主机中。而Docker本身并没有提供分布式共享存储方案，而是通过插件(plugin)机制实现与第三方存储系统对接集成
+3. 最重要的是：If a plugin registers itself as a VolumeDriver when activated, it must provide the Docker Daemon with writeable paths on the host filesystem.Docker不能直接读写外部存储系统，而必须把存储系统挂载到宿主机的本地文件系统中，Docker当作本地目录挂载到容器中，换句话说，只要外部存储设备能够挂载到本地文件系统就可以作为Docker的volume。
+4. docker daemon与plugin daemon通信的API ，部分
+
+    * VolumeDriver.Mount : 挂载一个卷到本机，Docker会把卷名称和参数发送给参数。**插件会返回一个本地路径给Docker，这个路径就是卷所在的位置。Docker在创建容器的时候，会将这个路径挂载到容器中**。
+    * VolumeDriver.Path : 一个卷创建成功后，Docker会调用Path API来获取这个卷的路径，随后Docker通过调用Mount API，让插件将这个卷挂载到本机。 
+    * VolumeDriver.Unmount : 当容器退出时，Docker daemon会发送Umount API给插件，通知插件这个卷不再被使用，插件可以对该卷做些清理工作（比如引用计数减一，不同的插件行为不同）。 
+    * VolumeDriver.Remove : 删掉特定的卷时调用，当运行”docker rm -v”命令时，Docker会调用该API发送请求给插件。 
 
 
 ## 引用
