@@ -150,6 +150,8 @@ cnm
 
 ![](/public/upload/docker/cnm.png)
 
+为容器分配ip，保持容器互通，并不是k8s/cni 介入网络的必要理由，因为docker也可以做到。它是一套组合拳，k8s中有namespace以及network-policy的概念，即想自由控制一个容器集群的不同namespace的容器是否互通。
+
 ### 实现方案
 
 参见[最新实践:将Docker网络方案进行到底](http://blog.dataman-inc.com/shurenyun-docker-133/)
