@@ -175,7 +175,7 @@ docker网络模型有一个基本原则：每个容器有一个ip，docker netwo
 
 路由方案的基本特点是：容器的ip即为网络中流通的ip，也就不需要网络地址转换（NAT）。
 
-calico与macvlan 的区别是：容器仍然使用物理机网卡的mac地址，macvlan 则是一个全新的地址。
+calico与macvlan 的区别是：容器仍然使用物理机网卡的mac地址，macvlan中，每个容器 都是一个全新的mac地址（MACVLAN可以从一个主机接口虚拟出多个macvtap，且每个macvtap设备都拥有不同的mac地址（对应不同的linux字符设备）。）。
 
 
 ## 引用

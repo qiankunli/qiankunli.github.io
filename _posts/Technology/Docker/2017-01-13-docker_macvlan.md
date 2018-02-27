@@ -42,6 +42,8 @@ ARP欺骗，当计算机接收到ARP应答数据包的时候，就会对本地�
 2. 创建容器时使用macvlan网络
 3. 外置交换机负责容器之间、host之间、容器与host之间的连通性。
 
+MACVLAN可以从一个主机接口虚拟出多个macvtap，且每个macvtap设备都拥有不同的mac地址（对应不同的linux字符设备）。
+
 docker macvlan 用802.1q模式，对于一个交换机端口来说：
 
 1. 物理机和容器的数据包属于不同的vlan，so， 交换机端口设置为trunk；
