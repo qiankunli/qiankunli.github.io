@@ -11,6 +11,7 @@ keywords: Docker,macvlan
 
 ## 简介
 
+[Docker在沪江落地的实践](https://hujiangtech.github.io/tech/%E5%90%8E%E7%AB%AF/2017/03/21/Docker.html)文中列举了docker 方案落地要解决的几个问题。
 
 
 将一个web app部署到docker 容器上。除了编排问题之外
