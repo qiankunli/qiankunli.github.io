@@ -75,6 +75,10 @@ keywords: Docker
 
 2. [在docker中使用java的内存情况](http://www.jianshu.com/p/1bf938fd8d70)提到了容器内存与jvm堆内存的基本关系。`Max memory = [-Xmx] + [-XX:MaxPermSize] + number_of_threads * [-Xss]`.在设置jvm启动参数的时候 -Xmx的这个值一般要小于docker限制内存数，个人觉得  -Xmx:docker的比例为 4/5 - 3/4
 
+提到docker 与 虚拟机的区别时， 常常会说“虚拟”和“隔离”的区别。假设一个16g内存的物理机，那么创建一个2g内存的虚拟机和2g内存容器，其jvm的表现便会有所不同。[Java inside docker: What you must know to not FAIL](https://developers.redhat.com/blog/2017/03/14/java-inside-docker/) some applications that collect information from the execution environment have been implemented before the existence of cgroups. Tools like ‘top‘, ‘free‘, ‘ps‘, and even the JVM ** is not optimized for executing inside a container**, a highly-constrained Linux process. Let’s check it out.
+
+There’s an experimental support in the JVM that has been included in JDK9 to support cgroup memory limits in container (i.e. Docker) environments. Check it out: http://hg.openjdk.java.net/jdk9/jdk9/hotspot/rev/5f1d1df0ea49
+
 ## Container stuck, can't be stopped or killed, can't exec into it either
 
 jdk6 编译的项目运行在jdk8上
@@ -113,6 +117,8 @@ tomcat花了12秒停掉，但是docker认为容器还未停掉，等了120s到10
 docker认为容器一直“活着”，但主进程已经退出了。所以，主进程退出不等于容器退出。主进程退出后，docker还要回收各种资源，比如volume等等，耗时太长，或者干脆操作失败。
 
 `docker kill ` 失败，`docker rm `成功，具体原因仍需解决！
+
+[Can't stop docker container #35933](https://github.com/moby/moby/issues/35933) 仍待解决。
 
 ## docker 停住
 环境：

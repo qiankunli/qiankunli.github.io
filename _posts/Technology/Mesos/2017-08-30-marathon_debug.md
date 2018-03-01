@@ -3,7 +3,7 @@
 layout: post
 title: 从一个marathon的问题开始的
 category: 技术
-tags: Docker
+tags: Mesos
 keywords: Docker
 
 ---

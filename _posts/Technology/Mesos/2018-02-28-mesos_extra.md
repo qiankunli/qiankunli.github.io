@@ -1,0 +1,45 @@
+---
+
+layout: post
+title: mesos 的一些tips
+category: 技术
+tags: Mesos
+keywords: Docker, calico
+
+---
+
+
+## 简介(未完成)
+
+17年初的时候，mesos和k8s还难分伯仲，18年的时候，mesos 就已经有点尴尬了。但在具体的环境下，mesos 仍有可取之处
+
+1. 大部分互联网公司的大部分业务是 web 项目/rpc server  + tomcat，具体的说，就是用tomcat 做项目容器。一个tomcat  作为 marathon 的 application，提供healthcheck、实例控制等，就够用了。k8s 的 pod 概念没有必要
+2. rpc 服务治理框架普遍自带 服务发现机制，k8s的service 没有必要
+
+
+[Mesos中文手册](https://mesos-cn.gitbooks.io)
+
+## mesos 的配置
+
+### 配置的分类
+
+[mesos 配置向导](https://mesos-cn.gitbooks.io/mesos-cn/content/document/runing-Mesos/Configuration.html)
+
+1. mesos 配置分为：通用配置、master配置、slave配置
+2. 配置的配置方式
+
+	* `/usr/sbin/mesos-slave` 参数
+	* 特定目录下的文件 ，文件内容为 配置值。 比如`/etc/mesos-slave/containerizers`，文件内容为 `docker,mesos`
+
+### 配置的位置
+
+[Mesos 安装与使用](https://yeasy.gitbooks.io/docker_practice/content/mesos/installation.html#%E8%BD%AF%E4%BB%B6%E6%BA%90%E5%AE%89%E8%A3%85)
+
+mesos 配置目录有三个
+
+1. `/etc/mesos` 主节点和从节点都会读取的配置文件，其中最关键的就是zk
+2. `/etc/mesos-master/`只有主节点会读取的配置，等价于启动 mesos-master 命令时候的默认选项
+3. `/etc/mesos-slave/`只有从节点会读取的配置，等价于启动 mesos-master 命令时候的默认选项
+
+此外，/etc/default/mesos、/etc/default/mesos-master、/etc/default/mesos-slave 这三个文件中可以存放一些环境变量定义，Mesos 服务启动之前，会将这些环境变量导入进来作为启动参数。
+	
