@@ -69,12 +69,90 @@ calicoctl, The calicoctl command line interface provides a number of resource ma
 
 以容器的方式提供 calico 服务
 
+直接以命令的方式运行容器
+
 	ETCD_ENDPOINTS=http://$ETCD_IP:$ETCD_PORT calicoctl node run --node-image=quay.io/calico/node:v2.6.8
 	
 	
+systemd service 文件的方式
+
+1. environment file
+
+		ETCD_AUTHORITY=localhost:2379
+		ETCD_SCHEME=http
+		ETCD_CA_FILE=""
+		ETCD_CERT_FILE=""
+		ETCD_KEY_FILE=""
+		CALICO_HOSTNAME=""
+		CALICO_NO_DEFAULT_POOLS=""
+		CALICO_IP="192.168.56.101"
+		CALICO_IP6=""
+		CALICO_AS=""
+		CALICO_LIBNETWORK_ENABLED=true
+		CALICO_NETWORKING_BACKEND=bird
+		# IP_AUTODETECTION_METHOD
+	
+2. systemd service file 
+
+		[Unit]
+		Description=calico-node
+		After=docker.service
+		Requires=docker.service
+		
+		[Service]
+		EnvironmentFile=/etc/calico/calico.env
+		ExecStartPre=-/usr/bin/docker rm -f calico-node
+		ExecStart=/usr/bin/docker run --net=host --privileged \
+		 --name=calico-node \
+		 -e HOSTNAME=${HOSTNAME} \
+		 -e IP=${CALICO_IP} \
+		 -e IP6=${CALICO_IP6} \
+		 -e CALICO_NETWORKING_BACKEND=${CALICO_NETWORKING_BACKEND} \
+		 -e AS=${CALICO_AS} \
+		 -e NO_DEFAULT_POOLS=${CALICO_NO_DEFAULT_POOLS} \
+		 -e CALICO_LIBNETWORK_ENABLED=${CALICO_LIBNETWORK_ENABLED} \
+		 -e ETCD_AUTHORITY=${ETCD_AUTHORITY} \
+		 -e ETCD_SCHEME=${ETCD_SCHEME} \
+		 -e ETCD_CA_CERT_FILE=${ETCD_CA_CERT_FILE} \
+		 -e ETCD_CERT_FILE=${ETCD_CERT_FILE} \
+		 -e ETCD_KEY_FILE=${ETCD_KEY_FILE} \
+		 -e IP_AUTODETECTION_METHOD=${IP_AUTODETECTION_METHOD} \
+		 -v /var/log/calico:/var/log/calico \
+		 -v /run/docker/plugins:/run/docker/plugins \
+		 -v /lib/modules:/lib/modules \
+		 -v /var/run/calico:/var/run/calico \
+		 -v /var/run/docker.sock:/var/run/docker.sock \
+		 -v /run:/run \
+		 quay.io/calico/node:v2.6.2
+		
+		ExecStop=-/usr/bin/docker stop calico-node
+		
+		Restart=on-failure
+		StartLimitBurst=3
+		StartLimitInterval=60s
+		
+		[Install]
+		WantedBy=multi-user.target
+	
+3. 启动 quay.io/calico/node, `systemctl staart calico-node`
+
+quay.io/calico/node:v2.6.8 运行时，比较重要的参数/环境变量主要有：
+
+1. IP ,The IPv4 address to assign this host 
+2. IP_AUTODETECTION_METHOD, The method to use to autodetect the IPv4 address for this host.
+3. IP 和 IP_AUTODETECTION_METHOD 是互斥关系，若IP 不设置，就会按照一定的策略detect ip。detect 时，运行virtural box 环境的 主机网卡名比较不常见，需要专门指定。综合来看，还是设置IP 好一些。
+
+	
+calico/node 启动时会创建两个默认的ipPool
+
+	calicoctl get ipPool
+	CIDR
+	192.168.0.0/16
+	fd80:24e2:f998:72d6::/64
+	
 ### docker 创建网络
 
-	docker network create --driver calico --ipam-driver calico-test
+	docker network create --driver calico --ipam-driver calico-ipam  --subnet=192.168.0.0/16 calico-test
 
 ## mesos
 
@@ -139,3 +217,24 @@ marathon 配置参数的方式与mesos 基本相同
 
 	zk://192.168.56.101:2181,192.168.56.102:2181,192.168.56.103:2181/marathon
 
+## 启动容器
+
+[Ucloud云上环境使用calico+libnetwork连通容器网络实践](https://zhuanlan.zhihu.com/p/24094454)
+
+marathon.json 
+
+	{
+	  "id": "my-docker-task",
+	  "cpus": 0.1,
+	  "mem": 64.0,
+	  "container": {
+	      "type": "DOCKER",
+	      "docker": {
+	          "network": "USER",
+	          "image": "nginx"
+	      }
+	  },
+	  "ipAddress": {
+	      "networkName": "calico-test"
+	  }
+	}

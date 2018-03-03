@@ -9,7 +9,7 @@ keywords: Docker, calico
 ---
 
 
-## 简介(未完成)
+## 简介
 
 17年初的时候，mesos和k8s还难分伯仲，18年的时候，mesos 就已经有点尴尬了。但在具体的环境下，mesos 仍有可取之处
 
@@ -43,3 +43,33 @@ mesos 配置目录有三个
 
 此外，/etc/default/mesos、/etc/default/mesos-master、/etc/default/mesos-slave 这三个文件中可以存放一些环境变量定义，Mesos 服务启动之前，会将这些环境变量导入进来作为启动参数。
 	
+查看配置位置最稳妥的办法是:查看对应systemd serivce文件中指定的 EnvironmentFile
+
+## marathon 
+
+marathon 配置参数的方式与mesos 基本相同
+
+配置目录为 `/etc/marathon/conf`（需要手动创建），此外默认配置文件在 `/etc/default/marathon`。
+
+主要就是配置master 和 zk 两个参数
+
+###  marathon status
+
+[Marathon Web Interface](https://mesosphere.github.io/marathon/docs/marathon-ui.html#application-status-reference)
+
+Application Status
+
+1. Running
+2. Deploying, Whenever a change to the application has been requested by the user. Marathon is performing the required actions, which haven’t completed yet.
+3. Suspended, An application with a target instances of 0 and whose running tasks count is 0.
+4. Waiting,Marathon is waiting for offers from Mesos. 
+5. Delayed,An app is considered delayed whenever too many tasks of the application failed in a short amount of time. Marathon will pause this deployment and retry later. 
+
+Health Status
+
+1. Healthy
+2. Unhealthy
+3. Staged
+4. Unknown
+5. Overcapacity
+6. Unscheduled
