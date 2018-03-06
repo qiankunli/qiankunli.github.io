@@ -18,9 +18,9 @@ keywords: Docker, calico
 
 |hostname|ip|作用|
 |---|---|---|
-|ubuntu-1|192.168.56.101|mesos master,marathon|
-|ubuntu-2|192.168.56.102|mesos slave|
-|ubuntu-3|192.168.56.103|mesos slave|
+|ubuntu-1|192.168.56.101|etcd,docker,mesos master,marathon|
+|ubuntu-2|192.168.56.102|etcd,docker,mesos slave|
+|ubuntu-3|192.168.56.103|etcd,docker,mesos slave|
 
 calico 与 mesos 集成有两种方式
 
@@ -64,6 +64,18 @@ calico 与 mesos 的整合到 2.6 版本为止，恢复时间未知。
 calicoctl, The calicoctl command line interface provides a number of resource management commands to allow you to create, modify, delete, and view the different Calico resources.
 
 从calico 网络的搭建（下载容器并运行），到calico 网络配置，设置为一个net=none 的容器配置 network namespace，都可以通过 calicoctl 来操作
+
+### 配置calicoctl 
+
+By default calicoctl looks for a configuration file at /etc/calico/calicoctl.cfg.
+
+	apiVersion: v1
+	kind: calicoApiConfig
+	metadata:
+	spec:
+	  datastoreType: "etcdv2"
+	  etcdEndpoints: "http://192.168.56.101:2379,http://192.168.56.102:2379,192.168.56.103:2379"
+	  
 
 ### Launch calico/node
 
@@ -150,6 +162,8 @@ calico/node 启动时会创建两个默认的ipPool
 	192.168.0.0/16
 	fd80:24e2:f998:72d6::/64
 	
+ip pool 中有一个ipip选项，若网络环境支持bgp，可以关闭。
+
 ### docker 创建网络
 
 	docker network create --driver calico --ipam-driver calico-ipam  --subnet=192.168.0.0/16 calico-test
@@ -238,3 +252,10 @@ marathon.json
 	      "networkName": "calico-test"
 	  }
 	}
+
+## 一些问题
+
+默认情况下，使用calico网络创建的容器的mac 地址是`ee:ee:ee:ee:ee:ee`，但部分环境下，该设置失效，mac 地址任意。 容器与外界通信时，所在host接收到数据后， 以ee:ee:ee:ee:ee:ee 向容器发送数据包，造成网络不通的现象。[
+Cannot communicate with the gateway #898](https://github.com/projectcalico/calicoctl/issues/898) 
+
+办法之一是，以Privilege模式运行容器，将cali0 mac 设置一下，`ifconfig cali0 hw ether ee:ee:ee:ee:ee:ee`

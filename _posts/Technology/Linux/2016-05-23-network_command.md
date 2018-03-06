@@ -8,7 +8,7 @@ keywords: network ovs
 
 ---
 
-## 简介（未完待续）
+## 简介
 
 http://fishcried.com/ 有一个linux 网络的基础知识系列，要研读下
 
@@ -90,6 +90,30 @@ iptables -D INPUT 7
 iptables -D FORWARD 4
 
 这样按序号删规则很方便
+
+[iptables 概念](http://www.zsythink.net/archives/1199)
+
+1. iptables 是 按rules 来办事的，这些规则分别指定了源地址、目的地址、传输协议等，并按数据包与规则是否匹配采取accept、reject、drop等action
+2. rule 通常不只一个，所以多个rule 组成一个链，链分为自定义链和默认链
+3. 根据链生效位置、以及host是否开始ip_forward的不同
+
+	* 到本机某进程的报文 prerouting--> input
+	* 开启转发功能时，由本机转发的报文 prerouting --> forward ==> postrouting
+	* 由本机的某进程发出报文 output --> postrouting
+
+4. 自定义链允许我们以自定义名称组织相关的规则，要被默认链引用，才可以生效
+
+		Chain INPUT (policy ACCEPT)
+		target     prot opt source               destination
+		cali-INPUT  all  --  anywhere             anywhere             /* cali:Cz_u1IQiXIMmKD4c */
+
+		Chain cali-INPUT (1 references)
+		target     prot opt source               destination
+		ACCEPT     all  --  anywhere             anywhere             /* cali:i7okJZpS8VxaJB3n */ mark match 0x1000000/0x1000000
+		DROP       ipencap--  anywhere             anywhere             /* cali:p8Wwvr6qydjU36AQ */ /* Drop IPIP packets from non-Calico hosts */ ! match-set cali4-all-hosts src
+
+	
+iptables 中还有表的概念，但从rule ==> chain 理解iptables 是最顺畅的。
 
 
 ## 引用
