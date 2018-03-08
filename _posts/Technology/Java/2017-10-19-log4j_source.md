@@ -67,6 +67,10 @@ LogManager
 
 通过初始化过程分析，那么自定义log4j的初始化过程的本质便是：自己触发执行`doConfigure(Properties properties, LoggerRepository hierarchy)`，doConfigure多次执行，会覆盖先前的配置。
 
+## 写日志的一些tips
+
+除了`log.error(e.getMessage,e)` 之外，最好带上一个business id， 这样查询错误的时候，除了可以根据log 关键字，还可以根据business id，后者更常见。
+
 ## 日志系统使用规范（未完成）
 
 兼容性问题
