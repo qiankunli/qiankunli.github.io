@@ -9,6 +9,10 @@ keywords: Linux
 ## 前言 ##
 本文记录一些日常使用linux的一些点。
 
+## 系统负载评估
+
+[理解Linux系统负荷](http://www.ruanyifeng.com/blog/2011/07/linux_load_average_explained.html)
+
 ## Linux中的引号 ##
 
 首先，单引号和双引号，都是为了解决中间有空格的问题。
