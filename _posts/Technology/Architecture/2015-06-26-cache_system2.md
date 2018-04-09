@@ -154,7 +154,15 @@ keywords: 缓存 redis
 
     [每天进步一点点——五分钟理解一致性哈希算法(consistent hashing)][]
     
+## varnish 缓存
 
+位于服务与 nginx 之间
+    
+## 全站缓存
+
+位于站点和用户之间
+
+[看不见摸不着的cdn是啥](http://qiankunli.github.io/2018/03/29/cdn.html)
 
 ## 引用
 
