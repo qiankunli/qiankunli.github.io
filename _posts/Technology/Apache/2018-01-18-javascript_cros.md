@@ -32,8 +32,10 @@ keywords: javascript
 
 ## 两种请求类型
 
-1.	preflight request
-2. simple request
+1. simple request
+2.	preflight request，“需预检的请求”要求必须首先使用 OPTIONS   方法发起一个预检请求到服务器，以获知服务器是否允许该实际请求。 
+
+对于需要预检的请求，每次请求发一次options 和 实际请求（比如post）（url 都是一样的）。为了减少 耗时，可以通过配置 `Access-Control-Max-Age` 缓存 options 结果，减少options 的请求次数。 [使用 Access-Control-Max-Age 来缓存 CORS 配置](https://www.web-tinker.com/article/20961.html)
 
 ## 后端工作
 
@@ -87,3 +89,7 @@ keywords: javascript
 [跨域资源共享 CORS 详解](http://www.ruanyifeng.com/blog/2016/04/cors.html)
 
 Access-Control-Allow-Credentials是一个布尔值，表示是否允许发送Cookie。**默认情况下，Cookie不包括在CORS请求之中**。设为true，即表示服务器明确许可，Cookie可以包含在请求中，一起发给服务器。**如果要发送Cookie，Access-Control-Allow-Origin就不能设为星号，必须指定明确的、与请求网页一致的域名（这样浏览器才知道发送哪些cookie）**。（从实践上看，这段话正确性存疑， 但应晓得有这回事）
+
+## 小结
+
+浏览器 + 后端 有一套策略（同源策略），实现起来基于一堆header。我们可以通过 设置header 来影响浏览器的行为。
