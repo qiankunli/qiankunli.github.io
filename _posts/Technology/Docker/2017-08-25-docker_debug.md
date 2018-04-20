@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: docker 环境常见问题
+title: docker 环境（主要运行java项目）常见问题
 category: 技术
 tags: Docker
 keywords: Docker
@@ -14,7 +14,7 @@ keywords: Docker
 2. Container stuck, can't be stopped or killed, can't exec into it either
 3. docker 停住
 4. docker pull 镜像失败
-5. 项目启动是访问mysql 失败
+5. 项目启动时访问mysql 失败
 
 ## 1 容器有时会莫名其妙重启
 
