@@ -1,22 +1,29 @@
 ---
 
 layout: post
-title: 一次docker debug过程
+title: docker 环境常见问题
 category: 技术
 tags: Docker
 keywords: Docker
 
 ---
 
+## 问题列表
 
-## 问题描述
+1. 容器有时会莫名其妙重启
+2. Container stuck, can't be stopped or killed, can't exec into it either
+3. docker 停住
+4. docker pull 镜像失败
+5. 项目启动是访问mysql 失败
+
+## 1 容器有时会莫名其妙重启
 
 环境：marathon + mesos + docker 集群
 
 现象：容器有时会莫名其妙重启
 
 
-## debug过程
+### debug过程
 
 ![](/public/upload/docker/mesos_debug_tab.png)
 
@@ -79,14 +86,14 @@ keywords: Docker
 
 There’s an experimental support in the JVM that has been included in JDK9 to support cgroup memory limits in container (i.e. Docker) environments. Check it out: http://hg.openjdk.java.net/jdk9/jdk9/hotspot/rev/5f1d1df0ea49
 
-## Container stuck, can't be stopped or killed, can't exec into it either
+## 2 Container stuck, can't be stopped or killed, can't exec into it either
 
 jdk6 编译的项目运行在jdk8上
 
 1. 代码本身经由jdk6编译，运行在jdk8上
 2. 代码依赖的jar由jdk6编译
 
-在docker-ce 1.3 以下会出现`docker ps`可以看到，但容器内jvm进程已经退出的情况。升级到docker-ce 1.7 则貌似解决了该问题。
+在docker-ce 1.3 以下会出现`docker ps`可以看到，但容器内jvm进程已经退出的情况。升级到docker-ce 1.7 仍未解决该问题。
 
 2017.12.05 更新
 
@@ -120,7 +127,8 @@ docker认为容器一直“活着”，但主进程已经退出了。所以，�
 
 [Can't stop docker container #35933](https://github.com/moby/moby/issues/35933) 仍待解决。
 
-## docker 停住
+## 3 docker 停住
+
 环境：
 
 1. ubuntu 16.04
@@ -147,7 +155,7 @@ docker认为容器一直“活着”，但主进程已经退出了。所以，�
 解决 [Swarm Kernel Panic after "unregister_netdevice"](https://github.com/moby/moby/issues/35068)，升级了内核版本到4.14.5
 
 
-## docker pull 镜像失败
+## 4 docker pull 镜像失败
 
 一开始认为是权限不够，后来发现同样配置的其它机器没有问题，同时将images server地址配置为了insecurity-registry。后来一个很偶然的原因发现整个物理机的磁盘都满了。
 
@@ -181,6 +189,57 @@ docker认为容器一直“活着”，但主进程已经退出了。所以，�
 	$ du -sh *
 	
 后来发现是某一个项目日志打的太多了，在此建议测试环境配置定时任务，周期性的清理掉项目的日志。
+
+## 5 项目启动是访问mysql 失败
+
+![](/public/upload/docker/docker_jdbc_timeout.png)
+
+运行在 docker 18.03.0-ce 的服务，启动时报连接 mysql 超时（如上图所示）。而较老版本17.09.0-ce 则无此问题。
+
+### 第一回合
+
+怀疑项目启动连接数据库时，容器还未准备好网络。
+
+因此呢，可以修改 c3p0 连接池配置，使 initialPoolSize=0。initialPoolSize 表示连接池初始化时创建的连接数，为0后，c3p0会在第一次接收用户请求时 才建立连接。
+
+结果，没有用
+
+### 第二回合
+
+
+验证办法，实现一个BeanFactoryPostProcessor子类，其回调方法 postProcessBeanFactory 执行一个类似ping 的方法
+
+    public void ping() {
+        int timeOut = 3000;  //超时应该在3钞以上
+        boolean status = false;     // 当返回值是true时，说明host是可用的，false则不可。
+        try {
+            status = InetAddress.getByName("192.168.x.x").isReachable(timeOut);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println("docker is reachable " + status);
+        log.info("docker is reachable {}", status);
+    }
+
+java doc 对 postProcessBeanFactory  的解释 为 Modify the application context's internal bean factory after its standard initialization. All bean definitions will have been loaded, but no beans will have been instantiated yet. 意图就是在 jdbc 初始化连接池之前，执行ping方法
+
+结果：可以ping 通，说明不是docker 网络的问题
+
+### 第三回合
+
+怀疑是 c3p0 配置的问题，以此为出发点 google 一下，[c3p0的连接池优化导致的异常](http://www.iloveqyc.com/2016/05/30/c3p0-optimize-out-of-time/) 对照实际项目配置，发现确实略短，改大后，问题解决。
+
+原有配置
+
+	jdbc.checkoutTimeout=1000
+
+修改后
+
+	jdbc.checkoutTimeout=60000
+	
+以当下粗浅的理解，checkoutTimeout 表示从连接池中 获取 连接的最大允许时间。若连接池有空闲连接，则直接返回，否则还需要 与远程db 建连接，耗时时间就会略长。
+
+有时间学习下c3p0 源码再与大家分享
 
 ## 发现与预防
 

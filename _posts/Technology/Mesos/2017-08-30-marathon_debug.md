@@ -8,8 +8,14 @@ keywords: Docker
 
 ---
 
+## 问题目录
 
-## 问题一描述
+1. app 一直处于unknown 状态，restart/destroy 失败
+2. waiting 状态的项目一直无法部署
+3. 创建项目时 Invalid JSON
+
+
+## 1. app 一直处于unknown
 
 基础环境：
 
@@ -61,7 +67,7 @@ marathon 部署一个新的task时，会先部署新的实例，然后干掉老�
 2. 在zookeeper中，`rmr /marathon/state/xx/marathon_app_name`
 3. `systemctl stop marathon`
 
-## 问题2
+## 2 waiting 状态的项目一直无法部署
 
 集群明明有空闲资源，但waiting状态的项目就是不调度到空闲的主机上
 
@@ -70,6 +76,14 @@ marathon 部署一个新的task时，会先部署新的实例，然后干掉老�
 2. [Marathon/Mesos 集群排错记录](http://www.ituring.com.cn/article/264014)
 
 根据Mesos state API (http://ip:5050/state)得到当前Mesos集群的所有状态信息的Json文件。
+
+## 3 创建项目时 Invalid JSON
+
+
+	{"message":"Invalid JSON","details":[{"path":"/id","errors":["error.pattern"]}]}
+	
+原因：marathon Application name 不允许出现下划线
+
 
 ## 升级带来的api变化
 
