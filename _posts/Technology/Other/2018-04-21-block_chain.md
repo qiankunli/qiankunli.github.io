@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 比特币 大杂烩
+title: 区块链泛谈
 category: 技术
 tags: Other
 keywords: block chain
