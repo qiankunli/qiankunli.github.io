@@ -67,6 +67,18 @@ LogManager
 
 通过初始化过程分析，那么自定义log4j的初始化过程的本质便是：自己触发执行`doConfigure(Properties properties, LoggerRepository hierarchy)`，doConfigure多次执行，会覆盖先前的配置。
 
+## tomcat 日志
+
+2018.4.25 补充
+
+[tomcat中的几种log](http://www.10tiao.com/html/240/201705/2649257445/1.html) 要点如下：
+
+1. catalina.out，catalina.out其实是tomcat的标准输出(stdout)和标准出错(stderr)。如果我们在应用里使用其他的日志框架，配置了向Console输出的，则也会在这里出现。
+2. catalina.{yyyy-MM-dd}.log是tomcat自己运行的一些日志，这些日志还会输出到catalina.out，但是应用向console输出的日志不会输出到catalina.{yyyy-MM-dd}.log。
+3. localhost.{yyyy-MM-dd}.log主要是应用初始化(listener, filter, servlet)**未处理的异常**最后被tomcat捕获而输出的日志，而这些未处理异常最终会导致应用无法启动。Spring的初始化我们往往是使用Spring提供的一个listener进行的，而如果Spring初始化时因为某个bean初始化失败，导致整个应用没有启动，这个时候的异常日志是输出到localhost中 ==> **初始化失败应该去查看下 localhost 日志**。
+
+
+
 ## 写日志的一些tips
 
 除了`log.error(e.getMessage,e)` 之外，最好带上一个business id， 这样查询错误的时候，除了可以根据log 关键字，还可以根据business id，后者更常见。

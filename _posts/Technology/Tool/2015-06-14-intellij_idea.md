@@ -75,6 +75,10 @@ idea64.exe.vmoptions
     
 ## 配置go语言开发环境
 
+2018.4.27 补充
+
+18年之后，建议idea 专为 go语言做的 [goland](https://www.jetbrains.com/go/)
+
 intellij 安装 go语言插件，这个网上有很多，可以参见`http://blog.csdn.net/qinxiandiqi/article/details/50319953`
 
 基本环境，windows下如果使用goxxx.msi安装，新建项目时，idea则会自动添加GOROOT和GOPATH环境变量，这两个变量很重要，作用参见其它文档。

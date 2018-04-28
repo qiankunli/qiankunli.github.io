@@ -161,6 +161,22 @@ keywords: Permission
 2. 管理员和开发是平级的，只是管理员的权限更大一些
 3. 管理员没有功能权限的要求，即只要是管理员就可以crud
 
+## 审批流程（未完成）
+
+2018.4.23 新增
+
+权限管理系统伴随的，通常会有一个审批流程系统，相关设计参见[审批流程数据库设计](https://blog.csdn.net/samqingqing/article/details/18732813)
+
+数据库表 设计中，也会有类和实例的关系
+
+1. flow:id,name
+2. node:id,flow_id,prev,next,handlers
+3. flow_example:id,title,uid(发起者),create_at,status(未发起，正在流转,已结束)
+4. process: id,node_id,uid(操作者),handle_at,flow_example_id
+
+1. flow + node 将一个流程的作用及先后 步骤 规定好
+2. flow_example 是一个流程的实例
+3. process，描述 在当前 实例下，进行到哪一个步骤
 
 ## 小结
 
