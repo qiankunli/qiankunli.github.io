@@ -72,7 +72,7 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 
 	![](/public/upload/architecture/distributed_system_2.png)
 	
-2. proposer 贿选 不会坚持 让acceptor 遵守自己的提议。出价最高的proposer 会得到大部分acceptor 的拥护，  而是以最快达成一致 为目标，若是贿金高但提议晚，也是会顺从 他人的提议。
+2. proposer 贿选 不会坚持 让acceptor 遵守自己的提议。出价最高的proposer 会得到大部分acceptor 的拥护（谁贿金高，acceptor最后听谁的。换个说法，acceptor 之间没有之间交互，但），  但会以最快达成一致 为目标，若是贿金高但提议晚，也是会顺从 他人的提议。
 
 下面看下 《区块链核心算法解析》 中的思维线条
 
