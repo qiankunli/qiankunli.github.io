@@ -62,6 +62,18 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 		* 在有足够多acceptor回复promise消息时，proposer发送accept消息
 		* 正常情况下acceptor回复accepted消息
 
+只有一个Proposer能进行到第二阶段运行。
+
+目前比较好的通俗解释，以贿选来描述 [如何浅显易懂地解说 Paxos 的算法？ - GRAYLAMB的回答 - 知乎](https://www.zhihu.com/question/19787937/answer/107750652)。
+
+一些补充
+
+1. proposer 和 acceptor，异类交互，同类不交互
+
+	![](/public/upload/architecture/distributed_system_2.png)
+	
+2. proposer 贿选 不会坚持 让acceptor 遵守自己的提议。出价最高的proposer 会得到大部分acceptor 的拥护，  而是以最快达成一致 为目标，若是贿金高但提议晚，也是会顺从 他人的提议。
+
 下面看下 《区块链核心算法解析》 中的思维线条
 
 1. 两节点
@@ -77,7 +89,7 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 
 		1. 独立的协调器。2pc/3pc 思路
 		2. 客户端向所有的服务端申请锁，谁先申请到所有服务器的锁，谁说了算。缺点：客户端拿到锁后宕机了，尴尬！
-		3. 票的概念，弱化形式的锁。客户端向所有的服务器请求一张票，得到超过半数票，便可以发布命令。paxos 套路（当然，具体细节更复杂）
+		3. 票的概念，弱化形式的锁。paxos 套路（当然，具体细节更复杂）
 
 
 ## 分布式知识体系
