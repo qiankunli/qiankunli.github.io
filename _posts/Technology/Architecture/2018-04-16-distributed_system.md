@@ -8,15 +8,16 @@ keywords: 分布式系统
 
 ---
 
-## 简介（未完成）
+## 简介
 
 本文主要聊一下 分布式系统的 基本组成和理论问题
-
-有没有一个 知识体系/架构、描述方式，能将分布式的各类知识都汇总起来
 
 [现有分布式项目小结](http://qiankunli.github.io/2015/07/14/distributed_project.html)
 [分布式配置系统](http://qiankunli.github.io/2015/08/08/distributed_configure_system.html)
 [分布式事务](http://qiankunli.github.io/2017/07/18/distributed_transaction.html)
+
+
+有没有一个 知识体系/架构、描述方式，能将分布式的各类知识都汇总起来？
 
 ## 学习分布式的正确姿势
 
@@ -42,30 +43,44 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 
 小结一下就是，一致性是一个结果，共识是一个算法，通常被用于达到一致性的结果。
 
+在《区块链核心算法解析》中，则采用另一种描述方式：对于一组节点，如果所有节点均以相同的顺序执行一个（可能是无限的）命令序列c1,c2,c3...，则这组节点 实现了状态复制。
+
 ## 一致性问题 的几个协议及其之间的关系
-
-结果和过程
-
-一致性是一个结果， 那么什么样的结果 称为一致？
-如何达成一致？
-
-达成一致的节点
-
-1. 只是失效
-2. 会伪造非法信息
-
 
 [从CAP理论到Paxos算法](http://blog.longjiazuo.com/archives/5369?hmsr=toutiao.io&utm_medium=toutiao.io&utm_source=toutiao.io) 基本要点：
 
 1. cap 彼此的关系。提高分区容忍性的办法就是一个数据项复制到多个节点上，那么出现分区之后，这一数据项就可能分布到各个区里。分区容忍就提高了。然而，要把数据复制到多个节点，就会带来一致性的问题，就是多个节点上面的数据可能是不一致的。要保证一致，每次写操作就都要等待全部节点写成功，而这等待又会带来可用性的问题。
 2. cap 着力点。网络分区是既成的现实，于是只能在可用性和一致性两者间做出选择。在工程上，我们关注的往往是如何在保持相对一致性的前提下，提高系统的可用性。
 3. 还是读写问题。[多线程](http://qiankunli.github.io/2014/10/09/Threads.html) 提到，多线程本质是一个并发读写问题，数据库系统中，为了描述并发读写的安全程度，还提出了隔离性的概念。具体到cap 理论上，副本一致性本质是并发读写问题（A主机写入的数据，B主机多长时间可以读到）。2pc/3pc 本质解决的也是如此 ==> A主机写入的数据，成功与失败，B主机多长时间可以读到，然后决定自己的行为。
-4. Paxos算法 （未完成）
+4. Paxos算法
+
+	* Phase 1
+		
+		* proposer向网络内超过半数的acceptor发送prepare消息
+		* acceptor正常情况下回复promise消息
+	* Phase 2
+		* 在有足够多acceptor回复promise消息时，proposer发送accept消息
+		* 正常情况下acceptor回复accepted消息
+
+下面看下 《区块链核心算法解析》 中的思维线条
+
+1. 两节点
+
+	1. 客户端服务端，如何可靠通信？如何处理消息丢失问题
+	2. 请求-确认，客户端一段时间收不到 确认则重发，为数据包标记序列号解决重发导致的重复包问题。这也是tcp 的套路
+
+2. 单客户端-多服务端
+3. 多客户端-多服务端
+
+	1. 多服务端前 加一个 单一入口（串行化器）， 所以的客户端先发给 串行化器，再分发给服务端。即主从复制思路==> 串行化器单点问题
+	2. 客户端先协调好，由一个客户端发命令
+
+		1. 独立的协调器。2pc/3pc 思路
+		2. 客户端向所有的服务端申请锁，谁先申请到所有服务器的锁，谁说了算。缺点：客户端拿到锁后宕机了，尴尬！
+		3. 票的概念，弱化形式的锁。客户端向所有的服务器请求一张票，得到超过半数票，便可以发布命令。paxos 套路（当然，具体细节更复杂）
 
 
-2pc/3pc/paxos 都需要协调者
-
-### 分布式
+## 分布式知识体系
 
 [distributed-systems-theory-for-the-distributed-systems-engineer](http://the-paper-trail.org/blog/distributed-systems-theory-for-the-distributed-systems-engineer/) 
 
@@ -88,10 +103,6 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 	
 问题就是，你如何将 一致性、共识 这些概念 place 到 分布式的 context中。
 
-
-
-
-## 分布式知识体系
 
 ![](/public/upload/architecture/distributed_system.png)
 

@@ -55,10 +55,53 @@ keywords: block chain
 The proof-of-work also solves the problem of determining representation in majority decision making. If the majority were based on one-IP-address-one-vote, it could be subverted by anyone able to allocate many IPs. Proof-of-work is essentially one-CPU-one-vote. The majority decision is represented by the longest chain, which has the greatest proof-of-work effort invested in it. 要点：
 
 1. one-IP-address-one-vote,无论是paxos、还是2pc/3pc这些，达成共识都是分两步走的，先找到一个基准（协调者），然后取得一致。但如何决定基准，传统共识算法 都是 one-IP-address-one-vote
-2. one-CPU-one-vote，为了充当协调者（记账权），one-IP-address-one-vote 类算法都是先投票，one-CPU-one-vote 是先干活。
+2. one-CPU-one-vote，为了充当协调者（记账权），one-IP-address-one-vote 类算法都是先投票，one-CPU-one-vote 是先干活。they vote with their cpu power
 
 干什么活？中本聪借鉴了 Adam Back's Hashcash 算法，`transactions + prev hash + nonce = hash1`, 新的hash 必须包含一定的量的 zero bits（貌似还必须得在最前面）
 
 1. attacker 可以改下transaction， 对 `transactions + prev hash + nonce` 重新计算得到hash2， 只要hash2 有一定量的 zero bits 也行，但很明显，hash2 不等于 hash1
 2. 于是，改了hash2，连带该block 之后所有的block 都得重算
 
+## tips
+
+本小节，都是一些小点，可以归类到安全机制，也可以说如何节省空间，也可以说比特币发行等，怎么归类都片面的，
+
+激励
+
+1. 给旷工发比特币， provides a way to ** initially ** distribute coins into circulation, since there is no central authority to issue them（去中心化影响 货币的方方面面）. initially 的含义是：比特币发完之后，旷工就只靠 交易费过活了。
+2. The incentive may help encourage nodes to stay honest.If a greedy attacker is able to assemble more CPU power than all the honest nodes
+
+	* defraud people by stealing back his payments
+	* using it to generate new coins
+
+	He ought to find it more profitable to play by the rules, such rules that favour him with more new coins than everyone else combined, than to undermine the system and the validity of his own wealth. 欺诈用户的事儿干多了，人们将不再信任比特币系统，attacker欺诈省掉的/拿到的比特币也就不值钱了。attacker 如果有这个计算资源，与其搞破坏，不如老老实实挖矿赚钱。
+
+3. 根据merkle tree 的一些特性，底层数据的任何变动都会传导到父节点，最终传导到 根节点。根的值实际代表了 对底层所有数据的 “数字摘要”。所以，对于block-chain 中比较早的 block来说，交易数据可以discard（如果你不关心所有人的所有交易链路的话）。A block header with no transactions would be about 80 bytes. If we suppose blocks are generated every 10 minutes, 80 bytes * 6 * 24 * 365 = 4.2MB per year. 全放内存都没有关系。
+
+4. It is possible to verify payments without running a full network node. A user only needs to keep a copy of the block headers of the longest proof-of-work chain,He can't check the transaction for himself, but by linking it to a place in the chain, he can see that a network node has accepted it. 轻钱包，交易本身合不合法无法直接确认（因为无法直接校验交易的输入 等），但可以向节点查询交易是否在 最长链中。
+
+4. SPV, [简单支付验证（SPV）与创新](https://www.jianshu.com/p/39be41dfb5fa) 交易确认与支付确认，有的文章对着两个概念不作区别，经常混淆使用。[区块链如何运用merkle tree验证交易真实性](https://www.tangshuang.net/4117.html) 要点如下：
+
+	* Merkle Tree, 把merkle root保存在区块头中，交易数据被保存在区块体中，Merkle Tree中间当那些hash并没有被保存，它们只是运算过程数据。**Merkle Tree 还被用于p2p 下载时的文件校验**
+	* merkle block message（spv 发出的请求 ） 和 验证路径 （节点对 spv 请求的响应）
+
+		![](/public/upload/other/bitcoin_paper_1.jpg)
+	
+	* 节点 如何 根据交易信息 得到交易所在的block，并返回 验证路径
+	* spv 如何 确认 验证路径 是否正确。 同步最长区块链 ==> 确认merkle root在最长链中 ==> merkle root 可信 ==> spv 根据返回 验证路径（hash01,hash23,hash2,hash3,hash(tx3)） 重新计算merkle root ==> 验证路径真实 ==> 交易已被最长链确认
+
+6. a new key pair should be used for each transaction to keep them from being linked to a common owner. 每个交易 都有一个new key pair
+
+	* 掩盖owner 的身份
+	* bitcoin 的接收者 在 交易快开始时 才将 key pair 给sender，防止 sender 提前 算好交易数据，提高了sender 拿到记账权的可能性
+
+## conclusion
+
+适合多次重复读
+
+We have proposed a system for electronic transactions without relying on trust（这句是纲领）. We started with the usual framework of coins made from digital signatures, which provides strong control of ownership, but is incomplete without a way to prevent double-spending. To solve this, we proposed a peer-to-peer network using proof-of-work to record a public history of transactions that quickly becomes computationally impractical for an attacker to change if honest nodes control a majority of CPU power. The network is robust in its unstructured simplicity. Nodes work all at once with little coordination. They do not need to be identified, since messages are not routed to any particular place and only need to be delivered on a best effort basis. Nodes can leave and rejoin the network at will, accepting the proof-of-work chain as proof of what happened while they were gone. They vote with their CPU power, expressing their acceptance of valid blocks by working on extending them and rejecting invalid blocks by refusing to work on them. Any needed rules and incentives can be enforced with this consensus mechanism.
+
+1. digital signatures，解决隐私和不可篡改性
+2. peer-to-peer network using proof-of-work 解决双花问题
+3. Nodes work all at once with little coordination，do not need to be identified，vote with their CPU power
+4. other rules and incentives can be enforced with this consensus mechanism.
