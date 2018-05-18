@@ -3,7 +3,7 @@
 layout: post
 title: 缓存系统——具体组件
 category: 技术
-tags: Architecture
+tags: Storage
 keywords: 缓存 redis
 
 ---

@@ -3,7 +3,7 @@
 layout: post
 title: 异构数据库表在线同步
 category: 技术
-tags: Architecture
+tags: Storage
 keywords: mysql binlog
 
 ---

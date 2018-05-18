@@ -2,7 +2,7 @@
 layout: post
 title: 我对Hadoop的认识
 category: 技术
-tags: Hadoop
+tags: Storage
 keywords: Hadoop 大数据 原理
 ---
 

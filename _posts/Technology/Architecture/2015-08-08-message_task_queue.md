@@ -73,9 +73,50 @@ producer ==> topic =1:n=> consumer group =1:n=> consumer
 
 一个topic消息广播给所有consumer group，consumer轮流处理consumer group 接到的消息(kafka有分区的概念，不同的consumer会消费不同的分区)。通过调整topic、consumer group、consumer三者关系来达到广播、组播和单播效果。
 
+## 消息队列监控
 
+### rabbitmq
 
+channel 接口本身 也提供
 
+	// 队列未消费的消息数
+    long messageCount(String queue) throws IOException;
+    // 队列消费者个数
+    long consumerCount(String queue) throws IOException;
+
+RabbitMQ 有灵活的插件机制，启用 [rabbitmq-management](http://www.rabbitmq.com/management.html) 就可以对服务进行监控和管理。`http://rabbitmq_host:15672/api/` 展示了rabbitmq 的http api 列表，基本具备所有 Rabbitmq java client  功能。http api的优势在于，可以在队列的消费实例之外构建专门的监控系统。
+
+1. 所有的请求需要授权，请求的返回数据都是json
+2. 很多请求返回的都是一个列表，你可以在请求中 加入sort 和 sort_reverse 为返回数据排序
+3. 默认vhost 使用%2f 代替
+
+`curl -i -u guest:guest http://ip:port/api/queues/%2f/queue_name` 返回值 json 
+
+	{
+		...
+		"consumers":xx
+		"state":xx,
+		"vhost":xx,
+		"durable":xx,
+		"auto_delete":xx
+		"messages_unacknowledged":xx,
+		"messages_unacknowledged_details":{
+			"rate":xx
+		},
+		"messages_ready":xx,
+		"messages_ready_details":{
+			"rate":xx
+		},
+		"messages":xx,
+		"messages_details":{
+			"rate":xx
+		}
+		...
+	}
+	
+据此，就可以对队列拥堵，consumer 实例是否正常 来做出预警。
+    
+    
 ## 其它
 
 消息队列系统有很多，主要有以下不同：

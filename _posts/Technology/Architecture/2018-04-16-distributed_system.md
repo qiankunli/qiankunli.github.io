@@ -25,9 +25,9 @@ keywords: 分布式系统
 
 [distributed-systems-theory-for-the-distributed-systems-engineer](http://the-paper-trail.org/blog/distributed-systems-theory-for-the-distributed-systems-engineer/) 文中提到：
 
-My response of old might have been “well, here’s the FLP paper, and here’s the Paxos paper, and here’s the Byzantine generals paper…”, and I’d have prescribed a laundry list of primary source material which would have taken at least six months to get through if you rushed. But I’ve come to thinking that recommending a ton of theoretical papers is often precisely the wrong way to go about learning distributed systems theory (unless you are in a PhD program). Papers are usually deep, usually complex, and require both serious study, and usually significant experience to glean their important contributions and to place them in context. What good is requiring that level of expertise of engineers?
+My response of old might have been “well, here’s the FLP paper, and here’s the Paxos paper, and here’s the Byzantine generals（拜占庭将军） paper…”, and I’d have prescribed(嘱咐、规定) a laundry list of primary source material which would have taken at least six months to get through if you rushed. **But I’ve come to thinking that recommending a ton of theoretical papers is often precisely the wrong way to go about learning distributed systems theory (unless you are in a PhD program).** Papers are usually deep, usually complex, and require both serious study, and usually significant experience to glean(捡拾) their important contributions and to place them in context. What good is requiring that level of expertise of engineers?
 
-也就是说，具体学习某一个分布式算法用处有限，你很难  place them in contex
+也就是说，具体学习某一个分布式算法用处有限。一个很难理解，一个是你很难  place them in contex（它们在解决分布式问题中的作用）。
 
 ### 一致性和共识
 
@@ -87,10 +87,18 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 	1. 多服务端前 加一个 单一入口（串行化器）， 所以的客户端先发给 串行化器，再分发给服务端。即主从复制思路==> 串行化器单点问题
 	2. 客户端先协调好，由一个客户端发命令
 
-		1. 独立的协调器。2pc/3pc 思路
+		1. 抽取独立的协调器。2pc/3pc 思路
 		2. 客户端向所有的服务端申请锁，谁先申请到所有服务器的锁，谁说了算。缺点：客户端拿到锁后宕机了，尴尬！
 		3. 票的概念，弱化形式的锁。paxos 套路（当然，具体细节更复杂）
 
+未完成
+
+1. paxos 无法保证确定性，即理论上存在一直无法达成一致， 不停地投票的情况
+2. paxos 假定 参与节点都按规则 运行的基础上
+
+FLP 原理
+
+可以画一个饼图，哪些不可能，哪些可能。理论上不可能，技术上又如何解决？
 
 ## 分布式知识体系
 

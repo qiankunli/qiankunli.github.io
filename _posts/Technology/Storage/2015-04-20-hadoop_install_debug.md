@@ -2,7 +2,7 @@
 layout: post
 title: Hadoop安装与调试
 category: 技术
-tags: Hadoop
+tags: Storage
 keywords: Hadoop Eclipse
 ---
 

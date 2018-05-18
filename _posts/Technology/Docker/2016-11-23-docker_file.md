@@ -32,6 +32,8 @@ docker关于存储方面的总体的理念是：**分层（因为不想像virtua
 
 ## 一些基础知识
 
+[docker中涉及到的一些linux知识](http://qiankunli.github.io/2016/12/02/linux_docker.html) 中提到，VFS 是文件系统事实上的规范，定义了挂载点、超级块、目录和索引节点等基本数据结构，定义了open/close/write/read 等基本接口
+
 ### 挂载/mount
 
 例如，`/dev/sdb`块设备被mount到`/mnt/alan`目录。命令：`mount -t ext3 /dev/sdb /mnt/alan`。
@@ -62,7 +64,7 @@ ln分为软链接和硬链接
 
 参见[Union mount](https://en.wikipedia.org/wiki/Union_mount)，In computer operating systems, union mounting is a way of combining multiple directories into one that appears to contain their combined contents.
 
-union mount的使用场景，As an example application of union mounting, consider the need to update the information contained on a CD-ROM or DVD. While a CD-ROM is not writable, one can overlay the CD's mount point with a writable directory in a union mount. Then, updating files in the union directory will cause them to end up in the writable directory, giving the illusion that the CD-ROM's contents have been updated.
+union mount的使用场景——读写只读文件系统，As an example application of union mounting, consider the need to update the information contained on a CD-ROM or DVD. While a CD-ROM is not writable, one can overlay the CD's mount point with a writable directory in a union mount. Then, updating files in the union directory will cause them to end up in the writable directory, giving the illusion that the CD-ROM's contents have been updated. 
 
 Union FileSystem的核心逻辑是Union Mount，它支持把一个目录A和另一个目录B union，提供一个虚拟的C目录（目录union的语义）。对于特定的权限设置策略，如果设置A目录可写，B目录只读。用户对目录C的读取就是A加上B的内容，而对C目录里文件写入和改写则会保存在目录A上。这样，就有了A在B上层的感觉。
 [DOCKER基础技术：AUFS](http://coolshell.cn/articles/17061.html)

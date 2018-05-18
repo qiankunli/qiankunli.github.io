@@ -12,19 +12,26 @@ keywords: network
 
 ## 镜像文件
 
-An archive file is a file that is composed of one or more computer files along with metadata. Archive files are used to collect multiple data files together into a single file for easier portability and storage, or simply to compress files to use less storage space. Archive files often store directory structures, error detection and correction information, arbitrary comments, and sometimes use built-in encryption.
+An archive file is a file that is composed of one or more computer files **along with metadata**. Archive files are used to collect multiple data files together into a single file for easier portability and storage, or simply to compress files to use less storage space. Archive files often store directory structures, error detection and correction information, arbitrary comments, and sometimes use built-in encryption.
 
-rootfs是基于内存的文件系统，所有操作都在内存中完成；也没有实际的存储设备，所以不需要设备驱动程序的参与。基于以上原因，Linux在启动阶段使用rootfs文件系统，当磁盘驱动程序和磁盘文件系统成功加载后，linux系统会将系统根目录从rootfs切换到磁盘文件系统。
+文件系统 是解决 根据 file name 找 file data的问题，从这个角度看，文件系统跟dns 有点异曲同工的意思。
+
+rootfs是基于内存的文件系统，所有操作都在内存中完成；也没有实际的存储设备，所以不需要设备驱动程序的参与。基于以上原因，Linux在启动阶段使用rootfs文件系统，当磁盘驱动程序和磁盘文件系统成功加载后，linux系统会将系统根目录从rootfs切换到磁盘文件系统（这句表述不准确）。
 
 所以呢，文件系统有内存文件系统，磁盘文件系统，还有基于磁盘文件系统之上的联合文件系统。
 
 参见[linux文件系统初始化过程(2)---挂载rootfs文件系统
-](http://blog.csdn.net/luomoweilan/article/details/17894473),linux文件系统中重要的数据结构有：文件、挂载点、超级块、目录项、索引节点等。图中含有两个文件系统（红色和绿色表示的部分），并且绿色文件系统挂载在红色文件系统tmp目录下。一般来说，每个文件系统在VFS层都是由挂载点、超级块、目录和索引节点组成；当挂载一个文件系统时，实际也就是创建这四个数据结构的过程，因此这四个数据结构的地位很重要，关系也很紧密。由于VFS要求实际的文件系统必须提供以上数据结构，所以不同的文件系统在VFS层可以互相访问。
+](http://blog.csdn.net/luomoweilan/article/details/17894473),linux文件系统中重要的数据结构有：文件、挂载点、超级块、目录项、索引节点等。图中含有两个文件系统（红色和绿色表示的部分），并且绿色文件系统挂载在红色文件系统tmp目录下。一般来说，每个文件系统在VFS层都是由挂载点、超级块、目录和索引节点组成；当挂载一个文件系统时，实际也就是创建这四个数据结构的过程，因此这四个数据结构的地位很重要，关系也很紧密。**由于VFS要求实际的文件系统必须提供以上数据结构，所以不同的文件系统在VFS层可以互相访问。**
     如果进程打开了某个文件，还会创建file(文件)数据结构，这样进程就可以通过file来访问VFS的文件系统了。
 
 ![](/public/upload/linux/linux_fs.png)
 
 这个图从上往下看，可以知道，各个数据结构通过数组等自己组织在一起，又通过引用上下关联。
+
+划重点：
+
+1. 文件系统有事实上的规范——VFS，定义了挂载点、超级块、目录和索引节点等基本数据结构，定义了open/close/write/read 等基本接口
+2. 因为VFS的存在，一个linux 实际上可以运转多个文件系统
 
 
 ## linux网桥
