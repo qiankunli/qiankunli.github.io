@@ -8,7 +8,7 @@ keywords: Docker volume
 
 ---
 
-## 简介
+## 简介（待整理）
 
 
 ## 从AUFS说起
@@ -83,6 +83,43 @@ volumn的作用：
 
 即使用以上两种命令，也只能删除没有容器连接的Volume。连接到用户指定主机目录的Volume永远不会被docker删除。
 
+## 补充材料
+
+docker关于存储方面的总体的理念是：**分层（因为不想像virtualbox一样copy整个镜像），层之间有父子关系。**
+
+分层内容的“镜像图（image graph）”代表了各种分层之间的关系，用来处理这些分层的驱动就被叫做“图驱动（graphdriver）”。docker1.2.0 源码中，驱动接口如下
+
+
+	type Driver interface {
+		String() string
+		Create(id, parent string) error
+		Remove(id string) error
+		Get(id, mountLabel string) (dir string, err error)
+		Put(id string)
+		Exists(id string) bool
+		Status() [][2]string
+		Cleanup() error
+	}
+	
+换句话说，接口表述了docker上层操作的要求。基于docker的分层理念，镜像数据以层为单位来组织，根据文件系统的不同，数据的内容不同，实现Driver interface的算法不同，这就是graphdriver。
+
+
+
+
+## docker volume plugin
+
+[Docker使用OpenStack Cinder持久化volume原理分析及实践](https://zhuanlan.zhihu.com/p/29905177)，几个要点
+
+1. Docker通过volume实现数据的持久化存储以及共享
+2. Docker创建的volume只能用于当前宿主机的容器使用，不能挂载到其它宿主机的容器中，这种情况下只能运行些无状态服务，对于需要满足HA的有状态服务，则需要使用分布式共享volume持久化数据，保证宿主机挂了后，容器能够迁移到另一台宿主机中。而Docker本身并没有提供分布式共享存储方案，而是通过插件(plugin)机制实现与第三方存储系统对接集成
+3. 最重要的是：If a plugin registers itself as a VolumeDriver when activated, it must provide the Docker Daemon with writeable paths on the host filesystem.Docker不能直接读写外部存储系统，而必须把存储系统挂载到宿主机的本地文件系统中，Docker当作本地目录挂载到容器中，换句话说，只要外部存储设备能够挂载到本地文件系统就可以作为Docker的volume。
+4. docker daemon与plugin daemon通信的API ，部分
+
+    * VolumeDriver.Mount : 挂载一个卷到本机，Docker会把卷名称和参数发送给参数。**插件会返回一个本地路径给Docker，这个路径就是卷所在的位置。Docker在创建容器的时候，会将这个路径挂载到容器中**。
+    * VolumeDriver.Path : 一个卷创建成功后，Docker会调用Path API来获取这个卷的路径，随后Docker通过调用Mount API，让插件将这个卷挂载到本机。 
+    * VolumeDriver.Unmount : 当容器退出时，Docker daemon会发送Umount API给插件，通知插件这个卷不再被使用，插件可以对该卷做些清理工作（比如引用计数减一，不同的插件行为不同）。 
+    * VolumeDriver.Remove : 删掉特定的卷时调用，当运行”docker rm -v”命令时，Docker会调用该API发送请求给插件。 
+
 ## 基于分布式文件系统的volume
 
 与docker容器在网络方面碰到的问题一样，在存储方面docker容器存在着
@@ -112,48 +149,7 @@ volumn的作用：
 |mount host dir|-v支持；Dockerfile不可以|类似于lizardfs，将分布式文件系统作为本机的一个host dir|简单，但docker file的中的volume就无法弄了|
 
 
-## 一些基础知识（待整理）
-
-linux系统的进程结构体有以下几个字段
-
-    struct task_struct {
-        struct m_inode * pwd;
-    	struct m_inode * root;
-    	struct m_inode * executable;				//进程对应可执行文件的i节点
-    }
-    
-
-### 传统的linux fs加载过程
-
-参见`https://www.kernel.org/doc/Documentation/filesystems/ramfs-rootfs-initramfs.txt`
-
-What is rootfs?
-
-Rootfs is a special instance of ramfs (or tmpfs, if that's enabled), which is
-always present in 2.6 systems.it's smaller and simpler for the kernel
-to just make sure certain lists can't become empty.Most systems just mount another filesystem over rootfs and ignore it（一般情况下，通过某种文件系统挂载内容至挂载点的话，挂载点目录中原先的内容将会被隐藏）.
-
-
-What is initramfs?
-
-All 2.6 Linux kernels contain a gzipped "cpio" format archive, which is
-extracted into rootfs when the kernel boots up.  After extracting, the kernel
-checks to see if rootfs contains a file "init", and if so it executes it as PID
-1.  If found, this init process is responsible for bringing the system the
-rest of the way up, including locating and mounting the real root device (if
-any).  If rootfs does not contain an init program after the embedded cpio
-archive is extracted into it, the kernel will fall through to the older code
-to locate and mount a root partition, then exec some variant of /sbin/init
-out of that.
-
-所以一个linux的启动过程经历了rootfs ==> 挂载initramfs ==> 挂载磁盘上的真正的fs
-
-为什么要有initrd？
-
-linux系统在启动时，会执行文件系统中的`/sbin/init`进程完成linux系统的初始化，执行`/sbin/init`进程的前提是linux内核已经拿到了存在硬盘上的系统镜像文件（加载设备驱动，挂载文件系统）。linux 发行版必须适应各种不同的硬件架构，将所有的驱动编译进内核是不现实的。Linux发行版在内核中只编译了基本的硬件驱动
-，在 linux内核启动前，boot loader会将存储介质中的initrd文件(cpio是其中的一种)加载到内存，内核启动时会在访问真正的根文件系统前先访问该内存中的initrd文件系统，执行initrd文件系统的某个文件（不同的linux版本差异较大），扫描设备，加载驱动。
-
-### docker container fs的加载过程
+## docker container fs的加载过程
 
 docker cotainer fs的演化过程:rootfs(read only image) ==> read-write filesystem（初始状态下是空的） ==> volume（这就不是一个文件系统，只是部分目录的覆盖了）
 
