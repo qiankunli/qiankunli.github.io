@@ -148,6 +148,8 @@ eth0 在linux中 就是一个 struct device , 每一个struct device 都有一�
 		func (ipam *IPAM)Allocate(subnet *net.IPNet)(ip net.IP,err error)
 		func (ipam *IPAm)Release(subnet *net.IPNet,ipaddr *net.IP) error
 		
+从中可以看到
+		
 1. 网络信息的dump，就是将 Network json化并写入文件中
 2. 对于bride network driver
 
