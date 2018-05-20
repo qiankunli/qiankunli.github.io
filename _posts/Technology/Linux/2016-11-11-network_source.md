@@ -175,11 +175,17 @@ linux内核准备好device struct和dev_base指针(这句不准确，或许是et
 
 ei开头的都是驱动程序自己的函数。
 
-1. 接收数据，device struct 初始化时，会为这个设备生成一个irq(中断号)，为irq其绑定ei_interrutp（网卡的中断处理函数），同时会建立一个irq与device的映射。接收到数据后，触发ei_interrutp, ei_interrutp根据中断号得到device,执行ei_receive（device), ei_receive 将数据拷贝到某个位置，执行内核的netif_rx,netif_rx执行net_bh，net_bh将数据包传递给网络层协议接收函数比如arp_rcv,ip_rcv.
+1. 接收数据，device struct 初始化时，会为这个设备生成一个irq(中断号)，为irq其绑定ei_interrutp（网卡的中断处理函数），同时会建立一个irq与device的映射。接收到数据后，触发ei_interrutp, ei_interrutp根据中断号得到device,执行`ei_receive（device)`, ei_receive 将数据拷贝到 数据接收队列（元素为 sk_buff，具有prev和next指针，struct device 维护了 sk_buff_head），执行内核的netif_rx,netif_rx 触发软中断 执行net_bh，net_bh 遍历 packet_type list 查看数据 符合哪个协议（不是每次都遍历），执行`packet_type.func`将数据包传递给网络层协议接收函数，`packet_type.func` 的可选值 arp_rcv,ip_rcv. ip_rcv中带有device 参数，用于校验数据包的mac 地址是否在 device.mc_list 之内，及检查是否开启IP_FORWARD等。
 
 2. 发送数据，由网络协议栈调用hard_start_xmit(初始化时，驱动程序将ei_start_xmit函数挂到其上)
 
 总的来说，kernel有几个extern的struct、pointer和func，驱动程序初始化完毕后，为linux内核准备了一个device struct list（驱动程序自己有一些功能函数，挂到device struct的函数成员上）。收到数据时，**kernel的extern func(比如netif_rx)在中断环境下被驱动程序调用**。发送数据时，则由内核网络协议栈调用device.hard_start_xmit，进而执行驱动程序函数。
+
+[Linux TCP/IP 协议栈源码分析](https://www.cnblogs.com/my_life/articles/4691254.html) 接收发送过程的详图
+
+![](/public/upload/linux/network_source_send.gif)
+
+![](/public/upload/linux/network_source_recv.gif)
 
 
 
@@ -229,7 +235,7 @@ tcp_protocol是为了从下到上的数据接收，其函数集主要是handler�
 3. 如何发送数据。通常不直接发送，先发到queue里。可以从socket初始化时拿到protocol类型（比如tcp）、目的ip，通过route等决定device，于是一路向下执行xx_write方法
 
 
-## 小结
+## 面向过程/对象/ioc
 
 **重要的不是细节**，这个过程让我想到了web编程中的controller,service,dao。都是分层，区别是web请求要立即返回，网络通信则不用。
 
@@ -243,4 +249,12 @@ tcp_protocol是为了从下到上的数据接收，其函数集主要是handler�
 |web|由spring管理，springmvc建立`<url,beanid>`,ioc建立`<beanId,bean>`|根据request信息及自身逻辑决定一步步如何往下走。|依赖关系建立的代码是集中的|
 |linux|所谓的“依赖关系”是通过一个个struct及其数组（或链表）header，下层持有上层的struct header以完成接收，发送时则直接指定下层函数|接收时根据packet的一些字段，发送时根据socket参数及路由|依赖关系建立的代码是分散的，就好比有个全局的map，所有service(或者dao)自己向map注入自己的信息|
 
-而这些，可能是c语言的套路吧。
+当然，c 毕竟 不是java，也不面向对象。比如struct device。
+
+1. 在接收过程中，更多的是作为一个数据载体存在的，在网卡驱动层 将device 包到 sk_buff->device 数据中传入 ip 层，在ip 层（ip_rcv） 被引用来 比对数据包的mac 地址是否 跟device 匹配。当然，毕竟struct device的类型不同，在接收数据的过程中，会调用device 的某些函数，以适配不同类型设备的处理逻辑。
+2. 在数据发送阶段，就有点向“对象”, device. hard_start_xmit 调用 驱动程序发送数据。
+
+在数据接收阶段，主要是面向过程的思路， 网卡驱动 ==> 接收缓冲区 ==> 软中断 ==> 网络层及 更上层校验处理 ==> socket 缓冲区。
+
+1. 所以，从数据的接收看，一个linux 有多少个 struct device 没关系，可以分成两类：有 没有 irq 跟 struct device 关联。没有的话，就只能通过网络层 转发 来触发 该device 相关的数据 接收过程。
+2. 网络接收 分成两个部分：驱动程序 驱动 代码将数据 写到 socket 缓冲区。上层调用 驱动代码 从socket 缓冲区 读取数据。
