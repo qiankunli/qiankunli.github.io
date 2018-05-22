@@ -127,6 +127,8 @@ docker认为容器一直“活着”，但主进程已经退出了。所以，�
 
 [Can't stop docker container #35933](https://github.com/moby/moby/issues/35933) 仍待解决。
 
+2018.05.22补充， mesos 升级为1.6.0 时，可以强杀 该容器，算是变相解决了该问题。
+
 ## 3 docker 停住
 
 环境：

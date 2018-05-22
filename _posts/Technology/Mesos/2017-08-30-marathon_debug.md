@@ -67,6 +67,8 @@ marathon 部署一个新的task时，会先部署新的实例，然后干掉老�
 2. 在zookeeper中，`rmr /marathon/state/xx/marathon_app_name`
 3. `systemctl stop marathon`
 
+2018.05.22补充， mesos 升级为1.6.0 时，可以强杀 该容器，算是变相解决了该问题。
+
 ## 2 waiting 状态的项目一直无法部署
 
 集群明明有空闲资源，但waiting状态的项目就是不调度到空闲的主机上

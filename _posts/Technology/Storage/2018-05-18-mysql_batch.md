@@ -135,6 +135,11 @@ SqlMapClientTemplate的核心是`T execute(SqlMapClientCallback<T> action)` 方�
 
 因此从代码上看，mybatis 相对 ibtatis 最大程度上屏蔽了 批量处理的 细节。 
 
+[mybatis中批量插入的两种方式(高效插入)](http://www.javasos.com/knowledgeinfo/K1711031428220140)几种姿势：
+
+1. foreach 标签
+2. ExecutorType.BATCH
+
 ## 其它
 
 如何评估 批量化操作之后，mysql的负载下降？是否可以最终解决主库与从库同步延迟大的问题？
