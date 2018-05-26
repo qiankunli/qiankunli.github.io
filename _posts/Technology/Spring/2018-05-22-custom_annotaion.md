@@ -65,12 +65,6 @@ keywords: JAVA Spring aop
 	}
 
 
-## 重新理解下aop
-
-1. 不侵入现有代码
-2. 切面代码 单独写
-3. 切面和切点的整合，可以用正则表达式，也可以用注解
-
 ## jdk proxy vs cglib
 
 [Spring的两种代理JDK和CGLIB的区别浅谈](https://blog.csdn.net/u013126379/article/details/52121096)
@@ -109,12 +103,47 @@ Spring + Aspectj annotation， 假设存在
 
 理论上，刨除性能、必须实现接口的因素， cglib 和 jdk proxy 是可以等效替换的，现在却出现了这个情况。
 
-`<aop:aspectj-autoproxy/>`时
+[AOP中获取方法上的注解信息](http://loveshisong.cn/%E7%BC%96%E7%A8%8B%E6%8A%80%E6%9C%AF/2016-06-01-AOP%E4%B8%AD%E8%8E%B7%E5%8F%96%E6%96%B9%E6%B3%95%E4%B8%8A%E7%9A%84%E6%B3%A8%E8%A7%A3%E4%BF%A1%E6%81%AF.html)
 
-1. 在Aspect 类Around 方法中，`ProceedingJoinPoint pjp` 无法获取 `HelloService.hello` 上的注解。但可以获取 `IHelloService.hello` 上的注解
+分析切面代码
+
+	Object interceptMethod(final ProceedingJoinPoint pjp){
+		  Method method = ((MethodSignature) (pjp.getSignature())).getMethod();
+		  ...
+	}
+	
+对代码打断点可以发现，MethodInvocationProceedingJoinPoint pjp 的实例数据为 
+
+    MethodInvocationProceedingJoinPoint
+	    methodInvocation
+	 	    proxy=HelloService
+	 	    method=IHelloService.hello
+	 	    target=HelloService
+
+因此，通过`((MethodSignature) (pjp.getSignature())).getMethod()` 得到的是接口方法。因为target 指向是正确的，可以根据 taget 简介获取
+
+	 Class<?> classTarget = pjp.getTarget().getClass();
+	 Class<?>[] par = ((MethodSignature) pjp.getSignature()).getParameterTypes();
+	 Method method = classTarget.getMethod(pjp.getSignature().getName(), par);
 
 
-[接口方法上的注解无法被 @Aspect 声明的切面拦截的原因分析](http://www.importnew.com/28788.html) （待进一步明确描述）
+[接口方法上的注解无法被 @Aspect 声明的切面拦截的原因分析](http://www.importnew.com/28788.html) 
+
+**如果类本身就不被spring 管理（也就是 new 创建的），则肯定无法被拦截**
+
+## 重新理解下aop
+
+1. 不侵入现有代码
+2. 切面代码 单独写
+3. 切面和切点的整合，可以用正则表达式，也可以用注解。换个角度看，注解往往是为了更好的描述切点。
+
+## 拦截框架代码的执行
+
+上文中提到的aop，往往是aop 一整套代码 作为一个jar 提供给用户使用，用户将注解加载自己的业务代码上。还有一种场景：拦截框架代码的执行。比如拦截ibatsis sqlMapTemplate 的执行，获取sql 表达式存在队列中。另起线程 读取队列 中的sql，批量执行。
+
+实现时有一个问题，即一旦拦截 sqlMapTemplate，spring 实际会构建一个sqlMapTemplate 的代理类 给 各个dao 类使用。若是dao类 写死了依赖 sqlMapTemplate 类，则代理类是无法强转成 sqlMapTemplate 类的。
+
+为此，要提供一个 sqlMapTemplate 的装饰类，所有 sqlMapTemplate 的调用方 依赖 sqlMapTemplateDecorator 类。aop 拦截 sqlMapTemplateDecorator 获取业务方调用信息，sqlMapTemplate 可以独善其身，继续为框架内 其它强依赖 sqlMapTemplate 的类 提供服务。
 
 ## 二次代理
 
