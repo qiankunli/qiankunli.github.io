@@ -145,6 +145,8 @@ application of a curried function, such as f(3).
 
 [SBT构建一个基本工程](http://www.jianshu.com/p/db903ad4781d)
 
+从sbt 的build 文件名`build.sbt`就可以 看到 sbt 和 ant（ant是 build.xml） 的近亲关系。
+
 ## play
 
 [给Java开发者的Play Framework(2.4)介绍 Part1：Play的优缺点以及适用场景](http://skaka.me/blog/2015/07/27/play1/)
