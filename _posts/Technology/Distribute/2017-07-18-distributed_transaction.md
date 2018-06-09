@@ -3,7 +3,7 @@
 layout: post
 title: 分布式事务
 category: 技术
-tags: Architecture
+tags: Distribute
 keywords: 分布式事务
 
 ---

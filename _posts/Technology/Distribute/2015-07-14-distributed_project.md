@@ -3,7 +3,7 @@
 layout: post
 title: 现有分布式项目小结
 category: 技术
-tags: Architecture
+tags: Distribute
 keywords: 分布式系统
 
 ---

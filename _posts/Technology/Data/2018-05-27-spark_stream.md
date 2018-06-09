@@ -63,25 +63,23 @@ spark stream 是微批处理。
 
 Executor 中不仅运行 job 的task（计算`rdd.map(f1).fitler(f2)`），还可以运行“接收器”。是不是可以这样讲？在分布式部署模式下， 驱动器代码 负责调度 Schedule，一般不负责直接 参与到 job中（从各种数据源读取文件、处理、写数据到文件）
 
+## spark stream 和storm
 
+[JStorm概叙 & 应用场景](https://github.com/alibaba/jstorm/wiki/%E6%A6%82%E5%8F%99-&-%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF) 中有一句话：
 
+* 从应用的角度，JStorm应用是一种遵守某种编程规范的分布式应用。
+* 从系统角度， JStorm是一套类似MapReduce的调度系统。 
+* 从数据的角度，JStorm是一套基于流水线的消息处理机制。
 
-## spark stream 和storm（未完成）
-
-storm做的是流式处理，就是数据不停地来，storm一直在运行，就是kafka、rabbit可以不停地接消息，storm可以不停地处理消息一样。
-
-hadoop和spark等则是批处理，其数据源是一个明确的文件，输出也是一个明确的文件。
-
-（待整理）实时性和大数据量其实是不可兼得的
-
-1. 比如数据量很大的话，就要移动计算（而不是移动数据），这时实现实时性就比较困难。
-2. 实时性与惰性求值 不易兼得
+如果用这个 描述结构 去描述spark 或 spark stream，以分布式应用系统的高度来归纳整理（分布式应用系统共同点、不同点、常见套路等），参见， 或许会比较有感觉。
 
 spark streaming 使用“微批次”的架构，把流式计算 当做一系列的小规模 批处理来对待。
+* spark，数据流进来，根据时间分隔成一小段，一小段做处理1、处理2、处理3。每小段的处理 还是按 spark rdd 的套路来。
+* storm，一个消息进来，一个消息做处理1、处理2、处理3
 
+rdd 采用函数式的方式 编写处理逻辑，spark scheduler 分发这个逻辑到各个节点。不准确的说，如果不涉及到分区操作的话，估计一个rdd 对应的工作（也就是数据的所有处理） 都是在一个节点完成的。
 
-spark，数据流进来，根据时间分隔成一小段，一小段做处理1、处理2、处理3。
-storm，一个消息进来，一个消息做处理1、处理2、处理3
+storm 其实更像 mapreduce（storm 作者讲述storm历史的时候，直接说storm 是 the hadoop of realtime），其提供的 topology= spout+ bolt，不准确的说，一个spout和 bolt 都对应一个节点，storm 负责将它们串联起来。 这也是storm 为什么 会用到 消息队列的  重要原因。 虽然spark 也涉及到 数据的序列化及节点间 传输
 
 ## spark stream 和 flink（未完成）
 

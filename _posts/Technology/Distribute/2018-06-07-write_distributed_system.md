@@ -3,7 +3,7 @@
 layout: post
 title: 自己写分布式系统1——分析一个简单的分布式任务调度系统
 category: 技术
-tags: Architecture
+tags: Distribute
 keywords: 分布式系统
 
 ---
@@ -19,6 +19,12 @@ keywords: 分布式系统
 	
 	1. 代码本身是一个进程，即定了main 函数
 	2. 通常有一个额外的提交工作比如spark-submit 等
+
+4. [JStorm概叙 & 应用场景](https://github.com/alibaba/jstorm/wiki/%E6%A6%82%E5%8F%99-&-%E5%BA%94%E7%94%A8%E5%9C%BA%E6%99%AF) 中有一句话：
+
+	* 从应用的角度，JStorm应用是一种遵守某种编程规范的分布式应用。
+	* 从系统角度， JStorm是一套类似MapReduce的调度系统。 
+	* 从数据的角度，JStorm是一套基于流水线的消息处理机制。
 
 因此笔者萌生了一个想法， 自己动手写一个最简单的 分布式程序，学一学其中的套路。
 

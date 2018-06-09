@@ -3,7 +3,7 @@
 layout: post
 title: 分布式系统小结
 category: 技术
-tags: Architecture
+tags: Distribute
 keywords: 分布式系统
 
 ---
@@ -12,12 +12,25 @@ keywords: 分布式系统
 
 本文主要聊一下 分布式系统的 基本组成和理论问题
 
-[现有分布式项目小结](http://qiankunli.github.io/2015/07/14/distributed_project.html)
-[分布式配置系统](http://qiankunli.github.io/2015/08/08/distributed_configure_system.html)
-[分布式事务](http://qiankunli.github.io/2017/07/18/distributed_transaction.html)
+到目前为止，笔者关于分布式这块的博客
 
+* [现有分布式项目小结](http://qiankunli.github.io/2015/07/14/distributed_project.html)
+* [分布式配置系统](http://qiankunli.github.io/2015/08/08/distributed_configure_system.html)
+* [分布式事务](http://qiankunli.github.io/2017/07/18/distributed_transaction.html)
 
-有没有一个 知识体系/架构、描述方式，能将分布式的各类知识都汇总起来？
+有没有一个 知识体系/架构、描述方式，能将分布式的各类知识都汇总起来？笔者认为，从上到下，主要有以下几块：
+
+1. 分布式应用系统，比如spark、storm 这些，计算逻辑编写完毕后，在集群氛围内分发、执行和监控。
+2. 分布式中间件，比如zookeeper、kafka这些
+3. 分布式基本原理，包括共识算法等
+
+## 分布式应用系统的 几个套路
+
+参见[Spark Stream 学习](http://qiankunli.github.io/2018/05/27/spark_stream.html)  中对spark stream 和storm 对比一节，有以下几点：
+
+1. 分布式应用系统，都是用户以代码的方式预定义好计算逻辑，系统将计算 下发到各个节点。这一点都是一样的，不同处是对外提供的抽象不同。比如`rdd.filter(function1).map(function2)`，而在storm 中则可能是 两个bolt
+2. 有的计算 逻辑在一个节点即可执行完毕，比如不涉及分区的spark rdd，或分布式运行一个shell。有的计算逻辑则 拆分到不同节点，比如storm和mapreduce，“分段”执行。此时系统就要做好 调度和协调。
+3. 分布式系统，总是要涉及到输入源数据的读取、数据在节点间流转、将结果写到输出端。
 
 ## 学习分布式的正确姿势
 
