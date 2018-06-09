@@ -82,7 +82,7 @@ Unsafe 提供 Direct memory access methods.
 
 ### synchronization
 
-Unsafe 提供 Low level primitives for synchronization.
+**Unsafe 提供 Low level primitives for synchronization.**
 
 	compareAndSwapInt/Long/Object
 	monitorEnter
@@ -101,7 +101,7 @@ Unsafe 提供 Low level primitives for synchronization.
 2. increment 新增 synchronized 关键字
 3. increment 使用 WriteLock
 4. 使用 AtomicLong 计数
-5. 使用cas，性能和 AtomicLong 就基本等价了
+5. 使用cas，性能和 AtomicLong 就基本等价了。 **Atomic 类的实现也基本如此。**
 
 		class CASCounter implements Counter {
 			private volatile long counter = 0;
@@ -130,12 +130,17 @@ Unsafe 提供 Low level primitives for synchronization.
 
 ![](/public/upload/java/thread_status.jpg)
 
+### 为什么需要 park 和 unpark
+
+[The java.util.concurrent synchronizer framework](http://gee.cs.oswego.edu/dl/papers/aqs.pdf) aqs 作者关于 aqs 的论文 有一个blocking 小节，重点如下：
+
+1. Until JSR166, there was no Java API available to block and unblock threads for purposes of creating synchronizers that are not based on built-in monitors 除了jvm 内置 monitor 对象，当时java 没有上层api 提供 block/unblock 线程的能力。所以再重复下重点：Unsafe 提供 Low level primitives for synchronization.
+2. The only candidates were Thread.suspend and Thread.resume, which are unusable because they encounter an unsolvable race problem: If an unblocking thread invokes resume before the blocking thread has executed suspend, the resume operation will have no effect. Thread.suspend 和 Thread.resume 倒是行，但提前执行 Thread.resume 就比较容易尴尬
+3. **this applies per-thread, not per-synchronizer.** 这或许解释了 很多场景下，synchronized 除了性能依然不够用的原因。
+
+其实Solaris-9/WIN32/Linux NPTL 都有类似的thread library，java 支持的比较晚，总之，java 的synchronized 关键字 不是java并发的全部， java也是在不断发展的。
+
 ### 其它
-
-jvm 中，那些“水面下的”对象
-
-1. Every object has an intrinsic lock associated with it.By convention, a thread that needs exclusive and consistent access toan object's fields has to acquire the object's intrinsic lock beforeaccessing them, and then release the intrinsic lock when it's done withthem.  笼统的说，在jvm中，每个对象都有一个monitor 对象。 
-2. [Java的LockSupport.park()实现分析](https://blog.csdn.net/hengyunabc/article/details/28126139)每个java线程都有一个Parker实例
 
 锁是服务于共享资源的；而semaphore是服务于多个线程间的执行的逻辑顺序的。
 
@@ -149,6 +154,13 @@ LockSupport的park/unpark和Object的wait/notify：
 
 1. 面向的对象不同；
 2. 跟Object的wait/notify不同，**LockSupport的park/unpark直接以线程为参数**，不需要获取对象的监视器； 
-3. 实现的机制不同，因此两者没有交集。
+3. 实现的机制不同，因此两者没有交集(也就是notify 不能 释放一个park 的线程)。
+
+## jvm 中，那些“水面下的”对象
+
+1. Every object has an intrinsic lock associated with it.By convention, a thread that needs exclusive and consistent access toan object's fields has to acquire the object's intrinsic lock beforeaccessing them, and then release the intrinsic lock when it's done withthem.  笼统的说，在jvm中，每个对象都有一个monitor 对象。 
+2. [Java的LockSupport.park()实现分析](https://blog.csdn.net/hengyunabc/article/details/28126139)每个java线程都有一个Parker实例
+
+
 
 java 作为一个计算机语言，线程这块，先不说并发，单就线程管理本身，理应提供启动、暂停、中止（interrupt）、销毁（代码自然运行结束）一个线程的能力。暂停是 current 线程 自己停自己，中止是别人停自己。
