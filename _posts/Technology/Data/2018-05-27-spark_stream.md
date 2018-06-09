@@ -71,7 +71,7 @@ Executor 中不仅运行 job 的task（计算`rdd.map(f1).fitler(f2)`），还�
 * 从系统角度， JStorm是一套类似MapReduce的调度系统。 
 * 从数据的角度，JStorm是一套基于流水线的消息处理机制。
 
-如果用这个 描述结构 去描述spark 或 spark stream，以分布式应用系统的高度来归纳整理（分布式应用系统共同点、不同点、常见套路等），参见， 或许会比较有感觉。
+如果用这个 描述结构 去描述spark 或 spark stream，以分布式应用系统的高度来归纳整理（分布式应用系统共同点、不同点、常见套路等），参见[分布式系统小结](http://qiankunli.github.io/2018/04/16/distributed_system_review.html)， 或许会比较有感觉。
 
 spark streaming 使用“微批次”的架构，把流式计算 当做一系列的小规模 批处理来对待。
 * spark，数据流进来，根据时间分隔成一小段，一小段做处理1、处理2、处理3。每小段的处理 还是按 spark rdd 的套路来。
