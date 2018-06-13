@@ -10,14 +10,14 @@ keywords: 分布式系统
 
 ## 简介
 
-## 常规业务系统与分布式计算系统的异同
+## 常规业务系统 也是分布式系统
 
 最近研究一个系统设计方案，学习spark、storm等，包括跟同事交流，有以下几个感觉
 
 1. 我们平时的系统其实也是分布式系统，若是归纳起来， 很多做法跟分布式系统差不多。比如你通过jdbc 访问mysql，spark 也是，spark rdd 做数据处理，我们又何尝不是。因此，特定的业务上，也没必要一定套spark、storm这些，系统的瓶颈有时也不是 spark、storm 可以解决的。
 2. 笔者以前熟悉的项目，都是一个个独立的节点，节点是按功能划分的，谈不上主次，几个功能的节点组合形成架构。分布式系统也包括多个节点，但通常有Scheduler和Executor，业务功能都由Executor 完成，Scheduler 监控和调度Executor。
 2. spark、storm 这些系统 一个很厉害的地方在于，抽象架设在分布式环境下。比如spark 的rdd，storm的topology/spout/bolt 这些。笔者以前的业务系统也有抽象，但抽象通常在单机节点内。
-3. 部署方式上，也跟笔者熟悉的tomcat、springboot jar 有所不通
+3. 部署方式上，也跟笔者熟悉的tomcat、springboot jar 有所不同
 	
 	1. 代码本身是一个进程，即定了main 函数
 	2. 通常有一个额外的提交工作比如spark-submit 等
@@ -28,21 +28,24 @@ keywords: 分布式系统
 	* 从系统角度， JStorm是一套类似MapReduce的调度系统。 
 	* 从数据的角度，JStorm是一套基于流水线的消息处理机制。
 
+6. 既然大致差不多，通常也可以用storm 来优化甚至 替换 业务系统的一些设计。比如storm 确实 减少或隐藏了 数据流转中的序列化、失败重试等问题。
+
+分布式系统也有点常规系统的意思
+
+1. 在storm中， Topology 的定义是一个Thrift结构，并且Nimbus 就是一个Thrift 服务
 
 ## 学习路径
 
 学习分布式应用系统的路径最好是
 
 1. 一个简单的任务分发系统。将一个可执行文件、main函数 下发到一台 特定主机并执行。
+2. 下发代码， 上一点是下发main函数，工作节点收到后直接另起进程运行就行了。下发代码即，工作节点另起 线程执行。**这其实跟rpc 差不多，只是rpc 事先定义好了函数和接口，逻辑比较受限。**
 2. 监控任务节点、可执行任务运行监控、重启等
 3. 下发一个复杂任务，这个任务需要多个任务节点 协作执行，这需要任务节点间通信等
 4. 学习storm，相对通用的复杂任务抽象，高效的节点间通信机制等
 5. 学习hadoop，节点间通信 直接成了 读写分布式文件系统，使得对外抽象得以简化。
 6. 学习spark，节点间 通信直接成了“内存复制”，并利用函数式思想，简化了对外api
 	
-
-因此笔者萌生了一个想法， 自己动手写一个最简单的 分布式程序，学一学其中的套路。
-
 ## 将计算异地执行
 
 [huangll99/DistributedTask](https://github.com/huangll99/DistributedTask/tree/master/src/main/java/com/hll/dist)
@@ -119,7 +122,7 @@ TaskProcessor 逻辑
 1. worker 在demo 中只是一个 socket 服务端，socket handler 的逻辑逻辑 就是 接收文件和 Runtime.exec 启动子进程。**从这个角度看，这与web request ==> web server ==> rpc service） 并无不同。**
 2. WorkClient 向 worker 节点 传输了 jar 文件、配置文件和 运行指令。worker 节点 有输入输出、有配置、有计算逻辑（jar）
 1.  子进程 的计算逻辑 **从代码上** 分为两部分，业务逻辑抽取为wordcount。驱动逻辑则负责外围的输入、输出、Context 封装等工作。（**以前一直在困惑 如何将wordcount交付给 节点执行，现在看，节点运行的 根本不是wordcount本身，wordcount 支持其中一环**）
-2. **conf 在这里是一个dsl文件，worker 节点 根据conf 这个dsl 文件加载数据、加载类（计算逻辑） 执行即可**
+2. **conf 在这里像是一个dsl文件，worker 节点 根据conf 这个dsl 文件加载数据、加载类（计算逻辑） 执行即可**
 
 在实践中
 
