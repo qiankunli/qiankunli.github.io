@@ -10,6 +10,8 @@ keywords: mysql innodb
 
 ## 简介
 
+可以事先看下 [数据库的一些知识](http://qiankunli.github.io/2016/09/21/db.html)
+
 《mysql技术内幕》 主要讲存储引擎部分。
 
 
