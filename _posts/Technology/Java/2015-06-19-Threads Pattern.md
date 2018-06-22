@@ -14,6 +14,8 @@ java性能的提高，io和多线程是其中两个重要部分，io方面java�
 
 了解一些设计模式，不仅可以提高编程能力，对学习一些框架的源码也是很有帮助的。
 
+![Java多线程编程模式实战指南一：Active Object模式（上）](http://www.infoq.com/cn/articles/Java-multithreaded-programming-mode-active-object-part1) 这是一个系列，作者黄文海还专门出了一本《Java多线程编程模式实战》
+
 ## 线程安全
 
 编写多线程程序时，一个逃不过的坑就是线程安全。
