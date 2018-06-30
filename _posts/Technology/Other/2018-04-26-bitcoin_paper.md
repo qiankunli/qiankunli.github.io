@@ -62,6 +62,12 @@ The proof-of-work also solves the problem of determining representation in major
 1. attacker 可以改下transaction， 对 `transactions + prev hash + nonce` 重新计算得到hash2， 只要hash2 有一定量的 zero bits 也行，但很明显，hash2 不等于 hash1
 2. 于是，改了hash2，连带该block 之后所有的block 都得重算
 
+《区块链核心算法解析》 中提到：
+
+1. 使用工作量证明机制的首要目的 是调节整个网络 找到区块的速度，**使得网络有时间来实现在最新一个区块上的同步。** 
+2. 区块链的作用 是维护一个一致的交易历史， 而所有的节点最终都将在 唯一的区块链（交易历史）上达成一致。
+3. 网络的参与者并非直接决定共识的具体内容，而是通过pow来竞争记账权，间接的达成共识。
+
 ## tips
 
 本小节，都是一些小点，可以归类到安全机制，也可以说如何节省空间，也可以说比特币发行等，怎么归类都片面的，
