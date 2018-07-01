@@ -20,7 +20,7 @@ keywords: 分布式系统
 
 有没有一个 知识体系/架构、描述方式，能将分布式的各类知识都汇总起来？笔者认为，从上到下，主要有以下几块：
 
-1. 分布式应用系统，比如spark、storm 这些，计算逻辑编写完毕后，在集群氛围内分发、执行和监控。
+1. 分布式应用系统，比如spark、storm 这些，计算逻辑编写完毕后，在集群范围内分发、执行和监控。
 2. 分布式中间件，比如zookeeper、kafka这些。将单机多线程/进程间的通信扩展到多机，要不怎么说叫“中间”件呢。
 3. 分布式基本原理，包括共识算法等
 
@@ -60,12 +60,37 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 
 ## 一致性问题 的几个协议及其之间的关系
 
+### cap
+
 [从CAP理论到Paxos算法](http://blog.longjiazuo.com/archives/5369?hmsr=toutiao.io&utm_medium=toutiao.io&utm_source=toutiao.io) 基本要点：
 
 1. cap 彼此的关系。提高分区容忍性的办法就是一个数据项复制到多个节点上，那么出现分区之后，这一数据项就可能分布到各个区里。分区容忍就提高了。然而，要把数据复制到多个节点，就会带来一致性的问题，就是多个节点上面的数据可能是不一致的。要保证一致，每次写操作就都要等待全部节点写成功，而这等待又会带来可用性的问题。
-2. cap 着力点。网络分区是既成的现实，于是只能在可用性和一致性两者间做出选择。在工程上，我们关注的往往是如何在保持相对一致性的前提下，提高系统的可用性。
+2. cap 着力点。**网络分区是既成的现实，于是只能在可用性和一致性两者间做出选择。**在工程上，我们关注的往往是如何在保持相对一致性的前提下，提高系统的可用性。
 3. 还是读写问题。[多线程](http://qiankunli.github.io/2014/10/09/Threads.html) 提到，多线程本质是一个并发读写问题，数据库系统中，为了描述并发读写的安全程度，还提出了隔离性的概念。具体到cap 理论上，副本一致性本质是并发读写问题（A主机写入的数据，B主机多长时间可以读到）。2pc/3pc 本质解决的也是如此 ==> A主机写入的数据，成功与失败，B主机多长时间可以读到，然后决定自己的行为。
-4. Paxos算法
+
+
+下文来自 李运华 极客时间中的付费专栏。
+
+Robert Greiner （http://robertgreiner.com/about/） 对CAP 的理解也经历了一个过程，他写了两篇文章来阐述CAP理论，第一篇被标记为outdated
+
+||第一版|第二版|
+|---|---|---|
+|地址|http://robertgreiner.com/2014/06/cap-theorem-explained/|http://robertgreiner.com/2014/08/cap-theorem-revisited/|
+|理论定义|Any distributed system cannot guaranty C, A, and P simultaneously.|In a distributed system (a collection of interconnected nodes that share data.), you can only have two out of the following three guarantees across a write/read pair: Consistency, Availability, and Partition Tolerance - one of them must be sacrificed.|
+|中文||在一个分布式系统（指互相连接并共享数据的节点的集合）中，当涉及读写操作时，只能保证一致性（Consistence）、可用性（Availability）、分区容错性（Partition Tolerance）三者中的两个，另外一个必须被牺牲。|
+|一致性|all nodes see the same data at the same time|A read is guaranteed to return the most recent write for a given client 总能读到 最新写入的新值|
+|可用性|Every request gets a response on success/failure|A non-failing node will return a reasonable response within a reasonable amount of time (no error or timeout)|
+|分区容忍性|System continues to work despite message loss or partial failure|The system will continue to function when network partitions occur|
+
+李运华 文中 关于Robert Greiner 两篇文章的对比 建议细读： 要点如下
+
+1. 不是所有的分布式系统都有 cap问题，必须interconnected 和 share data。
+2. 强调了write/read pair 。这跟上一点是一脉相承的。cap 关注的是对数据的读写操作，而不是分布式系统的所有功能。
+
+
+### Paxos
+
+Paxos算法
 
 	* Phase 1
 		
@@ -86,6 +111,8 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 	![](/public/upload/architecture/distributed_system_2.png)
 	
 2. proposer 贿选 不会坚持 让acceptor 遵守自己的提议。出价最高的proposer 会得到大部分acceptor 的拥护（谁贿金高，acceptor最后听谁的。换个说法，acceptor 之间没有之间交互，但），  但会以最快达成一致 为目标，若是贿金高但提议晚，也是会顺从 他人的提议。
+
+### 思维线条
 
 下面看下 《区块链核心算法解析》 中的思维线条
 

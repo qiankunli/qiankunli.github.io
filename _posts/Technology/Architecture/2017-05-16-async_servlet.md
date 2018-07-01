@@ -90,7 +90,9 @@ chaining operations
 
 因为所有的任务代码都是由一个“事件驱动引擎”执行的，换句话说，事件驱动引擎的时间，就好比cpu时间一样， 比较宝贵，要避免为未知的阻塞操作所滞留。
 
-2018.6.30 补充。拿netty 和 go 类比一下，可以看到，调用go语言的io方法，相当于
+## 以分层的方式理解netty
+
+2018.6.30 补充。拿netty 和 go 类比一下，可以看到，调用go语言的阻塞方法（io方法不确定是不是这样），相当于
 
 	read(){
 		约定好上下文
@@ -98,13 +100,13 @@ chaining operations
 	}
 	
 	
-go 中实际的 io 操作实际是go语言层完成的，goroutine 调度本身是对 内核系统调用的模仿。只是软中断变成了方法调用，线程阻塞改成 goroutine 阻塞。
+go 中实际的 阻塞 操作实际是go语言层完成的，goroutine 调度本身是对 内核系统调用的模仿。只是软中断变成了方法调用，线程阻塞改成 goroutine 阻塞。
 	
-netty 因为不能改写 io 语言的系统调用，为此 不敢向你直接暴露 io 方法，封装了一个channel 出来，你调用`channel.write()` 也不是真正的`java.nio.channels.SocketChannel.write`。 所以netty 也只能提供 一个 单独的层次，与上图竖着画驱动线程与事件驱动引擎（线程）的关系不同
+netty 因为不能改写 io 语言的系统调用，为此 不敢向你直接暴露 io 方法，封装了一个channel 出来，你调用`channel.write()` 不是真正的`java.nio.channels.SocketChannel.write`。 所以netty 也只能提供 一个 单独的层次，与上图竖着画驱动线程与事件驱动引擎（线程）的关系不同
 
 ![](/public/upload/architecture/async_servlet_2.png)
 
-相当于netty 提供了一个全异步 io 操作的抽象
+相当于netty 提供了一个全异步 io 操作（也包括一般的任务执行）的抽象层，支持类似AIO的”系统调用“。
 
 ## 其它
 
