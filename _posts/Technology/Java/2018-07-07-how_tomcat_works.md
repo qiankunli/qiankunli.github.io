@@ -166,7 +166,7 @@ chain.doFilter 就是一个内部递归，只是分散在了两个对象上执�
 [多线程](http://qiankunli.github.io/2014/10/09/Threads.html)
 
 1. HttpProcessor 会被封装成 runnable 交給Executor 执行。 **所以，所谓丢弃 连接，或者服务端执行 超时，都要从线程池 提交任务 这个事情来理解**
-2. 线程池的核心 就两个事儿：核心线程数、等待队列。因此，tomcat中 也会对应有 最小线程数、最大线程数、队列长度（tomcat 中叫acceptCount）等配置
+2. 线程池的核心 就两个事儿：核心线程数、等待队列。因此，tomcat中 也会对应有 最小线程数、最大线程数、队列长度（tomcat 中叫acceptCount）等配置。可见，tomcat 某一个时刻能处理的最大请求数 由最大线程数 + 队列长度 决定的。
 1. 线程池 线程数 是有限的，超过线程数 会在队列中等待。如果队列已满，则会执行reject 策略。 默认策略是：线程池 拒绝 HttpProcessor 为主体的 runnable，服务端关闭 socket，抛异常。客户端感知到 连接被关闭了 connection refused。
 2. 如果 一个线程 执行超时，则客户端会断开连接。此时，服务端线程 仍然继续 持有 socket 并做运算，只是最终向socket 写入数据时（`connector.OutputBuffer.realWriteBytes(OutputBuffer.java:393)`），会报Broken pipe异常（当然，这只是引起Broken pipe 原因之一）。
 
