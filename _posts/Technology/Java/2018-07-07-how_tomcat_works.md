@@ -14,7 +14,7 @@ keywords: commons-pipeline
 
 ## 代码的演化
         
-人的直观感觉
+新手的直观感觉
 
 	While(true){
 		Socket socket = serverSocket.accept();
