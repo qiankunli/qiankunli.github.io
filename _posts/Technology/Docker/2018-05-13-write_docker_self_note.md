@@ -55,7 +55,7 @@ initComand 启动后挂载文件系统，从管道中读取用户输入的comman
 		...
 		
 3. 启动带有namespace 隔离的进程，并将`/root/busybox` 作为其根目录。那么该进程运行的 可执行文件 便来自 `/root/busybox` 这片小天地了。
-4. 将`/root/busybox` 作为进程根目录之后，`mount -t proc proc /proc`  `mount -t tmpfs dev /dev`，**proc 和 dev 都是临时数据，busybox 提供不了**。此时，跟一个容器就很像了：进程隔离，资源限制，所有的数据文件被限制在`/root/busybox `下。学名叫：一个有镜像的环境。此时，可以用centos 的内核跑出ubuntu的感觉。
+4. 将`/root/busybox` 作为进程根目录之后，`mount -t proc proc /proc`  `mount -t tmpfs dev /dev`，**proc 和 dev 都是临时数据，busybox 提供不了（或无需提供）**。此时，跟一个容器就很像了：进程隔离，资源限制，所有的数据文件被限制在`/root/busybox `下。学名叫：一个有镜像的环境。此时，可以用centos 的内核跑出ubuntu的感觉。
 5. 但是，`/root/busybox` 中的数据 都是busybox 镜像文件的内容，进程的运行会更改这些镜像文件。所以，aufs 终于可以登场了。学名叫：容器和镜像隔离。
 6. 镜像文件夹 `/root/busybox`，别名readOnlyLayer. 另创建一个`/root/writeLayer` 作为writeLayer. 通过`mount -t aufs -o dirs=/root/busybox:/root/writeLayer none /root/mnt` 挂到 `/root/mnt` 并将其作为 进程的根目录。 进程退出时，卸载`/root/mnt`,删除`/root/writeLayer`，`/root/busybox` 独善其身.所谓的layer 就是一个个文件夹。
 7. 容器退出后，删除`/root/writeLayer`，写入的数据全丢了，通常也不是我们想要的。因此在上述挂载完`/root/mnt`，执行 `mount -t aufs -o dirs=/root/hostVolume /root/mnt/containerVolume` 将主机的`/root/hostVolume` 目录挂载到 主机的`/root/mnt/containerVolume` 上，也就是容器的`/containerVolume` 上。

@@ -16,7 +16,7 @@ keywords: abtest
 
 以笔者目前的开发经历，碰到各种框架，可以分为两类
 
-1. 针对具体业务，为提高代码可读性的 腾挪。最大程度的 隔离control 和 logic。有大牛指出：程序=control + logic
+1. 针对具体业务，为提高代码可读性的 腾挪。最大程度的 隔离control 和 logic。[程序的本质复杂性和元语言抽象](https://coolshell.cn/articles/10652.html)指出：程序=control + logic
 2. 代码在线程/主机之间腾挪。为了性能。
 
 ## 代码别写在一块

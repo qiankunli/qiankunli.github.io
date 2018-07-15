@@ -9,7 +9,7 @@ keywords: Docker,macvlan
 ---
 
 
-## 简介
+## 简介(未完成)
 
 容器的漂移伴随着ip的分配和释放，这对许多依赖ip的服务的运行产生了负面影响，比如nginx等，解决该问题，有以下办法
 
@@ -19,6 +19,14 @@ keywords: Docker,macvlan
 	* mesos-dns
    * marathon-lb
 
+
+## 微服务的几个套路
+
+1. dubbo 这种，软件层面 解决服务注册、发现、路由等工作
+2. marathon-lb、k8s service 这种，系统层面解决，服务本身无需服务发现相关的代码
+3. service mesh，所有服务的 连接器，在连接器 中做服务发现与路由。
+
+各有优势，必须结合各自的场景，若单纯是服务发现，则都可以满足。但针对一些场景，则各有优劣，比如日志采集、降级熔断等
 
 ## marathon-lb
 

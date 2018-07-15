@@ -9,7 +9,7 @@ keywords: Docker,macvlan
 ---
 
 
-## 简介
+## 简介（未完成）
 
 [Docker在沪江落地的实践](https://hujiangtech.github.io/tech/%E5%90%8E%E7%AB%AF/2017/03/21/Docker.html)文中列举了docker 方案落地要解决的几个问题。
 
@@ -57,6 +57,10 @@ build 慢的解决办法
 
 	
 [Docker 持续集成过程中的性能问题及解决方法](http://oilbeater.com/docker/2016/01/02/use-docker-performance-issue-and-solution.html)
+
+另一种方案：
+
+[Google开源其Java容器化工具Jib，简化镜像构建全流程](https://mp.weixin.qq.com/s/KwmVoFeUG8gJCrgh5AFkvQ)（未读）
 
 ## 性能不及物理机(未完成)
 
