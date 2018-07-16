@@ -62,6 +62,24 @@ build 慢的解决办法
 
 [Google开源其Java容器化工具Jib，简化镜像构建全流程](https://mp.weixin.qq.com/s/KwmVoFeUG8gJCrgh5AFkvQ)（未读）
 
+`mvn compile jib:build` 从中可以看到
+
+
+	[INFO] Retrieving registry credentials for harbor.test.ximalaya.com...
+	[INFO] Getting base image harbor.test.ximalaya.com/test/jdk8-tomcat8...
+	[INFO] Building dependencies layer...
+	[INFO] Building resources layer...
+	[INFO] Building classes layer...
+	[INFO] Retrieving registry credentials for harbor.test.ximalaya.com...
+	[INFO] Finalizing...
+	[INFO] 
+	[INFO] Container entrypoint set to [java, -cp, /app/libs/*:/app/resources/:/app/classes/, org.apache.catalina.startup.Bootstrap]
+	[INFO] 
+	[INFO] Built and pushed image as harbor.xx/test/jib-demo
+
+
+1. 与常规的将代码及依赖 打成一个jar 包作为一个layer 不同，jib 将dependencies、resources、 classes（即项目代码） 分别打成一个layer， 在项目实践中，dependencies、resources 变化不多 ，因此能够复用相当一部分空间。
+
 ## 性能不及物理机(未完成)
 
 表现为过快的耗尽物理机资源：
