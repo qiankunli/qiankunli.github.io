@@ -80,6 +80,23 @@ build 慢的解决办法
 
 1. 与常规的将代码及依赖 打成一个jar 包作为一个layer 不同，jib 将dependencies、resources、 classes（即项目代码） 分别打成一个layer， 在项目实践中，dependencies、resources 变化不多 ，因此能够复用相当一部分空间。
 
+
+打tag
+
+
+To tag the image with a simple timestamp, add the following to your pom.xml:
+
+	<properties>
+	  <maven.build.timestamp.format>yyyyMMdd-HHmmssSSS</maven.build.timestamp.format>
+	</properties>
+	Then in the jib-maven-plugin configuration, set the tag to:
+	
+	<configuration>
+	  <to>
+	    <image>my-image-name:${maven.build.timestamp}</image>
+	  </to>
+	</configuration>
+
 ## 性能不及物理机(未完成)
 
 表现为过快的耗尽物理机资源：

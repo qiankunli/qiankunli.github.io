@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: AQS学习2
+title: AQS4——一个博客系列的整理
 category: 技术
 tags: Java
 keywords: AQS
