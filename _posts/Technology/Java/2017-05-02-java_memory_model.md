@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: java内存模型
+title: JVM3——java内存模型
 category: 技术
 tags: Java
 keywords: JAVA memory model

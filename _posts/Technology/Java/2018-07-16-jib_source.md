@@ -4,7 +4,7 @@ layout: post
 title: jib 源码分析
 category: 技术
 tags: Java
-keywords: commons-pipeline
+keywords: jib
 
 ---
 

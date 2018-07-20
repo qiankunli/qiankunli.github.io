@@ -44,7 +44,7 @@ keywords: JAVA Spring aop
 ## Spring Aop 和 aspectj
 
 1. Spring Aop 是运行是增强，即SayHelloService.class 没变，但在运行时 变了，并且实际上，内存中 实际运行的是 SayHelloService$1，为此常涉及到二次代理失效的问题
-2. Spring AOP使用了AspectJ的Annotation，但是并没有使用它的编译器和织入器。启用 aspectj 注解 `   <aop:aspectj-autoproxy/>`. “用其名，不用其人”，aop 还是默认jdk动态代理，可选用cglib。
+2. Spring AOP使用了AspectJ的Annotation，但是并没有使用它的编译器和织入器。启用 aspectj 注解 `<aop:aspectj-autoproxy/>`. “用其名，不用其人”，aop 还是默认jdk动态代理，可选用cglib。
 3. Spring 容器中配置一个带 @Aspect 注释的 Bean，Spring 将会自动识别该 Bean，并将该 Bean 作为方面 Bean 处理。方面Bean与普通 Bean 没有任何区别，一样使用 <bean.../> 元素进行配置，一样支持使用依赖注入来配置属性值。
 
 也就是， 除非用上了`ajc` 去编译 java 源代码，否则，都是spring aop + jdk proxy/cglib 那一套。
@@ -148,4 +148,27 @@ Spring + Aspectj annotation， 假设存在
 ## 二次代理
 
 [Spring中DispacherServlet、WebApplicationContext、ServletContext的关系](https://blog.csdn.net/c289054531/article/details/9196149)
+
+[简述Spring容器与SpringMVC的容器的联系与区别](https://blog.csdn.net/wzx104104104/article/details/74937605)
+
+spring mvc 和 spring 是两个ioc，后者是前者的 父ioc。子容器(SpringMVC容器)可以访问父容器(Spring容器)的Bean，父容器(Spring容器)不能访问子容器(SpringMVC容器)的Bean。
+
+假设项目目录如下所示，abtest-client 注解作用于 service包下的HelloService类中
+
+    com.test.abc.controller
+    com.test.abc.service
+    com.test.abc.service.IHelloService
+    com.test.abc.service.imp.HelloService
+
+spring-context.xml 配置如下
+
+    <context:component-scan base-package="com.test.abc"/>
+    <aop:aspectj-autoproxy/>
+
+web-context.xml 配置如下
+
+    <context:component-scan base-package="com.test.abc"/>
+
+则spring mvc 与spring 容器中都将保有IHelloService 实例，但spring mvc ioc 下是HelloService 本身，而spring ioc 则是abtest-client
+处理过后的代理类，按照"子ioc 有bean 则用自己的，找不到就用父ioc "的规则，生效的是spring mvc ioc 下的HelloService，abtest 无效。
 
