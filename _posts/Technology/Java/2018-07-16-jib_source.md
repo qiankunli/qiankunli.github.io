@@ -94,5 +94,14 @@ StepsRunner 是有一个基本的构造函数之后
  
 最优意思的部分就是， 本来十几个step 具有复杂的依赖关系，有的需要同步执行，有的可以异步执行。而通过代码的腾挪， 表面调用起来却是平铺直叙的。
  
- 从另一个角度说，代码调用可以是顺序的，但业务不是顺序的。
+从另一个角度说，代码调用可以是顺序的，但业务不是顺序的。代码呈现的感觉跟实际的执行 不是一回事（也可以说，我们以前的方法太笨了）。
+
+再换一个角度说，我们看下 rxnetty 的一些代码，充分体现“程序=逻辑+控制”，逻辑与控制的分离。 
+
+	RxNetty.createHttpGet("http://localhost:8080/error")
+	               .flatMap(response -> response.getContent())
+	               .map(data -> "Client => " + data.toString(Charset.defaultCharset()))
+	               .toBlocking().forEach(System.out::println);
       	
+      	
+      
