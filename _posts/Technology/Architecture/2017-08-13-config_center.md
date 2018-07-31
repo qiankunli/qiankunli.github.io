@@ -8,7 +8,7 @@ keywords: config center
 
 ---
 
-## 简介
+## 简介（未完成）
 
 名词解释
 
@@ -137,6 +137,10 @@ abtest也分为面向客户端和服务端，借助于配置中心的下发通�
 但后端管理界面上 改掉配置中心的值后， 多长时间才能让所有用户 拿到最新的值？
 
 不能 保证用户 最新一次启动后，一定用的是最新值。因为从客户端实现来说，部分业务请求时间比较靠前，此时配置中心请求 尚未返回。
+
+## 现有方案的研究
+
+[spring_cloud_config](http://cloud.spring.io/spring-cloud-static/Dalston.SR2/#_spring_cloud_config)
 
 ## 小结
 
