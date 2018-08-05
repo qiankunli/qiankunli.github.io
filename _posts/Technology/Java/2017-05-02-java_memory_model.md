@@ -49,11 +49,15 @@ The hardware memory architecture does not distinguish between thread stacks and 
 When objects and variables can be stored in various different memory areas in the computer, certain problems may occur. The two main problems are:
 
 1. Visibility of thread updates (writes) to shared variables. 可以用volatile 关键字解决
-2. Race conditions when reading, checking and writing shared variables. 让两个线程 不用同时执行同一段代码，可以用synchronized block 解决，本质就是将竞争转移（从竞争同一个变量 到去竞争 同一个锁）。或者使用cas 保证竞争是原子的。
+2. Race conditions when reading, checking and writing shared variables. 让两个线程 不要同时执行同一段代码，可以用synchronized block 解决，本质就是将竞争转移（从竞争同一个变量 到去竞争 同一个锁）。或者使用cas 保证竞争是原子的。
 
 ![](/public/upload/java/jvm_memory_model_6.png)
 
 就着上图 去理解《java并发编程实战》中的有序性、原子性及可见性 ，会有感觉很多。
+
+可以脑补一下 基于jvm 内存模型，多线程执行 访问 对象的局部变量 的图，直接的观感是jvm 是从内存（heap）中直接拿数据的，会有原子性问题，但没有可见性问题。但实际上，你根本搞不清楚，从heap 中拿到的对象变量的值 是从寄存器、cpu cache、main memory 哪里拿到的，写入问题类似。jvm 提供volatile 等微操工具，介入两种内存模型的映射过程，来确保预期与实际一致，从这个角度看，jvm 并没有完全屏蔽硬件架构的特性（当然，也是为了提高性能考虑），不过确实做到了屏蔽硬件架构的差异性。
+
+到这里小结一下，当我们在说jvm 内存模型时，我在说什么？其实就是：jvm 内存区域构成（栈、堆等，栈由哪些构成，堆由哪些构成？） 以及 其与 硬件内存架构的 映射关系。
 
 ## 内存模型与语言
 
