@@ -96,9 +96,11 @@ The workers are organized like workers at an assembly line（流水线上的工�
 	
 The main disadvantage of the assembly line concurrency model is that the execution of a job is often spread out over multiple workers, and thus over multiple classes in your project. 
 
-It may also be harder to write the code. Worker code is sometimes written as callback handlers. Having code with many nested callback handlers may result in what some developer call callback hell. 将 callback hell 与 Assembly Line 线程模型联系起来。
+It may also be harder to write the code. Worker code is sometimes written as callback handlers. Having code with many nested callback handlers may result in what some developer call callback hell. 将 callback hell 与 Assembly Line 线程模型联系起来，**callback hell 是一种变相的流水线**。
 
 With the parallel worker concurrency model this tends to be easier. You can open the worker code and read the code executed pretty much from start to finish. Of course parallel worker code may also be spread over many different classes, but the execution sequence is often easier to read from the code.
+
+好在我们有很多现成的框架
 
 ## Functional Parallelism
 
