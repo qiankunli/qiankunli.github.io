@@ -75,7 +75,7 @@ keywords: test environment
 
 2. 请求链路 中携带 环境标识。（有赞文章中的方案）
 
-	![](/public/upload/architecture/test_environment_mangement_2.png)
+	![](/public/upload/architecture/test_environment_mangement_2.PNG)
 	
 	注意箭头的颜色
 
@@ -134,13 +134,13 @@ keywords: test environment
 2. 有B1时，A1 只能访问 B1
 3. A0 无法 访问B1
 
-几个尝试方案：
+几个可能方案：
 
 1. 不同隔离组处在不同的网络。满足要求23，不满足1 
 2. 开发状态的隔离组 只有出口网络，没有入口网络。这样根本不能通信
 3. 开发状态下的隔离组 处在不同的网络，任何开发隔离组 可以和 稳定状态下的隔离组 互通。满足要求13，不满足2
 
-本质原因就是，网络隔离只能决定禁止 访问谁，但不能决定 优先访问谁。
+本质原因就是，网络隔离只能决定禁止 访问谁，但不能决定 “优先”访问谁，优先是一个偏语义的概念，只能框架层去实现。
 
 
 
