@@ -59,8 +59,8 @@ keywords: abtest
 
 ### 一切皆配置
 
-![](/public/architecture/upload/client_support_client_1.png)
+![](/public/upload/architecture/client_support_client_1.png)
 
 ### 各自为政
 
-![](/public/architecture/upload/client_support_client_1.png)
+![](/public/upload/architecture/client_support_client_2.png)
