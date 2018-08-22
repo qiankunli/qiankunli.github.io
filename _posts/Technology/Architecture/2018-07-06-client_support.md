@@ -61,6 +61,8 @@ keywords: abtest
 
 ![](/public/upload/architecture/client_support_client_1.png)
 
+所有业务 以配置形式存在，通过配置中心 下发到客户端，客户端同时拉取 用户画像数据，据此根据 相应的配置数据 进行 匹配，进而产生 相应的业务行为。
+
 ### 各自为政
 
 ![](/public/upload/architecture/client_support_client_2.png)
