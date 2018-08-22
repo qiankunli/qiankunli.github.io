@@ -60,7 +60,7 @@ build 慢的解决办法
 
 另一种方案：
 
-[Google开源其Java容器化工具Jib，简化镜像构建全流程](https://mp.weixin.qq.com/s/KwmVoFeUG8gJCrgh5AFkvQ)（未读）
+[Google开源其Java容器化工具Jib，简化镜像构建全流程](https://mp.weixin.qq.com/s/KwmVoFeUG8gJCrgh5AFkvQ)
 
 `mvn compile jib:build` 从中可以看到
 
@@ -79,6 +79,34 @@ build 慢的解决办法
 
 
 1. 与常规的将代码及依赖 打成一个jar 包作为一个layer 不同，jib 将dependencies、resources、 classes（即项目代码） 分别打成一个layer， 在项目实践中，dependencies、resources 变化不多 ，因此能够复用相当一部分空间。
+
+2. maven pom.xml 配置 针对插件的 0.9.9 版本
+
+		<plugin>
+			<groupId>com.google.cloud.tools</groupId>
+			<artifactId>jib-maven-plugin</artifactId>
+			<version>0.9.9</version>
+			<configuration>
+				<allowInsecureRegistries>false</allowInsecureRegistries>
+				<from>
+					<image>harbor.test.xxx.com/test/jdk8</image>
+					<auth>
+						<username>xxx</username>
+						<password>xxx</password>
+					</auth>
+				</from>
+				<to>
+					<image>harbor.test.xxx.com/test/jib-springboot-demo</image>
+					<auth>
+						<username>xxx</username>
+						<password>xxx</password>
+					</auth>
+				</to>
+				<container>
+					<mainClass>com.xxx.springboot.demo.DockerSpringbootDemoApplication</mainClass>
+				</container>
+			</configuration>
+		</plugin>
 
 
 打tag
