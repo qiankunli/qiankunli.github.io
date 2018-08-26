@@ -8,19 +8,22 @@ keywords: mysql concurrency control
 
 ---
 
-## 前言（未完成）
+## 前言
 
-[InnoDB并发如此高，原因竟然在这？](https://juejin.im/entry/5b70db49e51d45663f46bc52) 有几条思路性的东西，值得总结
+数据库锁定机制简单来说，就是数据库为了保证数据的一致性，而使各种共享资源在被并发访问变得有序所设计的一种规则。
+
+[InnoDB并发如此高，原因竟然在这？](https://juejin.im/entry/5b70db49e51d45663f46bc52)  系列 内容 大部分来自 官方文章 [InnoDB Locking](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html)，同是加入了作者的一些提炼。
 
 通过并发控制保证数据一致性的常见手段有：
 
 * 锁（Locking）
 * 数据多版本（Multi Versioning）
-
 	
 ## 锁
 
-提高并发的演进思路：
+[挖坑，InnoDB的七种锁](https://mp.weixin.qq.com/s?__biz=MjM5ODYxMDA5OQ==&mid=2651961451&idx=1&sn=1bac366be5ad2dc721f79c9cb8e65e34&chksm=bd2d0db78a5a84a101e05a02e337fe91c3fd179132bced897156e1f34f0d0ba7e48dc89a1b95&mpshare=1&scene=23&srcid=0819tg70Rq5dtSfmkhNSo3Yw%23rd)
+
+学东西， 比较重要的不是怎么样，而是为什么要这样。 提高并发的演进思路：
 
 1. 普通锁，本质是串行 执行
 2. 读写锁，可以实现读读并发
@@ -31,12 +34,16 @@ keywords: mysql concurrency control
 	3. 并发读任务可以继续读取旧版本的数据，不至于阻塞；
 
 	有点aufs 写文件的意思
-4. 插入意向锁，提高插入并发。但对于AUTO_INCREMENT 类型的列，则AUTO-INC lock 用以使插入串行
+4. 写操作分为插入、更改和删除
+5. 对已有数据行的修改与删除，必须加强互斥锁X锁，那对于数据的插入，是否还需要加这么强的锁，来实施互斥呢？插入意向锁（间隙锁的一种，所以也是实施在索引上的），可以提高插入并发。
+6. 但对于AUTO_INCREMENT 类型的列，则AUTO-INC lock 用以使插入串行。
+7. 读读并行、写写串行都比较确定， 关键就是读写 如何协调，那么针对读写可能产生的问题 用对应的锁来解决（所以，数据库提高或降低 隔离级别，也就是数据库启用/禁用了这些锁）。
 
+	||第一个事务|第二个事务|说明|对应的锁|
+|---|---|---|---|---|
+|不可重复度|读1...读2|更改|同样的条件 ,   你读取过的数据 ,   再次读取出来发现值不一样了 |间隙锁|
+|幻读|读1...读2|插入、删除|  第 1 次和第 2 次读出来的记录数不一样（所以有间隙锁这一套）|临键锁|
 
-[挖坑，InnoDB的七种锁](https://mp.weixin.qq.com/s?__biz=MjM5ODYxMDA5OQ==&mid=2651961451&idx=1&sn=1bac366be5ad2dc721f79c9cb8e65e34&chksm=bd2d0db78a5a84a101e05a02e337fe91c3fd179132bced897156e1f34f0d0ba7e48dc89a1b95&mpshare=1&scene=23&srcid=0819tg70Rq5dtSfmkhNSo3Yw%23rd)
-
-文中提到 "事务会阻塞"，而不是我们常说的 "线程会阻塞"，这种 表述是不是意味着，执行事务的线程 如果发现事务阻塞了，就可以转而执行其它事务， 就像goroutine 那样？
 
 [插入InnoDB自增列，居然是表锁？
 ](https://mp.weixin.qq.com/s?__biz=MjM5ODYxMDA5OQ==&mid=2651961455&idx=1&sn=4c26a836cff889ff749a1756df010e0e&chksm=bd2d0db38a5a84a53db91e97c7be6295185abffa5d7d1e88fd6b8e1abb3716ee9748b88858e2&mpshare=1&scene=23&srcid=0819Cm3t80QS2jGTBwZx9hJO%23rd)
@@ -58,16 +65,110 @@ https://www.zhihu.com/question/51513268/answer/147733422)
 
 这就可以解释，为何涉及到 加字段 等操作，dba 总是要求 凌晨执行相关代码。因为在 `alter table xx` 期间，基本无法对数据库进行读写了。
 
+[InnoDB，select为啥会阻塞insert？](https://mp.weixin.qq.com/s?__biz=MjM5ODYxMDA5OQ==&mid=2651961471&idx=1&sn=da257b4f77ac464d5119b915b409ba9c&chksm=bd2d0da38a5a84b5fc1417667fe123f2fbd2d7610b89ace8e97e3b9f28b794ad147c1290ceea&mpshare=1&scene=23&srcid=0822Acfwzhugvrc1wp9x4o51%23rd)
 
-这里有一个问题，普通锁、读写锁、数据多版本 有一个提高并发度 的线可以将它们串起来，那么这7种锁 如何将它们串起来。
 
-感觉上是 调控 写与写操作的行为。
+InnoDB的细粒度(行)锁，是实现在索引记录上的，A record lock is a lock on an index record。如果查询没有命中索引，也将退化为表锁。
 
-## 其它
+1. 记录锁，它封锁索引记录，例如：
 
-普通锁
+		select * from t where id=1 for update;
 
-mysql 是按事务执行的，不是按sql 语句执行的
+	它会在id=1的索引记录上加锁，以阻止其他事务插入，更新，删除id=1的这一行。
+
+2. 间隙锁，它封锁索引记录中的间隔
+
+		select * from t where id between 8 and 15 for update;
+
+	会封锁区间，以阻止其他事务id=10的记录插入。
+	
+	间隙锁的主要目的，就是为了防止其他事务在间隔中插入数据，以导致“不可重复读”。如果把事务的隔离级别降级为读提交(Read Committed, RC)，Gap locking can be disabled explicitly.
+	
+3. 临键锁，是记录锁与间隙锁的组合，它的封锁范围，既包含索引记录，又包含索引区间。更具体的，临键锁会封锁索引记录本身，以及索引记录之前的区间。
+
+	如果一个会话占有了索引记录R的共享/排他锁，其他会话不能立刻在R之前的区间插入新的索引记录。
+	
+	t(id PK, name KEY, sex, flag);
+	
+	表中有四条记录：
+
+		1, shenjian, m, A
+		3, zhangsan, m, A
+		5, lisi, m, A
+		9, wangwu, f, B
+
+	PK上潜在的临键锁为：
+
+		(-infinity, 1]
+		(1, 3]
+		(3, 5]
+		(5, 9]
+		(9, +infinity]
+
+	临键锁的主要目的，也是为了避免幻读(Phantom Read)。如果把事务的隔离级别降级为RC，临键锁则也会失效。
+
+
+## 线程阻塞 还是事务 阻塞
+
+文中提到 "事务会阻塞"，而不是我们常说的 "线程会阻塞"，这种 表述是不是意味着，执行事务的线程 如果发现事务阻塞了，就可以转而执行其它事务， 就像goroutine 那样？ 从 [MySQL锁阻塞分析，mysql锁阻塞](http://www.bkjia.com/sjkqy/874857.html) 可以看到，就实现上来说， 事务阻塞也就意味着 执行事务的线程阻塞。进而可以推断，并发读写比较多时，会导致大量的数据库线程在同一时间处于阻塞状态，进而拖慢 数据库执行 任务队列中事务的速度。
+
+	$ show engine innodb status
+
+	------------
+	TRANSACTIONS
+	------------
+	Trx id counter 4131
+	Purge done for trx's n:o < 4119 undo n:o < 0 state: running but idle
+	History list length 126
+	LIST OF TRANSACTIONS FOR EACH SESSION:
+	---TRANSACTION 0, not started
+	MySQL thread id 2, OS thread handle 0x7f953ffff700, query id 115 localhost root init
+	show engine innodb status
+	---TRANSACTION 4130, ACTIVE 41 sec starting index read
+	mysql tables in use 1, locked 1
+	LOCK WAIT 2 lock struct(s), heap size 360, 1 row lock(s)
+	MySQL thread id 4, OS thread handle 0x7f953ff9d700, query id 112 localhost root updating
+	delete from emp where empno=7788
+	------- TRX HAS BEEN WAITING 41 SEC FOR THIS LOCK TO BE GRANTED:   ## 等待了41s
+	RECORD LOCKS space id 16 page no 3 n bits 88 index `PRIMARY` of table `test`.`emp` trx id 4130 lock_mode X locks rec but not gap waiting
+	Record lock, heap no 9 PHYSICAL RECORD: n_fields 10; compact format; info bits 0  ## 线程4在等待往test.emp中的主键上加X锁，page num=3
+	 0: len 4; hex 80001e6c; asc    l;;
+	 1: len 6; hex 000000001018; asc       ;;
+	 2: len 7; hex 91000001420084; asc     B  ;;
+	 3: len 5; hex 53434f5454; asc SCOTT;;
+	 4: len 7; hex 414e414c595354; asc ANALYST;;
+	 5: len 4; hex 80001d8e; asc     ;;
+	 6: len 4; hex 208794f0; asc     ;;
+	 7: len 4; hex 80000bb8; asc     ;;
+	 8: SQL NULL;
+	 9: len 4; hex 80000014; asc     ;;
+	
+	------------------
+	---TRANSACTION 4129, ACTIVE 45 sec starting index read
+	mysql tables in use 1, locked 1
+	LOCK WAIT 2 lock struct(s), heap size 360, 1 row lock(s)
+	MySQL thread id 7, OS thread handle 0x7f953ff6c700, query id 111 localhost root updating
+	update emp set sal=3500 where empno=7788
+	------- TRX HAS BEEN WAITING 45 SEC FOR THIS LOCK TO BE GRANTED:   ## 等待了45s
+	RECORD LOCKS space id 16 page no 3 n bits 88 index `PRIMARY` of table `test`.`emp` trx id 4129 lock_mode X locks rec but not gap waiting
+	Record lock, heap no 9 PHYSICAL RECORD: n_fields 10; compact format; info bits 0  ## 线程7在等待往test.emp中的主键上加X锁，page num=3
+	 0: len 4; hex 80001e6c; asc    l;;
+	 1: len 6; hex 000000001018; asc       ;;
+	 2: len 7; hex 91000001420084; asc     B  ;;
+	 3: len 5; hex 53434f5454; asc SCOTT;;
+	 4: len 7; hex 414e414c595354; asc ANALYST;;
+	 5: len 4; hex 80001d8e; asc     ;;
+	 6: len 4; hex 208794f0; asc     ;;
+	 7: len 4; hex 80000bb8; asc     ;;
+	 8: SQL NULL;
+	 9: len 4; hex 80000014; asc     ;;
+	
+	------------------
+	---TRANSACTION 4128, ACTIVE 51 sec
+	2 lock struct(s), heap size 360, 1 row lock(s)
+	MySQL thread id 3, OS thread handle 0x7f953ffce700, query id 110 localhost root clean
+
+从`show engine innodb status` 输出可以看到， 一个事务id 通常 对应一个 thread id。
 
 
 
@@ -76,7 +177,4 @@ mysql 是按事务执行的，不是按sql 语句执行的
 
 [深入理解MySQL――锁、事务与并发控制 这才是正确的！](https://zhuanlan.zhihu.com/p/36060546)
 
-
-[MySQL 加锁处理分析](http://hedengcheng.com/?p=771#_Toc374698316) （未读）
-
-官方文章 [InnoDB Locking](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html)
+[MySQL 加锁处理分析](http://hedengcheng.com/?p=771#_Toc374698316) 
