@@ -14,10 +14,24 @@ keywords: mysql concurrency control
 
 [InnoDB并发如此高，原因竟然在这？](https://juejin.im/entry/5b70db49e51d45663f46bc52)  系列 内容 大部分来自 官方文章 [InnoDB Locking](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html)，同是加入了作者的一些提炼。
 
-通过并发控制保证数据一致性的常见手段有：
+## 隔离性与 锁
 
-* 锁（Locking）
-* 数据多版本（Multi Versioning）
+[4种事务的隔离级别，InnoDB如何巧妙实现？](https://mp.weixin.qq.com/s?__biz=MjM5ODYxMDA5OQ==&mid=2651961498&idx=1&sn=058097f882ff9d32f5cdf7922644d083&chksm=bd2d0d468a5a845026b7d2c211330a6bc7e9ebdaa92f8060265f60ca0b166f8957cbf3b0182c&mpshare=1&scene=23&srcid=0829xvsK46xDhwpojd9EbY18%23rd)
+
+||第一个事务|第二个事务|说明|对应的锁|
+|---|---|---|---|---|
+|脏度|插入 未提交|select * ...|第二个事务读到了我提交的数据 ||
+|不可重复度|读1...读2|更改|同样的条件 ,   你读取过的数据 ,   再次读取出来发现值不一样了 |间隙锁|
+|幻读|读1...读2|插入、删除|  第 1 次和第 2 次读出来的记录数不一样（所以有间隙锁这一套）|临键锁|
+
+隔离性的进一步认识：多个用户的并发事务 访问同一个数据库时，一个用户的事务不应该为其它用户的事务干扰。这个干扰意涵就比较tricky了
+
+1. 未提交事务对事务的影响。事务有一个特性：事务未提交，那么对数据库的更改 就不算“尘埃落定”，这个时候的数据 就不应该被别的事务感知到。否则，可以视为“干扰”了
+2. 已提交事务对未提交事务的影响。比如事务A 要插入一条记录（记录包含 一个name字段，且设置为unique），事务A 先查询了一下发现没有name=lisi 记录，然后插入name=lisi 的记录。但在select 和 insert 之间 事务B 插入了name=lisi 的记录并提交，便会导致事务A 操作失败。不可重复读 和幻读 均可导致 该结果，此时也是一种“干扰”。
+
+但第二种情况 似乎情有可原，因为失败了就失败了，事务A 的用户再发起一次操作就可以了。所以说，隔离性是一致性和并发性的权衡。
+
+![](/public/upload/data/mysql_select.png)
 	
 ## 锁
 
@@ -38,12 +52,6 @@ keywords: mysql concurrency control
 5. 对已有数据行的修改与删除，必须加强互斥锁X锁，那对于数据的插入，是否还需要加这么强的锁，来实施互斥呢？插入意向锁（间隙锁的一种，所以也是实施在索引上的），可以提高插入并发。
 6. 但对于AUTO_INCREMENT 类型的列，则AUTO-INC lock 用以使插入串行。
 7. 读读并行、写写串行都比较确定， 关键就是读写 如何协调，那么针对读写可能产生的问题 用对应的锁来解决（所以，数据库提高或降低 隔离级别，也就是数据库启用/禁用了这些锁）。
-
-	||第一个事务|第二个事务|说明|对应的锁|
-|---|---|---|---|---|
-|不可重复度|读1...读2|更改|同样的条件 ,   你读取过的数据 ,   再次读取出来发现值不一样了 |间隙锁|
-|幻读|读1...读2|插入、删除|  第 1 次和第 2 次读出来的记录数不一样（所以有间隙锁这一套）|临键锁|
-
 
 [插入InnoDB自增列，居然是表锁？
 ](https://mp.weixin.qq.com/s?__biz=MjM5ODYxMDA5OQ==&mid=2651961455&idx=1&sn=4c26a836cff889ff749a1756df010e0e&chksm=bd2d0db38a5a84a53db91e97c7be6295185abffa5d7d1e88fd6b8e1abb3716ee9748b88858e2&mpshare=1&scene=23&srcid=0819Cm3t80QS2jGTBwZx9hJO%23rd)
@@ -106,8 +114,9 @@ InnoDB的细粒度(行)锁，是实现在索引记录上的，A record lock is a
 		(9, +infinity]
 
 	临键锁的主要目的，也是为了避免幻读(Phantom Read)。如果把事务的隔离级别降级为RC，临键锁则也会失效。
+	
 
-
+	
 ## 线程阻塞 还是事务 阻塞
 
 文中提到 "事务会阻塞"，而不是我们常说的 "线程会阻塞"，这种 表述是不是意味着，执行事务的线程 如果发现事务阻塞了，就可以转而执行其它事务， 就像goroutine 那样？ 从 [MySQL锁阻塞分析，mysql锁阻塞](http://www.bkjia.com/sjkqy/874857.html) 可以看到，就实现上来说， 事务阻塞也就意味着 执行事务的线程阻塞。进而可以推断，并发读写比较多时，会导致大量的数据库线程在同一时间处于阻塞状态，进而拖慢 数据库执行 任务队列中事务的速度。
@@ -171,10 +180,12 @@ InnoDB的细粒度(行)锁，是实现在索引记录上的，A record lock is a
 从`show engine innodb status` 输出可以看到， 一个事务id 通常 对应一个 thread id。
 
 
-
-
 ## 其它材料
 
 [深入理解MySQL――锁、事务与并发控制 这才是正确的！](https://zhuanlan.zhihu.com/p/36060546)
 
 [MySQL 加锁处理分析](http://hedengcheng.com/?p=771#_Toc374698316) 
+
+喜欢请关注个人微信订阅号
+
+![](/public/upload/qrcode_for_gh.jpg)
