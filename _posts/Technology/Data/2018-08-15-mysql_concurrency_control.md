@@ -31,7 +31,7 @@ keywords: mysql concurrency control
 
 但第二种情况 似乎情有可原，因为失败了就失败了，事务A 的用户再发起一次操作就可以了。所以说，隔离性是一致性和并发性的权衡。
 
-![](/public/upload/data/mysql_select.png)
+![](/public/upload/data/mysql_sql_lock.png)
 	
 ## 锁
 
