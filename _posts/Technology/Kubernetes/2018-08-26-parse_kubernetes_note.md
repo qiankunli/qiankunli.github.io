@@ -46,4 +46,6 @@ PaaS 主要是提供了一种名叫“应用托管”的能力。虚拟机技术
 
 ![](/public/upload/kubernetes/parse_k8s_ad.JPG)
 
+笔者个人微信订阅号
+
 ![](/public/upload/qrcode_for_gh.jpg)
