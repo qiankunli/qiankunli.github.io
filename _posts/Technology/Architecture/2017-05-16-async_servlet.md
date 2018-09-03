@@ -106,7 +106,9 @@ netty 因为不能改写 io 语言的系统调用，为此 不敢向你直接暴
 
 ![](/public/upload/architecture/async_servlet_2.png)
 
-相当于netty 提供了一个全异步 io 操作（也包括一般的任务执行）的抽象层，支持类似AIO的”系统调用“。
+相当于netty 提供了一个全异步 io 操作（也包括一般的任务执行）的抽象层，支持类似AIO的”系统调用“。所以上图竖着画，就是另一番滋味了。
+
+![](/public/upload/netty/netty_io.png)
 
 ## 其它
 

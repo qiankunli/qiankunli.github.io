@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 服务治理框架的几个点
+title: 微服务治理框架的几个点
 category: 技术
 tags: Architecture
 keywords: dubbo micro service
@@ -27,6 +27,16 @@ keywords: dubbo micro service
 左耳朵耗子 提出来的一系列方法论。
 
 ## 从0 到 1 实现一个服务治理框架
+
+单体服务 ==> 通过 rpc 分割为微服务  ==> 解决微服务 带来的问题
+
+### 基本能力
+
+1. 序列化协议
+2. 服务注册和发现
+
+### 附加能力
+
 
 ## 路由
 
