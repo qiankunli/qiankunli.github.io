@@ -247,3 +247,11 @@ keywords: 分布式系统
 
 	
 实现架构的时候，做好目标管理。先实现主要的，再实现次要的，这句其实不是废话。为什么？因为主要功能 很多时候决定了架构设计，**而在迭代的过程中**，上层架构会做微调，一旦微调，细节相关的代码就有可能会作废。
+
+《从0开始学架构》教程
+
+![](/public/upload/architecture/architecture_from_0_post.JPG)
+
+笔者个人微信订阅号
+
+![](/public/upload/qrcode_for_gh.jpg)
