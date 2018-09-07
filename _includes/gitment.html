@@ -2,8 +2,9 @@
 <link rel="stylesheet" href="https://imsun.github.io/gitment/style/default.css">
 <script src="https://imsun.github.io/gitment/dist/gitment.browser.js"></script>
 <script>
+var page_date = '{{ page.date }}';
 var gitment = new Gitment({
-	id: '<%= page.title %>'
+	id: page_date,
 	owner: 'qiankunli',
 	repo: 'qiankunli.github.io',
         oauth: {
