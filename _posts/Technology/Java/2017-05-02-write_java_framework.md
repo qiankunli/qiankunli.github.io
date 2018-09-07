@@ -31,6 +31,8 @@ keywords: JAVA spi xsd
 
 ## spi
 
+### 概念
+
 [java中的SPI机制](http://www.cnblogs.com/javaee6/p/3714719.html)
 
 java 平台对spi的支持可以参见java.util.ServiceLoader.A simple service-provider loading facility类。比如对一个maven项目结构
@@ -45,36 +47,46 @@ java 平台对spi的支持可以参见java.util.ServiceLoader.A simple service-p
 			resources
 				META-INF
 					services
-						org.lqk.spi.IUserService
+						org.lqk.spi.IUserService // 内容是org.lqk.spi. UserService
 						
 
 那么在代码中
 
 	public class ServiceBootstrap {
-		  public static <S> S loadFirst(Class<S> clazz) {
-		    Iterator<S> iterator = loadAll(clazz);
-		    if (!iterator.hasNext()) {
-		      throw new IllegalStateException(String.format(
-		              "No implementation defined in /META-INF/services/%s, please check whether the file exists and has the right implementation class!",
-		              clazz.getName()));
-		    }
-		    return iterator.next();
-		  }
-		  private static <S> Iterator<S> loadAll(Class<S> clazz) {
-		    ServiceLoader<S> loader = ServiceLoader.load(clazz);
-		    return loader.iterator();
-		  }
+		 public static void main(String[] args) {
+        	ServiceLoader<IUserService>
+                serviceLoader = ServiceLoader.load(IUserService.class);
+        	serviceLoader.forEach(IUserService::sayHello);
+    	}
 	}
-
 
 `ServiceBootstrap.load(IUserService.class)`即可得到IUserService实例。
 
+
+### 与api 对比
+
+[Java SPI思想梳理](https://zhuanlan.zhihu.com/p/28909673)
+spi 是与 api 相对应的一个词，代码上会有一个接口类与其对应
+
+||api|spi|
+|---|---|---|
+|概念上|概念上更接近实现方。实现了一个服务，然后提供接口 给外界调用|概念上更依赖调用方。比如java 的jdbc 规范，是先定义接口，然后交给mysql、oracle 等厂商实现|
+|interface 在|实现方所在的包中|调用方所在的包中|
+|interface 和 implement|在一个包中| implement位于独立的包中（也可认为在提供方中）|
+|如何对外提供服务，证明自己用处在哪里|提供接口 给外界调用|java spi的具体约定为: 当服务的提供者，提供了服务接口的一种实现之后，在jar包的META-INF/services/目录里同时创建一个以服务接口命名的文件。文件内容就是实现该服务接口的具体实现类|
+
+### 与 ioc 对比
 
 类似的ioc工具有[ Plexus，Spring之外的IoC容器](http://blog.csdn.net/huxin1/article/details/6020814)， [google/guice](https://github.com/google/guice)
 
 使用它们而不是spring ioc有一个好处：我们所写的框架，经常应用于很多使用spring的项目中，不使用spring ioc，可以不与业务使用的spring版本冲突。
 
 贴一段guice的简介：Put simply, Guice alleviates the need for factories and the use of new in your Java code. Think of Guice's @Inject as **the new new（一个新的new）.** You will still need to write factories in some cases, but your code will not depend directly on them. Your code will be easier to change, unit test and reuse in other contexts.
+
+
+1. 面向的对象的设计里，我们一般推荐模块之间基于接口编程
+2. ioc 侧重于将一个类的构造过程省掉，调用方只需关心类的使用。因为接口编程的关系，spring **顺带支持**通过scan 等方式 为一个接口 找到（spring 容器中）对应的实现类
+3. spi 强调一个接口有多种实现，不想在代码中写死具体使用哪种实现。
 
 ## xsd
 
