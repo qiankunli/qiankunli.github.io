@@ -1,5 +1,5 @@
-permalink: /:year/:month/:day/:title/
-# permalink: /:year/:month/:day/:id/
+# permalink: /:year/:month/:day/:title.html
+permalink: /:year/:month/:day/:id/
 paginate: 10
 # markdown: rdiscount
 markdown: kramdown
