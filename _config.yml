@@ -31,6 +31,11 @@ ga:
 disqus:
   shortname: qiankunli
 
+# gitment
+gitment:
+  id: ddbaadab5f5d810805c3
+  secret: 13b91b306680f11a55713382529b83259ef56546
+
 # 主题设置，自动激活某个标签
 active: 技术
 
