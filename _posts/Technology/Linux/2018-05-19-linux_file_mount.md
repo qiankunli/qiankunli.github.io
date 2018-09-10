@@ -33,18 +33,41 @@ VFS 是文件系统事实上的规范，定义了挂载点、超级块、目录�
 rootfs是基于内存的文件系统，所有操作都在内存中完成；也没有实际的存储设备，所以不需要设备驱动程序的参与。基于以上原因，Linux在启动阶段使用rootfs文件系统，当磁盘驱动程序和磁盘文件系统成功加载后，linux系统会将系统根目录从rootfs切换到磁盘文件系统（这句表述不准确）。
 
 参见[linux文件系统初始化过程(2)---挂载rootfs文件系统
-](http://blog.csdn.net/luomoweilan/article/details/17894473),linux文件系统中重要的数据结构有：文件、挂载点、超级块、目录项、索引节点等。图中含有两个文件系统（红色和绿色表示的部分），并且绿色文件系统挂载在红色文件系统tmp目录下。一般来说，每个文件系统在VFS层都是由挂载点、超级块、目录和索引节点组成；当挂载一个文件系统时，实际也就是创建这四个数据结构的过程，因此这四个数据结构的地位很重要，关系也很紧密。**由于VFS要求实际的文件系统必须提供以上数据结构，所以不同的文件系统在VFS层可以互相访问。**
-    如果进程打开了某个文件，还会创建file(文件)数据结构，这样进程就可以通过file来访问VFS的文件系统了。
+](http://blog.csdn.net/luomoweilan/article/details/17894473),linux文件系统中重要的数据结构有：文件、挂载点、超级块、目录项、索引节点等。图中含有两个文件系统（红色和绿色表示的部分），并且绿色文件系统挂载在红色文件系统tmp目录下。
+
+1. 一般来说，每个文件系统在VFS层都是由挂载点、超级块、目录和索引节点组成。PS，这点更新了以前的认知，课本上一般只体现超级块、目录和索引节点。
+2. 当挂载一个文件系统时，实际也就是创建这四个数据结构的过程，因此这四个数据结构的地位很重要，关系也很紧密。
+3. **由于VFS要求实际的文件系统必须提供以上数据结构，所以不同的文件系统在VFS层可以互相访问。**
+4. 如果进程打开了某个文件，还会创建file(文件)数据结构，这样进程就可以通过file来访问VFS的文件系统了。
 
 ![](/public/upload/linux/linux_fs.png)
 
-这个图从上往下看，可以知道，各个数据结构通过数组等自己组织在一起，又通过引用上下关联。
+从图中可以看到：
 
-划重点：
+1. 这个图从上往下看，可以知道，各个数据结构通过数组等自己组织在一起，又通过引用上下关联。
+2. 超级块、目录和索引节点这些，完成数据的组织和根据文件名寻址。
+3. 从上图可以理清挂载点和前三个结构的关系，**挂载点 将 文件系统彼此勾连 起来**。
 
-1. 文件系统有事实上的规范——VFS，定义了挂载点、超级块、目录和索引节点等基本数据结构，定义了open/close/write/read 等基本接口
-2. 因为VFS的存在，一个linux 实际上可以运转多个文件系统
-3. 超级块、目录和索引节点这些，完成数据的组织和根据文件名寻址。从上图可以理清挂载点和前三个结构的关系，挂载点 将 文件系统彼此勾连 起来（还有待挖掘）。
+[Mount Point Definition](http://www.linfo.org/mount_point.html)
+
+1. A filesystem is a hierarchy of directories (also referred to as a directory tree) that is used to organize files on a computer system. On Linux and other Unix-like operating systems, at the very top of this hierarchy is the root directory. 一个文件 系统是一个directory tree，根节点被称为root directory
+2. The mount point becomes the root directory of the newly added filesystem, and that filesystem becomes accessible from that directory. vfs 支持同时加载多个文件系统，也就是有多个directory tree 和 root directory。vfs 也是一个directory tree，只有一个root directory，那么必然有很多fs 的root directory 挂载在了vfs directory tree 的非root directory 上。 
+3. A mount point is a directory。可以猜测，如果没有挂载点的概念，也就是只有超级块、目录和索引节点，那么类似的效果需要一个 目录 去引用一个超级块。
+3. `/etc/fstab` 列出vfs 当前挂载的文件系统以及它们的挂载点
+
+		UUID=2d147dd5-0227-40e5-a143-1923112cb1bd /                       ext4    defaults        1 1
+		UUID=1d44ef13-382c-49e5-925a-9eac34bc575d swap                    swap    defaults        0 0
+		tmpfs                   /dev/shm                tmpfs   defaults        0 0
+		devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+		sysfs                   /sys                    sysfs   defaults        0 0
+		proc                    /proc                   proc    defaults        0 0
+		
+![](/public/upload/linux/linux_fs_1.png)
+		
+1. 有了挂载点、超级块、目录和索引节点 这几个结构，可以让一个vfs/rootfs 挂载多个 不同的fs
+2. 加上linux mount namespace这个结构，可以使得一个vfs 有多个 rootfs
+3. 在linux 操作系统中，文件系统和linux 内核是分开存放的，操作系统只有在开机启动时才会加载指定版本的内核镜像。如果一个rootfs 指向一个包含完整操作系统文件的目录，则这个rootfs 便可以作为一个完整的进程文件“环境”。
+4. 有了联合文件系统 可读、可写挂载这一套特性，可以让一个rootfs 有layer 感觉
 
 ### 几大文件系统
 
