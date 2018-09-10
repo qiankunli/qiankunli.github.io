@@ -19,7 +19,10 @@ keywords: PouchContainer
 2. 守护进程，一则为了一些依赖系统服务的组件可以正常使用；再则，使得容器 更像一点虚拟机
 3. 容器与虚拟机混合部署。
 
-	1. 以前认为的混合部署是 vm 搞vm、container 搞container，彼此互通就行了，且实施方式是由vm 环境 兼容容器。	2. PouchContainer 先支持container 后支持runv， 是从容器环境 兼容vm。PouchContainer 兼容vm 的一个重大区别是 都支持镜像发布，这样的混合发布才更有意义。
+	1. 以前认为的混合部署是 vm 搞vm、container 搞container，彼此互通就行了，且实施方式是由vm 环境 兼容容器。	
+	2. PouchContainer 先支持container 后支持runv， 是从容器环境 兼容vm。PouchContainer 兼容vm 的一个重大区别是 都支持镜像发布，这样的混合发布才更有意义。
+
+补充：Pouch 可能借鉴了kata的一些实现。Kata containers跟RunC类似，也是一个符合OCI运行时规范的一种 实现，不同之处是， kata containers整合了Intel的 Clear Containers 和 Hyper.sh 的 runV，给每个容器增加了一个独立的linux内核（不共享宿主机的内核），使容器有更好 的隔离性，安全性。
 
 ## 关于docker的使用
 
@@ -36,11 +39,19 @@ keywords: PouchContainer
 3. mysql 服务可以拆分为三个部分：对外接口；计算服务；存储。三个部分独立后，计算服务可以自由升级，对外接口可以保持不变，存储部分使用CSI。没有体验过msyql 宕机（集群太小） 或者复杂的业务（需要各种版本的mysql）的我，对这个需求挺难理解的。
 4. hadoop/es 等很多大公司都有自己的维护小组，小公司hadoop 集群一般不怎么变，自然无法理解 一个月一个小迭代升级的运维需求。
 
-关于层次的划分（这一部分还有待学习的深入）：调度层  ==> grpc ==> runtime 管理层(dockerd/pouchd，预备存储、网络等)  ==> runtime 层(oci，负责镜像push/pull、容器启动及 运行时数据管理)  
-
-
 P2P下载镜像，一个文件假设100m，按4m一块切分，客户端按块下载。局域网多个主机不一定都需要从第0块开始下载，假设4台主机在一个局域网内，分别下载25块，然后局域网内互传就行，比大家彼此都从第0块下载到100 要快很多。
 
+## 容器生态
+
+![](/public/upload/docker/container_eco.png)
+
+[OCI(Open Container Initiative) ](https://www.opencontainers.org/) 致力于建立一个容器运行时和镜像格式的规范，其核心目的在于避免容器生态的分化，确保在不同容器引擎上构建的容器可以相互兼容,runc 是其一个参考实现。包括：runtime spec 和 image spec
+
+容器引擎，或者说容器平台，不仅包含对于容器的生命周期的管理，还包括了对于容器生态的管理，比如docker images、docker volumes、 docker network 等指令
+
+为隔离各个容器引擎（比如docker、rkt等）之间的差异，通过统一的接口与各个容器引擎之间进行互动。kubernetes推出 CRI(container runtime interface)。与oci不同，cri不仅定义了容器的生命周期的管理，还引入了k8s中pod的概念，并定义了管理pod的生命周期。cri与kubernetes的概念更加贴合，紧密绑定。
+
+为了进一步与oci进行兼容，kubernetes还孵化了cri-o，成为了架设在cri和oci之间的一座桥梁。看来kubernetes是想直接 抛开docker、rkt 等容器引擎。
 		
 ## paas/cloud native
 

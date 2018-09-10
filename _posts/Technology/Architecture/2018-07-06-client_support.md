@@ -74,6 +74,8 @@ keywords: abtest
 2. 文件某个组织维度的管理员			审核
 2. 文件创建者		创建、修改
 
+[初级权限系统设计](http://qiankunli.github.io/2017/12/29/permission_system.html)
+
 ### 下发进度统计
 
 ### 精确到个人的日志记录
