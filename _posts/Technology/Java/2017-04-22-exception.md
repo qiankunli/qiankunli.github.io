@@ -66,6 +66,6 @@ Throwable.printStackTrace的实现：
 The compiler in the server VM now provides correct stack backtraces（回溯） for all “cold” built-in exceptions. For performance purposes, when such an exception is thrown a few times, the method may be recompiled. After recompilation, the compiler may choose a faster tactic（策略） using preallocated（预先分配的） exceptions that do not provide a stack trace. To disable completely the use of preallocated exceptions, use this new flag: `-XX:-OmitStackTraceInFastThrow`.
 
 
-
-
 jvm 如何处理异常 [JVM4——《深入拆解java 虚拟机》笔记](http://qiankunli.github.io/2018/07/20/jvm_note.html)
+
+异常捕捉 对性能是有影响的，

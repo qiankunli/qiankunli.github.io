@@ -15,6 +15,12 @@ keywords: 异步
 [Servlet 3.0 实战：异步 Servlet 与 Comet 风格应用程序
 ](https://www.ibm.com/developerworks/cn/java/j-lo-comet/)
 
+本文从以下角度阐述
+
+1. 为什么异步性能好一点
+2. 框架是如何提供异步接口的
+3. 上层业务如何使用这些异步接口来组织逻辑
+
 ## 为什么异步web可以提高吞吐量
 
 首先，异步不是突然出现一个异步就牛了，而是一系列手段加持的结果
@@ -33,7 +39,10 @@ keywords: 异步
 |第4s|100个请求处理成功|100个请求连接成功，100个请求处理成功|
 |4s小计|处理200个请求，50qps|100个请求连接成功，300个请求处理成功，65qps|
 
-## 异步编程框架
+
+## 异步编程的在各个层面的支持
+
+### 操作系统和语言层面
 
 强烈推荐这篇文章[有关异步编程框架的讨论](http://www.jianshu.com/p/c4e63927ead2)，基本要点：
 
@@ -62,7 +71,7 @@ keywords: 异步
 	
 **文章最后小结提到：其实从某种程度来说，异步框架是程序试图跳出操作系统界定的同步模型，重新虚拟出一套执行机制，让框架的使用者看起来像一个异步模型。另外通过把很多依赖操作系统实现的笨重功能换到程序内部使用更轻量级的实现。**
 
-## 异步也是写框架的一种方式
+## 框架层面——以netty 为例
 
 下文摘自《netty in action》对channel的介绍
 
@@ -90,8 +99,6 @@ chaining operations
 
 因为所有的任务代码都是由一个“事件驱动引擎”执行的，换句话说，事件驱动引擎的时间，就好比cpu时间一样， 比较宝贵，要避免为未知的阻塞操作所滞留。
 
-## 以分层的方式理解netty
-
 2018.6.30 补充。拿netty 和 go 类比一下，可以看到，调用go语言的阻塞方法（io方法不确定是不是这样），相当于
 
 	read(){
@@ -110,8 +117,6 @@ netty 因为不能改写 io 语言的系统调用，为此 不敢向你直接暴
 
 ![](/public/upload/netty/netty_io.png)
 
-## 其它
-
 netty in action 中提到
 
 non-blocking network calls free us from having to wait for the completion of an operation.fully asynchronous i/o builds on this feature and carries it a step further:an  asynchronous method returns  immediately and notifies the user when it is complete,directly or at a later time.
@@ -119,6 +124,45 @@ non-blocking network calls free us from having to wait for the completion of an 
 此时的线程不再是一个我们通常理解的：一个请求过来，干活，结束。而是一个不停的运行各种任务的线程，任务的结束不是线程的结束，任何的用户请求都是作为一个任务来提交。这就是java Executors中的线程，如果这个线程既可以处理任务，还可以注册socket 事件，就成了netty的eventloop
 
 我们指定线程运行任务 ==> 提交任务，任务线程自己干自己的，不会眷顾某个任务。那么就产生了与任务线程交互的问题，也就引出了callback、future等组件。java的future可以存储异步操作的结果，但结果要手工检查（或者就阻塞），netty的future则通过listener机制
+
+
+## 基于 异步接口组织业务逻辑
+
+### 异步框架提供哪些异步接口
+
+传统的接口——回调函数——事件，容易有callback hell问题
+
+javascript 有一套异步编程规范 [Promises/A+](https://promisesaplus.com/) 非常给力，然后java 语言参照着实现了一把[异步编程——Promise](https://github.com/hprose/hprose-java/wiki/%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B%E2%80%94%E2%80%94Promise)
+
+所谓Promise，**简单说就是一个“容器”**，里面保存着某个未来才会结束的事件（通常是一个异步操作）的结果。 此外 “容器”持有 对返回结果(正常/异常) 的处理函数`promise.then(onFulfilled, onRejected);`
+
+## 异步流程控制模式
+
+[async 异步编程框架](https://www.jianshu.com/p/cdddcd361567)
+
+异步流程控制模式包括
+
+1. 串行(series)，后一个调用参数依赖前一个调用的结果。
+2. 并行(parallel)，彼此无关联。 这种可以提供类似 CombinedFuture 的工具类
+3. 瀑布(waterfall)等，后一个调用是否执行 + 调用参数 依赖前一个调用的结果。这里有个问题，对于这种类型的业务，或许同步模型可读性会更好点。
+
+	    public static <V1, V2> Future<V2> then(final ListenableFuture<V1> future, final Predicate<V1> function, final AsyncFunction<V1, V2> asyncFunction) {
+	        Promise<V2> promise = new Promise<V2>();
+	        future.addListener(new Listener() {
+	            public void onSuccess() {
+	                V1 v1 = future.get();
+	                if (function.apply(v1)) {
+	                    promise = util(asyncFunction.apply(v1));
+	                }
+	            }
+	            public void onFail(){
+	                promise.setFailure()
+	            }
+	        });
+        	return promise;
+        }
+
+
 
 ## 小结
 
