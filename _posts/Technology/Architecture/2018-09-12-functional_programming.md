@@ -8,7 +8,40 @@ keywords: functional programming
 
 ---
 
-## 简介（未完成）
+## 简介
+
+## 一些代码技巧
+
+在java8 的List 接口中，存在一个default method 
+
+	void sort(Comparator<? super E> c)
+	
+对应`java.util.Collections` 中的sort 方法
+
+
+	 public static <T> void sort(List<T> list, Comparator<? super T> c) {
+        list.sort(c);
+    }
+    
+从[编程的本质](http://qiankunli.github.io/2018/07/14/nature_of_code.html) 中 可以知道 程序 = 控制 + 逻辑（这与函数式编程理念是非常契合的）。在这里的sort中，排序是用冒泡还是插入是控制 ，与业务无关。而Comparator 描述的是逻辑，与业务紧密相关。 
+
+在 [异步编程——Promise](https://github.com/hprose/hprose-java/wiki/%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B%E2%80%94%E2%80%94Promise) 中作者提了三个接口
+
+	interface Callback<R, V> {}
+	// 对输入采取一定的动作，没有返回
+	public interface Action<V> extends Callback<Void, V> {
+	    void call(V value) throws Throwable;
+	}
+	// 将输入转换为输出
+	public interface Func<R, V> extends Callback<R, V> {
+    	R call(V value) throws Throwable;
+	}
+	// 将输入转换为输出，异步
+	public interface AsyncFunc<R, V> extends Callback<R, V> {
+    	Promise<R> call(V value) throws Throwable;
+	}
+	
+实现一个完全符合函数式编程理念的项目很难，通常也很少有这样的机会。但在我们日常的代码中，多用用Action、Func、AsyncFunc 这类接口，却可以做到，可以在很大程度上提高代码的可读性。
 
 ## 函数式编程
 
@@ -64,5 +97,3 @@ application of a curried function, such as f(3).
 
 1. 从基本组成和相互关系的角度来描述，面向对象的基本组成是类和对象，基本组成的相互关系是继承、聚合等。函数式编程基本组成是函数、偏函数等，函数与函数关系可以是调用、内嵌、返回等。**当然，面向对象和函数编程是两个维度的东西，对比不太合适。**
 2. 笔者学习spark的时候，了解到，你对data set的一系列函数式调用，并不会被立即执行。比如对一个数据集，你先过滤男性、又将值翻番。从执行角度看，不会是把数据拿出来，先for循环一把过滤，再for循环一把每个值乘以2。一系列的函数调用更像是一个执行计划，spark会优化这些计划的执行，最终可能一次for循环就好了。
-
-
