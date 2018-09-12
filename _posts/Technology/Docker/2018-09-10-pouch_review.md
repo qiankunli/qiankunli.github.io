@@ -47,7 +47,9 @@ P2P下载镜像，一个文件假设100m，按4m一块切分，客户端按块�
 
 [OCI(Open Container Initiative) ](https://www.opencontainers.org/) 致力于建立一个容器运行时和镜像格式的规范，其核心目的在于避免容器生态的分化，确保在不同容器引擎上构建的容器可以相互兼容,runc 是其一个参考实现。包括：runtime spec 和 image spec
 
-容器引擎，或者说容器平台，不仅包含对于容器的生命周期的管理，还包括了对于容器生态的管理，比如docker images、docker volumes、 docker network 等指令
+容器引擎，或者说容器平台，不仅包含对于容器的生命周期的管理，还包括了对于容器生态的管理，比如docker images、docker volumes、 docker network 等指令。
+
+此处提一下， 容器运行时在不同的角度指向不同，很多地方也都有混用。比如对k8s来说，docker算是container runtime，对docker来说，runc是 container runtime ，不用纠结这些称呼。
 
 为隔离各个容器引擎（比如docker、rkt等）之间的差异，通过统一的接口与各个容器引擎之间进行互动。kubernetes推出 CRI(container runtime interface)。与oci不同，cri不仅定义了容器的生命周期的管理，还引入了k8s中pod的概念，并定义了管理pod的生命周期。cri与kubernetes的概念更加贴合，紧密绑定。
 

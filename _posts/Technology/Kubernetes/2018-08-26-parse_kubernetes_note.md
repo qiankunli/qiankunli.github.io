@@ -60,6 +60,15 @@ java 是一个单机版的业务逻辑实现语言，但在微服务架构成为
 
 对于大多数开发者而言，他们对应用依赖的理解，一直局限在编程语言层面，比如golang的godeps.json。容器镜像 打包的不只是应用， 还有整个操作系统的文件和目录。这就意味着，应用以及它运行所需要的所有依赖，都被封装在了一起，进而成为“沙盒”的一部分。参见 [linux 文件系统](http://qiankunli.github.io/2018/05/19/linux_file_mount.html)
 
+默认情况下，Docker 会为你提供一个隐含的ENTRYPOINT，即`/bin/sh -c`。所以在不指定ENTRYPOINT时，CMD的内容就是ENTRYPOINT 的参数。因此，一个不成文的约定是称docker 容器的启动进程为ENTRYPOINT 进程。
+
+一个进程的每种Linux namespace 都可以在对应的`/proc/进程号/ns/` 下有一个对应的虚拟文件，并且链接到一个真实的namespace 文件上。通过`/proc/进程号/ns/` 可以感知到进程的所有linux namespace；一个进程 可以选择加入到一个已经存在的namespace 当中；也就是可以加入到一个“namespace” 所在的文件中。这便是`docker exec`、两个容器共享network namespace 的原理。
+
+## kubernetes
+
+
+
+
 
 ![](/public/upload/kubernetes/parse_k8s_ad.JPG)
 

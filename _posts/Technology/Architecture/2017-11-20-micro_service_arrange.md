@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 微服务编排
+title: 微服务2——微服务编排
 category: 技术
 tags: Architecture
 keywords: micro service
@@ -87,6 +87,8 @@ keywords: micro service
 解决方法， 提供辅助类，简化代码编写即可
 
 **ABC 既可以是一个具体的微服务，也可以是一个聚合了多个微服务的方法，方法内的微服务依然可以具备 串行、条件串行、并行三种关系**
+
+若ABC 全部为异步调用，则有一个学名：异步流程控制模式，参见[异步编程](http://qiankunli.github.io/2017/05/16/async_program.html)
 
 ## 未来前景
 
