@@ -97,6 +97,8 @@ keywords: 左耳听风
 	* 像k8s 一样提供各式各样的部署与调度方式
 
 
+![](/public/upload/architecture/zuoerduohaozi_project_ability.png)
+
 	
 ![](/public/upload/architecture/zuoerduohaozi_post.JPG)
 

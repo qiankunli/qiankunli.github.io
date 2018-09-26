@@ -26,6 +26,14 @@ github 案例项目:
 1. [QNJR-GROUP/EasyTransaction](https://github.com/QNJR-GROUP/EasyTransaction)
 2. [moonufo/galaxyLight](https://github.com/moonufo/galaxyLight)
 
+2018.9.26 补充：《左耳听风》中提到：
+
+1. 对于应用层上的分布式事务一致性
+	
+	* 吞吐量大的最终一致性方案
+	* 吞吐量小的强一致性方案：两阶段提交
+2. 数据存储层解决这个问题的方式 是通过一些像paxos、raft或是nwr这样的算法和模型来解决。 PS：这可能是因为存储层 主要是副本一致性问题
+
 ## 从一致性问题开始
 
 [关于分布式一致性的探究](http://www.hollischuang.com/archives/663)
@@ -43,6 +51,8 @@ github 案例项目:
 [分布式系统的CAP理论](http://www.hollischuang.com/archives/666): 一致性指“all nodes see the same data at the same time”，即更新操作成功并返回客户端完成后，所有节点在同一时间的数据完全一致。==> 当更新操作完成之后，任何多个（节点）后续进程或者线程的访问都会返回最新的更新过的值。
 
 ## 一致性、XA、2pc/3pc paxos的关系
+
+该话题在另一篇博客 [分布式系统小结](http://qiankunli.github.io/2018/04/16/distributed_system_review.html) 也有阐述
 
 [2PC/3PC到底是啥](http://www.bijishequ.com/detail/49467?p=)
 
@@ -95,7 +105,7 @@ XA 是 X/Open DTP 定义的交易中间件与数据库之间的接口规范（�
 
 **在分布式环境下，分布式系统的每一次请求和响应，存在特有的三态概念：即成功、失败、超时。**相对于2pc，3pc处理了timeout问题。但3pc在数据一致性上也有问题：在参与者接收到preCommit消息后，如果出现网络分区，此时协调者所在的节点和参与者无法进行正常的网络通信，在这种情况下，参与者依然会进行事物的提交，就可能出现不同节点成功or失败，这必然出现数据的不一致。
 
-### 在代码上的表现（待整理）
+### 在代码上的表现
 
 1. 声明式事务
 2. 编程式事务
