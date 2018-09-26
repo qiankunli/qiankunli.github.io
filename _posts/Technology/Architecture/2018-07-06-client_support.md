@@ -51,6 +51,8 @@ keywords: abtest
 
 ### 灰度下发
 
+参见[abtest 系统设计汇总](http://qiankunli.github.io/2018/06/27/abtest.html) “如何扩大客户端abtest 的应用范围” 小节，在具备一个成熟的abtest 系统之后，灰度下发的事情 可以交给abtest 来统一完成。
+
 ### 支持多应用
 
 ### 数据的组织
