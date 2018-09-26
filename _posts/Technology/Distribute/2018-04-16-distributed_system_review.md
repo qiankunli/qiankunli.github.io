@@ -24,6 +24,8 @@ keywords: 分布式系统
 2. 分布式中间件，比如zookeeper、kafka这些。将单机多线程/进程间的通信扩展到多机，要不怎么说叫“中间”件呢。
 3. 分布式基本原理，包括共识算法等
 
+此外，可以参见[《左耳听风》笔记](http://qiankunli.github.io/2018/09/08/zuoertingfeng_note.html) 看下陈皓大牛对分布式系统的阐述
+
 ## 分布式计算系统的 几个套路
 
 参见[Spark Stream 学习](http://qiankunli.github.io/2018/05/27/spark_stream.html)  中对spark stream 和storm 对比一节，有以下几点：
