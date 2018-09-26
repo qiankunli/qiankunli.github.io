@@ -84,7 +84,7 @@ keywords: 左耳听风
 
 ## 分布式架构的冰与火
 
-![](/public/upload/zuoerduohaozi_distribution_system.jpg)
+![](/public/upload/zuoerduohaozi_distribution_system.png)
 
 几个重点：
 
