@@ -26,14 +26,24 @@ github 案例项目:
 1. [QNJR-GROUP/EasyTransaction](https://github.com/QNJR-GROUP/EasyTransaction)
 2. [moonufo/galaxyLight](https://github.com/moonufo/galaxyLight)
 
+
+在实际的业务中，分布式事务有以下表现形式：
+
+1. 跨数据库操作
+2. 数据库与rpc 等混合操作
+3. 多rpc 操作
+
 2018.9.26 补充：《左耳听风》中提到：
 
 1. 对于应用层上的分布式事务一致性
 	
-	* 吞吐量大的最终一致性方案
+	* 吞吐量大的最终一致性方案：消息队列补偿等
 	* 吞吐量小的强一致性方案：两阶段提交
 2. 数据存储层解决这个问题的方式 是通过一些像paxos、raft或是nwr这样的算法和模型来解决。 PS：这可能是因为存储层 主要是副本一致性问题
+3. 在实践中，还是尽量在数据存储层解决分布式事务问题。比如TiDB、OceanBase等，类似于一个无限容量的数据库 ==> 无需跨库操作 ==> 减少分布式事务问题。由此可见，一致性问题可以 "转嫁"
 
+
+[串一串一致性协议](http://qiankunli.github.io/2018/09/27/consistency_protocol.html)
 
 ## 2PC/3PC
 
