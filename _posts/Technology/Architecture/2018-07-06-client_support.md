@@ -37,6 +37,24 @@ keywords: abtest
 
 ![](/public/upload/architecture/client_support_match.png)
 
+假设client 十几个properties，服务端资源十几个properties， 匹配算法有两个方面
+
+1. 提高每一个资源匹配的速度
+2. 避免重复计算，一般使用缓存
+
+主要思路
+
+||单个匹配速度|避免重复计算|
+|---|---|---|
+|使用es|es解决|es解决|
+|哈希|每个property 依次匹配|将client 十几个properties 组成一个字符串 作为cache key|
+
+针对哈希算法，有以下优化的变种
+
+1. properties 按区分度 分为base 和 optional，使用base 作为cache key做初步过滤，对“漏网之鱼” 用optional 做一一匹配
+1. 将十几个properties 归类，每一列单独组成字符串，作为cache key。对每一类匹配得到的资源做交集，即为符合所有properties 约束的资源。
+2. 针对上一种方式，有些properties 作为基本属性，可以作为每一类 cache key的前缀
+
 ### 下发
 
 下发什么？
@@ -68,6 +86,17 @@ keywords: abtest
 ## 基本准备
 
 ### 客户端信息 标准化
+
+为了匹配 服务端“资源”，客户端请求是 要携带客户端信息，分为
+
+1. 设备信息，比如设备id、andriod/ios、wifi/5g 等
+2. 应用信息，比如app version、channel 等
+3. 用户id，以此可以得到用户的画像信息
+
+请求可以采用以下方式携带用户信息
+
+1. cookie，难以在各个客户端 共用
+2. 请求时 以json 描述用户信息
 
 ### 安全
 
