@@ -10,6 +10,62 @@ keywords: functional programming
 
 ## 简介
 
+可预先看下 [java 语言的动态性](http://qiankunli.github.io/2018/08/15/java_dynamic.html)  类型系统 部分 内容
+
+## 左耳听风
+
+来自《左耳听风》课程
+
+在编程这个世界中，更多的编程工作是解决业务上的问题，而不是计算机的问题。所以内存操作 等这些事情 尽量不要反应到 业务代码上来。
+
+![](/public/upload/architecture/function_programming.png)
+
+代码在描述 你要干什么，而不是怎么干。map/reduce 是控制，toUpper/sum 是业务逻辑。
+
+在皓哥文章末的评论中，有用户提到：面向对象编程和函数式编程 他们的关注点不一样，面向对象编程 帮助你设计更复杂的应用程序，函数式编程帮助你简化更复杂的计算。
+
+### 柯里化
+
+	def inc(x):
+		def incx(y):
+			return x+y
+		return incx
+	
+	incc = inc(2)
+	inc5 = inc(5)
+	
+	print inc2(5)	// output 7
+	print inc5(5) // output 10
+	
+大牛 **从参数分解的角度** 对柯里化 的描述是：将一个函数的多个参数 分解成多个函数，然后将函数多层封装起来，每层函数都返回一个函数去接收下一个参数，这样可以简化函数的多个参数。 
+
+### 装饰器
+
+皓哥用专门一章讲了装饰器， 从全文看，比较好玩的是，皓哥是如何将装饰器模式、linux 管道、代码层面的编排、pipeline 联系到一起的。
+
+Python Decorator 更多的类似类似java 注解
+
+	def hello(fn):
+		def wrapper():
+			print "hello %s" % fn.__name__
+			fn()
+			print "goodbye %s" % fn.__name__
+		return wrapper
+		
+	@hello
+	def Hao():
+		print "i am Hao Chen"
+		
+	Hao
+
+Python 的@注解语法糖会被 解释器解释为 `func = decorator(func)`；
+
+在java中达到类似的效果，有以下集中方式
+
+1. 类级别，定义类XX Decorator
+2. 方法加注解
+3. 
+
 ## 一些代码技巧
 
 在java8 的List 接口中，存在一个default method 

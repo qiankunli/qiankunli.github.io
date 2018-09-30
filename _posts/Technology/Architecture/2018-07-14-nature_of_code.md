@@ -66,6 +66,5 @@ keywords: abtest
 		};
 
 
-## 付费专栏
 
-一部分内容挪到[java 语言的动态性](http://qiankunli.github.io/2018/08/15/java_dynamic.html) 中的类型系统与泛型编程。
+

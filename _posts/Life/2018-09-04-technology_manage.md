@@ -16,8 +16,6 @@ keywords: technology manage
 
 ![](/public/upload/life/technology_manage_1.png)
 
-
-
 [技术管理到底管什么](https://mp.weixin.qq.com/s/QN1OKEFT3DiA82-OAp858Q)
 
 1. 无论是春秋战国时候的丞相，还是三国时候的谋士们，技能大概分成两种：谋略和理事。谋略重在想办法，理事重在做事情。但凡有名的丞相谋士至少有一样特长，两者兼顾的自然是不世功勋唾手而来。
