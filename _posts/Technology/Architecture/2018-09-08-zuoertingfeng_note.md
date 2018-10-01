@@ -109,7 +109,8 @@ keywords: 左耳听风
 
 ## 编程范式
 
-参见[java 语言的动态性](http://qiankunli.github.io/2018/08/15/java_dynamic.html)  [函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html)
+参见[java 语言的动态性](http://qiankunli.github.io/2018/08/15/java_dynamic.html)  [函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html) [面向对象设计](http://qiankunli.github.io/2018/10/01/object_oriented.html)
+
 
 ![](/public/upload/architecture/zuoerduohaozi_project_ability.png)
 

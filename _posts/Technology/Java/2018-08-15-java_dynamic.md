@@ -40,9 +40,6 @@ programming paradigm，范即模范之意，是一类典型的编程风格，不
 
 泛型编程于1985年在论文 generic programming 中被这样定义：Generic programming centers around the idea of abstracting from concrete, efficient algorithms to obtain generic algorithms that can be combined with different data representations to produce a wide variety of useful software. 屏蔽掉数据和操作数据的细节，让算法更为通用，让编程者更多的关注算法的结构，而不是在算法那中处理不同的数据类型。
 
-面向对象设计中的每一个对象 都应该能够接受数据、处理数据并将数据传递给其它对象。
-
-
 ## 编程语言的动态性
 
 [动态语言之三：语言的动态性](http://ooaer.iteye.com/blog/1704766) 要点如下

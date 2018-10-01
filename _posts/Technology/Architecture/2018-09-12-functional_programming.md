@@ -14,7 +14,7 @@ keywords: functional programming
 
 ## 左耳听风
 
-来自《左耳听风》课程
+20189.29 补充：来自《左耳听风》课程
 
 在编程这个世界中，更多的编程工作是解决业务上的问题，而不是计算机的问题。所以内存操作 等这些事情 尽量不要反应到 业务代码上来。
 
@@ -22,7 +22,7 @@ keywords: functional programming
 
 代码在描述 你要干什么，而不是怎么干。map/reduce 是控制，toUpper/sum 是业务逻辑。
 
-在皓哥文章末的评论中，有用户提到：面向对象编程和函数式编程 他们的关注点不一样，面向对象编程 帮助你设计更复杂的应用程序，函数式编程帮助你简化更复杂的计算。
+在皓哥文章末的评论中，有用户提到：面向对象编程和函数式编程 他们的关注点不一样，面向对象编程 帮助你设计更复杂的应用程序，函数式编程帮助你简化更复杂的计算。所以，**我们学东西不是为了腾笼换鸟，而是胸有谋划，师夷长技。**
 
 ### 柯里化
 
@@ -41,30 +41,24 @@ keywords: functional programming
 
 ### 装饰器
 
-皓哥用专门一章讲了装饰器， 从全文看，比较好玩的是，皓哥是如何将装饰器模式、linux 管道、代码层面的编排、pipeline 联系到一起的。
+皓哥用专门一章讲了装饰器， 从全文看，比较好玩的是皓哥如何将装饰器模式、linux 管道、代码层面的编排、pipeline 联系到一起的。
 
-Python Decorator 更多的类似类似java 注解
+shell 命令
 
-	def hello(fn):
-		def wrapper():
-			print "hello %s" % fn.__name__
-			fn()
-			print "goodbye %s" % fn.__name__
-		return wrapper
-		
-	@hello
-	def Hao():
-		print "i am Hao Chen"
-		
-	Hao
+	ps auwwx | awk '{print $2}' | sort -n | xargs echo
+	
+抽象成函数式的样子（函数嵌套）
 
-Python 的@注解语法糖会被 解释器解释为 `func = decorator(func)`；
+	xargs(echo,sort(n,awk('print $2',ps(auwwx))))
+	
+也可以将函数放进数组里，此处可能需要对三个方法进行修饰（Decorator）， 以便将普通函数管道化
 
-在java中达到类似的效果，有以下集中方式
+	pids = for_each(result,[ps_auwwx,awk_p2,sort_n,xargs_echo])
+	
+如果我们将这些函数当做微服务，那么管道其实在做服务的编排（再往下有类的编排、方法的编排）。
 
-1. 类级别，定义类XX Decorator
-2. 方法加注解
-3. 
+对于pipeline 式的代码，体现在java中便需要定义pipeline、Step/Stage等接口，然后自定义逻辑实现Step/Stage接口（如果逻辑是已经写好的，还需Decorator 修一下），最后由pipeline 驱动执行。而函数作为“第一公民”后，设计模式的三大类创建、行为、结构中的行为型模式 都可以由函数嵌套、函数参数、函数返回值等直接实现（函数层面），无需上升java的类/接口层面了。换句话说，**设计模式由类/接口层面（java 提到设计模式都会有一个复杂的类图） 下沉到 函数层面了**，将一些功能或逻辑代码 通过函数的拼装（因此才有了柯里化 和 高阶函数等）来组织。这也可说是 函数式编程的一个体现了吧。
+
 
 ## 一些代码技巧
 
