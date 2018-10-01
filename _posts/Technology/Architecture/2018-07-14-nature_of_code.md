@@ -12,37 +12,44 @@ keywords: abtest
 
 本文主要来自陈皓 的两篇文章 以及付费专栏《左耳听风》，作者的水平很高，语句也很精炼，实在是没什么可提炼整理的，干脆就弄成读书笔记了。
 
-## 笔记
+## 编程的本质
 
-[左耳朵耗子：编程的本质是什么？](http://www.gzhshoulu.wang/article/2101593) 要点：
+### 两篇论文
 
-1. 两个公式 Programs = Algorithms + Data Structures/Algorithm = Logic + Control，侧重说第二点
-2. 第二个表达式则想表达，数据结构不复杂，复杂的是算法，也就是我们的业务逻辑是复杂的。我们的算法由两个逻辑组成，一个是真正的业务逻辑，另外一种是控制逻辑。程序中有两种代码，一种是真正的业务逻辑代码，另一种代码是控制我们程序的代码，叫控制代码，这根本不是业务逻辑，业务逻辑不关心这个事情。
-3. 算法的效率往往可以通过提高控制部分的效率来实现，而无须改变逻辑部分。**就像函数式编程中的 Map/Reduce/Filter，它们都是一种控制。而传给这些控制模块的那个 lambda 表达式才是我们要解决的问题的逻辑，它们共同组成了一个算法。最后，我再把数据放在数据结构里进行处理，最终就成为了我们的程序。**
-4. Control 是可以标准化的。比如：遍历数据、查找数据、多线程、并发、异步等，都是可以标准化的。因为 Control 需要处理数据，所以标准化 Control，需要标准化 Data Structure，我们可以通过泛型编程来解决这个事。而 Control 还要处理用户的业务逻辑，即 Logic。所以，我们可以通过标准化接口 / 协议来实现，我们的 Control 模式可以适配于任何的 Logic。
-5. 编程范式的本质。有效地分离 Logic、Control 和 Data 是写出好程序的关键所在！
-6. 好多代码，会把控制逻辑和业务逻辑放在一块。里面有些变量和流程是跟业务相关的，有些是不相关的。业务逻辑决定了程序的复杂度，业务逻辑本身就复杂，你的代码就不可能写得简单。
-7. 控制一个程序流转的方式，即程序执行的方式，并行还是串行，同步还是异步，以及调度不同执行路径或模块，数据之间的存储关系，这些和业务逻辑没有关系。笔者最近的一个体会是，比如业务中应用和bundle是多对多关系，现在我要找一个应用的所有bundle，这个逻辑就应该抽象和隐藏掉，因为多对多是数据层面的事情。
-8. 代码复杂度的原因：
+Algorithms + Data Structures
+
+1. 如果数据结构设计的好，算法会简单
+2. 好的通用算法 应该用在不同的数据结构上
+
+An algorithm can be regarded as consisting of a logic component, which specifies the knowledge to be used in solving problems, and a control component, which determines the problem-solving strategies by means of which that knowledge is used. The logic component determines the meaning of the algorithm whereas the control component only affects its efficiency. The efficiency of an algorithm can often be improved by improving the control component without changing the logic of the algorithm. We argue that computer programs would be more often correct and more easily improved and modified if their logic and control aspects were identified and separated in the program text.
+
+Algorithm = Logic + Control
+
+1. Logic 解决问题
+2. Control 只影响效率
+3. Logic 和 Control 没有关系
+4. Logic 和 Control 如果分开，代码更容易改进和维护
+
+算法的效率往往可以通过提高控制部分的效率来实现，而无须改变逻辑部分
+
+### 揉和一下
+
+[左耳朵耗子：编程的本质是什么？](http://www.gzhshoulu.wang/article/2101593) 
+
+![](/public/upload/architecture/nature_of_code.png)
+
+1. 算法的效率往往可以通过提高控制部分的效率来实现，而无须改变逻辑部分。**就像函数式编程中的 Map/Reduce/Filter，它们都是一种控制。而传给这些控制模块的那个 lambda 表达式才是我们要解决的问题的逻辑，它们共同组成了一个算法。最后，我再把数据放在数据结构里进行处理，最终就成为了我们的程序。**
+
+2. 控制一个程序流转的方式，即程序执行的方式，并行还是串行，同步还是异步，以及调度不同执行路径或模块，数据之间的存储关系，这些和业务逻辑没有关系。
+3. 代码复杂度的本质：
 
 	* 业务逻辑的复杂度决定了代码的复杂度；
 	* 控制逻辑的复杂度 + 业务逻辑的复杂度 ==> 程序代码的混乱不堪；
 	* 绝大多数程序复杂混乱的根本原因：业务逻辑与控制逻辑的耦合。
 
-9. 如何分离 control 和 logic 呢？我们可以使用下面的这些技术来解耦。
 
-	1. State Machine	
-		* 状态定义
-		* 状态变迁条件
-		* 状态的 action
 
-	2. DSL – Domain Specific Language
-		* HTML，SQL，Unix Shell Script，AWK，正则表达式……
-
-	3. 编程范式
-		* 面向对象：委托、策略、桥接、修饰、IoC/DIP、MVC……
-		* 函数式编程：修饰、管道、拼装
-		* 逻辑推导式编程：Prolog
+## 程序的本质复杂性和元语言抽象
 
 [程序的本质复杂性和元语言抽象](https://coolshell.cn/articles/10652.html)
 

@@ -84,6 +84,8 @@ keywords: 左耳听风
 
 ## 分布式架构的冰与火
 
+下图主要集中在分布式系统的 应用于运维 角度。如何学习分布式参见 [分布式系统小结](http://qiankunli.github.io/2018/04/16/distributed_system_review.html)
+
 ![](/public/upload/architecture/zuoerduohaozi_distribution_system.png)
 
 几个重点：
@@ -105,11 +107,28 @@ keywords: 左耳听风
 	* Leader 选举
 	* 分布式状态机复制
 
-6. 对分布式系统的理解 一时仍难以有个眉目，可以多读读作者推荐的基本书。只是说起分布式的时候，比如分布式存储，重点不在存储，而在于处理节点 和 网络的不确定性。
+6. 对分布式系统的理解 一时仍难以有个眉目，可以多读读作者推荐的基本书。
 
 ## 编程范式
 
-参见[java 语言的动态性](http://qiankunli.github.io/2018/08/15/java_dynamic.html)  [函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html) [面向对象设计](http://qiankunli.github.io/2018/10/01/object_oriented.html)
+参见[java 语言的动态性](http://qiankunli.github.io/2018/08/15/java_dynamic.html)  [函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html) [面向对象设计](http://qiankunli.github.io/2018/10/01/object_oriented.html) [《编程的本质》笔记](http://qiankunli.github.io/2018/07/14/nature_of_code.html)
+
+## 高效沟通
+
+talk 并不cheap，人与人之间talk 是直接交流，code 是间接交流（code是人与机器的直接交流）
+
+1. 提前统一术语
+2. 反馈，把你理解的说给我听
+3. 用低级知识讲给没有背景知识的人
+4. 信息在传递过程中的损失。公司层级越深越容易失真
+
+![](/public/upload/architecture/zuoerduohaozi_communication.png)
+
+## 高效学习
+
+![](/public/upload/architecture/zuoerduohaozi_study.png)
+
+在总结和归纳中，积累的知识越多，在知识间进行联系和区别的能力越强，总结和归纳的能力越强/轻松，进而形成在更高维度上思考问题的能力。
 
 
 ![](/public/upload/architecture/zuoerduohaozi_project_ability.png)
