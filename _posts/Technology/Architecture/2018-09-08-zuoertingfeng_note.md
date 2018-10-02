@@ -109,9 +109,46 @@ keywords: 左耳听风
 
 6. 对分布式系统的理解 一时仍难以有个眉目，可以多读读作者推荐的基本书。
 
+其实上图换个 视角就成了
+
+![](/public/upload/architecture/system_architecture_design.png)
+
+## 弹力设计/容错设计/可用性
+
+design for failure，不要尝试着去避免故障，而是要把处理故障的代码（自我保护、打印更多信息）当成正常的功能做在架构里写在代码里。
+
+![](/public/upload/architecture/zuoerduohaozi_resiliency.png)
+
+无状态的服务 与 函数式编程如出一辙。为做成无状态的服务，需要耦合第三方有状态的存储服务，第三方存储服务计算与存储分离，最终依赖一个分布式文件系统。
+
+限流应该让后端服务感知到，限流发生时，我们应该在协议头中塞进一个标识，比如Http Header中放入一个限流级别，这样后端服务可以根据这个标识决定是否做降级。这也是design for failure 的一种体现
+
+限流是api 维度的，降级是服务维度的，有时不想让某个服务的问题导致整个api不可用
+
+## 高性能
+
+![](/public/upload/architecture/zuoerduohaozi_high_performance.png)
+
+网关要塞入链路分析的key、全链路压测的key、限流的key
+
 ## 编程范式
 
 参见[java 语言的动态性](http://qiankunli.github.io/2018/08/15/java_dynamic.html)  [函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html) [面向对象设计](http://qiankunli.github.io/2018/10/01/object_oriented.html) [《编程的本质》笔记](http://qiankunli.github.io/2018/07/14/nature_of_code.html)
+
+## 面试
+
+好简历是要用自己的经历去写的，最牛逼的简历只有一句话：我发明了Unix
+
+1. 技术知识的准备
+
+	* 知识点
+		* 编程语言
+		* 系统知识
+	* 算法题
+2. 工作项目的准备
+3. 为什么离职、职业规划、你的缺点是什么、你对我们有什么问题
+
+没事面试一下， 是提高自我认知、社会认知、行业认知的重要方式。
 
 ## 高效沟通
 
@@ -124,11 +161,19 @@ talk 并不cheap，人与人之间talk 是直接交流，code 是间接交流（
 
 ![](/public/upload/architecture/zuoerduohaozi_communication.png)
 
+另外一个地方看到的：在一个复杂环境下，很多问题已经不能就事论事来研究和解决，非常需要系统性的方法和战略性的眼光。
+
+西方很多职业化的专家， 做任何事情都有方法论、有套路，甚至于如何开一个会都有很多套路。
+
 ## 高效学习
 
 ![](/public/upload/architecture/zuoerduohaozi_study.png)
 
 在总结和归纳中，积累的知识越多，在知识间进行联系和区别的能力越强，总结和归纳的能力越强/轻松，进而形成在更高维度上思考问题的能力。
+
+## 其它
+
+![](/public/upload/architecture/zuoerduohaozi_machine_learning.png)
 
 
 ![](/public/upload/architecture/zuoerduohaozi_project_ability.png)
