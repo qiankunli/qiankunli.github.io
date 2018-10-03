@@ -139,6 +139,10 @@ design for ops，比如一个服务的多个实例，分别代表处于开发状
 
 ![](/public/upload/architecture/zuoerduohaozi_distribute_manage.png)
 
+边车模式优点便在于，sidecar 与应用可以独立升级
+
+![](/public/upload/architecture/zuoerduohaozi_sidecar.JPG)
+
 ## 高性能
 
 ![](/public/upload/architecture/zuoerduohaozi_high_performance.png)
