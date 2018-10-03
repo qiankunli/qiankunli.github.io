@@ -125,6 +125,8 @@ design for failure，不要尝试着去避免故障，而是要把处理故障�
 
 限流是api 维度的，降级是服务维度的，有时不想让某个服务的问题导致整个api不可用
 
+**像熔断降级这些东西，我们现在看待它们还处于“神器”范畴，后续必然随着分布式的普及， 成为一个“基础知识”，进而被内化到框架中。**
+
 ## 高性能
 
 ![](/public/upload/architecture/zuoerduohaozi_high_performance.png)

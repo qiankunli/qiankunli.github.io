@@ -34,7 +34,7 @@ keywords: 面向对象
 
 微观上的类实现与系统模块实现
 
-![](/public/upload/java/object_oriented_1.png)
+![](/public/upload/java/object_oriented_2.png)
 
 你设计一个controller-service-dao 项目 制定http api 时，肯定会想业务层面会有哪些调用，绝不会一个http api 干了一半的活儿 然后让调用方自己 访问两个 http api 自己聚合数据。对应的，我们在设计类时，根据类持有的数据/状态，一个对象可以访问数据库、可以内部操作线程，但其对外提供的interface function 应该是自洽的（对外隐藏掉不必要的细节）。类似的概念可以看 [ddd(一)——领域驱动理念入门](http://qiankunli.github.io/2017/12/25/ddd.html)
 
