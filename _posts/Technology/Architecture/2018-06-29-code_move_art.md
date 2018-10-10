@@ -10,14 +10,18 @@ keywords: abtest
 
 ## 简介
 
-编程思想分为面向过程、面向对象、响应式编程、函数式编程等， 但大部分程序猿 是业务开发，具体的说是controller-service-dao，大部分代码是面向过程式的代码。 
-
-倒不是controller-service-dao 有问题，但写惯了controller-service-dao，固化了顺序编程思维，碰到业务上来就controller-service-dao 一通，久而久之就会很难受，代码难写，写完难看，看完不敢改。
-
 以笔者目前的开发经历，碰到各种框架，可以分为两类
 
 1. 针对具体业务，为提高代码可读性的 腾挪。最大程度的 隔离control 和 logic。[程序的本质复杂性和元语言抽象](https://coolshell.cn/articles/10652.html)指出：程序=control + logic
 2. 代码在线程/主机之间腾挪。为了性能。
+
+## controller-service-dao
+
+编程思想分为面向过程、面向对象、响应式编程、函数式编程等， 但大部分程序猿 是业务开发，具体的说是controller-service-dao，大部分代码是面向过程式的代码。 
+
+倒不是controller-service-dao 有问题，但写惯了controller-service-dao，固化了顺序编程思维，碰到业务上来就controller-service-dao 一通，久而久之就会很难受，代码难写，写完难看，看完不敢改。
+
+关于controller/service/dao 更精炼的部分参见 [系统设计的一些体会](https://qiankunli.github.io/2018/09/28/system_design.html)
 
 ## 代码别写在一块
 

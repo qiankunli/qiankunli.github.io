@@ -139,9 +139,13 @@ design for ops，比如一个服务的多个实例，分别代表处于开发状
 
 ![](/public/upload/architecture/zuoerduohaozi_distribute_manage.png)
 
-边车模式优点便在于，sidecar 与应用可以独立升级
+程序=控制+逻辑，同理架构=控制+逻辑（业务服务），边车模式优点便在于控制与逻辑隔离，sidecar 与应用可以独立升级
 
 ![](/public/upload/architecture/zuoerduohaozi_sidecar.JPG)
+
+我们在sidecar 之上think big一下，假设在一个分布式系统中，在每个节点上都已经把一些标准的sidecar 给部署好了，那么真实的业务只需要往这个节点中放，就可以和本地的sidecar 通信，然后由sidecar 委托代理和其它系统的交互和控制。
+
+A service mesh is a dedicated infrastructure layer for handling service-to-service communication. It’s responsible for the reliable delivery of requests through the complex topology of services that comprise a modern, cloud native application. In practice, the service mesh is typically implemented as an array of lightweight network proxies that are deployed alongside application code, without the application needing to be aware.
 
 ## 高性能
 
@@ -152,6 +156,10 @@ design for ops，比如一个服务的多个实例，分别代表处于开发状
 ## 编程范式
 
 参见[java 语言的动态性](http://qiankunli.github.io/2018/08/15/java_dynamic.html)  [函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html) [面向对象设计](http://qiankunli.github.io/2018/10/01/object_oriented.html) [《编程的本质》笔记](http://qiankunli.github.io/2018/07/14/nature_of_code.html)
+
+## 程序猿练级攻略
+
+![](/public/upload/architecture/zuoerduohaozi_programmer_improvement.png)
 
 ## 面试
 

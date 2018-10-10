@@ -39,7 +39,7 @@ mesos 配置目录有三个
 
 1. `/etc/mesos` 主节点和从节点都会读取的配置文件，其中最关键的就是zk
 2. `/etc/mesos-master/`只有主节点会读取的配置，等价于启动 mesos-master 命令时候的默认选项
-3. `/etc/mesos-slave/`只有从节点会读取的配置，等价于启动 mesos-master 命令时候的默认选项
+3. `/etc/mesos-slave/`只有从节点会读取的配置，等价于启动 mesos-slave 命令时候的默认选项
 
 此外，/etc/default/mesos、/etc/default/mesos-master、/etc/default/mesos-slave 这三个文件中可以存放一些环境变量定义，Mesos 服务启动之前，会将这些环境变量导入进来作为启动参数。
 	
@@ -73,3 +73,26 @@ Health Status
 4. Unknown
 5. Overcapacity
 6. Unscheduled
+
+## mesos 常见问题
+
+### 重启一直失败
+
+ 可能原因：
+
+1. 磁盘空间不够
+2. 将mesos 以前的日志干掉， 重新启动，查看mesos日志可以发现
+
+		Log file created at: 2018/10/09 11:28:23
+		Running on machine: xx
+		Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+		E1009 11:28:23.090240  9958 slave.cpp:7290] EXIT with status 1: Failed to perform recovery: Collect failed: Detected duplicate pid 1526 for container ed7f5d07-b6ca-432c-8a4d-05ff5dda9407
+		If recovery failed due to a change in configuration and you want to
+		keep the current agent id, you might want to change the
+		`--reconfiguration_policy` flag to a more permissive value.
+		
+		To restart this agent with a new agent id instead, do as follows:
+		rm -f /var/lib/mesos/meta/slaves/latest
+		This ensures that the agent does not recover old live executors.
+		
+	执行`rm -f /var/lib/mesos/meta/slaves/latest` 后重启，发现成功
