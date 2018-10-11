@@ -161,6 +161,51 @@ A service mesh is a dedicated infrastructure layer for handling service-to-servi
 
 ![](/public/upload/architecture/zuoerduohaozi_programmer_improvement.png)
 
+1. 广度的知识是深度研究的副产品
+2. 很多时候，你缺少的不是知识而是热情
+3. 很多东西在概念上是相通的，在哲学层次上是相通的，这是你需要去追求的学习知识的境界。
+4. 永远和高手一起工作
+5. 不要只寄望于在工作中学习，工作没有覆盖的地方你就不学了。真正的高手在工作之余都会花很多时间去自己研究点东西的。
+
+
+[Teach Yourself Programming in Ten Years](http://norvig.com/21-days.html)
+
+A language that doesn't affect the way you think about programming, is not worth knowing. 
+
+The key is deliberative practice: not just doing it again and again, but challenging yourself with a task that is just beyond your current ability, trying it, analyzing your performance while and after doing it, and correcting any mistakes. Then repeat. And repeat again.
+
+Learning by Doing,he most effective learning requires a well-defined task with an appropriate difficulty level for the particular individual, informative feedback, and opportunities for repetition and corrections of errors.
+
+**Talk with other programmers; read other programs. This is more important than any book or training course.** 多与人聊天，多看代码是多么的重要。
+
+Computer science education cannot make anybody an expert programmer any more than studying brushes and pigment can make somebody an expert painter
+
+Learn at least a half dozen programming languages. Include one language that emphasizes class abstractions (like Java or C++), one that emphasizes functional abstraction (like Lisp or ML or Haskell), one that supports syntactic abstraction (like Lisp), one that supports declarative specifications (like Prolog or C++ templates), and one that emphasizes parallelism (like Clojure or Go).
+
+Remember that there is a "computer" in "computer science". Know how long it takes your computer to execute an instruction, fetch a word from memory (with and without a cache miss), read consecutive words from disk, and seek to a new location on disk.
+
+
+Approximate timing for various operations on a typical PC:
+
+|||
+|---|---|
+|execute typical instruction|	1/1,000,000,000 sec = 1 nanosec|
+|fetch from L1 cache memory|	0.5 nanosec|
+|branch misprediction|	5 nanosec|
+|fetch from L2 cache memory|	7 nanosec|
+|Mutex lock/unlock|	25 nanosec|
+|fetch from main memory|	100 nanosec|
+|send 2K bytes over 1Gbps network	|20,000 nanosec|
+|read 1MB sequentially from memory|	250,000 nanosec|
+|fetch from new disk location (seek)|	8,000,000 nanosec|
+|read 1MB sequentially from disk	|20,000,000 nanosec|
+|send packet US to Europe and back	|150 milliseconds = 150,000,000 nanosec|
+
+在合适的技术而不是熟悉的技术上工作
+
+[97-things-every-programmer-should-know](https://github.com/97-things/97-things-every-programmer-should-know/blob/master/en/SUMMARY.md)
+
+
 ## 面试
 
 好简历是要用自己的经历去写的，最牛逼的简历只有一句话：我发明了Unix
