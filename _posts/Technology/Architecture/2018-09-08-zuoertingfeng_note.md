@@ -166,6 +166,7 @@ A service mesh is a dedicated infrastructure layer for handling service-to-servi
 3. 很多东西在概念上是相通的，在哲学层次上是相通的，这是你需要去追求的学习知识的境界。
 4. 永远和高手一起工作
 5. 不要只寄望于在工作中学习，工作没有覆盖的地方你就不学了。真正的高手在工作之余都会花很多时间去自己研究点东西的。
+6. 在合适的技术而不是熟悉的技术上工作
 
 
 [Teach Yourself Programming in Ten Years](http://norvig.com/21-days.html)
@@ -201,7 +202,7 @@ Approximate timing for various operations on a typical PC:
 |read 1MB sequentially from disk	|20,000,000 nanosec|
 |send packet US to Europe and back	|150 milliseconds = 150,000,000 nanosec|
 
-在合适的技术而不是熟悉的技术上工作
+
 
 [97-things-every-programmer-should-know](https://github.com/97-things/97-things-every-programmer-should-know/blob/master/en/SUMMARY.md)
 

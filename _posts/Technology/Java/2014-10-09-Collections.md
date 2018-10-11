@@ -60,11 +60,11 @@ Queue是先进行出的，而PriorityQueue通过设置优先级以使需要的�
 
 
 
-## iterator ##
+## iterator 
 
 屏蔽掉底层的数据结构，提供统一的遍历接口，其声明了如下方法：hasnext(),next()
 
-## Map ## 
+## Map 
 
 存储的是key value对
 

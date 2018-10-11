@@ -78,13 +78,26 @@ keywords: Docker
 
 参见
 
+1. [Java and Docker, the limitations](https://royvanrijn.com/blog/2018/05/java-and-docker-memory-limits/) 在java9/10 以后jvm 对container提供了原生支持。There’s an experimental support in the JVM that has been included in JDK9 to support cgroup memory limits in container (i.e. Docker) environments. Check it out: http://hg.openjdk.java.net/jdk9/jdk9/hotspot/rev/5f1d1df0ea49
+
 1. [在 Docker 里跑 Java，趟坑总结](http://blog.tenxcloud.com/?p=1894)， jvm无法感知到自己在容器中进行，默认，堆的上限是物理机内存的四分之一，当容器的jvm没有设置xmx，即便容器内存设置的很大，也没有解决问题，导致容器会周期性重启（没有gc，逐渐累积到容器内存的限制值）。结论：要管控jvm 堆大小等参数，或使用特殊镜像。
 
 2. [在docker中使用java的内存情况](http://www.jianshu.com/p/1bf938fd8d70)提到了容器内存与jvm堆内存的基本关系。`Max memory = [-Xmx] + [-XX:MaxPermSize] + number_of_threads * [-Xss]`.在设置jvm启动参数的时候 -Xmx的这个值一般要小于docker限制内存数，个人觉得  -Xmx:docker的比例为 4/5 - 3/4
 
 提到docker 与 虚拟机的区别时， 常常会说“虚拟”和“隔离”的区别。假设一个16g内存的物理机，那么创建一个2g内存的虚拟机和2g内存容器，其jvm的表现便会有所不同。[Java inside docker: What you must know to not FAIL](https://developers.redhat.com/blog/2017/03/14/java-inside-docker/) some applications that collect information from the execution environment have been implemented before the existence of cgroups. Tools like ‘top‘, ‘free‘, ‘ps‘, and even the JVM ** is not optimized for executing inside a container**, a highly-constrained Linux process. Let’s check it out.
 
-There’s an experimental support in the JVM that has been included in JDK9 to support cgroup memory limits in container (i.e. Docker) environments. Check it out: http://hg.openjdk.java.net/jdk9/jdk9/hotspot/rev/5f1d1df0ea49
+### 单单设置xmx 也是不够的
+
+针对场景：容器设置为1g内存，jvm堆占用80%
+
+一般在生产环境下有个建议，xms与xmx设置为一样：For servers, both params should have the same value to avoid heap resizing during runtime. 这种方式在测试环境下 会导致一个问题：项目启动便占用820m内存。因为测试环境负载不是很高，大部分项目都在“待机”状态，占用820M有点浪费了。为节省内存占用，在测试环境下要设置xms
+
+||含义|默认值||
+|---|---|---|---|
+|xms|初始堆大小|物理内存的1/64|默认(MinHeapFreeRatio参数可以调整)空余堆内存小于40%时，JVM就会增大堆直到-Xmx的最大限制.|
+|xmx|最大堆大小|物理内存的1/4|默认(MaxHeapFreeRatio参数可以调整)空余堆内存大于70%时，JVM会减少堆直到 -Xms的最小限制|
+
+**若想进一步降低内存占用，可以进一步抬高MinHeapFreeRatio的值，降低MaxHeapFreeRatio的值，但这样会增大jvm resize heap的次数**
 
 ## 2 Container stuck, can't be stopped or killed, can't exec into it either
 
