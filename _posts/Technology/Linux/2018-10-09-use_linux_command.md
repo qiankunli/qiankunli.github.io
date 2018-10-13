@@ -31,4 +31,5 @@ keywords: linux命令
 1. 直观想法是rm，但rm 不支持正则表达式
 2. 则可以先找到文件，在通过xargs 串联 rm，`ls | grep ".*2018-03.*" | xargs rm -rf`
 
+后来试验了一下，`rm -rf *2018-03*` 也是可以的。
 

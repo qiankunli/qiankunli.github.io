@@ -116,6 +116,12 @@ Coordinating function calls across CPUs comes with an overhead（耗费）. The 
 
 which concurrency model is better?it depends on what your system is supposed to do. If your jobs are naturally parallel, independent and with no shared state necessary, you might be able to implement your system using the parallel worker model.Many jobs are not naturally parallel and independent though. For these kinds of systems I believe the assembly line concurrency model has more advantages than disadvantages
 
+不准确的说，可以将多线程模式归类为
+
+1. 单线程
+2. 多线程
+3. 主从线程，主从线程与多线程的区别在于，多线程中的每个线程干的是一样的活儿，主从线程中的线程则有任务分工
+
 ## 引用
 
 [Java多线程设计模式（一）][]
