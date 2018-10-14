@@ -99,6 +99,12 @@ keywords: Docker
 
 **若想进一步降低内存占用，可以进一步抬高MinHeapFreeRatio的值，降低MaxHeapFreeRatio的值，但这样会增大jvm resize heap的次数**
 
+## cpu
+
+[有赞容器化实践](https://segmentfault.com/a/1190000016551255)
+
+jvm 在容器内看到的cpu数不准确，会导致什么问题呢？jvm 以及很多 Java sdk 都会根据系统的 CPU 数来决定创建多少线程
+
 ## 2 Container stuck, can't be stopped or killed, can't exec into it either
 
 jdk6 编译的项目运行在jdk8上
