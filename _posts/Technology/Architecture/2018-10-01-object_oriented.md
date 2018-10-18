@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 面向对象1——重新看面向对象设计
+title: 重新看面向对象设计
 category: 技术
 tags: Architecture
 keywords: 面向对象
