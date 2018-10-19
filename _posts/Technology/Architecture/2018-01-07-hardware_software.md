@@ -29,7 +29,9 @@ cpu和内存的速度差异 ==> 缓存 ==> 多级缓存 ==> Cache是由很多个
 1. 所谓线程 安全，最后可以归结到 并发读写 问题。参见 [多线程](http://qiankunli.github.io/2014/10/09/Threads.html)
 2. 所谓数据结构，最后可以归结到 读写效率的 权衡问题。 参见[hbase 泛谈](http://qiankunli.github.io/2018/04/08/hbase.html) 数据信息 和 结构信息（提高读写效率）混在一起，因为磁盘的缘故， 顺序写即可提高读效率。而查询/读效率 的提高花活儿就比较多了，并且通常 会降低写效率。 
 
-## 内存屏障（未完成）
+## 内存屏障
+
+Compiler 和 cpu 经常搞一些 optimizations，这种单线程视角下的优化在多线程环境下是不合时宜的，为此要用 memory barriers 来禁止 Compiler 和 cpu 搞这些小动作。 For purposes here, I assume that the compiler and the hardware don't introduce funky optimizations (such as eliminating some "redundant" variable reads, a valid optimization under a single-thread assumption).
 
 [老司机谈技术天花板——做自己的破壁人](https://mp.weixin.qq.com/s?__biz=MzA4MDc5OTg5MA==&mid=2650585155&idx=3&sn=30392c82e2003ca54e248b6a7abbee88&mpshare=1&scene=1&srcid=0331lAZn3kCrRoyxDwVkfS7P#rd)
 
@@ -43,4 +45,29 @@ cpu和内存的速度差异 ==> 缓存 ==> 多级缓存 ==> Cache是由很多个
 |软硬件|cpu|创建线程的业务是无限的|用一个数据结构 表示和存放你要执行的任务/线程/进程，任尓干着急，我调度系统按既有的节奏来。|
 |java线程池|线程池管理的线程|要干的活儿是无限的|用一个runnable对象表示一个任务，线程池线程依次从队列中取出任务来执行|线程池管理的线程数可以扩大和缩小|
 |goroutine|goroutine调度器管理的线程|要干的活儿是无限的|用协程表示一个任务，线程从各自的队列里取出任务执行|A线程干完了，还可以偷B线程队列的活儿干|
+
+
+## 为什么会有人觉得优化没有必要，因为他们不理解有多耗时
+
+
+[Teach Yourself Programming in Ten Years](http://norvig.com/21-days.html)
+
+Remember that there is a "computer" in "computer science". Know how long it takes your computer to execute an instruction, fetch a word from memory (with and without a cache miss), read consecutive words from disk, and seek to a new location on disk.
+
+
+Approximate timing for various operations on a typical PC:
+
+||耗时|
+|---|---|
+|execute typical instruction|	1/1,000,000,000 sec = 1 nanosec|
+|fetch from L1 cache memory|	0.5 nanosec|
+|branch misprediction|	5 nanosec|
+|fetch from L2 cache memory|	7 nanosec|
+|Mutex lock/unlock|	25 nanosec|
+|fetch from main memory|	100 nanosec|
+|send 2K bytes over 1Gbps network	|20,000 nanosec|
+|read 1MB sequentially from memory|	250,000 nanosec|
+|fetch from new disk location (seek)|	8,000,000 nanosec|
+|read 1MB sequentially from disk	|20,000,000 nanosec|
+|send packet US to Europe and back	|150 milliseconds = 150,000,000 nanosec|
 
