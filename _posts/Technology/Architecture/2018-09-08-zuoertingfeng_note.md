@@ -163,6 +163,7 @@ A service mesh is a dedicated infrastructure layer for handling service-to-servi
 
 ![](/public/upload/architecture/zuoerduohaozi_programmer_improvement.png)
 
+[程序猿应该知道的](http://qiankunli.github.io/2018/10/19/programmer_should_know.html)
 
 ## 面试
 
