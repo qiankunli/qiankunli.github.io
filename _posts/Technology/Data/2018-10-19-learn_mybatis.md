@@ -102,6 +102,7 @@ SqlSession  由 SqlSessionFactory 创建
 
 1. mybatis 最重要的是SqlSessionFactory和SqlSession两个对象， 尤其以SqlSession 最为核心，其interface 定义最体现了class persistence framework 的精髓
 2. 很多框架，在实现其基本逻辑后， 一般会提供给一个xx-spring 封装以与spring 整合。所以在学习mybatis 时，**我们自己要分清楚哪些是框架本身的部分（里儿），哪些是皮儿。**
+3. 很多框架在主体之外，通常会有很多旁路系统，比如获取配置（动态或静态）、监控等，SqlSessionFactoryBuilder、SqlSessionFactory 就是类似的旁路系统，**搞清楚主体和枝节**。
 
 ## 再进一步
 
