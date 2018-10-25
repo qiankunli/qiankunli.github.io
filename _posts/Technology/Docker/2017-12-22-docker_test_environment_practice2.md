@@ -125,13 +125,26 @@ To tag the image with a simple timestamp, add the following to your pom.xml:
 	  </to>
 	</configuration>
 	
-## 将代码变成image（未完成）
+## 将代码变成image
 
 这是一个难题，难点不在如何变成jar，难在如何让一群完全没有docker 经验的人，按照指示，将代码变成jar/war，再变成image
 
-1. jenkins + 变量方案，jenkins将代码变成jar/war 之后，用变量指定jar/war 位置
-1. 阿里云效方案，用户在代码中附属一个配置文件，由命令根据文件打成jar/war，再制作为image
-2. jib 方案，使用maven 插件，将过程内置到 maven build 过程中
+1. jenkins + 变量方案，jenkins将代码变成jar/war 之后，用变量指定jar/war 位置，根据变量构建Dockerfile，制作镜像。该方案在实施过程中碰到以下问题
+	
+	* 新手习惯于克隆老手的已有项目，大量的配置错配
+	* 大量的变量散落在各个jenkins 项目中，无法被统一管理
+	* 有些项目生成的jar/war 没有包含依赖jar，而依赖jar目录各式各样
+	
+2. 阿里云效方案，用户在代码中附属一个配置文件，由命令根据文件打成jar/war，再制作为image
+3. google jib 方案，使用maven 插件，将过程内置到 maven build 过程中，并根据image registry 格式，直接push到registry 中。 
+4. 假设一个是maven项目，项目根目录下放上Dockerfile、marathon.json/xxx-pod.yaml 文件，自己写一个脚本（比如叫deploy.sh) 用户`maven package` 之后，执行`deploy.sh` 。该方案有以下问题
+
+	* 直接暴露Dockfile 和 marathon.json 对于一些新手来说，难以配置，可能要将配置文件“封装”一下
+
+
+灵活性和模板化的边界在哪里？
+
+
 
 ## 性能不及物理机(未完成)
 
