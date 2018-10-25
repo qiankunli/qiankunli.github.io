@@ -33,7 +33,7 @@ service discovery and container orchestration are two sides of the same idea.
 
 PS：the Cloud Age, virtualized servers that are programmable through a web interface。
 
-一个服务部署多个（几十个/上百个）实例带来许多挑战：如何部署？如何发现？挂了怎么办（总不能还靠人工）？通常依靠一个资源管理和调度平台辅助管理，如何选用和部署这个调度平台？从 "Evolution of Cattle" 的视角来看待 运维技术的演进。
+with the cattle approach to managing infrastructure,you don't manually allocate certain machines for running an application.Instead,you leave it up to an orchestrator to manage the life cycle of your containers. 一个服务部署多个（几十个/上百个）实例带来许多挑战：如何部署？如何发现？挂了怎么办（总不能还靠人工）？通常依靠一个资源管理和调度平台辅助管理，如何选用和部署这个调度平台？从 "Evolution of Cattle" 的视角来看待 运维技术的演进。
 
 ||描述| technologies |部署cattle service需要什么|备注|
 |---|---|---|---|---|
@@ -129,6 +129,31 @@ bridge 方案加上隧道 就是 vxlan，加上路由方案就是 calico
 5. 是一个L3方案（只要物理机来通就行）还是L2方案，L3网络扩展和提供在过滤和隔离网络流量方面的细粒度控制。
 6. 选择网络时，IP地址管理IPAM，组播，广播，IPv6，负载均衡，服务发现，策略，服务质量，高级过滤和性能都是需要额外考虑的。问题是这些能力是否受到支持。即使您的runtime，编排引擎或插件支持容器网络功能，您的基础架构也可能不支持该功能
 
+## container orchestrator
+
+一般orchestrator 包括但不限于以下功能：
+
+1. Organizational primitives，比如k8s的label
+2. Scheduling of containers to run on a ost
+3. Automated health checks to determine if a container is alive and ready to serve traffic and to relaunch it if necessary
+4. autoscaling 
+5. upgrading strategies,from rolling updates to more sophisticated techniques such as A/B and canary deployments.
+6. service discovery to determine which host a scheduled container ended upon,usually including DNS support.
+
+## CNI
+
+The cni specification is lightweight; it only deals with the network connectivity of containers,as well as the garbage collection of resources once containers are deleted.
 
 
 
+cni 接口规范，不是很长[Container Network Interface Specification](https://github.com/containernetworking/cni/blob/master/SPEC.md)，原来技术的世界里很多规范用Specification 来描述。
+
+![](/public/upload/docker/cni_2.png)
+
+
+![](/public/upload/docker/cni_3.png)
+
+对 CNI SPEC 的解读 [Understanding CNI (Container Networking Interface)](http://www.dasblinkenlichten.com/understanding-cni-container-networking-interface/)
+
+1. If you’re used to dealing with Docker this doesn’t quite seem to fit the mold. 习惯了docker 之后， 再看cni 有点别扭。原因就在于，docker 类似于操作系统领域的windows，把很多事情都固化、隐藏掉了，以至于认为docker 才是标准。
+2. The CNI plugin is responsible wiring up the container.  That is – it needs to do all the work to get the container on the network.  In Docker, this would include connecting the container network namespace back to the host somehow. 在cni 的世界里，container刚开始时没有网络的，是container runtime 操作cni plugin 将container add 到 network 中。
