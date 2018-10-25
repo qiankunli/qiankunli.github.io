@@ -124,6 +124,14 @@ To tag the image with a simple timestamp, add the following to your pom.xml:
 	    <image>my-image-name:${maven.build.timestamp}</image>
 	  </to>
 	</configuration>
+	
+## 将代码变成image（未完成）
+
+这是一个难题，难点不在如何变成jar，难在如何让一群完全没有docker 经验的人，按照指示，将代码变成jar/war，再变成image
+
+1. jenkins + 变量方案，jenkins将代码变成jar/war 之后，用变量指定jar/war 位置
+1. 阿里云效方案，用户在代码中附属一个配置文件，由命令根据文件打成jar/war，再制作为image
+2. jib 方案，使用maven 插件，将过程内置到 maven build 过程中
 
 ## 性能不及物理机(未完成)
 

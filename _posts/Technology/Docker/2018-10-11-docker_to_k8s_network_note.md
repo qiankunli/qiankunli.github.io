@@ -157,3 +157,30 @@ cni 接口规范，不是很长[Container Network Interface Specification](https
 
 1. If you’re used to dealing with Docker this doesn’t quite seem to fit the mold. 习惯了docker 之后， 再看cni 有点别扭。原因就在于，docker 类似于操作系统领域的windows，把很多事情都固化、隐藏掉了，以至于认为docker 才是标准。
 2. The CNI plugin is responsible wiring up the container.  That is – it needs to do all the work to get the container on the network.  In Docker, this would include connecting the container network namespace back to the host somehow. 在cni 的世界里，container刚开始时没有网络的，是container runtime 操作cni plugin 将container add 到 network 中。
+
+
+### "裸机" 使用cni
+
+[Understanding CNI (Container Networking Interface)](http://www.dasblinkenlichten.com/understanding-cni-container-networking-interface/)
+
+	mkdir cni
+	user@ubuntu-1:~$ cd cni
+	user@ubuntu-1:~/cni$ curl -O -L https://github.com/containernetworking/cni/releases/download/v0.4.0/cni-amd64-v0.4.0.tgz
+	user@ubuntu-1:~/cni$ tar -xzvf cni-amd64-v0.4.0.tgz
+	user@ubuntu-1:~/cni$ ls
+	bridge  cni-amd64-v0.4.0.tgz  cnitool  dhcp  flannel  host-local  ipvlan  loopback  macvlan  noop  ptp  tuning
+
+创建一个命名空间
+
+	sudo ip netns add 1234567890
+
+调用cni plugin将 container（也就是network namespace） ADD 到 network 上
+
+	sudo CNI_COMMAND=ADD CNI_CONTAINERID=1234567890 CNI_NETNS=/var/run/netns/1234567890 CNI_IFNAME=eth12 CNI_PATH=`pwd` ./bridge <mybridge.conf
+
+**从这也可以看到，前文画了图，整理了脑图，但资料看再多，都不如实操案例来的深刻。才能不仅让你“理性”懂了，也能让你“感性”懂了**
+
+### 在container runtime 下使用cni
+
+
+[Using CNI with Docker](http://www.dasblinkenlichten.com/using-cni-docker/) 未读
