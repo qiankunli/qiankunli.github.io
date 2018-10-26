@@ -176,11 +176,67 @@ cni 接口规范，不是很长[Container Network Interface Specification](https
 
 调用cni plugin将 container（也就是network namespace） ADD 到 network 上
 
-	sudo CNI_COMMAND=ADD CNI_CONTAINERID=1234567890 CNI_NETNS=/var/run/netns/1234567890 CNI_IFNAME=eth12 CNI_PATH=`pwd` ./bridge <mybridge.conf
+	cat > mybridge.conf <<"EOF"
+	{
+	    "cniVersion": "0.2.0",
+	    "name": "mybridge",
+	    "type": "bridge",
+	    "bridge": "cni_bridge0",
+	    "isGateway": true,
+	    "ipMasq": true,
+	    "ipam": {
+	        "type": "host-local",
+	        "subnet": "10.15.20.0/24",
+	        "routes": [
+	            { "dst": "0.0.0.0/0" },
+	            { "dst": "1.1.1.1/32", "gw":"10.15.20.1"}
+	        ]
+	    }
+	}
+	EOF
 
-**从这也可以看到，前文画了图，整理了脑图，但资料看再多，都不如实操案例来的深刻。才能不仅让你“理性”懂了，也能让你“感性”懂了**
+	sudo CNI_COMMAND=ADD CNI_CONTAINERID=1234567890 CNI_NETNS=/var/run/netns/1234567890 CNI_IFNAME=eth12 CNI_PATH=`pwd` ./bridge < mybridge.conf
+	
+mybridge.conf 描述了network 名为mybridge的配置，然后查看1234567890 network namespace 配置
 
-### 在container runtime 下使用cni
+ 	sudo ip netns exec 1234567890 ifconfig
+	eth12     Link encap:Ethernet  HWaddr 0a:58:0a:0f:14:02
+	          inet addr:10.15.20.2  Bcast:0.0.0.0  Mask:255.255.255.0
+	          inet6 addr: fe80::d861:8ff:fe46:33ac/64 Scope:Link
+	          UP BROADCAST RUNNING MULTICAST  MTU:1500  Metric:1
+	          RX packets:16 errors:0 dropped:0 overruns:0 frame:0
+	          TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
+	          collisions:0 txqueuelen:0
+	          RX bytes:1296 (1.2 KB)  TX bytes:648 (648.0 B)
+	 
+	user@ubuntu-1:~/cni$ sudo ip netns exec 1234567890 ip route
+	default via 10.15.20.1 dev eth12
+	1.1.1.1 via 10.15.20.1 dev eth12
+	10.15.20.0/24 dev eth12  proto kernel  scope link  src 10.15.20.2
+
+这个例子并没有什么实际的价值，但将“cni plugin操作 network namespace” 从cni繁杂的上下文中抽取出来，让我们看到它最本来的样子。**从这也可以看到，前文画了图，整理了脑图，但资料看再多，都不如实操案例来的深刻。才能不仅让你“理性”懂了，也能让你“感性”懂了**
+
+### Using CNI with container runtime
+
+[Using CNI with Docker](http://www.dasblinkenlichten.com/using-cni-docker/) net=none 创建的容器：`sudo docker run --name cnitest --net=none -d jonlangemak/web_server_1`，为其配置网络 与 上文的为 network namespace 配置网络是一样的。 
+
+I mentioned above that rkt implements CNI. In other words, rkt uses CNI to configure a containers network interface.
+
+![](/public/upload/docker/rocket_cni.png)
+
+1. network 要有一个json 文件描述，这个文件描述 放在rkt 可以识别的`/etc/rkt/net.d/` 目录下
+2. ` sudo rkt run --interactive --net=customrktbridge quay.io/coreos/alpine-sh` 便可以创建 使用customrktbridge network 的容器了。类似的，是不是可以推断`docker network create` 便是做了类似的事情。
+
+### CNI 小结
+
+有了整体的感觉时候，我们再来说
+
+1. 我们要为container 配置不同的网络
+2. 网络连通有不同的方案
+3. 如何将它们统一起来？
+
+CNI SPEC 做了建设性的抽象，在架构设计中有指导意义。 
+
+## kubernetes networking
 
 
-[Using CNI with Docker](http://www.dasblinkenlichten.com/using-cni-docker/) 未读
