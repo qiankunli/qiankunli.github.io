@@ -17,6 +17,9 @@ Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes �
 
 service discovery and container orchestration are two sides of the same idea.
 
+* TOC
+{:toc}
+
 
 ## container networking stack
 
@@ -71,7 +74,7 @@ ip-per-container 是网络方案中的一种，不要用习惯了，就以为只
 
 ||特点|ip/mac address|从交换机的视角看vlan方案|
 |---|---|---|---|
-|vlan|A virtual LAN (VLAN) is any broadcast domain that is partitioned and isolated in a computer network at the data link layer (OSI layer 2).<br>each sub-interface belongs to a different L2 domain using vlan |all sub-interfaces have same mac address.|交换机要支持 vlan tag|
+|vlan|A virtual LAN (VLAN) is any broadcast domain that is partitioned and isolated in a computer network at the data link layer (OSI layer 2).<br>each sub-interface belongs to a different L2 domain using vlan |all sub-interfaces have same mac address.|交换机要支持 vlan tag,vlan 学习参见[程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)|
 |Macvlan|Containers will directly get exposed in underlay network using Macvlan sub-interfaces.<br> Macvlan has 4 types(Private, VEPA, Bridge, Passthru)<br> 可以在vlan sub-interface 上创建 macvlan subinterface|Macvlan allows a single physical interface to have multiple mac and ip addresses using macvlan sub-interfaces. <br>|交换机的port一般只与一个mac绑定，使用macvlan 后必须支持绑定多个 且 无数量限制|
 |ipvlan|  ipvlan supports L2 and L3 mode.|the endpoints have the same mac address|省mac地址|
 |vxlan|Virtual Extensible LAN (VXLAN) is a network virtualization technology that attempts to address the scalability problems associated with large cloud computing deployments. <br>VXLAN endpoints, which terminate VXLAN tunnels and may be either virtual or physical switch ports, are known as VXLAN tunnel endpoints (VTEPs)||交换机无感知|
