@@ -32,15 +32,15 @@ PaaS 主要是提供了一种名叫“应用托管”的能力。虚拟机技术
 
 ### 农村包围城市
 
-为应对docker 一家在容器领域一家独大的情况，google 等制定了一套标准和规范OCI，意在将容器运行时和镜像的实现从Docker 项目中完全剥离出来。然并卵，Docker 是容器领域事实上的标准。为此，google 将战争引向容器之上的平台层（或者说PaaS层），发起了一个名为CNCF的基金会。所谓平台层，就是除容器化、容器编排之外，推动容器监控、存储层、日志手机、微服务（lstio）等项目百花争鸣，与kubernetes 融为一体。
+为应对docker 一家在容器领域一家独大的情况，google 等制定了一套标准和规范OCI，意在将容器运行时和镜像的实现从Docker 项目中完全剥离出来。然并卵，Docker 是容器领域事实上的标准。为此，google 将战争引向容器之上的平台层（或者说PaaS层），发起了一个名为CNCF（Cloud Native Computing Foundation）的基金会。所谓平台层，就是除容器化、容器编排之外，推动容器监控、存储层、日志手机、微服务（lstio）等项目百花争鸣，与kubernetes 融为一体。
 
 此时，kubernetes 对docker 依赖的只是一个 OCI 接口，docker 仍然是容器化的基础组件，但其 重要性在 平台化的 角度下已经大大下降了。若是kubernetes 说不支持 docker？那么。。。
 
 笔者负责将公司的测试环境docker化，一直为是否使用kubernetes 替换mesos 而纠结，从现在看：
 
 
-1. 单从“测试环境docker化” 来看，mesos 也是够用的。
-2. 打包发布不是全部，加上编排也不是。要做的其实是一个PaaS的事情，隔绝所有类型的应用与物理机。
+1. 单从“测试/线上环境容器化” 来看，docker/mesos 也是够用的。
+2. 但从“测试/线上环境PaaS化”的角度看，打包发布不是全部，加上编排也不是。整个过程中，容器化只是手段。[当我在说PaaS时，我在说什么](http://qiankunli.github.io/2018/09/26/paas.html)
 
 java 是一个单机版的业务逻辑实现语言，但在微服务架构成为标配的今天，服务发现、日志监控报警、熔断等也成为必备组件（spring cloud 提供了完整的一套）。如果这些组件 都可以使用协议来定义，那么最后用不用java 来写业务逻辑就不是那么重要了。
 
@@ -131,7 +131,9 @@ kubernetes 真正的价值，在于提供了一套基于容器构建分布式系
 
 kubelet 这个奇怪的名字，来自于Borg项目里的同源组件Borglet
 
-部署具体的说就是
+![](/public/upload/kubernetes/k8s_work.png)
+
+部署跟k8s的运行机制分不开，具体的说就是
 
 ||部署什么|如何部署|
 |---|---|---|
@@ -143,7 +145,27 @@ kubelet 这个奇怪的名字，来自于Borg项目里的同源组件Borglet
 当应用本身发生变化时 开发和运维可以通过容器和镜像来进行同步。 当应用部署参数发生变化时，这些yaml 文件就是它们相互沟通和信任的媒介。
 
 
+## 其它材料
 
+### Container-networking-docker-kubernetes
+
+container orchestrator
+
+一般orchestrator 包括但不限于以下功能：
+
+1. Organizational primitives，比如k8s的label
+2. Scheduling of containers to run on a ost
+3. Automated health checks to determine if a container is alive and ready to serve traffic and to relaunch it if necessary
+4. autoscaling 
+5. upgrading strategies,from rolling updates to more sophisticated techniques such as A/B and canary deployments.
+6. service discovery to determine which host a scheduled container ended upon,usually including DNS support.
+
+The unit of scheduling in Kubernetes is a pod. Essentially, this is a tightly coupled set of one or more containers that are always collocated (that is, scheduled onto a node as a unit); they cannot be spread over nodes. 
+
+1. The number of running instances of a pod—called replicas—can be declaratively stated and enforced through controllers. 
+2. **The logical organization of all resources, such as pods, deployments, or services, happens through labels.** label 的作用不小啊
+
+Kubernetes is highly extensible, from defining new workloads and resource types in general to customizing its user-facing parts, such as the CLI tool kubectl (pronounced cube cuddle).
 
 ![](/public/upload/kubernetes/parse_k8s_ad.JPG)
 

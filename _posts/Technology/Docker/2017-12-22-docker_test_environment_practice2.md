@@ -46,6 +46,7 @@ build 慢的原因：
 
 1. level 多
 2. war 包大
+3. jenkins 单机瓶颈，同时执行十几个`docker build -t ` docker 也会很卡
 
 build 慢的解决办法
 
@@ -54,6 +55,11 @@ build 慢的解决办法
 
 	* 优点：完全规避了docker build
 	* 缺点：每个版本的war包没有镜像，容器退化为了一个执行机器， 镜像带来的版本管理、回滚等不再支持
+
+3. 将git 代码 变成镜像的事情，可以交给专门的容器做，理由
+
+	* 破解jenkins 单点问题
+	* 集群资源通常是富余的，而build 任务具有明显的临时性特征，可以充分的将富余的资源利用起来。
 
 	
 [Docker 持续集成过程中的性能问题及解决方法](http://oilbeater.com/docker/2016/01/02/use-docker-performance-issue-and-solution.html)
@@ -142,7 +148,7 @@ To tag the image with a simple timestamp, add the following to your pom.xml:
 	* 直接暴露Dockfile 和 marathon.json 对于一些新手来说，难以配置，可能要将配置文件“封装”一下
 
 
-灵活性和模板化的边界在哪里？
+灵活性和模板化的边界在哪里？可以参见下 CNI 的设计理念。
 
 
 

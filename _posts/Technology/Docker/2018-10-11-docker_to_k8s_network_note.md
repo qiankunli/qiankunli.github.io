@@ -9,7 +9,7 @@ keywords: Container-Networking-Docker-Kubernetes
 ---
 
 
-## 简介（持续更新）
+## 简介
 
 Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes 中的容器网络的小册子
 
@@ -17,29 +17,6 @@ Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes �
 
 service discovery and container orchestration are two sides of the same idea.
 
-
-## Pets vs Cattle
-
-[DevOps Concepts: Pets vs Cattle](https://medium.com/@Joachim8675309/devops-concepts-pets-vs-cattle-2380b5aab313)
-
-
-想让服务可靠，有两种方式：把机器搞可靠；部署多个实例。
-
-||特点|详情| Examples |
-|---|---|---|---|
-|Pets|scale up|you trait the machines as individuals,you gave each (virtual)machine a name. when a machine gets ill you nurse it back to health and manually redeploy the app. | mainframes, solitary servers, load balancers and firewalls, database systems, and so on.|
-|Cattle|scale out|your machines are anonymous;they are all identical,they have numbers rather than names, and apps are automatically deployed onto any and each of the machines. when one of the machines gets ill, you don't worry about it immediately|web server arrays, no-sql clusters, queuing cluster, search cluster, caching reverse proxy cluster, multi-master datastores like Cassandra, big-data cluster solutions, and so on.|
-
-
-PS：the Cloud Age, virtualized servers that are programmable through a web interface。
-
-with the cattle approach to managing infrastructure,you don't manually allocate certain machines for running an application.Instead,you leave it up to an orchestrator to manage the life cycle of your containers. 一个服务部署多个（几十个/上百个）实例带来许多挑战：如何部署？如何发现？挂了怎么办（总不能还靠人工）？通常依靠一个资源管理和调度平台辅助管理，如何选用和部署这个调度平台？从 "Evolution of Cattle" 的视角来看待 运维技术的演进。
-
-||描述| technologies |部署cattle service需要什么|备注|
-|---|---|---|---|---|
-|Iron Age|物理机||Robust change configuration tools like Puppet (2005), CFEngine 3 (2008), and Chef|
-|The First Cloud Age|IaaS that virtualized the entire infrastructure (networks, storage, memory, cpu) into programmable resources. |Amazon Web Services (2006), Microsoft Azure (2010), Google Cloud Platform |push-based orchestration tools like Salt Stack (2011), Ansible (2012), and Terraform (2014). |
-|The Second Cloud Age|virtualize aspects of the infrastructure,This allows applications to be segregated into their own isolated environment without the need to virtualize hardware, which in turn duplicates the operating system per application. |OpenVZ (2005), Linux Containers or LXC (2008), and Docker (2015).|A new set of technologies evolved to allocate resources for containers and schedule these containers across a cluster of servers:Apache Mesos (2009), Kubernetes (2014), Nomad (2015), Swarm | Immutable Production(应用的每一次更改都是重新部署，所以本身是Immutable),disposable containers are configured at deployment. 容器在部署的时候被配置|
 
 ## container networking stack
 
@@ -49,6 +26,8 @@ with the cattle approach to managing infrastructure,you don't manually allocate 
 |the low-level networking layer|networking gear(网络设备),iptables,routing,ipvlan,linux namespaces|这些技术已经存在很多年，我们只是对它们的使用|
 |the container networking layer|single-host bridge mode,multi-host,ip-per-container|对底层技术provide some abstractions|
 |the container orchestration layer|service discovery,loadbalance,cni,kubernetes networking|marrying the container scheduler's decisions on where to place a container with the primitives provided by lower layers. 重要的事情读三遍：根据调度系统的决定，使用lower layer提供的操作place a container|
+
+![](/public/upload/docker/container_networking.png)
 
 
 ## 单机
@@ -114,8 +93,6 @@ there are two ways for Containers or VMs to communicate to each other.
 
 该表格持续更新中
 
-![](/public/upload/docker/container_networking.png)
-
 bridge 方案加上隧道 就是 vxlan，加上路由方案就是 calico
 
 [容器网络：盘点，解释与分析](http://www.dockerinfo.net/4289.html)
@@ -129,16 +106,7 @@ bridge 方案加上隧道 就是 vxlan，加上路由方案就是 calico
 5. 是一个L3方案（只要物理机来通就行）还是L2方案，L3网络扩展和提供在过滤和隔离网络流量方面的细粒度控制。
 6. 选择网络时，IP地址管理IPAM，组播，广播，IPv6，负载均衡，服务发现，策略，服务质量，高级过滤和性能都是需要额外考虑的。问题是这些能力是否受到支持。即使您的runtime，编排引擎或插件支持容器网络功能，您的基础架构也可能不支持该功能
 
-## container orchestrator
 
-一般orchestrator 包括但不限于以下功能：
-
-1. Organizational primitives，比如k8s的label
-2. Scheduling of containers to run on a ost
-3. Automated health checks to determine if a container is alive and ready to serve traffic and to relaunch it if necessary
-4. autoscaling 
-5. upgrading strategies,from rolling updates to more sophisticated techniques such as A/B and canary deployments.
-6. service discovery to determine which host a scheduled container ended upon,usually including DNS support.
 
 ## CNI
 
@@ -225,7 +193,10 @@ I mentioned above that rkt implements CNI. In other words, rkt uses CNI to confi
 ![](/public/upload/docker/rocket_cni.png)
 
 1. network 要有一个json 文件描述，这个文件描述 放在rkt 可以识别的`/etc/rkt/net.d/` 目录下
-2. ` sudo rkt run --interactive --net=customrktbridge quay.io/coreos/alpine-sh` 便可以创建 使用customrktbridge network 的容器了。类似的，是不是可以推断`docker network create` 便是做了类似的事情。
+2. ` sudo rkt run --interactive --net=customrktbridge quay.io/coreos/alpine-sh` 便可以创建 使用customrktbridge network 的容器了。类似的，是不是可以推断`docker network create` 便是 将 network json 文件写入到相应目录下
+3. 表面上的`sudo rkt run --interactive --net=customrktbridge quay.io/coreos/alpine-sh` 关于网络部分 实际上 是 `sudo CNI_COMMAND=ADD CNI_CONTAINERID=1234567890 CNI_NETNS=/var/run/netns/1234567890 CNI_IFNAME=eth12 CNI_PATH=pwd ./bridge < mybridge.conf
+` 执行，要完成这样的“映射”，需要规范定义 以及 规范相关方的协作，可以从这个角度再来审视前文对CNI SPEC 的一些梳理。
+4. 笔者以前一直有一个困惑，network、volume 可以作为一个“资源”随意配置，可以是一个json的存在，尤其是network，`docker network create ` 完了之后 就可以在`docker run -net=xx` 的时候使用。kubernetes 中更是 yaml 中声明一下network即可使用，是如何的背景支撑这样做？答案就在于，一个network json 不是一个静态配置，不准确的说，`network json = cni plugin binary name + cni plugin binary args`，container runtime 只是 network json的执行器而已。
 
 ### CNI 小结
 
@@ -235,8 +206,33 @@ I mentioned above that rkt implements CNI. In other words, rkt uses CNI to confi
 2. 网络连通有不同的方案
 3. 如何将它们统一起来？
 
+	* 基本抽象contaienr + network
+	* 静态组件：container 即 network namespace ，network 定义规范
+	* 动态逻辑：container runtime、orchestrator 协作规范
+
 CNI SPEC 做了建设性的抽象，在架构设计中有指导意义。 
 
 ## kubernetes networking
+
+想给一个容器连上网，办法实在太多，就好比现实世界中给你的电脑/手机连上网一样。但作为一个通用解决方案，就不得不做一定限制，好在k8s限制不太多。Rather than prescribing a certain networking solution, Kubernetes only states three fundamental requirements:
+
+* Containers can communicate with all other containers without NAT.
+* Nodes can communicate with all containers (and vice versa) without NAT.
+* The IP a container sees itself is the same IP as others see it. each pod has its own IP address that other pods can find and use. 很多业务启动时会将自己的ip 发出去（比如注册到配置中心），这个ip必须是外界可访问的。 学名叫：flat address space across the cluster.
+
+
+Kubernetes requires each pod to have an IP in a flat networking name‐ space with full connectivity to other nodes and pods across the network. This IP-per-pod model yields a backward-compatible way for you to treat a pod almost identically to a VM or a physical host, in the context of naming, service discovery, or port allocations. The model allows for a smoother transition from non–cloud native apps and environments.  这样就 no need to manage port allocation
+
+A service provides a stable virtual IP (VIP) address for a set of pods. It’s essential to realize that VIPs do not exist as such in the networking stack. For example, **you can’t ping them.** They are only Kubernetes- internal administrative entities. Also note that the format is IP:PORT, so the IP address along with the port make up the VIP. **Just think of a VIP as a kind of index into a data structure mapping to actual IP addresses.**
+
+k8s的service discovery 真的是 service 组件的discovery
+
+1. kube-proxy，给service 一个host 可访问的ip:port
+2. kube-dns/CNCF project CoreDNS，给service 一个域名
+3. Ingress，给service 一个可访问的http path
+
+[Kubernetes networking 101 – Pods](http://www.dasblinkenlichten.com/kubernetes-networking-101-pods/)(未读)
+
+[Kubernetes networking 101 – Services](http://www.dasblinkenlichten.com/kubernetes-networking-101-services/)（未读）
 
 

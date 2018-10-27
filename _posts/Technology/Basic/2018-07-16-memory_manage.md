@@ -3,7 +3,7 @@
 layout: post
 title: 内存管理的几个方法
 category: 技术
-tags: Architecture
+tags: Basic
 keywords: abtest
 
 ---
