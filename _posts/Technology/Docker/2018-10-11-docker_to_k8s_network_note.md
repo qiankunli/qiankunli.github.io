@@ -215,6 +215,9 @@ I mentioned above that rkt implements CNI. In other words, rkt uses CNI to confi
 
 CNI SPEC 做了建设性的抽象，在架构设计中有指导意义。 
 
+Docker是为了解决 DevOps 所提倡的“基础设施即代码”这个问题，而被创造出来的。那么 cni 也有点“为network namespace add network 即代码/配置”的味道。解决复杂问题的办法：分拆、简化、标准化。
+
+
 ## kubernetes networking
 
 想给一个容器连上网，办法实在太多，就好比现实世界中给你的电脑/手机连上网一样。但作为一个通用解决方案，就不得不做一定限制，好在k8s限制不太多。Rather than prescribing a certain networking solution, Kubernetes only states three fundamental requirements:
@@ -224,7 +227,7 @@ CNI SPEC 做了建设性的抽象，在架构设计中有指导意义。
 * The IP a container sees itself is the same IP as others see it. each pod has its own IP address that other pods can find and use. 很多业务启动时会将自己的ip 发出去（比如注册到配置中心），这个ip必须是外界可访问的。 学名叫：flat address space across the cluster.
 
 
-Kubernetes requires each pod to have an IP in a flat networking name‐ space with full connectivity to other nodes and pods across the network. This IP-per-pod model yields a backward-compatible way for you to treat a pod almost identically to a VM or a physical host, in the context of naming, service discovery, or port allocations. The model allows for a smoother transition from non–cloud native apps and environments.  这样就 no need to manage port allocation
+Kubernetes requires each pod to have an IP in a flat networking namespace with full connectivity to other nodes and pods across the network. This IP-per-pod model yields a backward-compatible way for you to treat a pod almost identically to a VM or a physical host（**ip-per-pod 的优势**）, in the context of naming, service discovery, or port allocations. The model allows for a smoother transition from non–cloud native apps and environments.  这样就 no need to manage port allocation
 
 A service provides a stable virtual IP (VIP) address for a set of pods. It’s essential to realize that VIPs do not exist as such in the networking stack. For example, **you can’t ping them.** They are only Kubernetes- internal administrative entities. Also note that the format is IP:PORT, so the IP address along with the port make up the VIP. **Just think of a VIP as a kind of index into a data structure mapping to actual IP addresses.**
 
@@ -234,8 +237,30 @@ k8s的service discovery 真的是 service 组件的discovery
 2. kube-dns/CNCF project CoreDNS，给service 一个域名
 3. Ingress，给service 一个可访问的http path
 
-[Kubernetes networking 101 – Pods](http://www.dasblinkenlichten.com/kubernetes-networking-101-pods/)(未读)
+### 为什么pod中要有一个pause 容器？
 
-[Kubernetes networking 101 – Services](http://www.dasblinkenlichten.com/kubernetes-networking-101-services/)（未读）
+[Kubernetes networking 101 – Pods](http://www.dasblinkenlichten.com/kubernetes-networking-101-pods/)
+
+all containers within a single pod share the same network namespace. 那么现在假设一个pod定义了三个容器（container1, container2, container3），你如何实现共享网络的效果呢？直接的想法：启动一个容器（比如container1），然后container2、container3 挂在container1上，但这样做有几个问题：
+
+1. 启动顺序无法保证，正常都是先拉到谁的镜像就先启动哪个
+2. 假设container1 挂了（比如业务代码问题），则就殃及container2, container3 。
+3. 尤其container3 还没有启动的时候，container1 挂了，那container3 怎么办呢？
+
+the pause container servers as an anchoring point for the pod and make it easy to determine what network namespace the pod containers should join. 
 
 
+## service 的实现机制
+
+[Kubernetes networking 101 – Services](http://www.dasblinkenlichten.com/kubernetes-networking-101-services/)
+
+1. 当pod 有多个实例时，service 可以负载均衡
+1.  services can be resolved by name so long as you are running the Kube-DNS cluster add on. kubelet will configure the containers resolv.conf file to include the appropriate DNS server (which also happens to be a service itself) and search domains，按域名访问service
+2. services are actually implemented with iptables rules. rules are implemented on the nodes by the kube-proxy service. the same iptables configuration will be made on each host.
+3. Notice that some of the iptables rules are using the statistic module and appear to be using it to calculate probability.  This is allows the service construct to act as a sort of load balancer. 
+
+[Kubernetes networking 101 – (Basic) External access into the cluster](http://www.dasblinkenlichten.com/kubernetes-networking-101-basic-external-access-into-the-cluster/)
+
+[Kubernetes Networking 101 – Ingress resources](http://www.dasblinkenlichten.com/kubernetes-networking-101-ingress-resources/)
+
+[Getting started with Calico on Kubernetes](http://www.dasblinkenlichten.com/getting-started-with-calico-on-kubernetes/)（未读）My goal with these posts has been to focus on the primitives and to show how a Kubernetes cluster handles networking internally as well as how it interacts with the upstream or external network. 

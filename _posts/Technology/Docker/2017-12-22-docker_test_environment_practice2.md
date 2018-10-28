@@ -151,6 +151,22 @@ To tag the image with a simple timestamp, add the following to your pom.xml:
 灵活性和模板化的边界在哪里？可以参见下 CNI 的设计理念。
 
 
+## 几个问题
+
+构建过程和发布过程
+
+
+1. 用不用jenkins? 怎么用jenkins？是否容器化jenkins？
+2. dockerfile 和代码是否在一起？
+3. 提交代码要不要自动构建？
+4. 构建过程要不要放到容器？
+5. 构建和发布的结合部 
+
+	* 发布时构建
+	* 平时代码提交即构建，发布时从已构建好的镜像进行部署。[基于容器的自动构建——Docker在美团的应用](https://www.jianshu.com/p/a1f371d9e0c5)
+
+
+
 
 ## 性能不及物理机(未完成)
 
