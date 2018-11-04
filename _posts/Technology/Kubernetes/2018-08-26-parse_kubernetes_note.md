@@ -148,7 +148,7 @@ kubelet 这个奇怪的名字，来自于Borg项目里的同源组件Borglet
 
 Kubernetes 跟 Docker 等很多项目最大的不同，就在于它不推荐你使用命令行的方式直接运行容器（虽然 kubectl run 支持)，而是采用yaml/json 文件的方式。最直接的好处是，你会有一个文件能记录下 Kubernetes到底“run”了什么。
 
-由于Yaml文件格式比较复杂，即使是老司机有时也不免会犯错或需要查询文档，因此可以参见[kubernetes yaml配置]() 
+由于Yaml文件格式比较复杂，即使是老司机有时也不免会犯错或需要查询文档，因此可以参见[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/kubernetes_yaml.html) 
 
 
 ## 其它材料
