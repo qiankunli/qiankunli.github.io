@@ -10,15 +10,15 @@ keywords: CoreOS Docker Kubernetes
 
 ## 简介
 
-本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删减。
+本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs)的摘抄，有删减。
 
 本文主要讲了Container Engine cluster和Pod的概念
 
 ##  Container Engine cluster
 
-A Container Engine cluster is a group of Compute Engine instances running Kubernetes. It consists of one or more node instances, and a Kubernetes master instance. A cluster is the foundation of a Container Engine application—pods,(如果说在coreos中，一个应用用container（及相关的service文件）表示。那么kubernete中，一个应用由pod表示) services, and replication controllers all run on top of a cluster.
+A Container Engine cluster is a group of Compute Engine instances running Kubernetes. It consists of one or more node instances, and a Kubernetes master instance. A cluster is the foundation of a Container Engine application—pods,services, and replication controllers all run on top of a cluster.
 
-（一个Container Engine cluster主要包含一个master和多个slave节点）
+一个Container Engine cluster主要包含一个master和多个slave节点，它是上层的pod、service、replication controllers的基础。
 
 ### The Kubernetes master
 
@@ -26,15 +26,22 @@ Every cluster has a single master instance. The master provides a unified view i
 
 **The master runs the Kubernetes API server, which services REST requests, schedules pod creation and deletion on worker nodes, and synchronizes pod information (such as open ports and location) with service information.**
 
+1. 提供统一视图
+2. service REST requests
+3. 调度
+4. 控制，使得actual state满足desired state 
+
 ### Nodes
 
 A cluster can have one or more node instances. These are managed from the master, and run the services necessary to support Docker containers. Each node runs the Docker runtime and hosts a Kubelet agent（管理docker runtime）, which manages the Docker containers scheduled on the host. Each node also runs a simple network proxy（网络代理程序）.
 
 ## What is a pod?
 
-A pod models an application-specific "logical host(逻辑节点)" in a containerized environment. It may contain one or more containers which are relatively tightly coupled—in a pre-container world（包含多个紧密联系的容器）, they would have executed on the same physical or virtual host.a pod has a single IP address.  Multiple containers that run in a pod all share that common network name space。
+A pod models an application-specific "logical host(逻辑节点)" in a containerized environment. It may contain one or more containers which are relatively tightly coupled—in a pre-container world（在 pre-container 时代， 我们将 多个紧密联系的容器 放在一个pod里）, they would have executed on the same physical or virtual host.a pod has a single IP address.  Multiple containers that run in a pod all share that common network name space。
 
 Like running containers, pods are considered to be relatively ephemeral rather than durable entities. Pods are scheduled to nodes and remain there until termination (according to restart policy) or deletion. When a node dies, the pods scheduled to that node are deleted. Specific pods are never rescheduled to new nodes; instead, they must be replaced.
+
+重点不是pod 是什么，而是什么情况下， 我们要将多个容器放在pod 里。 为什么需要一个pod 详细论述 [kubernetes objects再认识](http://qiankunli.github.io/2018/11/04/kubernetes_objects.html)
 
 ### Motivation for pods
 

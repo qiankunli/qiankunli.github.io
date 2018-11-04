@@ -142,6 +142,8 @@ kubelet 这个奇怪的名字，来自于Borg项目里的同源组件Borglet
 
 当应用本身发生变化时 开发和运维可以通过容器和镜像来进行同步。 当应用部署参数发生变化时，这些yaml 文件就是它们相互沟通和信任的媒介。
 
+关联内容参见 [在CoreOS集群上搭建Kubernetes](http://qiankunli.github.io/2015/01/29/Kubernetes_installation.html)
+
 ## kubernetes objects
 
 ![](/public/upload/kubernetes/parse_k8s_1.png)
