@@ -8,7 +8,7 @@ keywords: kubernetes
 
 ---
 
-## 简介(会不断增补)
+## 简介
 
 本文来自对极客时间《深入剖析kubernetes》的学习，作者本身对k8s 有一定的基础，但认为同样一个事情 听听别人 如何理解、表述 是很有裨益的，尤其是作者 还是k8s 领域的大牛。
 
@@ -123,8 +123,6 @@ k8s 强在哪里
 
 	![](/public/upload/kubernetes/k8s_pod.PNG)
 
-![](/public/upload/kubernetes/parse_k8s_1.png)
-
 kubernetes 真正的价值，在于提供了一套基于容器构建分布式系统的基础依赖。k8s提供了一种宏观抽象，作为一个集群操作系统，运行各种类型的应用。
 
 ## k8s 部署
@@ -144,11 +142,30 @@ kubelet 这个奇怪的名字，来自于Borg项目里的同源组件Borglet
 
 当应用本身发生变化时 开发和运维可以通过容器和镜像来进行同步。 当应用部署参数发生变化时，这些yaml 文件就是它们相互沟通和信任的媒介。
 
-## 实践
+## kubernetes objects
 
-Kubernetes 跟 Docker 等很多项目最大的不同，就在于它不推荐你使用命令行的方式直接运行容器（虽然 kubectl run 支持)，而是采用yaml/json 文件的方式。最直接的好处是，你会有一个文件能记录下 Kubernetes到底“run”了什么。
+![](/public/upload/kubernetes/parse_k8s_1.png)
 
-由于Yaml文件格式比较复杂，即使是老司机有时也不免会犯错或需要查询文档，因此可以参见[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/kubernetes_yaml.html) 
+yaml配置参见[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/kubernetes_yaml.html) 
+
+|现在|未来|
+|---|---|
+|进程|容器|
+|进程组|pod|
+|可执行文件|镜像|
+|操作系统|kubernetes|
+
+kubernetes objects具体内容参见 [kubernetes objects再认识](http://qiankunli.github.io/2018/11/04/kubernetes_yaml.html)
+
+
+
+
+
+
+
+
+
+
 
 
 ## 其它材料

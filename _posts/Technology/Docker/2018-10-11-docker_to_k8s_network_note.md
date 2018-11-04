@@ -249,6 +249,8 @@ all containers within a single pod share the same network namespace. 那么现�
 
 the pause container servers as an anchoring point for the pod and make it easy to determine what network namespace the pod containers should join. 
 
+pause container 被称为 infrastructure container，中文有的文章简称 Infra 容器。Infra 容器一定要占用极少的资源，所以它使用的是一个非常特殊的镜像，叫作：k8s.gcr.io/pause。这个镜像是一个用汇编语言编写的、永远处于“暂停”状态的容器，解压后的大小也只有 100~200 KB 左右。
+
 
 ## service 的实现机制
 
