@@ -14,7 +14,7 @@ keywords: 认知
 
 几篇文章体现了「学习」本身的知识，以及对认知过程本身的分析。学习和认知的方法本身也是一种技术。
 
-![](/public/upload/life/cognition_2.JPG)
+![](/public/upload/life/cognition_3.JPG)
 
 要回答“人（主体）如何去学习知识（客体）”？就得先回答：知识本身有什么特点？学习和认知本身有什么特点？
 
