@@ -13,11 +13,12 @@ keywords: CoreOS Docker Kubernetes
 * TOC
 {:toc}
 
-本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs)的摘抄，有删减。
-
-本文主要讲了Container Engine cluster和Pod的概念
 
 ##  Container Engine cluster
+
+本小节主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs)的摘抄，有删减。
+
+本小节主要讲了Container Engine cluster和Pod的概念
 
 A Container Engine cluster is a group of Compute Engine instances running Kubernetes. It consists of one or more node instances, and a Kubernetes master instance. A cluster is the foundation of a Container Engine application—pods,services, and replication controllers all run on top of a cluster.
 
@@ -59,13 +60,34 @@ Pods can be used to host vertically integrated application stacks, but their pri
 
 **Individual pods are not intended to run multiple instances of the same application**, in general.
 
-## 小结
+###小结
 
 A pod is a relatively tightly coupled group of containers that are scheduled onto the same host. 
 
 1. It models an application-specific(面向应用) "virtual host" in a containerized environment. 
 2. Pods serve as units of scheduling, deployment, and horizontal scaling/replication. 
 3. Pods share fate（命运）, and share some resources, such as storage volumes and IP addresses.(网络通信和数据交互就非常方便且高效)
+
+## 为什么需要pod？
+
+本小节大部分来自对极客时间《深入剖析kubernetes》的学习
+
+1. 操作系统为什么要有进程组？原因之一是 Linux 操作系统只需要将信号，比如，SIGKILL 信号，发送给一个进程组，那么该进程组中的所有进程就都会收到这个信号而终止运行。
+2. 在 Borg 项目的开发和实践过程中，Google 公司的工程师们发现，他们部署的应用，往往都存在着类似于“进程和进程组”的关系。更具体地说，就是这些应用之间有着密切的协作关系，使得它们必须部署在同一台机器上。具有“超亲密关系”容器的典型特征包括但不限于：
+
+	* 互相之间会发生直接的文件交换
+	* 使用 localhost 或者 Socket文件进行本地通信
+	* 会发生非常频繁的远程调用
+	* 需要共享某些 Linux Namespace
+
+3. 亲密关系 ==> 亲密关系为什么不在调度层面解决掉？非得提出pod 的概念？[容器设计模式](https://www.usenix.org/system/files/conference/hotcloud16/hotcloud16_burns.pdf)
+4. Pod，其实是一组共享了某些资源的容器。当然，共享Network Namespace和Volume 可以通过`通过docker run --net=B --volumes-from=B --name-=A image-A...`来实现，但这样 容器 B 就必须比容器 A 先启动，这样一个 Pod 里的多个容器就不是对等关系，而是拓扑关系了。
+5. **Pod 最重要的一个事实是：它只是一个逻辑概念。有了Pod，我们可以说Network Namespace和Volume 不是container A 的，也不是Container B的，而是Pod 的。哪怕Container A/B 还没有启动，我们也可以 配置Network Namespace和Volume**。以network namespace 为例，为什么需要一个pause 容器参见[《Container-Networking-Docker-Kubernetes》笔记](http://qiankunli.github.io/2018/10/11/docker_to_k8s_network_note.html)
+4. Pod 这种“超亲密关系”容器的设计思想，实际上就是希望，当用户想在一个容器里跑多个功能并不相关的应用时，应该优先考虑它们是不是更应该被描述成一个 Pod 里的多个容器。你就可以把整个虚拟机想象成为一个 Pod，把这些进程分别做成分别做成容器镜像，把有顺序关系的容器，定义为 Init Container。 作者提到了tomcat 镜像和war 包（war包单独做一个镜像）的例子，非常精彩，好就好在 分别做镜像 肯定比 镜像做在一起要方便。**重点不是pod 是什么，而是什么情况下， 我们要将多个容器放在pod 里。 **
+5. [https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs) Pods also simplify application deployment and management by providing a higher-level abstraction than the raw, low-level container interface. **Pods serve as units of deployment and horizontal scaling/replication. Co-location, fate sharing, coordinated replication, resource sharing, and dependency management are handled automatically.**
+
+
+综上，我们可以有一个不太成熟的理解：pod本质是一个场景的最佳实践的普适化。
 
 ## Pod Operations
 
