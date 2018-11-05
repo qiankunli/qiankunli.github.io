@@ -86,7 +86,7 @@ Spec是对于某项技术或知识的某个层次的一份完备的、系统性�
 
 原作者微信订阅号
 
-![](/public/upload/tielei_qrcode_for_gh.jpg）
+![](/public/upload/tielei_qrcode_for_gh.jpg)
 
 笔者个人微信订阅号
 

@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: zookeeper的一些分析
+title: zookeeper三重奏
 category: 技术
 tags: Java
 keywords: zookeeper
@@ -10,13 +10,17 @@ keywords: zookeeper
 
 ## 前言（待整理） 
 
-本文主要从zookeeper源码角度，分析下zookeeper一些功能点的实现
+* TOC
+{:toc}
+
+
+## 基本通信
+
+本小节主要从zookeeper源码角度，分析下zookeeper一些功能点的实现
 
 源码分析，github上已有maven组织的项目（zookeeper使用ant组织的），参见[swa19/zookeeperSourceCode](https://github.com/swa19/zookeeperSourceCode)
 
 源码的分析参见 [llohellohe/zookeeper](https://github.com/llohellohe/zookeeper/blob/master/docs/overview.md)
-
-## 基本通信
 
 ### 客户端
 
@@ -61,7 +65,7 @@ watch是由read operation设置的一次性触发器，由一个特定operation�
 
 在server端触发了一个watch，会传播到client。此类使用server cnxn对象来处理（参见ServerCnxn类），此对象管理client和server的连接并实现了Watcher接口。Watch.process方法序列化了watch event，并通过网络发送出去。client接收到了序列化数据，转换成watch event对象，并传递到应用程序。watch只会保存在内存，不会持久化到硬盘。当client断开与server的连接时，它的所有watch会从内存中清除。因为client的库也会维护一份watch的数据，在重连之后watch数据会再次被同步到server端。
 
-## 服务端
+### 服务端
 
 基本机制
 
@@ -71,7 +75,7 @@ watch是由read operation设置的一次性触发器，由一个特定operation�
 
 此外，因为是多节点的，zookeeper server还要支持leader选举和数据副本一致性的机制。
 
-## 如何实现watcher机制
+### 如何实现watcher机制
 
 总结起来看，监听分为三种情况
 
@@ -92,3 +96,47 @@ watch是由read operation设置的一次性触发器，由一个特定operation�
 2. 服务端watcher manager存储 `<path,watcher>`数据
 
 说简单点，就是跨主机callback，可以参见本文的callback章节
+
+
+## Curator
+
+Zookeeper committer Patrick 谈到：Guava is to Java what Curator is to Zookeeper
+
+对于client类的api
+
+1. 操作对象
+2. 操作对象提供的操作方法，以此来观察如何使用某个应用
+3. 操作方法返回的数据对象
+
+
+从增强手法上讲
+
+guava对java的封装，主要有以下几个方向：
+
+1. 继承java类功能以增强
+2. 提供独立的工具类以增强
+
+
+curator对zookeeper的增强则有些不同
+
+1. CuratorZookeeperClient 直接聚合的原来的zookeeper
+2. 监听事件上，则将zk的事件处理函数和事件对象进行了类似于“继承”的扩展。
+
+		new Watcher(){
+			 public void process(WatchedEvent watchedEvent){
+                CuratorEvent event = xx
+                processEvent(event);
+             }
+		}
+			
+### 几个有意思的工具类
+
+RetryLoop
+ThreadUtils
+
+## Spring-Curator
+
+相关博客 [Spring and Apache Curator](http://jdpgrailsdev.github.io/blog/2014/02/19/spring_curator.html) github [jdpgrailsdev/spring-curator](https://github.com/jdpgrailsdev/spring-curator)
+
+One of the thinks to know about the Apache Curator client is that you only need one per instance/ensemble of Apache ZooKeeper. Therefore, using Spring to manage the injection of a Singleton bean into a class that needs access to the client is a perfect fit. 
+
