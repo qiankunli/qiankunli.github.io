@@ -161,7 +161,7 @@ github 有一个 [phusion/baseimage-docker](https://github.com/phusion/baseimage
 1. multi-user
 2. multi-process
 
-[phusion/baseimage-docker](https://github.com/phusion/baseimage-docker)  的image 是基于ubuntu，笔者试着用alpine + runit + sshd 实现了一个简洁的
+[phusion/baseimage-docker](https://github.com/phusion/baseimage-docker)  的image 是基于ubuntu，笔者试着用alpine + runit + sshd 实现了一个简洁的base image，具体情况待实践一段时间再交流。
 
 个人微信订阅号
 
