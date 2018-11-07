@@ -13,10 +13,17 @@ keywords: 持续交付
 * TOC
 {:toc}
 
-## 为什么要一个容器一个进程？
+## 背景
 
-stack exchange [Why it is recommended to run only one process in a container?](https://devops.stackexchange.com/questions/447/why-it-is-recommended-to-run-only-one-process-in-a-container)
+对于springboot项目，一开始是用`java -jar `方式容器中启动，并作为容器的主进程。但测试环境，经常代码逻辑可能有问题，导致主进程失败，容器启动失败，进而触发marathon/k8s健康检查失败，进而不断重启容器。开发呢也一直抱怨看不到“事故现场”。所以针对这种情况，直观的想法是 不让`java -jar` 作为容器的主进程，进而产生一个在容器中运行多进程的问题。
 
+但容器中运行多进程，跟 one process per container 的理念相悖，我们就得视图探寻下来龙去脉了。
+
+## 为什么推荐一个容器一个进程？
+
+stack exchange [Why it is recommended to run only one process in a container?](https://devops.stackexchange.com/questions/447/why-it-is-recommended-to-run-only-one-process-in-a-container) 有一系列回答
+
+[Run Multiple Processes in a Container](https://runnable.com/docker/rails/run-multiple-processes-in-a-container) 也提了三个advantages
 
 理由要找的话有很多，比较喜欢一个回答：As in most cases, it's not all-or-nothing. The guidance of "one process per container" stems from the idea that containers should serve a distinct purpose. For example, a container should not be both a web application and a Redis server.
 
@@ -55,12 +62,20 @@ docker stop  对PID1进程 的要求
 
 所以第二种方案通常不可取，对于第一种方案，则有init 进程的选型问题
 
-||僵尸进程回收|处理SIGTERM信号|
-|---|---|---|
-|sh/bash|支持|不支持|
-|Supervisor|大部分不支持|支持|
+||僵尸进程回收|处理SIGTERM信号|alpine 安装大小|专用镜像|备注|
+|---|---|---|---|---|---|
+|sh/bash|支持|不支持|0m||脚本中可以使用exec 顶替掉sh/bash 自身|
+|Supervisor|待确认|支持|79m||
+|runit|待确认|支持|31m| [phusion/baseimage-docker](https://github.com/phusion/baseimage-docker)|
+|s6|||33m||
 
-## 一个容器多个进程的最佳实践
+## 一个容器多个进程的可能选择
+
+### 自定义脚本
+
+官方 [Run multiple services in a container](https://docs.docker.com/config/containers/multi-service_container/)
+
+### systemd
 
 [CHAPTER 3. USING SYSTEMD WITH CONTAINERS](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/managing_containers/using_systemd_with_containers)
 
@@ -68,10 +83,85 @@ docker stop  对PID1进程 的要求
 
 [Do you need to execute more than one process per container?](https://gomex.me/2018/07/21/do-you-need-to-execute-more-than-one-process-per-container/)
 
-[Run multiple services in a container](https://docs.docker.com/config/containers/multi-service_container/)
+### supervisor
+
+官方 [Run multiple services in a container](https://docs.docker.com/config/containers/multi-service_container/)
+
+[Admatic Tech Blog: Starting Multiple Services inside a Container with Supervisord](https://medium.com/@SaravSun/admatic-tech-blog-starting-multiple-services-inside-a-container-with-supervisord-16e3beb55916)
+
+使用 
+
+supervisord.conf
+
+	[supervisord]
+	nodaemon=true
+	logfile=/dev/stdout
+	loglevel=debug
+	logfile_maxbytes=0
+	
+	[program:pinggoogle]
+	command=ping admatic.in
+	autostart=true
+	autorestart=true
+	startsecs=5
+	stdout_logfile=NONE
+	stderr_logfile=NONE
+	
+Dockerfile
+	
+	FROM ubuntu
+	...
+	COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+	...
+	CMD ["/usr/bin/supervisord"]
+
+### runit
+
+[Run Multiple Processes in a Container](https://runnable.com/docker/rails/run-multiple-processes-in-a-container)
+
+A fully­ powered Linux environment typically includes an ​init​ process that spawns and supervises other processes, such as system daemons. The command defined in the CMD instruction of the Dockerfile is the only process launched inside the Docker container, so ​system daemons do not start automatically, even if properly installed.
+
+[runit - a UNIX init scheme with service supervision](http://smarden.org/runit/)
 
 
-其它 [Optimizing Spring Boot apps for Docker](https://openliberty.io/blog/2018/06/29/optimizing-spring-boot-apps-for-docker.html)
+使用
+
+Dockerfile
+
+	FROM phusion/passenger-­ruby22
+	
+	...
+	
+	#install custom bootstrap script as runit service
+	COPY myapp/start.sh /etc/service/myapp/run
+	
+	
+在这个Dockerfile 中，CMD 继承自 base image。 将`myapp/start.sh` 拷贝到 容器的 `/etc/service/myapp/run`	文件中即可 被runit 管理，runit 会管理 `/etc/service/` 下的应用（目录可配置），即 Each service is associated with a service directory
+
+### s6
+
+[Managing multiple processes in Docker containers](https://medium.com/@beld_pro/managing-multiple-processes-in-docker-containers-455480f959cc)
+
+## Docker-friendliness image
+
+与其在init 进程工具的选型上挣扎，是否有更有魄力的工具呢？
+
+1. docker 原生支持多进程，比如阿里的 pouch
+2. 原生支持多进程的 镜像
+
+github 有一个 [phusion/baseimage-docker](https://github.com/phusion/baseimage-docker) 笔者2018.11.7 看到时，有6848个star。 该镜像有几个优点：
+
+1. Modifications for Docker-friendliness.
+2. Administration tools that are especially useful in the context of Docker.
+3. Mechanisms for easily running multiple processes, without violating the Docker philosophy.  具体的说，The Docker developers advocate running a single logical service inside a single container. But we are not disputing that. Baseimage-docker advocates running multiple OS processes inside a single container, and a single logical service can consist of multiple OS processes. 
+
+
+什么叫 ubuntu 对 Docker-friendliness？（待体会）
+
+1. multi-user
+2. multi-process
+
+[phusion/baseimage-docker](https://github.com/phusion/baseimage-docker)  的image 是基于ubuntu，笔者试着用alpine + runit + sshd 实现了一个简洁的
 
 个人微信订阅号
 

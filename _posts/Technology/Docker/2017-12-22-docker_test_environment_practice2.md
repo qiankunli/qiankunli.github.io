@@ -115,6 +115,11 @@ build 慢的解决办法
 		</plugin>
 
 
+
+
+还有一种方案  [Optimizing Spring Boot apps for Docker](https://openliberty.io/blog/2018/06/29/optimizing-spring-boot-apps-for-docker.html)
+
+
 打tag
 
 
