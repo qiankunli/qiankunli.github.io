@@ -9,7 +9,7 @@ keywords: 数据结构
 ---
 
 
-## 前言（未完待续） 
+## 前言
 
 每本《数据结构》书上的主线都跑不了以下几点，时常回味一下，还是蛮有好处的。
 
@@ -42,6 +42,8 @@ keywords: 数据结构
 
 每种逻辑结构包含一些基本的运算，包括遍历，增减节点等。
 
+数据与数据之间的关系
+
 ## 队列
 
 教科书上一说队列，就是四个字“先进先出”,这四个字是无法表述队列的巨大作用的.
@@ -65,6 +67,35 @@ keywords: 数据结构
 ## 图
 
 深度优先和广度优先遍历，{初始状态，目标状态，规则集合}在寻找最佳策略上的应用
+
+## 碎碎念
+
+### 设计数据结构的过程是一种“映射”
+
+[Data Structure](https://www.encyclopedia.com/computing/dictionaries-thesauruses-pictures-and-press-releases/data-structure)Computer solution of a real-world problem involves designing some ideal data structures, and then mapping these onto available data structures (e.g. arrays, records, lists, queues, and trees) for the implementation. 先假设一种理想结构 然后再考虑着 组合基本结构去实现。
+
+
+我们说面向的对象的四个基本特性：抽象、封装、继承、多态。在四个基本特性之上呢，一群类的组合，有了各种设计模式。
+
+数组 + 哈希函数 就成了一个散列表。 也就是 基本特性的组合，是否也有设计模式一说呢？ 对于跳表来说，与其说数据结构本来就是那样子，还不如说为了在链表上提高查询速度而衍生的数据结构。亦或者说B+树，我们也可以说先有底层那一条叶子链，再有的上层索引结构。数据结构 + 数据结构 ==> 某方面更优秀的数据结构。数据结构 + 算法 ==> 更优秀的数据结构。
+
+![](/public/upload/algorithm/data_structure_vs_object.png)
+
+### 查询的不同意涵
+
+数据结构，model the application data，it is generally a requirement for any application to insert, edit and query a data store. Data structures offer different ways to store data items, while the algorithms provide techniques for managing this data. 不管什么样的数据结构，都跑不掉insert、edit、和query。尤其是query ，对于不同的数据结构，意涵很丰富
+
+1. 查询的入参不同，可能是index、数据的某个属性、范围、数据的某个特征（比如第k大的数）
+2. 查询返回的结果不同，可能是数据本身、数据集合、也可能是多个数据的组合（比如图的最优路径）
+
+
+### 数据结构与业务设计
+
+一般的业务系统要建立数据库表，数据库表要建立索引。笔者有一个经验，不要一开始建立索引。而是业务代码完毕后，观察常查询的属性，然后对这些数据建立索引。如果你愿意，索引 + 数据库表，就是一种数据结构，数据结构的构建（比如建立索引） 要反应业务的“意志”。
+
+[Definition of a Data Structure & Algorithms](https://smallbusiness.chron.com/definition-data-structure-algorithms-27214.html)Computing applications use many different types of data. Some applications model data within database systems, in which case the database system handles the details of choosing data structures, as well as the algorithms to manage them. However, in many cases, applications model their own data. When programmers decide what type of data structure to use for a particular set of data in an application, they need to take into account the specific data items to be stored, the relationships between data items and how the data will be accessed from within the application logic. [ddd(一)——领域驱动理念入门](http://qiankunli.github.io/2017/12/25/ddd.html) 也提到，一般业务以数据库ER设计为驱动，数据库设计代表了对业务的认识深度，也是业务的精华所在。 由此看， 数据库完成了一个项目本身应有的数据结构与算法的活儿。
+
+Algorithms for managing data structures sometimes involve recursion. With recursion, an algorithm calls itself, which means it repeats its own processes as part of a looping structure, with each step simplifying the problem at hand. Recursive algorithms can allow programmers to implement efficient sorting and searching techniques within their applications. However, writing recursive algorithms can be difficult for beginners, as it does require a significant amount of practice. 这段有一个很有意义的观点，Recursive algorithms 一般要对应 looping structure，是不是可以笼统的说：递归的算法一般对应着可以递归的数据结构。 
 
 ## 数据结构的"基本类型化"
 
