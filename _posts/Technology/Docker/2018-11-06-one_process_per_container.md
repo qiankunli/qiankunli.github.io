@@ -161,6 +161,7 @@ myapp/start.sh
 |utmpset| logout a line from utmp and wtmp file|
 |svlogd|runit’s service logging daemon|
 
+#### runit 工作原理
 
 ![](/public/upload/docker/runit.png)
 
