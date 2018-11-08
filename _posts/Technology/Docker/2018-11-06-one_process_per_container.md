@@ -123,8 +123,7 @@ A fully­ powered Linux environment typically includes an ​init​ process tha
 
 [runit - a UNIX init scheme with service supervision](http://smarden.org/runit/)
 
-
-使用
+#### 使用
 
 Dockerfile
 
@@ -136,11 +135,38 @@ Dockerfile
 	COPY myapp/start.sh /etc/service/myapp/run
 	
 	
+myapp/start.sh
+
+	#!/bin/sh
+	exec command
+
+	
 在这个Dockerfile 中，CMD 继承自 base image。 将`myapp/start.sh` 拷贝到 容器的 `/etc/service/myapp/run`	文件中即可 被runit 管理，runit 会管理 `/etc/service/` 下的应用（目录可配置），即 Each service is associated with a service directory
+
+这里要注意：记得通过exec 方式执行 command，这涉及到 [shell，exec，source执行脚本的区别](https://www.jianshu.com/p/dd7956aec097)
+
+
+[Using runit for maintaining services](https://debian-administration.org/article/697/Using_runit_for_maintaining_services) 
+
+[runit：进程管理工具runit](https://www.lijiaocn.com/%E6%8A%80%E5%B7%A7/2017/08/08/linux-tool-runit.html)
+
+||作用|备注|
+|---|---|---|
+|runit-init|runit-init is the first process the kernel starts. If runit-init is started as process no 1, it runs and replaces itself with runit|
+|runsvdir| starts and monitors a collection of runsv processes|当runsvdir检查到`/etc/service`目录下包含一个新的目录时，runsvdir会启动一个runsv进程来执行和监控run脚本。|
+|runsvchdir|change services directory of runsvdir|
+|sv|control and manage services monitored by runsv|`sv status /etc/service/test`<br>`sv stop /etc/service/test`<br>`sv restart /etc/service/test`|
+|runsv| starts and monitors a service and optionally an appendant log service|
+|chpst|runs a program with a changed process state|run脚本默认被root用户执行，通过chpst可以将run配置为普通用户来执行。|
+|utmpset| logout a line from utmp and wtmp file|
+|svlogd|runit’s service logging daemon|
+
+
+![](/public/upload/docker/runit.png)
 
 ### s6
 
-[Managing multiple processes in Docker containers](https://medium.com/@beld_pro/managing-multiple-processes-in-docker-containers-455480f959cc)
+[Managing multiple processes in Docker containers](https://medium.com/@beld_pro/managing-multiple-processes-in-docker-containers-455480f959cc) 
 
 ## Docker-friendliness image
 
@@ -161,7 +187,17 @@ github 有一个 [phusion/baseimage-docker](https://github.com/phusion/baseimage
 1. multi-user
 2. multi-process
 
+## 优雅的管理springboot 项目
+
+回到文开始提到的问题：
+
 [phusion/baseimage-docker](https://github.com/phusion/baseimage-docker)  的image 是基于ubuntu，笔者试着用alpine + runit + sshd 实现了一个简洁的base image，具体情况待实践一段时间再交流。
+
+1. 多进程方式，使得不管springboot 是否启动成功，容器都会启动成功
+2. 另外采取 措施监控 springboot 的健康状态，以决定是否 向该容器打入流量
+3. runit 正常会尝试不断重启，实际上往往因为代码的原因，启动一次就行了。因此启动springboot 的时候，先检查下 有没有`/etc/service/springboot/supervise`（runsv将服务的状态保存服务对应在supervise目录中） 文件，若没有则是第一次启动。有则是第二次启动，写入`/etc/service/springboot/down`（down 告知runsv 停止该服务）
+
+
 
 个人微信订阅号
 
