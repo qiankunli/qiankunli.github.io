@@ -93,6 +93,28 @@ A pod is a relatively tightly coupled group of containers that are scheduled ont
 
 ### Creating a pod
 
+Pod，而不是容器，才是 Kubernetes 项目中的最小编排单位。将这个设计落实到 API 对象上，容器（Container）就成了 Pod 属性里的一个普通的字段。那么，一个很自然的问题就是：到底哪些属性属于 Pod 对象，而又有哪些属性属于 Container 呢？
+
+Pod 扮演的是传统部署环境里“虚拟机”的角色。这样的设计，是为了使用户从传统环境（虚拟机环境）向 Kubernetes（容器环境）的迁移，更加平滑。而如果你能把 Pod 看成传统环境里的“机器”、把容器看作是运行在这个“机器”里的“用户程序”，那么很多关于 Pod 对象的设计就非常容易理解了。 比如，**凡是调度、网络、存储，以及安全相关的属性，基本上是 Pod 级别的**。这些属性的共同特征是，它们描述的是“机器”这个整体，而不是“机器”里的“用户程序”。
+
+
+	apiVersion: v1
+	kind: Pod...
+	spec: 
+		nodeSelector:
+		hostAliases:
+		containers:
+			- name:
+			  image:
+			  lifecycle: 
+			  	postStart: 
+			  		exec: 
+			  			command: ["/bin/sh","-c","echo hello world"]
+			  	preStop:
+			  		...
+
+		
+可以观察这些配置的位置，Pod的归Pod，容器的归容器。	
 #### Pod configuration file
 
 A pod configuration file specifies required information about the pod/ It can be formatted as YAML or as JSON, and supports the following fields:
