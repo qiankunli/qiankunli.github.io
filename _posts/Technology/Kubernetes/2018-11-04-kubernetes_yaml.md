@@ -95,6 +95,27 @@ At any given time, the Kubernetes Control Plane actively manages an object’s a
 
 metadata 与 spec 分别代表了 共性与个性，数据表设计也可以参照这个思路
 
+## PodPreset
+
+开发人员习惯的写的，是最简单的pod
+
+	apiVersion: v1
+	kind: Pod
+	metadata: 
+		name: website 
+		labels:
+			app: website 
+			role: frontend
+	spec: 
+		containers: 
+			- name:website 
+			  image: nginx
+			  ports: 
+				- containerPort:80
+
+但对运维来说，在实际环境中还需添加大量的配置，此时，运维可以事先定义一个PodPreset.yaml，并创建一个PodPreset`kubectl create -f preset.yaml`。 之后开发创建的pod（有一个规则匹配） 都会自动加上 preset.yaml 指定的配置。
+
+
 ## kubectl 
 
 在命令行中，所有 key-value 格式的参数，都使用“=”而非“:”表示。

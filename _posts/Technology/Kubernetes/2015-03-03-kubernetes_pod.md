@@ -179,3 +179,19 @@ Manifest部分的内容不再赘述（所包含字段，是否必须，以及其
 ### Deleting a pod
 
     kubectl delete pod xxx
+    
+## Pod 的生命周期
+
+1. pod的生命周期
+2. container的生命周期
+3. pod restartPolicy
+4. pod livenessProbe
+
+
+restartPolicy 和 Pod 里容器的状态，以及Pod 状态的对应关系（最终体现在`kube get pod pod_name` 时 status 的状态） [有一系列复杂的情况](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#example-states) ，可以概括为两条基本原则：
+
+1. 只要 Pod 的 restartPolicy 指定的策略允许重启异常的容器（比如：Always），那么这个 Pod 就会保持 Running 状态，并进行容器重启。否则，Pod 就会进入 Failed 状态 。
+2. 对于包含多个容器的 Pod，只有它里面所有的容器都进入异常状态后，Pod 才会进入 Failed 状态。在此之前，Pod都是 Running 状态。此时，Pod 的 READY 字段会显示正常容器的个数
+
+
+
