@@ -8,7 +8,7 @@ keywords: java forkjoin
 
 ---
 
-## 简介(未完成)
+## 简介(持续更新)
 
 ## optional
 
@@ -25,6 +25,50 @@ keywords: java forkjoin
 3. 一行解决问题的办法是`long uid = queryByName("zhangsan").map(User::getId).orElse(0l)`
 		
 stream map 之后是stream，optional map 之后是optional ，不要彼此相互干扰
+
+### 获取一个可能为null的对象的成员
+
+2018.11.14 补充，再看一个工具类
+
+	public class Nulls {
+	    public static <T, R> Optional<R> tryGet(T t, Function<T, R> function) {
+	        return null == t ? Optional.empty() : Optional.ofNullable(function.apply(t));
+	    }
+	    public static <T, R> Optional<R> tryGet(T t, Supplier<R> supplier) {
+	        return null == t ? Optional.empty() : Optional.ofNullable(supplier.get());
+	    }
+	    public static <T extends Collection, R> Optional<R> tryGet(T t, Supplier<R> supplier) {
+	        return null == t || 0 == t.size() ? Optional.empty() : Optional.ofNullable(supplier.get());
+	    }
+	}
+	
+使用时
+
+	public class NullsTest {
+	    @Setter
+	    @Getter
+	    class User {
+	        Long id;
+	    }
+	    
+	    @Test
+	    public void testUser() {
+	        User user = getUser();
+	        Optional<Long> id = Nulls.tryGet(user, () -> user.getId());
+	        System.out.println(id.orElse(null));
+	    }
+	
+	    @Test
+	    public void testList() {
+	        List<String> list = new ArrayList<>();
+	        Optional<String> id = Nulls.tryGet(list, () -> list.get(0));
+	        System.out.println(id.orElse(null));
+	    }
+	
+	    private User getUser() {
+	        return null;
+	    }
+	}
 
 
 ##  filter
