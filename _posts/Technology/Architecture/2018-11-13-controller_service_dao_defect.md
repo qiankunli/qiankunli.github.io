@@ -71,7 +71,7 @@ keywords: ddd cqrs
 1. 更复杂的成员变量 `List<List>` 或者 `List<Map<String,String>>`
 2. 更复杂的逻辑，比如设定默认地址，地址判重等。
 
-`UserService.addAddress`表示，我只想添加个地址而已。 
+`UserService.addAddress`吐血表示，我只想添加个地址而已。 
 
 换成充血模型
 
@@ -119,7 +119,7 @@ keywords: ddd cqrs
 		class QQ extends Contact{
 			String qq;
 		}
-		class phone extends Contact{
+		class Phone extends Contact{
 			String country;
 			String phone;
 		}
