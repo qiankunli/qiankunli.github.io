@@ -184,6 +184,8 @@ app sdk设计
 	* 前端页面 保存所有数据，在最后提交时 将所有数据一起提交
 	* 前端每一个阶段都提交一次数据，后端只是保存在缓存里，在最后提交时同步到db。设计思路参见 [ddd(三)——controller-service-dao的败笔](http://qiankunli.github.io/2018/11/13/controller_service_dao_defect.html)
 
+整体来说，在实现后端系统时，在有意识的向ddd 靠近，逐步学习ddd的理念。
+
 ## 性能
 
 ### 缓存/打掉缓存

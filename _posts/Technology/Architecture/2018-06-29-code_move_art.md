@@ -34,6 +34,65 @@ keywords: abtest
 
 反过来的说，如果每次修改都要动很多东西， 这就是代码的“坏味道”，说明抽象的 不是足够好。
 
+## 回调很有用
+
+以按行读写代码为例
+
+  	@Test
+    public void readFile() throws IOException {
+        FileInputStream in = new FileInputStream("test");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        String str = null;
+        while((str = reader.readLine()) != null) {
+            System.out.println(str);
+        }
+        //close
+        in.close();
+        reader.close();
+    }
+    
+在本例中，一行内容读取后，直接输出`System.out.println(str);`，逻辑不复杂。但若是每行的内容是一个复杂的json，且需要进行复杂的业务处理， 代码就很长了。
+
+此外，本例是读取一个磁盘文件，但若是读取hdfs文件，则读取代码至少扩充一倍。若是hdfs 很大，多线程读取时更为复杂。
+
+最后，读取文件一般是只关注读取的数据，弄一堆文件读取代码 和 数据处理逻辑写在一起，“坏味道”很大。
+
+  	@Test
+    public void readFile(LineHandler lineHandler) throws IOException {
+        FileInputStream in = new FileInputStream("test");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+        String str = null;
+        while((str = reader.readLine()) != null) {
+            lineHandler.handle(str);
+        }
+        //close
+        in.close();
+        reader.close();
+    }
+    
+    public void test(){
+    	...
+    	readFile(new LineHandler(){
+    		public void handle(String str){
+    			 System.out.println(str);
+    		}
+    	})
+    	...
+    }
+    
+使用回调分离关注。
+
+从这个例子还可以看到
+
+1. 逻辑是分层的，读取逻辑和数据处理逻辑 不要混在一起。换句话说，如果一个事情有两个明显不同的部分，那么代码应该写在两个地方
+2. 程序=逻辑 + 控制，在这个具体的例子中， 读取文件是控制，数据处理是逻辑
+3. 实现同样的效果，在java 里要定义一个接口，在scala 则可以直接写。
+3. 我们写在代码的时候，天然受语言的影响，过程式的、序列化的叙事/代码逻辑。但写代码 应该先想“应该有什么”，而不是“怎么做”。比如，从业务逻辑看，应该有一个观察者模式
+
+	1. 实现时应该先写观察者、监听者等代码， 然后再根据语言 将其串起来。观察者 模式java 与 go的实现很不一样，若是先从语言层面出发，则极易受语言的影响。
+	2. 观察者模式 本身的代码与 业务逻辑 不应混在一起，java 通过提取父类 等形式，将观察者模式本身的代码 与 业务逻辑分开。
+
+
 ## rxjava
 
 [rxjava](http://qiankunli.github.io/2018/06/20/rxjava.html)

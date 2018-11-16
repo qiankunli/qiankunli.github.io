@@ -41,6 +41,8 @@ keywords: JAVA Spring aop
 1. AspectJ是一套独立的面向切面编程的解决方案，和 Spring 是没有任何关系的。
 2. AspectJ属于编译时增强，其生成的 SayHelloService.class 和`javac` 生成的不一样
 
+Spring AOP 目前只支持基于 method 的 Join Points，而不支持基于 fileds 的 Join Points（据说是，字段名改了可以知道），也可以使用 AspectJ 去实现基于 fields 的 AOP。
+
 ## Spring Aop 和 aspectj
 
 1. Spring Aop 是运行是增强，即SayHelloService.class 没变，但在运行时 变了，并且实际上，内存中 实际运行的是 SayHelloService$1，为此常涉及到二次代理失效的问题

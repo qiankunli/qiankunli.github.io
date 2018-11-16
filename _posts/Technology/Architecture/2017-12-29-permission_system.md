@@ -164,8 +164,23 @@ keywords: Permission
 代码接口
 
 1. 方法上加注解，用来描述该方法 谁可以执行
+
+		@PrivilegedOperation("admin=true")
+		public void delete(Device device){
+			...
+		}
+
 2. 使用filter， 根据请求url + uid 判断是否具有操作权限
 3. 硬编码
+4. 拦截所有的资源访问方法，或者说在所有的资源操作方法执行之前 “塞入” 一个处理逻辑，进行权限判断。比如
+
+		@PrivilegedOperation
+		public void delete(@PrivilegedResourceId(resouce="device") id="deviceId" Device device){
+			...
+		}
+		
+	通过 PrivilegedOperation 拦截方法的执行，通过PrivilegedResourceId 描述资源的id
+		
 
 ## 审批流程（未完成）
 
