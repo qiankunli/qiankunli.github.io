@@ -38,7 +38,6 @@ keywords: abtest
 
 以按行读写代码为例
 
-  	@Test
     public void readFile() throws IOException {
         FileInputStream in = new FileInputStream("test");
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
@@ -57,7 +56,6 @@ keywords: abtest
 
 最后，读取文件一般是只关注读取的数据，弄一堆文件读取代码 和 数据处理逻辑写在一起，“坏味道”很大。
 
-  	@Test
     public void readFile(LineHandler lineHandler) throws IOException {
         FileInputStream in = new FileInputStream("test");
         BufferedReader reader = new BufferedReader(new InputStreamReader(in));
@@ -80,22 +78,24 @@ keywords: abtest
     	...
     }
     
-使用回调分离关注。
+**使用回调分离关注**
 
 从这个例子还可以看到
 
 1. 逻辑是分层的，读取逻辑和数据处理逻辑 不要混在一起。换句话说，如果一个事情有两个明显不同的部分，那么代码应该写在两个地方
 2. 程序=逻辑 + 控制，在这个具体的例子中， 读取文件是控制，数据处理是逻辑
-3. 实现同样的效果，在java 里要定义一个接口，在scala 则可以直接写。
+3. 实现同样的效果，在java 里要定义一个接口，在scala 则可以直接写。**如果一个逻辑，你用不同的语言实现，最后发现样子差别好大，就说明你没有做好抽象，任由语言特性干扰了代码结构。** 随需求所欲，不滞于物。**你要先知道理想状态是什么样子，然后用具体的语言、技术实现，而不是受困于语言和技术。**
 3. 我们写在代码的时候，天然受语言的影响，过程式的、序列化的叙事/代码逻辑。但写代码 应该先想“应该有什么”，而不是“怎么做”。比如，从业务逻辑看，应该有一个观察者模式
 
-	1. 实现时应该先写观察者、监听者等代码， 然后再根据语言 将其串起来。观察者 模式java 与 go的实现很不一样，若是先从语言层面出发，则极易受语言的影响。
+	1. 实现时应该先写观察者、监听者等代码， 然后再根据语言 将其串起来。观察者 模式java 与 go的实现很不一样，若是先从语言层面出发，则极易受语言的影响。对于本例来说，在写代码时，最好是先文件读取和数据处理分开写，然后将想办法它们串在一起（学名叫胶水代码 [系统设计的一些体会](http://qiankunli.github.io/2018/09/28/system_design.html)）。
 	2. 观察者模式 本身的代码与 业务逻辑 不应混在一起，java 通过提取父类 等形式，将观察者模式本身的代码 与 业务逻辑分开。
 
 
 ## rxjava
 
 [rxjava](http://qiankunli.github.io/2018/06/20/rxjava.html)
+
+[ddd(三)——controller-service-dao的败笔](http://qiankunli.github.io/2018/11/13/controller_service_dao_defect.html)
  
 响应式编程，笔者认为最关键的是 将观察者模式 扩展到数据/事件流上，而事件/数据流 是一种新的写代码的方式。
 
