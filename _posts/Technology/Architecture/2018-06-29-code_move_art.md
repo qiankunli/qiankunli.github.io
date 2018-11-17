@@ -36,7 +36,9 @@ keywords: abtest
 
 ## 回调很有用
 
-以按行读写代码为例
+2018.11.16 补充
+
+以按行读取文件代码为例
 
     public void readFile() throws IOException {
         FileInputStream in = new FileInputStream("test");
