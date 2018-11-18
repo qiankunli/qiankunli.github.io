@@ -159,7 +159,7 @@ yaml配置参见[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/ku
 
 
 
-
+[Kubernetes controller 组件](http://qiankunli.github.io/2015/03/03/kubernetes_controller.html)
 
 
 

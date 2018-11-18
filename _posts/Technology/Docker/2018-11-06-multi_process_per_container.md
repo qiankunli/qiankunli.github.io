@@ -19,6 +19,8 @@ keywords: 持续交付
 
 但容器中运行多进程，跟 one process per container 的理念相悖，我们就得探寻下来龙去脉了。
 
+从业界来说，虽然一个容器一个进程是官方推荐，但好像并不被大厂所遵守，以至于阿里甚至专门搞了一个PouchContainer 出来，[美团容器平台架构及容器技术实践](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651749434&idx=1&sn=92dcd59d05984eaa036e7fa804fccf20&chksm=bd12a5778a652c61f4a181c1967dbcf120dd16a47f63a5779fbf931b476e6e712e02d7c7e3a3&mpshare=1&scene=23&srcid=11183r23mQDITxo9cBDHbWKR%23rd)
+
 ## 为什么推荐一个容器一个进程？
 
 stack exchange [Why it is recommended to run only one process in a container?](https://devops.stackexchange.com/questions/447/why-it-is-recommended-to-run-only-one-process-in-a-container) 有一系列回答
@@ -197,7 +199,6 @@ github 有一个 [phusion/baseimage-docker](https://github.com/phusion/baseimage
 1. 多进程方式，使得不管springboot 是否启动成功，容器都会启动成功
 2. 另外采取 措施监控 springboot 的健康状态，以决定是否 向该容器打入流量
 3. runit 正常会尝试不断重启，实际上往往因为代码的原因，启动一次就行了。因此启动springboot 的时候，先检查下 有没有`/etc/service/springboot/supervise`（runsv将服务的状态保存服务对应在supervise目录中） 文件，若没有则是第一次启动。有则是第二次启动，写入`/etc/service/springboot/down`（down 告知runsv 停止该服务）
-
 
 
 个人微信订阅号

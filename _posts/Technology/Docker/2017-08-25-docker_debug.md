@@ -103,7 +103,13 @@ keywords: Docker
 
 [有赞容器化实践](https://segmentfault.com/a/1190000016551255)
 
-jvm 在容器内看到的cpu数不准确，会导致什么问题呢？jvm 以及很多 Java sdk 都会根据系统的 CPU 数来决定创建多少线程
+[美团容器平台架构及容器技术实践](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651749434&idx=1&sn=92dcd59d05984eaa036e7fa804fccf20&chksm=bd12a5778a652c61f4a181c1967dbcf120dd16a47f63a5779fbf931b476e6e712e02d7c7e3a3&mpshare=1&scene=23&srcid=11183r23mQDITxo9cBDHbWKR%23rd)
+
+jvm 在容器内看到的cpu数不准确，会导致什么问题呢？jvm 以及很多 Java sdk 会根据系统的 CPU 数来决定创建多少线程，比如ParallelGC线程数，这就会导致JVM启动过多的GC线程，直接的结果就导致GC性能下降。Java服务的感受就是延时增加，监控曲线突刺增加，吞吐量下降。
+
+Linux有两种IO：Direct IO和Buffered IO。Direct IO直接写磁盘，Duffered IO会先写到缓存再写磁盘，大部分场景下都是Buffered IO。美团使用的Linux内核3.X，社区版本中所有容器Buffer IO共享一个内核缓存，并且缓存不隔离，没有速率限制，导致高IO容器很容易影响同主机上的其他容器。
+
+大厂的玩的深，小厂表示，有点跟不动了。
 
 ## 2 Container stuck, can't be stopped or killed, can't exec into it either
 

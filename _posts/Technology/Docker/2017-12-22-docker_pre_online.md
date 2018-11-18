@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 测试环境docker化实践2
+title: 线上用docker要解决的问题
 category: 技术
 tags: Docker
 keywords: Docker,macvlan
@@ -170,8 +170,11 @@ To tag the image with a simple timestamp, add the following to your pom.xml:
 	* 发布时构建
 	* 平时代码提交即构建，发布时从已构建好的镜像进行部署。[基于容器的自动构建——Docker在美团的应用](https://www.jianshu.com/p/a1f371d9e0c5)
 
+## 服务画像
 
+[美团容器平台架构及容器技术实践](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651749434&idx=1&sn=92dcd59d05984eaa036e7fa804fccf20&chksm=bd12a5778a652c61f4a181c1967dbcf120dd16a47f63a5779fbf931b476e6e712e02d7c7e3a3&mpshare=1&scene=23&srcid=11183r23mQDITxo9cBDHbWKR%23rd)
 
+通过对服务容器实例运行指标的搜集和统计，更好的完成调度容器、优化资源分配。比如可以根据某服务的容器实例的CPU、内存、IO等使用情况，来分辨这个服务属于计算密集型还是IO密集型服务，在调度时尽量把互补的容器放在一起。
 
 ## 性能不及物理机(未完成)
 
@@ -182,6 +185,27 @@ cpu设置问题
 [Docker: 限制容器可用的 CPU](https://www.cnblogs.com/sparkdev/p/8052522.html)
 
 [Docker 运行时资源限制](http://blog.csdn.net/candcplusplus/article/details/53728507)
+
+## 推广
+
+
+[美团容器平台架构及容器技术实践](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651749434&idx=1&sn=92dcd59d05984eaa036e7fa804fccf20&chksm=bd12a5778a652c61f4a181c1967dbcf120dd16a47f63a5779fbf931b476e6e712e02d7c7e3a3&mpshare=1&scene=23&srcid=11183r23mQDITxo9cBDHbWKR%23rd)
+
+容器有如下优势：
+
+1. 轻量级：容器小、快，能够实现秒级启动。
+2. 应用分发：容器使用镜像分发，开发测试容器和部署容器配置完全一致。
+3. 弹性：可以根据CPU、内存等资源使用或者QPS、延时等业务指标快速扩容容器，提升服务能力。
+
+推广容器平台从某种程度上讲，自身是一个ToB的业务，首先要有好的产品。这个产品要能和客户现有的系统很好的进行集成，而不是让客户推翻所有的系统重新再来。要提供良好的客户支持，（即使有些问题不是这个产品导致的也要积极帮忙解决）。
+
+## 存储隔离性
+
+[美团点评Docker容器管理平台](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651746030&idx=3&sn=f0c97665bb35aca7bc054e9d230baae7&chksm=bd12b7a38a653eb5aca4ca366abee24bad89d1bfab9031e5bf859d15f38d92d6d0755beca225&scene=21#wechat_redirect)
+
+## 容器状态监控
+
+[适配多种监控服务的容器状态采集](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651746030&idx=3&sn=f0c97665bb35aca7bc054e9d230baae7&chksm=bd12b7a38a653eb5aca4ca366abee24bad89d1bfab9031e5bf859d15f38d92d6d0755beca225&scene=21#wechat_redirect)
 
 ## 镜像的清理
 
