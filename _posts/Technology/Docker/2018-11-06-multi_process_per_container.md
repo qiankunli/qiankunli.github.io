@@ -21,6 +21,8 @@ keywords: 持续交付
 
 从业界来说，虽然一个容器一个进程是官方推荐，但好像并不被大厂所遵守，以至于阿里甚至专门搞了一个PouchContainer 出来，[美团容器平台架构及容器技术实践](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651749434&idx=1&sn=92dcd59d05984eaa036e7fa804fccf20&chksm=bd12a5778a652c61f4a181c1967dbcf120dd16a47f63a5779fbf931b476e6e712e02d7c7e3a3&mpshare=1&scene=23&srcid=11183r23mQDITxo9cBDHbWKR%23rd)
 
+此外要注意的是，一个容器多进程 在k8s 的Pod 概念下，要相机做出一定的调整。
+
 ## 为什么推荐一个容器一个进程？
 
 stack exchange [Why it is recommended to run only one process in a container?](https://devops.stackexchange.com/questions/447/why-it-is-recommended-to-run-only-one-process-in-a-container) 有一系列回答
