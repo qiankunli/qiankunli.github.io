@@ -89,6 +89,11 @@ A pod is a relatively tightly coupled group of containers that are scheduled ont
 
 综上，我们可以有一个不太成熟的理解：pod本质是一个场景的最佳实践的普适化。
 
+“容器”镜像虽然好用，但是容器这样一个“沙盒”的概念，对于描述应用来说，还是太过简单了。Pod 对象，其实就是容器的升级版。它对容器进行了组合，添加了更多的属性和字段。
+Pod 这个看似复杂的 API 对象，实际上就是对容器的进一步抽象和封装而已。
+
+所以，将pod 单纯的理解为 多个容器 数字上的叠加 是不科学的。
+
 ## Pod Operations
 
 ### Creating a pod

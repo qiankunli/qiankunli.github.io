@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Kubernetes replication controller 组件
+title: Kubernetes controller 组件
 category: 技术
 tags: Kubernetes
 keywords: CoreOS Docker Kubernetes
@@ -12,6 +12,51 @@ keywords: CoreOS Docker Kubernetes
 本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删减。
 
 本文主要讲了replication controller（部分地方简称RC）
+
+2018.11.18 补充，内容来自极客时间 《深入剖析Kubernetes》
+
+
+## 编排的实现——控制器模型
+
+docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就在在集群里给镜像找一个主机来运行容器。经过 [《深入剖析kubernetes》笔记](http://qiankunli.github.io/2018/08/26/parse_kubernetes_note.html)的学习，很明显不是这样。比调度更重要的是编排，那么编排如何实现呢？
+
+### 有什么
+
+controller是一系列控制器的集合，不单指RC。
+
+	$ cd kubernetes/pkg/controller/
+	$ ls -d */              
+	deployment/             job/                    podautoscaler/          
+	cloud/                  disruption/             namespace/              
+	replicaset/             serviceaccount/         volume/
+	cronjob/                garbagecollector/       nodelifecycle/          replication/            statefulset/            daemon/
+	...
+
+### 构成
+
+一个控制器，实际上都是由上半部分的控制器定义（包括期望状态），加上下半部分的被控制对象（Pod 或 Volume等）的模板组成的。
+
+### 逻辑
+
+这些控制器之所以被统一放在 pkg/controller 目录下，就是因为它们都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。 （这是不是可以解释调度器 和控制器 不放在一起实现，因为两者是不同的处理逻辑，或者说编排依赖于调度）
+
+	for {
+	  实际状态 := 获取集群中对象 X 的实际状态（Actual State）
+	  期望状态 := 获取集群中对象 X 的期望状态（Desired State）
+	  if 实际状态 == 期望状态{
+	    什么都不做
+	  } else {
+	    执行编排动作，将实际状态调整为期望状态
+	  }
+	}
+
+实际状态往往来自于 Kubernetes 集群本身。 比如，kubelet 通过心跳汇报的容器状态和节点状态，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。而期望状态，一般来自于用户提交的 YAML 文件。 比如，Deployment 对象中 Replicas 字段的值，这些信息往往都保存在 Etcd 中。
+
+
+
+Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事件驱动”，有点类似 select和epoll的区别。控制器模型更有利于幂等。
+
+
 
 ## What is a replication controller?
 
