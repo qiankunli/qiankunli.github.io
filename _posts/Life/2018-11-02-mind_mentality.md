@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 程序猿常见的思维误区
+title: 猿性的弱点
 category: 生活
 tags: Life
 keywords: 认知

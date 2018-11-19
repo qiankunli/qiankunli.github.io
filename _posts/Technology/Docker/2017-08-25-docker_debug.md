@@ -109,7 +109,7 @@ jvm 在容器内看到的cpu数不准确，会导致什么问题呢？jvm 以及
 
 Linux有两种IO：Direct IO和Buffered IO。Direct IO直接写磁盘，Duffered IO会先写到缓存再写磁盘，大部分场景下都是Buffered IO。美团使用的Linux内核3.X，社区版本中所有容器Buffer IO共享一个内核缓存，并且缓存不隔离，没有速率限制，导致高IO容器很容易影响同主机上的其他容器。
 
-大厂的玩的深，小厂表示，有点跟不动了。
+很多方面，**容器内应用无法感知容器的存在**，此外，容器间也在不常见的地方相互影响着。此时需要更改glibc、更深入点比如内核等。大厂的玩的深，小厂表示，有点跟不动了。
 
 ## 2 Container stuck, can't be stopped or killed, can't exec into it either
 
