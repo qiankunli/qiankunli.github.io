@@ -88,7 +88,7 @@ build 慢的解决办法
 	* 每一个步骤都容器化时，比较复杂。尤其是 build 和push 过程，还需要 docker in docker
 	
 2. 阿里云效方案，用户在代码中附属一个配置文件，由命令根据文件打成jar/war，再制作为image
-3. google jib 方案，使用maven 插件，将过程内置到 maven build 过程中，并根据image registry 格式，直接push到registry 中。 
+3. google jib 方案，使用maven 插件，将过程内置到 maven build 过程中，并根据image registry 格式，直接push到registry 中。  jib 应用参加 []()
 4. 假设一个是maven项目，项目根目录下放上Dockerfile、marathon.json/xxx-pod.yaml 文件，自己写一个脚本（比如叫deploy.sh) 用户`maven package` 之后，执行`deploy.sh` 。该方案有以下问题
 
 	* 直接暴露Dockfile 和 marathon.json 对于一些新手来说，难以配置，可能要将配置文件“封装”一下
@@ -96,93 +96,6 @@ build 慢的解决办法
 
 灵活性和模板化的边界在哪里？可以参见下 CNI 的设计理念。
 
-## jib
-
-### 基本使用
-
-[Google开源其Java容器化工具Jib，简化镜像构建全流程](https://mp.weixin.qq.com/s/KwmVoFeUG8gJCrgh5AFkvQ)
-
-`mvn compile jib:build` 从中可以看到
-
-
-	[INFO] Retrieving registry credentials for harbor.test.ximalaya.com...
-	[INFO] Getting base image harbor.test.ximalaya.com/test/jdk8-tomcat8...
-	[INFO] Building dependencies layer...
-	[INFO] Building resources layer...
-	[INFO] Building classes layer...
-	[INFO] Retrieving registry credentials for harbor.test.ximalaya.com...
-	[INFO] Finalizing...
-	[INFO] 
-	[INFO] Container entrypoint set to [java, -cp, /app/libs/*:/app/resources/:/app/classes/, org.apache.catalina.startup.Bootstrap]
-	[INFO] 
-	[INFO] Built and pushed image as harbor.xx/test/jib-demo
-
-
-1. 与常规的将代码及依赖 打成一个jar 包作为一个layer 不同，jib 将dependencies、resources、 classes（即项目代码） 分别打成一个layer， 在项目实践中，dependencies、resources 变化不多 ，因此能够复用相当一部分空间。
-
-2. maven pom.xml 配置 针对插件的 0.9.9 版本
-
-		<plugin>
-			<groupId>com.google.cloud.tools</groupId>
-			<artifactId>jib-maven-plugin</artifactId>
-			<version>0.9.9</version>
-			<configuration>
-				<allowInsecureRegistries>false</allowInsecureRegistries>
-				<from>
-					<image>harbor.test.xxx.com/test/jdk8</image>
-					<auth>
-						<username>xxx</username>
-						<password>xxx</password>
-					</auth>
-				</from>
-				<to>
-					<image>harbor.test.xxx.com/test/jib-springboot-demo</image>
-					<auth>
-						<username>xxx</username>
-						<password>xxx</password>
-					</auth>
-				</to>
-				<container>
-					<mainClass>com.xxx.springboot.demo.DockerSpringbootDemoApplication</mainClass>
-				</container>
-			</configuration>
-		</plugin>
-
-
-
-
-还有一种方案  [Optimizing Spring Boot apps for Docker](https://openliberty.io/blog/2018/06/29/optimizing-spring-boot-apps-for-docker.html)
-
-
-打tag
-
-To tag the image with a simple timestamp, add the following to your pom.xml:
-
-	<properties>
-	  <maven.build.timestamp.format>yyyyMMdd-HHmmssSSS</maven.build.timestamp.format>
-	</properties>
-	Then in the jib-maven-plugin configuration, set the tag to:
-	
-	<configuration>
-	  <to>
-	    <image>my-image-name:${maven.build.timestamp}</image>
-	  </to>
-	</configuration>
-	
-### jib 优化
-
-从目前来看，我们感觉针对 java 项目来说，jib 是最优的。jib 貌似可以做到，不用非得在 pom.xml 中体现。`mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build -Dimage=<MY IMAGE>`
-
-对以后的多语言，可以项目中 弄一个deploy.yaml 文件。这个yaml 文件应该是 跨语言的，yaml 文件的执行器 应能根据 yaml 配置 自动完成 代码 到 镜像的所有工作。
-
-	language:java
-	param:
-	creator: zhangsan
-	
-然后，编写一个 build 程序
-
-1. 碰到java 执行 `mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build -Dimage=<MY IMAGE>` 。这里 build 程序要做的工作 是根据 deploy.yaml 文件的用户参数 拼凑 `mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build -Dimage=<MY IMAGE>`  命令 并执行。 **本质上还是用maven，只是在jenkins 和 maven 之间加了一层**，加了一层之后，就可以更方便的支持用户的个性化（或者说，用户可以在项目代码上 而不是jenkins 上做个性化配置）
-2. 碰到golang 执行 go build。  go 语言中 一定有类似  jib 的框架在。
 
 
 
