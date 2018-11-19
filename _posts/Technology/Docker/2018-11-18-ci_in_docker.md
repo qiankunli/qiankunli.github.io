@@ -88,7 +88,7 @@ build 慢的解决办法
 	* 每一个步骤都容器化时，比较复杂。尤其是 build 和push 过程，还需要 docker in docker
 	
 2. 阿里云效方案，用户在代码中附属一个配置文件，由命令根据文件打成jar/war，再制作为image
-3. google jib 方案，使用maven 插件，将过程内置到 maven build 过程中，并根据image registry 格式，直接push到registry 中。  jib 应用参加 []()
+3. google jib 方案，使用maven 插件，将过程内置到 maven build 过程中，并根据image registry 格式，直接push到registry 中。  jib 应用参加 [jib源码分析及应用](http://qiankunli.github.io/2018/11/19/jib_source.html)
 4. 假设一个是maven项目，项目根目录下放上Dockerfile、marathon.json/xxx-pod.yaml 文件，自己写一个脚本（比如叫deploy.sh) 用户`maven package` 之后，执行`deploy.sh` 。该方案有以下问题
 
 	* 直接暴露Dockfile 和 marathon.json 对于一些新手来说，难以配置，可能要将配置文件“封装”一下
