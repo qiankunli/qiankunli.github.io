@@ -78,6 +78,8 @@ build 慢的解决办法
 
 ## 如何将代码变成image
 
+### 可用方案
+
 这是一个难题，难点不在如何变成jar，难在如何让一群完全没有docker 经验的人，按照指示，将代码变成jar/war，再变成image
 
 1. jenkins + 变量方案，jenkins 执行maven 代码变成jar/war 之后，用变量指定jar/war 位置，根据变量构建Dockerfile，制作镜像。该方案在实施过程中碰到以下问题
@@ -96,7 +98,31 @@ build 慢的解决办法
 
 灵活性和模板化的边界在哪里？可以参见下 CNI 的设计理念。
 
+### 加一层
 
+从目前来看，针对 java 项目来说，jib 是最优的。在项目目录下直接执行 `mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build -Djib.to.image=<MY IMAGE>` 便可以将代码转换为镜像。
+
+对以后的多语言，可以项目中 弄一个deploy.yaml 文件。yaml 文件的解释/执行器 应能根据 yaml 配置 自动完成 代码 到 镜像的所有工作。
+
+	language:java
+	param: xx
+	creator: zhangsan
+	
+对于yaml 执行器
+
+1. 碰到java 执行要 `mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build -Djib.to.image=<MY IMAGE>` 
+
+	* 要做的工作 是根据 deploy.yaml 文件的用户参数 拼凑 `mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build -Djib.to.image=<MY IMAGE>`  命令 并执行。 
+	* **本质上还是用maven，只是在jenkins 和 maven 之间加了一层**，加了一层之后，就可以更方便的支持用户的个性化（或者说，用户可以在项目代码上 而不是jenkins 上做个性化配置）
+2. 碰到golang 执行 go build。  go 语言中 一定有类似  jib 的框架在。
+
+
+jenkins 作为驱动器的问题
+
+1. 权限管理比较弱
+2. 用户配置、操作无法拦截，也就不能做错误校验（或者很麻烦）。用户配置分散在各个jenkins中，也没有手段可以批量修改。
+3. jenkins 一般作为一个公司的基础系统，集中式，项目很多，会很卡。当然，可以用docker、集群的方式解决。
+4. 和基础设施即代码的理念一对比，就显得很臃肿。
 
 
 ## 其它细节

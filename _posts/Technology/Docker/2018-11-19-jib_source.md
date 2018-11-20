@@ -85,6 +85,18 @@ keywords: jib
 
 #### 通过mvn调用
 
+假设存在一个jib-demo的web项目，则可以在项目目录下（与项目pom.xml平级）执行
+
+	mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build \
+		-Djib.from.image=xx/common/jdk8-tomcat8 \
+	    -Djib.from.auth.username=zhangsan \
+	    -Djib.from.auth.password=lisi \
+		-Djib.to.image=xx/test/jib-demo \
+	    -Djib.to.auth.username=zhangsan \
+	    -Djib.to.auth.password=lisi
+	    
+也就是所有的pom配置都可以转换为命令行配置，使用这种方式的好处是开发无感知。
+
 ## 打tag
 
 To tag the image with a simple timestamp, add the following to your pom.xml:
@@ -100,20 +112,7 @@ To tag the image with a simple timestamp, add the following to your pom.xml:
 	  </to>
 	</configuration>
 	
-## jib 优化
 
-从目前来看，我们感觉针对 java 项目来说，jib 是最优的。jib 貌似可以做到，不用非得在 pom.xml 中体现。`mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build -Dimage=<MY IMAGE>`
-
-对以后的多语言，可以项目中 弄一个deploy.yaml 文件。这个yaml 文件应该是 跨语言的，yaml 文件的执行器 应能根据 yaml 配置 自动完成 代码 到 镜像的所有工作。
-
-	language:java
-	param:
-	creator: zhangsan
-	
-然后，编写一个 build 程序
-
-1. 碰到java 执行 `mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build -Dimage=<MY IMAGE>` 。这里 build 程序要做的工作 是根据 deploy.yaml 文件的用户参数 拼凑 `mvn compile com.google.cloud.tools:jib-maven-plugin:0.10.0:build -Dimage=<MY IMAGE>`  命令 并执行。 **本质上还是用maven，只是在jenkins 和 maven 之间加了一层**，加了一层之后，就可以更方便的支持用户的个性化（或者说，用户可以在项目代码上 而不是jenkins 上做个性化配置）
-2. 碰到golang 执行 go build。  go 语言中 一定有类似  jib 的框架在。
 
 ## 源码分析
 
