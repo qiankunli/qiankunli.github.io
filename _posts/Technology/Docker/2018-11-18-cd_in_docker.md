@@ -25,6 +25,8 @@ keywords: 持续交付
 
 ## 对环境隔离的支持
 
+环境变量即回调
+
 个人微信订阅号
 
 ![](/public/upload/qrcode_for_gh.jpg)

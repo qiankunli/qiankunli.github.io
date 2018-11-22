@@ -21,7 +21,7 @@ keywords: Docker,macvlan
 笔者在 [测试环境docker化实践](http://qiankunli.github.io/2017/03/29/docker_test_environment_practice.html) 提到了测试环境运行docker化的一些实践，一年多以来，对docker以及 docker实施有了很多新的认识：
 
 1. docker 本身的落地 涉及到 网络、编排工具选型 等问题，这个问题在18年已经逐步成熟并清晰。
-2. 仅仅是在一个集群上搭建和运行docker/k8s 等，还是非常初级的。推广容器平台从某种程度上讲，自身是一个ToB的业务。你不仅要能用，还得好用，这个好用体现在
+2. 仅仅是在一个集群上搭建和运行docker/k8s 等，还是非常初级的。因为docker/k8s层是一个PaaS层的东西，不可能动了这一层而开发等无感知，要下大力气屏蔽掉变化，减少对开发的影响。推广容器平台从某种程度上讲，自身是一个ToB的业务。你不仅要能用，还得好用，这个好用体现在
 
 	* 要形成一个完整的持续交付体系 [docker环境下的持续构建](http://qiankunli.github.io/2018/11/18/ci_in_docker.html) 以及 [docker环境下的持续发布](http://qiankunli.github.io/2018/11/18/cd_in_docker.html)
 	* 对开发同学的友好性 
