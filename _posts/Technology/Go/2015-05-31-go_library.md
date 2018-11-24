@@ -19,7 +19,7 @@ keywords: Go
 1. 可见性和代码划分
 
 	* c++ 在类上，即哪怕在同一个代码文件中，仍然无法访问一个类的私有方法
-	* java 是 类 + 报名
+	* java 是 类 + 包名
 	* go 在包上，从其他包中引入的常量、变量、函数、结构体以及接口，都需要加上包的前缀来进行引用。Golang 也可以 dot import 来去掉这个前缀。不幸的是，这个做法并不常规，并且不被建议。
 
 1. 假设有一个用户信息管理系统，直观感觉上的分包方式
@@ -29,6 +29,8 @@ keywords: Go
 	* 按模块划分。比如`user/UserControler.go,user/User.go`，缺点就是使用User类时只得 `user.User`
 
 2. 按依赖划分，即根包下 定义接口文件`servier.go`，包含User和UserController 接口定义，然后定义`postgresql/UserService.go` 或者`mysql/UserService.go`
+
+github 也有一些demo 项目layout [golang-standards/project-layout](https://github.com/golang-standards/project-layout)
 
 [作为一名Java程序员，我为什么不在生产项目中转向Go](http://www.infoq.com/cn/articles/why-not-go)
 
