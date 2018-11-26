@@ -138,7 +138,7 @@ build 慢的解决办法
 1. 版本控制
 2. DSL（领域特定语言），基于groovy 或yaml 的，Jenkins2.0 允许我们在项目的特定目录下放置一个Jenkinsfile的文件，使用Groovy实现了一套描述流水线的DSL。
 
-### 流水线即代码
+#### 流水线即代码
 
 可以项目中 弄一个deploy.yaml 文件。yaml 文件的解释/执行器 应能根据 yaml 配置 自动完成 代码 到 镜像的所有工作。
 

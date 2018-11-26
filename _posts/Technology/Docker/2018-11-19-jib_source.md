@@ -210,6 +210,13 @@ StepsRunner 是有一个基本的构造函数之后
 	               .toBlocking().forEach(System.out::println);
       	
 
+### docker registry api
+
+通过docker registry v2 api，是可以上传镜像的
+
+1. jib 的最后，是不是也是调用 docker registry v2 api
+2. 
+
 
 个人微信订阅号
 
