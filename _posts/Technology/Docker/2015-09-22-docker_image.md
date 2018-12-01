@@ -9,6 +9,29 @@ keywords: Docker image registry
 ---
 ## 简介
 
+* TOC
+{:toc}
+
+## 和ssh的是是非非
+
+2018.12.01 补充 [ssh连接远程主机执行脚本的环境变量问题](http://feihu.me/blog/2014/env-problem-when-ssh-executing-command-on-remote/)
+
+背景：
+
+1. 容器启动时会运行sshd，所以可以ssh 到容器
+2. 镜像dockerfile中 包含`ENV PATH=${PATH}:/usr/local/jdk/bin`
+2. `docker exec -it container bash` 可以看到 PATH 环境变量中包含 `/usr/local/jdk/bin`
+3. `ssh root@xxx` 到容器内，观察 PATH 环境变量，则不包含  `/usr/local/jdk/bin`
+
+这个问题涉及到 bash的四种模式
+
+1. 通过ssh登陆到远程主机  属于bash 模式的一种：login + interactive
+2. 不同的模式，启动shell时会去查找并加载 不同而配置文件，比如`/etc/bash.bashrc`、`~/.bashrc` 、`/etc/profile` 等
+3. login + interactive 模式启动shell时会 第一加载`/etc/profile`
+4. `/etc/profile` 文件内容默认有一句 `export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
+
+所以 `docker exec `可以看到 正确的PATH 环境变量值，而ssh 到容器不可以，解决方法之一就是 制作镜像时 向`/etc/profile` 追加 一个export 命令
+
 ## build 过程
 
     cid=$(docker run -v /foo/bar debian:jessie) 

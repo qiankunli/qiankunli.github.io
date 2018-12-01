@@ -13,11 +13,14 @@ keywords: 持续交付
 * TOC
 {:toc}
 
+建议先看下 常规自动化构建的 理念和历史发展 [maven/ant/gradle使用](http://qiankunli.github.io/2015/07/13/maven.html)
+
 ![](/public/upload/docker/ci_in_docker.png)
+
 
 ## 几个问题
 
-构建过程的过程中涉及到几个基本问题：
+从上图可以看到，”代码 ==> 镜像“涉及到多个步骤，构建过程的过程中涉及到几个基本问题：
 
 1. 用不用jenkins? 怎么用jenkins？是否容器化jenkins？
 2. dockerfile 和代码是否在一起？
