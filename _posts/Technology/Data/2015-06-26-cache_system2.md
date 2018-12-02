@@ -8,13 +8,17 @@ keywords: 缓存 redis
 
 ---
 
-## 简介（未完待续） 
+## 简介
 
+建议看下前文[缓存系统](http://qiankunli.github.io/2015/06/26/cache_system.html)
 
+[缓存那些事](https://tech.meituan.com/cache_about.html)
 
-## 缓存组件 一 
+![](/public/upload/data/cache_location.png)
 
-在java中，经常拿来当缓存用的是HashMap。不过，建议使用WeakHashMap，而不是HashMap，当然，更好的选择是使用框架，例如Guava Cache。
+## 本地缓存
+
+在java中，经常拿来当缓存用的是HashMap。不过，建议使用WeakHashMap，而不是HashMap，当然，更好的选择是使用框架，例如Guava Cache [Guava 学习笔记](https://legacy.gitbook.com/book/skyao/learning-guava/details)。
 
      public void TestLoadingCache() throws Exception{
         // Cache 类更加灵活
