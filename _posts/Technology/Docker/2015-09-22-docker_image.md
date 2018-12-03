@@ -12,6 +12,28 @@ keywords: Docker image registry
 * TOC
 {:toc}
 
+## 多阶段构建
+
+[Use multi-stage builds](https://docs.docker.com/develop/develop-images/multistage-build/) **multi-stage builds 的重点不是multi-stage  而是 builds**
+
+先使用docker 将go文件编译为可执行文件
+
+	FROM golang:1.7.3
+	WORKDIR /go/src/github.com/alexellis/href-counter/
+	COPY app.go .
+	RUN go get -d -v golang.org/x/net/html \
+	  && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
+	  
+因为笔者一直是直接做镜像，所以没这种感觉。不过这么做倒有一点好处：可执行文件的实际运行环境 可以不用跟 开发机相同。学名叫同构/异构镜像构建。
+
+然后将可执行文件 做成镜像
+
+	FROM alpine:latest  
+	RUN apk --no-cache add ca-certificates
+	WORKDIR /root/
+	COPY app .
+	CMD ["./app"]  
+
 ## 和ssh的是是非非
 
 2018.12.01 补充 [ssh连接远程主机执行脚本的环境变量问题](http://feihu.me/blog/2014/env-problem-when-ssh-executing-command-on-remote/)

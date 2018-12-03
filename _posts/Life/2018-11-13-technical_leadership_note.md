@@ -17,6 +17,9 @@ keywords: 技术领导力
 
 管理大师彼得·德鲁克说：“组织的目的，就是让平凡的人做出不平凡的事。”
 
+杰克·韦尔奇曾经说过：Before you are a leader, success is all about yourself. When you become a leader, success is all about growing others.当你在赛场上踢球时，你应该考虑做一名优秀的球员；当你成为一名优秀的球员时，你应该考虑做一名优秀的教练。
+
+
 
 ## 技术leader应该具备何种能力
 
@@ -94,6 +97,12 @@ keywords: 技术领导力
 我觉得优秀的人，都至少能达到：1、能够清楚地认识到什么东西是对的。2、在知道是对的情况下，愿意去把事情做得更好。
 
 CTO 是为 CEO 的吹牛而埋单的，但是不要忘记，作为追求利润最大化为唯一目标的经营单位，任何一次的目标定位，都是生死抉择。作为核心决策者之一，理解接受只是最基本的要求，充分参与其中，合理调配资源，并解决问题才是合格的 CTO。
+
+## 揉和
+
+黄勇
+
+![](/public/upload/life/technical_leadership_300_1.png)
 
 
 ## 大环境

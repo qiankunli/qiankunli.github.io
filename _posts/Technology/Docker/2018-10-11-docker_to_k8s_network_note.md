@@ -11,15 +11,16 @@ keywords: Container-Networking-Docker-Kubernetes
 
 ## 简介
 
-Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes 中的容器网络的小册子
+Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes 中的容器网络的小册子，本文是其读书笔记。
 
 容器网络仍然非常年轻，年轻就意味着多变，笔者之前博客总结几套方案都落伍了， 这更加需要我们对容器网络有一个梳理。
 
-service discovery and container orchestration are two sides of the same idea.
+**service discovery and container orchestration are two sides of the same idea.**
 
 * TOC
 {:toc}
 
+建议先看下[程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)
 
 ## container networking stack
 
