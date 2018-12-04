@@ -33,6 +33,8 @@ Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes �
 
 ![](/public/upload/docker/container_networking.png)
 
+一个 Network Namespace 的网络栈包括：网卡（Network Interface）、回环设备（Loopback Device）、路由表（Routing Table）和 iptables 规则。
+
 
 ## 单机
 
@@ -79,37 +81,6 @@ ip-per-container 是网络方案中的一种，不要用习惯了，就以为只
 |Macvlan|Containers will directly get exposed in underlay network using Macvlan sub-interfaces.<br> Macvlan has 4 types(Private, VEPA, Bridge, Passthru)<br> 可以在vlan sub-interface 上创建 macvlan subinterface|Macvlan allows a single physical interface to have multiple mac and ip addresses using macvlan sub-interfaces. <br>|交换机的port一般只与一个mac绑定，使用macvlan 后必须支持绑定多个 且 无数量限制|
 |ipvlan|  ipvlan supports L2 and L3 mode.|the endpoints have the same mac address|省mac地址|
 |vxlan|Virtual Extensible LAN (VXLAN) is a network virtualization technology that attempts to address the scalability problems associated with large cloud computing deployments. <br>VXLAN endpoints, which terminate VXLAN tunnels and may be either virtual or physical switch ports, are known as VXLAN tunnel endpoints (VTEPs)||交换机无感知|
-
-
-## 给所有网络方案归个类
-
-there are two ways for Containers or VMs to communicate to each other. 
-
-1. In Underlay network approach, VMs or Containers are directly exposed to host network. Bridge, macvlan and ipvlan network drivers are examples of this approach. 
-2. In Overlay network approach, there is an additional level of encapsulation like VXLAN, NVGRE
-
-||容器的网卡 来自哪里？|真正与外界通信的网卡是哪个？ external connectivity|容器与物理机网卡的关系及数据连通|
-|---|---|---|---|
-|bridge|veth|物理机网卡|veth pair 挂在bridge上，NAT 连通 物理机网卡|
-|macvlan|macvlan sub-interfaces|macvlan sub-interfaces|
-|ipvlan|ipvlan sub-interfaces|ipvlan sub-interfaces|
-|calico|veth|物理机网卡|host 侧的veth 与 host eth建立路由|
-
-该表格持续更新中
-
-bridge 方案加上隧道 就是 vxlan，加上路由方案就是 calico
-
-[容器网络：盘点，解释与分析](http://www.dockerinfo.net/4289.html)
-
-这个归类不好做，有好几个方面：
-
-1. 支持量级的大小
-2. 拆封包还是路由
-3. 交换机是否有感知
-4. 容器所在物理机/宿主机处于一个什么样的角色
-5. 是一个L3方案（只要物理机来通就行）还是L2方案，L3网络扩展和提供在过滤和隔离网络流量方面的细粒度控制。
-6. 选择网络时，IP地址管理IPAM，组播，广播，IPv6，负载均衡，服务发现，策略，服务质量，高级过滤和性能都是需要额外考虑的。问题是这些能力是否受到支持。即使您的runtime，编排引擎或插件支持容器网络功能，您的基础架构也可能不支持该功能
-
 
 
 ## CNI
