@@ -3,7 +3,7 @@
 layout: post
 title: docker dns
 category: 技术
-tags: Docker
+tags: Network
 keywords: Docker dns
 
 ---

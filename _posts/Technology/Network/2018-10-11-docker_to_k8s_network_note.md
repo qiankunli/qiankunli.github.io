@@ -3,7 +3,7 @@
 layout: post
 title: 《Container-Networking-Docker-Kubernetes》笔记
 category: 技术
-tags: Docker
+tags: Network
 keywords: Container-Networking-Docker-Kubernetes
 
 ---

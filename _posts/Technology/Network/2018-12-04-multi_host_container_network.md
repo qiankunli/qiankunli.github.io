@@ -3,7 +3,7 @@
 layout: post
 title: 跨主机容器通信
 category: 技术
-tags: Docker
+tags: Network
 keywords: container network
 
 ---
@@ -73,6 +73,7 @@ os->c->java 多线程](http://qiankunli.github.io/2014/10/09/Threads.html)
 |物理机局域网络|物理机网卡|网线 + 交换机|ARP广播，物理机内完成|
 |overlay 网络|容器 veth|容器与宿主机network namespace连通，物理机连通|网络插件 + etcd，物理机内完成|
 
+这个 discoverability 宏观上有点微服务 服务发现的意思。
 
 我们找一下覆盖网络的感觉
 
@@ -90,6 +91,8 @@ os->c->java 多线程](http://qiankunli.github.io/2014/10/09/Threads.html)
 覆盖网络如何解决connectivity and discoverability？connectivity由物理机之间解决，discoverability由veth 与 宿主机eth 之间解决，将上图细化一下
 
 ![](/public/upload/docker/overlay_network_2.png)
+
+有时觉得物理机内部 容器的veth 与 宿主机的eth0 之间塞个网桥、vtep、tun0 等虚拟设备 + 路由表等很复杂，但真实的网络世界，也不是一个交换机解决所有的问题。在数据中心网络中，什么三层交换机、二层交换机，交换机的搭配也是一门很深的学问。
 
 #### 隧道
 
