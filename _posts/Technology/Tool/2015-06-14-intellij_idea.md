@@ -8,6 +8,17 @@ keywords: IntelliJ IDEA
 
 ---
 
+* TOC
+{:toc}
+
+## 命令行下打开项目
+
+2018.12.6 补充
+
+Intellij idea-->Tools-->Create Command-line Lanucher
+
+进入指定项目的根目录，如果是gradle 项目就是 build.gradle 所在目录，如果是maven项目就是pom.xml  所在目录。然后输入：`idea .`，回车即可打开指定项目。
+
 ## war 和 war exploded
 
 1. war 模式，将web 工程以包的形式上传到服务器（也就是你本地的tomcat 文件夹）。
