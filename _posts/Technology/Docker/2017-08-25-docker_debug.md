@@ -111,7 +111,23 @@ Linux有两种IO：Direct IO和Buffered IO。Direct IO直接写磁盘，Duffered
 
 很多方面，**容器内应用无法感知容器的存在**，此外，容器间也在不常见的地方相互影响着。此时需要更改glibc、更深入点比如内核等。大厂的玩的深，小厂表示，有点跟不动了。
 
-## 2 Container stuck, can't be stopped or killed, can't exec into it either
+## jar冲突
+
+[tomcat启动遇到NoSuchMethodError错误的排查思路](http://hongjiang.info/tag/classloader/)
+
+[一次日志打印错乱引出对jvm加载jar包顺序的研究](https://my.oschina.net/ericquan8/blog/1523496)
+
+[Understanding class path wildcards](https://docs.oracle.com/javase/7/docs/technotes/tools/solaris/classpath.html)
+
+The order in which the JAR files in a directory are enumerated in the expanded class path is not specified and may vary from platform to platform and even from moment to moment on the same machine. A well-constructed application should not depend upon any particular order. If a specific order is required, then the JAR files can be enumerated explicitly in the class path.
+
+大意为：同一个目录下，jvm加载jar包顺序是无法保证的，每个系统的都不一样，甚至同一个系统不同的时刻加载都不一样。
+
+所以问题便来了，很多开发经常抱怨：为什么我的代码可以本地启动成功，到docker环境就不可以。
+
+为此，对于java 启动命令 `java -cp /app/resources:/app/classes:/app/libs/.* $mainclass` 将其扩充为 `java -cp /app/resources:/app/classes:$custom_classpath:/app/libs/.* $mainclass`。同一个`/app/libs/.*` 中的jar 加载顺序无法保证，那便将自定义classpath 提前。
+
+## Container stuck, can't be stopped or killed, can't exec into it either
 
 jdk6 编译的项目运行在jdk8上
 

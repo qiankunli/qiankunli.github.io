@@ -57,6 +57,8 @@ there are two ways for Containers or VMs to communicate to each other.
 1. In Underlay network approach, VMs or Containers are directly exposed to host network. Bridge, macvlan and ipvlan network drivers are examples of this approach. 
 2. In Overlay network approach, there is an additional level of encapsulation like VXLAN, NVGRE
 
+[Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)Broadly, there are two ways for Containers or VMs to communicate to each other. In Underlay network approach, VMs or Containers are directly exposed to host network. Bridge, macvlan and ipvlan network drivers are examples of this approach. In Overlay network approach, there is an additional level of encapsulation like VXLAN, NVGRE between the Container/VM network and the underlay network.
+
 ### overlay 网络
 
 建议参考下[《Container-Networking-Docker-Kubernetes》笔记](http://qiankunli.github.io/2018/10/11/docker_to_k8s_network_note.html) 一起学习

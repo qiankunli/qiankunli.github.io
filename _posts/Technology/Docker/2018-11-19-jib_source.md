@@ -215,8 +215,41 @@ StepsRunner 是有一个基本的构造函数之后
 通过docker registry v2 api，是可以上传镜像的
 
 1. jib 的最后，是不是也是调用 docker registry v2 api
-2. 
 
+
+
+## 一些实践
+
+以jib-demo 项目为例，执行
+
+	mvn com.google.cloud.tools:jib-maven-plugin:0.10.1:build -Djib.from.image=harbor.test.xxx.com/common/runit-jdk8-tomcat8 -Djib.from.auth.username=barge -Djib.from.auth.password=Barge.Xmly.2018 -Djib.to.image=harbor.test.xxx.com/test/jib-demo:20181206-154143 -Djib.to.auth.username=barge -Djib.to.auth.password=Barge.Xmly.2018 -f=pom.xml -Djib.useOnlyProjectCache=true -Djib.container.appRoot=/usr/local/tomcat/webapps/jib-demo
+	
+输出为：
+
+	[INFO] Getting base image harbor.test.ximalaya.com/common/runit-jdk8-tomcat8...
+	[INFO] Building dependencies layer...
+	[INFO] Building resources layer...
+	[INFO] Building classes layer...
+
+如果jib-demo 依赖一些snapshots jar，输出为
+
+	[INFO] Getting base image harbor.test.xxx.a.com/common/runit-jdk8-tomcat8...
+	[INFO] Building dependencies layer...
+	[INFO] Building snapshot dependencies layer...
+	[INFO] Building resources layer...
+	[INFO] Building classes layer...
+
+
+如果我们分别查看 `docker history harbor.test.xx.com/test/jib-demo:20181206-154143` 以及  `docker history  harbor.test.xx.com/common/runit-jdk8-tomcat8` 会发现两者大部分相似，只有最后的三个部分不同
+
+	[root@docker1 ~]# docker history harbor.test.xx.com/test/jib-demo:20181206-172214
+	IMAGE               CREATED             CREATED BY                                      SIZE                COMMENT
+	8317485ce8ec        48 years ago        jib-maven-plugin:0.10.1                         846B                classes
+	<missing>           48 years ago        jib-maven-plugin:0.10.1                         5.6kB               resources
+	<missing>           48 years ago        jib-maven-plugin:0.10.1                         6.25MB              dependencies
+	<missing>           3 days ago          /bin/sh -c chmod +x /etc/service/tomcat/run     406B		
+	
+这正是jib `在harbor.test.xx.com/common/runit-jdk8-tomcat8` 之上添加的dependencies 、resources  和 classes layer。
 
 个人微信订阅号
 

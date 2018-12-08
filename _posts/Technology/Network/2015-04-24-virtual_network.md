@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Docker网络一,Linux虚拟网络
+title: 虚拟网络
 category: 技术
 tags: Network
 keywords: Docker
@@ -14,7 +14,49 @@ keywords: Docker
 
 建议看下前文 [程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)
 
-### 网桥
+* TOC
+{:toc}
+
+1. 网络本身的虚拟，比如vlan等
+2. container 等带来的主机内网络虚拟 和跨主机网络虚拟
+
+## 传统以太网络
+
+现实世界中一个常见的网络环境，小公司的局域网经常这么干（蓝色图标表示交换机），以下称图1。
+
+![Alt text](/public/upload/docker/traditional_lan_architecture.jpg)
+
+## 802.1Q VLAN 以太网
+
+使用802.1QVLAN 技术，可以把逻辑上的子网和物理上的子网分割开来，即物理上连接在同一交换机上的终端可以属于不同逻辑子网（这个子网，跟同属于一个网段“子网”（比如`192.168.3.0/24`）不是一回事），处于不同逻辑子网的终端相互隔离，从而解决广播域混乱问题。以下称图3.
+
+![Alt text](/public/upload/docker/traditional_vlan_architecture.jpg)
+
+图3所示为一个现实世界中的 802.1Q VLAN 网络。六台电脑终端通过一级交换机接入网络，分属 VLAN 10、VLAN 20、VLAN 30。做为例子，图中左侧的交换机不支持 802.1Q VLAN，导致其连接的两台终端处于一个广播域中，尽管它们属于不同子网。作为对比，图中右侧的交换机支持 802.1Q VLAN，通过正确配置正确切割了子网的广播域，从而隔离了分属不同网段的终端。在连接外网之间，需要一个支持 802.1Q VLAN 的三层交换机，在进行数据外发时剥离 VLAN Tag，收到数据时根据IP信息转发到正确的VLAN子网。路由器根据IP信息进行NAT转换最终连接外网。
+
+
+
+如果采用硬件支持的方式来设置vlan，交换机是划分局域网的关键设备，所以本文说xx vlan，主要是针对交换机说的。
+
+交换机，维基百科解释：是一个扩大网络的器材，能为子网络中提供更多的port，以便连接更多的电脑。
+
+[VLAN原理详解](https://blog.csdn.net/phunxm/article/details/9498829)
+
+### vlan 划分
+
+常用的 VLAN 划分方式是通过端口进行划分，虽然这种划分 VLAN 的方式设置比较很简单， 但仅适用于终端设备物理位置比较固定的组网环境。随着移动办公的普及，终端设备可能不 再通过固定端口接入交换机，这就会增加网络管理的工作量。比如，一个用户可能本次接入 交换机的端口 1，而下一次接入交换机的端口 2，由于端口 1 和端口 2 属于不同的 VLAN，若 用户想要接入原来的 VLAN 中，网管就必须重新对交换机进行配置。显然，这种划分方式不 适合那些需要频繁改变拓扑结构的网络。而 MAC VLAN 则可以有效解决这个问题，它根据 终端设备的 MAC 地址来划分 VLAN。这样，即使用户改变了接入端口，也仍然处在原 VLAN 中。
+
+### 交换机IP-MAC-PORT
+
+网络中实际传输的是“帧”，帧里面是有目标主机的MAC地址的。在以太网中，一个主机要和另一个主机进行直接通信，必须要知道目标主机的MAC地址。但这个目标MAC地址是如何获得的呢？它就是通过地址解析协议获得的。所谓“地址解析”就是主机在发送帧前将目标IP地址转换成目标MAC地址的过程。ARP协议的基本功能就是通过目标设备的IP地址，查询目标设备的MAC地址，以保证通信的顺利进行。
+
+ARP欺骗，当计算机接收到ARP应答数据包的时候，就会对本地的ARP缓存进行更新，将应答中的IP和MAC地址存储在ARP缓存中。但是，**ARP协议并不只在发送ARP请求才接收ARP应答。**ARP应答可以不请自来，有人发送一个自己伪造的ARP应答(比如错误的ip-mac映射)，网络可能就会出现问题，这是协议的设计者当初没考虑到的。
+
+在交换机上配置了IMP(ip-mac-port映射)功能以后，交换机会检查每个数据包的源IP地址和MAC，对于没有在交换机内记录的IP和MAC地址的计算机所发出的数据包都会被交换机所阻止。ip-mac-port映射静态设置比较麻烦，可以开启交换机上面的DHCP SNOOPING功能， DHCP Snooping可以自动的学习IP和MAC以及端口的配对，并将学习到的对应关系保存到交换机的本地数据库中。
+
+默认情况下，交换机上每个端口只允许绑定一个IP-MAC条目，所以在使用docker macvlan时要打开这样的限制。
+
+## 网桥
 
 如果对网络不太熟悉，对于网桥的概念是很困惑的，下面试着简单解释一下。
 
@@ -44,9 +86,19 @@ keywords: Docker
         
 使用集线器连接局域网中的pc时，一个重要缺点是：任何一个pc发数据，其它pc都会收到，无用不说，还导致物理介质争用。网桥与交换机类似（其不同不足以影响对docker网络的理解），会学习mac地址与端口（串口）的映射。使用交换机替换集线器后，pc1发给pc2的数据只有pc2才会接收到。
 
+[Bridge vs Macvlan](https://hicu.be/bridge-vs-macvlan)
+
+
+Switching was just a fancy name for bridging, and that was a 1980s technology – or so the thinking went.A bridge can be a physical device or implemented entirely in software. Linux kernel is able to perform bridging since 1999. Switches have meanwhile became specialized physical devices and software bridging had almost lost its place. However, with the advent of virtualization, virtual machines running on physical hosts required Layer 2 connection to the physical network and other VMs. Linux bridging provided a well proven technology and entered it’s Renaissance. 
+
+最开始bridge是一个硬件， 也叫swtich，后来软件也可以实现bridge了，swtich就专门称呼硬件交换机了，再后来虚拟化时代到来，bridge 迎来了第二春。
+
+
+[Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)In linux bridge implementation, VMs or Containers will connect to bridge and bridge will connect to outside world. For external connectivity, we would need to use NAT. container 光靠 bridge 无法直接访问外网。
+
 建议看下 [docker中涉及到的一些linux知识](http://qiankunli.github.io/2016/12/02/linux_docker.html) 对网桥源码的分析。
 
-## Linux 上虚拟网络与真实网络的映射
+## 虚拟设备 ==> 虚拟网络
 
 Linux 用户想要使用网络功能，不能通过直接操作硬件完成，而需要直接或间接的操作一个Linux 为我们抽象出来的设备，即通用的 Linux 网络设备来完成。“eth0”并不是网卡，而是Linux为我们抽象（或模拟）出来的“网卡”。除了网卡，现实世界中存在的网络元素Linux都可以模拟出来，包括但不限于：电脑终端、二层交换机、路由器、网关、支持 802.1Q VLAN 的交换机、三层交换机、物理网卡、支持 Hairpin 模式的交换机。同时，既然linux可以模拟网络设备，自然提供了操作这些虚拟的网络设备的命令或接口。
 
@@ -54,11 +106,7 @@ Linux 用户想要使用网络功能，不能通过直接操作硬件完成，�
 
 传统以太网路与docker网桥及其网络模型，vlan网络与docker容器跨主机通信网络模型，其实有很大的相关性。本文举一个较为简单的例子。内容摘自[Linux 上虚拟网络与真实网络的映射][]
 
-## 传统以太网络
 
-现实世界中一个常见的网络环境，小公司的局域网经常这么干（蓝色图标表示交换机），以下称图1。
-
-![Alt text](/public/upload/docker/traditional_lan_architecture.jpg)
 
 在一台Linux主机上进行虚拟化模拟，以下称图2.
 
@@ -113,13 +161,7 @@ a “routing process” must be running in the global network namespace to recei
 
 在docker的网络世界里，与其说docker“容器”是如何与外界（容器，物理机，网络上的其它主机）交流的，不如说linux的 内部的network namespace是如何与外界（其它network namespace，根network namespace）交流的。
 
-## 802.1Q VLAN 以太网
 
-使用802.1QVLAN 技术，可以把逻辑上的子网和物理上的子网分割开来，即物理上连接在同一交换机上的终端可以属于不同逻辑子网（这个子网，跟同属于一个网段“子网”（比如`192.168.3.0/24`）不是一回事），处于不同逻辑子网的终端相互隔离，从而解决广播域混乱问题。以下称图3.
-
-![Alt text](/public/upload/docker/traditional_vlan_architecture.jpg)
-
-图3所示为一个现实世界中的 802.1Q VLAN 网络。六台电脑终端通过一级交换机接入网络，分属 VLAN 10、VLAN 20、VLAN 30。做为例子，图中左侧的交换机不支持 802.1Q VLAN，导致其连接的两台终端处于一个广播域中，尽管它们属于不同子网。作为对比，图中右侧的交换机支持 802.1Q VLAN，通过正确配置正确切割了子网的广播域，从而隔离了分属不同网段的终端。在连接外网之间，需要一个支持 802.1Q VLAN 的三层交换机，在进行数据外发时剥离 VLAN Tag，收到数据时根据IP信息转发到正确的VLAN子网。路由器根据IP信息进行NAT转换最终连接外网。
 
 
     
