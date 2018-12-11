@@ -131,8 +131,7 @@ To tag the image with a simple timestamp, add the following to your pom.xml:
 3. 引入gradle 项目，idea 一般要先 将 `mavenLocal()` 加入到 build.gradle 的 repositories 中，并执行`gradlew build`，将相关依赖下载完毕，然后再用idea 打开一次即可。
 
 
-### 主干代码（待梳理）
-
+### 主干代码
 
 要梳理两个事情
 
@@ -210,7 +209,7 @@ JibContainerBuilder 是 和 jib 平级的入口对象，Jib 对象的唯一作�
 
 ![](/public/upload/docker/jib_BuildSteps_process.png)
 
-相邻的两个同色表示没有依赖关系，不同色表示有依赖关系。上图只展现了相邻Step的并行度，实际执行时，并发读可以更高
+相邻的两个同色表示没有依赖关系，不同色表示有依赖关系。上图只展现了相邻Step的并行度，实际执行时，并发度可以更高
 
 ![](/public/upload/docker/jib_BuildSteps_parallel.png)
 
@@ -270,9 +269,7 @@ StepsRunner 部分实现如下
 
 注意 每一个 XXStep 都是一个 AsyncStep 实现， `new PullBaseImageStep(...)` 便触发了该Step的实际执行。
 
-那么问题来了，既然是AsyncStep，若是依赖 前置Step的执行结果，而前置Step 还未执行完毕怎么办？
-        
-每一个AsyncStep 的大致组成是
+那么问题来了，既然是AsyncStep，若是依赖 前置Step的执行结果，而前置Step 还未执行完毕怎么办？每一个AsyncStep 的大致组成是
  
  	class xxStep implements AsyncStep<Void>, Callable<Void>{
  		private 完成本Step所需基本属性
@@ -286,6 +283,7 @@ StepsRunner 部分实现如下
 	                依赖Step.getFuture())
 	            .call(this, listeningExecutorService);
  		}
+ 		public XX call() throws ExecutionException{...}
  	}
  	
  
@@ -293,12 +291,47 @@ StepsRunner 部分实现如下
  
 从另一个角度说，代码调用可以是顺序的，但业务不是顺序的。代码呈现的感觉跟实际的执行 不是一回事（也可以说，我们以前的方法太笨了）。
 
+
+### 回顾下流程驱动
+
+AsyncStep 接口官方注释：Holds the future for an asynchronously-running step. Implementations should:
+
+1. Be immutable
+2. Construct with the dependent AsyncSteps and submit a Callable to the ListeningExecutorService to run after all its dependent  AsyncSteps (for example,by using  `Futures.whenAllSucceed`)
+3. Have getFuture return the submitted future
+
+也就是说，在AsyncStep 实现类的构造方法中，并已经有了以下逻辑
+
+1. 等待依赖的Step 执行完毕
+2. 实现类自己是一个Callable，将自己提交给listeningExecutorService，使其执行自己的call 方法。换句话，实现类的call 方法被执行时，所有的依赖Step 已经执行完毕了。
+
+也就是BuildSteps.run ==> StepsRunner.run ==> runnable.run，runnable.run 的本质是
+
+	{
+		new XXStep();
+		new XXStep();
+		new XXStep(buildConfiguration,dependent AsyncSteps, ListeningExecutorService)
+		...
+	}
+
+所有的Step 都是异步执行，但因为持有了dependent AsyncSteps 的应用，造成了半同步半异步的效果。
+
+从这个角度看，BuildSteps 和 StepsRunner 的分工还蛮合理的，一个对象只干一点事情
+
+1. BuildSteps 负责 根据上层业务 指定 需要的Step，跟业务关系比较大
+2. StepsRunner 负责 将Step 组装在一起，并指明Step 的依赖关系（依赖关系本身与业务无关）
+3.  runnable.run 负责实际的驱动执行
+
+
 再换一个角度说，我们看下 rxnetty 的一些代码，充分体现“程序=逻辑+控制”，逻辑与控制的分离。 
 
 	RxNetty.createHttpGet("http://localhost:8080/error")
 	               .flatMap(response -> response.getContent())
 	               .map(data -> "Client => " + data.toString(Charset.defaultCharset()))
 	               .toBlocking().forEach(System.out::println);
+	               
+	               
+
       	
 
 ###  和maven 集成
@@ -309,27 +342,7 @@ Maven提高篇系列之（六）——编写自己的Plugin](http://www.cnblogs.
 
 `mvn compile jib:build` 触发 BuildImageMojo execute 方法执行
 
-BuildStepsRunner 包括一个BuildSteps 属性，外界通过  `BuildStepsRunner.build` ==> `BuildSteps.run` 触发build 过程的执行
 
-  	BuildStepsRunner(BuildSteps buildSteps) {
-    	this.buildSteps = buildSteps;
-  	}
-  	public void build(HelpfulSuggestions helpfulSuggestions){
-  	
-  	}
-
-### 几个问题
-
-通过docker registry v2 api，是可以上传镜像的
-
-1. jib 的最后，是不是也是调用 docker registry v2 api？ 比如对于golang语言 就有针对 registry api 的库 [github.com/heroku/docker-registry-client](https://github.com/heroku/docker-registry-client)
-2. 重新梳理 jib runner 的结构
-3. jib maven plugin 与 jib-core 分工的边界在哪里？ 直接的代码调用，使用jib-core 即可
-4. 源代码的调用 最终 是调用了 BuildSteps.run （它的前面实质都是在搞信息采集，准备上下文），也就是 jib的核心原理是在 jib-core 中体现的
-5. BuildSteps.run 之前和之后主要两个事情，信息采集，开始干活儿。是否可以做一个假设，底层使用registry api 发送数据。 那么jib的难点主要有几个部分
-
-	1. 如何将不同的数据分layer
-	2. 复杂的流程 如何 以一个 简单的链式调用 呈现。这个复杂流程的基本抽象是什么？基本的单位是什么？**一定有一个基本单元类 ，然后有一个机制，将这些基本单元类串在一起，最终呈现给调用方。**
 
 ## 从Jib 中学到的
 
@@ -338,6 +351,7 @@ BuildStepsRunner 包括一个BuildSteps 属性，外界通过  `BuildStepsRunner
 
 	1. 如何聚合这些Step
 	2. 若是支持Step 异步执行的话，如何处理它们之间的依赖关系
+3. 摸清代码的意图，是理解源码的第一步
 
 
 
