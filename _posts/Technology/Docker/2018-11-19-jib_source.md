@@ -224,7 +224,7 @@ JibContainerBuilder 是 和 jib 平级的入口对象，Jib 对象的唯一作�
 
 BuildSteps 和 StepRunner 都分为构造和执行两个部分
 
-1. BuildSteps 分别针对 DockerDaemonImage、RegistryImage、TarImage 等TargetImage 类型，提供了对应的静态构造方法。
+1. BuildSteps 分别针对 DockerDaemonImage、RegistryImage、TarImage 等TargetImage 类型，提供了对应的静态构造/工厂方法。
 2. StepsRunner 针对每一个步骤 提供了静态构造方法，但StepsRunner更像一个builder，只不过一般builder 类每次setXXX 是设置属性，StepsRunner 每次setXX 是扩充其持有的 stepsRunnable （Runnable 实现类），也就是扩充Runnable 的逻辑内容。stepsRunnable 是一个runnable 引用， 每一次setXX 都会将其指向一个更复杂的runnable 匿名实现类。
 
 ![](/public/upload/docker/jib_StepsRunner_process.png)
@@ -322,6 +322,10 @@ AsyncStep 接口官方注释：Holds the future for an asynchronously-running st
 2. StepsRunner 负责 将Step 组装在一起，并指明Step 的依赖关系（依赖关系本身与业务无关）
 3.  runnable.run 负责实际的驱动执行
 
+[系统设计的一些体会](http://qiankunli.github.io/2018/09/28/system_design.html) 提到：要分得清楚访问代码、业务代码、存储代码、胶水代码各自应在哪些层级，它们应该是什么角色。**在这里，所有Step 串行调用异步执行是本质**（异步执行有调用线程和执行线程之分，所以串行调用和异步执行不冲突，BuildSteps 和 StepsRunner 的静态构造方法和Builder 模式是访问或胶水代码，提高了可读性。
+
+每次`new XXStep()`可以理解为另起线程 执行一个Step。就像`ExecutorService.submit(()-> System.out.println("run in new thread"))` 是一样的。
+
 
 再换一个角度说，我们看下 rxnetty 的一些代码，充分体现“程序=逻辑+控制”，逻辑与控制的分离。 
 
@@ -331,7 +335,7 @@ AsyncStep 接口官方注释：Holds the future for an asynchronously-running st
 	               .toBlocking().forEach(System.out::println);
 	               
 	               
-
+在这个例子中，我直觉上的实现是不同的 TargeImage 对应一个Step数组，BuildSteps.run 就是 循环执行`ExecutorService.submit(step)`。**在这个步骤中，每个Step 是客体，等着被构造、被初始化、被执行。而jib 则是将ExecutorService 作为Step的成员，Step 有着更强的把控力， 对外也隐藏了异步的感觉**。优劣还需进一步体会。 
       	
 
 ###  和maven 集成

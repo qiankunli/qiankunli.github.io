@@ -27,7 +27,8 @@ keywords: Docker,macvlan
 	* 对开发同学的友好性 
 	* 与现有基础设施的兼容性
 
-3. 实现了前面几点，也只是解决了有无问题，若要在线上使用docker，很多测试环境不太在意的事便必须严肃对待。
+3. 守成：实现了前面几点，也只是解决了有无问题，若要在线上使用docker，很多测试环境不太在意的事便必须严肃对待。
+4. 进取：测试/线上使用同一个镜像；线上和测试环境工作流；自动扩容缩容
 
 线上用docker有哪些风险，要做哪些工作呢？
 
@@ -38,22 +39,26 @@ keywords: Docker,macvlan
 1. docker、网络、k8s、harbor 等集群的稳定
 2. 无缝接入/改造已有的网关、微服务、日志、构建/发布系统、监控等系统
 
-## docker 与 java的亲和性
+## 守成
+
+做到稳定替换 现有物理设施，用户无感知或弱感知。
+
+### docker 与 java的亲和性
 
 [docker 环境（主要运行java项目）常见问题](http://qiankunli.github.io/2017/08/25/docker_debug.html)
 
-## docker build 比较慢
+### docker build 比较慢
 
 [docker环境下的持续构建](http://qiankunli.github.io/2018/11/18/ci_in_docker.html) 
  
-## io隔离性
+### io隔离性
 
 [美团点评Docker容器管理平台](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651746030&idx=3&sn=f0c97665bb35aca7bc054e9d230baae7&chksm=bd12b7a38a653eb5aca4ca366abee24bad89d1bfab9031e5bf859d15f38d92d6d0755beca225&scene=21#wechat_redirect)
 
 1. 一个服务狂写日志 导致整个磁盘被占满
 2. 一个服务狂发数据 导致网卡被打满
 
-## 性能不及物理机
+### 性能不及物理机
 
 容器平台性能，主要包括两个方面性能：
 
@@ -62,17 +67,17 @@ keywords: Docker,macvlan
 
 如何科学的设置容器的资源配置？
 
-## 容器状态监控
+### 容器状态监控
 
 [适配多种监控服务的容器状态采集](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651746030&idx=3&sn=f0c97665bb35aca7bc054e9d230baae7&chksm=bd12b7a38a653eb5aca4ca366abee24bad89d1bfab9031e5bf859d15f38d92d6d0755beca225&scene=21#wechat_redirect)
 
-## 服务画像
+### 服务画像
 
 [美团容器平台架构及容器技术实践](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651749434&idx=1&sn=92dcd59d05984eaa036e7fa804fccf20&chksm=bd12a5778a652c61f4a181c1967dbcf120dd16a47f63a5779fbf931b476e6e712e02d7c7e3a3&mpshare=1&scene=23&srcid=11183r23mQDITxo9cBDHbWKR%23rd)
 
 通过对服务容器实例运行指标的搜集和统计，更好的完成调度容器、优化资源分配。比如可以根据某服务的容器实例的CPU、内存、IO等使用情况，来分辨这个服务属于计算密集型还是IO密集型服务，在调度时尽量把互补的容器放在一起。
 
-## 推广难题
+### 推广难题
 
 
 [美团容器平台架构及容器技术实践](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651749434&idx=1&sn=92dcd59d05984eaa036e7fa804fccf20&chksm=bd12a5778a652c61f4a181c1967dbcf120dd16a47f63a5779fbf931b476e6e712e02d7c7e3a3&mpshare=1&scene=23&srcid=11183r23mQDITxo9cBDHbWKR%23rd)
@@ -90,7 +95,7 @@ keywords: Docker,macvlan
 本文开头，笔者梳理了一个docker应用路线图，docker以及k8s 是一个入门门槛很高的技术，倒不是本身的知识点难学，而是其处于paas层，paas层的变动会影响一个公司的方方面面，持续交付体系、日志收集监控体系等，这些事情做不好或者做一半，很容易给人用了docker之后更麻烦的感觉。
 
 
-## 支持微服务架构的设计
+### 支持微服务架构的设计
 
 [美团点评Docker容器管理平台](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651746030&idx=3&sn=f0c97665bb35aca7bc054e9d230baae7&chksm=bd12b7a38a653eb5aca4ca366abee24bad89d1bfab9031e5bf859d15f38d92d6d0755beca225&scene=21#wechat_redirect)
 
@@ -99,7 +104,7 @@ keywords: Docker,macvlan
 2. 对日志采集的兼容
 
 
-## 镜像的清理
+### 镜像的清理
 
 起初，集群规模较小，harbor 和其它服务部署在一起。后来镜像文件 越来越多，于是将harbor 单独部署。但必然，单机磁盘无法承载 所有镜像，此时
 
@@ -108,7 +113,7 @@ keywords: Docker,macvlan
 
 	清理时，应根据当前服务使用镜像的情况，保留之前几个版本。笔者曾粗暴的清理了一些镜像，刚好赶上断网，直接导致部分服务重新部署时拉不到镜像。
 	
-## docker 无损发布
+### docker 无损发布
 
 流程
 
@@ -120,5 +125,7 @@ keywords: Docker,macvlan
 
 这个事儿可以在 k8s内部做，也可以为网关等组件提供扩缩容api，由网关节点视时机调用。
 
-## 网络方案选择与多机房扩展问题
+### 网络方案选择与多机房扩展问题
+
+## 进取
 
