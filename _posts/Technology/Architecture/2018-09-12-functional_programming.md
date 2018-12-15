@@ -141,6 +141,8 @@ application of a curried function, such as f(3).
 1. A lot of the GoF design patterns stem from a time when EVERYTHING needed to be an object. Object orientation was the new holy grail, and people even wanted to push objects down into databases. Object databases were invented (luckily, they’re all dead) and the SQL standard was enhanced with ORDBMS features. 面向对象领域，“一切皆对象”是最高准则，人们甚至想把对象存到数据库里去。
 2. Since Java 8, finally, we’re starting to recover from the damage that was made in early days of object orientation in the 90s, and we can move back to **a more data-centric, functional, immutable programming model** where data processing languages like SQL are appreciated rather than avoided, and Java will see more and more of these patterns, hopefully.
 
+这部分内容非常重要，在[函数式编程的设计模式](http://qiankunli.github.io/2018/12/15/functional_programming_patterns.html) 有专门阐述。
+
 ## 一些代码技巧
 
 在java8 的List 接口中，存在一个default method 

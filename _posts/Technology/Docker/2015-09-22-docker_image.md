@@ -12,6 +12,14 @@ keywords: Docker image registry
 * TOC
 {:toc}
 
+## 基础镜像的教训
+
+公司实践时，做docker 镜像的时候为了精简，用了alpine， 但是alpine的一些表现跟ubuntu 这些大家常见的OS不一样，几百号开发，光天天回答为啥不能xxx（参见[jar冲突](http://qiankunli.github.io/2017/08/25/docker_debug.html)），就把人搞死了。
+
+很多公司比如[个推镜像体系](https://segmentfault.com/a/1190000017103122) 均采用Centos 为base 镜像
+
+所以，技术极客跟推广使用还是有很大区别的。
+
 ## 多阶段构建
 
 [Use multi-stage builds](https://docs.docker.com/develop/develop-images/multistage-build/) **multi-stage builds 的重点不是multi-stage  而是 builds**

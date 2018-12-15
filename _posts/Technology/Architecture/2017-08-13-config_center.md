@@ -12,6 +12,7 @@ keywords: config center
 
 阅读本文时，可以先查看 [平台支持类系统的几个点](http://qiankunli.github.io/2018/07/06/client_support.html)。配置中心 本质上也属于一个平台支持系统，很多设计问题 也是平台支持系统 面临的问题。
 
+本文是从客户端和服务端两个方面一起说配置中心，大部分开源配置中心只关注服务端配置中心。
 
 ## 需求
 
@@ -22,7 +23,7 @@ keywords: config center
 
 1. 如何表示配置
 2. 如何存储配置
-3. 发布配置
+3. 发布/回滚配置
 3. 配置的下发  ==> 配置不可能一股脑全给用户 ==>  配置的组织
 5. 如何生效
 
@@ -31,8 +32,12 @@ keywords: config center
 
 6. 安全
 
+	* 操作配置需要权限及审计
 	* 和客户端的通信过程中，不被第三方篡改
 	* 后台crud管理操作中，不被无关用户操作
+
+7. 服务端、业务方客户端、app客户端的高可用
+8. 实时性
 
 
 
@@ -98,15 +103,33 @@ keywords: config center
 
 4. 账号权限系统设计。
 
-## 长连接（待提炼）
+## 长连接
 
 但后端管理界面上 改掉配置中心的值后， 多长时间才能让所有用户 拿到最新的值？
 
-不能 保证用户 最新一次启动后，一定用的是最新值。因为从客户端实现来说，部分业务请求时间比较靠前，此时配置中心请求 尚未返回。
+1. 对于客户端来说：不能 保证用户 最新一次启动后，一定用的是最新值。因为从客户端实现来说，部分业务请求时间比较靠前，此时配置中心请求 尚未返回。
+2. 对于服务端来说，根据实现的技术方案，基本可以做到。
 
 ## 现有方案的研究
 
 [spring_cloud_config](http://cloud.spring.io/spring-cloud-static/Dalston.SR2/#_spring_cloud_config)
+
+[干货 | 配置中心，让微服务『智能』](https://mp.weixin.qq.com/s?__biz=MjM5MDI3MjA5MQ==&mid=2697267852&idx=2&sn=e39b40bc4a7a3bc11ee8d5f980c5ef9e&chksm=8376f5b8b4017cae29aee9b49cce6c1c0ee113d2ebc99a3b8592adc7a949e0b39b8e768fe4c1&mpshare=1&scene=23&srcid=1212c80r7NMkfZlBDVF3OYyf%23rd)
+
+通过配置中心，我们可以方便地管理微服务在不同环境中的配置，从而可以在运行时动态调整服务行为，真正实现**配置即『控制』**的目标。 所以，在一定程度上，配置中心就成为了微服务的大脑
+
+配置中心的核心功能点：将配置同步到需要它的地方。
+
+配置中心的一些应用场景:
+
+1. 发布开关，某个功能带上，但是不打开
+2. 实验开关，AB测试
+3. 运维开关，大促前可以把一些非关键功能关闭来提升系统容量；当系统出现问题时可以关闭非关键功能来保证核心功能正常工作
+4. 黑白名单，某个调用方代码有问题导致超大量调用，对服务稳定性产生了影响，可以通过配置黑名单来暂时屏蔽这个调用方或IP
+5. 动态日志级别  https://github.com/ctripcorp/apollo-use-cases/tree/master/spring-cloud-logger
+6. 动态数据源
+7. 动态网关路由 https://github.com/ctripcorp/apollo-use-cases/tree/master/dynamic-datasource
+
 
 ## 小结
 
