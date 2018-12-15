@@ -96,22 +96,7 @@ keywords: jib
 3. 真正的 event 源 聚合了EventDispatcher 而不是 实现它。
 3. 但万变不离其宗，从`new DefaultEventDispatcher(eventHandlers)`看， 还是通过 “Observer” 去构造“Subject”
 
-函数式编程 对传统设计模式的影响（这是个大话题）
-
-1. 很多角色 不需要专门的类，比如jib 中Observer 就使用jdk8 自带的Consumer 替代了。
-2. 高阶函数：一个类本来可以有很多方法，现在都一个主要方法（执行主流程），然后传入Function、Consumer（表示策略） 代替了，模板模式、策略模式基本都消亡了。
-4. 逻辑聚合越来越普遍了，以前只是数据聚合（比如一个配置类聚合其它配置类，形成一个更大的配置类）。**jib-core 很多地方拿Runnable 当成员到处传着玩**。反过来说，逻辑更容易被拆分，参见`Consumer.andThen`
-
-		@FunctionalInterface
-		public interface Consumer<T> {
-		    void accept(T t);
-		    default Consumer<T> andThen(Consumer<? super T> after) {
-		        Objects.requireNonNull(after);
-		        return (T t) -> { accept(t); after.accept(t); };
-		    }
-		}
-
-此外，从event 设计中还可以看到一点，用更多Functional interface 对象 替代 if else 逻辑，比如 Jib 中的Handler 只会处理一个特定类型的事件。代码中会有更多的对象、funciton，但每个对象和function 都更简单。
+[函数式编程对设计模式的影响](http://qiankunli.github.io/2018/09/12/functional_programming.html)
 
 ## Allocation
 

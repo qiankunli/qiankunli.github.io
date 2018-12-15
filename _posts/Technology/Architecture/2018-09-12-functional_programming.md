@@ -59,41 +59,9 @@ shell 命令
 
 对于pipeline 式的代码，体现在java中便需要定义pipeline、Step/Stage等接口，然后自定义逻辑实现Step/Stage接口（如果逻辑是已经写好的，还需Decorator 修一下），最后由pipeline 驱动执行。而函数作为“第一公民”后，设计模式的三大类创建、行为、结构中的行为型模式 都可以由函数嵌套、函数参数、函数返回值等直接实现（函数层面），无需上升java的类/接口层面了。换句话说，**设计模式由类/接口层面（java 提到设计模式都会有一个复杂的类图） 下沉到 函数层面了**，将一些功能或逻辑代码 通过函数的拼装（因此才有了柯里化 和 高阶函数等）来组织。这也可说是 函数式编程的一个体现了吧。
 
+我们弄个小节专门讲下
 
-## 一些代码技巧
-
-在java8 的List 接口中，存在一个default method 
-
-	void sort(Comparator<? super E> c)
-	
-对应`java.util.Collections` 中的sort 方法
-
-
-	 public static <T> void sort(List<T> list, Comparator<? super T> c) {
-        list.sort(c);
-    }
-    
-从[编程的本质](http://qiankunli.github.io/2018/07/14/nature_of_code.html) 中 可以知道 程序 = 控制 + 逻辑（这与函数式编程理念是非常契合的）。在这里的sort方法中，排序是用冒泡还是插入是控制 ，与业务无关。而Comparator 描述的是逻辑，与业务紧密相关。 
-
-在 [异步编程——Promise](https://github.com/hprose/hprose-java/wiki/%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B%E2%80%94%E2%80%94Promise) 中作者提了三个接口
-
-	interface Callback<R, V> {}
-	// 对输入采取一定的动作，没有返回
-	public interface Action<V> extends Callback<Void, V> {
-	    void call(V value) throws Throwable;
-	}
-	// 将输入转换为输出
-	public interface Func<R, V> extends Callback<R, V> {
-    	R call(V value) throws Throwable;
-	}
-	// 将输入转换为输出，异步
-	public interface AsyncFunc<R, V> extends Callback<R, V> {
-    	Promise<R> call(V value) throws Throwable;
-	}
-	
-实现一个完全符合函数式编程理念的项目很难，通常也很少有这样的机会。但在我们日常的代码中，多用用Action、Func、AsyncFunc 这类接口，却可以做到，可以在很大程度上提高代码的可读性。
-
-## 函数式编程
+## 基本概念
 
 |||函数的概念|其它|
 |---|---|---|---|
@@ -147,3 +115,62 @@ application of a curried function, such as f(3).
 
 1. 从基本组成和相互关系的角度来描述，面向对象的基本组成是类和对象，基本组成的相互关系是继承、聚合等。函数式编程基本组成是函数、偏函数等，函数与函数关系可以是调用、内嵌、返回等。**当然，面向对象和函数编程是两个维度的东西，对比不太合适。**
 2. 笔者学习spark的时候，了解到，你对data set的一系列函数式调用，并不会被立即执行。比如对一个数据集，你先过滤男性、又将值翻番。从执行角度看，不会是把数据拿出来，先for循环一把过滤，再for循环一把每个值乘以2。一系列的函数调用更像是一个执行计划，spark会优化这些计划的执行，最终可能一次for循环就好了。
+
+
+## 函数式编程对java设计模式的影响
+
+函数式编程 对传统设计模式的影响（这是个大话题）
+
+1. 很多角色 不需要专门的类，比如jib 中Observer 就使用jdk8 自带的Consumer 替代了。
+2. 高阶函数：一个类本来可以有很多方法，现在都一个主要方法（执行主流程），然后传入Function、Consumer（表示策略） 代替了，模板模式、策略模式基本都消亡了。
+4. 逻辑聚合越来越普遍了，以前只是数据聚合（比如一个配置类聚合其它配置类，形成一个更大的配置类）。**jib-core 很多地方拿Runnable 当成员到处传着玩**。反过来说，逻辑更容易被拆分，参见`Consumer.andThen`
+
+		@FunctionalInterface
+		public interface Consumer<T> {
+		    void accept(T t);
+		    default Consumer<T> andThen(Consumer<? super T> after) {
+		        Objects.requireNonNull(after);
+		        return (T t) -> { accept(t); after.accept(t); };
+		    }
+		}
+
+此外，从jib-core event 设计中还可以看到一点，**用更多Functional interface 对象 替代 if else 逻辑**，比如 Jib 中的Handler 只会处理一个特定类型的事件。代码中会有更多的对象、funciton，但每个对象和function 都更简单。
+
+[How Functional Programming will (Finally) do Away With the GoF Patterns](https://blog.jooq.org/2016/07/04/how-functional-programming-will-finally-do-away-with-the-gof-patterns/)
+
+1. A lot of the GoF design patterns stem from a time when EVERYTHING needed to be an object. Object orientation was the new holy grail, and people even wanted to push objects down into databases. Object databases were invented (luckily, they’re all dead) and the SQL standard was enhanced with ORDBMS features. 面向对象领域，“一切皆对象”是最高准则，人们甚至想把对象存到数据库里去。
+2. Since Java 8, finally, we’re starting to recover from the damage that was made in early days of object orientation in the 90s, and we can move back to **a more data-centric, functional, immutable programming model** where data processing languages like SQL are appreciated rather than avoided, and Java will see more and more of these patterns, hopefully.
+
+## 一些代码技巧
+
+在java8 的List 接口中，存在一个default method 
+
+	void sort(Comparator<? super E> c)
+	
+对应`java.util.Collections` 中的sort 方法
+
+
+	 public static <T> void sort(List<T> list, Comparator<? super T> c) {
+        list.sort(c);
+    }
+    
+从[编程的本质](http://qiankunli.github.io/2018/07/14/nature_of_code.html) 中 可以知道 程序 = 控制 + 逻辑（这与函数式编程理念是非常契合的）。在这里的sort方法中，排序是用冒泡还是插入是控制 ，与业务无关。而Comparator 描述的是逻辑，与业务紧密相关。 
+
+在 [异步编程——Promise](https://github.com/hprose/hprose-java/wiki/%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B%E2%80%94%E2%80%94Promise) 中作者提了三个接口
+
+	interface Callback<R, V> {}
+	// 对输入采取一定的动作，没有返回
+	public interface Action<V> extends Callback<Void, V> {
+	    void call(V value) throws Throwable;
+	}
+	// 将输入转换为输出
+	public interface Func<R, V> extends Callback<R, V> {
+    	R call(V value) throws Throwable;
+	}
+	// 将输入转换为输出，异步
+	public interface AsyncFunc<R, V> extends Callback<R, V> {
+    	Promise<R> call(V value) throws Throwable;
+	}
+	
+实现一个完全符合函数式编程理念的项目很难，通常也很少有这样的机会。但在我们日常的代码中，多用用Action、Func、AsyncFunc 这类接口，却可以做到，可以在很大程度上提高代码的可读性。
+
