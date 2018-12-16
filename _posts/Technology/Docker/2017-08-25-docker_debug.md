@@ -10,11 +10,8 @@ keywords: Docker
 
 ## 问题列表
 
-1. 容器有时会莫名其妙重启
-2. Container stuck, can't be stopped or killed, can't exec into it either
-3. docker 停住
-4. docker pull 镜像失败
-5. 项目启动时访问mysql 失败
+* TOC
+{:toc}
 
 ## 1 容器有时会莫名其妙重启
 
@@ -126,6 +123,32 @@ The order in which the JAR files in a directory are enumerated in the expanded c
 所以问题便来了，很多开发经常抱怨：为什么我的代码可以本地启动成功，到docker环境就不可以。
 
 为此，对于java 启动命令 `java -cp /app/resources:/app/classes:/app/libs/.* $mainclass` 将其扩充为 `java -cp /app/resources:/app/classes:$custom_classpath:/app/libs/.* $mainclass`。同一个`/app/libs/.*` 中的jar 加载顺序无法保证，那便将自定义classpath 提前。
+
+## 设置磁盘限额（还不是特别懂）
+
+[猪八戒网DevOps容器云与流水线](http://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649699681&idx=1&sn=9f26d3dc8564fd31be93dead06489a6b&chksm=88930a02bfe48314e1e37873850010656d87650d0adcb1738049638cffb7e6496476b0cc8bac&mpshare=1&scene=23&srcid=121648JGw0qJ73GJs4ZJcIuY#rd)
+
+做好容器磁盘使用的限制，不要相信你们的开发，你不知道他们会向容器里输出什么
+
+1. 应用日志做好轮转
+2. 限制docker stdout标准输出，可以使用Docker的参数配置；
+3. 限制容器rootfs，目前DeviceMapper存储驱动支持较好；
+4. 限制所有挂载到容器的数据卷，不要让一个容器坏掉整个节点；
+5. 并且为节点添加自动驱逐参数，新版本kubelet是默认启用的。
+
+
+在安装Docker时，使用Devicemapper驱动安装，会默认限制大小10G
+
+## 日志采集
+
+[猪八戒网DevOps容器云与流水线](http://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649699681&idx=1&sn=9f26d3dc8564fd31be93dead06489a6b&chksm=88930a02bfe48314e1e37873850010656d87650d0adcb1738049638cffb7e6496476b0cc8bac&mpshare=1&scene=23&srcid=121648JGw0qJ73GJs4ZJcIuY#rd)
+
+![](/public/upload/docker/docker_log_collect.PNG)
+
+比较常见的有这么几种，可能也有项目日志直接写入ES集群，不需要容器内收集的。
+
+作者推荐使用第三种收集方案，以DaemonSet的方案部署日志收集组件，做到业务容器的完全无侵入，节省服务器资源，不必为每个业务容器都启动一个日志收集组件。
+
 
 ## Container stuck, can't be stopped or killed, can't exec into it either
 

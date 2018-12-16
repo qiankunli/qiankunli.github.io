@@ -16,7 +16,7 @@ keywords: Docker image registry
 
 公司实践时，做docker 镜像的时候为了精简，用了alpine， 但是alpine的一些表现跟ubuntu 这些大家常见的OS不一样，几百号开发，光天天回答为啥不能xxx（参见[jar冲突](http://qiankunli.github.io/2017/08/25/docker_debug.html)），就把人搞死了。
 
-很多公司比如[个推镜像体系](https://segmentfault.com/a/1190000017103122) 均采用Centos 为base 镜像
+很多公司比如[个推镜像体系](https://segmentfault.com/a/1190000017103122) [猪八戒网DevOps容器云与流水线](http://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649699681&idx=1&sn=9f26d3dc8564fd31be93dead06489a6b&chksm=88930a02bfe48314e1e37873850010656d87650d0adcb1738049638cffb7e6496476b0cc8bac&mpshare=1&scene=23&srcid=121648JGw0qJ73GJs4ZJcIuY#rd)均采用Centos 为base 镜像
 
 所以，技术极客跟推广使用还是有很大区别的。
 
