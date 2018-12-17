@@ -27,7 +27,7 @@ keywords: functional programming patterns
 [Gang of Four Patterns in a Functional Light: Part 1
 ](https://www.voxxed.com/2016/04/gang-four-patterns-functional-light-part-1/)
 
-a simple exercise of grammatical analysis. Consider a sentence like: “smoking is unhealthy” or even “running is tiring”. What are “smoking” and “running” in this context? In English, the -ing suffix transforms verbs like to smoke or to run into nouns. The biggest part of the design patterns listed in the Gang of Four book, especially the ones classified as behavioural patterns, follow exactly the same approach. Like the -ing suffix, they turn verbs into nouns – or in this case, functions into objects. 面向对象设计模式经常在搞一件事，把动词转换为名词，但很不幸，这个动作很多时候没有必要。 
+a simple exercise of grammatical analysis. Consider a sentence like: “smoking is unhealthy” or even “running is tiring”. What are “smoking” and “running” in this context? In English, the -ing suffix transforms verbs like to smoke or to run into nouns. The biggest part of the design patterns listed in the Gang of Four book, especially the ones classified as behavioural patterns, follow exactly the same approach. Like the -ing suffix, they turn verbs into nouns – or in this case, functions into objects. 面向对象设计模式经常在搞一件事，**把动词转换为名词**，但很不幸，这个动作很多时候没有必要。 
 
 Unfortunately, this transformation process is often unnecessary, or merely serves the purpose of shoehorning some concepts that are natural in functional programming into the object oriented paradigm. Moreover, this adaptation comes at the cost of a higher verbosity, lower readability and more difficult maintainability. In fact, it not only requires you to create objects with the exclusive purpose of wrapping one or more functions into them, but it also makes it necessary to develop some extra logic to glue these objects together down the line. The same goal could be achieved with a straightforward function composition. 把动作搞成对象，不仅多一个对象的概念，还要你花精力将几个对象黏合在一起（胶水代码），远不如function composition 来的直接。
 
@@ -60,9 +60,41 @@ Rethinking the command implementation in terms of plain function brings the bene
 
 It is worth noticing that the functions are actually finer grained than the strategy classes (they can be combined in a way not available by any class) and allow even better reusability. **函数比类更适合作为 逻辑的最小单元**，因为一些聚合方式类并不支持（比如高阶函数），函数也比类更容易被复用（Class::function；class::funciton 就可以复用了）
 
-以下未读
+## 观察者模式
 
 [Gang of Four Patterns in a Functional Light: Part 2](https://www.voxxed.com/2016/05/gang-four-patterns-functional-light-part-2/)
+
+the Template and the Observer patterns, which can both be reimplemented through the Java 8 Consumer interface.
+
+	interface Listener {
+	    void onEvent(Object event);
+	}
+	public class Observable {
+	    private final Map<Object, Listener> listeners = new ConcurrentHashMap<>();
+	    public void register(Object key, Listener listener) {
+	        listeners.put(key, listener);
+	    }
+	    public void unregister(Object key) {
+	        listeners.remove(key);
+	    }
+	 	// Observable will send an event it will be broadcast to both
+	 	// broadcast 一词用的贴切 
+	    public void sendEvent(Object event) {
+	        for (Listener listener : listeners.values()) {
+	            listener.onEvent( event );
+	        }
+	    }
+	}
+
+the Listener interface we defined above is semantically equivalent to the Consumer，所以等价替换下就成了
+
+	Observable observable = new Observable();
+	observable.register( "key1", e -> System.out.println(e) );
+	observable.register( "key2", System.out::println );
+	observable.sendEvent( "Hello World!" );
+
+
+以下未读
 
 [Gang of Four Patterns in a Functional Light: Part 3](https://www.voxxed.com/2016/05/gang-four-patterns-functional-light-part-3/)
 
