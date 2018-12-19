@@ -8,13 +8,13 @@ keywords: functional programming patterns
 
 ---
 
-## 简介(持续更新)
+## 简介
 
 可预先看下 [函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html)  
 
 在面向对象的观念里: 一切皆对象。但知道这句话并没有什么用，大部分人还是拿着面向对象的写着面向过程的代码，尤其是结合spring + springmvc 进行controller-service-dao 的业务开发。所以，看一个代码是不是“面向对象” 一个立足点就是对java 设计模式的应用。
 
-对应的，函数式编程时知道一切皆函数的意义也很有限，应用函数式编程的一个重要立足点就是：函数式编程中的设计模式。 
+对应的，函数式编程时知道“一切皆函数”的意义也很有限，应用函数式编程的一个重要立足点就是：函数式编程中的设计模式。 
 
 
 
@@ -94,8 +94,163 @@ the Listener interface we defined above is semantically equivalent to the Consum
 	observable.sendEvent( "Hello World!" );
 
 
-以下未读
+
+
+## 责任链
 
 [Gang of Four Patterns in a Functional Light: Part 3](https://www.voxxed.com/2016/05/gang-four-patterns-functional-light-part-3/)
 
+有些设计模式，很重要，但用的少， 就是被笨重的“面向对象”逻辑耽误了。
+
+	public abstract class AbstractFileParser implements FileParser {
+	    protected FileParser next;
+	    public void setNextParser( FileParser next ) {
+	        this.next = next;
+	    }
+	}
+	public class TextFileParser extends AbstractFileParser {
+	    @Override
+	    public String parse( File file ) {
+	        if ( file.getType() == File.Type.TEXT ) {
+	            return "Text file: " + file.getContent();
+	        } else if (next != null) {
+	            return next.parse( file );
+	        } else {
+	           throw new RuntimeException( "Unknown file: " + file );
+	        }
+	    }
+	}
+	public class AudioFileParser extends AbstractFileParser {
+		...
+	}
+	public class VideoFileParser extends AbstractFileParser {
+		...
+	}
+	
+责任链有好几种实现方式，上例是每个节点通过指针串联， 使用时
+
+	FileParser textParser = new TextFileParser();
+	FileParser audioParser = new AudioFileParser();
+	FileParser videoParser = new VideoFileParser();
+	textParser.setNextParser( audioParser );
+	audioParser.setNextParser( videoParser );
+	File file = new File( File.Type.AUDIO, "Dream Theater  - The Astonishing" );
+	String result = textParser.parse( file );
+
+其实呢，责任链的每一个节点可以是一个方法，然后通过 Stream 串联
+
+	String result = Stream.<Function<File, Optional<String>>>of( // [1]
+	        ChainOfRespLambda::parseText,
+	        ChainOfRespLambda::parseAudio,
+	        ChainOfRespLambda::parseVideo )
+	        .map(f -> f.apply( file )) // [2]
+	        .filter( Optional::isPresent ) // [3]
+	        .findFirst() // [4]
+	        .flatMap( Function.identity() ) // [5]
+	        .orElseThrow( () -> new RuntimeException( "Unknown file: " + file ) ) ); [6]
+
+
+## 访问者模式
+
 [Gang of Four Patterns in a Functional Light: Part 4](https://www.voxxed.com/2016/05/gang-four-patterns-functional-light-part-4/)
+
+In object-oriented programming the Visitor pattern is commonly used when it is required to add new operations to existing objects but it’s impossible (or not wanted for design reason) to modify the objects themselves and add the missing operations directly inside their implementation.  以前总结过一个[为对象附着一个函数](http://qiankunli.github.io/2018/06/20/rxjava.html)，没想到竟然有官方名称。
+
+
+	interface Element {
+	    <T> T accept(Visitor<T> visitor);
+	}
+	public static class Square implements Element {
+	    public final double side;
+	    public Square(double side) {
+	        this.side = side;
+	    }
+	    @Override
+	    public <T> T accept(Visitor<T> visitor) {
+	        return visitor.visit(this);
+	    }
+	}
+	public static class Circle implements Element {
+	    public final double radius;
+	    public Circle(double radius) {
+	        this.radius = radius;
+	    }
+	    @Override
+	    public <T> T accept(Visitor<T> visitor) {
+	        return visitor.visit(this);
+	    }
+	}
+	
+假设我们想求	Square 和Circle 的面积area 和周长perimeter
+
+1. 需要将area 和 perimeter放到Element 里
+2. 使用Visitor模式
+
+一个简单实现
+	
+	interface Visitor<T> {
+	    T visit(Square element);
+	    T visit(Circle element);
+	    T visit(Rectangle element);
+	}
+	public static class AreaVisitor implements Visitor<Double> {
+	    @Override
+	    public Double visit( Square element ) {
+	        return element.side * element.side;
+	    }
+	    @Override
+	    public Double visit( Circle element ) {
+	        return Math.PI * element.radius * element.radius;
+	    }
+	    @Override
+	    public Double visit( Rectangle element ) {
+	        return element.height * element.width;
+	    }
+	}
+	public static class PerimeterVisitor implements Visitor<Double> {...}
+	
+用函数式编程翻译一下。如果对scala 等支持pattern match 的代码，此处会更简洁
+
+	public class LambdaVisitor<A> implements Function<Object, A> {
+	    private Map<Class<?>, Function<Object, A>> fMap = new HashMap<>();
+	    public <B> Acceptor<A, B> on(Class<B> clazz) {
+	        return new Acceptor<>(this, clazz);
+	    }
+	    @Override
+	    public A apply( Object o ) {
+	        return fMap.get(o.getClass()).apply( o );
+	    }	 
+	    static class Acceptor<A, B> {
+	        private final LambdaVisitor visitor;
+	        private final Class<B> clazz;
+	        Acceptor( LambdaVisitor<A> visitor, Class<B> clazz ) {
+	            this.visitor = visitor;
+	            this.clazz = clazz;
+	        }
+	        public LambdaVisitor<A> then(Function<B, A> f) {
+	            visitor.fMap.put( clazz, f );
+	            return visitor;
+	        }
+	    }
+	}
+
+笔者对函数替代倒不是很在意，但一串链式操作完成map的赋值，感觉还是很神奇的
+	
+	static Function<Object, Double> areaCalculator = new LambdaVisitor<Double>()
+	        .on(Square.class).then( s -> s.side * s.side )
+	        .on(Circle.class).then( c -> Math.PI * c.radius * c.radius )
+	        .on(Rectangle.class).then( r -> r.height * r.width );
+
+
+## 小结
+
+数据结构 描述了数据与数据之间的关系；面向对象描述了对象与对象之间的关系；函数式编程则基于函数与函数之间的关系
+
+1. 实现逻辑时，先考虑用函数实现最小逻辑单元
+2. 优先复用编程语言提供的通用函数，比如Runnable、Function、Consumer、XXConsumer
+3. 对函数进行逻辑聚合
+
+	* 函数数组/Stream
+	* Consumer.andThen(xx).andThen
+	* 函数作为参数或返回值
+	* 将函数与特定key构成一个map

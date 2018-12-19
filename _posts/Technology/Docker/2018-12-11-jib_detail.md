@@ -142,46 +142,140 @@ newRoot 的创建入口在 StepsRunner 中
 对future的理解
 
 1. [彻底理解Java的Future模式](https://www.cnblogs.com/cz123/p/7693064.html) 单线程就不说了，在多线程中，你另起线程执行一个任务，Runnable.run 是没有返回值的。**从调用方的角度看，另起线程是为了加快处理，不意味着不关心执行结果。 调用方可以先不管 返回结果干别的，但不意味着永远不关心返回结果。所以调用方要有获取返回结果的手段，甚至于影响执行线程的手段（比如取消）。** 了解了这个，就会对那么多future的扩充类找到感觉，因为它们都是从调用者需求出发的。
-2. [Interface Future<V>](https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/Future.html) A Future represents the result of an asynchronous computation. 
+2. [Interface Future](https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/Future.html) A Future represents the result of an asynchronous computation. 
 3. [Guide to java.util.concurrent.Future](https://www.baeldung.com/java-future)future 一般与Callable 和ExecutorService 结合使用。  Callable is an interface representing a task that returns a result and has a single call() method. Creating an instance of Callable does not take us anywhere, we still have to pass this instance to an executor that will take care of starting that task in a new thread and give us back the valuable Future object. That’s where ExecutorService comes in.
 4. 自己的理解：凡是异步，必涉及调用方和执行方（通常还有队列），两方必涉及沟通媒介，类似于“句柄” 之类的东东。
 
+## 与docker registry 的交互
 
-## 一些Step的实现原理
+	com.google.cloud.tools.jib
+		blob
+		image
+		json
+		registry
+			RegistryClient
+			BlobPuller
+			BlobPusher
+			ManifestPuller
+			ManifestPusher
+			RegistryEndpointCaller
+			RegistryEndpointProvider
 
-以常用 的forBuildToDockerRegistry 包含的步骤来分析
+RegistryClient 大体上可以作为 与Registry 交互的入口，然后将请求具体分发给BlobPuller/ManifestPuller 等，blob、image、json 等包则提供 对请求及响应对象的封装。
 
-### retrieveTargetRegistryCredentialsStep
+![](/public/upload/docker/jib_RegistryClient.png)
 
-这个步骤的本质是 获取Credential ，也就是用户名和密码，无需远程访问。
+RegistryClient/BlobPuller 提供高层语义抽象，实际干活的是RegistryEndpointCaller 和 RegistryEndpointProvider。RegistryEndpointCaller 控制整体流程，RegistryEndpointProvider 及其子类控制流程中 个性化的部分，类似于模板模式，但采用了聚合的方式。**这是封装http 请求的经典方式**
 
-
-	class RetrieveRegistryCredentialsStep implements AsyncStep<Credential>, Callable<Credential> {
-	  	public Credential call() throws CredentialRetrievalException {
-	  		...
-	  		Optional<Credential> optionalCredential = credentialRetriever.retrieve();
-	  		...
-	  	}	
+	class RegistryEndpointCaller<T> {
+		RegistryEndpointCaller(
+			...
+			RegistryEndpointProvider<T> registryEndpointProvider,
+			Authorization authorization,
+			RegistryEndpointRequestProperties registryEndpointRequestProperties,
+			boolean allowInsecureRegistries){
+			...
+		}
+		private T call(URL url, Function<URL, Connection> connectionFactory){
+			 try (Connection connection = connectionFactory.apply(url)) {
+	      	Request.Builder requestBuilder = Request.builder().setXX...
+	      	if (sendCredentials) {
+	        	requestBuilder.setAuthorization(authorization);
+	      	}
+	      	Response response = connection.send(registryEndpointProvider.getHttpMethod(), requestBuilder.build());
+	      	return registryEndpointProvider.handleResponse(response);
+		}
 	}
-	
-	@FunctionalInterface
-	public interface CredentialRetriever {
-	  	Optional<Credential> retrieve() throws CredentialRetrievalException;
-	}
-	
-CredentialRetriever 是构建 RegistryImage	时拿到的
 
-	public class RegistryImage implements SourceImage, TargetImage {
-		public RegistryImage addCredential(String username, String password) {
-	    	addCredentialRetriever(() -> Optional.of(Credential.basic(username, password)));
-	    	return this;
-	  	}
+RegistryEndpointProvider 接口定义
+
+	interface RegistryEndpointProvider<T> {
+		String getHttpMethod();
+		URL getApiRoute(String apiRouteBase) throws MalformedURLException;
+		BlobHttpContent getContent();
+		List<String> getAccept();
+		T handleResponse(Response response) throws IOException, RegistryException;
+		default T handleHttpResponseException(HttpResponseException httpResponseException)
+		  throws HttpResponseException, RegistryErrorException {
+			throw httpResponseException;
+		}
+		String getActionDescription();
 	}
-	
-	public class Credential {
-		private final String username;
-  		private final String password;
-	}
+
+其子类包括，基本囊括了与registry 交互的所有过程
+
+1. AuthenticationMethodRetriever
+2. BlobChecker
+3. BlobPuller
+4. BlobPusher
+5. ManifestPuller
+6. ManifestPusher
+
+## Image 数据在客户端的保存（待梳理）
+
+先留一个问题：若是给镜像加Label，会不会影响镜像/layer 的digest？
+
+### 对象表示
+
+这块内容主要在 `com.google.cloud.tools.jib.image`中，重点包括以下对象
+
+1. Image
+2. Layer
+3. Blob
+
+![](/public/upload/docker/jib_Image.png)
+
+Image是一个数据类，包括字段及对应的Getter方法，setter工作由其内部类Builder 完成。
+
+![](/public/upload/docker/jib_Layer.png)
+
+An image layer 主要包括Blob 及其元数据信息
+
+1. Content BLOB, The compressed archive (tarball gzip) of the partial filesystem changeset
+2. Content Digest, The SHA-256 hash of the content BLOB.
+3. The SHA-256 hash of the uncompressed archive (tarball) of the partial filesystem changeset.
+3. Content Size, The size (in bytes) of the content BLOB.
+
+![](/public/upload/docker/jib_Blob.png)
+
+### 本地镜像缓存
+
+在`com.google.cloud.tools.jib.cache` 包下
+
+![](/public/upload/docker/jib_Cache.png)
+
+Cache 名为缓存，实际可以看做是 对象存储与检索，将对象数据最终存到磁盘上。
+
+缓存的目录位置参见 `com.google.cloud.tools.jib.filesystem.UserCacheHome`，不同OS 位置不同。`$CACHE_HOME/google-cloud-tools-java/jib` 主要内容如下
+
+1. layers
+	digest 文件，内容为digest
+2. tmp
+3. metadata-v2.json
+4. 各种xxx.tar.gz
+
+![](/public/upload/docker/jib_Cache_Storage.png)
+
+从上图可以看到Blob 状态的演变 Blob ==> WrittenLayer ==> Cachedlayer
+
+1. `Content-Type: application/octet-stream`流 ，先写在`$CACHE_HOME/google-cloud-tools-java/jib/tmp/.tmp.layer` 文件中，在接收文件的同时计算文件的Content Digest（SHA-256） 得到DescriptorDigest，配合文件长度totalBytes 得到BlobDescriptor。
+2. 解压文件，对解压后的文件 计算Content Digest（SHA-256） 得到diffId。然后将`$CACHE_HOME/google-cloud-tools-java/jib/tmp/.tmp.layer` 改名为`$CACHE_HOME/google-cloud-tools-java/jib/tmp/$diffId`
+3. 将`$CACHE_HOME/google-cloud-tools-java/jib/tmp/$diffId` 改名为`$CACHE_HOME/google-cloud-tools-java/jib/layers/$digest/$diffId`
+3. 基于`$CACHE_HOME/google-cloud-tools-java/jib/layers/$digest/$diffId` 文件构建FileBlob，进而构建Cachedlayer
+
+对于UncompressedLayer 文件，写入完毕后还会再加一个操作 write selector
+
+1. 创建一个`$CACHE_HOME/google-cloud-tools-java/jib/selectors/$diffId`
+2. 创建一个临时文件，写入内容`$digest` 
+3. 将临时文件mv 为`$CACHE_HOME/google-cloud-tools-java/jib/selectors/$diffId` 
+
+临时文件的意图是 atomic move。selector file的意图是 建立$diffId 到 $digest 的关联关系，这样就不用每次将UncompressedLayer 再压缩一遍后计算$digest。
+
+
+### jib本地镜像缓存与docker 本地镜像缓存的对比
+
+
+
 
 个人微信订阅号
 
