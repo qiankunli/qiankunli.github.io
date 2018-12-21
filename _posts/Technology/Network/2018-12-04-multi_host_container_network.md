@@ -26,13 +26,37 @@ keywords: container network
 
 1. 如果要访问的目标IP跟自己是一个网段的（根据CIDR就可以判断出目标端IP和自己是否在一个网段内了），就不用经过网关了，先通过ARP协议获取目标端的MAC地址，源IP直接发送数据给目标端IP即可。
 
-	|A mac|B mac|A ip|B ip|body|
-	|---|---|---|---|---|
+	<table>
+	<tr>
+		<td colspan="2">frame header</td>
+		<td colspan="3">frame body</td>
+	<tr>
+	<tr>
+		<td>A mac</td>
+		<td>B mac</td>
+		<td bgcolor="green">A ip</td>
+		<td bgcolor="green">B ip</td>
+		<td bgcolor="green">body</td>
+	<tr>
+	<table>
+
 
 2. 如果访问的不是跟自己一个网段的，就会先发给网关，然后再由网关发送出去，网关就是路由器的一个网口，网关一般跟自己是在一个网段内的，通过ARP获得网关的mac地址，就可以发送出去了
 
-	|A mac|gateway mac|A ip|B ip|body|
-	|---|---|---|---|---|
+	<table>
+	<tr>
+		<td colspan="2">frame header</td>
+		<td colspan="3">frame body</td>
+	<tr>
+	<tr>
+		<td>A mac</td>
+		<td>gateway mac</td>
+		<td bgcolor="green">A ip</td>
+		<td bgcolor="green">B ip</td>
+		<td bgcolor="green">body</td>
+	<tr>
+	<table>
+
 
 ### 主机路由对上述过程的影响
 
@@ -44,8 +68,20 @@ keywords: container network
 
 所谓下一跳地址就是：如果 IP 包从主机 A 发到主机 B，需要经过路由设备 X 的中转。那么 X 的 IP 地址就应该配置为主机 A 的下一跳地址。一旦A配置了下一跳地址，那么接下来，当 IP 包从网络层进入链路层封装成帧的时候，eth0 设备就会使用下一跳地址X_IP对应的 MAC 地址，作为该数据帧的目的 MAC 地址。
 
-|A mac|X mac|A ip|B ip|body|
-|---|---|---|---|---|
+<table>
+<tr>
+	<td colspan="2">frame header</td>
+	<td colspan="3">frame body</td>
+<tr>
+<tr>
+	<td>A mac</td>
+	<td>X mac</td>
+	<td bgcolor="green">A ip</td>
+	<td bgcolor="green">B ip</td>
+	<td bgcolor="green">body</td>
+<tr>
+<table>
+
 
 [程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)提到：在一个网络数据包传输的过程中（跨网络+路由器），都是源/目标mac在变，源/目标ip都没变。
 
@@ -121,20 +157,41 @@ VTEP 等内核实现的设备 ，包括vlan、vxlan 等内核实现的机制、�
 |calico + 网关bgp |网关|bgp 更新路由 |宿主机三层连通|
 
 
-1. flannel + udp
+1. flannel + udp/flannel + vxlan（tcp数据包），udp 和tcp 数据包首部大致相同
 
-	|host1 mac|host2mac|host1 ip|host2 ip|container1 mac|container2 mac|container1 ip|container2 ip|body|
-	|---|---|---|---|---|---|---|---|---|
+
+	<table>
+	<tr>
+		<td colspan="2">frame header</td>
+		<td colspan="5">frame body</td>
+	<tr>
+	<tr>
+		<td>host1 mac</td>
+		<td>host2 mac</td>
+		<td bgcolor="green">container1 mac</td>
+		<td bgcolor="green">container2 mac</td>
+		<td bgcolor="green">container1 ip</td>
+		<td bgcolor="green">container1 ip</td>
+		<td bgcolor="green">body</td>
+	<tr>
+	<table>
+
+
+2. flannel + host-gw/calico
 	
-2. flannel + vxlan
-
-	|host2mac|host2 ip|container1 mac|container2 mac|container1 ip|container2 ip|body|
-	|---|---|---|---|---|---|---|
-	
-3. flannel + host-gw/calico
-
-	|container1 mac|host2 mac|container1 ip|container2 ip|body|
-	|---|---|---|---|---|
+	<table>
+	<tr>
+		<td colspan="2">frame header</td>
+		<td colspan="3">frame body</td>
+	<tr>
+	<tr>
+		<td>container1 mac</td>
+		<td>host2 mac</td>
+		<td>container1 ip</td>
+		<td>container2 ip</td>
+		<td>body</td>
+	<tr>
+	<table>
 
 ### underlay/physical 网络
 

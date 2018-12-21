@@ -8,7 +8,7 @@ keywords: jib
 
 ---
 
-## 简介（持续更新）
+## 简介
 
 * TOC
 {:toc}
@@ -211,7 +211,7 @@ RegistryEndpointProvider 接口定义
 5. ManifestPuller
 6. ManifestPusher
 
-## Image 数据在客户端的保存（待梳理）
+## Image 数据在客户端的保存
 
 先留一个问题：若是给镜像加Label，会不会影响镜像/layer 的digest？
 
@@ -274,8 +274,15 @@ Cache 名为缓存，实际可以看做是 对象存储与检索，将对象数�
 
 ### jib本地镜像缓存与docker 本地镜像缓存的对比
 
+[关于docker image的那点事儿](http://qiankunli.github.io/2015/09/22/docker_image.html)  讲了
 
+1. registry storage（也就是registry daemon/container） 磁盘上存储layer 的方式
+2. registry storage 也 docker local storage的对比
+2. **可以看到，单就layer存储来说，jib 本地与 registry 采用的方式是一致的**
 
+## container configuration blob
+
+参见 [关于docker image的那点事儿](http://qiankunli.github.io/2015/09/22/docker_image.html) 以及 [Image Manifest Version 2, Schema 1](https://github.com/docker/distribution/blob/master/docs/spec/manifest-v2-1.md)
 
 个人微信订阅号
 
