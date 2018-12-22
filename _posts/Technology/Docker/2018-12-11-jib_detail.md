@@ -211,6 +211,13 @@ RegistryEndpointProvider 接口定义
 5. ManifestPuller
 6. ManifestPusher
 
+
+jsonTemplate 继承图  
+
+![](/public/upload/docker/jib_JsonTemplate.png)
+
+估计是受 json 序列化框架的影响，就像JsonTemplate 的注释：All JSON templates to be used with JsonTemplateMapper must extend this class. 其实就是dokcer distribution http 交互都是 json 字符串，所以弄些对应的对象，在web开发中经常被称为XXDTO，一些通用元素会搞一个BaseDTO 之类的公共类。
+
 ## Image 数据在客户端的保存
 
 先留一个问题：若是给镜像加Label，会不会影响镜像/layer 的digest？
