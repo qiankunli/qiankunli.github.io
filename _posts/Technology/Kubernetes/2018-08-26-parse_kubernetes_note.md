@@ -157,7 +157,9 @@ yaml配置参见[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/ku
 |可执行文件|镜像|
 |操作系统|kubernetes|
 
+在细讲k8s的具体技术时，文章的主要脉络：
 
+![](/public/upload/kubernetes/parse_k8s_skeleton.png)
 
 [Kubernetes controller 组件](http://qiankunli.github.io/2015/03/03/kubernetes_controller.html)
 

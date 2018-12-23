@@ -53,13 +53,24 @@ controller是一系列控制器的集合，不单指RC。
 	  }
 	}
 
-实际状态往往来自于 Kubernetes 集群本身。 比如，kubelet 通过心跳汇报的容器状态和节点状态，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。而期望状态，一般来自于用户提交的 YAML 文件。 比如，Deployment 对象中 Replicas 字段的值，这些信息往往都保存在 Etcd 中。
+实际状态往往来自于 Kubernetes 集群本身。 比如，**kubelet 通过心跳汇报的容器状态和节点状态**，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。而期望状态，一般来自于用户提交的 YAML 文件。 比如，Deployment 对象中 Replicas 字段的值，这些信息往往都保存在 Etcd 中。
 
 
 
 Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事件驱动”，有点类似 select和epoll的区别。控制器模型更有利于幂等。
 
+1. 对于控制器来说，被监听对象的变化是一个持续的信号，比如变成 ADD 状态。只要这个状态没变化，那么此后无论任何时候控制器再去查询对象的状态，都应该是 ADD。
+2. 而对于事件驱动来说，它只会在 ADD 事件发生的时候发出一个事件。如果控制器错过了这个事件，那么它就有可能再也没办法知道ADD 这个事件的发生了。
 
+### 实现
+
+[通过自定义资源扩展Kubernetes](https://blog.gmem.cc/extend-kubernetes-with-custom-resources)
+![](/public/upload/kubernetes/kubernete_controller_pattern.png)
+
+控制器的关键分别是informer/SharedInformer和Workqueue，前者观察kubernetes对象当前的状态变化并发送事件到workqueue，然后这些事件会被worker们从上到下依次处理。
+
+其它相关文章[A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html) 
+[Kubewatch, An Example Of Kubernetes Custom Controller](https://engineering.bitnami.com/articles/kubewatch-an-example-of-kubernetes-custom-controller.html)
 
 ## What is a replication controller?
 
