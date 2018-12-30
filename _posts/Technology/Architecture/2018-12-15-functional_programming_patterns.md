@@ -241,6 +241,21 @@ In object-oriented programming the Visitor pattern is commonly used when it is r
 	        .on(Circle.class).then( c -> Math.PI * c.radius * c.radius )
 	        .on(Rectangle.class).then( r -> r.height * r.width );
 
+### 关于访问者模式的一点感觉
+
+**理解角色的分离是理解大部分设计模式的关键**
+
+[访问者模式详解（伪动态双分派）](https://www.cnblogs.com/zuoxiaolong/p/pattern23.html)
+
+1. 静态单分派，方法重载
+2. 动态单分派，多态
+2. 动态双分派，依据两个实际类型去判断一个方法的运行行为
+
+		for (Bill bill : billList) {
+	    	bill.accept(viewer);
+	   	}
+	   	
+	Bill 可能是信用卡账单，也可能是支付宝账单；viewer可能是保存，也可能是打印。假设Bill 有3种，viewer 有2种，则Bill 和 viewer 只实现一个接口，便可以达到 2*3=6 的组合效果。
 
 ## 小结
 

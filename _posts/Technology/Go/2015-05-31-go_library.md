@@ -157,12 +157,45 @@ Go中的json处理，跟结构体是密切相关的，一般要为json字符串�
     	}
     }
     
-## command app
+## command line application
 
-[urfave/cli](https://github.com/urfave/cli)
+go 可执行文件没有复杂的依赖（java依赖jvm、python 依赖python库），特别适合做一些命令行工具
+
+大概的套路都是
+
+1. 定义一个Command对象
+2. Command 对象一般有一个 name，多个flag（全写和简写） 以及一个处理函数
+
+### [urfave/cli](https://github.com/urfave/cli)
 
 cli is a simple, fast, and fun package for building command line apps in Go. The goal is to enable developers to write fast and distributable command line applications in an expressive way.
 
 Things like generating help text and parsing command flags/options should not hinder productivity when writing a command line app.This is where cli comes into play. cli makes command line programming fun, organized, and expressive!
+
+### [spf13/cobra](https://github.com/spf13/cobra) 
+
+这个库牛就牛在k8s 用的也是它
+
+The best applications will read like sentences when used(命令执行起来应该像句子一样). Users will know how to use the application because they will natively understand how to use it.
+
+The pattern to follow is `APPNAME VERB NOUN --ADJECTIVE`. or `APPNAME COMMAND ARG --FLAG`
+
+A flag is a way to modify the behavior of a command 这句说的很有感觉
+
+### command line Application 的目录结构
+
+cobra 推荐
+
+  	appName/
+    	cmd/
+        	add.go
+        	your.go
+        	commands.go
+        	here.go
+      	main.go
+      	
+typically the main.go file is very bare. It serves one purpose: initializing.
+
+## http
 
 go语言中的`github.com/gorilla`可以方便的进行http url 到处理方法的dispatch，`github.com/urfave/cli` 则实现了用户输入命令到处理方法的dispatch。

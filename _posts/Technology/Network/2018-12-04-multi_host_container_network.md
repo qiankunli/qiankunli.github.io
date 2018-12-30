@@ -40,8 +40,9 @@ keywords: container network
 	<tr>
 	<table>
 
+	如何是一个局域网的, you can just send a packet with any random IP address on it, and as long as the MAC address is right it’ll get there.
 
-2. 如果访问的不是跟自己一个网段的，就会先发给网关，然后再由网关发送出去，网关就是路由器的一个网口，网关一般跟自己是在一个网段内的，通过ARP获得网关的mac地址，就可以发送出去了
+2. 如果访问的不是跟自己一个网段的，就会先发给网关（哪个网关由 The route table 确定），然后再由网关发送出去，网关就是路由器的一个网口，网关一般跟自己是在一个网段内的，通过ARP获得网关的mac地址，就可以发送出去了
 
 	<table>
 	<tr>
@@ -56,7 +57,6 @@ keywords: container network
 		<td bgcolor="green">body</td>
 	<tr>
 	<table>
-
 
 ### 主机路由对上述过程的影响
 
@@ -94,6 +94,8 @@ there are two ways for Containers or VMs to communicate to each other.
 2. In Overlay network approach, there is an additional level of encapsulation like VXLAN, NVGRE
 
 [Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)Broadly, there are two ways for Containers or VMs to communicate to each other. In Underlay network approach, VMs or Containers are directly exposed to host network. Bridge, macvlan and ipvlan network drivers are examples of this approach. In Overlay network approach, there is an additional level of encapsulation like VXLAN, NVGRE between the Container/VM network and the underlay network.
+
+[A container networking overview](https://jvns.ca/blog/2016/12/22/container-networking/)"every container gets an IP" concept I was really confused and kind of concerned. How would this even work?! My computer only has one IP address!  平白无故变出那么多ip来，自然要玩很多花活儿
 
 ### overlay 网络
 
@@ -193,6 +195,15 @@ VTEP 等内核实现的设备 ，包括vlan、vxlan 等内核实现的机制、�
 	<tr>
 	<table>
 
+[A container networking overview](https://jvns.ca/blog/2016/12/22/container-networking/) **How do routes get distributed**?
+
+Every container networking thing to runs some kind of **daemon program** on every box which is in charge of adding routes to the route table.
+
+There are two main ways they do it:
+
+1. the routes are in an etcd cluster, and the program talks to the etcd cluster to figure out which routes to set
+2. use the BGP protocol to gossip to each other about routes, and a daemon (BIRD) listens for BGP messages on every box
+
 ### underlay/physical 网络
 
 
@@ -212,6 +223,8 @@ VTEP 等内核实现的设备 ，包括vlan、vxlan 等内核实现的机制、�
 4. 容器所在物理机/宿主机处于一个什么样的角色
 5. 是一个L3方案（只要物理机来通就行）还是L2方案，L3网络扩展和提供在过滤和隔离网络流量方面的细粒度控制。
 6. 选择网络时，IP地址管理IPAM，组播，广播，IPv6，负载均衡，服务发现，策略，服务质量，高级过滤和性能都是需要额外考虑的。问题是这些能力是否受到支持。即使您的runtime，编排引擎或插件支持容器网络功能，您的基础架构也可能不支持该功能
+
+
 
 个人微信订阅号
 
