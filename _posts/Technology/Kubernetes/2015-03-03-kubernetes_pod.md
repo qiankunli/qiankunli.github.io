@@ -1,9 +1,9 @@
 ---
 layout: post
-title: Kubernetes 基本概念和 pod 组件
+title: Kubernetes pod 组件
 category: 技术
 tags: Kubernetes
-keywords: CoreOS Docker Kubernetes
+keywords: Kubernetes Pod
 
 ---
 
@@ -12,32 +12,6 @@ keywords: CoreOS Docker Kubernetes
 
 * TOC
 {:toc}
-
-
-##  Container Engine cluster
-
-本小节主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs)的摘抄，有删减。
-
-本小节主要讲了Container Engine cluster和Pod的概念
-
-A Container Engine cluster is a group of Compute Engine instances running Kubernetes. It consists of one or more node instances, and a Kubernetes master instance. A cluster is the foundation of a Container Engine application—pods,services, and replication controllers all run on top of a cluster.
-
-一个Container Engine cluster主要包含一个master和多个slave节点，它是上层的pod、service、replication controllers的基础。
-
-### The Kubernetes master
-
-Every cluster has a single master instance. The master provides a unified view into the cluster and, through its publicly-accessible endpoint, is the doorway(途径) for interacting with the cluster.
-
-**The master runs the Kubernetes API server, which services REST requests, schedules pod creation and deletion on worker nodes, and synchronizes pod information (such as open ports and location) with service information.**
-
-1. 提供统一视图
-2. service REST requests
-3. 调度
-4. 控制，使得actual state满足desired state 
-
-### Nodes
-
-A cluster can have one or more node instances. These are managed from the master, and run the services necessary to support Docker containers. Each node runs the Docker runtime and hosts a Kubelet agent（管理docker runtime）, which manages the Docker containers scheduled on the host. Each node also runs a simple network proxy（网络代理程序）.
 
 ## What is a pod?
 
@@ -60,7 +34,7 @@ Pods can be used to host vertically integrated application stacks, but their pri
 
 **Individual pods are not intended to run multiple instances of the same application**, in general.
 
-###小结
+### 小结
 
 A pod is a relatively tightly coupled group of containers that are scheduled onto the same host. 
 
