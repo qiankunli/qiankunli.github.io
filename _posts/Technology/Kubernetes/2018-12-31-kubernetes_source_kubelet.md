@@ -300,8 +300,11 @@ RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure the
 
 ![](/public/upload/kubernetes/dockershim_object.png)
 
+从左到右可以看到用户请求 怎么跟cni plugin(binary file) 产生关联的
 
-## 加载 CNI 
+golang中一个接口可以包含一个或多个其他的接口，这相当于直接将这些内嵌接口的方法列举在外层接口中一样。
+
+## 加载 CNI plugin
 
 ![](/public/upload/kubernetes/kubelet_cni_init.png)
 
@@ -342,9 +345,9 @@ cniNetworkPlugin.Init 方法逻辑如下
 		return nil, fmt.Errorf("No valid networks found in %s", confDir)
 	}
 
-docker service 作为grpc server 实现，最终还是操作了 CNI，CNIConfig接收到指令后， 拼凑“shell指令及参数” 执行 cni binary文件。CNI 插件的初始化就是 根据binary path 初始化CNIConfig，进而初始化NetworkPlugin。至于cni binary 本身只需要执行时运行即可，就像go 运行一般的可执行文件一样。
+docker service 作为grpc server 实现，最终还是操作了 CNI，CNIConfig接收到指令后， 拼凑“shell指令及参数” 执行 cni binary文件。CNI 插件的初始化就是 根据binary path 初始化CNIConfig，进而初始化NetworkPlugin。**至于cni binary 本身只需要执行时运行即可，就像go 运行一般的可执行文件一样**。
 
-github.com/containernetworking/cni/pkg/invoke/raw_exec.go
+`github.com/containernetworking/cni/pkg/invoke/raw_exec.go`
 
 	func (e *RawExec) ExecPlugin(ctx context.Context, pluginPath string, stdinData []byte, environ []string) ([]byte, error) {
 		stdout := &bytes.Buffer{}
@@ -360,6 +363,13 @@ github.com/containernetworking/cni/pkg/invoke/raw_exec.go
 	}
 
 ## 其它 
+
+|k8s涉及的组件|功能交付方式|
+|---|---|
+|kubectl|命令行，用户直接使用|
+|kubelet|命令行 启动 http|
+|cri-shim|grpc server|
+|cni plugin|命令行，程序直接使用|
 
 [kubelet 源码分析：Garbage Collect](https://cizixs.com/2017/06/09/kubelet-source-code-analysis-part-3/) gc 机制后面由  eviction 代替
 
