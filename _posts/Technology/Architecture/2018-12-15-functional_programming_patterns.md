@@ -12,7 +12,7 @@ keywords: functional programming patterns
 
 可预先看下 [函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html)  
 
-在面向对象的观念里: 一切皆对象。但知道这句话并没有什么用，大部分人还是拿着面向对象的写着面向过程的代码，尤其是结合spring + springmvc 进行controller-service-dao 的业务开发。所以，看一个代码是不是“面向对象” 一个立足点就是对java 设计模式的应用。
+在面向对象的观念里: 一切皆对象。但知道这句话并没有什么用，大部分人还是拿着面向对象的写着面向过程的代码，尤其是结合spring + springmvc 进行controller-service-dao 的业务开发。所以，看一个代码是不是“面向对象” 一个立足点就是对java 设计模式的应用。2019.1.2补充：这个思想学名叫“设计模式驱动编程”，在 [如此理解面向对象编程](https://coolshell.cn/articles/8745.html) 被批判了。
 
 对应的，函数式编程时知道“一切皆函数”的意义也很有限，应用函数式编程的一个重要立足点就是：函数式编程中的设计模式。 
 

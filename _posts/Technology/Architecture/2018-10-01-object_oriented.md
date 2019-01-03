@@ -12,15 +12,32 @@ keywords: 面向对象
 
 本文最初由[apollo client源码分析](http://qiankunli.github.io/2017/09/23/apollo_client_source.html) 引发，后来加入了 陈皓《左耳听风》教程的相关内容。
 
-2019.1.2 补充：[如此理解面向对象编程](https://coolshell.cn/articles/8745.html)，有一个需求：代码检查操作系统类型，若是linux 输出：linux很不错；若是windows，输出windows 很差
+## 喷一喷面向对象
+
+2019.1.2 补充
+
+[如此理解面向对象编程](https://coolshell.cn/articles/8745.html)，有一个需求：代码检查操作系统类型，若是linux 输出：linux很不错；若是windows，输出windows 很差
 
 1. 过程化的方案
 2. 一般面向对象方案（一个os 抽象class，一个具体os 对应一个子class）
 3. 面向对象进化：不仅弄子类，还弄一map 保存os 和 子类的关系
 4. 大神 Rob Pike 对此的评论是：根本就不需要什么Object，只需要一张小小的配置表格，里面配置了对应的操作系统和你想输出的文本。这不就完了。所谓的代码进化相当疯狂和愚蠢的，这个完全误导了对编程的认知。
-5. 还有的人喜欢用Object来替换所有的if-else语句，他们甚至还喜欢把函数的行数限制在10行以内 [programming in the
+
+
+还有的人喜欢用Object来替换所有的if-else语句，他们甚至还喜欢把函数的行数限制在10行以内 [programming in the
 twenty-first century](https://prog21.dadgum.com/156.html)
 6. **那23个经典的设计模式和OO半毛钱关系没有**，只不过人家用OO来实现罢了。设计模式就三个准则：1）中意于组合而不是继承，2）依赖于接口而不是实现，3）高内聚，低耦合。你看，这完全就是Unix的设计准则。
+
+
+[Don't Distract New Programmers with OOP](https://prog21.dadgum.com/93.html)
+
+The shift from procedural to OO brings with it a shift from thinking about problems and solutions to thinking about architecture. That's easy to see just by comparing a procedural Python program with an object-oriented one. The latter is almost always longer, full of extra interface and indentation and annotations. The temptation（诱惑） is to start moving trivial bits of code into classes and adding all these little methods and anticipating（预料） methods that aren't needed yet but might be someday. 封装对象、类、接口等对很多简单代码来说是不必要的。
+
+When you're trying to help someone learn how to go from a problem statement to working code, the last thing you want is to get them sidetracked（转移话题） by faux（人造的）-engineering busywork（作业、额外工作）. Some people are going to run with those scraps（点滴） of OO knowledge and build crazy class hierarchies and end up not as focused on on what they should be learning. Other people are going to lose interest because there's a layer of extra nonsense（无意义的） that makes programming even more cumbersome（笨重的）.
+
+面向对象逼着你除了思考问题本身外，还要思考结构、设计，很多人无此意识或功力不足， 滥用面向对象的特性，整出大量无意义的代码，使得代码复杂度大大超过了问题本身的复杂度。[函数式编程的设计模式](http://qiankunli.github.io/2018/12/15/functional_programming_patterns.html) 面向对象设计模式经常在搞一件事，把动词转换为名词，但很不幸，这个动作很多时候没有必要。
+
+
 
 ## 左耳听风
 
