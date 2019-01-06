@@ -18,6 +18,12 @@ keywords: kubernetes 源码分析
 
 笔者不太喜欢抠细节，加上k8s 没有使用 [uber-go/dig](https://github.com/uber-go/dig) 之类的依赖注入库（很多代码 搞到最后就是 spring ioc干的活儿，但一换go的马甲，经常一下子没看出来），struct 组合代码 和 struct 行为代码耦合在一起，本文主要关注 行为代码。笔者认为，**关键不是一些结构体定义， 而是业务逻辑：怎么启动了一个pod？怎么管理pod 的等？与cni、csi 插件怎么结合？如何与docker 协同？**
 
+背景知识
+
+1. 一个grpc client 和 server 如何实现
+2. [spf13/cobra](https://github.com/spf13/cobra)
+3. go 运行可执行文件
+
 ##  整体结构
 
 《深入剖析Kubernetes》：kubelet 调用下层容器运行时的执行过程，并不会直接调用Docker 的 API，而是通过一组叫作 CRI（Container Runtime Interface，容器运行时接口）的 gRPC 接口来间接执行的。Kubernetes 项目之所以要在 kubelet 中引入这样一层单独的抽象，当然是为了对 Kubernetes 屏蔽下层容器运行时的差异。实际上，对于 1.6 版本之前的 Kubernetes 来说，它就是直接调用 Docker 的 API 来创建和管理容器的。
@@ -241,6 +247,8 @@ m.createPodSandbox 和 startContainer
 ## dockershim
 
 在 Kubernetes 中，处理容器网络相关的逻辑并不会在kubelet 主干代码里执行，而是会在具体的 CRI（Container Runtime Interface，容器运行时接口）实现里完成。对于 Docker 项目来说，它的 CRI 实现叫作 dockershim，相关代码在 `pkg/kubelet/dockershim` 下
+
+CRI 设计的一个重要原则，**就是确保这个接口本身只关注容器， 不关注Pod**。但CRI 里有一个PodSandbox，抽取了Pod里的一部分与容器运行时相关的字段，比如Hostname、DnsConfig等。作为具体的容器项目，自己决定如何使用这些字段来实现一个k8s期望的Pod模型。
 
 ![](/public/upload/kubernetes/k8s_cri_docker.png)
 
