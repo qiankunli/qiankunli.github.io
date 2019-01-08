@@ -171,26 +171,6 @@ Kubernetes 项目的成功，是成千上万云计算平台上的开发者用脚
 Kubernetes 项目的本质其实只有一个，那就是“控制器模式”。这个思想，不仅仅是 Kubernetes 项目里每一个组件的“设计模板”，也是 Kubernetes 项目能够将开发者们紧紧团结到自己身边的重要原因。作为一个云计算平台的用户，能够用一个 YAML 文件表达我开发的应用的最终运行状态，并且自动地对我的应用进行运维和管理。**这种信赖关系，就是连接Kubernetes 项目和开发者们最重要的纽带。**
 
 
-## Container-networking-docker-kubernetes 对orchestrator 智能的描述
-
-container orchestrator
-
-一般orchestrator 包括但不限于以下功能：
-
-1. Organizational primitives，比如k8s的label
-2. Scheduling of containers to run on a ost
-3. Automated health checks to determine if a container is alive and ready to serve traffic and to relaunch it if necessary
-4. autoscaling 
-5. upgrading strategies,from rolling updates to more sophisticated techniques such as A/B and canary deployments.
-6. service discovery to determine which host a scheduled container ended upon,usually including DNS support.
-
-The unit of scheduling in Kubernetes is a pod. Essentially, this is a tightly coupled set of one or more containers that are always collocated (that is, scheduled onto a node as a unit); they cannot be spread over nodes. 
-
-1. The number of running instances of a pod—called replicas—can be declaratively stated and enforced through controllers. 
-2. **The logical organization of all resources, such as pods, deployments, or services, happens through labels.** label 的作用不小啊
-
-Kubernetes is highly extensible, from defining new workloads and resource types in general to customizing its user-facing parts, such as the CLI tool kubectl (pronounced cube cuddle).
-
 ![](/public/upload/kubernetes/parse_k8s_ad.JPG)
 
 笔者个人微信订阅号

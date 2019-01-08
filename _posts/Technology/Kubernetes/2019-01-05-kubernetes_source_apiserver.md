@@ -94,7 +94,7 @@ apiserver 启动时 自动加载 built-in resource/object 的scheme 信息， �
 
 ![](/public/upload/kubernetes/http_handler_object.png)
 
-上图要从右向左看（UML 软件的缘故）。 右边是绑定部分，绑定完成后，当接到restful 请求时 会路由到 `apiserver/pkg/registry/rest/rest.go` 定义的XXCreater/XXDeleter 等接口的实现类上。
+上图要从右向左看（UML 软件的缘故，不过有一阵儿分析进入瓶颈，的确是从storage 自下往下来串调用链）。 右边是绑定部分，绑定完成后，当接到restful 请求时 会路由到 `apiserver/pkg/registry/rest/rest.go` 定义的XXCreater/XXDeleter 等接口的实现类上。
 
 ### Schema 信息加载
 
