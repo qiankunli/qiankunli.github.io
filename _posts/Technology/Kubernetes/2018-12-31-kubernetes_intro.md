@@ -24,9 +24,6 @@ k8s 的知识体系是分层，内核是一套理念，然后是apiserver,kuberl
 
 [解读2018：我们处在一个什么样的技术浪潮当中？](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651011968&idx=1&sn=3d500660f7dd47c9fa4033bd9fa69c2f&chksm=bdbec3d38ac94ac523355e1e21f04af71e47a0841d1af0afedecc528b5eb4a5f9fe83f105a11&mpshare=1&scene=1&srcid=12217gWDeJ0aPl8BVBUycQyh#rd)Kubernetes 还是太底层了，真正的云计算并不应该是向用户提供的 Kubernetes 集群。2014 年 AWS 推出 Lambda 服务，Serverless 开始成为热词。从理论上说，Serverless 可以做到 NoOps、自动扩容和按使用付费，也被视为云计算的未来。Serverless 是我们过去 25 年来在 SaaS 中走的最后一步，因为我们已经渐渐将越来越多的职责交给了服务提供商。——Joe Emison 《为什么 Serverless 比其他软件开发方法更具优势》
 
-
-
-
 ## Container-networking-docker-kubernetes 对orchestrator 职能的描述
 
 container orchestrator
@@ -46,6 +43,63 @@ The unit of scheduling in Kubernetes is a pod. Essentially, this is a tightly co
 2. **The logical organization of all resources, such as pods, deployments, or services, happens through labels.** label 的作用不小啊
 
 Kubernetes is highly extensible, from defining new workloads and resource types in general to customizing its user-facing parts, such as the CLI tool kubectl (pronounced cube cuddle).
+
+
+## 编排的实现——控制器模型
+
+docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就在在集群里给镜像找一个主机来运行容器。经过 [《深入剖析kubernetes》笔记](http://qiankunli.github.io/2018/08/26/parse_kubernetes_note.html)的学习，很明显不是这样。比调度更重要的是编排，那么编排如何实现呢？
+
+### 有什么
+
+controller是一系列控制器的集合，不单指RC。
+
+	$ cd kubernetes/pkg/controller/
+	$ ls -d */              
+	deployment/             job/                    podautoscaler/          
+	cloud/                  disruption/             namespace/              
+	replicaset/             serviceaccount/         volume/
+	cronjob/                garbagecollector/       nodelifecycle/          replication/            statefulset/            daemon/
+	...
+
+### 构成
+
+一个控制器，实际上都是由上半部分的控制器定义（包括期望状态），加上下半部分的被控制对象（Pod 或 Volume等）的模板组成的。
+
+### 逻辑
+
+这些控制器之所以被统一放在 pkg/controller 目录下，就是因为它们都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。 （这是不是可以解释调度器 和控制器 不放在一起实现，因为两者是不同的处理逻辑，或者说编排依赖于调度）
+
+	for {
+	  实际状态 := 获取集群中对象 X 的实际状态（Actual State）
+	  期望状态 := 获取集群中对象 X 的期望状态（Desired State）
+	  if 实际状态 == 期望状态{
+	    什么都不做
+	  } else {
+	    执行编排动作，将实际状态调整为期望状态
+	  }
+	}
+
+实际状态往往来自于 Kubernetes 集群本身。 比如，**kubelet 通过心跳汇报的容器状态和节点状态**，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。而期望状态，一般来自于用户提交的 YAML 文件。 比如，Deployment 对象中 Replicas 字段的值，这些信息往往都保存在 Etcd 中。
+
+
+![](/public/upload/kubernetes/k8s_deployment.PNG)
+
+Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事件驱动”，有点类似 select和epoll的区别。控制器模型更有利于幂等。
+
+1. 对于控制器来说，被监听对象的变化是一个持续的信号，比如变成 ADD 状态。只要这个状态没变化，那么此后无论任何时候控制器再去查询对象的状态，都应该是 ADD。
+2. 而对于事件驱动来说，它只会在 ADD 事件发生的时候发出一个事件。如果控制器错过了这个事件，那么它就有可能再也没办法知道ADD 这个事件的发生了。
+
+### 实现
+
+[通过自定义资源扩展Kubernetes](https://blog.gmem.cc/extend-kubernetes-with-custom-resources)
+![](/public/upload/kubernetes/kubernete_controller_pattern.png)
+
+控制器的关键分别是informer/SharedInformer和Workqueue，前者观察kubernetes对象当前的状态变化并发送事件到workqueue，然后这些事件会被worker们从上到下依次处理。
+
+其它相关文章[A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html) 
+[Kubewatch, An Example Of Kubernetes Custom Controller](https://engineering.bitnami.com/articles/kubewatch-an-example-of-kubernetes-custom-controller.html)
+
+
 
 
 ## Julia Evans 系列

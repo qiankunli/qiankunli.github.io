@@ -87,7 +87,10 @@ innodb引擎内存占用
 
 各个环节环环相扣，像艺术品。
 
-[[转]MySQL日志——Undo | Redo](http://www.cnblogs.com/Bozh/archive/2013/03/18/2966494.html)中有一种非常贴切的描述：将redo log成为新数据（还未同步到磁盘）的备份儿，重做的时候好知道怎么做。将undo log称为老数据的备份儿，恢复的时候好知道怎么恢复。
+[[转]MySQL日志——Undo Redo](http://www.cnblogs.com/Bozh/archive/2013/03/18/2966494.html)中有一种非常贴切的描述：将redo log成为新数据（还未同步到磁盘）的备份儿，重做的时候好知道怎么做。将undo log称为老数据的备份儿，恢复的时候好知道怎么恢复。
+
+[MySQL之Undo Log和Redo Log](https://blog.csdn.net/TheLudlows/article/details/78146777)Undo + Redo的设计主要考虑的是提升IO性能，将随机读写磁盘转换为顺序读写。虽说通过缓存数据，减少了写数据的IO。
+但是却引入了新的IO，即写Redo Log的IO。
 
 ## 索引
 

@@ -14,66 +14,54 @@ keywords: CoreOS Docker Kubernetes
 
 本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs)的摘抄，有删减。
 
-本文主要讲了replication controller（部分地方简称RC）
+本文主要讲了replication controller（部分地方简称RC） **尤其要注意 replication controller 和 Kubernetes 控制器模型 不是一个范畴的事情。**
 
 2018.11.18 补充，内容来自极客时间 《深入剖析Kubernetes》
 
 
-## 编排的实现——控制器模型
 
-docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就在在集群里给镜像找一个主机来运行容器。经过 [《深入剖析kubernetes》笔记](http://qiankunli.github.io/2018/08/26/parse_kubernetes_note.html)的学习，很明显不是这样。比调度更重要的是编排，那么编排如何实现呢？
+## What is Kubernetes replication for?
 
-### 有什么
+[Kubernetes Replication Controller, Replica Set and Deployments: Understanding replication options](https://www.mirantis.com/blog/kubernetes-replication-controller-replica-set-and-deployments-understanding-replication-options/)
 
-controller是一系列控制器的集合，不单指RC。
+Typically you would want to replicate your containers (and thereby your applications) for several reasons, including: Reliability、Load balancing、Scaling。也就是说，应用不是启动一个实例就是完事了。如果应用有多个实例，那么弄几个实例，如何更新所有实例。然后随着k8s的演化，先是Replication Controller、然后 ReplicaSets 最后Deployment
 
-	$ cd kubernetes/pkg/controller/
-	$ ls -d */              
-	deployment/             job/                    podautoscaler/          
-	cloud/                  disruption/             namespace/              
-	replicaset/             serviceaccount/         volume/
-	cronjob/                garbagecollector/       nodelifecycle/          replication/            statefulset/            daemon/
-	...
-
-### 构成
-
-一个控制器，实际上都是由上半部分的控制器定义（包括期望状态），加上下半部分的被控制对象（Pod 或 Volume等）的模板组成的。
-
-### 逻辑
-
-这些控制器之所以被统一放在 pkg/controller 目录下，就是因为它们都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。 （这是不是可以解释调度器 和控制器 不放在一起实现，因为两者是不同的处理逻辑，或者说编排依赖于调度）
-
-	for {
-	  实际状态 := 获取集群中对象 X 的实际状态（Actual State）
-	  期望状态 := 获取集群中对象 X 的期望状态（Desired State）
-	  if 实际状态 == 期望状态{
-	    什么都不做
-	  } else {
-	    执行编排动作，将实际状态调整为期望状态
-	  }
-	}
-
-实际状态往往来自于 Kubernetes 集群本身。 比如，**kubelet 通过心跳汇报的容器状态和节点状态**，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。而期望状态，一般来自于用户提交的 YAML 文件。 比如，Deployment 对象中 Replicas 字段的值，这些信息往往都保存在 Etcd 中。
+1. The Replication Controller is the original **form of replication in Kubernetes**. It’s being replaced by Replica Sets. 
+2. **The major difference is that the rolling-update command works with Replication Controllers**, but won’t work with a Replica Set.This is because Replica Sets are meant to be used as the backend for Deployments.
+3. Deployments are intended to replace Replication Controllers.  They provide the same replication functions (through Replica Sets) and also the ability to rollout changes and roll them back if necessary.
 
 
-![](/public/upload/kubernetes/k8s_deployment.PNG)
+## deployment 
 
-Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事件驱动”，有点类似 select和epoll的区别。控制器模型更有利于幂等。
+《深入剖析Kubernetes》 经典PaaS的记忆：作业副本与水平扩展 小节 未完毕
 
-1. 对于控制器来说，被监听对象的变化是一个持续的信号，比如变成 ADD 状态。只要这个状态没变化，那么此后无论任何时候控制器再去查询对象的状态，都应该是 ADD。
-2. 而对于事件驱动来说，它只会在 ADD 事件发生的时候发出一个事件。如果控制器错过了这个事件，那么它就有可能再也没办法知道ADD 这个事件的发生了。
+有了Replication Controller 为什么还整一个 Deployment？因为后者是声明式的。
 
-### 实现
+[Replication Controller VS Deployment in Kubernetes](https://stackoverflow.com/questions/37423117/replication-controller-vs-deployment-in-kubernetes)
 
-[通过自定义资源扩展Kubernetes](https://blog.gmem.cc/extend-kubernetes-with-custom-resources)
-![](/public/upload/kubernetes/kubernete_controller_pattern.png)
+Deployments are a newer and higher level concept than Replication Controllers. They manage the deployment of Replica Sets (also a newer concept, but pretty much equivalent to Replication Controllers), and allow for easy updating of a Replica Set as well as the ability to roll back to a previous deployment.**Previously this would have to be done with `kubectl rolling-update` which was not declarative and did not provide the rollback features.**
 
-控制器的关键分别是informer/SharedInformer和Workqueue，前者观察kubernetes对象当前的状态变化并发送事件到workqueue，然后这些事件会被worker们从上到下依次处理。
+[Deployments](https://kubernetes.io/zh/docs/concepts/workloads/controllers/deployment/) A Deployment controller provides **declarative updates for Pods and ReplicaSets**.You describe a desired state in a Deployment object, and the Deployment controller changes the actual state to the desired state at a controlled rate. 
 
-其它相关文章[A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html) 
-[Kubewatch, An Example Of Kubernetes Custom Controller](https://engineering.bitnami.com/articles/kubewatch-an-example-of-kubernetes-custom-controller.html)
+[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/kubernetes_yaml.html)Every Kubernetes object includes two nested object fields that govern the object’s configuration: the object spec and the object status. 每个kubernetes object 都包括两个部分object spec  和 object status.  Deployment 只是在 ReplicaSet 的基础上，添加了 UP-TO-DATE 这个跟版本有关的状态字段（也就是说 spec 部分没改？）。
 
-## What is a replication controller?
+
+我们对多个实例的应用（而不是单个实例）有以下操作：
+
+|| Deployment controller逻辑|备注|
+|---|---|---|---|
+|水平扩展/收缩|修改所控制的 ReplicaSet 的 Pod 副本个数|只更改数量，镜像不变|
+|滚动更新/回滚|见下图，逐步减少v1 ReplicaSet 副本数，增加v2 ReplicaSet 的副本数|镜像改变，每次改变算一个“版本”|
+
+![](/public/upload/kubernetes/deployment_impl.png)
+
+|Kubernetes object|控制器逻辑|备注|
+|---|---|---|
+| Deployment |控制 ReplicaSet 的数目，以及每个 ReplicaSet 的属性|**Deployment 实际上是一个两层控制器**|
+| ReplicaSet |保证系统中 Pod 的个数永远等于指定的个数（比如，3 个）|一个应用的版本，对应的正是一个 ReplicaSet|
+
+
+## What is a replication controller?（逐步弃用）
 
 A replication controller ensures that a specified number of pod "replicas" are running at any one time. If there are too many, the replication controller kills some pods. If there are too few, it starts more. As opposed to just creating singleton pods or even creating pods in bulk, a replication controller replaces pods that are deleted or terminated for any reason, such as in the case of node failure. For this reason, we recommend that you use a replication controller even if your application requires only a single pod.（将Pod维持在一个确定的数量）
 
@@ -301,3 +289,9 @@ To delete a replication controller without deleting its pods, use container kube
     $ kubectl delete rc NAME
     
 A successful delete request returns the name of the deleted resource.
+
+
+
+
+
+
