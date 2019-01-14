@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Kubernetes controller 组件
+title: Kubernetes副本管理
 category: 技术
 tags: Kubernetes
 keywords: CoreOS Docker Kubernetes
