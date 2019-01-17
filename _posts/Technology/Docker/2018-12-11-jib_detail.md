@@ -135,16 +135,7 @@ newRoot 的创建入口在 StepsRunner 中
 
 如果看过[jib源码分析及应用](http://qiankunli.github.io/2018/11/19/jib_source.html) 中的Step 依赖关系图，并可以知道，感知一个并行的任务的进度是非常困难的。因为对Decentralized Allocation Tree 了解不多，本文不做过多涉及。
 
-
-## future
-
-
-对future的理解
-
-1. [彻底理解Java的Future模式](https://www.cnblogs.com/cz123/p/7693064.html) 单线程就不说了，在多线程中，你另起线程执行一个任务，Runnable.run 是没有返回值的。**从调用方的角度看，另起线程是为了加快处理，不意味着不关心执行结果。 调用方可以先不管 返回结果干别的，但不意味着永远不关心返回结果。所以调用方要有获取返回结果的手段，甚至于影响执行线程的手段（比如取消）。** 了解了这个，就会对那么多future的扩充类找到感觉，因为它们都是从调用者需求出发的。
-2. [Interface Future](https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/Future.html) A Future represents the result of an asynchronous computation. 
-3. [Guide to java.util.concurrent.Future](https://www.baeldung.com/java-future)future 一般与Callable 和ExecutorService 结合使用。  Callable is an interface representing a task that returns a result and has a single call() method. Creating an instance of Callable does not take us anywhere, we still have to pass this instance to an executor that will take care of starting that task in a new thread and give us back the valuable Future object. That’s where ExecutorService comes in.
-4. 自己的理解：凡是异步，必涉及调用方和执行方（通常还有队列），两方必涉及沟通媒介，类似于“句柄” 之类的东东。
+通过学习jib 对 java future 有了一些新的体会，参见[future](http://qiankunli.github.io/2016/07/08/future.html)
 
 ## 与docker registry 的交互
 
