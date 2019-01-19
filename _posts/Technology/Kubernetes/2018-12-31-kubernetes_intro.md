@@ -61,6 +61,8 @@ controller是一系列控制器的集合，不单指RC。
 	cronjob/                garbagecollector/       nodelifecycle/          replication/            statefulset/            daemon/
 	...
 
+**控制器是declarative API的重要组成部分**，参见[Kubernetes源码分析——apiserver](http://qiankunli.github.io/2019/01/05/kubernetes_source_apiserver.html)
+
 ### 构成
 
 一个控制器，实际上都是由上半部分的控制器定义（包括期望状态），加上下半部分的被控制对象（Pod 或 Volume等）的模板组成的。
