@@ -57,21 +57,50 @@ java 提供内置的队列实现，同时有必要提到一个高性能队列实
 
 消息模型可以分为两种， 队列和发布-订阅式。 
 
-1. 队列,一组消费者从服务器读取消息，一条消息只有其中的一个消费者来处理。
-2. 发布-订阅模型，消息被广播给所有的消费者，接收到消息的消费者都可以处理此消息。
+1. 队列,此时队列单纯的是一个"削峰"的作用
+2. 发布-订阅模型，可以看到相对于“生产消费者”的生产消费，**有一个订阅的过程来描述消费者的兴趣**，不是producer发的所有消息消费者都会接
 
+	![](/public/upload/architecture/subscribe_publish.png)
 
-rabbitmq
+	体现在实现上，一个rabbitmq为例
+	
+		1. rabbitmq producer和 consumer 都明确绑定exchange
+		2. rabbitmq producer发消息时，除了消息本身，要通过routingkey描述消息的“特征”。
 
-producer ==> exchange ==> queue  ==> consumer
+[RabbitMQ下的生产消费者模式与订阅发布模式](https://blog.csdn.net/zwgdft/article/details/53561277)
 
-一个消费者消费一个队列，通过改变exchange类型来达到广播、组播和单播效果。
+[Kafka下的生产消费者模式与订阅发布模式](https://blog.csdn.net/zwgdft/article/details/54633105)
 
-kafka
+### rabbitmq的发布订阅模式
 
-producer ==> topic =1:n=> consumer group =1:n=> consumer
+1. Exchange、Queue与Routing Key三个概念是理解RabbitMQ消息投递的关键。
+2. RabbitMQ中一个核心的原则是，消息不能直接投递到Queue中。
+3. Producer只能将自己的消息投递到Exchange中，由Exchange按照routing_key投递到对应的Queue中
+4. 在Consumer Worker中，声明自己对哪个Exchange感兴趣，并将自己的Queue绑定到自己感兴趣的一组routing_key上，建立相应的映射关系；
+5. 在Producer中，将消息投递一个Exchange中，并指明它的routing_key。
 
-一个topic消息广播给所有consumer group，consumer轮流处理consumer group 接到的消息(kafka有分区的概念，不同的consumer会消费不同的分区)。通过调整topic、consumer group、consumer三者关系来达到广播、组播和单播效果。
+![](/public/upload/architecture/rabbitmq_subscribe_publish.png)
+
+Queue这个概念只是对Consumer可见，Producer并不关心消息被投递到哪个Queue中
+
+![](/public/upload/architecture/rabbitmq_subscribe_publish_2.png)
+
+### kafka的消费订阅模型
+
+![](/public/upload/architecture/kafka_subscribe_publish.png)
+
+kafka 中partition 是物理上的概念，仅从逻辑概念上看
+
+![](/public/upload/architecture/kafka_subscribe_publish_3.png)
+
+所有接入topic 的consumer group 都会收到消息，producer 没有类似routingkey 可以进行topic 内部 consumer group的指定，因此Kafka只提供了单播和广播的消息模型，不支持组播（消息只发给topic 内的特定n个consumer group）。因此一般rabbitmq 项目只需要一个exchange即可，而kafka 通常要多个topic
+
+### 小结
+
+1. 两者都包含 物理概念和逻辑概念
+2. producer 只负责向逻辑概念发布数据
+3. consumer 一般与物理概念紧密关联，并绑定相关的逻辑概念（exchange + routingkey/topic，也就是订阅自己感兴趣的“事件”）
+
 
 ## 消息队列监控
 
