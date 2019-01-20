@@ -10,6 +10,8 @@ keywords: 消息队列 rabbitmq kafka
 
 ## 简介
 
+* TOC
+{:toc}
 
 ## linux的消息队列
 
@@ -46,19 +48,16 @@ java 提供内置的队列实现，同时有必要提到一个高性能队列实
 	* 环形数组（ring buffer），这里环形不是首位相顾，数组通过下标访问，Disruptor的“下标”会一直递增，通过“下标%数组长度”得到实际的数组index。数组长度2^n
 	* 假设ring buffer长度为length，则还有一个length bit的数组available buffer，用于标记ring buffer 对应下标的元素是否被生产者占用。意图就是，java内置队列加锁，同一时刻数组只能被一个线程访问。而ring buffer允许多个线程同时访问，通过检查 available buffer是否被其他线程捷足先登（**通过新增数据结构，来感知竞争激烈程度**），然后重试。**将加锁  改为 探测-重试**
 
-## 消息队列系统
+## 消息队列中间件
 
 基于内存或磁盘的队列，为分布式应用提供通信手段。
 
-个人观察，使用消息队列系统一个原因是：现代大型系统，大多由多个子系统组成。以A,B两个子系统为例，假定，A系统的输出由B系统处理。一般情况下，B系统的处理能力可以满足A系统的要求。然而，当A系统负载突然增大时，如果AB两系统以RPC方式连接，则会引起连锁反应:B系统也扛不住了。使用消息队列后，因为队列的缓冲功能，B系统可以按照自己的节奏处理数据，提高系统的可靠性。
-
-
-## 消息模型
+### 消息模型
 
 消息模型可以分为两种， 队列和发布-订阅式。 
 
 1. 队列,此时队列单纯的是一个"削峰"的作用
-2. 发布-订阅模型，可以看到相对于“生产消费者”的生产消费，**有一个订阅的过程来描述消费者的兴趣**，不是producer发的所有消息消费者都会接
+2. 发布-订阅模型，**在producer 和 consumer 之间提取一个独立的第三方**。可以看到，相对于“生产消费者”的生产消费，**有一个订阅的过程来描述消费者的兴趣**，不是producer发的所有消息消费者都会接
 
 	![](/public/upload/architecture/subscribe_publish.png)
 
@@ -85,7 +84,11 @@ Queue这个概念只是对Consumer可见，Producer并不关心消息被投递�
 
 ![](/public/upload/architecture/rabbitmq_subscribe_publish_2.png)
 
-### kafka的消费订阅模型
+只保留逻辑概念的话
+
+![](/public/upload/architecture/rabbitmq_subscribe_publish_3.png)
+
+### kafka的发布订阅模型
 
 ![](/public/upload/architecture/kafka_subscribe_publish.png)
 
@@ -93,14 +96,25 @@ kafka 中partition 是物理上的概念，仅从逻辑概念上看
 
 ![](/public/upload/architecture/kafka_subscribe_publish_3.png)
 
-所有接入topic 的consumer group 都会收到消息，producer 没有类似routingkey 可以进行topic 内部 consumer group的指定，因此Kafka只提供了单播和广播的消息模型，不支持组播（消息只发给topic 内的特定n个consumer group）。因此一般rabbitmq 项目只需要一个exchange即可，而kafka 通常要多个topic
+所有接入topic 的consumer group 都会收到消息，producer 没有类似routingkey 可以进行topic 内部 consumer group的指定，因此Kafka只提供了广播和单播（一对一广播）的消息模型，不支持组播（消息只发给topic 内的特定n个consumer group）。因此对于复杂场景，一般rabbitmq 项目只需要一个exchange即可，而kafka 通常要多个topic，**所以kafka topic 其实跟 rabbitmq的 routingkey 逻辑上作用更像**。
 
-### 小结
+### 发布订阅模型小结
 
 1. 两者都包含 物理概念和逻辑概念
 2. producer 只负责向逻辑概念发布数据
 3. consumer 一般与物理概念紧密关联，并绑定相关的逻辑概念（exchange + routingkey/topic，也就是订阅自己感兴趣的“事件”）
 
+### 消息中间件的选型
+
+笔者一度很迷kafka，并打算用其替换项目中的rabbitmq，但实际上kafka 不是银弹，比如其不支持优先级队列，而这个feature 在某些业务场景下很重要。
+
+选型消息中间件 应该注意哪些问题 可以参见[消息中间件选型分析——从Kafka与RabbitMQ的对比来看全局](http://blog.didispace.com/%E6%B6%88%E6%81%AF%E4%B8%AD%E9%97%B4%E4%BB%B6%E9%80%89%E5%9E%8B%E5%88%86%E6%9E%90/)
+
+![](/public/upload/architecture/queue_middleware_choose.png)
+
+消息中间件犹如小马过河，选择合适的才最重要，这需要贴合自身的业务需求，技术服务于业务。**RabbitMQ在于routing，而Kafka在于streaming**，了解其根本对于自己能够对症下药选择到合适的消息中间件尤为重要。
+
+消息中间件选型切忌一味的追求性能或者功能，性能可以优化，功能可以二次开发。**如果要在功能和性能方面做一个抉择的话，那么首选性能，因为总体上来说性能优化的空间没有功能扩展的空间大**。然而对于长期发展而言，生态又比性能以及功能都要重要。
 
 ## 消息队列监控
 
