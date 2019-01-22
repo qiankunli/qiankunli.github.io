@@ -73,5 +73,5 @@ Conditional logic in RX style programming is a big hurdle for new users. If you�
 
 那如果奇数和偶数场景下 调用不同的rpc呢？ 那就是将 数字map 为future。不管符不符合condition，都是一种输出，将分支判断转换为 map映射。那如果不符合条件没输出呢？用filter 操作即可。
 
-Rx-style programming really shines with asynchronous code. 反应式编程 对异步代码很友好
+Rx-style programming really shines with asynchronous code. 反应式编程 对异步代码很友好。只是在写处理逻辑（回调函数），rxjava 并不保证执行顺序线程是你看到的那样，控制权让出去了。命令式编程控制流排斥异步和多线程
 
