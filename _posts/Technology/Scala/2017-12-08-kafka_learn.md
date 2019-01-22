@@ -8,25 +8,23 @@ keywords: Scala  akka
 
 ---
 
-## 前言
+## 前言（未完成）
+
+建议先阅读下[消息/任务队列](http://qiankunli.github.io/2015/08/08/message_task_queue.html)，了解下消息队列中间件的宏观理论、概念及取舍
 
 ### 宏观概念
 
-	producer ==> topic ==> consumer
+仅从逻辑概念上看
+
+![](/public/upload/architecture/kafka_subscribe_publish_3.png)
 
 每个topic包含多个分区，每个分区包含多个副本。作为producer，一个topic消息放入哪个分区，hash一下即可
 
-从消费方来说，producer、topic和consumer的三角关系更像是
-
-						==> consumer group
-	producer ==> topic  ==> consumer group
-						==> consumer group
-						
-	producer ==> partion ==> consumer
-					
+![](/public/upload/architecture/kafka_subscribe_publish.png)
+	
 ## 具体细节
 
-### 生产者
+### 生产者(未完成)
 
 1. 发送消息时有同步异步的区别，本质上，
 
