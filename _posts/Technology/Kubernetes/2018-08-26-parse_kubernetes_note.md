@@ -165,7 +165,7 @@ yaml配置参见[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/ku
 
 ## 小结
 
-Kubernetes 项目的成功，是成千上万云计算平台上的开发者用脚投票的结果。云计算平台上的开发者们所关心的，并不是调度，也不是资源管管理，更不是网络或者存储，他们关心的只有一件事，那就是 Kubernetes 的 API。也就是声明式 API 和控制器模式；这个 API 独有的编程范式，即 Controller 和 Operator
+[认知的几点规律](http://qiankunli.github.io/2018/11/05/cognition.html)任何知识体系都是分层的，k8s也不例外，理念 ==> 核心组件 apiserver,kuberlet,controler ==> pod、rs之类。Kubernetes 项目的成功，是成千上万云计算平台上的开发者用脚投票的结果。云计算平台上的开发者们所关心的，并不是调度，也不是资源管管理，更不是网络或者存储，他们关心的只有一件事，那就是 Kubernetes 的 API。也就是声明式 API 和控制器模式；这个 API 独有的编程范式，即 Controller 和 Operator
 
 
 Kubernetes 项目的本质其实只有一个，那就是“控制器模式”。这个思想，不仅仅是 Kubernetes 项目里每一个组件的“设计模板”，也是 Kubernetes 项目能够将开发者们紧紧团结到自己身边的重要原因。作为一个云计算平台的用户，能够用一个 YAML 文件表达我开发的应用的最终运行状态，并且自动地对我的应用进行运维和管理。**这种信赖关系，就是连接Kubernetes 项目和开发者们最重要的纽带。**
