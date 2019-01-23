@@ -12,6 +12,23 @@ keywords: Scala  akka
 
 建议先阅读下[消息/任务队列](http://qiankunli.github.io/2015/08/08/message_task_queue.html)，了解下消息队列中间件的宏观理论、概念及取舍
 
+
+[Apache Kafka](https://kafka.apache.org/intro) is a distributed streaming platform. What exactly does that mean?
+A streaming platform has three key capabilities:
+
+1. Publish and subscribe to streams of records, similar to a message queue or enterprise messaging system.
+2. Store streams of records in a fault-tolerant durable way.
+3. Process streams of records as they occur.
+
+![](/public/upload/scala/kafka.png)
+
+给自己提几个问题
+
+1. kafka 将消息保存在磁盘中，在其设计理念中并不惧怕磁盘操作，它以顺序方式读写磁盘。具体如何体现？
+3. 多面的offset。一个msg写入所有副本后才会consumer 可见（消息commit 成功）。leader / follower 拿到的最新的offset=LEO, 所有副本都拿到的offset = HW
+4. 一个consumer 消费partition 到哪个offset 是由consumer 自己维护的
+
+
 ### 宏观概念
 
 仅从逻辑概念上看
@@ -21,6 +38,14 @@ keywords: Scala  akka
 每个topic包含多个分区，每个分区包含多个副本。作为producer，一个topic消息放入哪个分区，hash一下即可
 
 ![](/public/upload/architecture/kafka_subscribe_publish.png)
+
+整体架构图
+
+![](/public/upload/scala/kafka_framework.jpg)
+
+细化一下是这样的
+
+![](/public/upload/scala/kafka_framework_2.jpg)
 
 ## 代码使用
 
@@ -76,7 +101,10 @@ keywords: Scala  akka
 
 ### 生产者(未完成)
 
-1. 发送消息时有同步异步的区别，本质上，
+1. 发送消息时有同步异步的区别。发送端有一个缓冲区，缓冲区专门有一个消费线程负责将消息发给broker。
+
+    1. 异步即Productor 将数据发送到缓冲区 即返回
+    2. 同步即Productor 将消息发送到缓冲区后， 
 
 ### 加入interceptor
 
