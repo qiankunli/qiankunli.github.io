@@ -21,6 +21,56 @@ keywords: Scala  akka
 每个topic包含多个分区，每个分区包含多个副本。作为producer，一个topic消息放入哪个分区，hash一下即可
 
 ![](/public/upload/architecture/kafka_subscribe_publish.png)
+
+## 代码使用
+
+    <dependency>
+        <groupId>org.apache.kafka</groupId>
+        <artifactId>kafka_2.8.2</artifactId>
+        <version>0.8.0</version>
+    </dependency>
+
+### 生产者
+
+    // 配置属性
+    Properties props = new Properties();
+    props.put("metadata.broker.list", "localhost:9092");
+    props.put("serializer.class", "kafka.serializer.StringEncoder");
+    props.put("request.required.acks", "1");
+    ProducerConfig config = new ProducerConfig(props);
+    // 构建Producer
+    Producer<String, String> producer = new Producer<String, String>(config);
+    // 构建msg
+    KeyedMessage<String, String> data = new KeyedMessage<String, String>(topic, nEvents + "", msg);
+    // 发送msg
+    producer.send(data);
+    // 关闭
+    producer.close();
+
+### 消费者
+
+    // 配置属性
+    Properties props = new Properties();
+    props.put("zookeeper.connect", a_zookeeper);
+    props.put("group.id", a_groupId);
+    props.put("zookeeper.session.timeout.ms", "400");
+    props.put("zookeeper.sync.time.ms", "200");
+    props.put("auto.commit.interval.ms", "1000");
+    ConsumerConfig consumerConfig = new ConsumerConfig(props);
+    // 构建consumer
+    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
+    // consumer 根据目标 topic 返回 对应的stream
+    Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
+    topicCountMap.put(topic, new Integer(a_numThreads));
+    Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.createMessageStreams(topicCountMap);
+    // 消费特定 topic 的stream
+    List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(topic);
+    for (final KafkaStream stream : streams) {
+        ConsumerIterator<byte[], byte[]> it = stream.iterator();
+        while (it.hasNext()){
+            System.out.println("Thread " + m_threadNumber + ": " + new String(it.next().message()));
+        }
+    }
 	
 ## 具体细节
 

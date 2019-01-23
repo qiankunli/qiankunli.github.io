@@ -265,7 +265,10 @@ jdk8 及之后的 CompletableFuture
         	return promise;
         }
 
+## 异步带来的困难
 
+1. 调试困难
+2. 难以使用线程本地变量
 
 ## 小结
 
