@@ -28,6 +28,7 @@ A streaming platform has three key capabilities:
 3. 多面的offset。一个msg写入所有副本后才会consumer 可见（消息commit 成功）。leader / follower 拿到的最新的offset=LEO, 所有副本都拿到的offset = HW
 4. 一个consumer 消费partition 到哪个offset 是由consumer 自己维护的
 
+书中源码基于0.10.0.1
 
 ### 宏观概念
 
@@ -97,28 +98,34 @@ A streaming platform has three key capabilities:
         }
     }
 	
-## 具体细节
 
-### 生产者(未完成)
+## 生产者(未完成)
 
 ![](/public/upload/scala/kafka_producer.jpg)
 
-上述示意图分解一下
+![](/public/upload/scala/kafka_producer_object.png)
+
+1. producer 实现就是 业务线程（可能多个线程操作一个producer对象） 和 io线程（sender，看样子应该是一个producer对象一个）生产消费的过程
+2. 从producer 角度看，topic 分区数量以及 leader 副本的分布是动态变化的，Metadata 负责屏蔽相关细节，为producer 提供最新数据
+3. 发送消息时有同步异步的区别，其实底层实现相同，都是异步。业务线程通过`KafkaProducer.send`不断向RecordAccumulator 追加消息，当达到一定条件，会唤醒Sender 线程发送RecordAccumulator 中的消息
+4. ByteBuffer的创建和释放是比较消耗资源的，为了实现内存的高效利用，基本上每个成熟的框架或工具都有一套内存管理机制，对应到kafka 就是 BufferPool
+5. 业务线程和io线程协作靠队列，为什么不直接用队列？
+
+    1. RecordAccumulator acts as a queue that accumulates records into MemoryRecords instances to be sent to the server.The accumulator uses a bounded amount of memory and append calls will block when that memory is exhausted, unless this behavior is explicitly disabled.
+    3. 用了队列，才可以batch和压缩。
+
+6. If the request fails, the producer can automatically retry, though since we have specified etries as 0 it won't. Enabling retries also opens up the possibility of duplicates 
+
+### 业务线程
 
 ![](/public/upload/scala/kafka_producer_send.png)
 
-1. producer 实现就是两个 线程生产消费的过程
-1. 从producer 角度看，topic 分区数量以及 leader 副本的分布是动态变化的，Metadata 负责屏蔽相关细节，为producer 提供最新数据
-1. ByteBuffer的创建和释放是比较消耗资源的，为了实现内存的高效利用，基本上每个成熟的框架或工具都有一套内存管理机制，对应到kafka 就是 BufferPool
-1. 发送消息时有同步异步的区别，其实底层实现相同，都是异步。业务线程通过`KafkaProducer.send`不断向RecordAccumulator 追加消息，当达到一定条件，会唤醒Sender 线程发送RecordAccumulator 中的消息
+### sender 线程
 
-2. 两个线程协作靠队列，为什么不直接用队列？
+![](/public/upload/scala/kafka_sender.png)
 
-值得学习的地方
 
-1. interceptor
-
-### 加入interceptor
+### 值得学习的地方——interceptor
 
 在发送端，record发送和执行record发送结果的callback之前，由interceptor拦截
 
@@ -127,11 +134,11 @@ A streaming platform has three key capabilities:
 
 对于底层发送来说，`doSend(ProducerRecord<K, V> record, Callback callback)`interceptors的加入并不影响（实际代码有出入，但大意是这样）。
 
-### 反射的另个一好处
+### 值得学习的地方——反射的另个一好处
 
 假设你的项目，用到了一个依赖jar中的类，但因为策略问题，这个类对有些用户不需要，自然也不需要这个依赖jar。此时，在代码中，你可以通过反射获取依赖jar中的类，避免了直接写在代码中时，对这个jar的强依赖。
 
-### 为什么要zookeeper，因为关联业务要交换元数据
+## 为什么要zookeeper，因为关联业务要交换元数据
 
 今天笔者在学习kafka源码，kafka的主体是`producer ==> topic ==> consumer`，topic只是一个逻辑概念，topic包含多个分区，每个分区数据包含多个副本（leader副本，slave副本）。producer在发送数据之前，首先要确定目的分区（可能变化），其次确定目的分区的leader副本所在host，知道了目的地才能发送record，这些信息是集群的meta信息。producer每次向topic发送record，都要`waitOnMetadata(record.topic(), this.maxBlockTimeMs)`以拿到最新的metadata。
 
