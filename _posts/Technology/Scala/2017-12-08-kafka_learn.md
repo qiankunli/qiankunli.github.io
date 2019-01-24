@@ -10,6 +10,9 @@ keywords: Scala  akka
 
 ## 前言
 
+* TOC
+{:toc}
+
 建议先阅读下[消息/任务队列](http://qiankunli.github.io/2015/08/08/message_task_queue.html)，了解下消息队列中间件的宏观理论、概念及取舍
 
 整体来说，本书是对源码的“照本宣科”，提炼的东西不多，试试另外一本书：《learning apache kafka》
