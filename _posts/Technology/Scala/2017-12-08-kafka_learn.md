@@ -101,10 +101,22 @@ A streaming platform has three key capabilities:
 
 ### 生产者(未完成)
 
-1. 发送消息时有同步异步的区别。发送端有一个缓冲区，缓冲区专门有一个消费线程负责将消息发给broker。
+![](/public/upload/scala/kafka_producer.jpg)
 
-    1. 异步即Productor 将数据发送到缓冲区 即返回
-    2. 同步即Productor 将消息发送到缓冲区后， 
+上述示意图分解一下
+
+![](/public/upload/scala/kafka_producer_send.png)
+
+1. producer 实现就是两个 线程生产消费的过程
+1. 从producer 角度看，topic 分区数量以及 leader 副本的分布是动态变化的，Metadata 负责屏蔽相关细节，为producer 提供最新数据
+1. ByteBuffer的创建和释放是比较消耗资源的，为了实现内存的高效利用，基本上每个成熟的框架或工具都有一套内存管理机制，对应到kafka 就是 BufferPool
+1. 发送消息时有同步异步的区别，其实底层实现相同，都是异步。业务线程通过`KafkaProducer.send`不断向RecordAccumulator 追加消息，当达到一定条件，会唤醒Sender 线程发送RecordAccumulator 中的消息
+
+2. 两个线程协作靠队列，为什么不直接用队列？
+
+值得学习的地方
+
+1. interceptor
 
 ### 加入interceptor
 
