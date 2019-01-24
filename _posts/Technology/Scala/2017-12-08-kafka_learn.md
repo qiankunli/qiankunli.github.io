@@ -1,17 +1,18 @@
 ---
 
 layout: post
-title: 《Apache Kafka源码分析》小结
+title: 《Apache Kafka源码分析》——Producer与Consumer
 category: 技术
 tags: Scala
 keywords: Scala  akka
 
 ---
 
-## 前言（未完成）
+## 前言
 
 建议先阅读下[消息/任务队列](http://qiankunli.github.io/2015/08/08/message_task_queue.html)，了解下消息队列中间件的宏观理论、概念及取舍
 
+整体来说，本书是对源码的“照本宣科”，提炼的东西不多，试试另外一本书：《learning apache kafka》
 
 [Apache Kafka](https://kafka.apache.org/intro) is a distributed streaming platform. What exactly does that mean?
 A streaming platform has three key capabilities:
@@ -98,8 +99,43 @@ A streaming platform has three key capabilities:
         }
     }
 	
+## 背景知识
 
-## 生产者(未完成)
+### 网络通信
+
+kafka-producer/consumer 与zk 通信的部分相对有限，主要是与kafka server交互，通信时使用自定义的协议，裸调java NIO 进行网络通信。 
+
+1. producer 使用 NetworkClient 与kafka server 交互
+2. consumer 使用 ConsumerNetworkClient（聚合了NetworkClient）与kafka server 交互
+3. 协议对象如下图所示，`org.apache.kafka.common.protocol.ApiKeys` 定义了所有 Request/Response类型，FetchXX 是一个具体的例子
+
+    ![](/public/upload/scala/kafka_io_object.png)
+
+4. NetworkClient 发请求比较“委婉” 先send（缓存），最后poll真正开始发请求
+
+    1. send，Send a new request. Note that the request is not actually transmitted on the network until one of the `poll(long)` variants is invoked. At this point the request will either be transmitted successfully or will fail.Use the returned future to obtain the result of the send.
+    2. poll，Poll for any network IO.     
+
+### 传递保证语义（Delivery guarantee sematic）
+
+Delivery guarantee 有以下三个级别
+
+1. At most once，可以丢，但不能重复
+2. At least once，不能丢，可能重复
+3. exactly once，只会传递一次
+
+这三个级别不是一个配置保证的，而是producer 与consumer 配合实现的。比如想实现“exactly once”，可以为每个消息标识唯一id，producer 可能重复发送，而consumer 忽略已经消费过的消息即可。
+
+### consumer group rebalance
+
+当consumer group 新加入一个consumer 时，首要解决的就是consumer 消费哪个分区的问题。这个方案kafka 演化了多次，在最新的方案中，分区分配的工作放到了消费端处理。
+
+## 生产者
+
+大纲是什么？
+
+1. 线程模型
+2. 发送流程
 
 ![](/public/upload/scala/kafka_producer.jpg)
 
@@ -117,6 +153,8 @@ A streaming platform has three key capabilities:
 6. If the request fails, the producer can automatically retry, though since we have specified etries as 0 it won't. Enabling retries also opens up the possibility of duplicates 
 
 ### 业务线程
+
+producer 在KafkaProducer 与 NetworkClient 之间玩了多好花活儿？
 
 ![](/public/upload/scala/kafka_producer_send.png)
 
@@ -138,9 +176,23 @@ A streaming platform has three key capabilities:
 
 假设你的项目，用到了一个依赖jar中的类，但因为策略问题，这个类对有些用户不需要，自然也不需要这个依赖jar。此时，在代码中，你可以通过反射获取依赖jar中的类，避免了直接写在代码中时，对这个jar的强依赖。
 
+## 消费者
+
+[读Kafka Consumer源码](https://www.cnblogs.com/hzmark/p/kafka_consumer.html) 对consumer 源码的实现评价不高
+
+开发人员不必关心与kafka 服务端之间的网络连接的管理、心跳检测、请求超时重试等底层操作，也不必关心订阅Topic的分区数量、分区leader 副本的网络拓扑以及consumer group的Rebalance 等kafka的具体细节。
+
+KafkaConsumer 依赖SubscriptionState 管理订阅的Topic集合和Partition的消费状态，通过ConsumerCoordinator与服务端的GroupCoordinator交互，完成Rebalance操作并请求最近提交的offset。Fetcher负责从kafka 中拉取消息并进行解析，同时参与position 的重置操作，提供获取指定topic 的集群元数据的操作。上述所有请求都是通过ConsumerNetworkClient 缓存并发送的，在ConsumerNetworkClient  中还维护了定时任务队列，用来完成HeartbeatTask 任务和AutoCommitTask 任务。NetworkClient 在接收到上述请求的响应时会调用相应回调，最终交给其对应的XXHandler 以及RequestFuture 的监听器进行处理。
+
+![](/public/upload/scala/consumer_object.png)
+
+![](/public/upload/scala/consumer_poll.png)
+
+consumer 有没有一个缓冲区/队列， io线程负责往里放数据，业务线程专心拉数据并处理就行了呢? 实际上是没有的，consumer的 所有逻辑要通过 `KafkaConsumer.poll` 驱动，业务方要自己 启动线程操作 KafkaConsumer 驱动所有逻辑。
+
 ## 为什么要zookeeper，因为关联业务要交换元数据
 
-今天笔者在学习kafka源码，kafka的主体是`producer ==> topic ==> consumer`，topic只是一个逻辑概念，topic包含多个分区，每个分区数据包含多个副本（leader副本，slave副本）。producer在发送数据之前，首先要确定目的分区（可能变化），其次确定目的分区的leader副本所在host，知道了目的地才能发送record，这些信息是集群的meta信息。producer每次向topic发送record，都要`waitOnMetadata(record.topic(), this.maxBlockTimeMs)`以拿到最新的metadata。
+kafka的主体是`producer ==> topic ==> consumer`，topic只是一个逻辑概念，topic包含多个分区，每个分区数据包含多个副本（leader副本，slave副本）。producer在发送数据之前，首先要确定目的分区（可能变化），其次确定目的分区的leader副本所在host，知道了目的地才能发送record，这些信息是集群的meta信息。producer每次向topic发送record，都要`waitOnMetadata(record.topic(), this.maxBlockTimeMs)`以拿到最新的metadata。
 
 producer面对的是一个broker集群，这个meta信息找哪个broker要都不方便，也不可靠，本质上，还是从zookeeper获取比较方便。zookeeper成为producer与broker集群解耦的工具。
 
