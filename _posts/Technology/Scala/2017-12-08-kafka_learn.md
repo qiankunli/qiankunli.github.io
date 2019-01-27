@@ -106,7 +106,7 @@ A streaming platform has three key capabilities:
 
 ### 网络通信
 
-kafka-producer/consumer 与zk 通信的部分相对有限，主要是与kafka server交互，通信时使用自定义的协议，裸调java NIO 进行网络通信。 
+kafka-producer/consumer 与zk 通信的部分相对有限，主要是与kafka server交互，通信时使用自定义的协议，一个线程（kafka 服务端一个线程就不够用了）裸调java NIO 进行网络通信。 
 
 1. producer 使用 NetworkClient 与kafka server 交互
 2. consumer 使用 ConsumerNetworkClient（聚合了NetworkClient）与kafka server 交互
@@ -117,7 +117,8 @@ kafka-producer/consumer 与zk 通信的部分相对有限，主要是与kafka se
 4. NetworkClient 发请求比较“委婉” 先send（缓存），最后poll真正开始发请求
 
     1. send，Send a new request. Note that the request is not actually transmitted on the network until one of the `poll(long)` variants is invoked. At this point the request will either be transmitted successfully or will fail.Use the returned future to obtain the result of the send.
-    2. poll，Poll for any network IO.     
+    2. poll，Poll for any network IO.   
+
 
 ### 传递保证语义（Delivery guarantee sematic）
 
@@ -200,4 +201,9 @@ kafka的主体是`producer ==> topic ==> consumer`，topic只是一个逻辑概�
 producer面对的是一个broker集群，这个meta信息找哪个broker要都不方便，也不可靠，本质上，还是从zookeeper获取比较方便。zookeeper成为producer与broker集群解耦的工具。
 
 关联业务之间需要交换元数据，当然，数据库也可以承担这个角色，但数据库没有副本等机制保证可靠性
+
+## 小结
+
+1. 内存队列，push和poll 本质是对底层数组操作的封装
+2. 消息中间件，push 和 poll 本质是数据的序列化、压缩、io发送 与 io 拉取、发序列化、解压缩，**这就有点rpc 的味道了**，只是rpc 是双方直接通信，而消息中间件是 producer/consumer 都与 kafka server 通信。
 

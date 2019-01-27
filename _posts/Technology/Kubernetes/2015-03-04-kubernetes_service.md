@@ -217,3 +217,5 @@ service configure文件中有一个`PublicIPs`属性
     }
     
 在这里`192.168.56.102`和`192.168.56.103`是k8s集群从节点的ip（**主节点ip不行**）。这样，我们就可以通过`192.168.56.102:8765`和`192.168.56.102:8765`来访问这个service了。其好处是，kube-proxy为我们映射的端口是确定的。
+
+![](/public/upload/kubernetes/kubernetes_service_access.png)
