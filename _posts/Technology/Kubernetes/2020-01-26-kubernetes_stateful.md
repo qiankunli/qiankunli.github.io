@@ -13,7 +13,7 @@ keywords: kubernetes stateset
 * TOC
 {:toc}
 
-**Kubernetes 的各种object，就是常规的各个项目组件在 kubernetes 上的表示** [深入理解StatefulSet（三）：有状态应用实践](https://time.geekbang.org/column/article/41217) 充分体现了在我们把服务 迁移到Kubernetes 的过程中，要做多少概念的映射。
+**Kubernetes 的各种object，就是常规的各个项目组件在 kubernetes 上的表示** [深入理解StatefulSet（三）：有状态应用实践](https://time.geekbang.org/column/article/41217) 充分体现了在我们把服务 迁移到Kubernetes 的过程中，要做多少概念上的映射。
 
 ## 集大成者——StatefulSet
 

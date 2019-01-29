@@ -108,3 +108,40 @@ Rx-style programming really shines with asynchronous code. 反应式编程 对�
 2019.1.5 补充 [响应式架构与 RxJava 在有赞零售的实践](https://mp.weixin.qq.com/s?__biz=MzAxOTY5MDMxNA==&mid=2455759277&idx=1&sn=3096d192749deadeab3136751579493a&chksm=8c686f88bb1fe69e8182cf4659915a415b7d340c4257ab5d6a794283659906142837f824dd18&mpshare=1&scene=23&srcid=0105rUx9Zxj9jHjE1TfysyMX%23rd) 响应式架构（vs 微服务），响应式编程 。
 
 微服务之间的通信的最佳机制就是消息传输。如上文所说，服务之间的异步边界能够在时间和空间两方面进行解耦，能够提升整体系统的性能。
+
+### 将方法调用转换为数据流动
+
+反应式架构 是几个概念的集大成者，我们先要对 一些具体的概念有所感觉，比如异步、数据流 等
+
+假设1存在一个逻辑，对于传入的1000个uid，按照几个过滤条件（rpc调用）过滤，输出符合所有条件的uid，其它的uid 则记录原因。则常规代码如下
+
+	主流程{
+		List<Long> uids = filterX();
+		Map<uid,bool> result = filterX+1(uids);
+		List allowUids = xx
+		for(uid : result.keySet()){
+			if(result.getuid){
+				allowUids.add(uid)
+			}else{
+				// 记录原因
+			}
+		}
+	}
+
+如果是数据流动（这块可以考虑下spring stream）
+
+1. 没有主流程，至少代码上不直接体现
+2. filterX 是生产者 filterX+1 是消费者
+3. 用户是否符合条件 是两种“重要性” 均等的结果，均交给下游处理
+
+	filterX+1{
+		void onNext(data){
+			if(allow){
+				emit(nextFilter,data);
+			}else{
+				emit(errorHandler,data);
+			}
+		}
+	}
+
+像是一个链表节点，每个步骤除了负责自己， 还负责决策消息的下一个去处。

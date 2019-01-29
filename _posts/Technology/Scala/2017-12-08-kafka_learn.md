@@ -40,7 +40,7 @@ A streaming platform has three key capabilities:
 
 ![](/public/upload/architecture/kafka_subscribe_publish_3.png)
 
-每个topic包含多个分区，每个分区包含多个副本。作为producer，一个topic消息放入哪个分区，hash一下即可
+每个topic包含多个分区，每个分区包含多个副本。作为producer，一个topic消息放入哪个分区，hash一下即可。 《learning apache kafka》every partition is mapped to a logical log file that is represented as a set of segment files of equal sizes. Every partition is an ordered, immutable sequence of messages; 
 
 ![](/public/upload/architecture/kafka_subscribe_publish.png)
 
@@ -120,7 +120,7 @@ kafka-producer/consumer 与zk 通信的部分相对有限，主要是与kafka se
     2. poll，Poll for any network IO.   
 
 
-### 传递保证语义（Delivery guarantee sematic）
+### 传递保证语义（Delivery（guarantee） sematic）
 
 Delivery guarantee 有以下三个级别
 
@@ -135,6 +135,8 @@ Delivery guarantee 有以下三个级别
 当consumer group 新加入一个consumer 时，首要解决的就是consumer 消费哪个分区的问题。这个方案kafka 演化了多次，在最新的方案中，分区分配的工作放到了消费端处理。
 
 ## 生产者
+
+The producer connects to any of the alive nodes and requests metadata about the leaders for the partitions of a topic. This allows the producer to put the message directly to the lead broker for the partition.
 
 大纲是什么？
 
@@ -182,6 +184,8 @@ producer 在KafkaProducer 与 NetworkClient 之间玩了多好花活儿？
 
 ## 消费者
 
+While subscribing, the consumer connects to any of the live nodes and requests metadata about the leaders for the partitions of a topic. The consumer then issues a fetch request to the lead broker to consume the message partition by specifying the message offset (the beginning position of the message offset). Therefore, the Kafka consumer works in the pull model and always pulls all available messages after its current position in the Kafka log (the Kafka internal data representation).
+
 [读Kafka Consumer源码](https://www.cnblogs.com/hzmark/p/kafka_consumer.html) 对consumer 源码的实现评价不高
 
 开发人员不必关心与kafka 服务端之间的网络连接的管理、心跳检测、请求超时重试等底层操作，也不必关心订阅Topic的分区数量、分区leader 副本的网络拓扑以及consumer group的Rebalance 等kafka的具体细节。
@@ -194,6 +198,16 @@ KafkaConsumer 依赖SubscriptionState 管理订阅的Topic集合和Partition的�
 
 consumer 有没有一个缓冲区/队列， io线程负责往里放数据，业务线程专心拉数据并处理就行了呢? 实际上是没有的，consumer的 所有逻辑要通过 `KafkaConsumer.poll` 驱动，业务方要自己 启动线程操作 KafkaConsumer 驱动所有逻辑。
 
+Kafka provides two types of API for Java consumers:
+
+1. High-level API,  does not allow consumers to control interactions with brokers.
+2. Low-level API, is stateless
+and provides fine grained control over the communication between Kafka broker and the consumer.
+
+那么consumer 与broker 交互有哪些细节呢？The high-level consumer API is used when only data is needed and the handling of message offsets is not required. This API hides broker details from the consumer and allows effortless communication with the Kafka cluster by providing an abstraction over the low-level implementation. The high-level consumer stores the last offset
+(the position within the message partition where the consumer left off consuming the message), read from a specific partition in Zookeeper. This offset is stored based on the consumer group name provided to Kafka at the beginning of the process.
+
+
 ## 为什么要zookeeper，因为关联业务要交换元数据
 
 kafka的主体是`producer ==> topic ==> consumer`，topic只是一个逻辑概念，topic包含多个分区，每个分区数据包含多个副本（leader副本，slave副本）。producer在发送数据之前，首先要确定目的分区（可能变化），其次确定目的分区的leader副本所在host，知道了目的地才能发送record，这些信息是集群的meta信息。producer每次向topic发送record，都要`waitOnMetadata(record.topic(), this.maxBlockTimeMs)`以拿到最新的metadata。
@@ -201,6 +215,15 @@ kafka的主体是`producer ==> topic ==> consumer`，topic只是一个逻辑概�
 producer面对的是一个broker集群，这个meta信息找哪个broker要都不方便，也不可靠，本质上，还是从zookeeper获取比较方便。zookeeper成为producer与broker集群解耦的工具。
 
 关联业务之间需要交换元数据，当然，数据库也可以承担这个角色，但数据库没有副本等机制保证可靠性
+
+
+##  《learning apache kafka》
+
+1. producers and consumers work on the traditional push-and-pull model, where producers push the message to a Kafka broker and consumers pull the message from the broker.
+2. Log compaction,相同key的value 只会保留最新的
+3. Message compression in Kafka, For the cases where network bandwidth is a bottleneck, Kafka provides a message group compression feature for efficient message delivery.
+4. replication modes。Asynchronous replication： as soon as a lead replica writes the message to its local log, it sends the acknowledgement to the message client and does not wait for acknowledgements from follower replicas。Synchronous replication 则反之
+
 
 ## 小结
 
