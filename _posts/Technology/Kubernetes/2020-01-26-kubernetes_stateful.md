@@ -13,6 +13,8 @@ keywords: kubernetes stateset
 * TOC
 {:toc}
 
+**Kubernetes 的各种object，就是常规的各个项目组件在 kubernetes 上的表示** [深入理解StatefulSet（三）：有状态应用实践](https://time.geekbang.org/column/article/41217) 充分体现了在我们把服务 迁移到Kubernetes 的过程中，要做多少概念的映射。
+
 ## 集大成者——StatefulSet
 
 StatefulSet 的设计其实非常容易理解。它把真实世界的应用状态，抽象为了两种情况：
@@ -33,3 +35,4 @@ StatefulSet 里的不同 Pod 实例，不再像 ReplicaSet 中那样都是完全
 
 Persistent Volume Claim 和 PV 的关系。运维人员创建PV，告知有多少volume。开发人员创建Persistent Volume Claim 告知需要多少大小的volume。创建一个 PVC，Kubernetes 就会自动为它绑定一个符合条件的Volume。即使 Pod 被删除，它所对应的 PVC 和 PV 依然会保留下来。所以当这个 Pod 被重新创建出来之后，Kubernetes 会为它找到同样编号的 PVC，挂载这个 PVC 对应的 Volume，从而获取到以前保存在 Volume 里的数据。
 
+## ConfigMap

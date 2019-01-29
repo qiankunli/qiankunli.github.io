@@ -13,6 +13,8 @@ keywords: CoreOS Docker Kubernetes
 
 本文主要讲了service组件
 
+2019.1.29补充：之前理解的服务对外部的访问，是服务级别的。而Kubernetes 是打算将pod 级别的对外访问也交给service（哪怕是mysql 主从之间的访问），因为ip 是变化的，这也是kubernetes 不提倡ip 访问而提供的替换方案。
+
 ## What is a service?
 
 Container Engine pods are ephemeral（短暂的）. They can come and go over time, especially when driven by things like replication controllers. While each pod gets its own IP address, **those IP addresses cannot be relied upon to be stable over time（直接通过一个pod的ip来访问它是不可靠的）**. This leads to a problem: if some set of pods (let's call them backends) provides functionality to other pods (let's call them frontends) inside a cluster, how do those frontends find the backends?
