@@ -98,3 +98,5 @@ LogManager
 2017.12.23补充：有反馈称log4j2 性能更好，log4j在一定程度的负载下性能会急剧下降，成为瓶颈点。
 
 2019.1.30补充：日志记录期间分配临时对象，如日志事件对象，字符串，字符数组，字节数组等，这会对垃圾收集器造成压力并增加GC暂停发生的频率。具体事例参见 [java gc](http://qiankunli.github.io/2016/06/17/gc.html) 中 `log.debug(JSON.toJSONString(object))` 导致频繁fullgc 的例子
+
+[该让log4j退休了 - 论Java日志组件的选择](https://www.jianshu.com/p/85d141365d39)log4j2实现了“无垃圾”和“低垃圾”模式。简单地说，log4j2在记录日志时，能够重用对象（如String等），尽可能避免实例化新的临时对象，减少因日志记录产生的垃圾对象，减少垃圾回收带来的性能下降
