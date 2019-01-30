@@ -10,7 +10,8 @@ keywords: log4j
 
 ## 前言
 
-2017.12.23补充：有反馈称log4j2 性能更好，log4j在一定程度的负载下性能会急剧下降，成为瓶颈点。
+* TOC
+{:toc}
 
 首先明确几个日志框架的基本关系:[slf4j log4j logback关系详解和相关用法](http://www.cnblogs.com/Sinte-Beuve/p/5758971.html) 
 
@@ -25,7 +26,7 @@ keywords: log4j
 1. LoggerRepository是Logger实例的容器，维护Logger name与Logger的映射关系。
 2. Logger 本身并不直接写日志到文件，Logger（准确的说是父类）聚合Appender实现类，Logger将日志信息弄成LogEvent，交给Appender写入。
 
-## 插播-打日志的哲学
+## 打日志的哲学
 
 2018.11.05 补充
 
@@ -41,7 +42,7 @@ Logger name是一个Logger日志输入目的地、日志级别及日志格式的
 
 **从中可以学习到：那么类似的一个实例，通过配置文件读取，Logger、LoggerRepository（log4j中貌似功能有点弱化）、LoggerFactory、LoggerManager协同工作，达到`Logger log = LoggerFactory.getLogger(name)`效果。并根据配置文件变化，及时刷新。**
 
-## 配置文案理解
+## 配置文件理解
 
 一个全套的logger配置如下
 
@@ -84,15 +85,16 @@ LogManager
 3. localhost.{yyyy-MM-dd}.log主要是应用初始化(listener, filter, servlet)**未处理的异常**最后被tomcat捕获而输出的日志，而这些未处理异常最终会导致应用无法启动。Spring的初始化我们往往是使用Spring提供的一个listener进行的，而如果Spring初始化时因为某个bean初始化失败，导致整个应用没有启动，这个时候的异常日志是输出到localhost中 ==> **初始化失败应该去查看下 localhost 日志**。
 
 
-
-## 写日志的一些tips
-
-除了`log.error(e.getMessage,e)` 之外，最好带上一个business id， 这样查询错误的时候，除了可以根据log 关键字，还可以根据business id，后者更常见。
-
-## 日志系统使用规范（未完成）
+## 日志系统使用规范
 
 兼容性问题
 
 [slf4j兼容commons-logging,log4j,java.util.logging,支持log4j.xml和log4j.properties配置](http://blog.csdn.net/wayfoon322/article/details/4312012)
 
 如果你开发的是类库或者嵌入式组件，那么就应该考虑采用SLF4J，因为不可能影响最终用户选择哪种日志系统。
+
+## 日志框架的性能问题
+
+2017.12.23补充：有反馈称log4j2 性能更好，log4j在一定程度的负载下性能会急剧下降，成为瓶颈点。
+
+2019.1.30补充：日志记录期间分配临时对象，如日志事件对象，字符串，字符数组，字节数组等，这会对垃圾收集器造成压力并增加GC暂停发生的频率。具体事例参见 [java gc](http://qiankunli.github.io/2016/06/17/gc.html) 中 `log.debug(JSON.toJSONString(object))` 导致频繁fullgc 的例子

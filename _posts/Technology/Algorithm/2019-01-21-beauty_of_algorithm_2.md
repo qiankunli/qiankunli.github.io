@@ -38,6 +38,20 @@ Rabin-Karp 算法
 2. a~z 对应1~26，将所有字母对应的数字求和，容易冲突
 3. a~z 对应素数（这就引出了素数的价值），这样求和时冲突的概率就很低了
 
+## Trie树
+
+Trie 树的本质，就是利用字符串之间的公共前缀，将重复的前缀合并在一起。
+
+如何存储一个 Trie 树？假设我们的字符串中只有从 a 到 z 这 26 个小写字母
+
+1. 散列表方式
+
+        class TrieNode { 
+            char data; 
+            TrieNode children[26];
+        }
+
+
 
 
 ![](/public/upload/algorithm/beauty_of_algorithm_post.JPG)
