@@ -113,7 +113,7 @@ Rx-style programming really shines with asynchronous code. 反应式编程 对�
 
 反应式架构 是几个概念的集大成者，我们先要对 一些具体的概念有所感觉，比如异步、数据流 等
 
-假设1存在一个逻辑，对于传入的1000个uid，按照几个过滤条件（rpc调用）过滤，输出符合所有条件的uid，其它的uid 则记录原因。则常规代码如下
+假设存在一个逻辑，对于传入的1000个uid，按照几个过滤条件（rpc调用）过滤，输出符合所有条件的uid，其它的uid 则记录原因。则常规代码如下
 
 	主流程{
 		List<Long> uids = filterX();
@@ -130,7 +130,7 @@ Rx-style programming really shines with asynchronous code. 反应式编程 对�
 
 如果是数据流动（这块可以考虑下spring stream）
 
-1. 没有主流程，至少代码上不直接体现
+1. 没有主控流程，至少代码上不直接体现
 2. filterX 是生产者 filterX+1 是消费者
 3. 用户是否符合条件 是两种“重要性” 均等的结果，均交给下游处理
 
@@ -145,3 +145,5 @@ Rx-style programming really shines with asynchronous code. 反应式编程 对�
 	}
 
 像是一个链表节点，每个步骤除了负责自己， 还负责决策消息的下一个去处。
+
+从这个角度看，异步和数据流是一体两面的，异步先是数据流，从整个流程看，是一个数据的生产和处理过程。异步只是**从生产者的角度看** 是一个“异步”， 表示生产者想从数据的生产和处理过程中捕获事件/数据。
