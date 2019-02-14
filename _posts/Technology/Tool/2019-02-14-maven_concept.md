@@ -118,5 +118,5 @@ There are two snapshot “styles” that Maven can use.
 
 笔者碰到过一个问题：假设存在开发人员A和B，一个abc-0.0.1-snapshot.jar（A负责维护） 和demo项目（B负责维护），demo项目依赖abc-0.0.1-snapshot.jar。A改动 abc代码且未升版本号，mvn deploy 到artifactory.ximalaya.com 后。B  “mvn package” 编译 demo 项目时，如何 自动拉取到 最新的 abc-0.0.1-snapshot.jar？各种材料显示 “mvm package --update-snapshots” 可以做到，但在笔者的工作环境中update-snapshots 貌似无效。
 
-经过各种求助，最终确认是maven remote Repository 的Maven Snapshot Version Behavior 设置为Non-Unique 的缘故
+经过各种求助，最终确认是maven remote Repository 的Maven Snapshot Version Behavior 设置为Non-Unique 的缘故，将其改为Unique 即可。
 
