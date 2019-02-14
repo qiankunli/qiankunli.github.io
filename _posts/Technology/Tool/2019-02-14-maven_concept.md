@@ -18,9 +18,9 @@ keywords: maven
 文中以 client 作为贯穿通篇的example
 
 	<dependency>
-	<groupId>io.packagecloud</groupId>
-	<artifactId>client</artifactId>
-	<version>3.0.0-SNAPSHOT</version>
+		<groupId>io.packagecloud</groupId>
+		<artifactId>client</artifactId>
+		<version>3.0.0-SNAPSHOT</version>
 	</dependency>
 
 ## 一个Artifacts 的各种形态/表示
@@ -30,13 +30,13 @@ keywords: maven
 
 以guava为例
 
- 	<dependency>
+    <dependency>
 		<groupId>com.google.guava</groupId>
 		<artifactId>guava</artifactId>
 		<version>27.0.1-jre</version>
 	</dependency>
 
-其对应maven 中央仓库的 url 地址为  `http://central.maven.org/maven2/com/google/guava/guava/27.0.1-jre/`。guava-27.0.1-jre.jar   的具体下载地址就是上文提到的格式`http://central.maven.org/maven2/com/google/guava/guava/27.0.1-jre/guava-27.0.1-jre.jar`
+其对应maven 中央仓库的 url 地址为  `http://central.maven.org/maven2/com/google/guava/guava/27.0.1-jre/`。guava-27.0.1-jre.jar   的具体下载地址就是上文提到的URL construction scheme`http://central.maven.org/maven2/com/google/guava/guava/27.0.1-jre/guava-27.0.1-jre.jar`
 
 浏览器打开该url，可以看到如下目录结构
 
@@ -72,16 +72,19 @@ Just how your own Maven project has a pom.xml file listing its main dependencies
 
 ## Repository
 
-**A Maven repository is wherever these constructed artifact URLs live**. Most of the time, this is a Web server with a /maven2 document root, but it can actually be any protocol Maven has a transport plugin for.
+**A Maven repository is wherever these constructed artifact URLs live**（Repository 就是给一个url 能够拿到的文件的地方）. Most of the time, this is a Web server with a `/maven2` document root, but it can actually be any protocol Maven has a transport plugin for.
 
 1. The local repository, Before Maven attempts to download a particular artifact from a remote repository it checks the local repository. This is usually located at `$HOME/.m2/repository`. **The local repository follows the same standard repository layout as remote repositories**（也就是url 除了前缀不同，其它都是一样的）.
-2. Remote repositories, Remote repositories are defined in your project’s pom.xml file under the <repositories/> section.  一个猜测 maven Repository setting.xml 和 项目的pom.xml 是合并的关系
+2. Remote repositories, Remote repositories are defined in your project’s pom.xml file under the <repositories/> section.  猜测 maven Repository setting.xml 和 项目的pom.xml 是合并的关系
 
 there are two features that can be enabled on repositories, even at the same time.
 
 1. Release repositories, his is enabled by default on all defined repositories , These are artifacts that once published to a coordinate, must not be changed.
-2. SNAPSHOT repositories，每一个 version （`3.0.0-SNAPSHOT`）会对应 多个artifact 文件（每个文件对应一个 snapshotVersion），Using the value of that `<snapshotVersion>` as the $version in our URL construction scheme(`/$groupId[0]/../${groupId[n]/$artifactId/$version/$artifactId-$version.$extension`)，比如获取jar的url `/io/packagecloud/client/3.0.0-SNAPSHOT/client-3.0.0-20161003.234325-2.jar` 。可以看作`3.0.0-SNAPSHOT` 中的SNAPSHOT 在应用时会被替换为 时间戳
-3. maven-metadata.xml, In order to determine the the latest artifact to download for a particular SNAPSHOT version, Maven uses the Standard Repository Layout to locate a `maven-metadata.xml` file for that dependency.As more snapshot artifacts are pushed to 3.0.0-SNAPSHOT, **the maven-metadata.xml will always get updated to reflect the latest `<snapshotVersion>` to use.**
+2. SNAPSHOT repositories，多了maven-metadata.xml 和 snapshotVersion 的概念
+
+	1. 每一个 version （`3.0.0-SNAPSHOT`）会对应 多个artifact 文件，每个文件对应一个 snapshotVersion（对应3.0.0-20161003.234325-2），Using the value of that `<snapshotVersion>` as the $version in our URL construction scheme(`/$groupId[0]/../${groupId[n]/$artifactId/$version/$artifactId-$version.$extension`)，比如获取jar的url变成了 `/io/packagecloud/client/3.0.0-SNAPSHOT/client-3.0.0-20161003.234325-2.jar` 。可以看作`3.0.0-SNAPSHOT` 中的SNAPSHOT 在应用时会被替换为 时间戳
+
+	2. maven-metadata.xml, In order to determine the the latest artifact to download for a particular SNAPSHOT version, Maven uses the Standard Repository Layout to locate a `maven-metadata.xml` file for that dependency. As more snapshot artifacts are pushed to 3.0.0-SNAPSHOT, **the maven-metadata.xml will always get updated to reflect the latest `<snapshotVersion>` to use.** maven-metadata.xml永远指向 最新的snapshotVersion
 
 There are two snapshot “styles” that Maven can use.
 
@@ -89,9 +92,13 @@ There are two snapshot “styles” that Maven can use.
 2. Non-Unique Snapshots, When this behavior is selected, there is no maven-metadata.xml file that is used, The artifact is resolved just like any other（可以理解为跟release的处理机制一样）. 
 
 
-回顾一下，上文主要提到了几个概念：Coordinates、Artifacts（Primary、Secondary）、Checksums 、artifact URL、Repository等
+回顾一下
 
-## maven 更新snapshot 的原理
+1. 上文主要提到了几个概念：Coordinates、Artifacts（Primary、Secondary）、Checksums 、artifact URL、Repository等
+2. 基于这些基本概念，Repository 对Artifact进行了组织
+3. 基于这些基本概念和约定，maven客户端 与 Repository 进行协作
+
+## maven客户端与 Repository 的协作——maven 更新snapshot 的原理
 
 [跟踪Maven更新Snapshot依赖包时的操作](https://www.cnblogs.com/zhangqingsh/archive/2013/04/08/3006723.html) 文中以 构建 `com.my.testu:testu:1.0.1-SNAPSHOT` 为example
 
