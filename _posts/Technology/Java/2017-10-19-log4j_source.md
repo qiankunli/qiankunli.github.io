@@ -15,7 +15,7 @@ keywords: log4j
 
 首先明确几个日志框架的基本关系:[slf4j log4j logback关系详解和相关用法](http://www.cnblogs.com/Sinte-Beuve/p/5758971.html) 
 
-文章基本要点：slf4j是一系列的日志接口（slf4j由二十多个类组成，大部分是interface），而log4j logback是具体实现了的日志框架。logback是直接实现了slf4j的接口，是不消耗内存和计算开销的。而log4j不是对slf4j的原生实现，所以slf4j api在调用log4j时需要一个适配层，比如slf4j-log4j12。
+文章基本要点：slf4j是一系列的日志接口（slf4j由二十多个类组成，大部分是interface），而log4j、logback是具体实现了的日志框架。logback是直接实现了slf4j的接口，是不消耗内存和计算开销的。而log4j不是对slf4j的原生实现，所以slf4j api在调用log4j时需要一个适配层，比如slf4j-log4j12。
 
 源码分析参见：[Log4j源码解析--框架流程+核心解析](http://blog.csdn.net/u011794238/article/details/50736331)，几个基本概念理的比较清楚。
 
