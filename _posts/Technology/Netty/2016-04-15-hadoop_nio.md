@@ -46,7 +46,13 @@ java nio中几个基本操作对象SocketChannel、ServerSocketChannel和Selecto
           return new sun.nio.ch.PollSelectorProvider();  
     }  
     
-可以简单归纳如下:在Solaris系统下将会使用DevPollSelectorProdiver;在Linux系统下(2.6+版本),将会使用EPollSelectorProvider;否则将会使用PollSelectorProvider.对于SunJDK,DefaultSelectorProvider将直接返回WindowsSelectorProvider.这是一种基于Poll机制.
+可以简单归纳如下:
+
+1. 在Solaris系统下将会使用DevPollSelectorProdiver;
+2. 在Linux系统下(2.6+版本),将会使用EPollSelectorProvider;
+3. 否则将会使用PollSelectorProvider.
+
+对于SunJDK,DefaultSelectorProvider将直接返回WindowsSelectorProvider.这是一种基于Poll机制.
 
 本节引用自[NIO中Channel.spi学习][]
 

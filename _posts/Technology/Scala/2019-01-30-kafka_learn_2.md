@@ -21,5 +21,5 @@ kafka client (producer/consumer) 与kafka server通信时使用自定义的协�
 
 kafka 服务端 也这么玩就不够用了，所以
 
-网络层部分值得再看一遍，和netty的重大区别是，netty 没有使用队列
+![](/public/upload/scala/kafka_server_framework.jpg)
 
