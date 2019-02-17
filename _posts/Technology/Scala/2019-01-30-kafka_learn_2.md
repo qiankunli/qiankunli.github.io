@@ -50,6 +50,8 @@ kafka client (producer/consumer) 与kafka server通信时使用自定义的协�
 2. 如果文件较大，为加快读写速度，还要考虑读写索引文件
 3. 内存是否需要缓存热点磁盘数据
 
+建议和mysql 对比学习下  [《mysql技术内幕》笔记1](http://qiankunli.github.io/2017/10/31/inside_mysql1.html)
+
 |逻辑概念|对应的物理概念|备注|
 |---|---|---|
 |Log|目录|目录的命名规则`<topic_name>_<partition_id>`|
