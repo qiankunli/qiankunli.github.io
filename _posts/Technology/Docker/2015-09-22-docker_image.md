@@ -124,13 +124,29 @@ aufs和vfs，一个是文件系统，一个是文件系统接口，从上图每�
 
 **不论image 的registry storage 还是 local storage 都在表述一个事儿：layer存储以及 layer 如何组装成一个image**
 
-## 基础镜像的教训
+## 基础镜像选型的教训
 
 公司实践时，做docker 镜像的时候为了精简，用了alpine， 但是alpine的一些表现跟ubuntu 这些大家常见的OS不一样，几百号开发，光天天回答为啥不能xxx（参见[jar冲突](http://qiankunli.github.io/2017/08/25/docker_debug.html)），就把人搞死了。
 
 很多公司比如[个推镜像体系](https://segmentfault.com/a/1190000017103122) [猪八戒网DevOps容器云与流水线](http://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649699681&idx=1&sn=9f26d3dc8564fd31be93dead06489a6b&chksm=88930a02bfe48314e1e37873850010656d87650d0adcb1738049638cffb7e6496476b0cc8bac&mpshare=1&scene=23&srcid=121648JGw0qJ73GJs4ZJcIuY#rd)均采用Centos 为base 镜像
 
 所以，技术极客跟推广使用还是有很大区别的。
+
+## 警惕镜像占用的空间
+
+假设公司项目数有2k+，则使用docker后，一台物理机上可能跑过所有服务， 自然可能有2k+个镜像，庞大的镜像带来以下问题
+
+1. 占满物理机磁盘，笔者在jenkins + docker 打包机器上碰到过这种现象
+2. 虽未占满磁盘，但大量的镜像目录文件严重拖慢了docker pull 镜像的速度，进而导致调度系统（比如mesos+marathon）认为无法调度而将任务转移到别的机器上，导致某个主机空有资源但就是“接收”不了任务分派。
+
+为此，我们要周期性的清理 docker 占用的磁盘空间。[如何清理Docker占用的磁盘空间?](https://blog.fundebug.com/2018/01/10/how-to-clean-docker-disk/)
+
+docker 的磁盘使用 包括：images/containers/volumnes，可以用`docker system df` 查看。
+
+清理命令有两种选择：
+
+1. docker system prune命令可以用于清理磁盘，删除关闭的容器、无用的数据卷和网络，以及dangling镜像(即无tag的镜像)。
+2. docker system prune -a命令清理得更加彻底，可以将没有容器使用Docker镜像都删掉。
 
 ## 多阶段构建
 
