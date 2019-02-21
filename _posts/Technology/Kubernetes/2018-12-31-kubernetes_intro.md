@@ -101,8 +101,9 @@ Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事
 其它相关文章[A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html) 
 [Kubewatch, An Example Of Kubernetes Custom Controller](https://engineering.bitnami.com/articles/kubewatch-an-example-of-kubernetes-custom-controller.html)
 
+一位大牛的整理
 
-
+![](/public/upload/kubernetes/kubernetes_impl.jpg)
 
 ## Julia Evans 系列
 
