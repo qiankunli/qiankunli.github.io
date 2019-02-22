@@ -16,7 +16,7 @@ keywords: JAVA memory model
 文章系统阐述了 java 内存模型的 知识，提出了一个描述体系。
 
 1. The Java memory model specifies how the Java virtual machine works with the computer's memory (RAM). The Java virtual machine is a model of a whole computer so this model naturally includes a memory model - AKA the Java memory model. java内存模型 specifies 了jvm如何与物理机内存协同（work with）。因为jvm 是一个完整的计算机模型，因此java内存模型 很自然的包含了一个内存模型。
-2.  The Java memory model specifies how and when different threads can see values written to shared variables by other threads, and how to synchronize access to shared variables when necessary.
+2.  The Java memory model specifies how and when different threads can see values written to shared variables by other threads, and how to synchronize access to shared variables when necessary.The Java memory model specifies 线程间数据读写问题，这一段跟数据库事务的隔离级别很像[串一串一致性协议](http://qiankunli.github.io/2018/09/27/consistency_protocol.html) 多线程本质是一个并发读写问题，数据库系统中，为了描述并发读写的安全程度，还提出了隔离性的概念
 
 基于上述基本思想，文章从以下三个方面 来描述java 内存模型：
 
@@ -71,9 +71,20 @@ JMM属于语言级的内存模型，它确保在不同的编译器和不同的�
 
 [Java内存模型FAQ（六）没有正确同步的含义是什么？](http://ifeve.com/jmm-faq-incorrectlysync/)
 
+
+
 ## 其它材料
 
-详见[JSR 133 (Java Memory Model) FAQ](https://www.cs.umd.edu/~pugh/java/memoryModel/jsr-133-faq.html)及其译文[Java内存模型FAQ（一） 什么是内存模型](http://ifeve.com/memory-model/)，[深入理解Java内存模型（一）——基础](http://www.infoq.com/cn/articles/java-memory-model-1)系列文章
+极客时间《深入拆解Java虚拟机》
+
+1. happens-before 关系是用来描述两个操作的内存可见性的。如果操作 X happens-before 操作 Y，那么 X 的结果对于 Y 可见。
+2. **规定的happens-before 关系**：Java 内存模型定义了六七种线程间的 happens-before 关系。比如 线程的启动操作（即 Thread.starts()） happens-before 该线程的第一个操作。
+3. **可以手动控制的happens-before 关系**：Java 内存模型通过定义了一系列的 happens-before 操作（包括锁、volatile 字段、final 字段与安全发布），让应用程序开发者能够轻易地表达不同线程的操作之间的内存可见性。
+2. Java 内存模型是通过内存屏障来禁止重排序的。对于即时编译器来说，内存屏障将限制它所能做的重排序优化。对于处理器来说，内存屏障会导致缓存的刷新操作。
+
+**法无禁止即允许，在遵守happens-before规则的前提下，即时编译器以及底层体系架构能够调整内存访问操作（也就是重排序），以达到性能优化的效果。**
+
+[JSR 133 (Java Memory Model) FAQ](https://www.cs.umd.edu/~pugh/java/memoryModel/jsr-133-faq.html)及其译文[Java内存模型FAQ（一） 什么是内存模型](http://ifeve.com/memory-model/)，[深入理解Java内存模型（一）——基础](http://www.infoq.com/cn/articles/java-memory-model-1)系列文章
 
 首先，什么是内存模型，为何引入内存模型？ one or more layers of memory cache。缓存能够大大提升性能，但是它们也带来了许多挑战。例如，当两个CPU同时检查相同的内存地址时会发生什么？在什么样的条件下它们会看到相同的值？
 
