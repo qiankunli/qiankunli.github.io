@@ -24,6 +24,11 @@ cpu和内存的速度差异 ==> 缓存 ==> 多级缓存 ==> Cache是由很多个
 
 因此，缓存行中的64byte 数据，一个失效全失效，有时会带来一些性能问题。
 
+[JVM4——《深入拆解java 虚拟机》笔记
+2018年07月20日](http://qiankunli.github.io/2018/07/20/jvm_note.html)因为 缓存行，jvm 使用了字段内存对齐机制。
+
+volatile 字段和缓存行也是一番故事
+
 ## 内存 + cpu 二级结构
 
 1. 所谓线程 安全，最后可以归结到 并发读写 问题。参见 [多线程](http://qiankunli.github.io/2014/10/09/Threads.html)
