@@ -20,14 +20,14 @@ keywords: Permission
 
 [高性能队列——Disruptor](https://tech.meituan.com/disruptor.html)
 
-cpu和内存的速度差异 ==> 缓存 ==> 多级缓存 ==> Cache是由很多个cache line组成的。每个cache line通常是64字节，并且它有效地引用主内存中的一块儿地址。CPU每次从主存中拉取数据时，会把相邻的数据也存入同一个cache line。也就是说，假设一个cache line 对应内存地址是0x1000，存着一个volatile变量，你改了这个变量，那么跟它挨着的另一个变量（地址为0x1008）也会失效（假设它们同属于一个java对象内存结构，或都是某个数组的元素）因为整个cache line被标记为失效了。下次访问第二个变量时，便需要从内存中加载到缓存，再加载到cpu。
+cpu和内存的速度差异 ==> 缓存 ==> 多级缓存 ==> Cache是由很多个cache line组成的。每个cache line通常是64字节，并且它有效地引用主内存中的一块儿地址。CPU每次从主存中拉取数据时，会把相邻的数据也存入同一个cache line。也就是说，假设一个cache line 对应内存地址是0x1000，存着一个volatile变量，你改了这个变量，那么跟它挨着的另一个变量（地址为0x1008）也会失效（假设它们同属于一个java对象内存结构，或都是某个数组的元素）因为整个cache line被标记为失效了。下次访问第二个变量时，便需要从内存中加载到缓存，再加载到cpu。从某种程度上可以说：**cpu一直是批量访问内存的**。
 
 因此，缓存行中的64byte 数据，一个失效全失效，有时会带来一些性能问题。
 
 [JVM4——《深入拆解java 虚拟机》笔记
 2018年07月20日](http://qiankunli.github.io/2018/07/20/jvm_note.html)因为 缓存行，jvm 使用了字段内存对齐机制。
 
-volatile 字段和缓存行也是一番故事
+volatile 字段和缓存行也有一番故事
 
 ## 内存 + cpu 二级结构
 
