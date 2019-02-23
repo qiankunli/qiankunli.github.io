@@ -8,7 +8,7 @@ keywords: Scala  akka
 
 ---
 
-## 前言（未完成）
+## 前言
 
 * TOC
 {:toc}
@@ -33,6 +33,34 @@ kafka client (producer/consumer) 与kafka server通信时使用自定义的协�
 
 1. 分层实现，网络io 部分负责读写数据，并将数据序列化/反序列化为协议请求。
 2. 协议请求交给 上层处理， API层就好比 tomcat 中的servlet
+
+
+## 整体流程
+
+### 初始化过程
+
+![](/public/upload/scala/kafka_server_init.png)
+
+### 基本思路
+
+kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合和启动各个能力对象即可（kafka 称之为subsystem）。各能力对象都用到了统一的线程池，各自干各自的活儿。
+
+1. LogManager。 The entry point to the kafka log management subsystem. The log manager is responsible for log creation, retrieval, and cleaning. All read and write operations are delegated to the individual log instances. LogManager 干了日志文件的维护，单纯的日志写入交给了Log 对象
+2. ReplicaManager的主要功能是管理一个Broker 范围内的Partition 信息。代码上，Partition 对象为ReplicaManager 分担一部分职能
+3. KafkaController，在Kafka集群的多个Broker中， 有一个Broker会被推举为Controller Leader，负责管理整个集群中分区和副本的状态。
+
+![](/public/upload/scala/kafka_server_object.png)
+
+从下文可以看到，broker 的主要逻辑就是接收各种请求并处理。除了使用了自定义网络协议导致网络层不一样，在api层/业务层，broker 与webserver 的开发逻辑是类似的。作为一个“webserver”，KafkaServer 的一个很重要组件是请求分发——KafkaApis。KafkaServer 将各个组件startup后，KafkaApis 聚合各个能力组件，将请求分发到 各个能力组件具体的方法上。
+
+要注意两个层次的概念
+
+1. broker 层次的leader 和 follower
+2. replica 层次的leader 和 follower
+
+### 写日志过程
+
+![](/public/upload/scala/kafka_server_write_log.png)
 
 ## 日志存储
 
@@ -60,11 +88,31 @@ kafka client (producer/consumer) 与kafka server通信时使用自定义的协�
 
 ![](/public/upload/scala/kafka_index_file.jpg)
 
-### 代码实现
+## 基于zk协作的两种方式
 
+在kafka中，broker、分区、副本状态等 作为集群状态信息，一旦发生改变，都会需要集群的broker作出反应，那么broker 之间如何协同呢？
 
+在Kafka 早期版本中，每个broker 都会向zookeeper 上注册watcher，当分区或副本状态变化时会唤醒很多不必要的watcher， 导致羊群效应及zookeeper 集群过载。
 
+在新版的设计中，只有Controller Leader 在zookeeper上注册wather，其它的broker 几乎不用再监听zookeeper 中的数据变化。 每个Broker 启动时都会创建一个KafkaController 对象，但是集群中只能存在一个Controller Leader来对外提供服务。在集群启动时，多个Broker上的KafkaController 会在指定路径下竞争创建节点，只有第一个成功创建节点的KafkaController 才能成为Leader（其余的成为Follower）。当Leader出现故障后，所有的Follower会收到通知，再次竞争新的Leader。KafkaController 与Broker 交互，Broker 处理来自KafkaController 的LeaderAndIsrRequest、StopReplicaRequest、UpdateMetadataRequest 等请求
 
+简单说，老版本Broker 之间的数据传递依赖于Zookeeper，每个Broker 对zookeeper 的所有数据数据变化 相机做出反应 并更新zookeeper，比较低效。新版本Broker 选举出Controller Leader 后， 由Controller Leader 相机向各个Broker 发出指令。有人告诉你做什么，总比你拿到数据后自己分析判断再行动要容易些。
+
+作为对比，hadoop 之类框架有明确的master/slave 之分，但为了高可用，master 往往要多个副本。除此之外，分布式框之间的协同 应该是相通的
+
+1. 每个组件启动后，向zk 注册自己的信息
+2. 接收master/leader 的各种请求（http协议或自定义协议） 并处理即可，处理完相机更新zk的数据
+
+从这个角度看，每个slave 组件的逻辑与业务程序猿常写的web server 也别无二致
+
+## 小结
+
+面向对象的源码分析，一般先宏观（比如如何启动，比如业务逻辑的实现路径等）后细节，就是类图和主流程序列图
+
+1. 类图表达依赖关系，反映了代码的组织和业务抽象
+2. 主流程展示主要执行路径，反应了业务的逻辑
+
+JVM 线程通信 靠共享内存，反映在代码上 就是共享对象。
 
 
 

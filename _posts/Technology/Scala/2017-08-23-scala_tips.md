@@ -12,11 +12,13 @@ keywords: Scala
 
 1. object and class
 
-	*  using parentheses on the instance of a class actually calls the apply method defined on this class. This approach is widely used in the standard library as well as in third-party libraries.`val joe = new Person("zhangsan")`，joe.apply() 等同于 `joe()`
+	*  using parentheses(圆括号) on the instance of a class actually calls the apply method defined on this class. This approach is widely used in the standard library as well as in third-party libraries.`val joe = new Person("zhangsan")`，joe.apply() 等同于 `joe()`
 	*  Scala doesn’t have the static keyword but it does have syntax for defining singletons14. **If you need to define methods or values that can be accessed on a type rather than an instance**, use the object keyword.`object RandomUtils {def random100 = Math.round(Math.random * 100)}` After RandomUtils is defined this way, you will be able to use method random100 without creating any instances of the class: RandomUtils.random100
 	*  If an object has the same name as a class, then it’s called a companion object. Companion objects are often used in Scala for defining additional methods and implicit values. You will see a concrete example when we get to serializing objects into JSON.多做了一些工作，但代码中呈现的名字是一样的。
 	*  称呼泛型为Type parametrization或 parametrized class，这个比较贴切
-2. 代码简化
+
+
+2. 代码简化
 
 	* String interpolation，在字符串中使用变量，scala会自动完成替换
 	* 调用函数时不写参数，函数参数若有默认值，调用函数时可以不写参数。函数参数设置为implicit，相同scope下有implicit变量，调用函数时可以不写参数。
@@ -27,7 +29,6 @@ keywords: Scala
 
 	* If your function accepts only one argument, then you are free to call your function using curly braces instead of parentheses
 	* `def sum(a: Int, b: Int): Int = a + b` =Currying=> `def sum(a: Int)(b: Int): Int = a + b`
-
 
 ## case 和 锅炉板模式
 
@@ -82,3 +83,5 @@ boilerplate code 理念扩展下层次 就成了 boilerplate pattern， 比如�
 ## 其它
 
 [函数式思维和函数式编程](http://www.vaikan.com/programming-thinking-functional-way/)
+
+[怎么避免把scala程序写成java？ - 杨博的回答 - 知乎](https://www.zhihu.com/question/64568400/answer/222581715) 李浩毅写了一篇[Strategic Scala Style: Principle of Least Power](http://www.lihaoyi.com/post/StrategicScalaStylePrincipleofLeastPower.html) ， Scala的语言特性不算多，但是语言特性之间过于正交，一方面你把语言特性组合起来之后可以变得很复杂，写出各种其他语言的范式，另一方面容易玩脱。不想玩脱的话，就得优先选用功能最弱的功能（尽量少用scala的高级特性）。只在弱的功能解决不了你面临的问题时，才用更强的功能。Scala的创始人Martin Odersky也在李浩毅博客下面举双手赞成
