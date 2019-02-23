@@ -16,7 +16,7 @@ keywords: JAVA memory model
 文章系统阐述了 java 内存模型的 知识，提出了一个描述体系。
 
 1. The Java memory model specifies how the Java virtual machine works with the computer's memory (RAM). The Java virtual machine is a model of a whole computer so this model naturally includes a memory model - AKA the Java memory model. java内存模型 specifies 了jvm如何与物理机内存协同（work with）。因为jvm 是一个完整的计算机模型，因此java内存模型 很自然的包含了一个内存模型。
-2.  The Java memory model specifies how and when different threads can see values written to shared variables by other threads, and how to synchronize access to shared variables when necessary.The Java memory model specifies 线程间数据读写问题，这一段跟数据库事务的隔离级别很像[串一串一致性协议](http://qiankunli.github.io/2018/09/27/consistency_protocol.html) 多线程本质是一个并发读写问题，数据库系统中，为了描述并发读写的安全程度，还提出了隔离性的概念
+2.  The Java memory model specifies how and when different threads can see values written to shared variables by other threads, and how to synchronize access to shared variables when necessary.The Java memory model specifies 
 
 基于上述基本思想，文章从以下三个方面 来描述java 内存模型：
 
@@ -72,8 +72,7 @@ JMM属于语言级的内存模型，它确保在不同的编译器和不同的�
 [Java内存模型FAQ（六）没有正确同步的含义是什么？](http://ifeve.com/jmm-faq-incorrectlysync/)
 
 
-
-## 其它材料
+## 异曲同工——happens-before 与数据库隔离性
 
 极客时间《深入拆解Java虚拟机》
 
@@ -83,6 +82,15 @@ JMM属于语言级的内存模型，它确保在不同的编译器和不同的�
 2. Java 内存模型是通过内存屏障来禁止重排序的。对于即时编译器来说，内存屏障将限制它所能做的重排序优化。对于处理器来说，内存屏障会导致缓存的刷新操作。
 
 **法无禁止即允许，在遵守happens-before规则的前提下，即时编译器以及底层体系架构能够调整内存访问操作（也就是重排序），以达到性能优化的效果。**
+
+[《mysql技术内幕》笔记2](http://qiankunli.github.io/2017/11/12/inside_mysql2.html) 提到 数据库一共会发生11种异常现象，脏读、不可重复读、幻读只是其中三种，数据库提出隔离性的概念，用这三种异常现象的出现情况来描述并发读写的安全程度。java 有可见性的概念，提供关键字（而不是配置，比如隔离级别是mysql的一种配置）给用户来描述期望的可见性。
+
+||为什么提出|实现原理|
+|---|---|---|
+|隔离性|实现mysql 需要大量彼此关联的数据结构，并发读写|锁|
+|java内存模型|java内存模型与硬件内存模型的映射，并发读写 + 编译器、cpu重排序|happens-before 关系 + 内存屏障|
+
+## 其它材料
 
 [JSR 133 (Java Memory Model) FAQ](https://www.cs.umd.edu/~pugh/java/memoryModel/jsr-133-faq.html)及其译文[Java内存模型FAQ（一） 什么是内存模型](http://ifeve.com/memory-model/)，[深入理解Java内存模型（一）——基础](http://www.infoq.com/cn/articles/java-memory-model-1)系列文章
 

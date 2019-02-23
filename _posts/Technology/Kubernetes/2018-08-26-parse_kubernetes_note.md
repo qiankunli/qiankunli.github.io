@@ -170,6 +170,8 @@ yaml配置参见[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/ku
 
 Kubernetes 项目的本质其实只有一个，那就是“控制器模式”。这个思想，不仅仅是 Kubernetes 项目里每一个组件的“设计模板”，也是 Kubernetes 项目能够将开发者们紧紧团结到自己身边的重要原因。作为一个云计算平台的用户，能够用一个 YAML 文件表达我开发的应用的最终运行状态，并且自动地对我的应用进行运维和管理。**这种信赖关系，就是连接Kubernetes 项目和开发者们最重要的纽带。**
 
+作者的另一篇文章[后Kubernetes时代，2019的容器技术生态会发生些什么？](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651013514&idx=2&sn=39cc372cd50e021b4bf545732877b994&chksm=bdbeb9d98ac930cfdaa577282f6fb40e85670abe680e3f00c7bfbca4ad36812acee81b92bf05&scene=27#wechat_redirect)不同于一个只能生产资源的集群管理工具，Kubernetes 项目最大的价值，乃在于它从一开始就提倡的声明式 API 和以此为基础“控制器”模式。Kubernetes 项目为使用者提供了宝贵的 API 可扩展能力和良好的 API 编程范式，催生出了一个完全基于 Kubernetes API 构建出来的上层应用服务生态。可以说，正是这个生态的逐步完善与日趋成熟，才确立了 Kubernetes 项目如今在云平台领域牢不可破的领导地位，也间接宣告了竞品方案的边缘化。
+
 
 ![](/public/upload/kubernetes/parse_k8s_ad.JPG)
 
