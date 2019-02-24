@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes有状态服务
+title: Kubernetes StatefulSet/DaemonSet
 category: 技术
 tags: Kubernetes
 keywords: kubernetes stateset
@@ -12,6 +12,10 @@ keywords: kubernetes stateset
 
 * TOC
 {:toc}
+
+
+你一定有方法在不使用 Kubernetes、甚至不使用容器的情况下，自己 DIY 一个类似的方案出来。但是，一旦涉及到升级、版本管理等更工程化的能力，Kubernetes 的好处，才会更加凸现。
+
 
 **Kubernetes 的各种object，就是常规的各个项目组件在 kubernetes 上的表示** [深入理解StatefulSet（三）：有状态应用实践](https://time.geekbang.org/column/article/41217) 充分体现了在我们把服务 迁移到Kubernetes 的过程中，要做多少概念上的映射。
 
@@ -36,3 +40,14 @@ StatefulSet 里的不同 Pod 实例，不再像 ReplicaSet 中那样都是完全
 Persistent Volume Claim 和 PV 的关系。运维人员创建PV，告知有多少volume。开发人员创建Persistent Volume Claim 告知需要多少大小的volume。创建一个 PVC，Kubernetes 就会自动为它绑定一个符合条件的Volume。即使 Pod 被删除，它所对应的 PVC 和 PV 依然会保留下来。所以当这个 Pod 被重新创建出来之后，Kubernetes 会为它找到同样编号的 PVC，挂载这个 PVC 对应的 Volume，从而获取到以前保存在 Volume 里的数据。
 
 ## ConfigMap
+
+## DaemonSet
+
+## 体会
+
+学习rc、deployment、service、pod 这些Kubernetes object 时，因为功能和yaml 有直接的一对一关系，所以体会不深。在学习StatefulSet 和 DaemonSet 时，有几个感觉
+
+1. Kubernetes object 是分层次的，pod 是很基础的层次，然后rc、deployment、StatefulSet 等用来描述如何管理它。
+
+    * 换句话说，pod 的配置更多是给docker看的，deployment 和StatefulSet 等配置更多是给 Kubernetes Controller 看的
+    * pod 其实有一份儿配置的全集， DaemonSet 的生效 是背后偷偷改 pod 配置 加上 恰当的时机操作pod api

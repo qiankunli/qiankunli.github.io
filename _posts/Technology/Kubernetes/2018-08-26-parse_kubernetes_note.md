@@ -123,6 +123,8 @@ k8s 强在哪里
 
 	![](/public/upload/kubernetes/k8s_pod.PNG)
 
+声明式的好处 在[ansible学习](http://qiankunli.github.io/2018/12/29/ansible.html) ansible 与其它集群操作工具saltstack等的对比中也有体现。
+
 kubernetes 真正的价值，在于提供了一套基于容器构建分布式系统的基础依赖。k8s提供了一种宏观抽象，作为一个集群操作系统，运行各种类型的应用。
 
 ## k8s 部署
