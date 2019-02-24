@@ -58,6 +58,8 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 1. broker 层次的leader 和 follower
 2. replica 层次的leader 和 follower
 
+![](/public/upload/scala/kafka_framework_3.png)
+
 ### 写日志过程
 
 ![](/public/upload/scala/kafka_server_write_log.png)

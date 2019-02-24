@@ -14,6 +14,8 @@ keywords: mysql concurrency control
 
 [InnoDB并发如此高，原因竟然在这？](https://juejin.im/entry/5b70db49e51d45663f46bc52)  系列 内容 大部分来自 官方文章 [InnoDB Locking](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html)，同是加入了作者的一些提炼。
 
+2019.02.24补充，[JVM3——java内存模型](http://qiankunli.github.io/2017/05/02/java_memory_model.html)将mysql 与 jvm 内存模型的相关规则做了对比。
+
 ## 隔离性与 锁
 
 [4种事务的隔离级别，InnoDB如何巧妙实现？](https://mp.weixin.qq.com/s?__biz=MjM5ODYxMDA5OQ==&mid=2651961498&idx=1&sn=058097f882ff9d32f5cdf7922644d083&chksm=bd2d0d468a5a845026b7d2c211330a6bc7e9ebdaa92f8060265f60ca0b166f8957cbf3b0182c&mpshare=1&scene=23&srcid=0829xvsK46xDhwpojd9EbY18%23rd)
