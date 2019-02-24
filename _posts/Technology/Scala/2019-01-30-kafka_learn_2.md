@@ -35,13 +35,13 @@ kafka client (producer/consumer) 与kafka server通信时使用自定义的协�
 2. 协议请求交给 上层处理， API层就好比 tomcat 中的servlet
 
 
-## 整体流程
+## 单机——基本实现
 
 ### 初始化过程
 
 ![](/public/upload/scala/kafka_server_init.png)
 
-### 基本思路
+### 整体思路
 
 kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合和启动各个能力对象即可（kafka 称之为subsystem）。各能力对象都用到了统一的线程池，各自干各自的活儿。
 
@@ -59,6 +59,8 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 2. replica 层次的leader 和 follower
 
 ![](/public/upload/scala/kafka_framework_3.png)
+
+从单机角度看，自定义协议 + 主流程 + 旁路subsystem，与mysql 有点神似。
 
 ### 写日志过程
 
@@ -90,7 +92,7 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 
 ![](/public/upload/scala/kafka_index_file.jpg)
 
-## 基于zk协作的两种方式
+## 多机——基于zk协作的两种方式
 
 在kafka中，broker、分区、副本状态等 作为集群状态信息，一旦发生改变，都会需要集群的broker作出反应，那么broker 之间如何协同呢？
 
@@ -115,6 +117,8 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 2. 主流程展示主要执行路径，反应了业务的逻辑
 
 JVM 线程通信 靠共享内存，反映在代码上 就是共享对象。
+
+[源码分析体会](http://qiankunli.github.io/2019/01/24/source_parse.html)任何一个系统的设计都有功能和性能（泛化一下就是功能性和非功能性） 两个部分，识别系统模块属于哪个部分，有助于简化对系统的认识。通常，一个系统的最早版本只专注于功能，后续除非大的变动，后来的演化大部分都是为了性能上的追求。在kafka 这块，zk的协作方式等方面的变化 有很充分的体现。
 
 
 

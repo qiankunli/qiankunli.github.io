@@ -10,7 +10,9 @@ keywords: 认知
 
 ## 简介
 
+来自对极客时间《技术领导力300讲》洪强宁的文章的整理
 
+![](/public/upload/life/programmer_growth.png)
 
 ## 深度还是广度
 
