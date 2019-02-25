@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes StatefulSet/DaemonSet
+title: Kubernetes objects之编排对象 
 category: 技术
 tags: Kubernetes
 keywords: kubernetes stateset
@@ -43,6 +43,8 @@ Persistent Volume Claim 和 PV 的关系。运维人员创建PV，告知有多�
 
 ## DaemonSet
 
+## Job/CronJob
+
 ## 体会
 
 学习rc、deployment、service、pod 这些Kubernetes object 时，因为功能和yaml 有直接的一对一关系，所以体会不深。在学习StatefulSet 和 DaemonSet 时，有几个感觉
@@ -51,3 +53,7 @@ Persistent Volume Claim 和 PV 的关系。运维人员创建PV，告知有多�
 
     * 换句话说，pod 的配置更多是给docker看的，deployment 和StatefulSet 等配置更多是给 Kubernetes Controller 看的
     * pod 其实有一份儿配置的全集， DaemonSet 的生效 是背后偷偷改 pod 配置 加上 恰当的时机操作pod api
+2. Kubernetes objects是否可以笼统的划分一下，编排对象架构在调度对象之上？
+
+    1. 调度对象pod、service、volume
+    2. 编排对象StatefulSet、DaemonSet 和Job/CronJob 等
