@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 时序性数据库
+title: 时序性数据库介绍及对比
 category: 技术
 tags: Data
 keywords: tsdb
@@ -13,9 +13,7 @@ keywords: tsdb
 * TOC
 {:toc}
 
-建议看下前文 [OpenTSDB 入门](http://qiankunli.github.io/2017/08/02/opentsdb.html)
-
-[influxdb](http://qiankunli.github.io/2019/02/26/influxdb_intro.html)
+建议看下前文 [OpenTSDB 入门](http://qiankunli.github.io/2017/08/02/opentsdb.html) [influxdb 入门](http://qiankunli.github.io/2019/02/26/influxdb_intro.html)
 
 
 [下一代监控系统大阅兵-基于TSDB的监控系统定制开发需求调研](https://zhuanlan.zhihu.com/p/35978607)
@@ -57,6 +55,19 @@ OpenTSDB：基于 Hadoop and HBase 的时间序列数据库
 Prometheus 和InfluxDB 、 OpenTSDB最大的区别可以理解成：后两者仅仅是数据库，而 Prometheus 是一个监控系统，它不仅仅包含了时间序列数据库，还有全套的抓取、检索、绘图、报警的功能
 
 Prometheus 官网有个专门的对比 [Prometheus COMPARISON TO ALTERNATIVES](https://prometheus.io/docs/introduction/comparison/)
+
+
+## 注意事项
+
+### tag Cardinality 基数不能太大 
+
+[series cardinality](https://docs.influxdata.com/influxdb/v1.7/concepts/glossary/#series-cardinality)
+
+[Tags with high cardinality](https://community.influxdata.com/t/tags-with-high-cardinality/1557) 
+
+1. influxdb 会为tag 与 metric 建立反向索引
+2. tag 的基数说的是可选值的数量，比如省份的基数就是3x个，直辖市的基数是4个。这个influxdb 表的Cardinality 是所有tag 基数的乘积
+3. Cardinality 基数过大，会引起influxdb 查询缓慢。PS：还有待确认
 
 
 ## 纯粹的监控系统 与 数据采集存储反馈报警系统的异同
