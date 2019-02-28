@@ -45,6 +45,8 @@ spark 常规处理的是 非结构化文件，比如文本文件。Spark SQL是�
 
 ## spark stream
 
+[Spark 实战，第 1 部分 使用 Scala 语言开发 Spark 应用程序](https://www.ibm.com/developerworks/cn/opensource/os-cn-spark-practice1/index.html)
+
 ### 相关概念
 
 spark stream 是微批处理。

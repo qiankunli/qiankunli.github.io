@@ -13,7 +13,7 @@ keywords: influxdb
 * TOC
 {:toc}
 
-可以先看下同为时序数据库的 [OpenTSDB 入门](http://qiankunli.github.io/2017/08/02/opentsdb.html)，同类产品还可以参见 [Prometheus 入门与实践](https://www.ibm.com/developerworks/cn/cloud/library/cl-lo-prometheus-getting-started-and-practice/index.html)
+可以先看下同为时序数据库的 [OpenTSDB 入门](http://qiankunli.github.io/2017/08/02/opentsdb.html)，同类产品还可以参见 [Prometheus 入门与实践](https://www.ibm.com/developerworks/cn/cloud/library/cl-lo-prometheus-getting-started-and-practice/index.html) [时序性数据库介绍及对比](http://qiankunli.github.io/2019/02/26/tsdb_intro.html)
 
 [官网](https://www.influxdata.com/)
 
@@ -32,6 +32,8 @@ InfluxDB自带web管理界面，在浏览器中输入 http://服务器IP:8083 �
 
 
 ## schema
+
+[时序性数据库介绍及对比](http://qiankunli.github.io/2019/02/26/tsdb_intro.html)
 
 ### 与传统数据库中的名词做比较
 
