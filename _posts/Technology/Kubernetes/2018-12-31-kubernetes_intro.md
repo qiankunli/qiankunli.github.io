@@ -15,8 +15,6 @@ keywords: kubernetes
 
 ## 一些体会
 
-
-
 有时候不得不承认，一些概念可能都火了五六年了， 但在实践层面仍然是滞后。能用是不够的，好用才行。有一个大牛说过：ci/cd 和 devops 是一体两面的。比如对于java 开发来说，用物理机部署（拷贝文件、配置nginx等） 和使用k8s 发布服务一样复杂（虽说k8s可以一键发布，但理解k8s对他来说是个负担），至少前者他还懂一点。
 
 
@@ -44,6 +42,11 @@ The unit of scheduling in Kubernetes is a pod. Essentially, this is a tightly co
 
 Kubernetes is highly extensible, from defining new workloads and resource types in general to customizing its user-facing parts, such as the CLI tool kubectl (pronounced cube cuddle).
 
+## 一切操作皆对象
+
+在 Kubernetes 中，在编写 Pod 模板的时候，有一种“在 YAML 文件里编程序”的感觉
+
+![](/public/upload/kubernetes/kubernetes_object.png)
 
 ## 编排的实现——控制器模型
 
