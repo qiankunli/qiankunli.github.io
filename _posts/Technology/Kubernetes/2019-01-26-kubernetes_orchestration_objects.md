@@ -14,6 +14,8 @@ keywords: kubernetes stateset
 {:toc}
 
 
+![](/public/upload/kubernetes/kubernetes_object.png)
+
 你一定有方法在不使用 Kubernetes、甚至不使用容器的情况下，自己 DIY 一个类似的方案出来。但是，一旦涉及到升级、版本管理等更工程化的能力，Kubernetes 的好处，才会更加凸现。
 
 

@@ -74,6 +74,8 @@ GenericAPIServer 初始化时构建 http.Handler，描述了怎么处理用户�
 
 apiserver 启动时 自动加载 built-in resource/object 的scheme 信息， 对crud  url 根据 crud 的不同分别绑定在 通用的 Creater/Deleter 等http.Handler 进行处理
 
+![](/public/upload/kubernetes/kubernetes_object_save.png)
+
 ### 处理请求的url
 
 使用[go-restful](https://github.com/emicklei/go-restful)时，一个很重要的过程就是 url 和 handler 绑定，绑定逻辑在 CreateServerChain 中。  
