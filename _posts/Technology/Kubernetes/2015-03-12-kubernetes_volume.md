@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Kubernetes volume
+title: Kubernetes持久化存储
 category: 技术
 tags: Kubernetes
 keywords: CoreOS Docker Kubernetes Volume
@@ -78,6 +78,8 @@ PVC 可以理解为持久化存储的“接口”，它提供了对某种持久�
 
 容器持久化存储体系，完全是 Kubernetes 项目自己负责管理的，并不依赖于 docker volume 命令和 Docker 的存储插件。
 
+### Dynamic Provision
+
 ## Types of Volumes
 
 目前支持三种类型
@@ -147,4 +149,11 @@ Watch out when using this type of volume, because:
       name: "share-apache2"
       
 此时，share-apache2-1 container对`/data`目录所做操作都将反映到 share-apache2-2的`/data`目录中。
+
+## CSI
+
+![](/public/upload/kubernetes/k8s_csi.png)
+
+CSI 插件体系的设计思想，就是把Dynamic Provision 阶段以及 Kubernetes 里的一部分存储管理功能（比如“Attach 阶段”和“Mount 阶段”，实际上就是通过调用 CSI 插件来完成的），从主干代码里剥离出来，做成了几个单独的组件。这些组件会通过 Watch API 监听 Kubernetes 里与存储相关的事件变化，比如 PVC 的创建，来执行具体的存储管理动作。
+
 
