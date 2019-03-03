@@ -30,15 +30,15 @@ keywords: container network
 	<tr>
 		<td colspan="2">frame header</td>
 		<td colspan="3">frame body</td>
-	<tr>
+	</tr>
 	<tr>
 		<td>A mac</td>
 		<td>B mac</td>
 		<td bgcolor="green">A ip</td>
 		<td bgcolor="green">B ip</td>
 		<td bgcolor="green">body</td>
-	<tr>
-	<table>
+	</tr>
+	</table>
 
 	如何是一个局域网的, you can just send a packet with any random IP address on it, and as long as the MAC address is right it’ll get there.
 
@@ -48,15 +48,15 @@ keywords: container network
 	<tr>
 		<td colspan="2">frame header</td>
 		<td colspan="3">frame body</td>
-	<tr>
+	</tr>
 	<tr>
 		<td>A mac</td>
 		<td>gateway mac</td>
 		<td bgcolor="green">A ip</td>
 		<td bgcolor="green">B ip</td>
 		<td bgcolor="green">body</td>
-	<tr>
-	<table>
+	</tr>
+	</table>
 
 ### 主机路由对上述过程的影响
 
@@ -72,14 +72,14 @@ keywords: container network
 <tr>
 	<td colspan="2">frame header</td>
 	<td colspan="3">frame body</td>
-<tr>
+</tr>
 <tr>
 	<td>A mac</td>
 	<td>X mac</td>
 	<td bgcolor="green">A ip</td>
 	<td bgcolor="green">B ip</td>
 	<td bgcolor="green">body</td>
-<tr>
+</tr>
 </table>
 
 [程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)提到：在一个网络数据包传输的过程中（跨网络+路由器），都是源/目标mac在变，源/目标ip都没变。
@@ -164,7 +164,7 @@ VTEP 等内核实现的设备 ，包括vlan、vxlan 等内核实现的机制、�
 	<tr>
 		<td colspan="2">frame header</td>
 		<td colspan="5">frame body</td>
-	<tr>
+	</tr>
 	<tr>
 		<td>host1 mac</td>
 		<td>host2 mac</td>
@@ -173,8 +173,8 @@ VTEP 等内核实现的设备 ，包括vlan、vxlan 等内核实现的机制、�
 		<td bgcolor="green">container1 ip</td>
 		<td bgcolor="green">container1 ip</td>
 		<td bgcolor="green">body</td>
-	<tr>
-	<table>
+	</tr>
+	</table>
 
 
 2. flannel + host-gw/calico
@@ -183,15 +183,15 @@ VTEP 等内核实现的设备 ，包括vlan、vxlan 等内核实现的机制、�
 	<tr>
 		<td colspan="2">frame header</td>
 		<td colspan="3">frame body</td>
-	<tr>
+	</tr>
 	<tr>
 		<td>container1 mac</td>
 		<td>host2 mac</td>
 		<td>container1 ip</td>
 		<td>container2 ip</td>
 		<td>body</td>
-	<tr>
-	<table>
+	</tr>
+	</table>
 
 [A container networking overview](https://jvns.ca/blog/2016/12/22/container-networking/) **How do routes get distributed**?
 
@@ -223,6 +223,10 @@ There are two main ways they do it:
 6. 选择网络时，IP地址管理IPAM，组播，广播，IPv6，负载均衡，服务发现，策略，服务质量，高级过滤和性能都是需要额外考虑的。问题是这些能力是否受到支持。即使您的runtime，编排引擎或插件支持容器网络功能，您的基础架构也可能不支持该功能
 
 ## 网络隔离
+
+Kubernetes 对 Pod 进行“隔离”的手段，即：NetworkPolicy，NetworkPolicy 实际上只是宿主机上的一系列 iptables 规则。
+
+在具体实现上，凡是支持 NetworkPolicy 的 CNI 网络插件，都维护着一个 NetworkPolicy Controller，通过控制循环的方式对 NetworkPolicy 对象的增删改查做出响应，然后在宿主机上完成 iptables 规则的配置工作。
 
 
 个人微信订阅号
