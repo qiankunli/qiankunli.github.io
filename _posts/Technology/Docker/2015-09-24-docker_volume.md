@@ -8,7 +8,7 @@ keywords: Docker volume
 
 ---
 
-## 简介（待整理）
+## 简介
 
 背景材料 [linux 文件系统](http://qiankunli.github.io/2018/05/19/linux_file_mount.html)
 

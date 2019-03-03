@@ -21,6 +21,7 @@ A Pod specifies which Volumes its containers need in its ContainerManifest prope
 
 The storage media (Disk, SSD, or memory) of a volume is determined by the media of the filesystem holding the kubelet root dir (typically `/var/lib/kubelet`)(volumn的存储类型（硬盘，固态硬盘等）是由kubelet所在的目录决定的). There is no limit on how much space an EmptyDir or PersistentDir volume can consume（大小也是没有限制的）, and no isolation between containers or between pods.
 
+可以与 [docker volume](http://qiankunli.github.io/2015/09/24/docker_volume.html) 对比下异同
 
 ## Persistent Volume（PV）和 Persistent Volume Claim（PVC）
 
@@ -76,7 +77,7 @@ PVC 可以理解为持久化存储的“接口”，它提供了对某种持久�
 在 Kubernetes 中，实际上存在着一个专门处理持久化存储的控制器，叫作 Volume Controller。这个Volume Controller 维护着多个控制循环，其中有一个循环，扮演的就是撮合 PV 和 PVC 的“红娘”的角色。它的名字叫作 PersistentVolumeController
 
 
-容器持久化存储体系，完全是 Kubernetes 项目自己负责管理的，并不依赖于 docker volume 命令和 Docker 的存储插件。
+容器持久化存储体系，完全是 Kubernetes 项目自己负责管理的，并不依赖于 docker volume 命令和 Docker 的存储插件。**这跟Persistent Volume 是一致的，docker 只知道mount 本地的一个目录，至于这个目录有什么特别的，由k8s 来保证**。
 
 ### Dynamic Provision
 
@@ -154,6 +155,16 @@ Watch out when using this type of volume, because:
 
 ![](/public/upload/kubernetes/k8s_csi.png)
 
-CSI 插件体系的设计思想，就是把Dynamic Provision 阶段以及 Kubernetes 里的一部分存储管理功能（比如“Attach 阶段”和“Mount 阶段”，实际上就是通过调用 CSI 插件来完成的），从主干代码里剥离出来，做成了几个单独的组件。这些组件会通过 Watch API 监听 Kubernetes 里与存储相关的事件变化，比如 PVC 的创建，来执行具体的存储管理动作。
+CSI 插件体系的设计思想，就是把Dynamic Provision 阶段以及 Kubernetes 里的一部分存储管理功能（比如“Attach 阶段”和“Mount 阶段”，实际上是通过调用 CSI 插件来完成的），从主干代码里剥离出来，做成了几个单独的组件。这些组件会通过 Watch API 监听 Kubernetes 里与存储相关的事件变化，比如 PVC 的创建，来执行具体的存储管理动作。
+
+CSI 的设计思想，把插件的职责从“两阶段处理”，扩展成了Provision、Attach 和 Mount 三个阶段。其中，Provision 等价于“创建磁盘”，Attach 等价于“挂载磁盘到虚拟机”，Mount 等价于“将该磁盘格式化后，挂载在 Volume 的宿主机目录上”。
+
+一个 CSI 插件只有一个二进制文件，但它会以 gRPC 的方式对外提供三个服务（gRPC Service），分别叫作：CSI Identity、CSI Controller 和 CSI Node。
+
+关于k8s 插件，可以回顾下
+
+![](/public/upload/kubernetes/parse_k8s_1.png)
+
+
 
 

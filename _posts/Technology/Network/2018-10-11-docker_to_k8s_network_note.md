@@ -33,7 +33,7 @@ Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes �
 
 ![](/public/upload/docker/container_networking.png)
 
-一个 Network Namespace 的网络栈包括：网卡（Network Interface）、回环设备（Loopback Device）、路由表（Routing Table）和 iptables 规则。
+一个 Network Namespace 的网络栈包括：网卡（Network Interface）、回环设备（Loopback Device）、路由表（Routing Table）和 iptables 规则。**这句话框定了下文CNI  plugin 的功能边界**
 
 
 ## 单机
@@ -208,6 +208,10 @@ k8s的service discovery 真的是 service 组件的discovery
 1. kube-proxy，给service 一个host 可访问的ip:port
 2. kube-dns/CNCF project CoreDNS，给service 一个域名
 3. Ingress，给service 一个可访问的http path
+
+### Using CNI with CRI
+
+在 Kubernetes 中，处理容器网络相关的逻辑并不会在kubelet 主干代码里执行，而是会在具体的 CRI（CContainer Runtime Interface，容器运行时接口）实现里完成。对于 Docker 项目来说，它的CRI 实现叫作 dockershim
 
 ### 为什么pod中要有一个pause 容器？
 

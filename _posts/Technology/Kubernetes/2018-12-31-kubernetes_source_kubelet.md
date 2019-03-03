@@ -314,6 +314,8 @@ golang中一个接口可以包含一个或多个其他的接口，这相当于�
 
 ## 加载 CNI plugin
 
+建议参看[《Container-Networking-Docker-Kubernetes》笔记](http://qiankunli.github.io/2018/10/11/docker_to_k8s_network_note.html)了解下CNI 的相关概念及使用。
+
 ![](/public/upload/kubernetes/kubelet_cni_init.png)
 
 cniNetworkPlugin.Init 方法逻辑如下
@@ -375,9 +377,13 @@ docker service 作为grpc server 实现，最终还是操作了 CNI，CNIConfig�
 |k8s涉及的组件|功能交付方式|
 |---|---|
 |kubectl|命令行，用户直接使用|
-|kubelet|命令行 启动 http|
+|kubelet|命令行，提供http服务|
 |cri-shim|grpc server|
 |cni plugin|命令行，程序直接使用|
+
+关于k8s 插件，可以回顾下
+
+![](/public/upload/kubernetes/parse_k8s_1.png)
 
 [kubelet 源码分析：Garbage Collect](https://cizixs.com/2017/06/09/kubelet-source-code-analysis-part-3/) gc 机制后面由  eviction 代替
 
