@@ -10,6 +10,9 @@ keywords: network ovs
 
 ## 简介
 
+* TOC
+{:toc}
+
 http://fishcried.com/ 有一个linux 网络的基础知识系列，要研读下
 
 ## ip命令
@@ -82,6 +85,48 @@ wget https://github.com/openvswitch/ovs/raw/master/utilities/ovs-docker
 
 
 ## iptables
+
+### 从tomcat filter说起
+
+[tomcat filter分析](https://zsr.github.io/2017/11/15/tomcat-filter%E5%88%86%E6%9E%90/)
+
+![](/public/upload/network/tomcat_filter_chain.png)
+
+每次请求过来都会创建一个过滤器链(filterChain)，并把待执行的servlet对象存放到过滤器链中。对于每个url，对应的filter个数都是不固定的，filterchain需要保存每个请求所对应的一个filter数组，以及调用到的filter的position，以便继续向下调用filter
+
+### tomcat filter ==> netfilter 
+
+![](/public/upload/network/netfilter_positioning.png)
+
+Netfilter 子系统的作用，就是 Linux 内核里挡在“网卡”和“用户态进程”之间的一道“防火墙”。
+
+![](/public/upload/network/netfilter_flow.png)
+
+iptables 只是一个操作 Linux 内核 Netfilter 子系统的“界面”。链路层的“检查点”对应的操作界面叫作 ebtables。
+
+||linux 网络协议栈|http server|rpc server|
+|---|---|---|---|
+|操作界面|iptables、ebtables|xml|大部分框架为硬编码|
+|拦截的最小单位|rule|Filter|根据框架有所不同，一般为Filter|
+|最小单位的上一层单位|table|FilterChain|Filter 数组|
+|再上一层单位|Chain|||
+|流向|有forward 和 upward 两种流向|只有upward 一种流向|只有upward 一种流向|
+|路由|路由表|Mapping|router|
+
+笔者之前只是觉得 http server 与 rpc server 很像，但宽泛的说，网络协议栈与http server、rpc server 也是异曲同工。但我们学习 网络协议栈时，往往是从chain ==> table ==> rule 开始说。而http server 和 rpc server 则是从小到达 来表述。另一个显著地差异是，netfilter 有两种流向，chain的个数 也就更多，chain 可以形象的称之为“检查站”
+
+![](/public/upload/network/netfilter_chain_flow.png)
+
+
+iptables 表的作用，就是在某个具体的“检查点”（比如Output）上，按顺序执行几个不同的检查动作（比如，先执行nat，再执行 filter）。
+
+||类比于快递站点|
+|---|---|
+|chain|发货点、分拨中心、集散中心、营业点|
+|table|入库、分拨、核对、安检|
+|rule|比如入库，比如不接收xx的快递、不接收大于xx快递等|
+
+### 操作
 
 iptbales -L -vn --line-number
 
