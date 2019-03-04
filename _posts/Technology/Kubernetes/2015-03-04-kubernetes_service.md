@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Kubernetes service 组件
+title: Kubernetes service
 category: 技术
 tags: Kubernetes
 keywords: Docker Kubernetes
@@ -14,7 +14,7 @@ keywords: Docker Kubernetes
 
 本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删改。
 
-本文主要讲了service组件
+
 
 2019.1.29补充：之前理解的服务对外部的访问，是服务级别的。而Kubernetes 是打算将pod 级别的对外访问也交给service（哪怕是mysql 主从之间的访问），因为ip 是变化的 以及 多个pod 负载均衡的需求，这也是kubernetes 不提倡ip 访问而提供的替换方案。但在复杂系统中，网络处理越简单越好。iptables是万恶之源，给实际工作中的运维排错带来极大的麻烦。在一些大厂的实践中，一般很少使用service 方案。
 
@@ -33,7 +33,7 @@ A Container Engine service is an abstraction which defines a logical set of pods
 
 As an example, consider an image-process backend which is running with 3 live replicas. Those replicas are fungible—frontends do not care which backend they use. While the actual pods that comprise the set may change, the frontend client(s) do not need to know that. The service abstraction enables this decoupling.
 
-### How do they work?——基于iptables实现
+## How do they work?——基于iptables实现
 
 Service 是由 kube-proxy 组件，加上 iptables 来共同实现的。
 
@@ -88,11 +88,11 @@ Service 的 VIP 只是一条 iptables 规则上的配置，并没有真正的网
 
 A service, through its label selector(a key:value pair), can resolve to 0 or more pods. Over the life of a service, the set of pods which comprise that service can grow, shrink, or turn over completely. Clients will only see issues if they are actively using a backend when that backend is removed from the service (and even then, open connections will persist for some protocols).
 
-## Service Operations
+### Service Operations
 
 Services map a port on each cluster node to ports on one or more pods.The mapping uses a selector key:value pair in the service, and the labels property of pods. Any pods whose labels match the service selector are made accessible through the service's port.
 
-### Create a service
+#### Create a service
 
     $ kubectl create -f FILE
     
@@ -170,7 +170,7 @@ The second file uses Google Compute Engine network load balancing to create a si
 
 To access the service, a client connects to the external IP address, which forwards to port 8765 on a node in the cluster, which in turn accesses port 9376 on the pod. 
 
-### View a service
+#### View a service
 
     $ kubectl get services
     
@@ -191,7 +191,7 @@ Details about the specific service are returned:
     Port:     8765
     No events.
     
-### Delete a service
+#### Delete a service
 
     $ kubectl delete service NAME
     
@@ -228,3 +228,6 @@ service configure文件中有一个`PublicIPs`属性
     
 在这里`192.168.56.102`和`192.168.56.103`是k8s集群从节点的ip（**主节点ip不行**）。这样，我们就可以通过`192.168.56.102:8765`和`192.168.56.102:8765`来访问这个service了。其好处是，kube-proxy为我们映射的端口是确定的。
 
+## NodePort
+
+所谓 Service 的访问入口，其实就是每台宿主机上由 kube-proxy 生成的 iptables 规则，以及 kube-dns 生成的 DNS 记录。而一旦离开了这个集群，这些信息对用户来说，也就自然没有作用了。比如，一个集群外的host 对service vip 一点都不感冒。
