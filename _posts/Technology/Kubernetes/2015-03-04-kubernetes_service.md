@@ -3,17 +3,22 @@ layout: post
 title: Kubernetes service 组件
 category: 技术
 tags: Kubernetes
-keywords: CoreOS Docker Kubernetes
+keywords: Docker Kubernetes
 ---
 
 
 ## 简介
 
+* TOC
+{:toc}
+
 本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删改。
 
 本文主要讲了service组件
 
-2019.1.29补充：之前理解的服务对外部的访问，是服务级别的。而Kubernetes 是打算将pod 级别的对外访问也交给service（哪怕是mysql 主从之间的访问），因为ip 是变化的，这也是kubernetes 不提倡ip 访问而提供的替换方案。
+2019.1.29补充：之前理解的服务对外部的访问，是服务级别的。而Kubernetes 是打算将pod 级别的对外访问也交给service（哪怕是mysql 主从之间的访问），因为ip 是变化的 以及 多个pod 负载均衡的需求，这也是kubernetes 不提倡ip 访问而提供的替换方案。但在复杂系统中，网络处理越简单越好。iptables是万恶之源，给实际工作中的运维排错带来极大的麻烦。在一些大厂的实践中，一般很少使用service 方案。
+
+![](/public/upload/kubernetes/kubernetes_service_access.png)
 
 ## What is a service?
 
@@ -24,11 +29,13 @@ Enter services.
 
 A Container Engine service is an abstraction which defines a logical set of pods and a policy by which to access them. **The goal of services is to provide a bridge for non-Kubernetes-native applications to access backends without the need to write code that is specific to Kubernetes. A service offers clients an IP and port pair which, when accessed, redirects to the appropriate backends.(service会提供一个稳定的ip，作为桥梁，让其它pod访问。而service负责将请求转发到其对应的pod上)** The set of pods targeted is determined by a label selector.
 
-![kubernete_service_model.png](/public/upload/kubernetes/kubernete_service_model.png "")
+![kubernete_service_model.png](/public/upload/kubernetes/kubernete_service_model.png)
 
 As an example, consider an image-process backend which is running with 3 live replicas. Those replicas are fungible—frontends do not care which backend they use. While the actual pods that comprise the set may change, the frontend client(s) do not need to know that. The service abstraction enables this decoupling.
 
-### How do they work?
+### How do they work?——基于iptables实现
+
+Service 是由 kube-proxy 组件，加上 iptables 来共同实现的。
 
 Every node in a Kubernetes cluster runs a kube-proxy. **This application watches the Kubernetes master for the addition and removal of Service and Endpoints objects. For each Service it opens a port (random) on the local node. Any connections made to that port will be proxied to one of the corresponding backend Pods.（这句非常关键）** Which backend to use is decided based on the AffinityPolicy of the Service. Lastly, it installs iptables rules which capture traffic to the Service's Port on the Service's portal IP and redirects that traffic to the previously described port.
 
@@ -76,7 +83,8 @@ Kubernetes内部如何访问这个Pod对应的Service？
     
 
 可以看到，一些相关信息都会被记录到etcd中。
-    
+
+Service 的 VIP 只是一条 iptables 规则上的配置，并没有真正的网络设备，所以你 ping 这个地址，是不会有任何响应的。
 
 A service, through its label selector(a key:value pair), can resolve to 0 or more pods. Over the life of a service, the set of pods which comprise that service can grow, shrink, or turn over completely. Clients will only see issues if they are actively using a backend when that backend is removed from the service (and even then, open connections will persist for some protocols).
 
@@ -220,4 +228,3 @@ service configure文件中有一个`PublicIPs`属性
     
 在这里`192.168.56.102`和`192.168.56.103`是k8s集群从节点的ip（**主节点ip不行**）。这样，我们就可以通过`192.168.56.102:8765`和`192.168.56.102:8765`来访问这个service了。其好处是，kube-proxy为我们映射的端口是确定的。
 
-![](/public/upload/kubernetes/kubernetes_service_access.png)
