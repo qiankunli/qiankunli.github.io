@@ -10,6 +10,12 @@ keywords: linux命令
 
 ## 简介（持续更新）
 
+## yum 升级回退
+
+[在RHEL/CentOS系统上使用YUM history命令回滚升级操作](http://os.51cto.com/art/201801/563966.htm)
+
+	yum history undo 13
+
 ## 找到第一次报错的位置 并显示前后几行
 
 	grep ERROR  xxx.log -m 1 -A 10

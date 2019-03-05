@@ -214,6 +214,8 @@ apt 方式
 		
 ## marathon
 
+[Install Marathon](http://192.168.60.8:8080/ui/#/apps/%2Fdeploy-to-docker-openapi-smart-device-auth-test)
+
 ### 安装marathon
 
 	apt-get install marathon
@@ -222,7 +224,7 @@ apt 方式
 
 marathon 配置参数的方式与mesos 基本相同
 
-配置目录为 `/etc/marathon/conf`（需要手动创建），此外默认配置文件在 `/etc/default/marathon`。
+对于一些系统来说，配置目录为 `/etc/marathon/conf`（需要手动创建），此外默认配置文件在 `/etc/default/marathon`。
 
 	mkdir -p /etc/marathon/conf
 	cp /etc/mesos/zk /etc/marathon/conf/master
@@ -230,6 +232,10 @@ marathon 配置参数的方式与mesos 基本相同
 创建 `/etc/marathon/conf/zk` 文件，内容为
 
 	zk://192.168.56.101:2181,192.168.56.102:2181,192.168.56.103:2181/marathon
+
+对于marathon 来说，有一些参数是必配的[Marathon Command-Line Flags](https://mesosphere.github.io/marathon/docs/command-line-flags.html)
+
+注意：**marathon 每次升级都会改动一些东西，未经过完整测试，请不要轻易升级**。
 
 ## 启动容器
 
