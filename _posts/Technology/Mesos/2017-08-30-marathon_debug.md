@@ -110,15 +110,6 @@ mesos kill task（执行失败，还在找原因）
  
 	curl -XPOST  -H "Content-Type:application/json" -d '{"ids":["docker-war-demo2.06c168dc-01bf-11e8-bcd1-2a0c412ba8a6"]}' http://192.168.60.8:8080/v2/tasks/delete
 	
-## CPU Resources in Docker, Mesos and Marathon
-
-[CPU Resources in Docker, Mesos and Marathon](https://zcox.wordpress.com/2014/09/17/cpu-resources-in-docker-mesos-and-marathon/) 几个要点（假设物理机有8个核心）
-
-1. 即便marathon cpus 配置为0.1 ，容器依然可以访问物理机所有的8个核心，即cpus和物理机核心没有对应关系
-2. mesos convert the cpus value into a value for Docker’s `--cpu-shares` setting,which according to the Docker documentation is just a **priority weight** for that process relative to all others on the machine. An application run with cpus=2 should receive twice the priority as one using cpus=1.
-3.  This is another effect that the cpus parameter has: it specifies the CPU capacity used up by the application.Maybe cpu-capacity or cpu-weight would be more descriptive
-4. 因为cpus 还作为CPU capacity 的描述载体，它以cpu 核心数作为上限。你如何配置marathon app 的cpus，完全取决于你打算让一个机器跑多少app，以及它相对其它app的重要性。 
-
 ## 反例操作
 
 marathon 显示一个 task 是unhealthy，但对应物理机docker 容器及mesos 进程都找不到，笔者的土方法是：到marathon的zk上删除对应app的数据，然后restart marathon。然后有一次公司停电，unhealthy 的任务太多，笔者干脆zk 操作`rmr /marathon`，然后所有的任务都不见了。后来没办法，根据zk snapshot恢复的zk。
