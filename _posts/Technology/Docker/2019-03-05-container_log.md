@@ -126,4 +126,6 @@ docker 启用user namesapce（此处只是普及，不推荐使用）
 
 为提高系统友好性，在删除项目日志后 应向负责人发一个消息提醒。
 
+docker 还可以限制磁盘的读写速度 [限制容器的 Block IO - 每天5分钟玩转 Docker 容器技术（29）](https://www.ibm.com/developerworks/community/blogs/132cfa78-44b0-4376-85d0-d3096cd30d3f/entry/%E9%99%90%E5%88%B6%E5%AE%B9%E5%99%A8%E7%9A%84_Block_IO_%E6%AF%8F%E5%A4%A95%E5%88%86%E9%92%9F%E7%8E%A9%E8%BD%AC_Docker_%E5%AE%B9%E5%99%A8%E6%8A%80%E6%9C%AF_29?lang=en)
+
 
