@@ -93,7 +93,7 @@ Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事
 
 The informer creates a local cache of a set of resources only used by itself.But, in Kubernetes, there is a bundle of controllers running and caring about multiple kinds of resources. This means that there will be an overlap - one resource is being cared by more than one controller. 但一个Controller 一个informer 引起了巨大的浪费：信息重复；api server 负载/连接数提高；序列化反序列化成本。
 
-SharedInformer，因为SharedInformer 是共享的，所以其Resource Event Handler 也就没什么业务逻辑，Whenever a resource changes, the Resource Event Handler puts a key to the Workqueue. 
+SharedInformer，因为SharedInformer 是共享的，所以其Resource Event Handler 也就没什么业务逻辑，Whenever a resource changes, the Resource Event Handler puts a key to the Workqueue.  这个Workqueue 支持优先级等高级特性
 
 控制器的关键分别是informer/SharedInformer和Workqueue，前者观察kubernetes对象当前的状态变化并发送事件到workqueue，然后这些事件会被worker们从上到下依次处理。
 

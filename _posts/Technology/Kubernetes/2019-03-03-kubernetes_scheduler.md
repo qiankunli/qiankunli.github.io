@@ -45,7 +45,7 @@ limit 不设定，默认值由 LimitRange object确定
 
 DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 DaemonSet 的 PPod 被回收，它又会立即在原宿主机上被重建出来，这就使得前面资源回收的动作，完全没有意义了。
 
-## 理念
+## 实现
 
 在 Kubernetes 项目中，默认调度器的主要职责，就是为一个新创建出来的 Pod，寻找一个最合适的节点（Node）而这里“最合适”的含义，包括两层： 
 
@@ -65,7 +65,64 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 调度这个事情，在不同的公司和团队里的实际需求一定是大相径庭的。上游社区不可能提供一个大而全的方案出来。所以，将默认调度器插件化是 kube-scheduler 的演进方向。
 
-## 和yarn/mesos 等调度器对比
+## 算法
+
+### Predicate
+
+1. GeneralPredicates
+	1. PodFitsResources，检查的只是 Pod 的 requests 字段
+	2. PodFitsHost，宿主机的名字是否跟 Pod 的 spec.nodeName 一致。
+	3. PodFitsHostPorts，Pod 申请的宿主机端口（spec.nodePort）是不是跟已经被使用的端口有冲突。
+	4. PodMatchNodeSelector，Pod 的 nodeSelector 或者 nodeAffinity 指定的节点，是否与待考察节点匹配
+
+2. 与 Volume 相关的过滤规则
+3. 是宿主机相关的过滤规则
+4. Pod 相关的过滤规则。比较特殊的，是 PodAffinityPredicate。这个规则的作用，是检查待调度 Pod 与 Node 上的已有 Pod 之间的亲密（affinity）和反亲密（anti-affinity）关系
+
+在具体执行的时候， 当开始调度一个 Pod 时，Kubernetes 调度器会同时启动 16 个 Goroutine，来并发地为集群里的所有 Node 计算 Predicates，最后返回可以运行这个 Pod 的宿主机列表。
+
+### Priorities
+
+在 Predicates 阶段完成了节点的“过滤”之后，Priorities 阶段的工作就是为这些节点打分。这里打分的范围是 0-10 分，得分最高的节点就是最后被 Pod 绑定的最佳节点。
+
+1. LeastRequestedPriority + BalancedResourceAllocation
+
+	1. LeastRequestedPriority计算方法`score = (cpu((capacity-sum(requested))10/capacity) + memory((capacity-sum(requested))10/capacity))/2` 实际上就是在选择空闲资源（CPU 和 Memory）最多的物理机
+	2. BalancedResourceAllocation，计算方法`score = 10 - variance(cpuFraction,memoryFraction,volumeFraction)*10` 每种资源的 Fraction 的定义是 ：Pod 请求的资源/ 节点上的可用资源。而 variance 算法的作用，则是资源 Fraction 差距最小的节点。BalancedResourceAllocation 选择的，其实是调度完成后，所有节点里各种资源分配最均衡的那个节点，从而避免一个节点上 CPU 被大量分配、而 Memory 大量剩余的情况。
+2. NodeAffinityPriority
+2. TaintTolerationPriority
+3. InterPodAffinityPriority
+4. ImageLocalityPriority
+
+## 优先级和抢占
+
+优先级和抢占机制，解决的是 （高优先级的）Pod 调度失败时该怎么办的问题
+
+	apiVersion: v1
+	kind: Pod
+	metadata:
+	name: nginx
+	labels:
+		env: test
+	spec:
+	containers:
+	- name: nginx
+		image: nginx
+		imagePullPolicy: IfNotPresent
+	priorityClassName: high-priority
 
 
+Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的 PriorityClass。当这个 Pod 被提交给 Kubernetes 之后，Kubernetes 的 PriorityAdmissionController 就会自动将这个 Pod 的 spec.priority 字段设置为 PriorityClass 对应的value 值。
 
+如果确定抢占可以发生，那么调度器就会把自己缓存的所有节点信息复制一份，然后使用这个副本来模拟抢占过程。
+
+1. 找到牺牲者，判断抢占者是否可以部署在牺牲者所在的Node上
+2. 真正开始抢占
+
+	1. 调度器会检查牺牲者列表，清理这些 Pod 所携带的 nominatedNodeName 字段。
+	2. 调度器会把抢占者的 nominatedNodeName，设置为被抢占的 Node 的名字。
+	3. 调度器会开启一个 Goroutine，同步地删除牺牲者。
+3. 调度器就会通过正常的调度流程把抢占者调度成功
+
+
+## 和yarn/mesos 等调度器对比（未完成）
