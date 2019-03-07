@@ -17,14 +17,7 @@ keywords: jib
 
 最近碰到一个问题，部分项目在容器疯狂打日志，把磁盘都弄满了，弄满的原因有以下两个
 
-1. 日志写到了stdout 下 [JSON File logging driver](https://docs.docker.com/config/containers/logging/json-file/) By default, Docker captures the standard output (and standard error) of all your containers, and writes them in files using the JSON format. 这部分因为不太重要，因此可以限定一个较小的大小
-
-    * 改动`/etc/docker/daemon.json`
-    * 启动容器时 明确指定 `docker run --log-driver json-file --log-opt max-size=10m alpine echo hello world` 甚至可以 log-driver=none
-
-    这部分文件过大，带来的另一个问题是，删除容器时 json-file 所在的`/var/lib/docker/containers/$ContainerId/xx-json.log` 依然残留在物理机磁盘上，成为耗尽磁盘的定时炸弹
-    * 使用定时任务每天执行`docker system prune -af`
-    
+1. 日志写到了stdout下，详情见下文 
 2. 日志写到某个文件下，日志数量本身就很大
 
 针对日志文件过大的问题，有几种方法
@@ -33,6 +26,30 @@ keywords: jib
 2. 疏，以特定用户运行项目，该容器内用户只可以访问特定的文件夹，比如/logs，然后将容器/logs 映射到物理机上，定时清理
 3. 监控，随时监控磁盘，异常时报警
 4. 日志由日志采集工具收集，不在磁盘上停留
+
+## stdout log
+
+[JSON File logging driver](https://docs.docker.com/config/containers/logging/json-file/) By default, Docker captures the standard output (and standard error) of all your containers, and writes them in files using the JSON format. 对于一个容器来说，当应用把日志输出到 stdout 和 stderr 之后，容器项目在默认情况下就会把这些日志输出到宿主机上的一个 JSON 文件里。
+
+[「Allen 谈 Docker 系列」之 docker logs 实现剖析](http://blog.daocloud.io/allen_docker01/)
+
+对于应用的标准输出(stdout)日志，Docker Daemon 在运行这个容器时就会创建一个协程(goroutine)，负责标准输出日志。由于此 goroutine 绑定了整个容器内所有进程的标准输出文件描述符，因此容器内应用的所有标准输出日志，都会被 goroutine 接收。goroutine 接收到容器的标准输出内容时，立即将这部分内容，写入与此容器—对应的日志文件中，日志文件位于`/var/lib/docker/containers/<container_id>`，文件名为<container_id>-json.log。
+
+![](/public/upload/docker/docker_log.png)
+
+Docker 则通过 docker logs 命令向用户提供日志接口。`docker logs` 实现原理的本质均基于与容器一一对应的 <container-id>-json.log，`kubectl logs`类似
+
+从这可以看到几个问题
+
+1. app 同时输出文件日志和stdout 是一种浪费
+2. stdout 日志在 `/var/lib/docker/containers/<container_id>` 下可以被清理， 也可以配置 docker daemon 设置 log-driver 和 log-opts 参数
+
+		 "log-driver":"json-file",
+	  	 "log-opts": {"max-size":"500m", "max-file":"3"}
+	  	 
+3. 这部分文件过大，带来的另一个问题是，删除容器时 json-file 所在的`/var/lib/docker/containers/$ContainerId/xx-json.log` 依然残留在物理机磁盘上，成为耗尽磁盘的定时炸弹
+4. 使用定时任务每天执行`docker system prune -af`
+
 
 ## 堵
 

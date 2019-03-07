@@ -13,28 +13,7 @@ keywords: kuberneteslog
 * TOC
 {:toc}
 
-## docker 日志
 
-对于一个容器来说，当应用把日志输出到 stdout 和 stderr 之后，容器项目在默认情况下就会把这些日志输出到宿主机上的一个 JSON 文件里
-
-[「Allen 谈 Docker 系列」之 docker logs 实现剖析](http://blog.daocloud.io/allen_docker01/)
-
-对于应用的标准输出(stdout)日志，Docker Daemon 在运行这个容器时就会创建一个协程(goroutine)，负责标准输出日志。由于此 goroutine 绑定了整个容器内所有进程的标准输出文件描述符，因此容器内应用的所有标准输出日志，都会被 goroutine 接收。goroutine 接收到容器的标准输出内容时，立即将这部分内容，写入与此容器—对应的日志文件中，日志文件位于`/var/lib/docker/containers/<container_id>`，文件名为<container_id>-json.log。
-
-![](/public/upload/docker/docker_log.png)
-
-Docker 则通过 docker logs 命令向用户提供日志接口。`docker logs` 实现原理的本质均基于与容器一一对应的 <container-id>-json.log，`kubectl logs`类似
-
-从这可以看到几个问题
-
-1. app 同时输出文件日志和stdout 是一种浪费
-2. stdout 日志在 `/var/lib/docker/containers/<container_id>` 下可以被清理， 也可以配置 docker daemon 设置 log-driver 和 log-opts 参数
-
-		 "log-driver":"json-file",
-	  	 "log-opts": {"max-size":"500m", "max-file":"3"}
-	  	 
-3. 将日志输出到stdout 貌似是容器环境下的方案，这与物理机时代非常不同
-4. 你如何限定开发小伙伴不向文件写日志? 限定写文件权限
 
 ## kubernetes 日志
 
