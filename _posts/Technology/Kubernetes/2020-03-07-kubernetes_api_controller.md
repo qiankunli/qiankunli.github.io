@@ -8,17 +8,12 @@ keywords: kubernetes scheduler
 
 ---
 
-## 简介（持续更新）
+## 简介
 
 * TOC
 {:toc}
 
 ## 一种新的模型
-
-[A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html)
-
-[Kubewatch, An Example Of Kubernetes Custom Controller](https://engineering.bitnami.com/articles/kubewatch-an-example-of-kubernetes-custom-controller.html)
-
 
 [Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)
 
@@ -30,12 +25,11 @@ keywords: kubernetes scheduler
 
 ![](/public/upload/kubernetes/kubernetes_object.png)
 
-
 ## 控制器模型
 
 [kube-controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/) **In applications of robotics and automation, a control loop is a non-terminating loop that regulates the state of the system**（在自动化行业是常见方式）. In Kubernetes, a controller is a control loop that watches the shared state of the cluster through the API server and makes changes attempting to move the current state towards the desired state. Examples of controllers that ship with Kubernetes today are the replication controller, endpoints controller, namespace controller, and serviceaccounts controller.
 
-docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就在在集群里给镜像找一个主机来运行容器。经过 [《深入剖析kubernetes》笔记](http://qiankunli.github.io/2018/08/26/parse_kubernetes_note.html)的学习，很明显不是这样。比调度更重要的是编排，那么编排如何实现呢？
+docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就在在集群里给镜像找一个主机来运行容器。经过 [《深入剖析kubernetes》笔记](http://qiankunli.github.io/2018/08/26/parse_kubernetes_note.html)的学习，很明显不是这样。比调度更重要的是编排，那么编排如何实现呢？控制器
 
 ### 有什么
 
@@ -67,8 +61,7 @@ controller是一系列控制器的集合，不单指RC。
 
 实际状态往往来自于 Kubernetes 集群本身。 比如，**kubelet 通过心跳汇报的容器状态和节点状态**，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。而期望状态，一般来自于用户提交的 YAML 文件。 比如，Deployment 对象中 Replicas 字段的值，这些信息往往都保存在 Etcd 中。
 
-
-![](/public/upload/kubernetes/k8s_deployment.PNG)
+![](/public/upload/kubernetes/k8s_controller_definition.PNG)
 
 Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事件驱动”，有点类似 select和epoll的区别。控制器模型更有利于幂等。
 
@@ -78,13 +71,34 @@ Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事
 ### 实现
 
 [通过自定义资源扩展Kubernetes](https://blog.gmem.cc/extend-kubernetes-with-custom-resources)
-![](/public/upload/kubernetes/kubernete_controller_pattern.png)
+
+[A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html) 
+
+控制器与api server的关系，从拉取到监听：In order to retrieve an object's information, the controller sends a request to Kubernetes API server.However, repeatedly retrieving information from the API server can become expensive. Thus, in order to get and list objects multiple times in code, Kubernetes developers end up using cache which has already been provided by the client-go library. Additionally, the controller doesn't really want to send requests continuously. It only cares about events when the object has been created, modified or deleted. 
+
+起初是一个controller 一个informer，informer 由两个部分组成
+
+1. Listwatcher is a combination of a list function and a watch function for a specific resource in a specific namespace. 
+2. Resource Event Handler is where the controller handles notifications for changes on a particular resource
+
+		type ResourceEventHandlerFuncs struct {
+			AddFunc    func(obj interface{})
+			UpdateFunc func(oldObj, newObj interface{})
+			DeleteFunc func(obj interface{})
+		}
+
+The informer creates a local cache of a set of resources only used by itself.But, in Kubernetes, there is a bundle of controllers running and caring about multiple kinds of resources. This means that there will be an overlap - one resource is being cared by more than one controller. 但一个Controller 一个informer 引起了巨大的浪费：信息重复；api server 负载/连接数提高；序列化反序列化成本。
+
+SharedInformer，因为SharedInformer 是共享的，所以其Resource Event Handler 也就没什么业务逻辑，Whenever a resource changes, the Resource Event Handler puts a key to the Workqueue. 
 
 控制器的关键分别是informer/SharedInformer和Workqueue，前者观察kubernetes对象当前的状态变化并发送事件到workqueue，然后这些事件会被worker们从上到下依次处理。
 
-其它相关文章[A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html) 
+![](/public/upload/kubernetes/kubernete_controller_pattern.png)
+
+
+## 自定义Controller（未完成）
+
 [Kubewatch, An Example Of Kubernetes Custom Controller](https://engineering.bitnami.com/articles/kubewatch-an-example-of-kubernetes-custom-controller.html)
 
-一位大牛的整理
 
-![](/public/upload/kubernetes/kubernetes_impl.jpg)
+

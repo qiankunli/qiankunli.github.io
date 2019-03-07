@@ -74,3 +74,9 @@ Every cluster has a single master instance. The master provides a unified view i
 ### Nodes
 
 A cluster can have one or more node instances. These are managed from the master, and run the services necessary to support Docker containers. Each node runs the Docker runtime and hosts a Kubelet agent（管理docker runtime）, which manages the Docker containers scheduled on the host. Each node also runs a simple network proxy（网络代理程序）.
+
+## 组件协作
+
+一位大牛的整理
+
+![](/public/upload/kubernetes/kubernetes_impl.jpg)
