@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: Kubernetes源码分析——scheduler
+title: Kubernetes scheduler
 category: 技术
 tags: Kubernetes
-keywords: kubernetes 源码分析
+keywords: kubernetes scheduler
 
 ---
 
@@ -47,7 +47,6 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 ## 理念
 
-
 在 Kubernetes 项目中，默认调度器的主要职责，就是为一个新创建出来的 Pod，寻找一个最合适的节点（Node）而这里“最合适”的含义，包括两层： 
 
 1. 从集群所有的节点中，根据调度算法挑选出所有可以运行该 Pod 的节点；
@@ -59,9 +58,14 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 **调度器对一个 Pod 调度成功，实际上就是将它的 spec.nodeName 字段填上调度结果的节点名字**。 这在k8s 的很多地方都要体现，k8s 不仅将对容器的操作“标准化” ==> “配置化”，一些配置是用户决定的，另一个些是系统决定的
 
+调度主要包括两个部分
 
-## 未读
+1. 组件交互，包括如何与api server交互感知pod 变化，如何感知node 节点的cpu、内存等参数。PS：任何调度系统都有这个问题。
+2. 调度算法，上文的Predicate和Priority 算法
 
-informer [A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html)
+调度这个事情，在不同的公司和团队里的实际需求一定是大相径庭的。上游社区不可能提供一个大而全的方案出来。所以，将默认调度器插件化是 kube-scheduler 的演进方向。
 
-[Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)
+## 和yarn/mesos 等调度器对比
+
+
+
