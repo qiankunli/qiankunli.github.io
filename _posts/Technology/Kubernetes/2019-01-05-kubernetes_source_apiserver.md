@@ -263,6 +263,9 @@ pod2 资源类型在服务器端的注册的工作，APIServer 会自动帮我�
 
 1. 修改kubenetes的源码，显然难度比较高，也不太合适
 2. 创建自定义API server并聚合到API中 Aggregated APIs are subordinate APIServers that sit behind the primary API server, which acts as a proxy. 
+
+	![](/public/upload/kubernetes/kubernetes_aggregator.png)
+
 3. 1.7以下版本编写TPR，kubernetes1.7及以上版本用CRD
 
 使用CRD 有如下优势
