@@ -92,6 +92,8 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 
 ![](/public/upload/scala/kafka_index_file.jpg)
 
+以索引文件中的3，205为例，在数据文件中表示第3个message（在全局partition表示第314个message），以及该消息的物理偏移地址为205。
+
 ## 多机——基于zk协作的两种方式
 
 在kafka中，broker、分区、副本状态等 作为集群状态信息，一旦发生改变，都会需要集群的broker作出反应，那么broker 之间如何协同呢？
