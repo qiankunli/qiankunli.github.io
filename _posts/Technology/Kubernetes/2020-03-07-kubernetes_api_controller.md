@@ -104,5 +104,38 @@ SharedInformer，因为SharedInformer 是共享的，所以其Resource Event Han
 
 [Kubewatch, An Example Of Kubernetes Custom Controller](https://engineering.bitnami.com/articles/kubewatch-an-example-of-kubernetes-custom-controller.html)
 
+参见 [Kubernetes源码分析——apiserver](http://qiankunli.github.io/2019/01/05/kubernetes_source_apiserver.html)
 
+## 另一种扩展——operator
+
+[Kubernetes Controller vs Kubernetes Operator?](https://stackoverflow.com/questions/47848258/kubernetes-controller-vs-kubernetes-operator)
+
+The list of controller in the Control-plane，比如
+
+1. Deployment
+2. ReplicaSet
+3. StatefulSet
+4. DaemonSet
+
+From the Google Search, I found out that there are K8s Operators such as
+
+1. etcd Operator
+2. Prometheus Operator
+3. kong Operators
+
+
+All Operators use the controller pattern, but not all controllers are Operators. It's only an Operator if it's got: controller pattern + API extension + single-app focus.
+
+Operator is a customized controller implement with CRD. It follow the same pattern with build-in controllers (i.e. watch, diff, action).
+
+
+作者 believe the term "kubernetes operator" was introduced by [the CoreOS people](https://coreos.com/operators/) here
+
+	An Operator is a method of packaging, deploying and managing a Kubernetes application. A Kubernetes application is an application that is both deployed on Kubernetes and managed using the Kubernetes APIs and kubectl tooling.
+
+	An Operator is an application-specific controller that extends the Kubernetes API to create, configure and manage instances of complex stateful applications on behalf of a Kubernetes user. It builds upon the basic Kubernetes resource and controller concepts, but also includes domain or application-specific knowledge to automate common tasks better managed by computers.
+
+So basically, a kubernetes operator is the name of a pattern that consists of a kubernetes controller that adds new objects to the Kubernetes API, in order to configure and manage an application, such as Prometheus or etcd. 为应用kubernetes 化而生的。
+
+In one sentence: An operator is a domain specific controller.
 
