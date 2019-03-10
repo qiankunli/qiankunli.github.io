@@ -133,6 +133,9 @@ init 函数 初始化了一个全局变量 `legacyscheme.Scheme`
 
 CreateServerChain 方法内 调用的CreateKubeAPIServerConfig 方法用到了 `legacyscheme.Scheme`
 
+## Admission Controller
+
+准入控制器是kubernetes 的API Server上的一个链式Filter，它根据一定的规则决定是否允许当前的请求生效，并且有可能会改写资源声明。
 
 ## 如何扩展api server——CRD
 
