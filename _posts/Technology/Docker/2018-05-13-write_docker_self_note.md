@@ -38,6 +38,8 @@ initComand 启动后挂载文件系统，从管道中读取用户输入的comman
 
 ## 镜像的来龙去脉
 
+### 镜像是一个压缩后的文件夹
+
 1. 通过namespace，可以让容器工作在一个隔离的环境中。但用户输入的command 比如`/bin/sh` 仍然是宿主机上的可执行文件。（注意，此时只是新的mnt namespace，还没有change root）
 2. 下载busybox 镜像，将其解压至目录`/root/busybox`，会看到内容为
 
@@ -54,9 +56,15 @@ initComand 启动后挂载文件系统，从管道中读取用户输入的comman
 		tmp
 		...
 		
+### changeroot
+
+2019.3.13 补充：Mount Namespace 修改的，是容器进程对文件系统“挂载点”的认知。但是，这也就意味着，只有在“挂载”这个操作发生之后，进程的视图才会被改变。而在此之前，新创建的容器会直接继承宿主机的各个挂载点。
 		
 3. 启动带有namespace 隔离的进程，并将`/root/busybox` 作为其根目录。那么该进程运行的 可执行文件 便来自 `/root/busybox` 这片小天地了。
 4. 将`/root/busybox` 作为进程根目录之后，`mount -t proc proc /proc`  `mount -t tmpfs dev /dev`，**proc 和 dev 都是临时数据，busybox 提供不了（或无需提供）**。此时，跟一个容器就很像了：进程隔离，资源限制，所有的数据文件被限制在`/root/busybox `下。学名叫：一个有镜像的环境。此时，可以用centos 的内核跑出ubuntu的感觉。
+
+### 联合挂载——不想让进程直接操作镜像文件
+
 5. 但是，`/root/busybox` 中的数据 都是busybox 镜像文件的内容，进程的运行会更改这些镜像文件。所以，aufs 终于可以登场了。学名叫：容器和镜像隔离。
 6. 镜像文件夹 `/root/busybox`，别名readOnlyLayer. 另创建一个`/root/writeLayer` 作为writeLayer. 通过`mount -t aufs -o dirs=/root/busybox:/root/writeLayer none /root/mnt` 挂到 `/root/mnt` 并将其作为 进程的根目录。 进程退出时，卸载`/root/mnt`,删除`/root/writeLayer`，`/root/busybox` 独善其身。所谓的layer 就是一个个文件夹，不管是提供操作系统文件还是单纯提供一个挂载点，在root namespace 看是平级关系，在容器 namespace 看是有层次关系。
 
@@ -67,11 +75,7 @@ initComand 启动后挂载文件系统，从管道中读取用户输入的comman
 
 上述 过程 阐述了**二层模式的镜像分层存储**的原理， 虽然不是docker的最终形态，但非常直观的将 namespace、cgroup、aufs 等技术与docker 关联在了一起。
 
-这里有两个事儿：
-
-* 将一个操作系统文件目录作为容器的根；**所谓容器镜像，也称为一个容器的rootfs，在root mount namespace 看来就是一个文件夹，网络传输形态是一个压缩文件。** 
-* 联合挂载以将镜像分层
-
+**mount namespace 虽然很重要，但隔离本身并不能让容器工作，解压镜像、挂载/proc、专门的读写层、挂载volume 这系列技术的组合运用才是 关键**。
 
 ## 几个问题
 
