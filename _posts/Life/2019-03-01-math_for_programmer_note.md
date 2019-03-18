@@ -30,6 +30,8 @@ keywords: math
 
 数学 ==> 人造  ==> 工具  ==> 发明工具的初衷 ==> 透过现象看本质（相同问题的不同方法，不同问题的相同方法） ==> 融会贯通
 
+[为什么需要反码和补码](http://qiankunli.github.io/2018/01/07/hardware_software.html)
+
 ## 学什么？
 
 ![](/public/upload/life/math_for_programmer_1.jpg)
@@ -45,7 +47,6 @@ keywords: math
 
 
 假设有四种面额的钱币，1 元、2 元、5 元和 10 元，要找零给顾客10元，有多少种方式？
-
 
 ![](/public/upload/algorithm/iteration.jpg)
 
