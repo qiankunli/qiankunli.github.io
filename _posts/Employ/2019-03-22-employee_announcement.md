@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 招聘帖
+title: 喜马拉雅FM招聘帖
 category: 招聘
 tags: Employ
 keywords: Product thinking
