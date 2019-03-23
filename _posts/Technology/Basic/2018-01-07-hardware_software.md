@@ -129,4 +129,4 @@ Approximate timing for various operations on a typical PC:
 |fetch from new disk location (seek)|	8,000,000 nanosec|
 |read 1MB sequentially from disk	|20,000,000 nanosec|
 |send packet US to Europe and back	|150 milliseconds = 150,000,000 nanosec|
-
+|上下文切换|数千个CPU时钟周期，1微秒|
