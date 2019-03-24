@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes找感觉
+title: Kubernetes作用及整体结构
 category: 技术
 tags: Kubernetes
 keywords: kubernetes 
@@ -75,8 +75,21 @@ Every cluster has a single master instance. The master provides a unified view i
 
 A cluster can have one or more node instances. These are managed from the master, and run the services necessary to support Docker containers. Each node runs the Docker runtime and hosts a Kubelet agent（管理docker runtime）, which manages the Docker containers scheduled on the host. Each node also runs a simple network proxy（网络代理程序）.
 
-## 组件协作
+## 整体结构
 
-一位大牛的整理
+[Kubernetes架构为什么是这样的？](https://mp.weixin.qq.com/s/ps34qFlEzQNYbp6ughkrOA)
+
+![](/public/upload/kubernetes/k8s_framework.PNG)
+
+调整后的架构图
+
+![](/public/upload/kubernetes/k8s_framework_refactor.PNG)
+
+1. etcd，各个组件通信都并不是互相调用 API 来完成的，而是把状态写入 ETCD（相当于写入一个消息），其他组件通过监听 ETCD 的状态的的变化（相当于订阅消息），然后做后续的处理，然后再一次把更新的数据写入 ETCD。
+2. api server，各个组件并不是直接访问 ETCD，而是访问一个代理，这个代理是通过标准的RESTFul API，重新封装了对 ETCD 接口调用，除此之外，这个代理还实现了一些附加功能，比如身份的认证、缓存等
+3. Controller Manager 是实现任务调度的
+4. Scheduler 是用来做资源调度的
+
+### 一位大牛的整理
 
 ![](/public/upload/kubernetes/kubernetes_impl.jpg)

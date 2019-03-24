@@ -16,8 +16,6 @@ keywords: functional programming patterns
 
 对应的，函数式编程时知道“一切皆函数”的意义也很有限，应用函数式编程的一个重要立足点就是：函数式编程中的设计模式。 
 
-
-
 ## Functional Programming Design Patterns
 
 本小节膝盖给 ScottWlaschin 大神，其slide 有一幅图[Functional Programming Patterns (NDC London 2014)](https://www.slideshare.net/ScottWlaschin/fp-patterns-ndc-london2014) 其在youtube 有对应的演讲。
