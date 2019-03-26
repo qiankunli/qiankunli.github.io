@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes scheduler
+title: Kubernetes资源调度-scheduler
 category: 技术
 tags: Kubernetes
 keywords: kubernetes scheduler
