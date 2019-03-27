@@ -29,6 +29,8 @@ reactor pattern 理念 参见 [Understanding Reactor Pattern: Thread-Based and E
 5. This pattern decouples modular application-level code from reusable reactor implementation.
 6. The purpose of the Reactor design pattern is to avoid the common problem of creating a thread for each message/request/connection.Avoid this problem is to avoid the famous and known problem C10K.
 
+《反应式设计模式》 基于事件的系统通常建立在一个事件循环上。任何时刻只要发生了事情， 对应的事件就会被追加到一个队列中。事件循环持续的从队列中拉取事件，并执行绑定在事件上的回调函数。每一个回调函数通常都是一段微小的、匿名的、响应特定事件（例如鼠标点击）的过程。回调函数也可能产生新事件，这些事件随后也会被追加到队列里面等待处理。
+
 个人微信订阅号
 
 ![](/public/upload/qrcode_for_gh.jpg)
