@@ -130,3 +130,12 @@ Approximate timing for various operations on a typical PC:
 |read 1MB sequentially from disk	|20,000,000 nanosec|
 |send packet US to Europe and back	|150 milliseconds = 150,000,000 nanosec|
 |上下文切换|数千个CPU时钟周期，1微秒|
+
+## 单核CPU技术瓶颈 ==> CPU 向多核发展 ==> 多台服务器
+
+2019.3.28 补充
+
+1. 语言层面，golang协程、java9 支持反应式等
+2. 架构层面，全异步化、反应式架构、分布式计算
+
+通过语言层、框架层提出新的模型，引导写出并行度高的代码

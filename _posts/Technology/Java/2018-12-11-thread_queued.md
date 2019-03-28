@@ -34,7 +34,11 @@ keywords: groovy
 
 ## 传统队列
 
+[Lock-Free Queue](http://qiankunli.github.io/2018/10/15/lock_free.html)
+
 ## AQS 的排队方式
+
+[AQS4——论文学习](http://qiankunli.github.io/2018/06/05/aqs3.html)
 
 [JUC lock - AQS - CLH queue](https://programmer.help/blogs/04.juc-lock-aqs-clh-queue.html)
 
@@ -42,9 +46,9 @@ keywords: groovy
 
 ## 其它
 
-[全面异步化：淘宝反应式架构升级探索](https://www.infoq.cn/article/2upHTmd0pOEUNmhY5-Ay) 消息驱动强调无阻塞、无 callback，所以不会有线程挂在那里，不会有持续的资源消耗。同时，事件驱动或消息驱动都是异步化，而**异步化会将操作系统中的队列情况显式地提升到了应用层**，使得应用层可以显式根据队列的情况来进行压力负载的感知
+[全面异步化：淘宝反应式架构升级探索](https://www.infoq.cn/article/2upHTmd0pOEUNmhY5-Ay) 消息驱动强调无阻塞、无 callback，所以不会有线程挂在那里，不会有持续的资源消耗。同时，事件驱动或消息驱动都是异步化，而**异步化会将操作系统中的队列情况显式地提升到了应用层**，使得应用层可以显式根据队列的情况来进行压力负载的感知。
 
-操作系统的内存分配、进程/线程调度、队列等显式到应用层，看起来是一个趋势。
+操作系统的内存分配、进程/线程调度、队列等显式到应用层，看起来是一个趋势。这样，应用层线程一直是（尽量）跑满的，os 单纯的根据时间片切换线程即可。
 
 笔者个人微信订阅号
 
