@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes作用及整体结构
+title: Kubernetes整体结构
 category: 技术
 tags: Kubernetes
 keywords: kubernetes 
@@ -22,9 +22,7 @@ keywords: kubernetes
 
 [解读2018：我们处在一个什么样的技术浪潮当中？](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651011968&idx=1&sn=3d500660f7dd47c9fa4033bd9fa69c2f&chksm=bdbec3d38ac94ac523355e1e21f04af71e47a0841d1af0afedecc528b5eb4a5f9fe83f105a11&mpshare=1&scene=1&srcid=12217gWDeJ0aPl8BVBUycQyh#rd)Kubernetes 还是太底层了，真正的云计算并不应该是向用户提供的 Kubernetes 集群。2014 年 AWS 推出 Lambda 服务，Serverless 开始成为热词。从理论上说，Serverless 可以做到 NoOps、自动扩容和按使用付费，也被视为云计算的未来。Serverless 是我们过去 25 年来在 SaaS 中走的最后一步，因为我们已经渐渐将越来越多的职责交给了服务提供商。——Joe Emison 《为什么 Serverless 比其他软件开发方法更具优势》
 
-## Container-networking-docker-kubernetes 对orchestrator 职能的描述
-
-container orchestrator
+### 赢在orchestrator
 
 一般orchestrator 包括但不限于以下功能：
 
@@ -42,7 +40,7 @@ The unit of scheduling in Kubernetes is a pod. Essentially, this is a tightly co
 
 Kubernetes is highly extensible, from defining new workloads and resource types in general to customizing its user-facing parts, such as the CLI tool kubectl (pronounced cube cuddle).
 
-## Julia Evans 系列
+### Julia Evans 系列
 
 [Reasons Kubernetes is cool](https://jvns.ca/blog/2017/10/05/reasons-kubernetes-is-cool/)
 
@@ -50,7 +48,7 @@ once you have a working Kubernetes cluster you really can set up a production HT
 
 这个事情在商业上是类似，最开始都是先垂直发展，然后面横向打通。你搞电商，我搞外卖，但到最后发现物流、资金流、云计算可以打通。
 
-##  Container Engine cluster
+###  Container Engine cluster
 
 本小节主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs)的摘抄，有删减。
 
@@ -60,9 +58,8 @@ A Container Engine cluster is a group of Compute Engine instances running Kubern
 
 一个Container Engine cluster主要包含一个master和多个slave节点，它是上层的pod、service、replication controllers的基础。
 
-### The Kubernetes master
-
-Every cluster has a single master instance. The master provides a unified view into the cluster and, through its publicly-accessible endpoint, is the doorway(途径) for interacting with the cluster.
+1. The Kubernetes master, Every cluster has a single master instance. The master provides a unified view into the cluster and, through its publicly-accessible endpoint, is the doorway(途径) for interacting with the cluster.
+2. Nodes, A cluster can have one or more node instances. These are managed from the master, and run the services necessary to support Docker containers. Each node runs the Docker runtime and hosts a Kubelet agent（管理docker runtime）, which manages the Docker containers scheduled on the host. Each node also runs a simple network proxy（网络代理程序）.
 
 **The master runs the Kubernetes API server, which services REST requests, schedules pod creation and deletion on worker nodes, and synchronizes pod information (such as open ports and location) with service information.**
 
@@ -71,9 +68,14 @@ Every cluster has a single master instance. The master provides a unified view i
 3. 调度
 4. 控制，使得actual state满足desired state 
 
-### Nodes
+## 设计理念
 
-A cluster can have one or more node instances. These are managed from the master, and run the services necessary to support Docker containers. Each node runs the Docker runtime and hosts a Kubelet agent（管理docker runtime）, which manages the Docker containers scheduled on the host. Each node also runs a simple network proxy（网络代理程序）.
+[火得一塌糊涂的kubernetes有哪些值得初学者学习的？](https://mp.weixin.qq.com/s/iI5vpK5bVkKmdbf9sbAGWw)
+
+1. 声明式 VS 命令式, 在分布式系统中，任何组件都可能随时出现故障。当组件恢复时，需要弄清楚要做什么，使用命令式 API 时，处理起来就很棘手。但是使用声明式 API ，组件只需查看 API 服务器的当前状态，即可确定它需要执行的操作。
+2. 显式的 API, Kubernetes 是透明的，它没有隐藏的内部 API。换句话说 **Kubernetes 系统内部用来交互的 API 和我们用来与 Kubernetes 交互的 API 相同**。这样做的好处是，当 Kubernetes 默认的组件无法满足我们的需求时，我们可以利用已有的 API 实现我们自定义的特性。
+3. 无侵入性, 我们的应用达到镜像后, 不需要改动就可以遨游在 Kubernetes 集群中。 Kubernetes 以一种友好的方式将 Secret、Configuration等注入 Pod，减少了大家的工作量，而无需重写或者很大幅度改变原有的应用代码。
+4. 有状态的移植, 比如 PersistentVolumeClaim 和 PersistentVolume
 
 ## 整体结构
 

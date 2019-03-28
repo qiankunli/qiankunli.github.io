@@ -25,6 +25,8 @@ The storage media (Disk, SSD, or memory) of a volume is determined by the media 
 
 ## Persistent Volume（PV）和 Persistent Volume Claim（PVC）
 
+![](/public/upload/kubernetes/k8s_pvc.jpg)
+
 ||Volume|Persistent Volume|
 |---|---|---|
 |持久性|有可能被 kubelet 清理掉，也不能被“迁移”到其他节点|不会因为容器的删除而被清理掉，也不会跟当前的宿主机绑定|
