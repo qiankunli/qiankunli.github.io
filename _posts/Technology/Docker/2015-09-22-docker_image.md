@@ -12,6 +12,15 @@ keywords: Docker image registry
 * TOC
 {:toc}
 
+
+## build 时使用http代理
+
+2019.4.3 补充
+
+	docker build --build-arg HTTPS_PROXY='http://userName:password@proxyAddress:port' \
+							--build-arg HTTP_PROXY='http://userName:password@proxyAddress:port' \
+							-t $IMAGE_NAGE .
+
 ## 镜像仓库
 
 2018.12.21 补充

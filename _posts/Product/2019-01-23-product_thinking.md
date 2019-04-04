@@ -77,4 +77,12 @@ keywords: Product thinking
 3. 行动后发现，全量的客户有限，根本没有增量空间，这就是没有价值
 4. 时机不对，比如手机处理视频特效的功能，提出这个想法的时候，当时的手机配置还不足以支撑这个功能。
 
+## 产品哲学
+
+[阿里巴巴资深技术专家无相：我们能从 InteliJ IDEA 中学到什么？](https://mp.weixin.qq.com/s/4MzUns7TW8Rtej1_hjqaZw) Every aspect of IntelliJ IDEA is designed with ergonomics in mind. IntelliJ IDEA is built around the idea that every minute a developer spends in the flow is a good minute, and things that break developers out of flow are bad things. Every design and implementation decision considers the possibility of interrupting developer’s flow and seeks to eliminate or minimize it. “Creative Flow” or just “Flow” is a state of mind where you feel evenly attuned, and focused on the task at hand. 当用户使用你的产品时，尽量减少中断用户使用的东西，使其沉浸其中。比如我比较喜欢idea的一点是，idea 直接集成了命令行
+
+产品设计遵循 MVP 原则：在开始设计产品时不要追求一个完美的产品需求 (实际上这样的完美需求也是不存在的），而是通过提供最小化可行产品获取用户反馈，并在这个最小化可行产品上持续快速迭代，直到产品到达一个相对稳定的阶段。这样可以快速验证团队的目标，快速试错。
+
+
+
 
