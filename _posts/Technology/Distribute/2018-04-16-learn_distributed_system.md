@@ -105,16 +105,6 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 
 也就是说，具体学习某一个分布式算法用处有限。一个很难理解，一个是你很难  place them in contex（它们在解决分布式问题中的作用）。
 
-### 分布式与一致性
-
-李运华 《从0到1学架构》 关于Robert Greiner 两篇文章的对比 建议细读，要点如下
-
-1. 不是所有的分布式系统都有 cap问题，必须interconnected 和 share data。比如一个简单的微服务系统 没有shar data，便没有cap 问题。
-2. 强调了write/read pair 。这跟上一点是一脉相承的。cap 关注的是对数据的读写操作，而不是分布式系统的所有功能。
-
-
-想要沉迷，可以查看梳理的博客：[串一串一致性协议](http://qiankunli.github.io/2018/09/27/consistency_protocol.html)
-
 ## 分布式知识体系
 
 [distributed-systems-theory-for-the-distributed-systems-engineer](http://the-paper-trail.org/blog/distributed-systems-theory-for-the-distributed-systems-engineer/) 

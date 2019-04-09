@@ -10,22 +10,10 @@ keywords: 分布式事务
 
 ## 简介
 
-笔者相关的其它两篇文章
+* TOC
+{:toc}
 
-[JTA与TCC](http://qiankunli.github.io/2016/05/21/tcc.html)
-
-其它引用
-
-[关于分布式事务、两阶段提交协议、三阶提交协议](http://www.hollischuang.com/archives/681)
-
-[分布式事务的典型处理方式:2PC、TCC、异步确保和最大努力型](http://kaimingwan.com/post/fen-bu-shi/fen-bu-shi-shi-wu-de-dian-xing-chu-li-fang-shi-2pc-tcc-yi-bu-que-bao-he-zui-da-nu-li-xing)
-
-
-github 案例项目:
-
-1. [QNJR-GROUP/EasyTransaction](https://github.com/QNJR-GROUP/EasyTransaction)
-2. [moonufo/galaxyLight](https://github.com/moonufo/galaxyLight)
-
+事务一致性属于 一致性问题的一种，建议先看下 [串一串一致性协议](http://qiankunli.github.io/2018/09/27/consistency_protocol.html)
 
 在实际的业务中，分布式事务有以下表现形式：
 
@@ -42,12 +30,11 @@ github 案例项目:
 2. 数据存储层解决这个问题的方式 是通过一些像paxos、raft或是nwr这样的算法和模型来解决。 PS：这可能是因为存储层 主要是副本一致性问题
 3. 在实践中，还是尽量在数据存储层解决分布式事务问题。比如TiDB、OceanBase等，类似于一个无限容量的数据库 ==> 无需跨库操作 ==> 减少分布式事务问题。由此可见，一致性问题可以 "转嫁"
 
-
-[串一串一致性协议](http://qiankunli.github.io/2018/09/27/consistency_protocol.html)
-
 ## 2PC/3PC
 
 [一致性协议](http://www.cnblogs.com/xrq730/p/4992198.html)
+
+[JTA与TCC](http://qiankunli.github.io/2016/05/21/tcc.html)
 
 ### 过程
 
@@ -111,6 +98,13 @@ github 案例项目:
 
 从代码实现上，一般到2pc就可以保证大部分场景的一致性，然后框架着重点开始转向，通过异步、补偿等机制提高调用性能。
 
+### 开源代码
+
+github 案例项目:
+
+1. [QNJR-GROUP/EasyTransaction](https://github.com/QNJR-GROUP/EasyTransaction)
+2. [moonufo/galaxyLight](https://github.com/moonufo/galaxyLight)
+
 ## 最终一致性
 
 主线程逻辑
@@ -129,8 +123,6 @@ github 案例项目:
 1. 不需要confirm，比如send mq业务，try逻辑发就是了，没啥好confirm的。
 2. 主线程要尽可能的快，不能等try rpc1和try rpc2结束，再confirm依次搞完。而是try完了，主线程直接搞别的。至于confirm（可以没有）、cancel由异步线程解决。
 
-
-
 异步、补偿
 
 目前主流触发异步数据补偿的方式有两种：
@@ -141,3 +133,9 @@ github 案例项目:
 [分布式系统事务一致性解决方案](http://www.infoq.com/cn/articles/solution-of-distributed-system-transaction-consistency)
 
 [以交易系统为例，看分布式事务架构的五大演进](http://www.sohu.com/a/134477290_487514)
+
+## 其它
+
+[关于分布式事务、两阶段提交协议、三阶提交协议](http://www.hollischuang.com/archives/681)
+
+[分布式事务的典型处理方式:2PC、TCC、异步确保和最大努力型](http://kaimingwan.com/post/fen-bu-shi/fen-bu-shi-shi-wu-de-dian-xing-chu-li-fang-shi-2pc-tcc-yi-bu-que-bao-he-zui-da-nu-li-xing)
