@@ -17,6 +17,8 @@ keywords: Permission
 
 国外一个大牛的博客 [Mechanical Sympathy](https://mechanical-sympathy.blogspot.com/) Hardware and software working together in harmony 讲的是底层硬件是如何运作的，以及与其协作而非相悖的编程方式。[剖析Disruptor:为什么会这么快？（二）神奇的缓存行填充](http://ifeve.com/disruptor-cacheline-padding/) 作为一个开发者你可以逃避不去了解CPU、数据结构或者大O符号 —— 而我用了10年的职业生涯来忘记这些东西。但是现在看来，如果你知道这些知识并应用它，你能写出一些非常巧妙和非常快速的代码。
 
+2019.4.12 补充：[进程管理信息数据结构](http://qiankunli.github.io/2017/02/14/linux_art_review.html) 二进制文件分段 ==> 进程分段 ==> cpu代码段寄存器/数据段寄存器/堆栈段寄存器等，从这个视角看，又有一种软硬件融合的味道。
+
 ## 为什么需要反码和补码
 
 ### 有界/越界/溢出与取模
@@ -130,6 +132,24 @@ Approximate timing for various operations on a typical PC:
 |read 1MB sequentially from disk	|20,000,000 nanosec|
 |send packet US to Europe and back	|150 milliseconds = 150,000,000 nanosec|
 |上下文切换|数千个CPU时钟周期，1微秒|
+
+### 线程切换的成本
+
+不仅创建线程的代价高，线程切换的开销也很高
+
+1. 线程切换只能在内核态完成，如果当前用户处于用户态，则必然引起用户态与内核态的切换。
+2. 上下文切换，前面说线程信息需要用一个task_struct保存，线程切换时，必然需要将旧线程的task_struct从内核切出，将新线程的切入，带来上下文切换。除此之外，还需要切换寄存器、程序计数器、线程栈（包括操作栈、数据栈）等。2019.03.22补充：《反应式设计模式》尽管CPU已经越来越快，但更多的内部状态已经抵消了纯执行速度上带来的进步，使得上下文切换大约需要耗费1微秒的时间(数千个CPU时钟周期)，这一点在二十年来几乎没有大的改进。
+3. 执行线程调度算法，线程1放弃cpu ==> 线程调度算法找下一个线程 ==> 线程2
+4. 缓存缺失，切换线程，需要执行新逻辑。如果二者的访问的地址空间不相近，则会引起缓存缺失。 PS “进程切换”的代价更大巨大，[linux线程切换和进程切换](https://www.cnblogs.com/kkshaq/p/4547725.html)当你改变虚拟内存空间的时候，处理的页表缓冲（processor’s Translation Lookaside Buffer (TLB)）或者相当的神马东西会被全部刷新，这将导致内存的访问在一段时间内相当的低效。
+
+### 用户态与内核态切换有什么代价呢？
+
+[Understanding User and Kernel Mode](https://blog.codinghorror.com/understanding-user-and-kernel-mode/)
+
+1. 在操作系统中，In Kernel mode, the executing code has complete and unrestricted access to the underlying hardware. It can execute any CPU instruction and reference any memory address. 而用户态可以访问的指令和地址空间是受限的
+2. 用户态和内核态的切换通常涉及到内存的复制，比如内核态read 得到的数据返回给 用户态，因为用户态访问不了内核态的read 返回数据。
+3. jvm 则再插一腿，因为jvm 数据不仅在用户态，jvm 还希望数据是由jvm heap管理，所以对于read 操作来讲，数据从内核态 ==> 用户态  ==> jvm heap 经历了两次复制，netty 中允许使用堆外内存（对于linux来说，jvm heap和堆外内存都在进程的堆内存之内） 减少一次复制
+4. linux 和jvm 都可以使用 mmap来减少用户态和内核态的内存复制，但一是应用场景有限，二是代码复杂度提升了好多。
 
 ## 单核CPU技术瓶颈 ==> CPU 向多核发展 ==> 多台服务器
 
