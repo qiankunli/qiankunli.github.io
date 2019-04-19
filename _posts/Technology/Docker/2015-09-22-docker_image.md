@@ -21,6 +21,18 @@ keywords: Docker image registry
 							--build-arg HTTP_PROXY='http://userName:password@proxyAddress:port' \
 							-t $IMAGE_NAGE .
 
+
+当你在公司负责维护docker 镜像时，不同镜像的Dockerfile 为了支持协作及版本跟踪 一般会保存在git 库中。制作镜像 通常需要安装类似jdk/tomcat 等可执行文件，这些文件建议使用远程下载的方式（因为git 保存二进制文件 不太优雅），以安装tomcat 为例
+
+
+		RUN \
+					DIR=/tmp/tomcat && mkdir -p ${DIR} && cd ${DIR} && \
+					curl -sLO http://mirrors.tuna.tsinghua.edu.cn/apache/tomcat/tomcat-8/v8.5.40/bin/apache-tomcat-8.5.40.tar.gz &&\
+					tar -zxvf apache-tomcat-8.5.40.tar.gz -C /usr/local/ && \
+					mv /usr/local/apache-tomcat-8.5.40 /usr/local/tomcat && \
+					rm -rf ${DIR}
+
+
 ## 镜像仓库
 
 2018.12.21 补充
