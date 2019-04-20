@@ -21,6 +21,13 @@ keywords: Redis
 
 源码来自[带有详细注释的 Redis 3.0 代码（annotated Redis 3.0 source code）](https://github.com/huangz1990/redis-3.0-annotated)
 
+## 宏观梳理
+
+**序列图待补充，应一直通到内存操作**
+
+![](/public/upload/data/redis_sequence_diagram.png)
+
+整个轴线是redisServer 初始化并启动eventloop， eventLoop 创建redisClient 及processCommand 方法进而 执行redisCommand 向 dict 中保存数据
 
 ![](/public/upload/data/redis_class_diagram.png)
 
@@ -46,9 +53,7 @@ redis.c
 		return 0
 	}
 
-**序列图待补充，应一直通到内存操作**
 
-![](/public/upload/data/redis_sequence_diagram.png)
 
 ## 网络层
 
