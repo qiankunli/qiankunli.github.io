@@ -13,12 +13,24 @@ keywords: project
 * TOC
 {:toc}
 
+## 协议的几个套路
 
+### 如何表达长度
 
+1. 在协议的起始位置(或其它约定位置)直接说长度
+2. 在协议的起始位置标识有几个元素，然后每个元素分别说明自己的长度。比如redis请求的协议格式
 
+### 简单协议
 
+1. 请求和回复协议格式一致
 
-## 协议的制定
+### 复杂协议
+
+1. 大部分协议分为header和data部分，data部分经常随着header部分变化，比如http协议transfer-encoding:chunked或者multipart
+2. 需要复杂的初始化，比如ssl，在工作之前，要进行ssl握手。
+3. 一次语义动作的完成，需要多次通信。通常表现在，既有控制指令，又有数据指令。控制指令通常作为数据指令的上下文，需要协议框架进行存储。
+
+## 协议的特点
 
 1. 文本协议 vs 二进制协议
 
@@ -39,14 +51,15 @@ expect null-terminated strings.
 
 c中的strlen函数就不算是binary safe的，因为它依赖于特殊的字符'\0'来判断字符串是否结束。而在php中，strlen函数是binary safe的，因为它不会对任何字符（包括'\0'）进行特殊解释。
 
-
 ## 协议层的实现
 
-### http/http2
+### 文本协议
 
 http 太普遍以至于我们都不感觉到它们是协议了
 
 [netty对http2协议的解析](http://qiankunli.github.io/2017/06/12/netty_http2.html)
+
+[Redis 学习](http://redisdoc.com/topic/protocol.html)
 
 ### 自定义二进制
 
@@ -57,3 +70,4 @@ http 太普遍以至于我们都不感觉到它们是协议了
 ### java/c/golang 
 
 [为什么netty比较难懂？](http://qiankunli.github.io/2017/10/13/learn_netty.html)
+
