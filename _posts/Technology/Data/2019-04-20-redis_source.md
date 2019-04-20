@@ -19,6 +19,9 @@ keywords: Redis
 
 ![](/public/upload/architecture/network_communication.png)
 
+源码来自[带有详细注释的 Redis 3.0 代码（annotated Redis 3.0 source code）](https://github.com/huangz1990/redis-3.0-annotated)
+
+
 ![](/public/upload/data/redis_class_diagram.png)
 
 ## 启动过程
@@ -42,6 +45,8 @@ redis.c
 		aeDeleteEventLoop(server.el);
 		return 0
 	}
+
+**序列图待补充，应一直通到内存操作**
 
 ![](/public/upload/data/redis_sequence_diagram.png)
 
@@ -121,7 +126,7 @@ Redis 中会处理两种事件：时间事件和文件事件。在每个事件�
 			...
 		}
 
-2. acceptTcpHandler ==> createClient ==> aeCreateFileEvent ==> readQueryFromClient
+2. 创建客户端，并绑定读事件到loop：acceptTcpHandler ==> createClient ==> aeCreateFileEvent ==> readQueryFromClient
 
 		void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
     int cport, cfd, max = MAX_ACCEPTS_PER_CALL;
