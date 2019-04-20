@@ -27,6 +27,8 @@ Kubernetes和Mesos调度的最大区别在于资源调度请求的方式
 1. 主动 Push 方式。是 Mesos 采用的方式，就是 Mesos 的资源调度组件（Mesos Master）主动推送资源 Offer 给 Framework，Framework 不能主动请求资源，只能根据 Offer 的信息来决定接受或者拒绝。
 2. 被动 Pull 方式。是 Kubernetes 的方式，资源调度组件 Scheduler 被动的响应 Controller Manager的资源请求。
 
+[集群调度系统的演进](https://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649701086&idx=1&sn=2018b0a05027725f08686a73a26788ed&chksm=889305bdbfe48cabd83e49bbf321f96bd708925d89576cfcf0cfb49fb0221c0e0f6a84db602d&mpshare=1&scene=23&srcid=%23rd)Kubernetes 是一个集群调度系统，今天这篇文章主要是介绍 Kubernetes 之前一些集群调度系统的架构，**通过梳理他们的设计思路和架构特点，我们能够学习到集群调度系统的架构的演进过程，以及在架构设计时需要考虑的主要问题**，对理解 Kubernetes 的架构会非常有帮助。(未细读)
+
 ### 为什么不支持横向扩展？
 
 几乎所有的集群调度系统都无法横向扩展（Scale Out），集群调度系统的架构看起来都是这个样子的
