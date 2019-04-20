@@ -12,6 +12,9 @@ keywords: Redis
 
 建议看下前文 [Redis 学习](http://redisdoc.com/topic/protocol.html)
 
+参考[《Apache Kafka源码分析》——server](http://qiankunli.github.io/2019/01/30/kafka_learn_2.html)服务端网络开发的基本套路
+
+![](/public/upload/architecture/network_communication.png)
 
 ### `set msg 'hello world'` 发生了什么
 
@@ -45,7 +48,7 @@ redis.c
 		return 0
 	}
 
-Redis的网络监听没有采用libevent等，而是自己实现了一套简单的机遇event驱动的API，具体见ae.c。事件处理器的主循环
+Redis的网络监听没有采用libevent等，而是自己实现了一套简单的机遇event驱动的API，具体见ae.c。事件处理器的主循环 
 
 	void aeMain(aeEventLoop *eventLoop) {
 		eventLoop->stop = 0;
@@ -57,6 +60,8 @@ Redis的网络监听没有采用libevent等，而是自己实现了一套简单�
 			aeProcessEvents(eventLoop, AE_ALL_EVENTS);
 		}
 	}
+
+[Redis 中的事件循环](https://draveness.me/redis-eventloop)
 
 ## Sentinel(哨兵模式)
 

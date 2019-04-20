@@ -15,6 +15,12 @@ keywords: Scala  akka
 
 建议先阅读下[《Apache Kafka源码分析》——Producer与Consumer](http://qiankunli.github.io/2017/12/08/kafka_learn_1.html)
 
+服务端网络开发的基本套路
+
+![](/public/upload/architecture/network_communication.png)
+
+对应到kafka server
+
 ![](/public/upload/scala/kafka_server_framework.jpg)
 
 对kafka好奇的几个问题：

@@ -104,6 +104,14 @@ Recycler ： Light-weight object pool based on a thread-local stack.
 1. common pool 从数据结构上限定线程安全，
 2. Recycler 则是通过ThreadLocal实现线程安全性，线程可以简单直接的访问该线程域下的Stack。
 
+### diect memory
+
+[Understanding Java heap memory and Java direct memory](http://fibrevillage.com/sysadmin/325-understanding-java-heap-memory-and-java-direct-memory)
+
+diect memory不是在Java heap上，那么这块内存的大小是多少呢？默认是一般是64M，可以通过参数：-XX:MaxDirectMemorySize来控制。
+
+直接内存的释放并不是由你控制的，而是由full gc来控制的，直接内存会自己检测情况而调用system.gc()
+
 ## 引用计数
 
 ### java内存回收的局限性

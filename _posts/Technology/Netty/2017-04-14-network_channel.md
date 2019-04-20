@@ -88,6 +88,30 @@ Channels are hierarchical有以下个含义
 		
 从这里就可以看到，netty的channel不再是java nio channel那个只负责r/w操作的纯洁的小伙儿了，这个channel更应该叫Endpoint(Client/server)或channelFacade更合适。
 
+### ChannelPool
+
+上层接口
+
+1. ChannelPoolHandler，Handler which is called for various actions done by the  ChannelPool.ChannelPool的很多操作完成后会触发
+2. ChannelHealthChecker， Called before a Channel will be returned via  ChannelPool.acquire() or ChannelPool.acquire(Promise). 在用户通过acquire方法获取channel的时候，确保返回的channel是健康的。
+3. ChannelPool，Allows to acquire and release Channel and so act as a pool of these.
+4. ChannelPoolMap,Allows to map  ChannelPool implementations to a specific key.将channelpool映射到一个特殊的key上。这个key通常是InetSocketAddress，记一个地址映射多个channel。
+
+        public interface ChannelPool extends Closeable {
+            Future<Channel> acquire();
+            Future<Channel> acquire(Promise<Channel> promise);
+            Future<Void> release(Channel channel);
+            Future<Void> release(Channel channel, Promise<Void> promise);
+            void close();
+        }
+
+
+ChannelPool有两个简单实现simplechannelpool和FixedChannelPool，后者可以控制Channel的最大个数。但相对于common-pool，其在minActive，minIdle等控制上还是不足的。所以笔者在实现时，最终还是选择基于common-pool2实现基于netty的channel pool。
+    
+基于common-pool2实现基于netty的channel pool需要注意的是：
+
+1. 空闲Channel的连接保持。一个简单的解决方案是心跳机制，即向channel的pipeline中添加发送与接收心跳请求与响应的Handler。
+2. common-pool 池的存储结构选择先进先出的队列，而不是先进后出的堆栈。
 
 
 ## channel 和 unsafe的关系
