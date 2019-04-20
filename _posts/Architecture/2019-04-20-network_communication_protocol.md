@@ -61,6 +61,8 @@ http 太普遍以至于我们都不感觉到它们是协议了
 
 [Redis 学习](http://redisdoc.com/topic/protocol.html)
 
+Redis 这个文本协议的实现性能仍然可以和二进制协议一样快。因为 Redis 协议将数据的长度放在数据正文之前， 所以程序无须像 JSON 那样， 为了寻找某个特殊字符而扫描整个 payload 
+
 ### 自定义二进制
 
 [《Apache Kafka源码分析》——server](http://qiankunli.github.io/2019/01/30/kafka_learn_2.html)
