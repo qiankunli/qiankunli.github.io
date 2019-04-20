@@ -10,6 +10,10 @@ keywords: JAVA netty pool
 
 ## 前言
 
+服务端网络开发的基本套路
+
+![](/public/upload/architecture/network_communication.png)
+
 简单的netty client demo是
 
 	public class TimeClient {

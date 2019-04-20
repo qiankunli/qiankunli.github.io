@@ -10,8 +10,10 @@ keywords: JAVA netty channel
 
 ## 前言
 
-借用知乎上"者年"关于java nio技术栈的回答[如何学习Java的NIO](https://www.zhihu.com/question/29005375/answer/43021911)
+* TOC
+{:toc}
 
+借用知乎上"者年"关于java nio技术栈的回答[如何学习Java的NIO](https://www.zhihu.com/question/29005375/answer/43021911)
 
 0. 计算机体系结构和组成原理 中关于中断，关于内存，关于 DMA，关于存储 等关键知识点
 1. 操作系统 中 内核态用户态相关部分，  I/O 软件原理
@@ -22,6 +24,10 @@ keywords: JAVA netty channel
 6. [多种I/O模型及其对socket效率的改进](http://mickhan.blog.51cto.com/2517040/1586370)
 
 根据这个思路，笔者整理了下相关的知识，参见[java io涉及到的一些linux知识](http://qiankunli.github.io/2017/04/16/linux_io.html)
+
+服务端网络开发的基本套路
+
+![](/public/upload/architecture/network_communication.png)
 
 
 ## netty 与 tomcat 对比理解
@@ -160,54 +166,128 @@ inbound 的被称作events， outbound 的被称作operations。
 
 ## eventloop
 
-	SingleThreadEventExecutor{
-		 private volatile Thread thread;
-		 Queue<Runnable> taskQueue;
-		 protected abstract void run();
-		 private void doStartThread() {
-		 	  executor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    thread = Thread.currentThread();
-                    if (interrupted) {
-                        thread.interrupt();
-                    }
-                    ...
-                    SingleThreadEventExecutor.this.run();
-                }
+[Netty 核心组件 EventLoop 源码解析](https://www.jianshu.com/p/2b42954c2983)
+
+### 存在形式
+
+![](/public/upload/netty/NioEventLoop_Inheritance.PNG)
+
+使用红框标出了重点部分：PS： 下面的思维方式很重要
+
+1. ScheduledExecutorService 接口表示是一个定时任务接口，EventLoop 可以接受定时任务。
+2. EventLoop 接口：Netty 接口文档说明该接口作用：一旦 Channel 注册了，就处理该Channel对应的所有I/O 操作。
+3. SingleThreadEventExecutor 表示这是一个单个线程的线程池。
+
+一个 EventLoop 将由一个永远都不会改变的Thread 驱动，同时任务（Runnable 或者 Callable）可以直接提交给 EventLoop 实现，以立即执行或者调度执行。根据配置和可用核心的不同，可能会创建多个 EventLoop 实例用以优化资源的使用，并且单个 EventLoop 可能会被指派用于服务多个 Channel（PS： 但一个channel只归属一个EventLoop，以线程安全）。
+
+`eventloop.execute(task)` 实现，**主要这段代码由调用线程执行**
+
+    public void execute(Runnable task) {
+        boolean inEventLoop = inEventLoop();
+        if (inEventLoop) {
+            addTask(task);
+        } else {
+            startThread();
+            addTask(task);
+            if (isShutdown() && removeTask(task)) {
+                reject();
             }
-		 }
-		 public boolean inEventLoop() {
-            return this.thread == Thread.currentThread();
-    	 }
-	}
-	
-从SingleThreadEventExecutor代码中可以看到
+        }
+        if (!addTaskWakesUp && wakesUpForTask(task)) {
+            wakeup(inEventLoop);
+        }
+    }
 
-1. SingleThreadEventExecutor的基本逻辑就是执行run方法，run方法的基本工作是执行taskQueue中的任务。其子类NioEventLoop在run方法中加入了自己的私活：select(),并处理捕获的selectKey。
-2. SingleThreadEventExecutor虽然具备线程执行能力，但其只是Runable的一部分，**用来定义任务**，真正的线程驱动由executor（初始化EventLoopGroup时传入或默认初始化）负责。
-3. SingleThreadEventExecutor是一个executor，一个executor的基本实现就是：一个队列 + 一堆线程。对外的接口就是：提交runnable。
-4. SingleThreadEventExecutor记录了执行自己run方法的线程，这样可以区分操作调用来自自家线程还是外界。如果是外界，则将操作变成任务提交。操作的实际执行永远由自家线程负责，以达到线程安全的目的。
+首先判断该 EventLoop 的线程是否是当前线程，如果是，直接添加到任务队列中去，如果不是，则尝试启动线程（但由于线程是单个的，因此只能启动一次），随后再将任务添加到队列中去。如果线程已经停止，并且删除任务失败，则执行拒绝策略，默认是抛出异常。
 
-我们复盘一下，如果我去实现一个nioeventloop，我会怎么写
+### EventLoop 中的 Loop 到底是什么？
 
-	NioEventLoop implements Runnable{
-		selector
-		Queue<Runnable> taskQueue;
-		public void run(){
-			selectKeys = selector.select();
-			process(selectKeys);
-			process(taskQueue);
+    protected void run() {
+        for (;;) {
+			switch (...) {
+				case SelectStrategy.CONTINUE:
+					...
+				case SelectStrategy.SELECT:
+					this.select(this.wakenUp.getAndSet(false));
+					...
+				default:
+				    cancelledKeys = 0;
+					needsToSelectAgain = false;
+					final int ioRatio = this.ioRatio;
+					if (ioRatio == 100) {
+						try {
+							processSelectedKeys();
+						} finally {
+							runAllTasks();
+						}
+					} else {
+						final long ioStartTime = System.nanoTime();
+						try {
+							processSelectedKeys();
+						} finally {
+							// Ensure we always run tasks.
+							final long ioTime = System.nanoTime() - ioStartTime;
+							runAllTasks(ioTime * (100 - ioRatio) / ioRatio);
+						}
+					}
+			}			
+            // Always handle shutdown even if the loop processing threw an exception.
+			...
+        }
+    }
+
+整个 run 方法做了3件事情：
+
+1. selector 获取感兴趣的事件。
+2. processSelectedKeys 处理事件。
+3. runAllTasks 执行队列中的任务。
+
+在 Netty 中，有2种任务，一种是 IO 任务，一种是非 IO 任务，ioRatio 的作用就是限制执行任务队列的时间。
+
+	private void select(boolean oldWakenUp) throws IOException {
+        Selector selector = this.selector;
+		int selectCnt = 0;
+		long currentTimeNanos = System.nanoTime();
+		long selectDeadLineNanos = currentTimeNanos + this.delayNanos(currentTimeNanos);
+		while(true) {
+			long timeoutMillis = (selectDeadLineNanos - currentTimeNanos + 500000L) / 1000000L;
+			if (timeoutMillis <= 0L) {
+				if (selectCnt == 0) {
+					selector.selectNow();
+					selectCnt = 1;
+				}
+				break;
+			}
+			if (this.hasTasks() && this.wakenUp.compareAndSet(false, true)) {
+				selector.selectNow();
+				selectCnt = 1;
+				break;
+			}
+			int selectedKeys = selector.select(timeoutMillis);
+			++selectCnt;
+			if (selectedKeys != 0 || oldWakenUp || this.wakenUp.get() || this.hasTasks() || this.hasScheduledTasks()) {
+				break;
+			}
+			if (Thread.interrupted()) {
+				selectCnt = 1;
+				break;
+			}
+			long time = System.nanoTime();
+			if (time - TimeUnit.MILLISECONDS.toNanos(timeoutMillis) >= currentTimeNanos{
+				selectCnt = 1;
+			} else if (SELECTOR_AUTO_REBUILD_THRESHOLD > 0 && selectCnt >= SELECTOR_AUTO_REBUILD_THRESHOLD) {
+				this.rebuildSelector();
+				selector = this.selector;
+				selector.selectNow();
+				selectCnt = 1;
+				break;
+			}
 		}
-	}
-	
-系统怎么启动呢？
+    }
 
-    nioEventLoop = new NioEventLoop();
-    nioEventLoop关联channel等
-    Executots.execute(nioEventLoop);
-    
-但这样做有一个问题：这两者有什么优劣呢？
+整段代码都在弄一个事情：是`selector.selectNow();` 还是 `selector.select(timeoutMillis)`
+
+这段逻辑可不孤单，[Redis源码分析](http://qiankunli.github.io/2019/04/20/redis_source.html) 中的eventloop 异曲同工
 
 ## channel 以及 unsafe pipeline eventloop 三国杀
 
