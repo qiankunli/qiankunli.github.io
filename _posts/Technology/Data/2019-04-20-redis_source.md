@@ -13,7 +13,7 @@ keywords: Redis
 * TOC
 {:toc}
 
-建议看下前文 [Redis 学习](http://redisdoc.com/topic/protocol.html)
+建议看下前文[Redis 学习](http://qiankunli.github.io/2018/06/15/redis.html)
 
 参考[《Apache Kafka源码分析》——server](http://qiankunli.github.io/2019/01/30/kafka_learn_2.html)服务端网络开发的基本套路
 
@@ -116,6 +116,8 @@ Redis的网络监听没有采用libevent等，而是自己实现了一套简单�
 Redis 中会处理两种事件：时间事件和文件事件。在每个事件循环中 Redis 都会先处理文件事件，然后再处理时间事件直到整个循环停止。 aeApiPoll 可看做文件事件的生产者（还有一部分文件事件来自accept等），processEvents 和 processTimeEvents 作为 Redis 中发生事件的消费者，每次都会从“事件池”（aeEventLoop的几个列表字段）中拉去待处理的事件进行消费。
 
 ## 协议层
+
+[Redis 通信协议](http://redisdoc.com/topic/protocol.html)
 
 我们以读事件为例，但发现数据可读时，执行了` fe->rfileProc(eventLoop,fd,fe->clientData,mask);`，那么rfileProc 的执行逻辑是啥呢？
 
@@ -281,7 +283,7 @@ Redis 中会处理两种事件：时间事件和文件事件。在每个事件�
 
 ![](/public/upload/data/redis_command_set.png)
 
-### 业务层
+## 业务层
 
 	redis.c
 	// 调用命令的实现函数，执行命令
@@ -314,6 +316,8 @@ Redis 中会处理两种事件：时间事件和文件事件。在每个事件�
 		{"set",setCommand,-3,"wm",0,NULL,1,1,1,0,0},
 		...
 	}
+
+![](/public/upload/data/redis_command_set_command.png)
 	
 	t_string.c
 	/* SET key value [NX] [XX] [EX <seconds>] [PX <milliseconds>] */
@@ -356,6 +360,9 @@ Redis 中会处理两种事件：时间事件和文件事件。在每个事件�
 		signalModifiedKey(db,key);
 	}
 
+前面说过， 命令实现函数会将命令回复保存到客户端的输出缓冲区里面， 并为客户端的套接字关联命令回复处理器， 当客户端套接字变为可写状态时， 服务器就会执行命令回复处理器， 将保存在客户端输出缓冲区中的命令回复发送给客户端。
+
+当命令回复发送完毕之后， 回复处理器会清空客户端状态的输出缓冲区， 为处理下一个命令请求做好准备。
 
 ## 在保存到dict 的过程中，数据的形态也一直在变化
 
