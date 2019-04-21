@@ -8,7 +8,7 @@ keywords: Redis
 
 ---
 
-## 前言（持续更新）
+## 前言
 
 * TOC
 {:toc}
@@ -23,13 +23,13 @@ keywords: Redis
 
 ## 宏观梳理
 
-**序列图待补充，应一直通到内存操作**
-
 ![](/public/upload/data/redis_sequence_diagram.png)
 
-整个轴线是redisServer 初始化并启动eventloop， eventLoop 创建redisClient 及processCommand 方法进而 执行redisCommand 向 dict 中保存数据
+整个轴线是redisServer 初始化并启动eventloop， eventLoop 创建redisClient 及驱动processCommand 方法进而 执行redisCommand 向 dict 中保存数据
 
 ![](/public/upload/data/redis_class_diagram.png)
+
+本文 以一个`set mykey myvalue` 来分析redis的 启动和保存流程
 
 ## 启动过程
 
@@ -210,13 +210,264 @@ Redis 中会处理两种事件：时间事件和文件事件。在每个事件�
 			processInputBuffer(c);
 			server.current_client = NULL;
 		}
+		// 处理客户端输入的命令内容
+		void processInputBuffer(redisClient *c) {
+			// 尽可能地处理查询缓冲区中的内容
+			while(sdslen(c->querybuf)) {
+				...
+				// 判断请求的类型
+				// 简单来说，多条查询是一般客户端发送来的，
+				// 而内联查询则是 TELNET 发送来的
+				if (!c->reqtype) {
+					if (c->querybuf[0] == '*') {
+						// 多条查询
+						c->reqtype = REDIS_REQ_MULTIBULK;
+					} else {
+						// 内联查询
+						c->reqtype = REDIS_REQ_INLINE;
+					}
+				}
+				// 将缓冲区中的内容转换成命令，以及命令参数
+				if (c->reqtype == REDIS_REQ_INLINE) {
+					if (processInlineBuffer(c) != REDIS_OK) break;
+				} else if (c->reqtype == REDIS_REQ_MULTIBULK) {
+					if (processMultibulkBuffer(c) != REDIS_OK) break;
+				} else {
+					redisPanic("Unknown request type");
+				}
+				...
+			}
+		}
 		redis.c
-		processCommand（待充实）
+		int processCommand(redisClient *c) {
+			// 特别处理 quit 命令
+			// 查找命令，并进行命令合法性检查，以及命令参数个数检查
+			c->cmd = c->lastcmd = lookupCommand(c->argv[0]->ptr);
+			// 没找到指定的命令 或 参数个数错误 直接返回
+			// 检查认证信息
+			// 如果开启了集群模式，那么在这里进行转向操作。
+			// 如果设置了最大内存，那么检查内存是否超过限制，并做相应的操作
+			// 如果这是一个主服务器，并且这个服务器之前执行 BGSAVE 时发生了错误
+			// 那么不执行写命令
+			// 如果服务器没有足够多的状态良好服务器
+			// 并且 min-slaves-to-write 选项已打开
+			// 如果这个服务器是一个只读 slave 的话，那么拒绝执行写命令
+			// 在订阅于发布模式的上下文中，只能执行订阅和退订相关的命令
+			/* Only allow INFO and SLAVEOF when slave-serve-stale-data is no and
+			* we are a slave with a broken link with master. */
+			// 如果服务器正在载入数据到数据库，那么只执行带有 REDIS_CMD_LOADING
+			// 标识的命令，否则将出错
+			/* Lua script too slow? Only allow a limited number of commands. */
+			// Lua 脚本超时，只允许执行限定的操作，比如 SHUTDOWN 和 SCRIPT KILL
+			/* Exec the command */
+			if (c->flags & REDIS_MULTI &&
+				c->cmd->proc != execCommand && c->cmd->proc != discardCommand &&
+				c->cmd->proc != multiCommand && c->cmd->proc != watchCommand)
+			{
+				// 在事务上下文中除 EXEC 、 DISCARD 、 MULTI 和 WATCH 命令之外
+				// 其他所有命令都会被入队到事务队列中
+				queueMultiCommand(c);
+				addReply(c,shared.queued);
+			} else {
+				// 执行命令
+				call(c,REDIS_CALL_FULL);
+				c->woff = server.master_repl_offset;
+				// 处理那些解除了阻塞的键
+				if (listLength(server.ready_keys))
+					handleClientsBlockedOnLists();
+			}
+			return REDIS_OK;
+		}
 
 ### 业务层
 
+	redis.c
+	// 调用命令的实现函数，执行命令
+	void call(redisClient *c, int flags) {
+		// start 记录命令开始执行的时间
+		// 记录命令开始执行前的 FLAG
+		// 如果可以的话，将命令发送到 MONITOR
+		/* Call the command. */
+		c->flags &= ~(REDIS_FORCE_AOF|REDIS_FORCE_REPL);
+		redisOpArrayInit(&server.also_propagate);
+		// 保留旧 dirty 计数器值
+		dirty = server.dirty;
+		// 计算命令开始执行的时间
+		start = ustime();
+		// 执行实现函数
+		c->cmd->proc(c);
+		// 计算命令执行耗费的时间
+		duration = ustime()-start;
+		// 计算命令执行之后的 dirty 值
+		dirty = server.dirty-dirty;
+		...
+		// 如果有需要，将命令放到 SLOWLOG 里面
+		// 更新命令的统计信息
+		...
+		server.stat_numcommands++;
+	}
+	redis.c
+	struct redisCommand redisCommandTable[] = {
+		{"get",getCommand,2,"r",0,NULL,1,1,1,0,0},
+		{"set",setCommand,-3,"wm",0,NULL,1,1,1,0,0},
+		...
+	}
+	
+	t_string.c
+	/* SET key value [NX] [XX] [EX <seconds>] [PX <milliseconds>] */
+	void setCommand(redisClient *c) {
+		int j;
+		robj *expire = NULL;
+		int unit = UNIT_SECONDS;
+		int flags = REDIS_SET_NO_FLAGS;
+		// 设置选项参数
+		// 尝试对值对象进行编码
+		c->argv[2] = tryObjectEncoding(c->argv[2]);
+		setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
+	}
 
-## Sentinel(哨兵模式)
+	void setGenericCommand(redisClient *c, int flags, robj *key, robj *val, robj *expire, int unit, robj *ok_reply, robj *abort_reply) {
+		long long milliseconds = 0; /* initialized to avoid any harmness warning */
+		// 取出过期时间
+		// 如果设置了 NX 或者 XX 参数，那么检查条件是否不符合这两个设置
+		// 在条件不符合时报错，报错的内容由 abort_reply 参数决定
+		// 将键值关联到数据库
+		setKey(c->db,key,val);
+		// 将数据库设为脏
+		// 为键设置过期时间
+		if (expire) setExpire(c->db,key,mstime()+milliseconds);
+		// 发送事件通知
+		// 设置成功，向客户端发送回复
+	}
+	db.c
+	void setKey(redisDb *db, robj *key, robj *val) {
+		// 添加或覆写数据库中的键值对
+		if (lookupKeyWrite(db,key) == NULL) {
+			dbAdd(db,key,val);
+		} else {
+			dbOverwrite(db,key,val);
+		}
+		incrRefCount(val);
+		// 移除键的过期时间
+		removeExpire(db,key);
+		// 发送键修改通知
+		signalModifiedKey(db,key);
+	}
+
+
+## 在保存到dict 的过程中，数据的形态也一直在变化
+
+相关的数据结构
+
+	struct redisClient {
+		// 查询缓冲区
+		sds querybuf;
+		// 参数数量
+		int argc;
+		// 参数对象数组
+		robj **argv;	
+	}
+
+	typedef struct redisObject {
+		// 类型
+		unsigned type:4;
+		// 编码
+		unsigned encoding:4;
+		// 对象最后一次被访问的时间
+		unsigned lru:REDIS_LRU_BITS; /* lru time (relative to server.lruclock) */
+		// 引用计数
+		int refcount;
+		// 指向实际值的指针
+		void *ptr;
+	} robj;
+
+转换的代码
+
+	networking.c
+	// 将 c->querybuf 中的协议内容转换成 c->argv 中的参数对象
+	int processMultibulkBuffer(redisClient *c) {
+		// 读入命令的参数个数
+		// 比如 *3\r\n$3\r\nSET\r\n... 将令 c->multibulklen = 3
+		if (c->multibulklen == 0) {
+			// 检查缓冲区的内容第一个 "\r\n"
+			newline = strchr(c->querybuf,'\r');
+			if (newline == NULL) {
+				...
+				return REDIS_ERR;
+			}
+			// 协议的第一个字符必须是 '*'
+			// 将参数个数，也即是 * 之后， \r\n 之前的数字取出并保存到 ll 中
+			// 比如对于 *3\r\n ，那么 ll 将等于 3
+			ok = string2ll(c->querybuf+1,newline-(c->querybuf+1),&ll);
+			// 参数的数量超出限制
+			// 设置参数数量
+			// 根据参数数量，为各个参数对象分配空间
+			if (c->argv) zfree(c->argv);
+			c->argv = zmalloc(sizeof(robj*)*c->multibulklen);
+		}
+		// 从 c->querybuf 中读入参数，并创建各个参数对象到 c->argv
+		while(c->multibulklen) {
+			// 读入参数长度
+			if (c->bulklen == -1) {
+				// 确保 "\r\n" 存在
+				// 确保协议符合参数格式，检查其中的 $...
+				// 读取长度
+				// 比如 $3\r\nSET\r\n 将会让 ll 的值设置 3
+				ok = string2ll(c->querybuf+pos+1,newline-(c->querybuf+pos+1),&ll);
+				...
+				// 参数的长度
+				c->bulklen = ll;
+			}
+			// 读入参数
+			// 确保内容符合协议格式
+			// 为参数创建字符串对象  
+			if (pos == 0 &&
+				c->bulklen >= REDIS_MBULK_BIG_ARG &&
+				(signed) sdslen(c->querybuf) == c->bulklen+2){
+				c->argv[c->argc++] = createObject(REDIS_STRING,c->querybuf);
+				sdsIncrLen(c->querybuf,-2); /* remove CRLF */
+				c->querybuf = sdsempty();
+				/* Assume that if we saw a fat argument we'll see another one
+				* likely... */
+				c->querybuf = sdsMakeRoomFor(c->querybuf,c->bulklen+2);
+				pos = 0;
+			} else {
+				c->argv[c->argc++] =
+					createStringObject(c->querybuf+pos,c->bulklen);
+				pos += c->bulklen+2;
+			}
+			// 清空参数长度
+			// 减少还需读入的参数个数
+			c->multibulklen--;    
+		}
+		// 从 querybuf 中删除已被读取的内容
+		// 如果本条命令的所有参数都已读取完，那么返回
+		// 如果还有参数未读取完，那么就协议内容有错
+	}
+
+object.c
+
+	robj *createObject(int type, void *ptr) {
+		robj *o = zmalloc(sizeof(*o));
+		o->type = type;
+		o->encoding = REDIS_ENCODING_RAW;
+		o->ptr = ptr;
+		o->refcount = 1;
+		/* Set the LRU to the current lruclock (minutes resolution). */
+		o->lru = LRU_CLOCK();
+		return o;
+	}
+
+1. 最开始命令数据在redisClient->querybuf 中以字符串形式存在
+2. processMultibulkBuffer 然后字符串 数据被拆分为 redisObject 保存在 redisClient->argv[1],redisClient->argv[2]，当然redisObject 的类型仍被标记为字符串
+3. 到db.c 时，`setKey(robj *key,robj *val)`
+4. dict.c `dictAdd(void *key, void *val)` key 已被转换为 sds。 value 何时被转换为 对应类型的还有待确认。（未完成）
+
+## Sentinel/哨兵模式
 
 sentinel是redis高可用的解决方案，sentinel系统可以监视一个或者多个redis master服务，以及这些master服务的所有从服务；当某个master服务下线时，自动将该master下的某个从服务升级为master服务替代已下线的master服务继续处理请求。
+
+## 小结
+
+**如果你看到一个新东西，却没有理清它的逻辑，直到打通你已熟悉的东西（学名叫已有的知识体系），那肯定是没有真正理解它**。 在redis 源码分析这里，你已知的是各种内存操作（即业务层部分），未知的网络层到业务层的通路。
 
