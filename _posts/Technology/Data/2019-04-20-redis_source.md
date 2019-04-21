@@ -29,7 +29,7 @@ keywords: Redis
 
 ![](/public/upload/data/redis_class_diagram.png)
 
-本文 以一个`set mykey myvalue` 来分析redis的 启动和保存流程
+本文 以一个`SET KEY VALUE` 来分析redis的 启动和保存流程
 
 ## 启动过程
 
@@ -279,6 +279,8 @@ Redis 中会处理两种事件：时间事件和文件事件。在每个事件�
 			return REDIS_OK;
 		}
 
+![](/public/upload/data/redis_command_set.png)
+
 ### 业务层
 
 	redis.c
@@ -459,9 +461,14 @@ object.c
 	}
 
 1. 最开始命令数据在redisClient->querybuf 中以字符串形式存在
+
+	![](/public/upload/data/redis_command_in_querybuf.png)
 2. processMultibulkBuffer 然后字符串 数据被拆分为 redisObject 保存在 redisClient->argv[1],redisClient->argv[2]，当然redisObject 的类型仍被标记为字符串
-3. 到db.c 时，`setKey(robj *key,robj *val)`
-4. dict.c `dictAdd(void *key, void *val)` key 已被转换为 sds。 value 何时被转换为 对应类型的还有待确认。（未完成）
+
+	![](/public/upload/data/redis_command_in_argv.png)
+3. t_string.c setCommand 对值对象进行编码
+4. 到db.c 时，`setKey(robj *key,robj *val)`
+5. dict.c `dictAdd(void *key, void *val)` key 已被转换为 sds。 
 
 ## Sentinel/哨兵模式
 
