@@ -260,10 +260,4 @@ redis中提供对lua脚本的支持，jedis和sdr自然也不甘落后，也都�
 
 基于common pool2实现
 
-## redis的其它应用
 
-http://www.blogjava.net/masfay/archive/2012/07/03/382080.html
-
-1. pipeline
-2. 跨jvm的id生成器 
-3. 跨jvm的锁实现
