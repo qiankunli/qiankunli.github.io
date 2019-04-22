@@ -8,7 +8,7 @@ keywords: jedis,spring-data-redis
 
 ---
 
-## 简介（待整理）
+## 简介
 
 * TOC
 {:toc}
