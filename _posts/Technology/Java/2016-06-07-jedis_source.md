@@ -10,9 +10,8 @@ keywords: jedis,spring-data-redis
 
 ## 简介（待整理）
 
-分为三块
-
-简单，pool，shard
+* TOC
+{:toc}
 
 [Intro to Jedis – the Java Redis Client Library](https://www.baeldung.com/jedis-java-redis-client-library)
 
@@ -164,25 +163,72 @@ Response
 
 pipeline包含client成员，因此具备数据的收发能力，但在收发数据的逻辑上与jedis的不同。pipeline的基本原理是：在pipeline中的请求，会直接发出去，同时加一个response进入list（相当于约定好返回结果存这里）。网络通信嘛，返回的结果本质上是inputstream。等到syncAndReturnAll的时候集中解析inputstream。因为redis server端是单线程处理的，所以也不用担心get("2")的结果跑在get("1")的前面。
 
+    public List<Object> syncAndReturnAll() {
+        if (getPipelinedResponseLength() > 0) {
+            List<Object> unformatted = client.getMany(getPipelinedResponseLength());
+            List<Object> formatted = new ArrayList<Object>();
+            for (Object o : unformatted) {
+                try {
+                    formatted.add(generateResponse(o).get());
+                } catch (JedisDataException e) {
+                    formatted.add(e);
+                }
+            }
+            return formatted;
+        } else {
+            return java.util.Collections.<Object> emptyList();
+        }
+    }
+
 ## spring-data-redis实现
 
-很明显，从RedisTemplate作为入口开始分析，由此得到sdr上层接口类如下：
+[Spring Data Redis](https://spring.io/projects/spring-data-redis#overview) 源代码 [spring-projects/spring-data-redis](https://github.com/spring-projects/spring-data-redis)示例代码
 
-1. RedisTemplate extends RedisAccessor implements RedisOperations.
+    ListOperations<String, Person> listOps = template.listOps();
+    listOps.rightPush(random, new Person("Jane", "Smith"));
+    List<Person> peopleOnSecondFloor = listOps.range("users:floor:2", 0, -1);
 
-    redis的操作主要分为两种
-    
-    - 数据结构操作，list，set等，都有自己的独有的操作，所以将其作为一个类封起来
-    - 数据控制操作，各种数据结构通用的，比如过期，删除啊
+下文仅以redis 五种类型的 String和List 数据结构为例：
 
-2. ValueOperations,ListOperation等，各种数据结构操作的方法。
-3. AbstractOperations，各种数据结构Operation的公共类
-4. RedisCallback，Callback interface for Redis 'low level' code
-5. RedisConnection extends RedisCommands，A connection to a Redis server. Acts as an common abstraction across various Redis client libraries 
+![](/public/upload/java/sdr_redisTemplate_diagram.png)
 
-RedisTemplate将具体的数据结构操作委托给各种数据结构Operation（以下以ValueOperations举例），ValueOperations最终又调用了RedisTemplate的`<T> T execute(RedisCallback<T> callback, boolean b)`。
+RedisTemplate 和ValueOperations、ListOperation 互相持有对方的引用， RedisTemplate 作为用户操作的入口对象， ValueOperations、ListOperation 等负责分担五种数据类型的 操作。
 
-也就是说，RedisTemplate提供了高层调用结构和基本的逻辑实现（execute逻辑就是：建连接，序列化，发请求数据，拿数据，返回）。各数据结构特殊的部分（即拿到的数据怎么处理）由它们自己实现，双方的结合点就是callback。这和spring-jdbc中的JdbcTemplate非常相像。
+![](/public/upload/java/sdr_redisConnection_diagram.png)
+
+1. 数据操作最终由 JedisConnection 来完成
+2. 从spring-data-redis 实现看，spring-data-redis 只是将jedis 作为 redis 访问的工具之一，并没有严格绑定
+3. JedisConnection 与 JedisStringCommands、JedisListCommands 等互相持有对方的引用，JedisStringCommands、JedisListCommands 等负责分担五种数据类型的 操作。
+
+![](/public/upload/java/sdr_sequence_diagram.png)
+
+	public <T> T execute(RedisCallback<T> action, boolean exposeConnection, boolean pipeline) {
+		RedisConnectionFactory factory = getRequiredConnectionFactory();
+		RedisConnection conn = null;
+		try {
+			if (enableTransactionSupport) {
+				conn = RedisConnectionUtils.bindConnection(factory, enableTransactionSupport);
+			} else {
+				conn = RedisConnectionUtils.getConnection(factory);
+			}
+			boolean existingConnection = TransactionSynchronizationManager.hasResource(factory);
+			RedisConnection connToUse = preProcessConnection(conn, existingConnection);
+			boolean pipelineStatus = connToUse.isPipelined();
+			if (pipeline && !pipelineStatus) {
+				connToUse.openPipeline();
+			}
+			RedisConnection connToExpose = (exposeConnection ? connToUse : createRedisConnectionProxy(connToUse));
+			T result = action.doInRedis(connToExpose);
+			if (pipeline && !pipelineStatus) {
+				connToUse.closePipeline();
+			}
+			return postProcessResult(result, connToUse, existingConnection);
+		} finally {
+			RedisConnectionUtils.releaseConnection(conn, factory);
+		}
+	}
+
+RedisTemplate使用模板模式，提供了高层调用结构和基本的逻辑实现（execute逻辑就是：建连接，序列化，发请求数据，拿数据，返回）。ValueOperations、ListOperation 对应的命令由它们自己实现，双方的结合点就是callback。这和spring-jdbc中的JdbcTemplate非常相像。
 
 ## ScriptingCommands
 
