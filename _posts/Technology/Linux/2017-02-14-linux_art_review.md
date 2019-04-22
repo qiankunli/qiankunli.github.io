@@ -126,6 +126,27 @@ init/main.c
 2. 理解了进程管理信息数据结构、保护模式这一套理念后，就可以理解汇编程序(bootsect.s,setup.s,head.s)的大部分工作意图。**书中P40的两个问题非常有价值**：为什么没有最先调用main函数？为什么加载工作完成后，仍然没有执行main函数，而是打开A20、pe和pg，建立IDT和GDT...，然后才开始执行main函数？
 3. 启动过程就是不停向上抽象的过程。比如，一开始只能通过汇编物理地址访问外设，后来可以文件形式访问外设；一开始用BIOS默认的中断体系，当OS自己的中断体系建立后，就可以软中断提供系统调用。
 
+2019.4.22补充：其实你看C系[Redis源码分析](http://qiankunli.github.io/2019/04/20/redis_source.html) 也是类似，先初始化domain内的各种抽象，然后开始干活，只是linux 的各种“抽象”偏硬件。
+
+	redis.c
+	int main(int argc, char **argv) {
+		...
+		// 初始化服务器
+		initServerConfig();
+		...
+		// 将服务器设置为守护进程
+		if (server.daemonize) daemonize();
+		// 创建并初始化服务器数据结构
+		initServer();
+		...
+		// 运行事件处理器，一直到服务器关闭为止
+		aeSetBeforeSleepProc(server.el,beforeSleep);
+		aeMain(server.el);
+		// 服务器关闭，停止事件循环
+		aeDeleteEventLoop(server.el);
+		return 0
+	}
+
 ## OS驱动进程执行，中断驱动OS执行
 
 ### os的加载

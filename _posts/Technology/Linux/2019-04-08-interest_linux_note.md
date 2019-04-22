@@ -162,13 +162,49 @@ CPU 和内存来来回回传数据，靠的都是总线。其实总线上主要�
 |数据复制|无内存复制|例如io操作等会涉及到内存复制|
 
 
+## 从glibc 到系统调用
+
+[The GNU C Library (glibc)](https://www.gnu.org/software/libc/started.html)
+
+![](/public/upload/linux/glibc_systemcall_kernel.jpg)
 
 
+1.  glibc 的 syscal.list 列出 glibc 函数对应的系统调用
+2. glibc 的脚本 make_syscall.sh 根据 syscal.list 生成对应的宏定义(函数映射到系统调用)
+3. glibc 的 syscal-template.S 使用这些宏, 定义了系统调用的调用方式(也是通过宏)
+4. 其中会调用 DO_CALL (也是一个宏), 32位与 64位实现不同
 
 
+glibc 里面的 open 函数
 
+    int open(const char *pathname, int flags, mode_t mode)
 
+在 glibc 的源代码中，有个文件 syscalls.list，里面列着所有 glibc 的函数对应的系统调用
 
+    # File name Caller  Syscall name    Args    Strong name Weak names
+    open		-	open		Ci:siv	__libc_open __open open
+
+以32位为例，函数名 ==> Syscall name ==> DO_CALL ==> `int $0x80`
+
+    /* Linux takes system call arguments in registers:
+        syscall number	%eax	     call-clobbered
+        arg 1		%ebx	     call-saved
+        arg 2		%ecx	     call-clobbered
+        arg 3		%edx	     call-clobbered
+        arg 4		%esi	     call-saved
+        arg 5		%edi	     call-saved
+        arg 6		%ebp	     call-saved
+    ......
+    */
+    #define DO_CALL(syscall_name, args)                           \
+        PUSHARGS_##args                               \
+        DOARGS_##args                                 \
+        movl $SYS_ify (syscall_name), %eax;                          \
+        ENTER_KERNEL                                  \
+        POPARGS_##args
+    # define ENTER_KERNEL int $0x80
+
+函数传参到底层就是寄存器传参了。
 
 
 
