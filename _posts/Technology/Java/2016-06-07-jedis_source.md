@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Jedis分析
+title: Jedis源码分析
 category: 技术
 tags: Java
 keywords: jedis,spring-data-redis
@@ -14,29 +14,36 @@ keywords: jedis,spring-data-redis
 
 简单，pool，shard
 
+[Intro to Jedis – the Java Redis Client Library](https://www.baeldung.com/jedis-java-redis-client-library)
+
 ## 简单实现
 
-几个基本的model：jedis，client(Connection)，command。这几个model都有对应的Binaryxx。比如Jedis继承 BinaryJedis，封装一些编码的处理操作。Jedis `set(String key,String value)`，对应BinaryJedis就是`set(byte[] key,byte[] value)`。Binaryxx 提供基本能力，jedis/client/command 做一些代码或接口封装。
+![](/public/upload/java/jedis_class_diagram.png)
 
+从下到上，是一个复杂功能需求如何被逐步分解的过程，比如JedisCommands 的`void set(String key,String value)` 和BinaryJedisCommands 的`void set(byte[] key,byte[] value)`
 
 在网络通信层面，jedis与其它rpc组件是一样一样的
 
-1. 提供代理接口，将远程操作模拟在本地，比如`set(key,value)`
-2. `set(key,value)`的实现，实际是：key序列化，加上一定的协议约定（包含哪些字段，字段的先后顺序），发送数据，等待响应，将响应反序列化。
+![](/public/upload/java/jedis_sequence_diagram.png)
 
-在业务层面
 
-首先redis协议支持的操作，称为Command，反映在代码中，抽象出了一系列的Command接口，负责不同的操作。
+jedis协议支持的操作，称为Command，反映在代码中，抽象出了一系列的Command接口，负责不同的操作。
 
 - BasicCommands，比如ping，save，bgsave等
 - BinaryJedisCommands，负责各种数据结构的set和get
-- MultiKeyBinaryCommands，应该是多个key-value的同时设置
+- MultiKeyBinaryCommands，参数为多个key的命令
+
+        Long del(String... keys);
+        List<String> blpop(int timeout, String... keys);
+
+- AdvancedJedisCommands
+
+          List<Slowlog> slowlogGet();
+          String clientList();
+
 - 其它的Command类一般用不着
 
-在基本操作之上，提供以下封装
-
-1. shardedJedis
-2. 还有支持主从的
+### set 命令实例
 
 client负责数据io，command定义业务接口，jedis负责整合两者。command没有XXXCommand实现类，其最终由jedis实现，jedis实现几个Command，该jedis就支持几种操作，比如ShardedJedis就没有支持所有的Command。
 
@@ -57,6 +64,7 @@ client负责数据io，command定义业务接口，jedis负责整合两者。com
     Connection sendCommand(Command cmd, byte[]... args) {
         try {
             this.connect();
+            // 协议层
             Protocol.sendCommand(this.outputStream, cmd, args);
             ++this.pipelinedCommands;
             return this;
@@ -88,11 +96,10 @@ client负责数据io，command定义业务接口，jedis负责整合两者。com
     
 整个代码看下来，真是太流畅了，类似的client-server工具程序可以借鉴下。
 
-## pool实现
+## shard jedis 实现
 
-基于common pool2实现
+![](/public/upload/java/sharded_jedis_class_diagram.png)
 
-## shard （pool）实现
 
 这里主要用到了一致性哈希，完成`key ==> 虚拟节点 ==> 实际节点`的映射
 
@@ -100,14 +107,13 @@ client负责数据io，command定义业务接口，jedis负责整合两者。com
 
     // ShardedJedis
     public String set(String key, String value) {
-        Jedis j = (Jedis)this.getShard(key);
+        Jedis j = this.getShard(key);
         return j.set(key, value);
     }
     // Sharded，先在TreeMap中找到对应key所对应的ShardInfo，然后通过ShardInfo在LinkedHashMap中找到对应的Jedis实例。
     public R getShard(byte[] key) {
         return this.resources.get(this.getShardInfo(key));
     }
-
 
     Sharded<R, S extends ShardInfo<R>> {
         private TreeMap<Long, S> nodes;                  hash(虚拟shardinfo)与shardinfo的映射
@@ -133,17 +139,7 @@ pipeline的简单实例
     System.out.println(responses.get(1));
     System.out.println(responses.get(2));
 
-
-涉及到的实现类`Pipeline ==》MultiKeyPipelineBase ==》 PipelineBase`
-
-对应Command接口，有好多pipeline接口
-
-- BinaryRedisPipeline，提供操作字节数组的接口（基本的数据操作）
-- RedisPipeline，基本的数据操作，原始类型（为转成字节数组），这些节本操作的返回值变了。`Response<String> set(String key, String value)`
-- BasicRedisPipeline, bgsave,save的操作
-- MultiKeyBinaryRedisPipeline、MultiKeyCommandsPipeline，multikey的原始类型和二进制类型操作
-- ClusterPipeline，cluster相关的操作
-
+![](/public/upload/java/pipeline_class_diagram.png)
 
 提供Queable接口，负责暂存响应结果
 
@@ -166,7 +162,7 @@ Response
     	Response<?> dependency = null; 
     }
 
-pipeline包含client成员，因此具备数据的收发能力，但在收发数据的逻辑上与jedis的不同。pipeline的基本原理是：在pipeline中的请求，会直接发出去，同时加一个response进入list（相当于约定好返回结果存这里）。网络通信嘛，返回的结果本质上是inputstream，get的时候，或许拿到了inputstream，但是不解析。等到syncAndReturnAll的时候集中解析inputstream。因为redis server端是单线程处理的，所以也不用担心get("2")的结果跑在get("1")的前面。
+pipeline包含client成员，因此具备数据的收发能力，但在收发数据的逻辑上与jedis的不同。pipeline的基本原理是：在pipeline中的请求，会直接发出去，同时加一个response进入list（相当于约定好返回结果存这里）。网络通信嘛，返回的结果本质上是inputstream。等到syncAndReturnAll的时候集中解析inputstream。因为redis server端是单线程处理的，所以也不用担心get("2")的结果跑在get("1")的前面。
 
 ## spring-data-redis实现
 
@@ -210,6 +206,9 @@ redis中提供对lua脚本的支持，jedis和sdr自然也不甘落后，也都�
         String scriptLoad(String script);
     }
 
+## pool实现
+
+基于common pool2实现
 
 ## redis的其它应用
 
