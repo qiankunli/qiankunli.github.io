@@ -18,6 +18,9 @@ keywords: network
 
 2018.10.12 补充，[The Linux Kernel](https://www.tldp.org/LDP/tlk/tlk.html)，基于内核2.0.33， 当你对0.xx,1.xx 版本的内核有一定了解之后，可以尝试深入一下，了解下前人的演进思路。
 
+相关文章 [《程序员的自我修养》小结](http://qiankunli.github.io/2015/04/22/programer.html) [《趣谈Linux操作系统》笔记
+](http://qiankunli.github.io/2019/04/08/interest_linux_note.html)
+
 ## 进程管理信息数据结构
 
 本段摘自page43

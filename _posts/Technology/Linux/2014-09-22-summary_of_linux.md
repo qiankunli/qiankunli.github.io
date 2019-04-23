@@ -7,11 +7,37 @@ keywords: Linux
 ---
 
 ## 前言 ##
+
 本文记录一些日常使用linux的一些点。
 
 ## 系统负载评估
 
 [理解Linux系统负荷](http://www.ruanyifeng.com/blog/2011/07/linux_load_average_explained.html)
+
+## 查看 ps -ef
+
+    [root@deployer ~]# ps -ef
+    UID        PID  PPID  C STIME TTY          TIME CMD
+    root         1     0  0  2018 ?        00:00:29 /usr/lib/systemd/systemd --system --deserialize 21
+    root         2     0  0  2018 ?        00:00:00 [kthreadd]
+    root         3     2  0  2018 ?        00:00:00 [ksoftirqd/0]
+    root         5     2  0  2018 ?        00:00:00 [kworker/0:0H]
+    root         9     2  0  2018 ?        00:00:40 [rcu_sched]
+    ......
+    root       337     2  0  2018 ?        00:00:01 [kworker/3:1H]
+    root       380     1  0  2018 ?        00:00:00 /usr/lib/systemd/systemd-udevd
+    root       415     1  0  2018 ?        00:00:01 /sbin/auditd
+    root       498     1  0  2018 ?        00:00:03 /usr/lib/systemd/systemd-logind
+    ......
+    root@pts/0
+    root     32794 32792  0 Jan10 pts/0    00:00:00 -bash
+    root     32901 32794  0 00:01 pts/0    00:00:00 ps -ef
+
+三类进程
+
+1. pid=1 init进程Systemd
+2. pid=2 内核线程kthreadd，用户态不带中括号， 内核态带中括号
+3. tty 带问号的，说明不是前台启动的，一般都是后台启动的服务
 
 ## Linux中的引号 ##
 
