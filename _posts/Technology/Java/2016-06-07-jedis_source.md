@@ -29,10 +29,13 @@ keywords: jedis,spring-data-redis
 
 ![](/public/upload/java/jedis_sequence_diagram.png)
 
+1. JedisPool 池化了 Jedis，是Jedis 池的操作入口。池化的不是“连接”，而是整个Jedis 对象。
+2. Jedis 作为 单连接操作入口，提供了操作API
+3. BinaryJedis 实际干活儿，聚合了Client、Transaction、Pipeline 等能力对象，Client 基于Socket 负责实际的网络访问。
 
 jedis协议支持的操作，称为Command，反映在代码中，抽象出了一系列的Command接口，负责不同的操作。
 
-- BasicCommands，比如ping，save，bgsave等
+- BasicCommands，比如ping，save，bgsave等，方法一般没有参数，或参数跟数据内容无关
 - BinaryJedisCommands，负责各种数据结构的set和get
 - MultiKeyBinaryCommands，参数为多个key的命令
 
