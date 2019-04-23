@@ -25,10 +25,6 @@ keywords: jedis,spring-data-redis
 
 从下到上，是一个复杂功能需求如何被逐步分解的过程，比如JedisCommands 的`void set(String key,String value)` 和BinaryJedisCommands 的`void set(byte[] key,byte[] value)`
 
-在网络通信层面，jedis与其它rpc组件是一样一样的
-
-![](/public/upload/java/jedis_sequence_diagram.png)
-
 1. JedisPool 池化了 Jedis，是Jedis 池的操作入口。池化的不是“连接”，而是整个Jedis 对象。
 2. Jedis 作为 单连接操作入口，提供了操作API
 3. BinaryJedis 实际干活儿，聚合了Client、Transaction、Pipeline 等能力对象，Client 基于Socket 负责实际的网络访问。
@@ -48,6 +44,10 @@ jedis协议支持的操作，称为Command，反映在代码中，抽象出了�
           String clientList();
 
 - 其它的Command类一般用不着
+
+在网络通信层面，jedis与其它rpc组件是一样一样的
+
+![](/public/upload/java/jedis_sequence_diagram.png)
 
 ### set 命令实例
 
