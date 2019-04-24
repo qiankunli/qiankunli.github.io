@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Codis/Jodis源码分析
+title: Codis源码分析
 category: 技术
 tags: Go
 keywords: Go
@@ -49,21 +49,20 @@ Proxy拥有更好的监控和控制，同时其后端信息亦不易暴露，易
 1. codis-proxy 。客户端连接的Redis代理服务，本身实现了Redis协议，表现很像原生的Redis （就像 Twemproxy）。一个业务可以部署多个 codis-proxy，其本身是无状态的。
 2. codis-server。Codis 项目维护的一个Redis分支，加入了slot的支持和原子的数据迁移指令。
 
-### 源码分析
+### 源码分析（未完成）
 
 主要是两个package
 
 cmd 命令入口，即通过命令行 启动 socket server 程序等
 pkg 各个组件的源码文件
 
-## Jodis - Java client for codis
 
-[Jodis - Java client for codis](https://github.com/CodisLabs/jodis) 功能特性
 
-1. Use a round robin policy to balance load to multiple codis proxies.
-2. Detect proxy online and offline automatically.
+## 其它
 
-从目前看，主要是解决多proxy 的服务发现
+架构师们是如此贪心，有单点就一定要变成分布式，同时还希望尽可能的透明:P。就MySQL来看，从最早的单点到主从读写分离，再到后来阿里的类似Cobar和TDDL，分布式和可扩展性是达到了，但是牺牲了事务支持，于是有了后来的OceanBase。Redis从单点到Twemproxy，再到Codis，再到Reborn。**到最后的存储早已和最初的面目全非，但协议和接口永存，比如SQL和Redis Protocol**。
+
+我认为，抛开底层存储的细节，对于业务来说，KV，SQL查询（关系型数据库支持）和事务，可以说是构成业务系统的存储原语。为什么memcached/Redis+mysql的组合如此的受欢迎，正是因为这个组合，几个原语都能用上，对于业务来说，可以很方便的实现各种业务的存储需求，能轻易的写出「正确」的程序。但是，现在的问题是数据大到一定程度上时，从单机向分布式进化的过程中，最难搞定的就是事务
 
 
 

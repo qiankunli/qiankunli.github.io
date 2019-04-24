@@ -263,4 +263,79 @@ redis中提供对lua脚本的支持，jedis和sdr自然也不甘落后，也都�
 
 基于common pool2实现
 
+## Jodis - Java client for codis
+
+[Jodis - Java client for codis](https://github.com/CodisLabs/jodis) 功能特性
+
+1. Use a round robin policy to balance load to multiple codis proxies.
+2. Detect proxy online and offline automatically.
+
+从目前看，主要是解决多codis proxy 的服务发现， codis 参见[Codis源码分析](http://qiankunli.github.io/2019/04/23/codis_source.html)
+
+示例代码
+
+    JedisResourcePool jedisPool = RoundRobinJedisPool.create()
+            .curatorClient("zkserver:2181", 30000).zkProxyDir("/jodis/xxx").build();
+    try (Jedis jedis = jedisPool.getResource()) {
+        jedis.set("foo", "bar");
+        String value = jedis.get("foo");
+        System.out.println(value);
+    }
+
+![](/public/upload/java/jodis_class_diagram.png)
+
+    // RoundRobinJedisPool 构造方法
+    private RoundRobinJedisPool(CuratorFramework curatorClient, boolean closeCurator,
+            String zkProxyDir, JedisPoolConfig poolConfig, int connectionTimeoutMs, int soTimeoutMs,
+            String password, int database, String clientName) {
+        ...
+        watcher = new PathChildrenCache(curatorClient, zkProxyDir, true);
+        watcher.getListenable().addListener(new PathChildrenCacheListener() {
+            public void childEvent(CuratorFramework client, PathChildrenCacheEvent event)
+                    throws Exception {
+                synchronized (RoundRobinJedisPool.this) {
+                    if (RESET_TYPES.contains(event.getType())) {
+                        resetPools();
+                    }
+                }
+            }
+        });
+    }
+    private volatile ImmutableList<PooledObject> pools = ImmutableList.of();
+    // 干掉offline 实例，为pools 赋值新的online 实例
+    private void resetPools() {
+        ImmutableList<PooledObject> pools = this.pools;
+        Map<String, PooledObject> addr2Pool = copy from pools
+        ImmutableList.Builder<PooledObject> builder = ImmutableList.builder();
+        // 根据活着的实例 构建builder，并从addr2Pool 移除活着的实例
+        for (ChildData childData : watcher.getCurrentData()) {
+            CodisProxyInfo proxyInfo = MAPPER.readValue(childData.getData(),
+                    CodisProxyInfo.class);
+            if (!CODIS_PROXY_STATE_ONLINE.equals(proxyInfo.getState())) {
+                continue;
+            }
+            String addr = proxyInfo.getAddr();
+            PooledObject pool = addr2Pool.remove(addr);
+            if (pool == null) {
+                pool = new PooledObject(addr,new JedisPool(...));
+            }
+            builder.add(pool);
+        }
+        this.pools = builder.build();
+        // 移除 offline 的实例
+        for (final PooledObject pool: addr2Pool.values()) {
+            jedisPoolClosingExecutor.schedule(new Runnable() {
+                public void run() {
+                    pool.close();
+                }
+            }, DELAY_BEFORE_CLOSING_POOL, TimeUnit.MILLISECONDS);
+        }
+    }
+
+1. Jodis 采用 依赖Jedis 的方式，将JedisPool 入口对象改为 RoundRobinJedisPool。整个jar 只有四五个类
+2. RoundRobinJedisPool从zk 中拿到codis-proxy地址列表，重建pools
+3. synchronized + volatile + 先准备数据再赋值` this.pools = builder.build();` 来保护pools 的安全访问
+
+
+
 
