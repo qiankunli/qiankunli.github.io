@@ -22,8 +22,6 @@ Codis 是一个分布式 Redis 解决方案, 对于上层的应用来说, 连接
 
 [为什么大厂都喜欢用 Codis 来管理分布式集群？](https://juejin.im/post/5c132b076fb9a04a08218eef)
 
-[Codis作者黄东旭细说分布式Redis架构设计和踩过的那些坑们](https://my.oschina.net/u/658658/blog/500499)（未读完）
-
 Redis多实例通常有3个使用途径
 
 1. 客户端静态分片，一致性哈希；也称为Smart Client
@@ -49,16 +47,30 @@ Proxy拥有更好的监控和控制，同时其后端信息亦不易暴露，易
 1. codis-proxy 。客户端连接的Redis代理服务，本身实现了Redis协议，表现很像原生的Redis （就像 Twemproxy）。一个业务可以部署多个 codis-proxy，其本身是无状态的。
 2. codis-server。Codis 项目维护的一个Redis分支，加入了slot的支持和原子的数据迁移指令。
 
-### 源码分析（未完成）
+### 源码分析
 
 主要是两个package
 
-cmd 命令入口，即通过命令行 启动 socket server 程序等
-pkg 各个组件的源码文件
+1. cmd 命令入口，包含main.go文件，通过命令行 启动 socket server 程序等，command-line interfaces 工具用的是 [docopt-go](https://github.com/docopt/docopt.go)
+2. pkg 各个组件的源码文件。 
 
+codis-proxy 模块一共就二三十个go文件，非常适合做go 语言入门
 
+![](/public/upload/go/codis_class_diagram.png)
+
+![](/public/upload/go/codis_sequence_diagram.png)
+
+1. Proxy每接到一个redis请求，就创建一个独立的session进行处理
+2. codis将请求与结果关联起来的方式，就是把结果当做request的一个属性
+3. Session核心就是创建loopReader和loopWriter。loopReader负责读取和分发请求到后端，loopWriter负责合并请求结果，然后返回给客户端。
+4. forwardSync将指定的slot、request、键的哈希值，经过process得到实际处理请求的BackendConn，然后把请求放入BackendConn的chan *Request中，等待处理
+5. backendConn负责实际对redis请求进行处理，loopWriter负责从backendConn.input中取出请求并发送，loopReader负责遍历所有请求，从redis.Conn中解码得到resp并设置为相关的请求的属性
+
+![](/public/upload/go/codis_framework.png)
 
 ## 其它
+
+[Codis作者黄东旭细说分布式Redis架构设计和踩过的那些坑们](https://my.oschina.net/u/658658/blog/500499)
 
 架构师们是如此贪心，有单点就一定要变成分布式，同时还希望尽可能的透明:P。就MySQL来看，从最早的单点到主从读写分离，再到后来阿里的类似Cobar和TDDL，分布式和可扩展性是达到了，但是牺牲了事务支持，于是有了后来的OceanBase。Redis从单点到Twemproxy，再到Codis，再到Reborn。**到最后的存储早已和最初的面目全非，但协议和接口永存，比如SQL和Redis Protocol**。
 

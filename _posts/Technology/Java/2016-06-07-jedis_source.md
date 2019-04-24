@@ -317,6 +317,7 @@ redis中提供对lua脚本的支持，jedis和sdr自然也不甘落后，也都�
             String addr = proxyInfo.getAddr();
             PooledObject pool = addr2Pool.remove(addr);
             if (pool == null) {
+                // 与传统JedisPool 的方式一样
                 pool = new PooledObject(addr,new JedisPool(...));
             }
             builder.add(pool);
@@ -332,8 +333,8 @@ redis中提供对lua脚本的支持，jedis和sdr自然也不甘落后，也都�
         }
     }
 
-1. Jodis 采用 依赖Jedis 的方式，将JedisPool 入口对象改为 RoundRobinJedisPool。整个jar 只有四五个类
-2. RoundRobinJedisPool从zk 中拿到codis-proxy地址列表，重建pools
+1. Jodis 采用 依赖Jedis 的方式，将JedisPool 入口对象改为 RoundRobinJedisPool。**整个jar 只有四五个类**
+2. RoundRobinJedisPool从zk 中拿到codis-proxy地址列表，重建pools。说白了就是 proxy list 从配置取改成从zk 取
 3. synchronized + volatile + 先准备数据再赋值` this.pools = builder.build();` 来保护pools 的安全访问
 
 
