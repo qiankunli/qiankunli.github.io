@@ -47,7 +47,7 @@ Proxy拥有更好的监控和控制，同时其后端信息亦不易暴露，易
 1. codis-proxy 。客户端连接的Redis代理服务，本身实现了Redis协议，表现很像原生的Redis （就像 Twemproxy）。一个业务可以部署多个 codis-proxy，其本身是无状态的。
 2. codis-server。Codis 项目维护的一个Redis分支，加入了slot的支持和原子的数据迁移指令。
 
-### 源码分析
+## 源码分析
 
 主要是两个package
 
@@ -59,6 +59,9 @@ codis-proxy 模块一共就二三十个go文件，非常适合做go 语言入门
 ![](/public/upload/go/codis_class_diagram.png)
 
 ![](/public/upload/go/codis_sequence_diagram.png)
+
+
+参见 [Codis源码解析——proxy的启动](https://blog.csdn.net/antony9118/article/details/75268358) 系列
 
 1. Proxy每接到一个redis请求，就创建一个独立的session进行处理
 2. codis将请求与结果关联起来的方式，就是把结果当做request的一个属性
