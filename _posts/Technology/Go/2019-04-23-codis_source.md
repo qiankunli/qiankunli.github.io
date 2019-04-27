@@ -97,7 +97,7 @@ slot 一共1024个，分属于两个Group，其中第一个Group 是offline 状�
 [深入浅出百亿请求高可用Redis(codis)分布式集群揭秘
 ](https://zhuanlan.zhihu.com/p/62867207) 还是腾讯的大神画的有水平
 
-![](public/upload/go/codis_proxy_process.jpg)
+![](/public/upload/go/codis_proxy_process.jpg)
 
 ## 其它
 
