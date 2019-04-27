@@ -49,12 +49,35 @@ Proxy拥有更好的监控和控制，同时其后端信息亦不易暴露，易
 
 ## 源码分析
 
+几个好奇
+
+1. proxy 的基本逻辑就是转发，既做服务端也做客户端，在代码上如何体现？
+2. 如何自动做rebalance？slot hash关键逻辑是啥？
+3. 和zk的协作方式是啥？
+
 主要是两个package
 
 1. cmd 命令入口，包含main.go文件，通过命令行 启动 socket server 程序等，command-line interfaces 工具用的是 [docopt-go](https://github.com/docopt/docopt.go)
 2. pkg 各个组件的源码文件。 
 
 codis-proxy 模块一共就二三十个go文件，非常适合做go 语言入门
+
+
+### 路由规则
+
+![](public/upload/go/codis_key_route.jpg)
+
+看一个codis-dashboard 例子
+
+![](/public/upload/go/codis_dashboard_1.jpg)
+
+有两个Codis-Proxy，4个Redis实例，分属于两个Group（G1和G2）
+
+![](/public/upload/go/codis_dashboard_2.png)
+
+slot 一共1024个，分属于两个Group，其中第一个Group 是offline 状态
+
+### 请求处理
 
 ![](/public/upload/go/codis_class_diagram.png)
 
@@ -70,6 +93,11 @@ codis-proxy 模块一共就二三十个go文件，非常适合做go 语言入门
 5. backendConn负责实际对redis请求进行处理，loopWriter负责从backendConn.input中取出请求并发送，loopReader负责遍历所有请求，从redis.Conn中解码得到resp并设置为相关的请求的属性
 
 ![](/public/upload/go/codis_framework.png)
+
+[深入浅出百亿请求高可用Redis(codis)分布式集群揭秘
+](https://zhuanlan.zhihu.com/p/62867207) 还是腾讯的大神画的有水平
+
+![](public/upload/go/codis_proxy_process.jpg)
 
 ## 其它
 
