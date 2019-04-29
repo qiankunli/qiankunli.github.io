@@ -36,6 +36,10 @@ keywords: groovy
 
 [Lock-Free Queue](http://qiankunli.github.io/2018/10/15/lock_free.html)
 
+## synchronized
+
+[Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)如果线程进入 monitorenter **会将自己放入该 objectmonitor 的 entryset 队列，然后阻塞**（PS： **注意这种表述方式，是线程自己将自己加入队列，然后线程自己阻塞了自己**），如果当前持有线程调用了 wait 方法，**将会释放锁，然后将自己封装成 objectwaiter 放入 objectmonitor 的 waitset 队列**，这时候 entryset 队列里的某个线程将会竞争到锁，并进入 active 状态，如果这个线程调用了 notify 方法，将会把 waitset 的第一个 objectwaiter 拿出来放入 entryset （这个时候根据策略可能会先自旋），当调用 notify 的那个线程执行 moniterexit 释放锁的时候， entryset 里的线程就开始竞争锁后进入 active 状态。
+
 ## AQS 的排队方式
 
 [AQS4——论文学习](http://qiankunli.github.io/2018/06/05/aqs3.html)
