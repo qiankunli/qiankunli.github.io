@@ -50,6 +50,11 @@ Linux0.11是一个支持多进程的现代操作系统，这就意味着，各�
 2. 知道了GDT等是干什么的，就可以顺畅的分析OS启动时为什么要初始化GDT，OS进程初始化时，为什么要设置LDT。
 
 
+[Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ) [硬件对软件设计的影响](http://qiankunli.github.io/2018/01/07/hardware_software.html)
+
+![](/public/upload/linux/cpu_work.jpeg)
+
+
 ## 操作系统是一个main函数
 
 摘自[loveveryday/linux0.11](https://github.com/loveveryday/linux0.11)

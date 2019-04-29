@@ -120,17 +120,6 @@ aqs 作者关于aqs的论文[The java.util.concurrent Synchronizer Framework](ht
 		* 如果是，则让进程休眠，直到FUTEX_WAKE 或 timeout
 
 
-## aqs 为什么自己 也要维护一个队列
-
-虽说aqs 只需要 glibc/linux 提供 线程的block/unblock 的能力即可。但实际上，linux block 线程时也顺带 将其加入了 内核级的等待队列中，为什么？
-
-1. glibc 层面上的mutex/condition 也提供队列管理 等待线程，aqs 不直接用？
-2. 内核 也将线程加入到等待队列了？aqs 何必再加入？
-
-原因
-
-1. jvm 层面上java 线程有一个数据结构，glibc 上线程也有一个数据结构，linux 内核 则是 task_struct，不同层级维护的信息不同。再则，jvm 层级的 等待队列，jvm 可以管理和访问，易于做一些事儿
-2. aqs 使用的是 clh 队列，有一些独到之处，还有待分析。
 
 ## 小结
 
