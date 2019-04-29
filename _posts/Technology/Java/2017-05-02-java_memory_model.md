@@ -24,6 +24,8 @@ keywords: JAVA memory model
 2. harware memory Architecture
 3. Bridging The Gap Between The Java Memory Model And The Hardware Memory Architecture
 
+[Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)为了让应用程序免于数据竞争的干扰， Java  内存模型中定义了 happen-before 来描述两个操作的内存可见性，也就是 X 操作 happen-before 操作 Y ， 那么 X 操作结果 对 Y 可见。
+
 ## java memory model
 
 ![](/public/upload/java/jvm_memory_model_2.png)
