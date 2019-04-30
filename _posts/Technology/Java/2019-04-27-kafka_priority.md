@@ -21,4 +21,6 @@ github 上的两个收获
 
 [flipkart-incubator/priority-kafka-client](https://github.com/flipkart-incubator/priority-kafka-client)
 
+![](/public/upload/java/priority_kafka_class_diagram.png)
+
 [gazilabs/kpq](https://github.com/gazilabs/kpq)

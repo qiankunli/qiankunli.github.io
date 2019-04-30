@@ -79,27 +79,38 @@ A streaming platform has three key capabilities:
 
 ### 消费者
 
+[Kafka系列（四）Kafka消费者：从Kafka中读取数据](http://www.dengshenyu.com/%E5%88%86%E5%B8%83%E5%BC%8F%E7%B3%BB%E7%BB%9F/2017/11/14/kafka-consumer.html)
+
     // 配置属性
     Properties props = new Properties();
-    props.put("zookeeper.connect", a_zookeeper);
-    props.put("group.id", a_groupId);
-    props.put("zookeeper.session.timeout.ms", "400");
-    props.put("zookeeper.sync.time.ms", "200");
-    props.put("auto.commit.interval.ms", "1000");
-    ConsumerConfig consumerConfig = new ConsumerConfig(props);
-    // 构建consumer
-    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
-    // consumer 根据目标 topic 返回 对应的stream
-    Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
-    topicCountMap.put(topic, new Integer(a_numThreads));
-    Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.createMessageStreams(topicCountMap);
-    // 消费特定 topic 的stream
-    List<KafkaStream<byte[], byte[]>> streams = consumerMap.get(topic);
-    for (final KafkaStream stream : streams) {
-        ConsumerIterator<byte[], byte[]> it = stream.iterator();
-        while (it.hasNext()){
-            System.out.println("Thread " + m_threadNumber + ": " + new String(it.next().message()));
+    props.put("bootstrap.servers", "broker1:9092,broker2:9092");
+    props.put("group.id", "CountryCounter");
+    props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+    KafkaConsumer<String, String> consumer = new KafkaConsumer<String,String>(props);
+    // 订阅主题
+    consumer.subscribe(Collections.singletonList("customerCountries"));
+    // 拉取循环
+    try {
+        while (true) {  //1)
+            ConsumerRecords<String, String> records = consumer.poll(100);  //2)
+            for (ConsumerRecord<String, String> record : records)  //3)
+            {
+                log.debug("topic = %s, partition = %s, offset = %d,
+                    customer = %s, country = %s\n",
+                    record.topic(), record.partition(), record.offset(),
+                    record.key(), record.value());
+                int updatedCount = 1;
+                if (custCountryMap.countainsValue(record.value())) {
+                    updatedCount = custCountryMap.get(record.value()) + 1;
+                }
+                custCountryMap.put(record.value(), updatedCount)
+                JSONObject json = new JSONObject(custCountryMap);
+                System.out.println(json.toString(4))
+            }
         }
+    } finally {
+        consumer.close(); //4
     }
 	
 ## 背景知识
@@ -196,7 +207,7 @@ KafkaConsumer 依赖SubscriptionState 管理订阅的Topic集合和Partition的�
 
 ![](/public/upload/scala/consumer_poll.png)
 
-consumer 有没有一个缓冲区/队列， io线程负责往里放数据，业务线程专心拉数据并处理就行了呢? 实际上是没有的，consumer的 所有逻辑要通过 `KafkaConsumer.poll` 驱动，业务方要自己 启动线程操作 KafkaConsumer 驱动所有逻辑。
+Kafka对外暴露了一个非常简洁的poll方法，其内部实现了协作、分区重平衡、心跳、数据拉取等功能，但使用时这些细节都被隐藏了
 
 Kafka provides two types of API for Java consumers:
 
