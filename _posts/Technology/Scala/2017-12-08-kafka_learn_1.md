@@ -94,8 +94,7 @@ A streaming platform has three key capabilities:
     try {
         while (true) {  //1)
             ConsumerRecords<String, String> records = consumer.poll(100);  //2)
-            for (ConsumerRecord<String, String> record : records)  //3)
-            {
+            for (ConsumerRecord<String, String> record : records)  //3){
                 log.debug("topic = %s, partition = %s, offset = %d,
                     customer = %s, country = %s\n",
                     record.topic(), record.partition(), record.offset(),
