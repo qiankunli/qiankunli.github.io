@@ -8,7 +8,7 @@ keywords: kafka
 
 ---
 
-## 简介（持续更新）
+## 简介
 
 
 kafka 官方需求  Kafka Improvement Proposals [KIP-349: Priorities for Source Topics](https://cwiki.apache.org/confluence/display/KAFKA/KIP-349%3A+Priorities+for+Source+Topics)
@@ -95,13 +95,13 @@ KafkaConsumer 包括fetcher 成员，通过设置`fetcher.maxPollRecords` 可以
 CapacityBurstPriorityKafkaConsumer 配置
 
 | Config | Mandatory | Description |
-|:------------|:----------------|:------------|
-| max.priority             | Yes      |    Defines max priority
-| group.id             | Yes      |    Defines logical group ID for the consumer
-| max.poll.records             | Yes      |    Defines max records to be polled across priority levels
-| max.poll.history.window.size             | No      |    This is window length to track historical counts of records obtained from ```poll()```. Defaulted to 6
-| min.poll.window.maxout.threshold             | No      |    This is threshold on how many historical counts os records obtained from ```poll()``` maxed out w.r.t. ```max.poll.records``` config. Defaulted to 4
-Rest of the configs are similar to that of ```KafkaConsumer```.
+|---|---|---|
+|max.priority|Yes| Defines max priority|
+|group.id|Yes|Defines logical group ID for the consumer|
+|max.poll.records|Yes|Defines max records to be polled across priority levels|
+|max.poll.history.window.size|No|This is window length to track historical counts of records obtained from ```poll()```. Defaulted to 6|
+|min.poll.window.maxout.threshold|No|This is threshold on how many historical counts os records obtained from ```poll()``` maxed out w.r.t. ```max.poll.records``` config. Defaulted to 4|
+|Rest of the configs are similar to that of ```KafkaConsumer```.|
 
 CapacityBurstPriorityKafkaConsumer.poll 一次可以拉取的记录数由`max.poll.records` 配置，`max.poll.records`property is split across priority topic consumers based on maxPollRecordsDistributor - defaulted to ExpMaxPollRecordsDistributor. `max.poll.records` 按一定算法 split 分摊给 各个consumer
 
@@ -110,9 +110,59 @@ CapacityBurstPriorityKafkaConsumer.poll 一次可以拉取的记录数由`max.po
 1. 一共50个“名额”，3个优先级，优先级越高分的越多
 2. 一种分配方式是指数分配（Exponential distribution of maxPollRecords across all priorities (upto maxPriority)），即高一个优先级的“配额”是低一个优先级“配额”的2倍。当然，你也可以选择 高一个优先级的“配额”比低一个优先级的多1个。 
 
-以`{2=29, 1=14, 0=7}` 配额为例，假设实际拉取数据时
+### 窗口机制
 
-1. 第一次实际拉取情况 `{2=10, 1=10, 0=7}` 即高优先级 消息不多，低优先级 消息比较多。
-2. 第二次拉取时，各个优先级的配额还按`{2=29, 1=14, 0=7}` 来么？
-3. 如果每次拉取数据 都按`{2=29, 1=14, 0=7}` 的配额进行，考虑一种情况：在一段时间内（比如10分钟），高中低消息数量相同，但高优先级消息先少后多，低优先级消息先多后少。 则10分钟结束后，可能出现低优先级消费数量比高优先级 还多的情况。
-4. 为此，priority_kafka 使用了Window机制，加入第一次实际拉取情况 `{2=10, 1=10, 0=7}` ，则第二次制定拉取配额时，为高优先级burst，比如制定配额为 `{2=29+19,1=14+4,0=7+3}` 来补偿高优先级的消费数量。window 部分的逻辑待进一步梳理。
+
+
+For example say we have:
+
+    max.priority = 3;
+    max.poll.records = 50;
+    maxPollRecordsDistributor = ExpMaxPollRecordsDistributor.instance();
+    max.poll.history.window.size = 6;   // 窗口长度
+    min.poll.window.maxout.threshold = 4;
+
+以上述配置为例， 3个优先级总额50的流量 分配是`{2=29, 1=14, 0=7}` ，你规定了配额，但上游的消息大多数时候都不是按配额 进来的。比如，你给priority=2 的“流量”最高，但如果 priority=2 的消息量一直不多，此时就应该多给priority=1/0 多一些被消费的机会。
+
+
+    Case 1: FIFO view of poll window is
+    2 - [29, 29, 29, 29, 29, 29];   //近6次循环实际读取的数据量
+    1 - [14, 14, 14, 14, 14, 14];
+    0 - [7, 7, 7, 7, 7, 7];
+    In this case every priority level topic consumer will retain its
+    capacity and not burst as everyone is eligible to burst but no
+    one is ready to give away reserved capacity.
+
+理想状态，上游消息 一直按配额 发送
+
+    Case 2: FIFO view of poll window is
+    2 - [29, 29, 29, 29, 29, 29];
+    1 - [14, 14, 14, 11, 10, 9];
+    0 - [7, 7, 7, 7, 7, 7];
+    In this case every priority level topic consumer will retain its
+    capacity and not burst as everyone is eligible to burst but no
+    one is ready to give away(赠送) reserved capacity.
+
+priority=2和priority=0 按配额发送，priority=1 有点“后劲不足”。但因为 priority=1 在min.poll.window.maxout.threshold = 4 的范围内 最大消息量仍是14，所以“按兵不动”再等等看
+
+
+    Case 3: FIFO view of poll window is
+    2 - [29, 29, 29, 29, 29, 29];
+    1 - [10, 10, 7, 10, 9, 0];
+    0 - [7, 7, 7, 7, 7, 7];
+    In this case priority level 2 topic consumer will burst into
+    priority level 1 topic consumer's capacity and steal (14 - 10 = 4),
+    hence increasing its capacity or max.poll.records property to
+    (29 + 4 = 33).
+
+priority=2和priority=0 按配额发送， priority=1 在min.poll.window.maxout.threshold = 4 的范围内 最大实际读取数量10 低于配额，则其空出来的14-10 个配合给priority=2
+
+    Case 3: FIFO view of poll window is
+    2 - [20, 25, 25, 20, 15, 10];
+    1 - [10, 10, 7, 10, 9, 0];
+    0 - [7, 7, 7, 7, 7, 7];
+    In this case priority level 0 topic consumer will burst into
+    priority level 2 and 1 topic consumer capacities and steal
+    (29 - 25 = 4 and 14 - 10 = 4), hence increasing its capacity
+    or max.poll.records property to (7 + 8 = 15).
+
