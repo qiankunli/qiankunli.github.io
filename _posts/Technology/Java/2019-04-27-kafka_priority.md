@@ -33,15 +33,24 @@ kafka 官方需求  Kafka Improvement Proposals [KIP-349: Priorities for Source 
 
 ## 优先级从高到低依次拉取，优先级越高拉取“配额”越大
 
-[flipkart-incubator/priority-kafka-client](https://github.com/flipkart-incubator/priority-kafka-client)
+下文主要来自对[flipkart-incubator/priority-kafka-client](https://github.com/flipkart-incubator/priority-kafka-client)的源码分析
 
 ![](/public/upload/java/priority_kafka_producer_class_diagram.png)
 
 ![](/public/upload/java/priority_kafka_consumer_class_diagram.png)
 
+This client provides abstraction to implement Kafka's Producer<K, V> and Consumer<K, V> with priority support.  PriorityKafkaProducer 和 CapacityBurstPriorityKafkaConsumer 只是聚合了KafkaProducer 和 KafkaConsumer成员 ，其本身仍符合KafkaProducer 和 KafkaConsumer 接口
+
+CapacityBurstPriorityKafkaConsumer 的类描述
+
+1. regulates（管理、控制） capacity (record processing rate) across priority levels. 跨优先级管控 记录消费速度
+2. When we discuss about priority topic XYZ and consumer group ABC, here XYZ and ABC are the logical names. For every logical priority topic XYZ one must define max supported priority level via the config ClientConfigs#MAX_PRIORITY_CONFIG property.**This property is used as the capacity lever（杠杆） for tuning（调音、调谐） processing rate across priorities**. Every object of the class maintains KafkaConsumer instance for every priority level topic [0, ${max.priority - 1}].
+
 ### 循环拉取
 
-    // 同事维护多个consumer
+CapacityBurstPriorityKafkaConsumer聚合多个优先级的consumer，先不考虑优先级，循环拉取逻辑如下：
+
+    // 同时维护多个consumer
     private Map<Integer, KafkaConsumer<K, V>> consumers;
     public ConsumerRecords<K, V> poll(long pollTimeoutMs) {
         Map<TopicPartition, List<ConsumerRecord<K, V>>> consumerRecords = 
@@ -55,18 +64,15 @@ kafka 官方需求  Kafka Improvement Proposals [KIP-349: Priorities for Source 
                 }
             }
         } while (consumerRecords.isEmpty() && System.currentTimeMillis() < (start + pollTimeoutMs));
+        ...
     }
 
-从上述代码可以看到， 单纯的循环拉取，只是做到了局部的先消费优先级搞的，再消费优先级低的。但还是无法做到，当高中低都有消息待消费时，集中全力先消费高优先级的消息。
-
-CapacityBurstPriorityKafkaConsumer 的类描述
-
-1. regulates capacity (record processing rate) across priority levels. 跨优先级管控 记录消费速度
-2. When we discuss about priority topic XYZ and consumer group ABC, here XYZ and ABC are the logical names. For every logical priority topic XYZ one must define max supported priority level via the config ClientConfigs#MAX_PRIORITY_CONFIG property.**This property is used as the capacity lever（杠杆） for tuning processing rate across priorities**. Every object of the class maintains KafkaConsumer instance for every priority level topic [0, ${max.priority - 1}].
+从上述代码可以看到， 单纯的循环拉取，只是做到了一次循环范围内先消费优先级高的，再消费优先级低的。消费次序有高低之分，但消费机会是均等的，无法做到当高中低都有消息待消费时，集中全力先消费高优先级的消息。
 
 ### 设定一次拉取多少个
 
-   void updateMaxPollRecords(KafkaConsumer<K, V> consumer, int maxPollRecords) {
+    // CapacityBurstPriorityKafkaConsumer.java
+    void updateMaxPollRecords(KafkaConsumer<K, V> consumer, int maxPollRecords) {
         try {
             Field fetcherField = org.apache.kafka.clients.consumer.KafkaConsumer.class.getDeclaredField(FETCHER_FIELD);
             fetcherField.setAccessible(true);
@@ -84,7 +90,20 @@ KafkaConsumer 包括fetcher 成员，通过设置`fetcher.maxPollRecords` 可以
 1. `ConsumerRecords<K, V> Consumer.poll(long pollTimeoutMs)` 指明线程如果没有数据时等待多长时间，0表示不等待立即返回。
 2. `fetcher.maxPollRecords` 控制一个poll()调用返回的记录数，这个可以用来控制应用在拉取循环中的处理数据量。
 
-### 一次拉取多少
+### 一次拉取多少, 如何在各个优先级之间分配
+
+CapacityBurstPriorityKafkaConsumer 配置
+
+| Config | Mandatory | Description |
+|:------------|:----------------|:------------|
+| max.priority             | Yes      |    Defines max priority
+| group.id             | Yes      |    Defines logical group ID for the consumer
+| max.poll.records             | Yes      |    Defines max records to be polled across priority levels
+| max.poll.history.window.size             | No      |    This is window length to track historical counts of records obtained from ```poll()```. Defaulted to 6
+| min.poll.window.maxout.threshold             | No      |    This is threshold on how many historical counts os records obtained from ```poll()``` maxed out w.r.t. ```max.poll.records``` config. Defaulted to 4
+Rest of the configs are similar to that of ```KafkaConsumer```.
+
+CapacityBurstPriorityKafkaConsumer.poll 一次可以拉取的记录数由`max.poll.records` 配置，`max.poll.records`property is split across priority topic consumers based on maxPollRecordsDistributor - defaulted to ExpMaxPollRecordsDistributor. `max.poll.records` 按一定算法 split 分摊给 各个consumer
 
 `Map<Integer, Integer> ExpMaxPollRecordsDistributor.distribution(maxPriority,maxPollRecords)` 假设输入是 `3,50` 则输出为`{2=29, 1=14, 0=7}`
 
