@@ -19,11 +19,11 @@ keywords: project
 
 ## 整体结构
 
-来自《软件架构设计》
-
 ![](/public/upload/architecture/network_communication.png)
 
 ## 1+N+M 模型
+
+来自《软件架构设计》
 
 ![](/public/upload/architecture/server_side_1nm.png)
 
