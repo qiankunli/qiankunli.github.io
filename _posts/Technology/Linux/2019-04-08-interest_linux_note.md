@@ -212,7 +212,9 @@ glibc 里面的 open 函数
 
 函数传参到底层就是寄存器传参了。glibc 让我们完全以C语言的方式与内核交互，屏蔽了系统调用表、软中断、寄存器等硬件细节。
 
+## 进程数据结构
 
+![](/public/upload/linux/linux_task_struct.jpeg)
 
-
+![](/public/upload/linux/linux_task_struct_data.png)
 
