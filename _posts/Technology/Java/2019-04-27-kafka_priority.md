@@ -110,9 +110,7 @@ CapacityBurstPriorityKafkaConsumer.poll 一次可以拉取的记录数由`max.po
 1. 一共50个“名额”，3个优先级，优先级越高分的越多
 2. 一种分配方式是指数分配（Exponential distribution of maxPollRecords across all priorities (upto maxPriority)），即高一个优先级的“配额”是低一个优先级“配额”的2倍。当然，你也可以选择 高一个优先级的“配额”比低一个优先级的多1个。 
 
-### 窗口机制
-
-
+### 根据实际情况调整配额
 
 For example say we have:
 
