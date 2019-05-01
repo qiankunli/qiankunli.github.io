@@ -44,7 +44,11 @@ When you're trying to help someone learn how to go from a problem statement to w
 
 面向对象逼着你除了思考问题本身外，还要思考结构、设计，很多人无此意识或功力不足， 滥用面向对象的特性，整出大量无意义的代码，使得代码复杂度大大超过了问题本身的复杂度。[函数式编程的设计模式](http://qiankunli.github.io/2018/12/15/functional_programming_patterns.html) 面向对象设计模式经常在搞一件事，把动词转换为名词，但很不幸，这个动作很多时候没有必要。
 
+## 继承也是组合
 
+对于继承，子类通过super 可以访问父类的相关方法。对于java8 interface，也是类似。从这个角度看，如果将 this、super 理解为 类成员，继承父类、实现接口，像是组合的一种特殊形态。在c++里面，子类拥有父类的数据拷贝。那么java的内存对象模型和c的内存对象模型，研究一下，做个对比，还是蛮有意思的。以下图为例，UML 在展示PriorityKafkaProducer的继承和聚合关系时，将父类AbstractPriorityKafkaProducer和聚合类/成员KafkaProducer做了平级的处理。
+
+![](/public/upload/java/priority_kafka_producer_class_diagram.png)
 
 ## 左耳听风
 

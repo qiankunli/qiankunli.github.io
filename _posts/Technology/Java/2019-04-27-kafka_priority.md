@@ -11,12 +11,10 @@ keywords: kafka
 ## 简介（持续更新）
 
 
-kafka 官方需求  Kafka Improvement Proposals
-
-[KIP-349: Priorities for Source Topics](https://cwiki.apache.org/confluence/display/KAFKA/KIP-349%3A+Priorities+for+Source+Topics)
+kafka 官方需求  Kafka Improvement Proposals [KIP-349: Priorities for Source Topics](https://cwiki.apache.org/confluence/display/KAFKA/KIP-349%3A+Priorities+for+Source+Topics)
 
 
-背景
+背景，我们希望kafka 可以支持“优先级”特性：即便队列里已经有了很多消息，但是高优先级消息可以“插队”进而立即被消费。自然地，在kafka 的概念里，我们建立多个topic，一个topic代表一个优先级，那么难点就转换为了 如何对 不同优先级的consumer 进行封装处理了。
 
 ![](/public/upload/java/priority_kafka_subscribe.png)
 
