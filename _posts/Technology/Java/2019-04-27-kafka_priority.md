@@ -25,11 +25,13 @@ kafka 官方需求  Kafka Improvement Proposals [KIP-349: Priorities for Source 
 
 ![](/public/upload/java/priority_kafka_internal_queue.png)
 
-存在的风险
 
-1. 内存的 priority queue 一般都有容量限制
+java 自带的PriorityBlockingQueue 无界队列，如果消费者消费速速不够快的话，“波峰”涌入，可能会导致内存OOM，因此要使用有界优先级阻塞队列。
+
+对于 有界优先级阻塞队列 ，存在的风险
+
 1. 如果consumer 消费速度不够快，则priority queue 大部分时间处于满的状态，进而堵塞
-3. priority queue 可以保证 已经插入的消息 按照priority 排队，但不能保证阻塞的几个插入方按优先级插入。（待确认）
+2. priority queue 可以保证 已经插入的消息 按照priority 排队，但不能保证阻塞的几个插入方按优先级插入。
 
 ## 优先级从高到低依次拉取，优先级越高拉取“配额”越大
 

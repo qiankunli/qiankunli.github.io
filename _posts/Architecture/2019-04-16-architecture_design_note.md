@@ -15,6 +15,8 @@ keywords: project
 
 参见 [系统设计的一些体会](http://qiankunli.github.io/2018/09/28/system_design.html)
 
+[书籍部分电子书](http://www.keledge.com/wrap/details/book?id=17039910)
+
 语言、数据结构、算法、中间件使用等属于硬的内容，比如容易表述，也容易衡量。而架构设计，系统的“三高”则属于“隐性问题”
 
 1. 因为一个系统设计问题导致研发人力的投入和时间成本的增加
