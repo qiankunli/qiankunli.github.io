@@ -110,7 +110,7 @@ keywords: mysql innodb
 
 以上都是从读的角度看，从写的角度看：事务隔离性要求，insert操作的记录只对事务本身可见，对其它事务不可见。
 
-### 一些啰嗦
+### 从并发访问的视角来看
 
 并发访问会带来哪些问题，有哪些控制手段？
 
@@ -137,18 +137,22 @@ keywords: mysql innodb
 
 |并发控制粒度和方法|jvm|mysql|
 |---|---|---|
-|单条语句的原子性|字节码指令|update 语句等|
+|单条语句的原子性|字节码指令|update 语句等<br>其实是数据库隐式加锁|
 |乐观锁|cas|update xx where version = xx|
 |悲观锁||select xx for update|
 |多条语句的原子性|synchronized/lock/读写锁|事务 start transaction;commit|
+
+上层应用开发会加各种锁，有些锁是隐式的，数据库会主动加（比如update），有些锁是显式的，比如select xx for update。 因为开发的使用不当，数据库会发生死锁，就像jvm 也会死锁一样。作为数据库，必须有机制检测出死锁（判断一个有向图是否存在环），并解决死锁问题，比如强制让其中某个事务回滚，释放锁。
 	
 ## 从redo log想到的
 
-事务狭义的说，是一个sql操作序列，广义的说，异构的和分布式的操作序列都可以。redo log主要用于保证事务的持久性
+![](/public/upload/data/mysql_redo_log.jpg)
+
+redo log主要用于保证事务的持久性
 
 1. 数据写入一般先保存在内存中，定期将内存数据写入到磁盘，以提高性能
 2. 数据写磁盘一般是随机的，单次较慢，也不允许频繁写入
-3. 磁盘的顺序写性能较高，所以先将redo log持久化到磁盘，便可以快速的保存操作信息。
+3. 磁盘的顺序写性能较高，所以采用Write-Ahead log机制，将日志顺序持久化到磁盘。Write-Ahead log 就是redo log
 
 PS，随机写优化为顺序写，也是一种重要的架构优化方法。 
 
