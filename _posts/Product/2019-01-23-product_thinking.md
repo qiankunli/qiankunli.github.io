@@ -81,6 +81,7 @@ keywords: Product thinking
 
 [阿里巴巴资深技术专家无相：我们能从 InteliJ IDEA 中学到什么？](https://mp.weixin.qq.com/s/4MzUns7TW8Rtej1_hjqaZw) Every aspect of IntelliJ IDEA is designed with ergonomics in mind. IntelliJ IDEA is built around the idea that every minute a developer spends in the flow is a good minute, and things that break developers out of flow are bad things. Every design and implementation decision considers the possibility of interrupting developer’s flow and seeks to eliminate or minimize it. “Creative Flow” or just “Flow” is a state of mind where you feel evenly attuned, and focused on the task at hand. 当用户使用你的产品时，尽量减少中断用户使用的东西，使其沉浸其中。比如我比较喜欢idea的一点是，idea 直接集成了命令行
 
+鹏哥：做产品一定要去触发用户的情感。 比如我们做一个产品展示用户的收听历史，这个时候单纯的信息可视化 对用户的触动有限，更有价值的比如说：用户最早使用时间、最晚使用时间等等，再辅助一些情感的话术。
 
 
 
