@@ -100,7 +100,17 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 
 以索引文件中的3，205为例，在数据文件中表示第3个message（在全局partition表示第314个message），以及该消息的物理偏移地址为205。
 
-## 多机——基于zk协作的两种方式
+## zookeeper
+
+### 为什么要zookeeper，因为关联业务要交换元数据
+
+kafka的主体是`producer ==> topic ==> consumer`，topic只是一个逻辑概念，topic包含多个分区，每个分区数据包含多个副本（leader副本，slave副本）。producer在发送数据之前，首先要确定目的分区（可能变化），其次确定目的分区的leader副本所在host，知道了目的地才能发送record，这些信息是集群的meta信息。producer每次向topic发送record，都要`waitOnMetadata(record.topic(), this.maxBlockTimeMs)`以拿到最新的metadata。
+
+producer面对的是一个broker集群，这个meta信息找哪个broker要都不方便，也不可靠，本质上，还是从zookeeper获取比较方便。zookeeper成为producer与broker集群解耦的工具。
+
+关联业务之间需要交换元数据，当然，数据库也可以承担这个角色，但数据库没有副本等机制保证可靠性
+
+### 多机——基于zk协作的两种方式
 
 在kafka中，broker、分区、副本状态等 作为集群状态信息，一旦发生改变，都会需要集群的broker作出反应，那么broker 之间如何协同呢？
 
@@ -116,6 +126,15 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 2. 接收master/leader 的各种请求（http协议或自定义协议） 并处理即可，处理完相机更新zk的数据
 
 从这个角度看，每个slave 组件的逻辑与业务程序猿常写的web server 也别无二致
+
+在安装kafka的时候，经常需要改三个配置文件。
+
+1. server.properties, 配置zk地址
+2. producer.properties, 配置broker列表，只有实际的生产端需要（估计是给命令行工具用的）
+3. consumer.properties, 配置broker列表，只有实际的消费端需要（估计是给命令行工具用的）
+
+早期consumer.properties 也是要配置 zk地址的，在靠后的版本就不需要了，这个变迁也体现了zk 作用的变化。producer.properties 未发现要配置zk 地址。
+
 
 ## 小结
 
