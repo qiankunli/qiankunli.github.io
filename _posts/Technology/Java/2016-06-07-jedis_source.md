@@ -19,6 +19,8 @@ keywords: jedis,spring-data-redis
 
 ![](/public/upload/data/redis_structure_and_object.png)
 
+相关文章 [spring redis 源码分析](http://qiankunli.github.io/2019/05/09/spring_jedis_source.html)
+
 ## 简单实现
 
 ![](/public/upload/java/jedis_class_diagram.png)
