@@ -119,10 +119,12 @@ kafka-consumer.xml
 
         public class KafkaTemplate<K, V> implements KafkaOperations<K, V> {
             private final ProducerFactory<K, V> producerFactory;
+            // volatile 保证多线程的可见性
             private volatile Producer<K, V> producer;
             private Producer<K, V> getTheProducer() {
                 if (this.producer == null) {
                     synchronized (this) {
+                        // 多重检查
                         if (this.producer == null) {
                             this.producer = this.producerFactory.createProducer();
                         }
@@ -167,6 +169,48 @@ kafka-consumer.xml
 
 1. 将KafkaProducer 的send callback 转换为ListenableFuture
 2. 使用 producerListener 将“事件处理”逻辑与发送主流程解耦
+
+## 消费者
+
+![](/public/upload/spring/spring_kafka_consumer_class_diagram.png)
+
+1. 黄色DefaultKafkaConsumerFactory 就是一个单纯的工厂模式，根据配置构造KafkaConsumer
+2. MessageListenerContainer 类注释  Internal abstraction used by the framework representing a message listener container，封装了两件事
+
+    1. 如何创建KafkaConsumer
+    2. 如何消费收到的消息，业务方定义
+    3. 如何执行KafkaConsumer
+
+启动逻辑 KafkaMessageListenerContainer.doStart
+
+执行逻辑
+
+## spring task Executor 体系
+
+![](/public/upload/spring/spring_task_executor.png)
+
+TaskExecutor 类注释 Implementations can use all sorts of different execution strategies,such as: synchronous, asynchronous, using a thread pool, and more.
+
+Equivalent to JDK 1.5's  java.util.concurrent.Executor interface; extending it now in Spring 3.0, so that clients may declare
+a dependency on an Executor and receive any TaskExecutor implementation.This interface remains separate from the standard Executor interface mainly for backwards compatibility with JDK 1.4 in Spring 2.x.
+
+**说白了就是为了方便 代码中引入和使用Executor 而设计的，又不想受jdk Executor 接口演变的影响，所以自定义了一个子接口**。 PS：除了简单的java bean，spring 试图将所有的java 类都纳入到IOC 的管理。
+
+    @Service
+    public class BusinessService{
+        @Autowire
+        private Executor executor;
+    }
+
+从方法注释上看，TaskExecutor.execute 和 Executor.execute  的重大区别是，TaskExecutor.execute 根据实现的不同 可能异步可能阻塞， 而Executor.execute 则标明了是异步的。
+
+public class SimpleAsyncTaskExecutor{
+    // SimpleAsyncTaskExecutor 最后落脚的方法
+	protected void doExecute(Runnable task) {
+		Thread thread = (this.threadFactory != null ? this.threadFactory.newThread(task) : createThread(task));
+		thread.start();
+	}
+}
 
 ## 多线程 消费
 
