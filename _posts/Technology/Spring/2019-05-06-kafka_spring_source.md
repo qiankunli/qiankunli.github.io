@@ -20,4 +20,7 @@ keywords: kafka
 
 1. 官方如何多线程消费consumer
 
+
+[【原创】探讨kafka的分区数与多线程消费](https://raising.iteye.com/blog/2252456) 未读
+
 ## 代码示例
