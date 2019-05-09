@@ -8,7 +8,7 @@ keywords: kafka
 
 ---
 
-## 简介（未完成）
+## 简介
 
 
 源码地址 [spring-projects/spring-kafka](https://github.com/spring-projects/spring-kafka)
@@ -183,7 +183,47 @@ kafka-consumer.xml
 
 启动逻辑 KafkaMessageListenerContainer.doStart
 
-执行逻辑
+    protected void doStart() {
+        ...
+        setRunning(true);
+        // 关键就是最后的提交 task
+        this.listenerConsumerFuture = containerProperties
+                    .getConsumerTaskExecutor()
+                    .submitListenable(this.listenerConsumer);
+    }
+
+执行逻辑 ListenerConsumer.run
+
+    public void run() {
+        // 不停地拉取 消息并调用 MessageListener执行用户自定义的业务逻辑
+        while (isRunning()) {
+            if (!this.autoCommit) {
+                processCommits();
+            }
+            ...	
+            ConsumerRecords<K, V> records = this.consumer.poll(this.containerProperties.getPollTimeout());
+            if (records != null && records.count() > 0) {
+                if (this.autoCommit) {
+                    invokeListener(records);
+                }else {
+                    ...
+                }
+            }else {
+                ...	
+            }
+        }
+        // 表示consumer已经关闭，进行清理动作
+        if (this.listenerInvokerFuture != null) {
+            stopInvokerAndCommitManualAcks();
+        }
+        try {
+            this.consumer.unsubscribe();
+        }catch (WakeupException e) {
+            // No-op. Continue process
+        }
+        this.consumer.close();
+    }
+
 
 ## spring task Executor 体系
 
