@@ -14,7 +14,7 @@ keywords: kafka
 kafka 官方需求  Kafka Improvement Proposals [KIP-349: Priorities for Source Topics](https://cwiki.apache.org/confluence/display/KAFKA/KIP-349%3A+Priorities+for+Source+Topics)
 
 
-背景，我们希望kafka 可以支持“优先级”特性：即便队列里已经有了很多消息，但是高优先级消息可以“插队”进而立即被消费。自然地，在kafka 的概念里，我们建立多个topic，一个topic代表一个优先级，那么难点就转换为了 如何对 不同优先级的consumer 进行封装处理了。
+背景，我们希望kafka 可以支持“优先级”特性：即便队列里已经有了很多消息，但是高优先级消息可以“插队”进而立即被消费。自然地，在kafka 的概念里，我们建立多个topic，一个topic代表一个优先级，每个consumer 有一个或多个consumer（下文统一简化为一个consumer），**那么难点就转换为“如何对 不同优先级的consumer 进行封装处理”了**。
 
 ![](/public/upload/java/priority_kafka_subscribe.png)
 
@@ -24,7 +24,6 @@ kafka 官方需求  Kafka Improvement Proposals [KIP-349: Priorities for Source 
 ## 内部使用优先级队列重新缓冲
 
 ![](/public/upload/java/priority_kafka_internal_queue.png)
-
 
 java 自带的PriorityBlockingQueue 无界队列，如果消费者消费速速不够快的话，“波峰”涌入，可能会导致内存OOM，因此要使用有界优先级阻塞队列。
 
@@ -59,6 +58,7 @@ CapacityBurstPriorityKafkaConsumer聚合多个优先级的consumer，先不考�
             new HashMap<TopicPartition, List<ConsumerRecord<K, V>>>();
         long start = System.currentTimeMillis();
         do {
+            // 每一次整体“拉取”，都调用每个“子”consumer 拉取一次
             for (int i = maxPriority - 1; i >= 0; --i) {
                 ConsumerRecords<K, V> records = consumers.get(i).poll(0);
                 for (TopicPartition partition : records.partitions()) {
@@ -166,3 +166,4 @@ priority=2和priority=0 按配额发送， priority=1 在min.poll.window.maxout.
     (29 - 25 = 4 and 14 - 10 = 4), hence increasing its capacity
     or max.poll.records property to (7 + 8 = 15).
 
+整个机制有点“自适应”的感觉，设定一个初始配额`{2=29, 1=14, 0=7}`，然后根据实际拉取数量，校正下一次的配额（预定拉取数量）。
