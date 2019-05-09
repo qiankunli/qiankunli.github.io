@@ -10,16 +10,14 @@ keywords: kafka
 
 ## 简介
 
+* TOC
+{:toc}
 
 源码地址 [spring-projects/spring-kafka](https://github.com/spring-projects/spring-kafka)
 
 官网地址 [Spring for Apache Kafka](https://spring.io/projects/spring-kafka)
 
 spring 对框架的封装 套路很一致，参见 [spring redis 源码分析](http://qiankunli.github.io/2019/05/09/spring_jedis_source.html) 以及 spring 对rabbitmq 的代码。
-
-问题
-
-1. 官方如何多线程消费consumer
 
 ## 代码示例
 
@@ -251,7 +249,3 @@ public class SimpleAsyncTaskExecutor{
 		thread.start();
 	}
 }
-
-## 多线程 消费
-
-[【原创】探讨kafka的分区数与多线程消费](https://raising.iteye.com/blog/2252456) 未读

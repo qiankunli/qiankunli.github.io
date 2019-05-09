@@ -19,6 +19,10 @@ keywords: Scala  akka
 ## 一条消息大小不能超过1M
 
 
+## 多线程 消费
+
+[【原创】探讨kafka的分区数与多线程消费](https://raising.iteye.com/blog/2252456) 未读
+
 
 
 
