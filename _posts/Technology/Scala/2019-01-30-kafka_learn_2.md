@@ -135,6 +135,15 @@ producer面对的是一个broker集群，这个meta信息找哪个broker要都�
 
 早期consumer.properties 也是要配置 zk地址的，在靠后的版本就不需要了，这个变迁也体现了zk 作用的变化。producer.properties 未发现要配置zk 地址。
 
+## Kafka Pipeline
+
+《软件架构设计》
+
+![](/public/upload/scala/kafka_pipeline.png)
+
+1. 客户端每发送一条消息，要写入到Leader、Follower1和Follower2 之后，Leader 才会对客户端返回成功
+2. Leader 不会主动给两个Follower 同步数据，而是等两个Follower 主动拉取，并且是批量拉取
+3. 为什么叫pipeline呢？Leader处理完msg1就去处理msg2了，等Follower同步完成再告诉客户端msg1接收成功。**将一次消息处理分为接收消息和同步消息两个步骤，并且并行化了**。
 
 ## 小结
 

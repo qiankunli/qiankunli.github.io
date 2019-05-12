@@ -23,7 +23,7 @@ keywords: project
 
 ## 1+N+M 模型
 
-来自《软件架构设计》
+来自《软件架构设计》 将一个请求的处理分为3道工序：监听、IO、业务逻辑处理。worker 线程还可以继续拆分成编解码、业务逻辑计算等环节，进一步提高并发度。请求与请求之间是并行的，一次请求处理的多个环节之间也是并行的。
 
 ![](/public/upload/architecture/server_side_1nm.png)
 
