@@ -93,9 +93,6 @@ keywords: 分布式系统
 2. 有的计算 逻辑在一个节点即可执行完毕，比如不涉及分区的spark rdd，或分布式运行一个shell。有的计算逻辑则 拆分到不同节点，比如storm和mapreduce，“分段”执行。此时系统就要做好 调度和协调。
 3. 分布式系统，总是要涉及到输入源数据的读取、数据在节点间流转、将结果写到输出端。
 
-## 学习分布式的正确姿势（old）
-
-2018.7.16 补充 [漫谈分布式系统、拜占庭将军问题与区块链](http://zhangtielei.com/posts/blog-consensus-byzantine-and-blockchain.html) 作者阐述了分布式系统的核心问题和概念，沿着逻辑上前后一贯的思路，讨论了区块链技术。推荐阅读。
 
 ### 不要沉迷与具体的算法
 
@@ -105,29 +102,5 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 
 也就是说，具体学习某一个分布式算法用处有限。一个很难理解，一个是你很难  place them in contex（它们在解决分布式问题中的作用）。
 
-## 分布式知识体系
 
-[distributed-systems-theory-for-the-distributed-systems-engineer](http://the-paper-trail.org/blog/distributed-systems-theory-for-the-distributed-systems-engineer/) 
-
-1. Many difficulties that the distributed systems engineer faces can be blamed on two underlying causes:
-
-	* processes may fail
-	* there is no good way to tell that they have done so
-
-2. The basic tension of fault tolerance。fault 有两种级别
-
-	* 节点失效
-	* 节点返回错误数据（对应拜占庭将军问题中的 叛徒）
-3. basic primitives
-
-	* Leader election
-	* Consistent snapshotting
-	* Consensus
-	* Distributed state machine replication
-
-	
-问题就是，你如何将 一致性、共识 这些概念 place 到 分布式的 context中。
-
-
-![](/public/upload/architecture/distributed_system.png)
 
