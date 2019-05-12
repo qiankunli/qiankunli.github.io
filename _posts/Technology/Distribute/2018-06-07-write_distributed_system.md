@@ -10,7 +10,12 @@ keywords: 分布式系统
 
 ## 简介
 
-## 常规业务系统 也是分布式系统
+参见[Spark Stream 学习](http://qiankunli.github.io/2018/05/27/spark_stream.html)  中对spark stream 和storm 对比一节，有以下几点：
+
+1. 分布式计算系统，都是用户以代码的方式预定义好计算逻辑，系统将计算 下发到各个节点。这一点都是一样的，不同处是对外提供的抽象不同。比如spark的`rdd.filter(function1).map(function2)`，而在storm 中则可能是 两个bolt
+2. 任务分片：有的计算 逻辑在一个节点即可执行完毕，比如不涉及分区的spark rdd，或分布式运行一个shell。有的计算逻辑则 拆分到不同节点，比如storm和mapreduce。此时系统就要做好 调度和协调。
+
+## 常规业务系统也是分布式系统
 
 最近研究一个系统设计方案，学习spark、storm等，包括跟同事交流，有以下几个感觉
 

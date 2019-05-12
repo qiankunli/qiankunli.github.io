@@ -41,102 +41,7 @@ keywords: 一致性协议
 
 在《区块链核心算法解析》中，则采用另一种描述方式：对于一组节点，如果所有节点均以相同的顺序执行一个（可能是无限的）命令序列c1,c2,c3...，则这组节点 实现了状态复制。
 
-[实践丨分布式事务解决方案汇总：2PC、消息中间件、TCC、状态机+重试+幂等](http://www.10tiao.com/html/551/201904/2652561205/1.html)《软件架构设计：大型网站技术架构与业务架构融合之道》**把一致性问题分为了两大类：事务一致性和多副本一致性**。
-
-李运华 《从0到1学架构》 关于Robert Greiner 两篇文章的对比 建议细读，要点如下
-
-1. 不是所有的分布式系统都有 cap问题，必须interconnected 和 share data。比如一个简单的微服务系统 没有shar data，便没有cap 问题。
-2. 强调了write/read pair 。这跟上一点是一脉相承的。cap 关注的是对数据的读写操作，而不是分布式系统的所有功能。
-
-## 一致性理论——CAP
-
-以下来自对两个付费专栏的整理
-
-### 左耳听风
-
-![](/public/upload/distribute/cap.PNG)
-
-![](/public/upload/distribute/cap_2.png)
-
-### 从0到1学架构
-
-下文来自 李运华 极客时间中的付费专栏《从0到1学架构》。
-
-Robert Greiner （http://robertgreiner.com/about/） 对CAP 的理解也经历了一个过程，他写了两篇文章来阐述CAP理论，第一篇被标记为outdated
-
-||第一版|第二版|
-|---|---|---|
-|地址|http://robertgreiner.com/2014/06/cap-theorem-explained/|http://robertgreiner.com/2014/08/cap-theorem-revisited/|
-|理论定义|Any distributed system cannot guaranty C, A, and P simultaneously.|In a distributed system (a collection of interconnected nodes that share data.), you can only have two out of the following three guarantees across a write/read pair: Consistency, Availability, and Partition Tolerance - one of them must be sacrificed.|
-|中文||在一个分布式系统（指互相连接并共享数据的节点的集合）中，当涉及读写操作时，只能保证一致性（Consistence）、可用性（Availability）、分区容错性（Partition Tolerance）三者中的两个，另外一个必须被牺牲。|
-|一致性|all nodes see the same data at the same time|A read is guaranteed to return the most recent write for a given client 总能读到 最新写入的新值|
-|可用性|Every request gets a response on success/failure|A non-failing node will return a reasonable response within a reasonable amount of time (no error or timeout)|
-|分区容忍性|System continues to work despite message loss or partial failure|The system will continue to function when network partitions occur|
-
-李运华 文中 关于Robert Greiner 两篇文章的对比 建议细读： 要点如下
-
-1. 不是所有的分布式系统都有 cap问题，必须interconnected 和 share data。比如一个简单的微服务系统 没有share data，便没有cap 问题。
-2. 强调了write/read pair 。这跟上一点是一脉相承的。cap 关注的是对数据的读写操作，而不是分布式系统的所有功能。
-
-### 其它材料
-
-[从CAP理论到Paxos算法](http://blog.longjiazuo.com/archives/5369?hmsr=toutiao.io&utm_medium=toutiao.io&utm_source=toutiao.io) 基本要点：
-
-1. cap 彼此的关系。提高分区容忍性的办法就是一个数据项复制到多个节点上，那么出现分区之后，这一数据项就可能分布到各个区里。分区容忍就提高了。然而，要把数据复制到多个节点，就会带来一致性的问题，就是多个节点上面的数据可能是不一致的。要保证一致，每次写操作就都要等待全部节点写成功，而这等待又会带来可用性的问题。
-2. cap 着力点。**网络分区是既成的现实，于是只能在可用性和一致性两者间做出选择。**在工程上，我们关注的往往是如何在保持相对一致性的前提下，提高系统的可用性。
-3. 还是读写问题。[多线程](http://qiankunli.github.io/2014/10/09/Threads.html) 提到，多线程本质是一个并发读写问题，数据库系统中，为了描述并发读写的安全程度，还提出了隔离性的概念。具体到cap 理论上，副本一致性本质是并发读写问题（A主机写入的数据，B主机多长时间可以读到）。2pc/3pc 本质解决的也是如此 ==> A主机写入的数据，成功与失败，B主机多长时间可以读到，然后决定自己的行为。
-
-《反应式设计模式》Eric Brewer评论道：CAP 的这个表述是为了让设计人员的思想敞开至更广泛的系统和权衡。但”3个只能满足2个“的表述总是具有误导性，因为它简化了属性之间的紧密联系。PS：比如系统有几十毫秒的不一致在实践中是可以接受的，进而在CAP三个特性上可以适当放宽。
-
-
-## 一致性、XA、2pc/3pc paxos的关系
-
-[2PC/3PC到底是啥](http://www.bijishequ.com/detail/49467?p=)
-
-XA 是 X/Open DTP 定义的交易中间件与数据库之间的接口规范（即接口函数），交易中间件用它来通知数据库事务的开始、结束以及提交、回滚等。 XA 接口函数由数据库厂商提供。 
-二阶提交协议和三阶提交协议就是根据这一思想衍生出来的，而**分布式事务从广义上来讲也是一致性的一种表现：**事务是数据库特有的概念，分布式事务最初起源于处理多个数据库之间的数据一致性问题，但随着IT技术的高速发展，大型系统中逐渐使用SOA服务化接口替换直接对数据库操作，所以如何保证各个SOA服务之间的数据一致性也被划分到分布式事务的范畴。来自[以交易系统为例，看分布式事务架构的五大演进](http://www.sohu.com/a/134477290_487514)。所以2PC/3PC也可以叫一致性协议。
-
-在真实的应用中，尽管有系统使用2PC/3PC协议来作为数据一致性协议，但是比较少见，更多的是作为实现**数据更新原子性手段**出现。
-
-为什么2PC/3PC没有被广泛用在保证数据的一致性上？主要原因应该还是它本身的缺陷，所有经常看到这句话：there is only one consensus protocol, and that’s Paxos” – all other approaches are just broken versions of Paxos. 意即世上只有一种一致性算法，那就是Paxos。
-
-更新想要被其它node感知到，就要提交更新，各个一致性协议的不同、缺点，也主要体现在提交方式上：
-
-1. 单数据库事务
-2. 多数据库事务，一个数据源更新操作已提交，另一个数据源更新操作失败，则数据不一致。so，应该在所有数据源更新操作完之后，再提交。
-3. 基于后置提交的多数据库事务，一个数据源提交成功，另一个数据源提交失败，则数据不一致。
-3. XA事务，将提交分为两个步骤，预提交、确认提交。前一个步骤“重”，完成大部分提交操作。后一个步骤“轻”，失败概率很低。so，依然会有部分数据源确认提交失败的问题，不过因为概率低，数据量小，可以通过记录日志转向人工处理。
-4. 从数据库领域延伸到微服务领域，分布式事务，TCC。
-5. 放弃强一致性、达到最终一致性。初步解决一致性问题后，主要通过异步补偿机制进行部分妥协，提高性能。
-
-[分布式服务框架之服务化最佳实践](http://www.infoq.com/cn/articles/servitization-best-practice)
-
-
-### Paxos
-
-Paxos算法
-
-	* Phase 1
-		
-		* proposer向网络内超过半数的acceptor发送prepare消息
-		* acceptor正常情况下回复promise消息
-	* Phase 2
-		* 在有足够多acceptor回复promise消息时，proposer发送accept消息
-		* 正常情况下acceptor回复accepted消息
-
-只有一个Proposer能进行到第二阶段运行。
-
-目前比较好的通俗解释，以贿选来描述 [如何浅显易懂地解说 Paxos 的算法？ - GRAYLAMB的回答 - 知乎](https://www.zhihu.com/question/19787937/answer/107750652)。
-
-一些补充
-
-1. proposer 和 acceptor，异类交互，同类不交互
-
-	![](/public/upload/architecture/distributed_system_2.png)
-	
-2. proposer 贿选 不会坚持 让acceptor 遵守自己的提议。出价最高的proposer 会得到大部分acceptor 的拥护（谁贿金高，acceptor最后听谁的。换个说法，acceptor 之间没有之间交互，但），  但会以最快达成一致 为目标，若是贿金高但提议晚，也是会顺从 他人的提议。
-
-### 思维线条
+## 《区块链核心算法解析》
 
 下面看下 《区块链核心算法解析》 中的思维线条
 
@@ -171,7 +76,6 @@ tips
 3. POW，间接共识，先选谁说了算，再达成共识。
 
 两个算法对cap的侧重有所不同
-
 
 ## 从容错性强弱的角度来串一下一致性协议
 

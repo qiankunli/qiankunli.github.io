@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 分布式事务
+title: 事务一致性
 category: 技术
 tags: Distribute
 keywords: 分布式事务
