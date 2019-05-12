@@ -102,8 +102,6 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 
 ![](/public/upload/distribute/cap.PNG)
 
-![](/public/upload/distribute/cap_2.png)
-
 ### 从0到1学架构
 
 下文来自 李运华 极客时间中的付费专栏《从0到1学架构》。
