@@ -13,28 +13,49 @@ keywords: 一致性协议
 * TOC
 {:toc}
 
+## 复制状态 == 复制日志 ==> 状态一致=日志顺序一致
+
+![](/public/upload/distribute/consistency_copy_log.png)
+
+假设KV集群有三台机器，机器之间相互通信，把自己的值传播给其他机器。三个客户端并发的向集群发送三个请求，假设每台机器把收到的请求按日志存下来（包括客户端的请求和其它Node的请求）。不管顺序如何（135/153/315/351/513/531），只要三台机器的日志顺序是一样的，就是所谓的“一致性”。这句话有几个点：
+
+1. Nod2 也可以收到经由Node1 转发的来自Client1 的X=1的请求，本质上还是3个Node如何协调一致的问题。
+2. 为何要存储日志，直接存储最终的数据不就行了么？
+
+	1. 日志只有一种操作，就是append。而数据状态一直在变化，可以add、delete、update 把三种操作变成一种，便于持久化存储
+	2. 数据可能是很复杂的数据结构，比如树、图等，并且状态一直在变化，为保证多机数据一致做数据比对很麻烦。
+	3. **任何复杂的数据都可以通过日志生成**。一样的初始状态 + 一样的输入事件 = 一样的最终状态。可见要保证最终状态一致，只需保证多个Node的日志流是一样的即可。
+	4. 日志是一个线性序列，比对容易 
+	5. Node宕机重启后，只需重放日志即可
+
+## 日志顺序一致 ==> 集群Node对同一个日志位置存储哪个数据协商一致
+
+虽然每个Node 接收到的请求顺序不同，但它们对日志中1号位置、2号位置、3号位置的认知是一样的，大家一起保证1号位置、2号位置、3号位置存储的数据一样。
+
+每个Node 在存储日志前要先问下其它Node（我打算在位置n存xx，你们同意不？若是不同意，你们想存啥），之后再决定把这条日志写到哪个位置（按上次大家的意思，我打算在位置n存xx，你们同意不？若是不同意，重新开始）。
 
 
 ## Paxos
 
-Paxos算法
+上文所说的“日志位置” 在这里是一个Proposer生成的自增ID，不需要全局有序。
 
-	* Phase 1
+每个Node 同时充当了两个角色：Proposer和Acceptor，在实现过程中， 两个角色在同一个进程里面。
+
+* Prepare阶段——针对一个“位置”的提议，充分的听取大家的意见
+
+	![](/public/upload/distribute/paxos_propose_stage.png)
+
+	1. Proposer 广播 prepare(n)
+	2. Proposer 如果收到半数以上yes，则支持在位置n写入 收到的新值（按一定的算法规则）。否则n 自增，重新请求。
+
+* Accept阶段——选取一个“意见”，向大家确认
 		
-		* proposer向网络内超过半数的acceptor发送prepare消息
-		* acceptor正常情况下回复promise消息
-	* Phase 2
-		* 在有足够多acceptor回复promise消息时，proposer发送accept消息
-		* 正常情况下acceptor回复accepted消息
+	![](/public/upload/distribute/paxos_accept_stage.png)
 
-只有一个Proposer能进行到第二阶段运行。
+	1. Proposer 广播 accept(n,v)
+	2. Proposer 如果收到半数以上yes，并且收到的n与accept n一致，则结束。否则n 自增，重新从零开始。
+
+Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0开始，陷入“不断”循环，即“活锁”问题（一直得动，但没有结果）。
 
 目前比较好的通俗解释，以贿选来描述 [如何浅显易懂地解说 Paxos 的算法？ - GRAYLAMB的回答 - 知乎](https://www.zhihu.com/question/19787937/answer/107750652)。
 
-一些补充
-
-1. proposer 和 acceptor，异类交互，同类不交互
-
-	![](/public/upload/architecture/distributed_system_2.png)
-	
-2. proposer 贿选 不会坚持 让acceptor 遵守自己的提议。出价最高的proposer 会得到大部分acceptor 的拥护（谁贿金高，acceptor最后听谁的。换个说法，acceptor 之间没有之间交互，但），  但会以最快达成一致 为目标，若是贿金高但提议晚，也是会顺从 他人的提议。
