@@ -59,3 +59,8 @@ Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0�
 
 目前比较好的通俗解释，以贿选来描述 [如何浅显易懂地解说 Paxos 的算法？ - GRAYLAMB的回答 - 知乎](https://www.zhihu.com/question/19787937/answer/107750652)。
 
+## Raft
+
+### 单点写入
+
+![](/public/upload/distribute/raft_copy_log.png)
