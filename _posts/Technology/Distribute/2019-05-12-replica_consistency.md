@@ -8,17 +8,32 @@ keywords: 一致性协议
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
 
+建议先参见 [串一串一致性协议](http://qiankunli.github.io/2018/09/27/consistency_protocol.html) 了解下背景
 
-## 直接拷贝数据就可以做到副本一致了么？
+![](/public/upload/distribute/consistency.png)
+
+《软件架构设计》有一个关于Paxos、Raft和Zab 的分析对比，建议看下。
+
+## 副本一致的弯弯绕
 
 ![](/public/upload/distribute/consistency_copy_log.png)
 
 假设KV集群有三台机器，机器之间相互通信，把自己的值传播给其他机器，三个客户端并发的向集群发送三个请求，值X 应该是多少？是多少没关系，135都行，向一个client返回成功、其它client返回失败（或实际值）即可，关键是Node1、Node2、Node3 一致。
+
+||Replicated State Machine|Primary-Backup System|
+|---|---|---|
+|中文|复制状态机|
+|应用的协议|Paxos、Raft|Zab|
+|mysql binlog的数据格式|statement<br>存储的是原始的sql语句|raw<br>数据表的变化数据|
+|redis持久化的两种方式|AOF<br>持久化的是客户端的set/incr/decr命令|RDB<br>持久化的是内存的快照|
+|数据同步次数|客户端的写请求都要在节点之间同步|有时可以合并|
+
+## Replicated State Machine
 
 ### 复制状态 == 复制日志 ==> 状态一致 == 日志顺序一致
 
@@ -66,8 +81,6 @@ Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0�
 
 ## Raft
 
-### 单点写入
-
 ![](/public/upload/distribute/raft_copy_log.png)
 
 与Paxos 不断循环的2PC 不同，Raft/Zab 算法分为3个阶段
@@ -79,10 +92,7 @@ Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0�
 2. 正常阶段，Leader 接收写请求，然后复制给其他Followers
 3. 恢复阶段，旧Leader宕机， 新Leader上任，其他Follower切换到新Leader，开始同步数据。 
 
-
-## 小结
-
-一种粗浅的感觉
+## 为什么paxos 更复杂——有一个Leadre 能带来多少好处
 
 ![](/public/upload/distribute/paxos_vs_raft.png)
 
@@ -92,6 +102,9 @@ Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0�
 	1. 对一个term（第几任leader）而言，一个Follower 只能投一次票， 如果投给了candidate1 就不能再投给 candidate2
 	2. 谁的日志最新 谁就是leader，follower 甚至candidate会支持拥有最新日志的candidate 的当leader
 
+3. 乱序提交 vs 顺序提交：paxos 因为每个Node都可以接收请求，导致的一个问题是无法确认请求的时间顺序。raft和zab 都是Leader 接收请求，就一定可以排出先后。日志有了时序的保证，就相当于在全局为每条日志做了个顺序的编号！基于这个编号，就可以做日志的顺序提交、不同节点间的日志比对，回放日志的时候，也可以按照编号从小到大回放。
+
 可见，协商谁当老大比协商一个值更明确，也更容易做出决策。生活中也是如此，谁当老大看拳头硬不硬就行了（吵都不用吵），但一件事怎么办却会吵得的不可开交。
+
 
 kafka 因为有更明确地业务规则，可以直接复制数据。《软件架构设计》 多副本一致性章节的开篇就 使用kafka 为例讲了一个 做一个强一致的系统有多难。
