@@ -17,9 +17,14 @@ keywords: 一致性协议
 
 ![](/public/upload/distribute/consistency.png)
 
-《软件架构设计》有一个关于Paxos、Raft和Zab 的分析对比，建议看下。
+《软件架构设计》有一个关于Paxos、Raft和Zab 的分析对比，包括
 
-## 副本一致的弯弯绕
+1. 复制模型
+2. 写入方式：多点/单点写入， 乱序/顺序提交
+3. 同步方向：双向/单向同步
+4. 心跳检测：有/无
+
+## 复制模型
 
 ![](/public/upload/distribute/consistency_copy_log.png)
 

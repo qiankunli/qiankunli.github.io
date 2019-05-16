@@ -22,6 +22,21 @@ keywords: 异步
 
 2019.1.24补充：**异步实现绝大多数时候离不开队列和对调，刚好对应操作系统的 task_struct[] 和 中断处理**。
 
+## 异步
+
+1. 异步的两种表现形式：future和callback，具体参见[Future](http://qiankunli.github.io/2016/07/08/future.html)和[回调](http://qiankunli.github.io/2016/07/08/callback.html)
+2. 异步的实现有两种层面：系统级（中断及中断处理，本质就是硬件+os支持的callback）和业务级，业务级别有
+
+	1. 比如zookeeper client，queue + 线程实现callback
+	2. 比如一些rpc框架，底层netty callback + 全局map 实现future
+
+3. 异步可以用在不同的地方：
+
+	||计算|IO:BIO/NIO|
+	|---|---|---|
+	|单线程|当一个函数前后代码不变，就中间的逻辑经常变时，可以考虑提个callback出去||
+	|多线程|一个queue和一个执行线程，执行线程执行任务，结果写入future返回。业务线程操作future|一个`<全局唯一id,Future>` + io线程。io线程发送请求，拿到结果后，根据全局唯一id找到future并写入结果|
+
 ## 异步的价值
 
 ### 为什么异步web可以提高吞吐量
