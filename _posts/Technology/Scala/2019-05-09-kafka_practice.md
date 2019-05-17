@@ -18,7 +18,6 @@ keywords: Scala  akka
 
 ## 一条消息大小不能超过1M
 
-
 ## 消费端优化
 
 ### 多线程 消费
@@ -38,6 +37,27 @@ keywords: Scala  akka
 
     ![](/public/upload/scala/kafka_one_consumer_multi_worker.png)
 
+### 多线程消费的变迁
+
+[Why We Replaced Our Kafka Connector with a Kafka Consumer](https://hackernoon.com/why-we-replaced-our-kafka-connector-with-a-kafka-consumer-972e56bebb23) 结合kafka 源码中 ConsumerConnector 被标记为Deprecated 来看，kafka的消费端一开始用的是 ConsumerConnector，现在开始推荐使用 KafkaConsumer
+
+  	Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
+		// 一个Topic启动几个消费者线程，会生成几个KafkaStream。
+    topicCountMap.put(topic, new Integer(KafkaStream的数量));
+    Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = consumer.createMessageStreams(topicCountMap);
+		List<KafkaStream<byte[], byte[]>> topicList = consumerMap.get(topic);
+		for (KafkaStream<byte[], byte[]> kafkaStream : topicList) {  
+				ConsumerIterator<byte[], byte[]> it = stream.iterator();
+				while (it.hasNext()) {
+						System.out.println("Receive->[" + new String(it.next().message()) + "]");
+				}
+		}
+
+[Kafka 0.8 Consumer处理逻辑](https://www.cnblogs.com/byrhuangqiang/p/6364082.html)
+
+![](/public/upload/scala/kafka_consumer_connector.png)
+
+fetcher线程数和topic所在多少台broker有关。一个Topic启动几个消费者线程，会生成几个KafkaStream。一个KafkaStream对应的是一个Queue(有界的LinkedBlockingQueue)
 
 
 ### 什么时候commit 消息
