@@ -16,8 +16,6 @@ keywords: Scala  akka
 建议先阅读下[《Apache Kafka源码分析》——Producer与Consumer](http://qiankunli.github.io/2017/12/08/kafka_learn_1.html)
 
 
-## 一条消息大小不能超过1M
-
 ## 消费端优化
 
 ### 多线程 消费
@@ -64,4 +62,10 @@ fetcher线程数和topic所在多少台broker有关。一个Topic启动几个消
 
 ## 生产端优化
 
+### 一条消息大小不能超过1M
+
 批量发送
+
+## 其它材料
+
+[快手万亿级别Kafka集群应用实践与技术演进之路](https://mp.weixin.qq.com/s?__biz=MzU1NDA4NjU2MA==&mid=2247496484&idx=1&sn=4238cc7f88860559861178a083e5b475&chksm=fbea4aebcc9dc3fdb370a413e38daace82cbfb431108b1348bd20b13dc896c31eff39978a525&mpshare=1&scene=23&srcid=0517eZdv7dqXtw4lWMl1xo8v%23rd)
