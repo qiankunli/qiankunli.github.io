@@ -52,7 +52,9 @@ keywords: project
 
 ![](/public/upload/architecture/architecture.png)
 
-当你碰到一篇文章，即可place it in context，分析其在架构知识的哪一层
+当你碰到一篇文章、技术、知识点，有自己的方法论，能够place it in context，分析其在架构知识的哪一层
+
+![](/public/upload/architecture/tech_value.png)
 
 ## 系统架构
 
