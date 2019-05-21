@@ -15,9 +15,6 @@ keywords: 系统设计
 
 ![](/public/upload/architecture/system_design.png)
 
-1. 几种“架构”不可以混淆
-1. 业务设计中，"数据匹配"可能只是一句话，而在工程实现中则是一个很复杂的项目。
-
 ## 笔者的历程
 
 1. 觉得代码实现是难点
@@ -106,7 +103,7 @@ api 包括
 
 函数最小参数原则，比如一个函数要根据用户名查询用户其它信息，此时函数的参数一定要是userName，不能图省事（IDE自动生成的方法通常会这样）直接使用包含userName的Person/User等上层对象。
 
-[深度 | API 设计最佳实践的思考](https://yq.aliyun.com/articles/701810?utm_content=g_1000056442)
+[深度API设计最佳实践的思考](https://yq.aliyun.com/articles/701810?utm_content=g_1000056442)
 
 1. API 的设计本身最关键的难题并不是让客户端与服务端软件之间如何交互，而是设计者、维护者、API使用者这几个程序员群体之间在 API 生命周期内的互动。一个 API 如何被使用，以及API本身如何被维护，依赖于**设计者提供了一个清晰易于理解的模型**。
 
