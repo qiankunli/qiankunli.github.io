@@ -13,16 +13,16 @@ keywords: network
 linux系统的进程结构体有以下几个字段
 
     struct task_struct {
-				...
-				struct m_inode * pwd;
-				struct m_inode * root;
-				struct m_inode * executable;				//进程对应可执行文件的i节点
-				...
-				/* Filesystem information: */
-				struct fs_struct                *fs;
-				/* Open file information: */
-				struct files_struct             *files;
-				...
+        ...
+        struct m_inode * pwd;
+        struct m_inode * root;
+        struct m_inode * executable;				//进程对应可执行文件的i节点
+        ...
+        /* Filesystem information: */
+        struct fs_struct                *fs;
+        /* Open file information: */
+        struct files_struct             *files;
+        ...
     }
 
 每个进程有一个文件系统的数据结构，还有一个打开文件的数据结构
