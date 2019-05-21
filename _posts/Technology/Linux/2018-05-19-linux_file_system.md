@@ -13,10 +13,19 @@ keywords: network
 linux系统的进程结构体有以下几个字段
 
     struct task_struct {
-        struct m_inode * pwd;
-    	struct m_inode * root;
-    	struct m_inode * executable;				//进程对应可执行文件的i节点
+				...
+				struct m_inode * pwd;
+				struct m_inode * root;
+				struct m_inode * executable;				//进程对应可执行文件的i节点
+				...
+				/* Filesystem information: */
+				struct fs_struct                *fs;
+				/* Open file information: */
+				struct files_struct             *files;
+				...
     }
+
+每个进程有一个文件系统的数据结构，还有一个打开文件的数据结构
 
 ## vfs
 
@@ -127,7 +136,7 @@ An archive file is a file that is composed of one or more computer files **along
 
 例如，`/dev/sdb`块设备被mount到`/mnt/alan`目录。命令：`mount -t ext3 /dev/sdb /mnt/alan`。
 
-那么mount这个过程所需要解决的问题就是将/mnt/alan的dentry目录项所指向的inode屏蔽掉，重新定位到/dev/sdb所表示的inode索引节点。这个描述并不准确，但有利于简化理解。参见[linux文件系统之mount流程分析](http://www.cnblogs.com/cslunatic/p/3683117.html)
+那么mount这个过程所需要解决的问题就是将`/mnt/alan`的dentry目录项所指向的inode屏蔽掉，重新定位到`/dev/sdb`所表示的inode索引节点。这个描述并不准确，但有利于简化理解。参见[linux文件系统之mount流程分析](http://www.cnblogs.com/cslunatic/p/3683117.html)
 
 **如果将mount的过程理解为：inode被替代的过程。**除了将设备mount到rootfs上，根据被替代方式的不同，mount的花样可多了。
 

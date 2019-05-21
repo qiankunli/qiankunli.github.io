@@ -218,3 +218,5 @@ glibc 里面的 open 函数
 
 ![](/public/upload/linux/linux_task_struct_data.png)
 
+一个进程的运行竟然要保存这么多信息，这些信息都可以通过命令行取出来。
+
