@@ -44,7 +44,19 @@ keywords: linux 内核
 
 [Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)中断有点类似于我们经常说的事件驱动编程，而这个事件通知机制是怎么实现的呢，硬件中断的实现通过一个导线和 CPU 相连来传输中断信号，软件上会有特定的指令，例如执行系统调用创建线程的指令，而 CPU 每执行完一个指令，就会检查中断寄存器中是否有中断，如果有就取出然后执行该中断对应的处理程序。
 
+## 进程调度
 
+![](/public/upload/linux/process_schedule.png)
+
+    struct task_struct{
+        ...
+        unsigned int policy;
+
+        int prio, static_prio, normal_prio;
+        unsigned int rt_priority;
+        ...
+        const struct sched_class *sched_class;
+    }
 
 
 

@@ -13,6 +13,23 @@ keywords: kubernetes yaml
 * TOC
 {:toc}
 
+## 总纲
+
+两个基本工作
+
+1. 应用容器化
+
+    1. 
+    2. 
+    3. 
+    4. 
+2. 编排自动化
+
+    1. 
+    2. 
+    3. 
+    4. 
+
 ## web界面管理
 
 [Qihoo360/wayne](https://github.com/Qihoo360/wayne) Wayne 是一个通用的、基于 Web 的 Kubernetes 多集群管理平台。通过可视化 Kubernetes 对象模板编辑的方式，降低业务接入成本， 拥有完整的权限管理系统，适应多租户场景，是一款适合企业级集群使用的发布平台。

@@ -97,7 +97,7 @@ Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0�
 2. 正常阶段，Leader 接收写请求，然后复制给其他Followers
 3. 恢复阶段，旧Leader宕机， 新Leader上任，其他Follower切换到新Leader，开始同步数据。 
 
-## 为什么paxos 更复杂——有一个Leadre 能带来多少好处
+## 为什么paxos 更复杂——有一个Leader 能带来多少好处
 
 ![](/public/upload/distribute/paxos_vs_raft.png)
 
