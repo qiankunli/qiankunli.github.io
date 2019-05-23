@@ -56,7 +56,10 @@ keywords: linux命令
 
 ## x86 架构
 
-![](/public/upload/linux/hardware_architecture.jpeg)
+<div class="class=width:100%;height:auto;">
+    <img src="/public/upload/linux/hardware_architecture.jpeg"/>
+</div>
+
 
 ### “指令格式-cpu结构-总线”的暧昧关系
 
