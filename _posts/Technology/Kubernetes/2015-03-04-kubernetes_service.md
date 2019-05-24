@@ -117,6 +117,8 @@ service configure文件中有一个`PublicIPs`属性
 
 所谓 Service 的访问入口，其实就是每台宿主机上由 kube-proxy 生成的 iptables 规则，以及 kube-dns 生成的 DNS 记录。而一旦离开了这个集群，这些信息对用户来说，也就自然没有作用了。比如，一个集群外的host 对service vip 一点都不感冒。
 
-## ingress
+## Ingress
 
 Ingress和Pod、Servce等等类似，被定义为kubernetes的一种资源。本质上说Ingress只是存储在etcd上面一些数据，我们可以能过kubernetes的apiserver添加删除和修改ingress资源。真正让整个Ingress运转起来的一个重要组件是Ingress Controller，但并不像其它Controller一样作为kubernetes的核心组件在master启动的时候一起启动起来
+
+具体实现参见 [扩展Kubernetes](http://qiankunli.github.io/2019/05/24/kubernetes_extension.html)

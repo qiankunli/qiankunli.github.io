@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes扩展
+title: 扩展Kubernetes
 category: 技术
 tags: Kubernetes
 keywords: kubernetes crd
@@ -13,8 +13,9 @@ keywords: kubernetes crd
 * TOC
 {:toc}
 
-## 如何扩展api server——CRD
+## CRD
 
+建议先查看[Kubernetes 控制器模型](http://qiankunli.github.io/2019/03/07/kubernetes_controller.html)
 
 ### Custom Resource
 
@@ -66,7 +67,7 @@ Spring 提供了扩展 xml 的机制，用来编写自定义的 xml bean ，例�
 
 自定义custom controller 就有点 自定义 ansible module的意思。
 
-### 实操
+### 实操——极客时间
 
 来自极客时间 《深入剖析Kubernetes》 
 
@@ -157,7 +158,45 @@ pod2 资源类型在服务器端的注册的工作，APIServer 会自动帮我�
 5. 想要复用kubernetes API的公共功能，比如CRUD、watch、内置的认证和授权等
 
 
-
-
-
 [Kubernetes Deep Dive: Code Generation for CustomResources](https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/)
+
+## 实操——Ingress（未完成）
+
+Ingress 背景及作用参见[访问Kubernetes上的服务](http://qiankunli.github.io/2015/03/04/kubernetes_service.html)
+
+[Kubernetes Ingress（2）Controller源码分析](http://shareinto.github.io/2017/04/13/KubernetesIngress(2)/)未理解
+
+[Kubernetes Ingress Controller的使用介绍及高可用落地](http://www.servicemesher.com/blog/kubernetes-ingress-controller-deployment-and-ha/)未读
+
+## 另一种扩展——operator
+
+[Kubernetes Controller vs Kubernetes Operator?](https://stackoverflow.com/questions/47848258/kubernetes-controller-vs-kubernetes-operator)
+
+The list of controller in the Control-plane，比如
+
+1. Deployment
+2. ReplicaSet
+3. StatefulSet
+4. DaemonSet
+
+From the Google Search, I found out that there are K8s Operators such as
+
+1. etcd Operator
+2. Prometheus Operator
+3. kong Operators
+
+
+All Operators use the controller pattern, but not all controllers are Operators. It's only an Operator if it's got: controller pattern + API extension + single-app focus.
+
+Operator is a customized controller implement with CRD. It follow the same pattern with build-in controllers (i.e. watch, diff, action).
+
+
+作者 believe the term "kubernetes operator" was introduced by [the CoreOS people](https://coreos.com/operators/) here
+
+	An Operator is a method of packaging, deploying and managing a Kubernetes application. A Kubernetes application is an application that is both deployed on Kubernetes and managed using the Kubernetes APIs and kubectl tooling.
+
+	An Operator is an application-specific controller that extends the Kubernetes API to create, configure and manage instances of complex stateful applications on behalf of a Kubernetes user. It builds upon the basic Kubernetes resource and controller concepts, but also includes domain or application-specific knowledge to automate common tasks better managed by computers.
+
+So basically, a kubernetes operator is the name of a pattern that consists of a kubernetes controller that adds new objects to the Kubernetes API, in order to configure and manage an application, such as Prometheus or etcd. 为应用kubernetes 化而生的。
+
+In one sentence: An operator is a domain specific controller.
