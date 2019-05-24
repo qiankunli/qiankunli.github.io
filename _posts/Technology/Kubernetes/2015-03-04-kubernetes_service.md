@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Kubernetes service
+title: 访问Kubernetes上的服务
 category: 技术
 tags: Kubernetes
 keywords: Docker Kubernetes
@@ -14,9 +14,7 @@ keywords: Docker Kubernetes
 
 本文主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs "")的摘抄，有删改。
 
-
-
-2019.1.29补充：之前理解的服务对外部的访问，是服务级别的。而Kubernetes 是打算将pod 级别的对外访问也交给service（哪怕是mysql 主从之间的访问），因为ip 是变化的 以及 多个pod 负载均衡的需求，这也是kubernetes 不提倡ip 访问而提供的替换方案。但在复杂系统中，网络处理越简单越好。iptables是万恶之源，给实际工作中的运维排错带来极大的麻烦。在一些大厂的实践中，一般很少使用service 方案。
+2019.1.29补充：之前理解的服务对外部的访问，服务的“粒度”比较大，如一个支付接口，后面一堆服务支撑。而Kubernetes 是打算将pod 级别的对外访问也交给service，因为ip 是变化的 以及 多个pod 负载均衡的需求，这也是kubernetes 不提倡ip 访问而提供的替换方案。但service 是基于iptables实现的，在复杂系统中，网络处理越简单越好。iptables是万恶之源，给实际工作中的运维排错带来极大的麻烦。在一些大厂的实践中，一般很少使用service 方案。
 
 ![](/public/upload/kubernetes/kubernetes_service_access.png)
 
@@ -25,15 +23,13 @@ keywords: Docker Kubernetes
 Container Engine pods are ephemeral（短暂的）. They can come and go over time, especially when driven by things like replication controllers. While each pod gets its own IP address, **those IP addresses cannot be relied upon to be stable over time（直接通过一个pod的ip来访问它是不可靠的）**. This leads to a problem: if some set of pods (let's call them backends) provides functionality to other pods (let's call them frontends) inside a cluster, how do those frontends find the backends?
 (Pod组件的状态经常变化，也可能存在多个副本，那么其他组件如何来访问它呢)
 
-Enter services.
-
 A Container Engine service is an abstraction which defines a logical set of pods and a policy by which to access them. **The goal of services is to provide a bridge for non-Kubernetes-native applications to access backends without the need to write code that is specific to Kubernetes. A service offers clients an IP and port pair which, when accessed, redirects to the appropriate backends.(service会提供一个稳定的ip，作为桥梁，让其它pod访问。而service负责将请求转发到其对应的pod上)** The set of pods targeted is determined by a label selector.
 
 ![kubernete_service_model.png](/public/upload/kubernetes/kubernete_service_model.png)
 
-As an example, consider an image-process backend which is running with 3 live replicas. Those replicas are fungible—frontends do not care which backend they use. While the actual pods that comprise the set may change, the frontend client(s) do not need to know that. The service abstraction enables this decoupling.
+突然想起一句话：计算机里的事情，没什么问题是加一层解决不了的。
 
-## How do they work?——基于iptables实现
+### How do they work?——基于iptables实现
 
 Service 是由 kube-proxy 组件，加上 iptables 来共同实现的。
 
@@ -88,117 +84,6 @@ Service 的 VIP 只是一条 iptables 规则上的配置，并没有真正的网
 
 A service, through its label selector(a key:value pair), can resolve to 0 or more pods. Over the life of a service, the set of pods which comprise that service can grow, shrink, or turn over completely. Clients will only see issues if they are actively using a backend when that backend is removed from the service (and even then, open connections will persist for some protocols).
 
-### Service Operations
-
-Services map a port on each cluster node to ports on one or more pods.The mapping uses a selector key:value pair in the service, and the labels property of pods. Any pods whose labels match the service selector are made accessible through the service's port.
-
-#### Create a service
-
-    $ kubectl create -f FILE
-    
-Where:
-
-- -f FILE or --filename FILE is a relative path to a service configuration file in either JSON or YAML format.
-
-A successful service create request returns the service name.
-
-#### Service configuration file
-
-When creating a service, you must point to a service configuration file as the value of the -f flag. The configuration file can be formatted as YAML or as JSON, and supports the following fields:
-
-    {
-      "id": string,
-      "kind": "Service",
-      "apiVersion": "v1beta1",
-      "selector": {
-        string: string
-      },
-      "containerPort": int,
-      "protocol": string,
-      "port": int,
-      "createExternalLoadBalancer": bool
-    }
-    
-Required fields are:
-
-- id: The name of this service.
-- kind: Always Service.
-- apiVersion: Currently v1beta1.
-- selector: The label key:value pair that defines the pods to target.
-- containerPort The port to target on the pod.
-- port: The port on the node instances to map to the containerPort.
-
-Optional fields are:
-
-- protocol: The Internet protocol to use when connecting to the container port. Must be TCP.
-- createExternalLoadBalancer: If true, sets up Google Compute Engine network load balancing for your service. This provides an externally-accessible IP address that sends traffic to the correct port on your cluster nodes. To do this, a target pool is created that contains all nodes in the cluster. A forwarding rule defines a static IP address and maps it to the service's port on the target pool. Traffic is sent to clusters in the pool in round-robin order.
-
-#### Sample files
-
-The following service configuration files assume that you have a set of pods that expose port 9376 and carry the label app=example.
-
-Both files create a new service named myapp which resolves to TCP port 9376 on any pod with the app=example label.
-
-The difference in the files is in how the service is accessed. The first file does not create an external load balancer; the service can be accessed through port 8765 on any of the nodes' IP addresses.
-
-    {
-      "id": "myapp",
-      "kind": "Service",
-      "apiVersion": "v1beta1",
-      "selector": {
-        "app": "example"
-      },
-      "containerPort": 9376,
-      "protocol": "TCP",
-      "port": 8765
-    }
-（一个服务有多个pod，如果我们想对其进行调度的话，可以使用gce）
-The second file uses Google Compute Engine network load balancing to create a single IP address that spreads traffic to all of the nodes in your cluster. This option is specified with the "createExternalLoadBalancer": true property.
-
-    {
-      "id": "myapp",
-      "kind": "Service",
-      "apiVersion": "v1beta1",
-      "selector": {
-        "app": "example"
-      },
-      "containerPort": 9376,
-      "protocol": "TCP",
-      "port": 8765,
-      "createExternalLoadBalancer": true
-    }
-
-To access the service, a client connects to the external IP address, which forwards to port 8765 on a node in the cluster, which in turn accesses port 9376 on the pod. 
-
-#### View a service
-
-    $ kubectl get services
-    
-A successful get request returns all services that exist on the specified cluster:
-
-    NAME                LABELS                                    SELECTOR            IP                  PORT
-    apache2-service     <none>                                    name=apache2        10.100.123.196      9090
-    
-To return information about a specific service,
-
-    $ kubectl describe service NAME
-    
-Details about the specific service are returned:
-
-    Name:     myapp
-    Labels:   <none>
-    Selector: app=MyApp
-    Port:     8765
-    No events.
-    
-#### Delete a service
-
-    $ kubectl delete service NAME
-    
-A successful delete request returns the deleted service's name.
-
-## Other
-
 ### kubernetes和kubernetes-ro
 
 kubernetes启动时，默认有两个服务kubernetes和kubernetes-ro
@@ -231,3 +116,7 @@ service configure文件中有一个`PublicIPs`属性
 ## NodePort
 
 所谓 Service 的访问入口，其实就是每台宿主机上由 kube-proxy 生成的 iptables 规则，以及 kube-dns 生成的 DNS 记录。而一旦离开了这个集群，这些信息对用户来说，也就自然没有作用了。比如，一个集群外的host 对service vip 一点都不感冒。
+
+## ingress
+
+Ingress和Pod、Servce等等类似，被定义为kubernetes的一种资源。本质上说Ingress只是存储在etcd上面一些数据，我们可以能过kubernetes的apiserver添加删除和修改ingress资源。真正让整个Ingress运转起来的一个重要组件是Ingress Controller，但并不像其它Controller一样作为kubernetes的核心组件在master启动的时候一起启动起来

@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes 声明式api与控制器模型
+title: Kubernetes 控制器模型
 category: 技术
 tags: Kubernetes
 keywords: kubernetes scheduler
@@ -100,7 +100,7 @@ SharedInformer，因为SharedInformer 是共享的，所以其Resource Event Han
 ![](/public/upload/kubernetes/kubernete_controller_pattern.png)
 
 
-## 自定义Controller（未完成）
+## 自定义Controller
 
 [Kubewatch, An Example Of Kubernetes Custom Controller](https://engineering.bitnami.com/articles/kubewatch-an-example-of-kubernetes-custom-controller.html)
 

@@ -212,6 +212,8 @@ CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的�
 
 缺个类图
 
+![](/public/upload/linux/schedule_class.png)
+
 ## Per CPU的struct
 
 linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
