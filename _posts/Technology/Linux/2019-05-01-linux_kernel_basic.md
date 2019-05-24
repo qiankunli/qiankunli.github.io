@@ -53,11 +53,13 @@ keywords: linux 内核
 
 ![](/public/upload/linux/mm_struct.png)
 
-## 地址空间内的栈：用户栈和内核栈
+## 地址空间内的栈
+
+栈是主要用途就是支持函数调用。
 
 大多数的处理器架构，都有实现**硬件栈**。有专门的栈指针寄存器，以及特定的硬件指令来完成 入栈/出栈 的操作。
 
-### 栈的切换
+### 用户栈和内核栈的切换
 
 删改自[进程内核栈、用户栈](http://www.cnblogs.com/shengge/articles/2158748.html)
 
@@ -77,10 +79,28 @@ keywords: linux 内核
 
 内核地址空间所有进程空闲，但内核栈却不共享。为什么需要单独的进程内核栈？**因为同时可能会有多个进程在内核运行**。
 
-所有进程运行的时候，都可能通过系统调用陷入内核态继续执行。假设第一个进程 A 陷入内核态执行的时候，需要等待读取网卡的数据，主动调用 schedule() 让出 CPU；此时调度器唤醒了另一个进程 B，碰巧进程 B 也需要系统调用进入内核态。那问题就来了，如果内核栈只有一个，那进程 B 进入内核态的时候产生的压栈操作，必然会破坏掉进程 A 已有的内核栈数据；一但进程 A 的内核栈数据被破坏，很可能导致进程 A 的内核态无法正确返回到对应的用户态了。
+所有进程运行的时候，都可能通过系统调用陷入内核态继续执行。假设第一个进程 A 陷入内核态执行的时候，需要等待读取网卡的数据，主动调用 `schedule()` 让出 CPU；此时调度器唤醒了另一个进程 B，碰巧进程 B 也需要系统调用进入内核态。那问题就来了，如果内核栈只有一个，那进程 B 进入内核态的时候产生的压栈操作，必然会破坏掉进程 A 已有的内核栈数据；一但进程 A 的内核栈数据被破坏，很可能导致进程 A 的内核态无法正确返回到对应的用户态了。
 
 进程内核栈在**进程创建的时候**，通过 slab 分配器从 thread_info_cache 缓存池中分配出来，其大小为 THREAD_SIZE，一般来说是一个页大小 4K；
 
+### 进程切换带来的用户栈切换和内核栈切换
+
+    // 持有task_struct 便可以访问进程在内存中的所有数据
+    struct task_struct {
+        ...
+        struct mm_struct                *mm;
+        struct mm_struct                *active_mm;
+        ...
+        void  *stack;   // 指向内核栈的指针
+    }
+
+从进程 A 切换到进程 B，用户栈要不要切换呢？当然要，在切换内存空间的时候就切换了，每个进程的用户栈都是独立的，都在内存空间里面。
+
+那内核栈呢？已经在 __switch_to 里面切换了，也就是将 current_task 指向当前的 task_struct。里面的 void *stack 指针，指向的就是当前的内核栈。
+
+内核栈的栈顶指针呢？在 __switch_to_asm 里面已经切换了栈顶指针，并且将栈顶指针在 __switch_to加载到了 TSS 里面。
+
+用户栈的栈顶指针呢？如果当前在内核里面的话，它当然是在内核栈顶部的 pt_regs 结构里面呀。当从内核返回用户态运行的时候，pt_regs 里面有所有当时在用户态的时候运行的上下文信息，就可以开始运行了。
 
 ## 中断栈
 
@@ -90,18 +110,117 @@ keywords: linux 内核
 
 ## 进程调度
 
+### 基于虚拟运行时间的调度
+
 ![](/public/upload/linux/process_schedule.png)
 
     struct task_struct{
         ...
-        unsigned int policy;
-
+        unsigned int policy;    // 调度策略
+        ...
         int prio, static_prio, normal_prio;
         unsigned int rt_priority;
         ...
-        const struct sched_class *sched_class;
+        const struct sched_class *sched_class; // 调度策略的执行逻辑
     }
 
+CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，定义一个vruntime来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的
 
+调度需要一个数据结构来对 vruntime 进行排序，因为任何一个策略做调度的时候，都是要区分谁先运行谁后运行。这个能够排序的数据结构不但需要查询的时候，能够快速找到最小的，更新的时候也需要能够快速的调整排序，毕竟每一个tick vruntime都会增长。能够平衡查询和更新速度的是树，在这里使用的是红黑树。sched_entity 表示红黑树的一个node（数据结构中很少有一个Tree 存在，都是根节点`Node* root`就表示tree了）。
+
+    struct task_struct{
+        ...
+        struct sched_entity se;     // 对应完全公平算法调度
+        struct sched_rt_entity rt;  // 对应实时调度
+        struct sched_dl_entity dl;  // 对应deadline 调度
+        ...
+    }
+
+每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。这样保证了实时任务的优先级永远大于普通任务。
+
+
+CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的每一个节点都是一个 sched_entity（说白了每个节点是一个进/线程），每个 sched_entity 都属于一个 task_struct，task_struct 里面有指针指向这个进程属于哪个调度类。
+
+![](/public/upload/linux/process_schedule_impl.jpeg)
+
+如果是主动调度，上图就是一个很完整的循环
+
+### Schedule
+
+    // schedule 方法入口
+    asmlinkage __visible void __sched schedule(void){
+        struct task_struct *tsk = current;
+        sched_submit_work(tsk);
+        do {
+            preempt_disable();
+            __schedule(false);
+            sched_preempt_enable_no_resched();
+        } while (need_resched());
+    }
+    // 主要逻辑是在 __schedule 函数中实现的
+    static void __sched notrace __schedule(bool preempt){
+        struct task_struct *prev, *next;
+        unsigned long *switch_count;
+        struct rq_flags rf;
+        struct rq *rq;
+        int cpu;
+        // 在当前cpu 上取出任务队列rq（其实是红黑树）
+        cpu = smp_processor_id();
+        rq = cpu_rq(cpu);   
+        prev = rq->curr;
+        // 获取下一个任务
+        next = pick_next_task(rq, prev, &rf);
+        clear_tsk_need_resched(prev);
+        clear_preempt_need_resched();
+        // 当选出的继任者和前任不同，就要进行上下文切换，继任者进程正式进入运行
+        if (likely(prev != next)) {
+		rq->nr_switches++;
+		rq->curr = next;
+		++*switch_count;
+        ......
+		rq = context_switch(rq, prev, next, &rf);
+    }
+
+上下文切换主要干两件事情，一是切换进程空间，也即虚拟内存；二是切换寄存器和 CPU 上下文。
+
+    // context_switch - switch to the new MM and the new thread's register state.
+    static __always_inline struct rq *context_switch(struct rq *rq, struct task_struct *prev,struct task_struct *next, struct rq_flags *rf){
+        struct mm_struct *mm, *oldmm;
+        ......
+        // 切换虚拟地址空间
+        mm = next->mm;
+        oldmm = prev->active_mm;
+        ......
+        switch_mm_irqs_off(oldmm, mm, next);
+        ......
+        /* Here we just switch the register state and the stack. */
+        // 切换寄存器
+        switch_to(prev, next, prev);
+        barrier();
+        return finish_task_switch(prev);
+    }
+
+### 调度类
+
+如果将task_struct 视为一个对象，在很多场景下 主动调用`schedule()` 让出cpu，那么如何选取下一个task 就是其应该具备的能力，sched_class 作为其成员就顺理成章了。
+
+    struct task_struct{
+        const struct sched_class *sched_class; // 调度策略的执行逻辑
+    }
+
+## 小结
+
+linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。
+
+1. struct rq，描述在此 CPU 上所运行的所有进程
+2. 结构体 tss， 所有寄存器切换 ==> 内存拷贝/拷贝到特定tss_struct
+
+在 x86 体系结构中，提供了一种以硬件的方式进行进程切换的模式，对于每个进程，x86 希望在内存里面维护一个 TSS（Task State Segment，任务状态段）结构。这里面有所有的寄存器。另外，还有一个特殊的寄存器 TR（Task Register，任务寄存器），指向某个进程的 TSS。更改 TR 的值，将会触发硬件保存 CPU 所有寄存器的值到当前进程的 TSS 中，然后从新进程的 TSS 中读出所有寄存器值，加载到 CPU 对应的寄存器中。
+
+但是这样有个缺点。我们做进程切换的时候，没必要每个寄存器都切换，这样每个进程一个 TSS，就需要全量保存，全量切换，动作太大了。于是，Linux 操作系统想了一个办法。还记得在系统初始化的时候，会调用 cpu_init 吗？这里面会给每一个CPU 关联一个 TSS，然后将 TR 指向这个 TSS，然后在操作系统的运行过程中，TR 就不切换了，永远指向这个TSS
+
+在 Linux 中，真的参与进程切换的寄存器很少，主要的就是栈顶寄存器
+
+所谓的进程切换，就是将某个进程的 thread_struct里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。
 
 
