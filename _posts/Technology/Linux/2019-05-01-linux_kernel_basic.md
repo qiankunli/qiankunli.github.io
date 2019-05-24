@@ -141,7 +141,9 @@ CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，定
 
 CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的每一个节点都是一个 sched_entity（说白了每个节点是一个进/线程），每个 sched_entity 都属于一个 task_struct，task_struct 里面有指针指向这个进程属于哪个调度类。
 
-![](/public/upload/linux/process_schedule_impl.jpeg)
+<div class="class=width:100%;height:auto;">
+    <img src="/public/upload/linux/process_schedule_impl.jpeg"/>
+</div>
 
 如果是主动调度，上图就是一个很完整的循环
 
