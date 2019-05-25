@@ -60,6 +60,10 @@ fetcher线程数和topic所在多少台broker有关。一个Topic启动几个消
 
 ### 什么时候commit 消息
 
+### 消费慢的坑（未完成）
+
+kafka消费太慢，误以为consumer挂掉，一直rebalance。背后的原理
+
 ## 生产端优化
 
 ### 一条消息大小不能超过1M

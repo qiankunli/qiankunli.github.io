@@ -24,6 +24,8 @@ keywords: 深度学习
 
 [Deep Learning](http://www.deeplearningbook.org/)
 
+[陆奇最新演讲：没有学习能力，看再多世界也没用](https://mp.weixin.qq.com/s?__biz=MzIxNTAzNzU0Ng==&mid=2654628648&idx=1&sn=e8d8f9d2389a2f6b4069fd3642360320&chksm=8c50a82dbb27213b04d7b28bf5e94980b477ce16d3cf0078fc315fd654af159b4903df8a779a&mpshare=1&scene=1&srcid=#rd) 绝对高屋建瓴，推荐多看几遍。
+
 ## 人脑神经网络
 
 [神经元之间的连接网络](http://www.xlzx.com/cgi/xr_html/articles/NLP/2796.html)
