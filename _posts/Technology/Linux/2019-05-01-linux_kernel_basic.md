@@ -13,8 +13,6 @@ keywords: linux 内核
 * TOC
 {:toc}
 
-[Linux虚拟地址空间布局以及进程栈和线程栈总结](https://www.cnblogs.com/sky-heaven/p/7112006.html)
-
 ## 虚拟地址空间：用户空间和内核空间
 
 ### 进程“独占”虚拟内存及虚拟内存划分
@@ -54,6 +52,8 @@ keywords: linux 内核
 ![](/public/upload/linux/mm_struct.png)
 
 ## 地址空间内的栈
+
+[Linux虚拟地址空间布局以及进程栈和线程栈总结](https://www.cnblogs.com/sky-heaven/p/7112006.html)
 
 栈是主要用途就是支持函数调用。
 
@@ -161,7 +161,7 @@ CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的�
     <img src="/public/upload/linux/process_schedule_impl.jpeg"/>
 </div>
 
-基于进程调度第一定律，上图就是一个很完整的循环，一直是方法调方法（process1.func1 ==> process1.schedule ==> process2.func2 ==> process2.schedule ==> process3.func3），只不过是跨了进程
+基于进程调度第一定律，上图就是一个很完整的循环，cpu的执行一直是方法调方法（process1.func1 ==> process1.schedule ==> process2.func2 ==> process2.schedule ==> process3.func3），只不过是跨了进程
 
 ### 调度类
 
@@ -210,7 +210,7 @@ CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的�
         ......
     }
 
-**这段跟golang协程的读写过程 是一样一样的**
+**这段跟golang协程的读写过程 是一样一样的**，内核机制上层化（内存管理、线程调度放到语言层/框架层来解决）是一个普遍趋势。
 
 ### 抢占式调度
 
