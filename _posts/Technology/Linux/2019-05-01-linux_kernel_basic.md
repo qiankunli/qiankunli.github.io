@@ -110,6 +110,8 @@ keywords: linux 内核
 
 ## 进程调度
 
+**进程调度第一定律**：所有进程的调度最终是通过正在运行的进程调用__schedule 函数实现
+
 ### 基于虚拟运行时间的调度
 
 ![](/public/upload/linux/process_schedule.png)
@@ -138,6 +140,20 @@ CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，定
 
 每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。这样保证了实时任务的优先级永远大于普通任务。
 
+    // Pick up the highest-prio task:
+    static inline struct task_struct *pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf){
+        const struct sched_class *class;
+        struct task_struct *p;
+        ......
+        for_each_class(class) {
+            p = class->pick_next_task(rq, prev, rf);
+            if (p) {
+                if (unlikely(p == RETRY_TASK))
+                    goto again;
+                return p;
+            }
+        }
+    }
 
 CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的每一个节点都是一个 sched_entity（说白了每个节点是一个进/线程），每个 sched_entity 都属于一个 task_struct，task_struct 里面有指针指向这个进程属于哪个调度类。
 
@@ -145,7 +161,76 @@ CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的�
     <img src="/public/upload/linux/process_schedule_impl.jpeg"/>
 </div>
 
-如果是主动调度，上图就是一个很完整的循环
+基于进程调度第一定律，上图就是一个很完整的循环，一直是方法调方法（process1.func1 ==> process1.schedule ==> process2.func2 ==> process2.schedule ==> process3.func3），只不过是跨了进程
+
+### 调度类
+
+如果将task_struct 视为一个对象，在很多场景下 主动调用`schedule()` 让出cpu，那么如何选取下一个task 就是其应该具备的能力，sched_class 作为其成员就顺理成章了。
+
+    struct task_struct{
+        const struct sched_class *sched_class; // 调度策略的执行逻辑
+    }
+
+![](/public/upload/linux/schedule_class.png)
+
+
+
+### 主动调度
+
+主动调度，就是进程运行到一半，因为等待 I/O 等操作而主动调用 schedule() 函数让出 CPU。
+
+写入块设备的一个典型场景。写入需要一段时间，这段时间用不上CPU
+
+    static void btrfs_wait_for_no_snapshoting_writes(struct btrfs_root *root){
+        ......
+        do {
+            prepare_to_wait(&root->subv_writers->wait, &wait,
+                    TASK_UNINTERRUPTIBLE);
+            writers = percpu_counter_sum(&root->subv_writers->counter);
+            if (writers)
+                schedule();
+            finish_wait(&root->subv_writers->wait, &wait);
+        } while (writers);
+    }
+
+从 Tap 网络设备等待一个读取
+
+    static ssize_t tap_do_read(struct tap_queue *q,
+                struct iov_iter *to,
+                int noblock, struct sk_buff *skb){
+        ......
+        while (1) {
+            if (!noblock)
+                prepare_to_wait(sk_sleep(&q->sk), &wait,
+                        TASK_INTERRUPTIBLE);
+        ......
+            /* Nothing to read, let's sleep */
+            schedule();
+        }
+        ......
+    }
+
+**这段跟golang协程的读写过程 是一样一样的**
+
+### 抢占式调度
+
+在计算机里面有一个时钟，会过一段时间触发一次时钟中断，时钟中断处理函数会调用 scheduler_tick()，代码如下
+
+    void scheduler_tick(void){
+        int cpu = smp_processor_id();
+        struct rq *rq = cpu_rq(cpu);
+        struct task_struct *curr = rq->curr;
+        ......
+        curr->sched_class->task_tick(rq, curr, 0);
+        cpu_load_update_active(rq);
+        calc_global_load_tick(rq);
+        ......
+    }
+
+对于普通进程 scheduler_tick ==> fair_sched_class.task_tick_fair ==> entity_tick ==> update_curr 更新当前进程的 vruntime ==> check_preempt_tick 检查是否是时候被抢占了
+
+当发现当前进程应该被抢占，不能直接把它踢下来，而是把它标记为应该被抢占。为什么呢？因为进程调度第一定律呀，一定要等待正在运行的进程调用 __schedule 才行
+
 
 ### Schedule
 
@@ -201,18 +286,6 @@ CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的�
         barrier();
         return finish_task_switch(prev);
     }
-
-### 调度类（未完成）
-
-如果将task_struct 视为一个对象，在很多场景下 主动调用`schedule()` 让出cpu，那么如何选取下一个task 就是其应该具备的能力，sched_class 作为其成员就顺理成章了。
-
-    struct task_struct{
-        const struct sched_class *sched_class; // 调度策略的执行逻辑
-    }
-
-缺个类图
-
-![](/public/upload/linux/schedule_class.png)
 
 ## Per CPU的struct
 
