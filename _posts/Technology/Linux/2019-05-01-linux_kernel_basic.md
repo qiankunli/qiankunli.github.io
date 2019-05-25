@@ -112,9 +112,9 @@ keywords: linux 内核
 
 **进程调度第一定律**：所有进程的调度最终是通过正在运行的进程调用__schedule 函数实现
 
-### 基于虚拟运行时间的调度
-
 ![](/public/upload/linux/process_schedule.png)
+
+### 基于虚拟运行时间的调度
 
     struct task_struct{
         ...
