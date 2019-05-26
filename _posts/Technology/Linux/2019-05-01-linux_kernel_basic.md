@@ -15,8 +15,6 @@ keywords: linux 内核
 
 ## 进程数据结构
 
-![](/public/upload/linux/linux_task_struct.jpeg)
-
 ![](/public/upload/linux/linux_task_struct_data.png)
 
 一个进程的运行竟然要保存这么多信息，这些信息都可以通过命令行取出来。fork 进程时， 创建一个空的task_struct 结构之后，这些信息也将被一一复制。
