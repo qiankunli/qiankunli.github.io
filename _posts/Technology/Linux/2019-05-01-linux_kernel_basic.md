@@ -57,7 +57,13 @@ keywords: linux 内核
 ||完全由内核实现|由内核态和用户态合作完成<br>相当一部分逻辑由glibc库函数pthread_create来做|
 |数据结构||内核态struct task_struct <br>用户态 struct pthread|
 
-## 虚拟地址空间：用户空间和内核空间
+[线程创建的成本](http://qiankunli.github.io/2014/10/09/Threads.html)
+
+[线程切换的成本](http://qiankunli.github.io/2018/01/07/hardware_software.html)
+
+## 规划虚拟地址空间：用户空间和内核空间
+
+对于内存的访问，用户态的进程使用虚拟地址，内核的也基本都是使用虚拟地址
 
 ### 进程“独占”虚拟内存及虚拟内存划分
 
@@ -80,6 +86,15 @@ keywords: linux 内核
 
 左右两侧均表示虚拟地址空间，左侧以描述内核空间为主，右侧以描述用户空间为主。
 
+|内存区域|日常看到的|
+|---|---|
+|Text Segment<br>Data Segment<br>BSS Segment|Text Segment 是存放二进制可执行代码<br>Data Segment 存放静态常量<br>BSS Segment 存放未初始化的静态变量<br>正是ELF二进制执行文件的三个部分|
+|堆|malloc|
+|Memory Mapping Segment|用来把文件映射进内存用的<br>动态链接库/so文件就是加载到这里|
+|栈|函数栈|
+
+在内核里面也会有内核的代码，同样有 Text Segment、Data Segment 和 BSS Segment，别忘了内核代码也是 ELF 格式的。
+
 ### 在代码上的体现
 
     // 持有task_struct 便可以访问进程在内存中的所有数据
@@ -94,6 +109,8 @@ keywords: linux 内核
 内核使用内存描述符mm_struct来表示进程的地址空间，该描述符表示着进程所有地址空间的信息
 
 ![](/public/upload/linux/linux_virtual_address.png)
+
+在用户态，进程觉着整个空间是它独占的，没有其他进程存在。但是到了内核里面，无论是从哪个进程进来的，看到的都是同一个内核空间，看到的都是同一个进程列表。虽然内核栈是各用个的，但是如果想知道的话，还是能够知道每个进程的内核栈在哪里的。所以，**如果要访问一些公共的数据结构，需要进行锁保护**。
 
 ![](/public/upload/linux/mm_struct.png)
 
@@ -154,6 +171,8 @@ keywords: linux 内核
 |---|---|---|
 |栈地址|进程用户栈|在进程的堆里面创建的|
 |指令指针初始位置|main函数|为线程指定的函数|
+
+对应着jvm 一个线程一个栈
 
 ## 中断栈
 
