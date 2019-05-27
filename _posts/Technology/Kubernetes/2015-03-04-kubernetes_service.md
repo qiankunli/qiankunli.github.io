@@ -149,12 +149,12 @@ host 字段定义的值，就是这个 Ingress 的入口，当用户访问 cafe.
 
 ### Ingress Controller 部署和实现（未完成）
 
-Ingress和Pod、Servce等等类似，被定义为kubernetes的一种资源。本质上说Ingress只是存储在etcd上面一些数据，我们可以能过kubernetes的apiserver添加删除和修改ingress资源。真正让整个Ingress运转起来的一个重要组件是Ingress Controller，但并不像其它Controller一样作为kubernetes的核心组件在master启动的时候一起启动起来
+Ingress和Pod、Servce等等类似，被定义为kubernetes的一种资源。本质上说Ingress只是存储在etcd上面一些数据，我们可以通过kubernetes的apiserver添加删除和修改ingress资源。真正让整个Ingress运转起来的一个重要组件是Ingress Controller，但并不像其它Controller一样作为kubernetes的核心组件在master启动的时候一起启动起来
 
 部署 Nginx Ingress Controller`kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/mandatory.yaml` （yaml 文件未详细分析）
 
 在上述 YAML 文件中，我们定义了一个使用 nginx-ingress-controller 镜像的 Pod，这个 Pod 本身，就是一个监听 Ingress 对象以及它所代理的后端 Service 变化的控制器。
 
-当一个新的 Ingress 对象由用户创建后，nginx-ingress-controller 就会根据Ingress 对象里定义的内容，生成一份对应的 Nginx 配置文件（/etc/nginx/nginx.conf），并使用这个配置文件启动一个 Nginx 服务。而一旦 Ingress 对象被更新，nginx-ingress-controller 就会更新这个配置文件。如果这里只是被代理的 Service 对象被更新，nginx-ingress-controller 所管理的 Nginx 服务是不需要重新加载（reload）的，因为其通过Nginx Lua方案实现了 Nginx Upstream 的动态配置。
+当一个新的 Ingress 对象由用户创建后，nginx-ingress-controller 就会根据Ingress 对象里定义的内容，生成一份对应的 Nginx 配置文件（`/etc/nginx/nginx.conf`），并使用这个配置文件启动一个 Nginx 服务。而一旦 Ingress 对象被更新，nginx-ingress-controller 就会更新这个配置文件。如果这里只是被代理的 Service 对象被更新，nginx-ingress-controller 所管理的 Nginx 服务是不需要重新加载（reload）的，因为其通过Nginx Lua方案实现了 Nginx Upstream 的动态配置。
 
 具体实现参见 [扩展Kubernetes](http://qiankunli.github.io/2019/05/24/kubernetes_extension.html)
