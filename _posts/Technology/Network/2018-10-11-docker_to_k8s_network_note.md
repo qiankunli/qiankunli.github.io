@@ -151,7 +151,28 @@ I mentioned above that rkt implements CNI. In other words, rkt uses CNI to confi
 2. ` sudo rkt run --interactive --net=customrktbridge quay.io/coreos/alpine-sh` 便可以创建 使用customrktbridge network 的容器了。类似的，是不是可以推断`docker network create` 便是 将 network json 文件写入到相应目录下
 3. 表面上的`sudo rkt run --interactive --net=customrktbridge quay.io/coreos/alpine-sh` 关于网络部分 实际上 是 `sudo CNI_COMMAND=ADD CNI_CONTAINERID=1234567890 CNI_NETNS=/var/run/netns/1234567890 CNI_IFNAME=eth12 CNI_PATH=pwd ./bridge < mybridge.conf
 ` 执行，要完成这样的“映射”，需要规范定义 以及 规范相关方的协作，可以从这个角度再来审视前文对CNI SPEC 的一些梳理。
-4. 笔者以前一直有一个困惑，network、volume 可以作为一个“资源”随意配置，可以是一个json的存在，尤其是network，`docker network create ` 完了之后 就可以在`docker run -net=xx` 的时候使用。kubernetes 中更是 yaml 中声明一下network即可使用，是如何的背景支撑这样做？答案就在于，一个network json 不是一个静态配置，不准确的说，`network json = cni plugin binary name + cni plugin binary args`，container runtime 只是 network json的执行器而已。
+
+
+笔者以前一直有一个困惑，network、volume 可以作为一个“资源”随意配置，可以是一个json的存在，尤其是network，`docker network create ` 完了之后 就可以在`docker run -net=xx` 的时候使用。kubernetes 中更是 yaml 中声明一下network即可使用，是如何的背景支撑这样做？ 结合源码来看 [加载 CNI plugin](http://qiankunli.github.io/2018/12/31/kubernetes_source_kubelet.html) Kubelet 会根据 network.json `cmd:=exec.Command(ctx,"bridge");cmd.Run()`
+
+	{
+	    "cniVersion": "0.2.0",
+	    "name": "mybridge",
+	    "type": "bridge",
+	    "bridge": "cni_bridge0",
+	    "isGateway": true,
+	    "ipMasq": true,
+	    "ipam": {
+	        "type": "host-local",
+	        "subnet": "10.15.20.0/24",
+	        "routes": [
+	            { "dst": "0.0.0.0/0" },
+	            { "dst": "1.1.1.1/32", "gw":"10.15.20.1"}
+	        ]
+	    }
+	}
+
+答案就在于：我们习惯了主体 ==> 客体，比如docker早期版本，直接docker ==> container/network namespace。 而cni体系中则是runtime ==> cni plugin ==> container/network namespace。container runtime看作是一个network.json文件的“执行器”，通过json 文件找到cni plugin binary 并驱动其执行。一个network 不是一个真实实体，netowrk.json描述的不是如何创建一个网络，而是描述了如何给一个container 配置网络。
 
 ### CNI 小结
 
