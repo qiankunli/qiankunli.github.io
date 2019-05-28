@@ -186,10 +186,7 @@ I mentioned above that rkt implements CNI. In other words, rkt uses CNI to confi
 	* 静态组件：container 即 network namespace ，network 定义规范
 	* 动态逻辑：container runtime、orchestrator 协作规范
 
-CNI SPEC 做了建设性的抽象，在架构设计中有指导意义。 
-
-Docker是为了解决 DevOps 所提倡的“基础设施即代码”这个问题，而被创造出来的。那么 cni 也有点“为network namespace add network 即代码/配置”的味道。解决复杂问题的办法：分拆、简化、标准化。
-
+CNI SPEC 做了建设性的抽象，在架构设计中有指导意义：如果你自己做架构设计，你定义的接口/规范 能hold住这么繁杂的 容器插件方案么？
 
 ## kubernetes networking
 
@@ -228,18 +225,3 @@ the pause container servers as an anchoring point for the pod and make it easy t
 
 pause container 被称为 infrastructure container，中文有的文章简称 Infra 容器。Infra 容器一定要占用极少的资源，所以它使用的是一个非常特殊的镜像，叫作：k8s.gcr.io/pause。这个镜像是一个用汇编语言编写的、永远处于“暂停”状态的容器，解压后的大小也只有 100~200 KB 左右。
 
-
-## service 的实现机制
-
-[Kubernetes networking 101 – Services](http://www.dasblinkenlichten.com/kubernetes-networking-101-services/)
-
-1. 当pod 有多个实例时，service 可以负载均衡
-1.  services can be resolved by name so long as you are running the Kube-DNS cluster add on. kubelet will configure the containers resolv.conf file to include the appropriate DNS server (which also happens to be a service itself) and search domains，按域名访问service
-2. services are actually implemented with iptables rules. rules are implemented on the nodes by the kube-proxy service. the same iptables configuration will be made on each host.
-3. Notice that some of the iptables rules are using the statistic module and appear to be using it to calculate probability.  This is allows the service construct to act as a sort of load balancer. 
-
-[Kubernetes networking 101 – (Basic) External access into the cluster](http://www.dasblinkenlichten.com/kubernetes-networking-101-basic-external-access-into-the-cluster/)
-
-[Kubernetes Networking 101 – Ingress resources](http://www.dasblinkenlichten.com/kubernetes-networking-101-ingress-resources/)
-
-[Getting started with Calico on Kubernetes](http://www.dasblinkenlichten.com/getting-started-with-calico-on-kubernetes/)（未读）My goal with these posts has been to focus on the primitives and to show how a Kubernetes cluster handles networking internally as well as how it interacts with the upstream or external network. 
