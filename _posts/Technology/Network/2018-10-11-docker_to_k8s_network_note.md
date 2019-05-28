@@ -11,45 +11,29 @@ keywords: Container-Networking-Docker-Kubernetes
 
 ## 简介
 
+* TOC
+{:toc}
+
 Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes 中的容器网络的小册子，本文是其读书笔记。
 
 容器网络仍然非常年轻，年轻就意味着多变，笔者之前博客总结几套方案都落伍了， 这更加需要我们对容器网络有一个梳理。
 
 **service discovery and container orchestration are two sides of the same idea.**
 
-* TOC
-{:toc}
-
 建议先看下[程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)
 
 ## container networking stack
-
 
 |分层|包括哪些|作用|
 |---|---|---|
 |the low-level networking layer|networking gear(网络设备),iptables,routing,ipvlan,linux namespaces|这些技术已经存在很多年，我们只是对它们的使用|
 |the container networking layer|single-host bridge mode,multi-host,ip-per-container|对底层技术provide some abstractions|
-|the container orchestration layer|service discovery,loadbalance,cni,kubernetes networking|marrying the container scheduler's decisions on where to place a container with the primitives provided by lower layers. 重要的事情读三遍：根据调度系统的决定，使用lower layer提供的操作place a container|
+|the container orchestration layer|service discovery,loadbalance,cni,kubernetes networking|marrying the container scheduler's decisions on where to place a container with the primitives provided by lower layers. |
 
 ![](/public/upload/docker/container_networking.png)
 
 一个 Network Namespace 的网络栈包括：网卡（Network Interface）、回环设备（Loopback Device）、路由表（Routing Table）和 iptables 规则。**这句话框定了下文CNI  plugin 的功能边界**
 
-
-## 单机
-
-除了四种网络模型之外，还有administrative point of view
-
-1. allocating ip addresses, 手动分配是不现实的，此外，**to prevent arp collisions on a local network, the docker daemon generates a mac address from the allocated ip address** 
-2. managing ports
-
-	* fixed allocation
-	* dynamic allocation
-	* ip-per-container，就没有端口分配的问题了
-
-3. network security
-
-ip-per-container 是网络方案中的一种，不要用习惯了，就以为只有这一种方式。
 
 ## 多机
 
@@ -66,7 +50,6 @@ ip-per-container 是网络方案中的一种，不要用习惯了，就以为只
 	* VXLAN evolved as a Data Center technology，所以分析vxlan 优势时一切以 数据中心的需求为出发点。一个超大型数据中心，交换机怎么联都是有技术含量的 [What is a Networking Switch Fabric](https://www.sdxcentral.com/sdn/definitions/what-is-networking-switch-fabric/)
 	* vlan 4096 数量限制 不是问题
 	* TOR（Top Of Rack）交换机MAC地址表限制。数据中心的虚拟化给网络设备带来的最直接影响就是：之前TOR（Top Of Rack）交换机的一个端口连接一个物理主机对应一个MAC地址，但现在交换机的一个端口虽然还是连接一个物理主机但是可能进而连接几十个甚至上百个虚拟机和相应数量的MAC地址。
-	* 待补充
 	* VTEP 在微服务领域有点像现在的service mesh，一个vm/container 是一个微服务，微服务只需和sevice mesh sidecar 沟通
 
 
@@ -90,9 +73,6 @@ The cni specification is lightweight; it only deals with the network connectivit
 
 
 cni 接口规范，不是很长[Container Network Interface Specification](https://github.com/containernetworking/cni/blob/master/SPEC.md)，原来技术的世界里很多规范用Specification 来描述。
-
-![](/public/upload/docker/cni_2.png)
-
 
 ![](/public/upload/docker/cni_3.png)
 

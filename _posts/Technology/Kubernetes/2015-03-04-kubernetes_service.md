@@ -147,11 +147,11 @@ host 字段定义的值，就是这个 Ingress 的入口，当用户访问 cafe.
 
 一个 Ingress 对象的主要内容，实际上就是一个“反向代理”服务（比如：Nginx）的配置文件的描述。
 
-### Ingress Controller 部署和实现（未完成）
+### Ingress Controller 部署和实现
 
 Ingress和Pod、Servce等等类似，被定义为kubernetes的一种资源。本质上说Ingress只是存储在etcd上面一些数据，我们可以通过kubernetes的apiserver添加删除和修改ingress资源。真正让整个Ingress运转起来的一个重要组件是Ingress Controller，但并不像其它Controller一样作为kubernetes的核心组件在master启动的时候一起启动起来
 
-部署 Nginx Ingress Controller`kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/mandatory.yaml` （yaml 文件未详细分析）
+部署 Nginx Ingress Controller`kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/mandatory.yaml` 
 
 在上述 YAML 文件中，我们定义了一个使用 nginx-ingress-controller 镜像的 Pod，这个 Pod 本身，就是一个监听 Ingress 对象以及它所代理的后端 Service 变化的控制器。
 
