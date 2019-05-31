@@ -196,6 +196,10 @@ cr3 是 CPU 的一个寄存器，它会指向当前进程的顶级 pgd。如果 
 
 这里需要注意两点。第一点，cr3 里面存放当前进程的顶级 pgd，这个是硬件的要求。cr3 里面需要存放 pgd 在物理内存的地址，不能是虚拟地址。第二点，用户进程在运行的过程中，访问虚拟内存中的数据，会被 cr3 里面指向的页表转换为物理地址后，才在物理内存中访问数据，这个过程都是在用户态运行的，地址转换的过程无需进入内核态。
 
+![](/public/upload/linux/linux_page_table.jpg)
+
+这就可以解释，为什么页表数据在 task_struct 的mm_struct里却又 可以融入硬件地址翻译机制了。
+
 ### 通过缺页中断来“填充”页表
 
 内存管理并不直接分配物理内存，只有等你真正用的那一刻才会开始分配。只有访问虚拟内存的时候，发现没有映射多物理内存，页表也没有创建过，才触发缺页异常。进入内核调用 do_page_fault，一直调用到 __handle_mm_fault，__handle_mm_fault 调用 pud_alloc 和 pmd_alloc，来创建相应的页目录项，最后调用 handle_pte_fault 来创建页表项。
@@ -243,7 +247,7 @@ cr3 是 CPU 的一个寄存器，它会指向当前进程的顶级 pgd。如果 
         return handle_pte_fault(&vmf);
     }
 
-以handle_pte_fault 的一种场景 do_anonymous_page为例：先通过 pte_alloc 分配一个页表项，然后通过 alloc_zeroed_user_highpage_movable 分配一个页，接下来要调用 mk_pte，将页表项指向新分配的物理页，set_pte_at 会将页表项塞到页表里面。
+以handle_pte_fault 的一种场景 do_anonymous_page为例：先通过 pte_alloc 分配一个页表项，然后通过 alloc_zeroed_user_highpage_movable 分配一个页，接下来要调用 mk_pte，**将页表项指向新分配的物理页**，set_pte_at 会将页表项塞到页表里面。
 
     static int do_anonymous_page(struct vm_fault *vmf){
         struct vm_area_struct *vma = vmf->vma;
