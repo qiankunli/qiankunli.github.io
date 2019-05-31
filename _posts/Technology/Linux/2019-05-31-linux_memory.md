@@ -13,54 +13,69 @@ keywords: linux 内核
 * TOC
 {:toc}
 
-## 进程数据结构
+![](/public/upload/linux/linux_memory_management.png)
 
-![](/public/upload/linux/linux_task_struct_data.png)
+## 内存管理
 
-一个进程的运行竟然要保存这么多信息，这些信息都可以通过命令行取出来。fork 进程时， 创建一个空的task_struct 结构之后，这些信息也将被一一复制。
+对于内存的访问，用户态的进程使用虚拟地址，内核的也基本都是使用虚拟地址
 
-    long _do_fork(unsigned long clone_flags,
-	      unsigned long stack_start,
-	      unsigned long stack_size,
-	      int __user *parent_tidptr,
-	      int __user *child_tidptr,
-	      unsigned long tls){
-        struct task_struct *p;
-        int trace = 0;
-        long nr;
-        ......
-        // 复制结构
-        p = copy_process(clone_flags, stack_start, stack_size,
-                child_tidptr, NULL, trace, tls, NUMA_NO_NODE);
-        ......
-        if (!IS_ERR(p)) {
-            struct pid *pid;
-            pid = get_task_pid(p, PIDTYPE_PID);
-            nr = pid_vnr(pid);
-            if (clone_flags & CLONE_PARENT_SETTID)
-                put_user(nr, parent_tidptr);
-            ......
-            // 唤醒新进程
-            wake_up_new_task(p);
-            ......
-            put_pid(pid);
-        } 
+### 物理内存空间布局
 
+![](/public/upload/linux/linux_physical_memory.jpg)
 
-![](/public/upload/linux/task_fork.jpeg)
+### 虚拟内存与物理内存的映射
 
+|页表|用户态|内核态|备注|
+|---|---|---|---|
+|在哪|task_struct的mm_struct|mm_struct init_mm|
+|地址映射方式|走四级页表来翻译|线性映射|内核空间也必须有一部分是非线性映射，比如下图的vmalloc|
+|何时创建|随进程创建产生|内核初始化时|
+|独立性|独占|共享|
 
-||创建进程|创建线程|
-|---|---|---|
-|系统调用|fork|clone|
-|copy_process逻辑|会将五大结构 files_struct、fs_struct、sighand_struct、signal_struct、mm_struct 都复制一遍<br>从此父进程和子进程各用各的数据结构|五大结构仅仅是引用计数加一<br>也即线程共享进程的数据结构|
-||完全由内核实现|由内核态和用户态合作完成<br>相当一部分逻辑由glibc库函数pthread_create来做|
-|数据结构||内核态struct task_struct <br>用户态 struct pthread|
+### 进程“独占”虚拟内存及虚拟内存划分
 
-[线程创建的成本](http://qiankunli.github.io/2014/10/09/Threads.html)
+为了保证操作系统的稳定性和安全性。用户程序不可以直接访问硬件资源，如果用户程序需要访问硬件资源，必须调用操作系统提供的接口，这个调用接口的过程也就是系统调用。每一次系统调用都会存在两个内存空间之间的相互切换，通常的网络传输也是一次系统调用，通过网络传输的数据先是从内核空间接收到远程主机的数据，然后再**从内核空间复制到用户空间**，供用户程序使用。这种从内核空间到用户空间的数据复制很费时，虽然保住了程序运行的安全性和稳定性，但是牺牲了一部分的效率。
 
-[线程切换的成本](http://qiankunli.github.io/2018/01/07/hardware_software.html)
+如何分配用户空间和内核空间的比例也是一个问题，是更多地分配给用户空间供用户程序使用，还是首先保住内核有足够的空间来运行。在当前的Windows 32位操作系统中，默认用户空间：内核空间的比例是1:1，而在32位Linux系统中的默认比例是3:1（3GB用户空间、1GB内核空间）（这里只是地址空间，映射到物理地址，可没有某个物理地址的内存只能存储内核态数据或用户态数据的说法）。
 
+||用户地址空间|内核地址空间|备注|
+|---|---|---|---|
+|地址类型|虚拟地址|虚拟地址|都要经过 MMU 的翻译，变成物理地址|
+|生存期|随进程创建产生|持续存在|
+|共享|进程独占|所有进程共享|
+|对应物理空间|分散且不固定|提前固定下来一片连续的物理地址空间，所有进程共享|
+
+![](/public/upload/linux/virtual_memory_space.jpg)
+
+左右两侧均表示虚拟地址空间，左侧以描述内核空间为主，右侧以描述用户空间为主。
+
+|内存区域|日常看到的|
+|---|---|
+|Text Segment<br>Data Segment<br>BSS Segment|Text Segment 是存放二进制可执行代码<br>Data Segment 存放静态常量<br>BSS Segment 存放未初始化的静态变量<br>正是ELF二进制执行文件的三个部分|
+|堆|malloc|
+|Memory Mapping Segment|用来把文件映射进内存用的<br>动态链接库/so文件就是加载到这里|
+|栈|函数栈|
+
+在内核里面也会有内核的代码，同样有 Text Segment、Data Segment 和 BSS Segment，别忘了内核代码也是 ELF 格式的。
+
+### 在代码上的体现
+
+    // 持有task_struct 便可以访问进程在内存中的所有数据
+    struct task_struct {
+        ...
+        struct mm_struct                *mm;
+        struct mm_struct                *active_mm;
+        ...
+        void  *stack;   // 指向内核栈的指针
+    }
+
+内核使用内存描述符mm_struct来表示进程的地址空间，该描述符表示着进程所有地址空间的信息
+
+![](/public/upload/linux/linux_virtual_address.png)
+
+在用户态，进程觉着整个空间是它独占的，没有其他进程存在。但是到了内核里面，无论是从哪个进程进来的，看到的都是同一个内核空间，看到的都是同一个进程列表。虽然内核栈是各用个的，但是如果想知道的话，还是能够知道每个进程的内核栈在哪里的。所以，**如果要访问一些公共的数据结构，需要进行锁保护**。
+
+![](/public/upload/linux/mm_struct.png)
 
 ## 地址空间内的栈
 
@@ -128,198 +143,128 @@ keywords: linux 内核
 
 当系统收到中断事件后，进行中断处理的时候，也需要中断栈来支持函数调用。由于系统中断的时候，系统当然是处于内核态的，所以中断栈是可以和内核栈共享的。但是具体是否共享，这和具体处理架构密切相关。ARM 架构就没有独立的中断栈。
 
-## 进程调度
+## 内存管理的进程和硬件背景
 
-**进程调度第一定律**：所有进程的调度最终是通过正在运行的进程调用__schedule 函数实现
+### 页表的位置
 
-![](/public/upload/linux/process_schedule.png)
+每个进程都有独立的地址空间，为了这个进程独立完成映射，每个进程都有独立的进程页表，这个页表的最顶级的 pgd 存放在 task_struct 中的 mm_struct 的 pgd 变量里面。
 
-### 基于虚拟运行时间的调度
+在一个进程新创建的时候，会调用 fork，对于内存的部分会调用 copy_mm，里面调用 dup_mm。
 
-    struct task_struct{
-        ...
-        unsigned int policy;    // 调度策略
-        ...
-        int prio, static_prio, normal_prio;
-        unsigned int rt_priority;
-        ...
-        const struct sched_class *sched_class; // 调度策略的执行逻辑
+    // Allocate a new mm structure and copy contents from the mm structure of the passed in task structure.
+    static struct mm_struct *dup_mm(struct task_struct *tsk){
+        struct mm_struct *mm, *oldmm = current->mm;
+        mm = allocate_mm();
+        memcpy(mm, oldmm, sizeof(*mm));
+        if (!mm_init(mm, tsk, mm->user_ns))
+            goto fail_nomem;
+        err = dup_mmap(mm, oldmm);
+        return mm;
     }
 
-CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，定义一个vruntime来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的
+除了创建一个新的 mm_struct，并且通过memcpy将它和父进程的弄成一模一样之外，我们还需要调用 mm_init 进行初始化。接下来，mm_init 调用 mm_alloc_pgd，分配全局页目录项，赋值给mm_struct 的 pdg 成员变量。
 
-调度需要一个数据结构来对 vruntime 进行排序，因为任何一个策略做调度的时候，都是要区分谁先运行谁后运行。这个能够排序的数据结构不但需要查询的时候，能够快速找到最小的，更新的时候也需要能够快速的调整排序，毕竟每一个tick vruntime都会增长。能够平衡查询和更新速度的是树，在这里使用的是红黑树。sched_entity 表示红黑树的一个node（数据结构中很少有一个Tree 存在，都是根节点`Node* root`就表示tree了）。
-
-    struct task_struct{
-        ...
-        struct sched_entity se;     // 对应完全公平算法调度
-        struct sched_rt_entity rt;  // 对应实时调度
-        struct sched_dl_entity dl;  // 对应deadline 调度
-        ...
+    static inline int mm_alloc_pgd(struct mm_struct *mm){
+        mm->pgd = pgd_alloc(mm);
+        return 0;
     }
 
-每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。这样保证了实时任务的优先级永远大于普通任务。
+一个进程的虚拟地址空间包含用户态和内核态两部分。为了从虚拟地址空间映射到物理页面，页表也分为用户地址空间的页表和内核页表。在内核里面，映射靠内核页表，这里内核页表会拷贝一份到进程的页表
 
-    // Pick up the highest-prio task:
-    static inline struct task_struct *pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf){
-        const struct sched_class *class;
-        struct task_struct *p;
-        ......
-        for_each_class(class) {
-            p = class->pick_next_task(rq, prev, rf);
-            if (p) {
-                if (unlikely(p == RETRY_TASK))
-                    goto again;
-                return p;
-            }
-        }
-    }
+如果是用户态进程页表，会有 mm_struct 指向进程顶级目录 pgd，对于内核来讲，也定义了一个 mm_struct，指向 swapper_pg_dir（指向内核最顶级的目录 pgd）。
 
-CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的每一个节点都是一个 sched_entity（说白了每个节点是一个进/线程），每个 sched_entity 都属于一个 task_struct，task_struct 里面有指针指向这个进程属于哪个调度类。
+    struct mm_struct init_mm = {
+        .mm_rb		= RB_ROOT,
+        // pgd 页表最顶级目录
+        .pgd		= swapper_pg_dir,
+        .mm_users	= ATOMIC_INIT(2),
+        .mm_count	= ATOMIC_INIT(1),
+        .mmap_sem	= __RWSEM_INITIALIZER(init_mm.mmap_sem),
+        .page_table_lock =  __SPIN_LOCK_UNLOCKED(init_mm.page_table_lock),
+        .mmlist		= LIST_HEAD_INIT(init_mm.mmlist),
+        .user_ns	= &init_user_ns,
+        INIT_MM_CONTEXT(init_mm)
+    };
 
-<div class="class=width:100%;height:auto;">
-    <img src="/public/upload/linux/process_schedule_impl.jpeg"/>
-</div>
+### 页表的应用
 
-基于进程调度第一定律，上图就是一个很完整的循环，cpu的执行一直是方法调方法（process1.func1 ==> process1.schedule ==> process2.func2 ==> process2.schedule ==> process3.func3），只不过是跨了进程
+**一个进程 fork 完毕之后，有了内核页表（内核初始化时即弄好了内核页表， 所有进程共享），有了自己顶级的 pgd，但是对于用户地址空间来讲，还完全没有映射过（用户空间页表一开始是不完整的，只有最顶级目录pgd这个“光杆司令”）**。这需要等到这个进程在某个 CPU 上运行，并且对内存访问的那一刻了
 
-### 调度类
+当这个进程被调度到某个 CPU 上运行的时候，要调用 context_switch 进行上下文切换。对于内存方面的切换会调用 switch_mm_irqs_off，这里面会调用 load_new_mm_cr3。
 
-如果将task_struct 视为一个对象，在很多场景下 主动调用`schedule()` 让出cpu，那么如何选取下一个task 就是其应该具备的能力，sched_class 作为其成员就顺理成章了。
+cr3 是 CPU 的一个寄存器，它会指向当前进程的顶级 pgd。如果 CPU 的指令要访问进程的虚拟内存，它就会自动从cr3 里面得到 pgd 在物理内存的地址，然后根据里面的页表解析虚拟内存的地址为物理内存，从而访问真正的物理内存上的数据。
 
-    struct task_struct{
-        const struct sched_class *sched_class; // 调度策略的执行逻辑
-    }
+这里需要注意两点。第一点，cr3 里面存放当前进程的顶级 pgd，这个是硬件的要求。cr3 里面需要存放 pgd 在物理内存的地址，不能是虚拟地址。第二点，用户进程在运行的过程中，访问虚拟内存中的数据，会被 cr3 里面指向的页表转换为物理地址后，才在物理内存中访问数据，这个过程都是在用户态运行的，地址转换的过程无需进入内核态。
 
-![](/public/upload/linux/schedule_class.png)
+### 通过缺页中断来“填充”页表
 
-sched_class结构体类似面向对象中的基类啊,通过函数指针类型的成员指向不同的函数，实现了多态。
+内存管理并不直接分配物理内存，只有等你真正用的那一刻才会开始分配。只有访问虚拟内存的时候，发现没有映射多物理内存，页表也没有创建过，才触发缺页异常。进入内核调用 do_page_fault，一直调用到 __handle_mm_fault，__handle_mm_fault 调用 pud_alloc 和 pmd_alloc，来创建相应的页目录项，最后调用 handle_pte_fault 来创建页表项。
 
-### 主动调度
-
-主动调度，就是进程运行到一半，因为等待 I/O 等操作而主动调用 schedule() 函数让出 CPU。
-
-写入块设备的一个典型场景。写入需要一段时间，这段时间用不上CPU
-
-    static void btrfs_wait_for_no_snapshoting_writes(struct btrfs_root *root){
-        ......
-        do {
-            prepare_to_wait(&root->subv_writers->wait, &wait,
-                    TASK_UNINTERRUPTIBLE);
-            writers = percpu_counter_sum(&root->subv_writers->counter);
-            if (writers)
-                schedule();
-            finish_wait(&root->subv_writers->wait, &wait);
-        } while (writers);
-    }
-
-从 Tap 网络设备等待一个读取
-
-    static ssize_t tap_do_read(struct tap_queue *q,
-                struct iov_iter *to,
-                int noblock, struct sk_buff *skb){
-        ......
-        while (1) {
-            if (!noblock)
-                prepare_to_wait(sk_sleep(&q->sk), &wait,
-                        TASK_INTERRUPTIBLE);
-        ......
-            /* Nothing to read, let's sleep */
-            schedule();
+    static noinline void
+    __do_page_fault(struct pt_regs *regs, unsigned long error_code,
+            unsigned long address){
+        struct vm_area_struct *vma;
+        struct task_struct *tsk;
+        struct mm_struct *mm;
+        tsk = current;
+        mm = tsk->mm;
+        // 判断缺页是否发生在内核
+        if (unlikely(fault_in_kernel_space(address))) {
+            if (vmalloc_fault(address) >= 0)
+                return;
         }
         ......
+        // 找到待访问地址所在的区域 vm_area_struct
+        vma = find_vma(mm, address);
+        ......
+        fault = handle_mm_fault(vma, address, flags);
+        ......
+
+    static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
+            unsigned int flags){
+        struct vm_fault vmf = {
+            .vma = vma,
+            .address = address & PAGE_MASK,
+            .flags = flags,
+            .pgoff = linear_page_index(vma, address),
+            .gfp_mask = __get_fault_gfp_mask(vma),
+        };
+        struct mm_struct *mm = vma->vm_mm;
+        pgd_t *pgd;
+        p4d_t *p4d;
+        int ret;
+        pgd = pgd_offset(mm, address);
+        p4d = p4d_alloc(mm, pgd, address);
+        ......
+        vmf.pud = pud_alloc(mm, p4d, address);
+        ......
+        vmf.pmd = pmd_alloc(mm, vmf.pud, address);
+        ......
+        return handle_pte_fault(&vmf);
     }
 
-**这段跟golang协程的读写过程 是一样一样的**，内核机制上层化（内存管理、线程调度放到语言层/框架层来解决）是一个普遍趋势。
+以handle_pte_fault 的一种场景 do_anonymous_page为例：先通过 pte_alloc 分配一个页表项，然后通过 alloc_zeroed_user_highpage_movable 分配一个页，接下来要调用 mk_pte，将页表项指向新分配的物理页，set_pte_at 会将页表项塞到页表里面。
 
-### 抢占式调度
-
-在计算机里面有一个时钟，会过一段时间触发一次时钟中断，时钟中断处理函数会调用 scheduler_tick()，代码如下
-
-    void scheduler_tick(void){
-        int cpu = smp_processor_id();
-        struct rq *rq = cpu_rq(cpu);
-        struct task_struct *curr = rq->curr;
+    static int do_anonymous_page(struct vm_fault *vmf){
+        struct vm_area_struct *vma = vmf->vma;
+        struct mem_cgroup *memcg;
+        struct page *page;
+        int ret = 0;
+        pte_t entry;
         ......
-        curr->sched_class->task_tick(rq, curr, 0);
-        cpu_load_update_active(rq);
-        calc_global_load_tick(rq);
+        if (pte_alloc(vma->vm_mm, vmf->pmd, vmf->address))
+            return VM_FAULT_OOM;
+        ......
+        page = alloc_zeroed_user_highpage_movable(vma, vmf->address);
+        ......
+        entry = mk_pte(page, vma->vm_page_prot);
+        if (vma->vm_flags & VM_WRITE)
+            entry = pte_mkwrite(pte_mkdirty(entry));
+        vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
+                &vmf->ptl);
+        ......
+        set_pte_at(vma->vm_mm, vmf->address, vmf->pte, entry);
         ......
     }
-
-对于普通进程 scheduler_tick ==> fair_sched_class.task_tick_fair ==> entity_tick ==> update_curr 更新当前进程的 vruntime ==> check_preempt_tick 检查是否是时候被抢占了
-
-当发现当前进程应该被抢占，不能直接把它踢下来，而是把它标记为应该被抢占。为什么呢？因为进程调度第一定律呀，一定要等待正在运行的进程调用 __schedule 才行
-
-
-### Schedule
-
-    // schedule 方法入口
-    asmlinkage __visible void __sched schedule(void){
-        struct task_struct *tsk = current;
-        sched_submit_work(tsk);
-        do {
-            preempt_disable();
-            __schedule(false);
-            sched_preempt_enable_no_resched();
-        } while (need_resched());
-    }
-    // 主要逻辑是在 __schedule 函数中实现的
-    static void __sched notrace __schedule(bool preempt){
-        struct task_struct *prev, *next;
-        unsigned long *switch_count;
-        struct rq_flags rf;
-        struct rq *rq;
-        int cpu;
-        // 在当前cpu 上取出任务队列rq（其实是红黑树）
-        cpu = smp_processor_id();
-        rq = cpu_rq(cpu);   
-        prev = rq->curr;
-        // 获取下一个任务
-        next = pick_next_task(rq, prev, &rf);
-        clear_tsk_need_resched(prev);
-        clear_preempt_need_resched();
-        // 当选出的继任者和前任不同，就要进行上下文切换，继任者进程正式进入运行
-        if (likely(prev != next)) {
-		rq->nr_switches++;
-		rq->curr = next;
-		++*switch_count;
-        ......
-		rq = context_switch(rq, prev, next, &rf);
-    }
-
-上下文切换主要干两件事情，一是切换进程空间，也即虚拟内存；二是切换寄存器和 CPU 上下文。
-
-    // context_switch - switch to the new MM and the new thread's register state.
-    static __always_inline struct rq *context_switch(struct rq *rq, struct task_struct *prev,struct task_struct *next, struct rq_flags *rf){
-        struct mm_struct *mm, *oldmm;
-        ......
-        // 切换虚拟地址空间
-        mm = next->mm;
-        oldmm = prev->active_mm;
-        ......
-        switch_mm_irqs_off(oldmm, mm, next);
-        ......
-        /* Here we just switch the register state and the stack. */
-        // 切换寄存器
-        switch_to(prev, next, prev);
-        barrier();
-        return finish_task_switch(prev);
-    }
-
-## Per CPU的struct
-
-linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
-
-1. struct rq，描述在此 CPU 上所运行的所有进程
-2. 结构体 tss， 所有寄存器切换 ==> 内存拷贝/拷贝到特定tss_struct
-
-在 x86 体系结构中，提供了一种以硬件的方式进行进程切换的模式，对于每个进程，x86 希望在内存里面维护一个 TSS（Task State Segment，任务状态段）结构。这里面有所有的寄存器。另外，还有一个特殊的寄存器 TR（Task Register，任务寄存器），指向某个进程的 TSS。更改 TR 的值，将会触发硬件保存 CPU 所有寄存器的值到当前进程的 TSS 中，然后从新进程的 TSS 中读出所有寄存器值，加载到 CPU 对应的寄存器中。
-
-但是这样有个缺点。我们做进程切换的时候，没必要每个寄存器都切换，这样每个进程一个 TSS，就需要全量保存，全量切换，动作太大了。于是，Linux 操作系统想了一个办法。还记得在系统初始化的时候，会调用 cpu_init 吗？这里面会给每一个CPU 关联一个 TSS，然后将 TR 指向这个 TSS，然后在操作系统的运行过程中，TR 就不切换了，永远指向这个TSS
-
-在 Linux 中，真的参与进程切换的寄存器很少，主要的就是栈顶寄存器
-
-所谓的进程切换，就是将某个进程的 thread_struct里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。
 
 
