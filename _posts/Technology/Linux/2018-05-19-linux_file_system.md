@@ -10,6 +10,9 @@ keywords: network
 
 ## 简介
 
+* TOC
+{:toc}
+
 linux系统的进程结构体有以下几个字段
 
     struct task_struct {
@@ -27,74 +30,29 @@ linux系统的进程结构体有以下几个字段
 
 每个进程有一个文件系统的数据结构，还有一个打开文件的数据结构
 
-## vfs
-
-[解析 Linux 中的 VFS 文件系统机制](https://www.ibm.com/developerworks/cn/linux/l-vfs/)
-
-VFS 是文件系统事实上的规范，定义了挂载点、超级块、目录和索引节点等基本数据结构，定义了open/close/write/read 等基本接口
-
-文件系统 是解决 根据 file name 找 file data的问题，从这个角度看，文件系统跟dns 有点异曲同工的意思。
-
-文件系统有内存文件系统，磁盘文件系统，还有基于磁盘文件系统之上的联合文件系统。
-
 ## linux 文件系统的加载
 
-rootfs是基于内存的文件系统，所有操作都在内存中完成；也没有实际的存储设备，所以不需要设备驱动程序的参与。基于以上原因，Linux在启动阶段使用rootfs文件系统，当磁盘驱动程序和磁盘文件系统成功加载后，linux系统会将系统根目录从rootfs切换到磁盘文件系统（这句表述不准确）。
+在文件系统的实现中，每个在硬盘上的结构，在内存中也对应相同格式的结构。当所有的数据结构都读到内存里面，内核就可以通过操作这些数据结构，来操作文件系统了。
+
+rootfs是基于内存的文件系统，所有操作都在内存中完成；也没有实际的存储设备，所以不需要设备驱动程序的参与。基于以上原因，Linux在启动阶段使用rootfs文件系统。
 
 参见[linux文件系统初始化过程(2)---挂载rootfs文件系统
-](http://blog.csdn.net/luomoweilan/article/details/17894473),linux文件系统中重要的数据结构有：文件、挂载点、超级块、目录项、索引节点等。图中含有两个文件系统（红色和绿色表示的部分），并且绿色文件系统挂载在红色文件系统tmp目录下。
+](http://blog.csdn.net/luomoweilan/article/details/17894473),linux文件系统中重要的数据结构有：文件、挂载点、超级块、目录项、索引节点等。
 
-1. 一般来说，每个文件系统在VFS层都是由挂载点、超级块、目录和索引节点组成。PS，这点更新了以前的认知，课本上一般只体现超级块、目录和索引节点。
-2. 当挂载一个文件系统时，实际也就是创建这四个数据结构的过程，因此这四个数据结构的地位很重要，关系也很紧密。
+1. VFS 是文件系统事实上的规范，定义了挂载点、超级块、目录和索引节点等基本数据结构，定义了open/close/write/read 等基本接口
+2. 一般来说，每个文件系统在VFS层都是由挂载点、超级块、目录和索引节点组成。当挂载一个文件系统时，实际也就是创建这四个数据结构的过程，因此这四个数据结构的地位很重要，关系也很紧密。
 3. **由于VFS要求实际的文件系统必须提供以上数据结构，所以不同的文件系统在VFS层可以互相访问。**
 4. 如果进程打开了某个文件，还会创建file(文件)数据结构，这样进程就可以通过file来访问VFS的文件系统了。
 
-![](/public/upload/linux/linux_fs.png)
 
-从图中可以看到：
-
-1. 这个图从上往下看，可以知道，各个数据结构通过数组等自己组织在一起，又通过引用上下关联。
-2. 超级块、目录和索引节点这些，完成数据的组织和根据文件名寻址。
-3. 从上图可以理清挂载点和前三个结构的关系，**挂载点 将 文件系统彼此勾连 起来**。
-
-[Mount Point Definition](http://www.linfo.org/mount_point.html)
-
-1. A filesystem is a hierarchy of directories (also referred to as a directory tree) that is used to organize files on a computer system. On Linux and other Unix-like operating systems, at the very top of this hierarchy is the root directory. 一个文件 系统是一个directory tree，根节点被称为root directory
-2. The mount point becomes the root directory of the newly added filesystem, and that filesystem becomes accessible from that directory. vfs 支持同时加载多个文件系统，也就是有多个directory tree 和 root directory。vfs 也是一个directory tree，只有一个root directory，那么必然有很多fs 的root directory 挂载在了vfs directory tree 的非root directory 上。 
-3. A mount point is a directory。可以猜测，如果没有挂载点的概念，也就是只有超级块、目录和索引节点，那么类似的效果需要一个 目录 去引用一个超级块。
-3. `/etc/fstab` 列出vfs 当前挂载的文件系统以及它们的挂载点
-
-		UUID=2d147dd5-0227-40e5-a143-1923112cb1bd /                       ext4    defaults        1 1
-		UUID=1d44ef13-382c-49e5-925a-9eac34bc575d swap                    swap    defaults        0 0
-		tmpfs                   /dev/shm                tmpfs   defaults        0 0
-		devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
-		sysfs                   /sys                    sysfs   defaults        0 0
-		proc                    /proc                   proc    defaults        0 0
-		
-![](/public/upload/linux/linux_fs_1.png)
-		
-1. 有了挂载点、超级块、目录和索引节点 这几个结构，可以让一个vfs/rootfs 挂载多个 不同的fs
-2. 加上linux mount namespace这个结构，可以使得一个vfs 有多个 rootfs
-3. 在linux 操作系统中，文件系统和linux 内核是分开存放的，操作系统只有在开机启动时才会加载指定版本的内核镜像。如果一个rootfs 指向一个包含完整操作系统文件的目录，则这个rootfs 便可以作为一个完整的进程文件“环境”。
-4. 有了联合文件系统 可读、可写挂载这一套特性，可以让一个rootfs 有layer 感觉
-
-### 几大文件系统
-
-aufs,vfs,devicemapper,btrfs,它们之间的关系。参见[容器（Docker）概念中存储驱动的深入解析](http://weibo.com/ttarticle/p/show?id=2309404039168383667054)
-
-1. vfs，屏蔽底层的文件系统差异，比如ext2，ext3。在docker 场景下，vfsgraph指的是不提供共享layer的特性。对于vfs来说，Driver.create layer最上层，就是将镜像所有的分层依次拷贝到静态的子文件夹中，然后将这个文件夹挂载到容器的根文件系统。
-
-2. 联合文件系统，aufs,它不是一个真正的文件系统，如ext4或者xfs，它仅仅是站在一个已有的文件系统上提供了这些功能。对于aufs来说，Driver.create layer最上层，就是创建一个新的文件夹（读写layer），将镜像的所有只读层挂进来，然后将这个文件夹挂载到容器的根文件系统。至于说，写时复制，这个就是aufs 文件系统的功能，跟graphDriver就没有关系了。
-
-3. 特定文件系统的实现（devicemapper，btrfs等）。是一个具体的文件系统，有一定的内置特性，比如快照。在这每一个情形中，你都需要新建一个磁盘(准确的说是块设备)并用该文件系统格式化磁盘（或者为了快速测试，用循环挂载的文件作为磁盘），来使用这些选项作为Docker引擎的存储后端。CentOS 7开始，预设的文件系统由原来的EXT4变成了XFS文件系统
+对于每一个进程，打开的文件都有一个文件描述符，在 files_struct 里面会有文件描述符数组。每一个文件描述符是这个数组的下标，里面的内容指向一个 file 结构，表示打开的文件。这个结构里面有这个文件对应的 inode，最重要的是这个文件对应的操作 file_operation。如果操作这个文件，就看这个file_operation 里面的定义了。
 
 
-所以，总结起来，参见[Supported Filesystems](http://www.projectatomic.io/docs/filesystems/)
+![](/public/upload/linux/linux_file_class_diagram.png)
 
 
-All backends except the vfs one shares diskspace between base images. However, they work on different levels, so the behaviour is somewhat different. Both devicemapper and btrfs share data on the **block level**, so a single change in a file will cause just the block containing that byte being duplicated. However the aufs backend works on the **file level**, so any change to a file means the entire file will be copied to the top layer and then changed there. The exact behaviour here therefore depends on what kind of write behaviour an application does.
+如果说 file 结构是一个文件打开以后才创建的，dentry 是放在一个 dentry cache 里面的，文件关闭了，他依然存在，因而他可以更长期的维护内存中的文件的表示和硬盘上文件的表示之间的关系。
 
-However, any kind of write-heavy load(写负载比较大) inside a container (such as databases or large logs) should generally be done to a volume.（共享文件系统有共享文件系统的问题，所以写负载比较大的操作，还要弄到volume中） A volume is a plain directory from the host mounted into the container, which means it has none of the overhead(天花板) that the storage backends may have. It also means you can easily access the data from a new container if you update the image, or if you want to access the same data from multiple concurrent containers.（这段解释了我们为什么要用volume）
 
 ### 传统的linux fs加载过程
 
@@ -126,17 +84,87 @@ out of that.
 linux系统在启动时，会执行文件系统中的`/sbin/init`进程完成linux系统的初始化，执行`/sbin/init`进程的前提是linux内核已经拿到了存在硬盘上的系统镜像文件（加载设备驱动，挂载文件系统）。linux 发行版必须适应各种不同的硬件架构，将所有的驱动编译进内核是不现实的。Linux发行版在内核中只编译了基本的硬件驱动
 ，在 linux内核启动前，boot loader会将存储介质中的initrd文件(cpio是其中的一种)加载到内存，内核启动时会在访问真正的根文件系统前先访问该内存中的initrd文件系统，执行initrd文件系统的某个文件（不同的linux版本差异较大），扫描设备，加载驱动。
 
-
-## 镜像文件
-
-An archive file is a file that is composed of one or more computer files **along with metadata**. Archive files are used to collect multiple data files together into a single file for easier portability and storage, or simply to compress files to use less storage space. Archive files often store directory structures, error detection and correction information, arbitrary comments, and sometimes use built-in encryption.
-
-
 ## 挂载/mount
 
 例如，`/dev/sdb`块设备被mount到`/mnt/alan`目录。命令：`mount -t ext3 /dev/sdb /mnt/alan`。
 
-那么mount这个过程所需要解决的问题就是将`/mnt/alan`的dentry目录项所指向的inode屏蔽掉，重新定位到`/dev/sdb`所表示的inode索引节点。这个描述并不准确，但有利于简化理解。参见[linux文件系统之mount流程分析](http://www.cnblogs.com/cslunatic/p/3683117.html)
+那么mount这个过程所需要解决的问题就是将`/mnt/alan`的dentry目录项所指向的inode屏蔽掉，重新定位到`/dev/sdb`所表示的inode索引节点。这个描述并不准确，但有利于简化理解。**它要解决的问题是：将对 VFS 目录树中某一目录的操作转化为具体安装到其上的实际文件系统的对应操作**。对目录或文件的操作将最终由目录或文件所对应的 inode 结构中的 i_op 和 i_fop 所指向的函数表中对应的函数来执行。即对 `/mnt/alan` 目录所对应的 inode 中 i_op 和 i_fop 的调用转换到 `/dev/sdb`上文件系统根目录所对应的 inode 中 i_op 和 i_fop 的操作。
+
+### 实现原理
+
+mount系统调用
+
+    SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name, char __user *, type, unsigned long, flags, void __user *, data){
+        ......
+        ret = do_mount(kernel_dev, dir_name, kernel_type, flags, options);
+        ......
+    }
+
+接下里的调用链：do_mount->do_new_mount->vfs_kern_mount。
+
+    struct vfsmount *
+    vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void *data){
+        ......
+        mnt = alloc_vfsmnt(name);
+        ......
+        // 从文件系统中读取超级块
+        root = mount_fs(type, flags, name, data);
+        ......
+        mnt->mnt.mnt_root = root;
+        mnt->mnt.mnt_sb = root->d_sb;
+        mnt->mnt_mountpoint = mnt->mnt.mnt_root;
+        mnt->mnt_parent = mnt;
+        list_add_tail(&mnt->mnt_instance, &root->d_sb->s_mounts);
+        return &mnt->mnt;
+    }
+
+vfs_kern_mount 先是创建 struct mount 结构，每个挂载的文件系统都对应于这样一个结构。
+
+    struct mount {
+        struct hlist_node mnt_hash;
+        struct mount *mnt_parent;   // 装载点所在的父文件系统
+        struct dentry *mnt_mountpoint; // 装载点在父文件系统中的dentry
+        struct vfsmount mnt;
+        union {
+            struct rcu_head mnt_rcu;
+            struct llist_node mnt_llist;
+        };
+        struct list_head mnt_mounts;	/* list of children, anchored here */
+        struct list_head mnt_child;	/* and going through their mnt_child */
+        struct list_head mnt_instance;	/* mount instance on sb->s_mounts */
+        const char *mnt_devname;	/* Name of device e.g. /dev/dsk/hda1 */
+        struct list_head mnt_list;
+        ......
+    } __randomize_layout;
+
+
+    struct vfsmount {
+        struct dentry *mnt_root; // 当前文件系统根目录的dentry
+        struct super_block *mnt_sb;	// 指向超级块的指针
+        int mnt_flags;
+    } __randomize_layout;
+
+
+mount并没有直接改变`/mnt/alan`目录所对应的 inode 结构中的 i_op 和 i_fop 指针，而且 `/mnt/alan`所对应的 dentry结构仍然在 VFS 的目录树中，并没有被从其中隐藏起来，那么这之间的转化到底是如何实现的呢？如果读者阅读过 Linux 关于文件系统部分的代码，应该知道 path_lookup() 函数在整个 Linux 繁琐的文件系统代码中属于一个重要的基础性的函数。简单说来，这个函数用于解析文件路径名。从 VFS 的操作到实际文件系统操作的转化就是由它完成的。当 path_lookup() 函数搜索到 `/mnt/alan`时，返回`/dev/sdb` 的根节点dentry
+
+### 挂载点
+
+[Mount Point Definition](http://www.linfo.org/mount_point.html)
+
+1. A filesystem is a hierarchy of directories (also referred to as a directory tree) that is used to organize files on a computer system. On Linux and other Unix-like operating systems, at the very top of this hierarchy is the root directory. 一个文件 系统是一个directory tree，根节点被称为root directory
+2. The mount point becomes the root directory of the newly added filesystem, and that filesystem becomes accessible from that directory. 
+3. `/etc/fstab` 列出vfs 当前挂载的文件系统以及它们的挂载点
+
+		UUID=2d147dd5-0227-40e5-a143-1923112cb1bd /                       ext4    defaults        1 1
+		UUID=1d44ef13-382c-49e5-925a-9eac34bc575d swap                    swap    defaults        0 0
+		tmpfs                   /dev/shm                tmpfs   defaults        0 0
+		devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
+		sysfs                   /sys                    sysfs   defaults        0 0
+		proc                    /proc                   proc    defaults        0 0
+		
+
+## 挂载方式
+
 
 **如果将mount的过程理解为：inode被替代的过程。**除了将设备mount到rootfs上，根据被替代方式的不同，mount的花样可多了。
 
@@ -169,6 +197,27 @@ Union FileSystem的核心逻辑是Union Mount，它支持把一个目录A和另�
 
 [Docker存储驱动简介](https://linux.cn/thread-16017-1-1.html)
 
+
+
+## 几大文件系统
+
+文件系统有内存文件系统，磁盘文件系统，还有基于磁盘文件系统之上的联合文件系统。
+
+aufs,vfs,devicemapper,btrfs,它们之间的关系。参见[容器（Docker）概念中存储驱动的深入解析](http://weibo.com/ttarticle/p/show?id=2309404039168383667054)
+
+1. vfs，屏蔽底层的文件系统差异，比如ext2，ext3。在docker 场景下，vfsgraph指的是不提供共享layer的特性。对于vfs来说，Driver.create layer最上层，就是将镜像所有的分层依次拷贝到静态的子文件夹中，然后将这个文件夹挂载到容器的根文件系统。
+
+2. 联合文件系统，aufs,它不是一个真正的文件系统，如ext4或者xfs，它仅仅是站在一个已有的文件系统上提供了这些功能。对于aufs来说，Driver.create layer最上层，就是创建一个新的文件夹（读写layer），将镜像的所有只读层挂进来，然后将这个文件夹挂载到容器的根文件系统。至于说，写时复制，这个就是aufs 文件系统的功能，跟graphDriver就没有关系了。
+
+3. 特定文件系统的实现（devicemapper，btrfs等）。是一个具体的文件系统，有一定的内置特性，比如快照。在这每一个情形中，你都需要新建一个磁盘(准确的说是块设备)并用该文件系统格式化磁盘（或者为了快速测试，用循环挂载的文件作为磁盘），来使用这些选项作为Docker引擎的存储后端。CentOS 7开始，预设的文件系统由原来的EXT4变成了XFS文件系统
+
+
+所以，总结起来，参见[Supported Filesystems](http://www.projectatomic.io/docs/filesystems/)
+
+
+All backends except the vfs one shares diskspace between base images. However, they work on different levels, so the behaviour is somewhat different. Both devicemapper and btrfs share data on the **block level**, so a single change in a file will cause just the block containing that byte being duplicated. However the aufs backend works on the **file level**, so any change to a file means the entire file will be copied to the top layer and then changed there. The exact behaviour here therefore depends on what kind of write behaviour an application does.
+
+However, any kind of write-heavy load(写负载比较大) inside a container (such as databases or large logs) should generally be done to a volume.（共享文件系统有共享文件系统的问题，所以写负载比较大的操作，还要弄到volume中） A volume is a plain directory from the host mounted into the container, which means it has none of the overhead(天花板) that the storage backends may have. It also means you can easily access the data from a new container if you update the image, or if you want to access the same data from multiple concurrent containers.（这段解释了我们为什么要用volume）
 
 ## 引用
 
