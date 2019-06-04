@@ -24,6 +24,9 @@ keywords: 一致性协议
 3. 同步方向：双向/单向同步
 4. 心跳检测：有/无
 
+
+我们使用“一致性”这个字眼太频繁了，国外的 Consistency 被称为一致性、Consensus 也唤作一致性，甚至是 Coherence 都翻译成一致性。比如大名鼎鼎的 Raft 算法和 Paxos 算法。了解它的人都知道它们的作用是在分布式系统中让多个节点就某个决定达成共识，都属于 Consensus Algorithm 一族
+
 ## 复制模型
 
 ![](/public/upload/distribute/consistency_copy_log.png)
