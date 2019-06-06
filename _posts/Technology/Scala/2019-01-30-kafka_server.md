@@ -151,6 +151,8 @@ producer面对的是一个broker集群，这个meta信息找哪个broker要都�
 2. Leader 不会主动给两个Follower 同步数据，而是等两个Follower 主动拉取，并且是批量拉取
 3. 为什么叫pipeline呢？Leader处理完msg1就去处理msg2了，等Follower同步完成再告诉客户端msg1接收成功。**将一次消息处理分为接收消息和同步消息两个步骤，并且并行化了**。
 
+主动拉取 是kafka 的一个重要特征，不仅是consumer 主动拉取broker， broker partition follower 也是主动拉取leader。
+
 ## 小结
 
 面向对象的源码分析，一般先宏观（比如如何启动，比如业务逻辑的实现路径等）后细节，就是类图和主流程序列图

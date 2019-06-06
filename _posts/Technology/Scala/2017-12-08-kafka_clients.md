@@ -144,6 +144,12 @@ Delivery guarantee 有以下三个级别
 
 当consumer group 新加入一个consumer 时，首要解决的就是consumer 消费哪个分区的问题。这个方案kafka 演化了多次，在最新的方案中，分区分配的工作放到了消费端处理。
 
+所谓的consumer group，指的是多个consumer实例共同组成一个组来消费topic。topic中的每个分区都只会被组内的一个consumer实例消费，其他consumer实例不能消费它。（从实现看，consumer 主动拉取的逻辑也不适合 多个consumer 同时拉取一个partition，因为宕机后无法重新消费。一个consumer 一个partition，server 端也无需考虑多线程竞争问题了）。
+
+为什么要引入consumer group呢？主要是为了提升消费者端的吞吐量。多个consumer实例同时消费，加速整个消费端的吞吐量（TPS）。
+
+consumer group里面的所有consumer实例不仅“瓜分”订阅topic的数据，而且更酷的是它们还能彼此协助。假设组内某个实例挂掉了，Kafka能够自动检测到，然后把这个 Failed 实例之前负责的分区转移给其他活着的consumer。这个过程就是 Kafka 中大名鼎鼎的Rebalance。其实既是大名鼎鼎，也是臭名昭著，因为由重平衡引发的消费者问题比比皆是。事实上，目前很多重平衡的Bug 社区都无力解决。
+
 ## 生产者
 
 The producer connects to any of the alive nodes and requests metadata about the leaders for the partitions of a topic. This allows the producer to put the message directly to the lead broker for the partition.
@@ -217,16 +223,7 @@ and provides fine grained control over the communication between Kafka broker an
 那么consumer 与broker 交互有哪些细节呢？The high-level consumer API is used when only data is needed and the handling of message offsets is not required. This API hides broker details from the consumer and allows effortless communication with the Kafka cluster by providing an abstraction over the low-level implementation. The high-level consumer stores the last offset
 (the position within the message partition where the consumer left off consuming the message), read from a specific partition in Zookeeper. This offset is stored based on the consumer group name provided to Kafka at the beginning of the process.
 
-
-
-所谓的consumer group，指的是多个consumer实例共同组成一个组来消费topic。topic中的每个分区都只会被组内的一个consumer实例消费，其他consumer实例不能消费它。（从实现看，consumer 主动拉取的逻辑也不适合 多个consumer 同时拉取一个partition，因为宕机后无法重新消费。一个consumer 一个partition，server 端也无需考虑多线程竞争问题了）。
-
-为什么要引入consumer group呢？主要是为了提升消费者端的吞吐量。多个consumer实例同时消费，加速整个消费端的吞吐量（TPS）。
-
-consumer group里面的所有consumer实例不仅“瓜分”订阅topic的数据，而且更酷的是它们还能彼此协助。假设组内某个实例挂掉了，Kafka能够自动检测到，然后把这个 Failed 实例之前负责的分区转移给其他活着的consumer。这个过程就是 Kafka 中大名鼎鼎的Rebalance。其实既是大名鼎鼎，也是臭名昭著，因为由重平衡引发的消费者问题比比皆是。事实上，目前很多重平衡的Bug 社区都无力解决。
-
-
-
+**主动拉取 是kafka 的一个重要特征，不仅是consumer 主动拉取broker， broker partition follower 也是主动拉取leader**。
 
 ##  《learning apache kafka》
 
