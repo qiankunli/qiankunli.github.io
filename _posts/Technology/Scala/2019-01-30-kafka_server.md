@@ -13,7 +13,7 @@ keywords: Scala  akka
 * TOC
 {:toc}
 
-建议先阅读下[《Apache Kafka源码分析》——Producer与Consumer](http://qiankunli.github.io/2017/12/08/kafka_learn_1.html)
+建议先阅读下[《Apache Kafka源码分析》——Producer与Consumer](http://qiankunli.github.io/2017/12/08/kafka_clients.html)
 
 服务端网络开发的基本套路
 
@@ -99,6 +99,12 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 ![](/public/upload/scala/kafka_index_file.jpg)
 
 以索引文件中的3，205为例，在数据文件中表示第3个message（在全局partition表示第314个message），以及该消息的物理偏移地址为205。
+
+当写满了一个日志段后，Kafka 会自动切分出一个新的日志段，并将老的日志段封存起来。Kafka 在后台还有定时任务会定期地检查老的日志段是否能够被删除，从而实现回收磁盘空间的目的。
+
+## 分区
+
+副本机制可以保证数据的持久化或消息不丢失，但倘若Leader副本积累了太多的数据以至于单台 Broker 机器都无法容纳了，此时应该怎么办呢？如果你了解其他分布式系统，你可能听说过分片、分区域等提法，比如 MongoDB 和 Elasticsearch 中的 Sharding、HBase 中的 Region，其实它们都是相同的原理，只是 Partitioning 是最标准的名称。
 
 ## zookeeper
 
