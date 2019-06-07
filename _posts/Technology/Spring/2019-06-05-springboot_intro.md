@@ -8,8 +8,15 @@ keywords: springboot
 
 ---
 
-## 简介
+## 简介（未完成）
 
+![](/public/upload/spring/springboot.png)
+
+几个问题
+
+1. 如何自动加载配置，将依赖bean 注入到spring ioc
+2. 如何自动规范依赖jar？继承 spring-boot-starter-parent
+3. tomcat 是如何内置的
 
 ## spring 当前的问题
 
