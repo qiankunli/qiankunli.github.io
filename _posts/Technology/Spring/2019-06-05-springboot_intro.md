@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: springboot 入门
+title: Springboot 入门
 category: 技术
 tags: Spring
 keywords: springboot
