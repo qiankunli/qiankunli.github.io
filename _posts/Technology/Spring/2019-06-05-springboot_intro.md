@@ -10,6 +10,9 @@ keywords: springboot
 
 ## 简介（持续更新）
 
+* TOC
+{:toc}
+
 ![](/public/upload/spring/springboot.png)
 
 几个问题
@@ -97,7 +100,7 @@ In Spring 3.1, we can use the @Profile annotation only at the class level. We ca
 
 [Spring @Conditional Annotation](https://javapapers.com/spring/spring-conditional-annotation/)
 
-Spring 4.0 has introduced a new annotation @Conditional. It is used to develop an “If-Then-Else” type of conditional checking for bean registration. 
+Spring 4.0 has introduced a new annotation @Conditional. It is used to develop an “If-Then-Else” type of conditional checking for **bean registration**. 
 
 Spring 4.0 @Conditional annotation is at more higher level when compared to @Profile annotation.Difference between @Conditional and @Profile Annotations
 
@@ -123,3 +126,34 @@ Spring 4.0 @Conditional annotation is at more higher level when compared to @Pro
             return new LinuxListService();
         }
     }
+
+[Spring 4.0 的条件化注解](https://qidawu.github.io/2017/06/05/spring-conditional-bean/)
+
+    public interface Condition {
+        boolean matches(ConditionContext var1, AnnotatedTypeMetadata var2);
+    }
+
+其中，通过 Condition 接口的入参 ConditionContext，我们可以做到如下几点：
+
+1. 借助 getRegistry() 返回的 BeanDefinitionRegistry 检查 bean 定义；
+2. 借助 getBeanFactory() 返回的 ConfigurableListableBeanFactory 检查 bean 是否存在，甚至探查 bean 的属性；
+3. 借助 getEnvironment() 返回的 Environment 检查环境变量是否存在以及它的值是什么；
+4. 读取并探查 getResourceLoader() 返回的 ResourceLoader 所加载的资源；
+5. 借助 getClassLoader() 返回的 ClassLoader 加载并检查类是否存在。
+
+## 有条件创建Bean + 一点变通 ==> 自动配置
+
+    public class JdbcTemplateCondition implements Condition {
+        @Override
+        public boolean matches(ConditionContext context,AnnotatedTypeMetadata metadata) {
+            try {
+                // 加载成功即存在，加载失败跑异常即不存在
+                context.getClassLoader().loadClass("org.springframework.jdbc.core.JdbcTemplate");
+                return true;
+            } catch (Exception e) {
+                return false;
+            } 
+        }
+    }
+
+Springboot 定义了很多 @Conditional，比如`ConditionalOnClass("org.springframework.jdbc.core.JdbcTemplate")` 便等同了上述代码。

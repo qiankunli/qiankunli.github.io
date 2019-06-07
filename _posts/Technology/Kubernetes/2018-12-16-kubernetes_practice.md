@@ -60,6 +60,16 @@ Node affinity, described [here](https://kubernetes.io/docs/concepts/configuratio
     value: "value"
     effect: "NoSchedule"
 
+## 另类“Service”——给服务一个稳定的主机名
+
+容器的ip 总是经常变，针对这个问题， k8s早已有一系列解决方案。
+
+1. k8s 套件内
+
+    1. k8s集群内，Service等
+    2. k8s集群外，Nodeport，ingress等
+2. 提供一个dns服务器，维护`<容器名,ip>` 映射
+3. 改写ipam插件，支持静态ip
 
 ## web界面管理
 
