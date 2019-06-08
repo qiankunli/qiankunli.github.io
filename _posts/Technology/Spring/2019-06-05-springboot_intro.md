@@ -52,7 +52,7 @@ spring 迭代过程中，跟配置有关的部分，配置最终也是为了创�
 6. Spring 4.0, provide some updates to Spring 3.x @Profile
 
 
-### 根据Profile创建Bean ==> 一次打包即可跨环境运行
+### 根据@Profile创建Bean ==> 一次打包即可跨环境运行
 
 [@Profile Annotation Improvements in Spring 4](https://javapapers.com/spring/profile-annotation-improvements-in-spring-4/)
 

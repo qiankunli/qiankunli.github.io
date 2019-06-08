@@ -22,7 +22,7 @@ AOP是一套编程思想，是一种功能分解的方法，类似于责任链�
 
 来自《spring源码深度解析》：我们知道，使用面向对象编程有一些弊端，**当需要为多个不具有继承关系的对象引入同一个公共行为时**，例如日志、安全检测等（负责注册的类和处理商品类，都需要记录日志，但它们之间没什么继承关系），我们只有在每个对象里引入公共行为，这样程序中就产生了大量的重复代码，程序就不便于维护了。所以就有了一个面向对象编程的补充，即面向方面编程，AOP所关注的方向是横向的，不同于OOP的纵向。
 
-AOP是一个编程模型，aspectj和jboss AOP对于Aop模型进行了具体的实现。Spring AOP则将aspectj的实现加入到Spring平台中，使得AOP与Spring可以更好的融合起来为开发提供方便的服务。具体的说，**spring aop本身不做aop的事，只是提供一种手段（封装和引入），将aop与spring ioc整合在一起**。
+AOP是一个编程模型，aspectj和jboss AOP对于Aop模型进行了具体的实现。Spring AOP则将aspectj的实现加入到Spring平台中，使得AOP与Spring可以更好的融合起来为开发提供方便的服务。具体的说，**spring aop本身不做aop的事，只是提供一种手段（封装和引入），将aop与spring ioc整合在一起**（就好像spring本身不提供kafka，而是通过spring-kafka 将kafka的功能引入到ioc）。
 
 ## spring aop中的一些概念
 

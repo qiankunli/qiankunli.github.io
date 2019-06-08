@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 《Spring技术内幕》笔记
+title: 回头看Spring IOC
 category: 技术
 tags: Spring
 keywords: JAVA Spring
@@ -28,7 +28,7 @@ keywords: JAVA Spring
     
 2017.7.27 更新
 
-面向对象出来之后，一个项目的代码通常由一系列对象组成，而理解一个项目的难点变成了：如何理解对象之间复杂的依赖关系。比如A依赖B，B可以作为A的成员、方法参数等，而Spring统一成了一种：B作为A的成员。c、go之类，即便按照面向对象的思路来编程，因为没有类似spring的组件，业务本身的复杂性 + 对象之间的复杂的依赖关系，增加了理解的难度。
+面向对象出来之后，一个项目的代码通常由一系列对象组成，而理解一个项目的难点变成了：如何理解对象之间复杂的依赖关系。读过netty源码的都知道，channel、pipeline、eventloop三个组件之间，复杂的依赖关系，简直不忍直视。比如A依赖B，B可以作为A的成员、方法参数等，而Spring统一成了一种：B作为A的成员。c、go之类，即便按照面向对象的思路来编程，因为没有类似spring的组件，业务本身的复杂性 + 对象之间的复杂的依赖关系，增加了理解的难度。
 
 IoC 容器控制了对象；控制什么呢？那就是主要控制了外部资源获取。包括
 
@@ -71,6 +71,14 @@ IOC设计模式的两个重要支持：
 
 1. **对象间依赖关系的建立和应用系统的运行状态没有很强的关联性**，因此对象的依赖关系可以在启动时建立好，ioc容器（负责建立对象的依赖关系）不会对应用系统有很强的侵入性。
 2. 面向对象系统中，除了一部分对象是数据对象外，其他很大一部分是用来处理数据的，这些对象并不经常发生变化，在系统中以单件的形式起作用就可以满足应用的需求。
+
+ioc的实现不只spring一种，可以多方对比观察。谷歌的guice也是一个ioc实现
+
+	configUtil = InjectorUtils.getInstance(ConfigUtil.class);
+	
+对应到spring
+
+	configUtil = (ConfigUtil)beanFactory.getBean("configUtil");
 
 ## ioc的实现
 
@@ -175,9 +183,18 @@ In contrast to a **plain BeanFactory**, an ApplicationContext is supposed to det
         registerBeanPostProcessors(beanFactory,priorityOrderedPostProcessors);
     }
 
+### BeanFactory VS ApplicationContext
+
 ApplicationContexts can autodetect BeanPostProcessor beans in their bean definitions and apply them to any beans subsequently created.Plain bean factories allow for **programmatic registration** of post-processors,applying to all beans created through this factory.
 
-可以说，BeanFactory 基本实现了一个bean container 需要的所有功能，但其一些特性要programmatic，ApplicationContext 将其封装了一下。 
+可以说，BeanFactory 基本实现了一个bean container 需要的所有功能，但其一些特性要programmatic，ApplicationContext在简单容器BeanFactory的基础上，增加了许多面向框架的特性。《Spring技术内幕》中参照XmlBeanFactory的实现，以编程方式使用DefaultListableBeanFactory，从中我们可以看到Ioc容器使用的一些基本过程。
+
+	ClassPathResource res = new ClassPathResource("beans.xml");
+	DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+	XmlBeanDefinitionReader reader = new XmlBeanDefinitionReader(factory);
+	reader.loadBeanDefinitions(res);
+	
+**简单来说，`reader.loadBeanDefinitions(res);`将类信息从`beans.xml` 读取到DefaultListableBeanFactory及其父类的各种map中。然后`factory.getBean`时即可做出对应的反应。**
 
 ## 细说BeanDefinition
 
@@ -235,4 +252,10 @@ BeanDefinition的几种来源
 2. 注解扫描
 
 
+## Bean的管理Environment
 
+Interface representing the environment in which the current application is running.Models two key aspects of the application environment: profiles and properties. Environment代表着程序的运行环境，主要包含了两种信息，一种是profiles，用来描述哪些bean definitions 是可用的；一种是properties，用来描述系统的配置，其来源可能是配置文件、jvm属性文件、操作系统环境变量等。
+
+并不是所有的Bean 都会被纳入到ioc管理，A profile is a named, **logical group of bean definitions** to be registered with the container only if the given profile is active. Beans may be assigned to a profile whether defined in XML or via annotations; see the spring-beans 3.1 schema or the  @Profile annotation for syntax details.
+
+Properties play an important role in almost all applications,and may originate from a variety of sources: properties files, JVM system properties, system environment variables, JNDI, servlet context parameters, ad-hoc Properties objects,Maps, and so on. The role of the environment object with relation to properties is to provide the user with a convenient service interface for configuring property sources and resolving properties from them.
