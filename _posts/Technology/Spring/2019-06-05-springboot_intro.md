@@ -8,24 +8,23 @@ keywords: springboot
 
 ---
 
-## 简介（持续更新）
+## 简介
 
 * TOC
 {:toc}
 
 ![](/public/upload/spring/springboot.png)
 
-几个问题
-
-1. 如何自动加载配置，将依赖bean 注入到spring ioc
-2. 如何自动规范依赖jar？继承 spring-boot-starter-parent
-3. tomcat 是如何内置的
-
 ## 起步依赖
 
 Dependency management is a critical aspects of any complex project. And doing this manually is less than ideal;
 
 Spring Boot starters were built to address exactly this problem. Starter POMs are a set of convenient dependency descriptors that you can include in your application. 说的好像 starter 依赖  有一点netty-all 的感觉。项目依赖netty-all，再通过netty-all 传递依赖netty-buffer、netty-codec、netty-codec-http、netty-common等
+
+|中间件本身|融入spring|融入springboot|
+|---|---|---|
+|rabbitmq|spring-rabbit|spring-boot-starter-amqp|
+|...|...|...|
 
 ## 创建Bean的那些事儿
 

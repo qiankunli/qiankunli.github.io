@@ -8,17 +8,21 @@ keywords: proxyFactoryBean
 
 ---
 
-## 简介(待整理，过多细节，太罗嗦)
+## 简介
 
-AOP是一套编程思想，是一种功能分解的方法，类似于责任链模式中的横切（具体的实现还真用了责任链模式）。在展开叙述之前，先介绍一些概念及名词。
+* TOC
+{:toc}
 
-AOP是一个编程模型，aspectj和jboss AOP对于Aop模型进行了具体的实现。Spring AOP则将aspectj的实现加入到Spring平台中，使得AOP与Spring可以更好的融合起来为开发提供方便的服务。具体的说，spring aop本身不做aop的事，只是提供一种手段（封装和引入），将aop与spring ioc整合在一起。
+## 编程思想 or 编程模型
 
-Aop的实现用到了动态代理技术，动态代理技术主要有两套实现：jdk和cglib。
+AOP是一套编程思想，是一种功能分解的方法，类似于责任链模式中的横切（具体的实现还真用了责任链模式）。其实，在web开发中，Filter和Servlet，本身就是一个AOP-like，只是跟常规的AOP有以下不同：
 
-[spring源码分析之——spring aop原理](http://michael-softtech.iteye.com/blog/814047) 从代码上看，Spring AOP的原理大致如下： 
+- 其组合逻辑在web容器中已经实现，我们只需写自己的Filter（advice）和Servlet（pointcut）即可。
+- 其组合逻辑被封装成一个代理类，在运行时生成字节码。
 
-实现一个InstantiationAwareBeanPostProcessor接口的bean。在每次bean初始化的时候找到所有advisor（spring ioc启动时，会采集类信息存储在BeanDefinition中），根据pointcut 判断是不是需要为将实例化的bean生成代理，如果需要，就把advice编制在代理对象里面。
+来自《spring源码深度解析》：我们知道，使用面向对象编程有一些弊端，**当需要为多个不具有继承关系的对象引入同一个公共行为时**，例如日志、安全检测等（负责注册的类和处理商品类，都需要记录日志，但它们之间没什么继承关系），我们只有在每个对象里引入公共行为，这样程序中就产生了大量的重复代码，程序就不便于维护了。所以就有了一个面向对象编程的补充，即面向方面编程，AOP所关注的方向是横向的，不同于OOP的纵向。
+
+AOP是一个编程模型，aspectj和jboss AOP对于Aop模型进行了具体的实现。Spring AOP则将aspectj的实现加入到Spring平台中，使得AOP与Spring可以更好的融合起来为开发提供方便的服务。具体的说，**spring aop本身不做aop的事，只是提供一种手段（封装和引入），将aop与spring ioc整合在一起**。
 
 ## spring aop中的一些概念
 
@@ -59,7 +63,82 @@ Aop的实现用到了动态代理技术，动态代理技术主要有两套实�
         
 Pointcut和advice在spring aop中都是一套类图（较多的父子层级关系）。它们既是aop模型中的概念，也对应配置文件中为我们提供的数据。
 
-像上面讲述推送项目一样，我们从两个方面讲spring aop的实现。
+
+## 使用
+
+配置方式的关键是：advice方法运行在pointcut方法的哪里（before、after、around等）
+
+1. advice实现接口MethodBeforeAdvice
+2. 配置注解
+
+        public class xxxAdvice{
+            @Pointcut
+            public void xxx(){}
+            @Before
+            public void beforeSleep(){}
+        }
+        
+3. <aop:aspect>
+
+        <aop:aspect id="pAspect" ref="permissionCheckAspect">
+			<aop:pointcut id="pPointCut"
+				expression="(*..*)" />
+			<aop:before pointcut-ref="pPointCut" method="xxx" />
+		</aop:aspect>
+		
+
+在切面中，一般可以拿到切点的相关数据，进而处理相关的逻辑。
+
+## 动态代理技术（待调整）
+
+Aop的实现用到了动态代理技术，动态代理技术主要有两套实现：jdk和cglib。
+
+[spring源码分析之——spring aop原理](http://michael-softtech.iteye.com/blog/814047) 从代码上看，Spring AOP的原理大致如下： 
+
+实现一个InstantiationAwareBeanPostProcessor接口的bean。在每次bean初始化的时候找到所有advisor（spring ioc启动时，会采集类信息存储在BeanDefinition中），根据pointcut 判断是不是需要为将实例化的bean生成代理，如果需要，就把advice编制在代理对象里面。
+
+AOP应用了java动态代理技术（或者cglib）：基于反射在运行时生成代理类的字节码，下面是一个简单的例子：
+
+    public class BookFacadeProxy implements InvocationHandler {  
+        private Object delegate;    // 委托类  
+        // 返回代理类
+        public Object createProxy(Object target) {  
+            this.target = target;  
+            //取得代理对象  
+            return Proxy.newProxyInstance(delegate.getClass().getClassLoader(),  
+                    delegate.getClass().getInterfaces(), this);   
+        }  
+        public Object invoke(Object proxy, Method method, Object[] args)  
+                throws Throwable {  
+            Object result=null;  
+            System.out.println("事务开始");  
+            //执行方法  
+            result=method.invoke(target, args);  
+            System.out.println("事务结束");  
+            return result;  
+        }  
+    }  
+    
+通过createProxy方法，就可以返回某个类的代理类实例。委托类和代理类实现同一个接口，构建代理类时，通过invoke方法生成代理类每个方法的字节码。
+    
+而在上面章节提到，ioc在实例化bean时，预留了很多回调函数。所谓的回调函数，具体到java中就是一系列BeanPostProcessor链，BeanPostProcessor包括两个方法：
+
+Object postProcessBeforeInitialization(Object, String)   // 实例化bean前执行
+Object postProcessAfterInitialization(Object, String)    // 实例化bean后执行
+
+在postProcessAfterInitialization方法中：
+
+    
+    Object postProcessAfterInitialization(Object obj, String beanName){
+        1. 根据beanName收集匹配的“增强”
+        2. 判断采用何种动态代理技术
+        3. 根据obj及相关“增强”获取动态代理后的实例result
+        4. retrun result;
+    }
+    
+通过AOP，我们实际使用的类实例，已经不是我们源码看到的“基础类”，而是“基础类”和“增强类”的有机组合。
+
+
 
 ## 创建代理对象（假设配置信息都已加入如内存）
 
@@ -175,14 +254,7 @@ aop拦截器链的执行逻辑如下
 3.	执行后置通知（原来压栈的方法出栈）
 4.	异常通知（与后置通知类似（都是在方法的后边执行嘛），不过，貌似一个方法的异常通知只能有一个）
 
-## spring aop的应用场景
 
-将整体流程写好，把中间的个性化环节暴漏出来，这是框架常做的工作。而在spring中，一边是spring（确切的说，是spring的ioc倡导的pojo编程范式），一边是某个领域的具体解决方案（一般包含复杂的父子关系），两者如何整合？（我就曾经碰到过这样的问题，用spring写多线程程序，怎么看怎么怪）。
 
-这个时候，我们就能看到aop的用武之地，spring的事务，rmi实现等都依赖的aop。
-
-## 小结
-
-本文简要概述了spring aop的实现原理，忽略了一些背景知识，如有疑问，欢迎评论中留言。
 
 

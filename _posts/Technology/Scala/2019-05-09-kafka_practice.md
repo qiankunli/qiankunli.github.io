@@ -16,6 +16,13 @@ keywords: Scala  akka
 建议先阅读下[《Apache Kafka源码分析》——Producer与Consumer](http://qiankunli.github.io/2017/12/08/kafka_learn_1.html)
 
 
+## 重新理解kafka
+
+Apache Kafka 是消息引擎系统，也是一个分布式流处理平台（Distributed Streaming Platform）
+
+官网上明确标识 Kafka Streams 是一个用于搭建实时流处理的客户端库而非是一个完整的功能系统。这就是说，你不能期望着 Kafka 提供类似于集群调度、弹性部署等开箱即用的运维特性。坦率来说，这的确是一个“双刃剑”的设计，也是 Kafka 社区“剑走偏锋”不正面 PK 其他流计算框架的特意考量。大型公司的流处理平台一定是大规模部署的，因此具备集群调度功能以及灵活的部署方案是不可或缺的要素。但毕竟这世界上还存在着很多中小企业，它们的流处理数据量并不巨大，逻辑也并不复杂，部署几台或十几台机器足以应付。
+
+
 ## 消费端优化
 
 ### 多线程 消费
@@ -69,6 +76,8 @@ kafka消费太慢，误以为consumer挂掉，一直rebalance。背后的原理
 ### 一条消息大小不能超过1M
 
 批量发送
+
+
 
 ## 其它材料
 
