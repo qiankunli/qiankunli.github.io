@@ -8,7 +8,7 @@ keywords: springboot
 
 ---
 
-## 简介（持续更新）
+## 简介
 
 * TOC
 {:toc}
@@ -91,6 +91,83 @@ applyInitializers 会执行`initializer.initialize(context)`
 
 ## starter 依赖扩展ApplicationContext的入口 ApplicationContextInitializer
 
+    public class XXApplicationContextInitializer implements ApplicationContextInitializer<ConfigurableApplicationContext{
+        @Override
+        public void initialize(ConfigurableApplicationContext applicationContext) {
+            ...
+            applicationContext.getBeanFactory().addBeanPostProcessor(xx);
+            applicationContext.getBeanFactory().registerSingleton("xx", xx);
+            ...
+        }
+    }
+
+通过BeanFactory 对象，便可以将自定义的业务对象 注入到ioc 容器中，为spring 所用。
+
 ## tomcat 是如何内置的——ServletWebServerApplicationContext
 
 ![](/public/upload/spring/spring_boot_web_server.png)
+
+## @EnableAutoConfiguration 如何工作
+
+
+    @Target(ElementType.TYPE)
+    @Retention(RetentionPolicy.RUNTIME)
+    @Documented
+    @Inherited
+    @SpringBootConfiguration
+    @EnableAutoConfiguration
+    @ComponentScan(excludeFilters = {
+            @Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
+            @Filter(type = FilterType.CUSTOM,
+                    classes = AutoConfigurationExcludeFilter.class) })
+    public @interface SpringBootApplication {
+        ...
+    }
+
+如果使用了@SpringBootApplication注解，那么自动就启用了EnableAutoConfiguration
+
+
+    @Target(ElementType.TYPE)
+    @Retention(RetentionPolicy.RUNTIME)
+    @Documented
+    @Inherited
+    @AutoConfigurationPackage
+    @Import(AutoConfigurationImportSelector.class)
+    public @interface EnableAutoConfiguration {
+        String ENABLED_OVERRIDE_PROPERTY ="spring.boot.enableautoconfiguration";
+        Class<?>[] exclude() default {};
+        String[] excludeName() default {};
+    }
+
+@Import 的作用类似xml 中的`<import>` Provides functionality equivalent to the `<import/>` element in Spring XML.Allows for importing  @Configuration classes,ImportSelector and
+ImportBeanDefinitionRegistrar implementations
+
+    public class AutoConfigurationImportSelector implements DeferredImportSelector{
+        protected AutoConfigurationEntry getAutoConfigurationEntry(
+                AutoConfigurationMetadata autoConfigurationMetadata,
+                AnnotationMetadata annotationMetadata) {
+            ...
+            List<String> configurations = getCandidateConfigurations(annotationMetadata,
+                    attributes);
+            ...
+        }
+        protected List<String> getCandidateConfigurations(AnnotationMetadata metadata,
+                AnnotationAttributes attributes) {
+            List<String> configurations = SpringFactoriesLoader.loadFactoryNames(
+                    EnableAutoConfiguration.class, getBeanClassLoader());
+            return configurations;
+        }
+    }
+
+
+自动配置类就是普通的Spring @Configuration类，通过SpringFactoriesLoader机制完成加载，实现上通常使用@Conditional(比如@ConditionalOnClass或者@ConditionalOnMissingBean)
+
+spring-boot-autoconfigure `META-INF/spring.factories`内容示例
+
+    org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+    org.springframework.boot.autoconfigure.admin.SpringApplicationAdminJmxAutoConfiguration,\
+    org.springframework.boot.autoconfigure.aop.AopAutoConfiguration,\
+    org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration,\
+    ...
+
+总结一下就是，@EnableAutoConfiguration 会push springboot 加载各个依赖jar `META-INF/spring.factories` 中key=org.springframework.boot.autoconfigure.EnableAutoConfiguration 指定的@Configuration 类
