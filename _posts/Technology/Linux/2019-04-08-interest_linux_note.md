@@ -244,6 +244,9 @@ cpu 操作设备转换为  ==> cpu操作设备控制器的寄存器/缓冲器。
 
     1. 所有设备都在 /dev/ 文件夹下面创建一个特殊的设备文件。这个设备特殊文件也有 inode，但是它不关联到硬盘或任何其他存储介质上的数据，而是**建立了与某个设备驱动程序的连接**。
     2. 硬盘设备这里有一点绕。假设是 /dev/sdb，这是一个设备文件。这个文件本身和硬盘上的文件系统没有任何关系。/dev/sdb 其实是在一个特殊的文件系统 devtmpfs 中。但是当我们将 /dev/sdb 格式化成一个文件系统 ext4 （`mkfs.ext4 /dev/sdb`）并将它 mount 到一个路径下面，例如在 /mnt/sdb 下面（`mount /dev/sdb /mnt/sdb`）。这个时候 /dev/sdb 还是一个设备文件在特殊文件系统 devtmpfs 中，而 /mnt/sdb 下面的文件才是在ext4 文件系统中，只不这个设备是在 /dev/sdb 设备上的。
+    3. 内核驱动模块要定一个 file_operations 结构
+
+        ![](/public/upload/linux/linux_kernel_driver.png)
 
 Linux 操作系统新添加了一个设备，且新的设备从来没有加载过驱动，需要安装驱动，其实就是加载一个内核模块。可以通过 insmod 安装内核模块。内核模块的后缀一般是 ko，比如`insmod openvswitch.ko`。一旦有了驱动，我们就可以通过命令 mknod 在 /dev 文件夹下面创建设备文件`mknod filename type major minor`，一旦执行了这个命令，新创建的设备文件就和上面加载过的驱动关联起来，这个时候就可以通过操作设备文件来操作驱动程序，从而操作设备。
 
@@ -251,10 +254,5 @@ Linux 操作系统新添加了一个设备，且新的设备从来没有加载�
 2. type 就是c字符设备b块设备
 3. major 就是主设备号
 4. minor就是次设备号
-
-
-
-
-
 
 
