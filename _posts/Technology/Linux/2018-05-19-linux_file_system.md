@@ -39,50 +39,23 @@ linux系统的进程结构体有以下几个字段
 3. **由于VFS要求实际的文件系统必须提供以上数据结构，所以不同的文件系统在VFS层可以互相访问。**
 4. 如果进程打开了某个文件，还会创建file(文件)数据结构，这样进程就可以通过file来访问VFS的文件系统了。
 
-
 对于每一个进程，打开的文件都有一个文件描述符，在 files_struct 里面会有文件描述符数组。每一个文件描述符是这个数组的下标，里面的内容指向一个 file 结构，表示打开的文件。这个结构里面有这个文件对应的 inode，最重要的是这个文件对应的操作 file_operation。如果操作这个文件，就看这个file_operation 里面的定义了。
 
 ![](/public/upload/linux/linux_file_class_diagram.png)
 
 如果说 file 结构是一个文件打开以后才创建的，dentry 是放在一个 dentry cache 里面的，文件关闭了，他依然存在，因而他可以更长期的维护内存中的文件的表示和硬盘上文件的表示之间的关系。
 
-## rootfs
+## mount ==> 使磁盘上的文件可以被访问
 
-rootfs是基于内存的文件系统，所有操作都在内存中完成；也没有实际的存储设备，所以不需要设备驱动程序的参与。基于以上原因，Linux在启动阶段使用rootfs文件系统。
+一个磁盘如何被使用？
 
-参见`https://www.kernel.org/doc/Documentation/filesystems/ramfs-rootfs-initramfs.txt`
+1. `insmod xx.ko` 加载块设备驱动
+2. `mknod /dev/xx type major minor` 创建设备文件，实质将文件操作与设备驱动程序关联，对于字符设备，操作`/dev/xx`便是读写字符设备了，对于块设备，会复杂一点。
+3. 例如，`mount -t ext3 /dev/sdb /mnt/alan`，`/dev/sdb`块设备被mount到`/mnt/alan`目录。mount会调用 `ext3_mount->mount_bdev`，mount_bdev 根据 /dev/xxx 这个名字，找到相应的设备并打开它，然后根据打开的设备文件，**填充 ext3 文件系统的 super_block**。`/dev/sdb`的inode 结构是指向设备的，`/mnt/sdb` 的inode 结构是指向ext3 文件系统的。
 
-What is rootfs?
+**访问块设备要解决的问题是：将对 VFS 目录树中某一目录的操作转化为具体安装到其上的实际文件系统的对应操作，进一步转化为对块设备的操作**。insmod、mknod、mount 加载驱动、创建设备文件，加载super block等来打通上述环节。
 
-Rootfs is a special instance of ramfs (or tmpfs, if that's enabled), which is
-always present in 2.6 systems.it's smaller and simpler for the kernel
-to just make sure certain lists can't become empty.Most systems just mount another filesystem over rootfs and ignore it（一般情况下，通过某种文件系统挂载内容至挂载点的话，挂载点目录中原先的内容将会被隐藏）.
-
-
-What is initramfs?
-
-All 2.6 Linux kernels contain a gzipped "cpio" format archive, which is
-extracted into rootfs when the kernel boots up.  After extracting, the kernel
-checks to see if rootfs contains a file "init", and if so it executes it as PID
-1.  If found, this init process is responsible for bringing the system the
-rest of the way up, including locating and mounting the real root device (if
-any).  If rootfs does not contain an init program after the embedded cpio
-archive is extracted into it, the kernel will fall through to the older code
-to locate and mount a root partition, then exec some variant of /sbin/init
-out of that.
-
-所以一个linux的启动过程经历了rootfs ==> 挂载initramfs ==> 挂载磁盘上的真正的fs
-
-为什么要有initrd？
-
-linux系统在启动时，会执行文件系统中的`/sbin/init`进程完成linux系统的初始化，执行`/sbin/init`进程的前提是linux内核已经拿到了存在硬盘上的系统镜像文件（加载设备驱动，挂载文件系统）。linux 发行版必须适应各种不同的硬件架构，将所有的驱动编译进内核是不现实的。Linux发行版在内核中只编译了基本的硬件驱动
-，在 linux内核启动前，boot loader会将存储介质中的initrd文件(cpio是其中的一种)加载到内存，内核启动时会在访问真正的根文件系统前先访问该内存中的initrd文件系统，执行initrd文件系统的某个文件（不同的linux版本差异较大），扫描设备，加载驱动。
-
-## 挂载/mount
-
-例如，`/dev/sdb`块设备被mount到`/mnt/alan`目录。命令：`mount -t ext3 /dev/sdb /mnt/alan`。
-
-那么mount这个过程所需要解决的问题就是将`/mnt/alan`的dentry目录项所指向的inode屏蔽掉，重新定位到`/dev/sdb`所表示的inode索引节点。这个描述并不准确，但有利于简化理解。**它要解决的问题是：将对 VFS 目录树中某一目录的操作转化为具体安装到其上的实际文件系统的对应操作**。对目录或文件的操作将最终由目录或文件所对应的 inode 结构中的 i_op 和 i_fop 所指向的函数表中对应的函数来执行。即对 `/mnt/alan` 目录所对应的 inode 中 i_op 和 i_fop 的调用转换到 `/dev/sdb`上文件系统根目录所对应的 inode 中 i_op 和 i_fop 的操作。
+对目录或文件的操作将最终由目录或文件所对应的 inode 结构中的 i_op 和 i_fop 所指向的函数表中对应的函数来执行。即对 `/mnt/alan` 目录所对应的 inode 中 i_op 和 i_fop 的调用转换到 `/dev/sdb`上文件系统根目录所对应的 inode 中 i_op 和 i_fop 的操作。
 
 ### 实现原理
 
@@ -159,7 +132,6 @@ mount并没有直接改变`/mnt/alan`目录所对应的 inode 结构中的 i_op 
 
 ## 挂载方式
 
-
 **如果将mount的过程理解为：inode被替代的过程。**除了将设备mount到rootfs上，根据被替代方式的不同，mount的花样可多了。
 
 ||一般用途|备注|
@@ -191,7 +163,37 @@ Union FileSystem的核心逻辑是Union Mount，它支持把一个目录A和另�
 
 [Docker存储驱动简介](https://linux.cn/thread-16017-1-1.html)
 
+## rootfs
 
+rootfs是基于内存的文件系统，所有操作都在内存中完成；也没有实际的存储设备，所以不需要设备驱动程序的参与。基于以上原因，Linux在启动阶段使用rootfs文件系统。
+
+参见`https://www.kernel.org/doc/Documentation/filesystems/ramfs-rootfs-initramfs.txt`
+
+What is rootfs?
+
+Rootfs is a special instance of ramfs (or tmpfs, if that's enabled), which is
+always present in 2.6 systems.it's smaller and simpler for the kernel
+to just make sure certain lists can't become empty.Most systems just mount another filesystem over rootfs and ignore it（一般情况下，通过某种文件系统挂载内容至挂载点的话，挂载点目录中原先的内容将会被隐藏）.
+
+
+What is initramfs?
+
+All 2.6 Linux kernels contain a gzipped "cpio" format archive, which is
+extracted into rootfs when the kernel boots up.  After extracting, the kernel
+checks to see if rootfs contains a file "init", and if so it executes it as PID
+1.  If found, this init process is responsible for bringing the system the
+rest of the way up, including locating and mounting the real root device (if
+any).  If rootfs does not contain an init program after the embedded cpio
+archive is extracted into it, the kernel will fall through to the older code
+to locate and mount a root partition, then exec some variant of /sbin/init
+out of that.
+
+所以一个linux的启动过程经历了rootfs ==> 挂载initramfs ==> 挂载磁盘上的真正的fs
+
+为什么要有initrd？
+
+linux系统在启动时，会执行文件系统中的`/sbin/init`进程完成linux系统的初始化，执行`/sbin/init`进程的前提是linux内核已经拿到了存在硬盘上的系统镜像文件（加载设备驱动，挂载文件系统）。linux 发行版必须适应各种不同的硬件架构，将所有的驱动编译进内核是不现实的。Linux发行版在内核中只编译了基本的硬件驱动
+，在 linux内核启动前，boot loader会将存储介质中的initrd文件(cpio是其中的一种)加载到内存，内核启动时会在访问真正的根文件系统前先访问该内存中的initrd文件系统，执行initrd文件系统的某个文件（不同的linux版本差异较大），扫描设备，加载驱动。
 
 ## 几大文件系统
 
