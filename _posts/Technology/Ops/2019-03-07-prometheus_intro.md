@@ -8,7 +8,10 @@ keywords: Prometheus
 
 ---
 
-## 简介（未完成）
+## 简介（持续更新）
+
+* TOC
+{:toc}
 
 [Prometheus官网](https://prometheus.io/)
 
@@ -25,6 +28,8 @@ Prometheus is an open-source systems monitoring and alerting toolkit. 数据采�
 Prometheus is a monitoring platform that collects metrics from monitored targets by scraping metrics HTTP endpoints on these targets. prometheus 通过被抓取对象 暴露出的http 端口抓取metrics，可以看作是一个按配置拉取特定url的“爬虫”
 
 ## 配置文件
+
+Prometheus is configured via command-line flags and a configuration file. While the command-line flags configure immutable system parameters (such as storage locations, amount of data to keep on disk and in memory, etc.), the configuration file defines everything related to scraping jobs and their instances, as well as which rule files to load.
 
 从配置文件来看 prometheus
 
@@ -51,8 +56,10 @@ Prometheus is a monitoring platform that collects metrics from monitored targets
 
 启动prometheus `prometheus --config.file=prometheus.yml`
 
-
-Prometheus uses rules to create new time series and to generate alerts.
+[Reloading Prometheus’ Configuration](https://www.robustperception.io/reloading-prometheus-configuration)类似于nginx 运行时reload 配置文件一样`nignx -c nginx.conf -s reload`， prometheus 也支持运行时reload
+ 
+1. 给Prometheus 进程发送SIGHUP信号 `kill -HUP $Prometheus_Pid`
+2. 在Prometheus 启动时携带command line flag `--web.enable-lifecycle`的前提下，调用http reload 接口，`curl -X POST http://ip:9090/-/reload`
 
 ## 存储
 
@@ -106,3 +113,36 @@ Prometheus Server 对`http://ip:9090/metrics` 返回的数据 不是直接原样
 ### 和存储结果 对接
 
 本身支持 metric 数据存储在本地磁盘
+
+## Prometheus expression language
+
+[QUERYING PROMETHEUS](https://prometheus.io/docs/prometheus/latest/querying/basics/)即便一个表达语言，那也是麻雀虽小五脏俱全，字面量、运算符、语法规则、函数等都有，虽然没有编程语言全面，但也像SQL一样很完备了
+
+Time series Selectors 从time series 中选择需要的数据
+
+1. Instant vector selectors 以下3个实例
+
+        ## 根据metric name 选择
+        http_requests_total
+        ## 根据metric name + label 选择
+        http_requests_total{job="prometheus",group="canary"}
+        ## label 支持多个运算符
+        http_requests_total{environment=~"staging|testing|development",method!="GET"}
+
+2. Range Vector Selectors
+
+        # 使用[]指定一个range duration
+        http_requests_total{job="prometheus"}[5m]
+
+[expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
+
+## rules
+
+Prometheus uses rules to create new time series and to generate alerts.
+
+### recording rules
+
+Recording rules allow you to precompute frequently needed or computationally expensive expressions and save their result as a new set of time series. Querying the precomputed result will then often be much faster than executing the original expression every time it is needed. This is especially useful for dashboards, which need to query the same expression repeatedly every time they refresh.
+
+每次query，一下子计算上千条time series 肯定会很耗时，因此可以预置一些规则，比如每5分钟汇总一次，即可大大减少计算最终结果时的数据量。
+
