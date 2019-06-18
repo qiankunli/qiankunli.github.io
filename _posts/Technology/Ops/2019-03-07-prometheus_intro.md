@@ -19,6 +19,8 @@ keywords: Prometheus
 
 Prometheus 是由SoundCloud 开发的开源监控报警系统和时序数据库（TSDB），由Golang编写
 
+由于数据采集可能会有丢失，所以 Prometheus 不适用于对采集数据要 100% 准确的情形，例如实时监控
+
 ## 整体结构
 
 ![](/public/upload/ops/prometheus.png)
@@ -112,7 +114,15 @@ Prometheus Server 对`http://ip:9090/metrics` 返回的数据 不是直接原样
 
 ### 和存储结果 对接
 
-本身支持 metric 数据存储在本地磁盘
+Prometheus includes a local on-disk time series database, but also optionally integrates with remote storage systems.
+
+    # prometheus.yml
+    remote_write:
+    - url: "http://localhost:1234/receive"
+    remote_read
+    - url: xx
+
+可以这么理解， Prometheus 定义了一套协议规范，可以和Adapter (及其背后的remote storage) 进行数据交互
 
 ## Prometheus expression language
 
