@@ -51,6 +51,8 @@ keywords: jib
 
 ### Exporter+Prometheus+Adapter
 
+Kubernetes的核心组件提供了Prometheus的采集接口
+
 ## 可以根据监控数据做什么
 
 1. 根据容器内存的耗费统计，个性化容器的内存 limit
