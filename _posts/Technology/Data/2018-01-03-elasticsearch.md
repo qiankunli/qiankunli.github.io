@@ -8,7 +8,7 @@ keywords: elasticsearch
 
 ---
 
-## 前言（未完成）
+## 前言（持续更新）
 
 * TOC
 {:toc}
@@ -28,7 +28,8 @@ elasticsearch 是面向文档的，**使用JSON作为文档序列化格式**（J
 |记录|rows|documents|
 |列|columns|fields|document中所有field都拥有一个倒排索引|
 |数据库操作|SQL|restful api|
-|新增一条记录|create databalse xx;<br> use xx <br>create table xx;<br> insert xx|`PUT /$index/$type/$id`|
+|新增一条记录|create databalse xx;<br> use xx <br>create table xx;<br> insert xx|`PUT /$index/$type/$id` + json body|
+|更新某个字段|`update xx set xx=xx`|`update /$index/$type/$id`|es是整体更新|
 
 es 不适合/不善于频繁更新、复杂关联查询、事务等操作
 
@@ -56,3 +57,46 @@ tar.gz 文件解压完
     README.textile
 
 `bin/elasticsearch` 前台启动，`bin/elasticsearch -d`后台启动。
+
+## 索引透明/自动化——数据插入即可被搜索
+
+插入一条记录 `curl -XPUT -H 'Content-Type:application/json' http://ip:9200/school/student/1 -d '{"name":"zhangsan"}'`
+
+查看插入的记录 `curl http://192.168.62.212:9200/school/student/1`
+
+    {
+        "_index":"school",
+        "_type":"student",
+        "_id":"1",
+        "_version":1,
+        "_seq_no":0,
+        "_primary_term":1,
+        "found":true,
+        "_source":{
+            "name":"zhangsan"
+        }
+    }
+
+使用Query DSL 通过json 请求body查询 `curl -H 'Content-Type:application/json' http://192.168.62.212:9200/school/student/_search -d '{"query":{"match":{"name":"lisi"}}}'`
+
+增强的“select”
+
+1. 全文搜索，凡是出现某个关键字的json 都被检索，并给出相关性评分
+2. 短语搜索，检索同时出现多个关键字的 json
+3. 高亮我们的搜索
+4. 聚合aggregations
+
+最关键的是：**无需配置，只需要添加数据然后开始搜索**。
+
+## 分布式概念透明化
+
+elasticsearch 在分布式概念上做了很大程度的透明化，很多操作自动完成
+
+1. 将json记录分区到不同的shard中，
+2. 将shard均匀的分配到不同节点，对索引和搜索做负载均衡
+3. 冗余每一个shard
+4. 将集群任意一个节点的请求路由到相应数据所在的节点
+5. 无论增加删除节点，分片都可以做到无缝的扩展和迁移
+
+
+
