@@ -90,7 +90,7 @@ tar.gz 文件解压完
 
 ## 分布式概念透明化
 
-elasticsearch 在分布式概念上做了很大程度的透明化，很多操作自动完成
+elasticsearch 在分布式概念（cluster/node/shard）上做了很大程度的透明化，很多操作自动完成
 
 1. 将json记录分区到不同的shard中，
 2. 将shard均匀的分配到不同节点，对索引和搜索做负载均衡
@@ -98,5 +98,13 @@ elasticsearch 在分布式概念上做了很大程度的透明化，很多操作
 4. 将集群任意一个节点的请求路由到相应数据所在的节点
 5. 无论增加删除节点，分片都可以做到无缝的扩展和迁移
 
+集群中有一个node被选举为master，它将临时管理集群级别的一些变更，例如新建/删除database（es叫index）、增加移除node等，master不参与记录（es叫document）级别的变更和搜索。
 
+database(es叫索引)只是一个用来指向多个shard（默认一个index被分配5个shard）的逻辑命名空间，一个shard 是最小级别的工作单元，就是一个Lucene实例，本身就是一个完整的搜索引擎。只不过应用程序直接与 index（mysql叫database）而不是shard 通信罢了。shard 分为primary shard 和 replica shard，后者用于冗余数据并提供读请求。
+
+||es|kafka||
+|---|---|---|---|
+|逻辑概念|database/index|topic|
+|工作单位|shard|partition|
+|副本机制|leader-follower|primary-replica|es副本还可对外服务|
 
