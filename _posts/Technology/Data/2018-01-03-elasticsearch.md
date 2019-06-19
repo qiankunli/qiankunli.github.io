@@ -13,23 +13,28 @@ keywords: elasticsearch
 * TOC
 {:toc}
 
+面向对象编程语言流行的原因之一，是我们可以用对象来表示和处理现实生活中那些有着潜在关系和复杂结构的实体。但当我们想存储这些实体的时候问题便来了，传统上，我们以行和列的形式把数据存储在关系型数据库中，相当于使用电子表格。这种固定的存储方式导致对象的灵活性不复存在了。PS：或许是ddd存在的动因之一 [ddd(一)——领域驱动理念入门](http://qiankunli.github.io/2017/12/25/ddd.html)
+
+如何能以对象的形式存储对象呢？相对于围绕表格去为我们的程序建模，我们可以专注使用数据，把对象本来的灵活性找回来。对象是一种语言相关，记录在内存的数据结构。为了在网络间发送或者存储它，我们需要一些标准的格式来表示它。JSON 是一种可读的以文本来表示对象的方式，已经成为NoSQL领域的事实标准格式。
+
 Elasticsearch所涉及到的每一项技术都不是创新或革命性的，全文搜索、分析系统以及分布式数据库早已存在了，它的革命性在于将这些独立且有用的技术整合成一个一体化的、实时的应用。
 
-## Comparing document-oriented and relational data
+## 直接存储对象
 
 应用中的对象很少只是简单的键值列表，更多时候它拥有复杂的数据结构，比如包含日期、地理位置、另一个对象或数组。总有一天你会想到把这些对象存储在数据库中。将这些数据保存到由行和列组成的关系数据库中，就好比是把一个丰富、信息表现力强的对象拆散了放入一个非常大的表格中：你不得不拆散对象以适应表模式（通常一列表示一个字段），然后又不得不在查询的时候重建它们。
 
-elasticsearch 是面向文档的，**使用JSON作为文档序列化格式**（JSON已经成为NoSQL领域的标准格式），这意味着它可以存储整个对象或文档，然而它不仅仅是存储，还会索引每个文档的内容使之可以被索引、搜索、排序、过滤。elasticsearch官方客户端会自动为你序列化和反序列化Json。 PS：document-oriented 虽然不像relational database 一样有schema，但也是有json格式的。
+elasticsearch 是面向文档的，**使用JSON作为文档序列化格式**，这意味着它可以存储整个对象或文档，然而它不仅仅是存储，还会索引每个文档的内容使之可以被索引、搜索、排序、过滤。elasticsearch官方客户端会自动为你序列化和反序列化Json。 PS：document-oriented 虽然不像relational database 一样有schema，但也是有json格式的。
 
 |称谓|relational db|elasticsearch||
 |---|---|---|---|
 |数据库|databases|indices/indexes|索引在es里如此自然，以至于数据库都叫索引|
-|表|tables|types|
-|记录|rows|documents|
+|表|tables|types|document代表的对象的类|
+|记录|rows|documents|document是以唯一ID标识并存储与es的对象的json数据|
 |列|columns|fields|document中所有field都拥有一个倒排索引|
 |数据库操作|SQL|restful api|
 |新增一条记录|create databalse xx;<br> use xx <br>create table xx;<br> insert xx|`PUT /$index/$type/$id` + json body|
 |更新某个字段|`update xx set xx=xx`|`update /$index/$type/$id`|es是整体更新|
+|并发控制|隔离级别|乐观锁|
 
 es 不适合/不善于频繁更新、复杂关联查询、事务等操作
 
@@ -68,7 +73,7 @@ tar.gz 文件解压完
         "_index":"school",
         "_type":"student",
         "_id":"1",
-        "_version":1,
+        "_version":1,   ## cud都会使_version增加
         "_seq_no":0,
         "_primary_term":1,
         "found":true,
@@ -76,6 +81,13 @@ tar.gz 文件解压完
             "name":"zhangsan"
         }
     }
+
+只返回source部分 `curl http://192.168.62.212:9200/school/student/1/_source`
+
+    {
+        "name":"zhangsan"
+    }
+    
 
 使用Query DSL 通过json 请求body查询 `curl -H 'Content-Type:application/json' http://192.168.62.212:9200/school/student/_search -d '{"query":{"match":{"name":"lisi"}}}'`
 
@@ -106,5 +118,8 @@ database(es叫索引)只是一个用来指向多个shard（默认一个index被�
 |---|---|---|---|
 |逻辑概念|database/index|topic|
 |工作单位|shard|partition|
-|副本机制|leader-follower|primary-replica|es副本还可对外服务|
+|副本机制|primary-replica|leader-follower|es副本还可对外服务|
+|集群发现|广播|zk|
+|复制数据|push|pull|
+
 
