@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: elasticsearch 初步认识
+title: 《elasticsearch权威指南》笔记
 category: 技术
 tags: Data
 keywords: elasticsearch
@@ -30,7 +30,7 @@ elasticsearch 是面向文档的，**使用JSON作为文档序列化格式**，�
 |数据库|databases|indices/indexes|索引在es里如此自然，以至于数据库都叫索引|
 |表|tables|types|document代表的对象的类|
 |记录|rows|documents|document是以唯一ID标识并存储与es的对象的json数据|
-|列|columns|fields|document中所有field都拥有一个倒排索引|
+|列|columns|fields|document中所有field都拥有一个（倒排）索引|
 |数据库操作|SQL|restful api|
 |新增一条记录|create databalse xx;<br> use xx <br>create table xx;<br> insert xx|`PUT /$index/$type/$id` + json body|
 |更新某个字段|`update xx set xx=xx`|`update /$index/$type/$id`|es是整体更新|
@@ -120,6 +120,53 @@ database(es叫索引)只是一个用来指向多个shard（默认一个index被�
 |工作单位|shard|partition|
 |副本机制|primary-replica|leader-follower|es副本还可对外服务|
 |集群发现|广播|zk|
-|复制数据|push|pull|
+|复制数据|复试请求到各个shard|pull|es可以通过参数调整复制策略<br>es建议sync复制，这估计是其不适合大量写入的原因吧|
+
+## 映射
+
+倒排索引由document/json记录中出现的唯一的单词列表，以及对每个单词在文档中的位置组成。
+
+为了能够把日期字段处理为日期，把数字字段处理成数字，把字符串字段处理成全文本(full-text)或精确地字符串值，elasticsearch 需要知道每个字段里都包含了什么类型。索引中每个ducument 都有一个type，每个type 拥有自己的mapping或schema definition。一个mapping 定义了field的数据类型， 以及field被elasticsearch处理的方式。
 
 
+    curl -XPUT -H 'Content-Type:application/json' http://ip:9200/school/student/3 -d '{
+        "name":"lisi",
+        "age":18,
+        "interests":["sports","music"],
+        "address":{
+            "country":"china",
+            "city":"shanghai"
+        }
+    }'
+
+`curl http://ip:9200/school/_mapping\?pretty` 查看返回
+
+    {
+        "school": {
+            "mappings": {
+                "properties": {
+                    "address": {
+                        "properties": {
+                            "city": {xx}, 
+                            "country": {xx}
+                        }
+                    }, 
+                    "age": {
+                        "type": "long"
+                    }, 
+                    "interests": {
+                        "type": "text", 
+                        "fields": {}
+                    }, 
+                    "name": {
+                        "type": "text", 
+                        "fields": {}
+                    }
+                }
+            }
+        }
+    }
+
+## 其它金句
+
+自然语言实际上是高度结构化的，问题是自然语言的规则是如此复杂，计算机难以正确解析，于是常常被视为“非结构化数据”。
