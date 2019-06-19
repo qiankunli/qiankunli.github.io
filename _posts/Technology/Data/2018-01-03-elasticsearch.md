@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 《elasticsearch权威指南》笔记
+title: 《Elasticsearch权威指南》笔记
 category: 技术
 tags: Data
 keywords: elasticsearch
