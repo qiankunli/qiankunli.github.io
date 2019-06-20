@@ -72,7 +72,7 @@ RAM 是随机访问内存，就是给一个地址就能访问到数据，而磁�
 
 ### 缓存速度的差异
 
-![](/public/upload/basic/cpu_cache.png)
+![](/public/upload/basic/cpu_cache.jpg)
 
 |从CPU到|	大约需要的 CPU 周期|	大约需要的时间|
 |---|---|---|
