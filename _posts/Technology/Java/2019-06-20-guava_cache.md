@@ -10,6 +10,9 @@ keywords: kafka
 
 ## 简介
 
+* TOC
+{:toc}
+
 [Guava LocalCache 缓存介绍及实现源码深入剖析](https://ketao1989.github.io/2014/12/19/Guava-Cache-Guide-And-Implement-Analyse/)
 
 guava LocalCache与ConcurrentHashMap有以下不同
