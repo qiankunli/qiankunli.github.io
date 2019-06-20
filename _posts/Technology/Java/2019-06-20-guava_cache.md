@@ -170,6 +170,8 @@ segment 简单说也是数组加链表，只是元素类型是ReferenceEntry，�
 
 refreshAfterWrite 注意不是 expireAfterWrite
 
+如果缓存过期，恰好有多个线程读取同一个key的值，那么guava只允许一个线程去加载数据，其余线程阻塞。这虽然可以防止大量请求穿透缓存，但是效率低下。使用refreshAfterWrite可以做到：只阻塞加载数据的线程，其余线程返回旧数据。
+
     LoadingCache<String, Object> caches = CacheBuilder.newBuilder() 
         .maximumSize(100) 
         .refreshAfterWrite(10, TimeUnit.MINUTES) 
@@ -182,6 +184,7 @@ refreshAfterWrite 注意不是 expireAfterWrite
 
 ### 另起线程拉新值
 
+真正加载数据的那个线程一定会阻塞，可以让这个加载过程是异步的，这样就可以让所有线程立马返回旧值
 
     ListeningExecutorService backgroundRefreshPools = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(20)); LoadingCache<String, Object> caches = CacheBuilder.newBuilder() 
         .maximumSize(100) 
