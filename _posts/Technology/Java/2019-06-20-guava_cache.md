@@ -55,6 +55,24 @@ Map类结构简单说就是数组 + 链表，最基本的数据单元是entry
 2. copyFor()函数的存在是因为在expand(rehash)重新创建节点时，对WeakReference、SoftReference需要重新创建实例（C++中的深度复制思想，就是为了保持对象状态不会相互影响），而对强引用来说，直接使用原来的值即可，这里很好的展示了对彼变化的封装思想； 
 3. notifiyNewValue只用于LoadingValueReference，它的存在是为了对LoadingValueReference来说能更加及时的得到CacheLoader加载的值。
 
+## 弱引用
+
+||回收时机|
+|---|---|
+|Strong Reference|若一个对象通过一系列强引用可到达，它就是强可达的(strongly reachable)，那么它就不被回收|
+|Soft Reference|在内存不充足时才会被回收|
+|Weak Reference|gc时|
+|Phantom Reference/虚引用|通过虚引用甚至无法获取到被引用的对象|
+
+垃圾收集器会把那些刚清除的弱引用放入创建弱引用对象时所指定的引用队列(Reference Queue)中
+
+[十分钟理解Java中的弱引用](https://www.jianshu.com/p/a7aaaf1bd7be)
+
+    Product productA = new Product(...);
+    WeakReference<Product> weakProductA = new WeakReference<>(productA);
+
+当productA变为null时（表明它所引用的Product已经无需存在于内存中），这时指向这个Product对象的就只剩弱引用对象weakProductA了，这时候相应的Product对象是**弱可达**的
+
 ## segment.get
 
 ![](/public/upload/java/guava_cache_segment_get_flow.png)
