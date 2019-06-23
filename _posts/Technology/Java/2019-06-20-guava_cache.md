@@ -25,8 +25,8 @@ guava LocalCache与ConcurrentHashMap有以下不同
 
 ![](/public/upload/java/guava_cache.png)
 
-1. 我们一般用的LoadingCache 实际实现类是 LocalLoadingCache，整个guava cache的核心是LocalCache。
-2. AbstractCache：This class provides a **skeletal implementation** of the  Cache interface to minimize the effort required to implement this interface.To implement a cache, the programmer needs only to extend this class and provide an implementation for the get(Object) and getIfPresent methods.  getAll are implemented in terms of get; getAllPresent is implemented in terms of getIfPresent; putAll is implemented in terms of put, invalidateAll(Iterable) is implemented in terms of invalidate. 这是一个典型抽象类的使用：skeletal implementation，封装通用逻辑，承接大部分interface 方法， 剩下几个个性化的方法留给子类实现。 
+1. 我们一般用的LoadingCache 实际实现类是 LocalLoadingCache，LocalLoadingCache 封装了LocalCache ==> 整个guava cache的核心是LocalCache。
+2. AbstractCache：This class provides a **skeletal implementation** of the  Cache interface to minimize the effort required to implement this interface.To implement a cache, the programmer needs only to extend this class and provide an implementation for the get(Object) and getIfPresent methods.  getAll are implemented in terms of get; getAllPresent is implemented in terms of getIfPresent; putAll is implemented in terms of put, invalidateAll(Iterable) is implemented in terms of invalidate. 这是一个典型抽象类的使用场景：skeletal implementation，封装通用逻辑，承接大部分interface 方法， 剩下几个个性化的方法留给子类实现。 
 
 ## LocalCache 的核心是Segment
 
