@@ -17,9 +17,11 @@ keywords: kafka
 
 guava LocalCache与ConcurrentHashMap有以下不同
 
-1. ConcurrentHashMap ”分段控制并发“是隐式的，而LocalCache 是显式的
+1. ConcurrentHashMap ”分段控制并发“是隐式的（实现中没有Segment对象），而LocalCache 是显式的。
 2. 在Cache中，使用ReferenceEntry来封装键值对，并且对于值来说，还额外实现了ValueReference引用对象来封装对应Value对象。
-3. 在Cache中，在segment 粒度上支持了LRU机制， 体现在Segment上就是 writeQueue 和 accessQueue。队列中的元素按照访问或者写时间排序，新的元素会被添加到队列尾部。如果，在队列中已经存在了该元素，则会先delete掉，然后再尾部add该节点
+3. 在Cache 中支持过期 + 自动loader机制，这也使得其加锁方式与ConcurrentHashMap 不同。
+4. 在Cache中，在segment 粒度上支持了LRU机制， 体现在Segment上就是 writeQueue 和 accessQueue。队列中的元素按照访问或者写时间排序，新的元素会被添加到队列尾部。如果，在队列中已经存在了该元素，则会先delete掉，然后再尾部add该节点
+
 
 ## Cache的核心是LocalCache
 
@@ -88,8 +90,7 @@ Map类结构简单说就是数组 + 链表，最基本的数据单元是entry
         ValueReference<K, V> valueReference = null;
         LoadingValueReference<K, V> loadingValueReference = null;
         boolean createNewEntry = true;
-
-        lock();
+        lock(); // 加锁
         int newCount = this.count - 1;
         AtomicReferenceArray<ReferenceEntry<K, V>> table = this.table;
         // 计算key在数组中的落点
@@ -119,7 +120,7 @@ Map类结构简单说就是数组 + 链表，最基本的数据单元是entry
         } else {
             e.setValueReference(loadingValueReference);
         }
-        unlock();   
+        unlock(); // 解锁
         synchronized (e) {
             return loadSync(key, hash,loadingValueReference, loader);
         }
@@ -127,7 +128,7 @@ Map类结构简单说就是数组 + 链表，最基本的数据单元是entry
 
 segment 简单说也是数组加链表，只是元素类型是ReferenceEntry，根据key 计算index，然后沿着链表匹配value，若相同，判断value元素是否有效，无效（null or 过期）则创建loadingValueReference 并更新到 ReferenceEntry。loadingValueReference.loadFuture 开始执行load逻辑。
 
-只有ReferenceEntry 更新 其value引用 loadingValueReference 的部分是需要加锁的，之后线程竞争便转移到了 loadingValueReference 上
+只有ReferenceEntry 更新 其value引用 loadingValueReference 的部分是需要加锁的，之后**线程竞争便转移**到了 loadingValueReference 上
 
     V loadSync(K key,int hash,
         LoadingValueReference<K, V>,loadingValueReference,CacheLoader<? super K, V> loader)throws ExecutionException {
@@ -181,7 +182,10 @@ segment 简单说也是数组加链表，只是元素类型是ReferenceEntry，�
 从上述代码可以看到
 
 1. “其它线程等待”的效果，不是对key 加锁， 其它线程得不到锁而等待
-2. LoadingValueReference 持有了 future对象，线程发现value 处于loading状态时 便直接 `LoadingValueReference.waitForValue` ==> `future.get` 准备等结果了
+2. **LoadingValueReference 持有了 future对象**，也是线程的“竞争点”，线程发现value 处于loading状态时 便直接 `LoadingValueReference.waitForValue` ==> `future.get` 准备等结果了。这个竞争点选的很精巧
+
+    1. 以 key 或者value 作为竞争点 + lock/unlock，线程发现key 数据过期，锁住key（标识key等手段），获取数据，解锁key。**因为你不知道key/value 什么时候过期，所以每次lock/unlock 是很大的浪费**。
+    2. 以 value isLoading 作为竞争点，线程发现value isNotLoading，创建一个新的value 对象设置状态为loading，原子的修改entry的value，这样其它线程可以根据loading 状态决定自己的行为，而不是无脑lock/unlock
 
 ## 如果不想线程排队
 
