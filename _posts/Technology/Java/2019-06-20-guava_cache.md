@@ -47,7 +47,7 @@ Map类结构简单说就是数组 + 链表，最基本的数据单元是entry
 
 ![](/public/upload/java/guava_cache_value_reference.png)
 
-为了减少不必须的load加载，在value引用中增加了loading标识和wait方法等待加载获取值。这样，就可以等待上一个调用loader方法获取值，而不是重复去调用loader方法加重系统负担，而且可以更快的获取对应的值。
+为了减少不必要的load加载，**在value引用中**（而不是常规的在key 上加锁）增加了loading标识和wait方法等待加载获取值。这样，调用方线程就可以等待上一个线程loader方法获取值，而不是重复去调用loader方法加重系统负担，而且可以更快的获取对应的值。
 
 在Cache分别实现了基于Strong,Soft，Weak三种形式的ValueReference实现。
 
@@ -135,7 +135,7 @@ segment 简单说也是数组加链表，只是元素类型是ReferenceEntry，�
         return getAndRecordStats(key, hash,loadingValueReference, loadingFuture);
     }
 
-### waitForLoadingValue
+### 请求合并的实现——waitForLoadingValue
 
     V waitForLoadingValue(ReferenceEntry<K, V> e, K key, ValueReference<K, V> valueReference)
         throws ExecutionException {
