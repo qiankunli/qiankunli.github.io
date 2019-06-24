@@ -8,9 +8,7 @@ keywords: JAVA exception
 
 ---
 
-## 前言（未完成）
-
-## 其它
+## 前言
 
 异常有两种：
 
@@ -69,3 +67,21 @@ The compiler in the server VM now provides correct stack backtraces（回溯） 
 jvm 如何处理异常 [JVM4——《深入拆解java 虚拟机》笔记](http://qiankunli.github.io/2018/07/20/jvm_note.html)
 
 异常捕捉 对性能是有影响的，
+
+## InterruptedException
+
+[Dealing with InterruptedException](https://www.ibm.com/developerworks/library/j-jtp05236/index.html)
+
+为什么会有InterruptedException？cancellation mechanism
+
+When a method throws InterruptedException, It is telling you that it is a blocking method and that it will make an attempt to unblock and return early 
+
+The completion of an ordinary method is dependent only on how much work you've asked it to do and whether adequate computing resources (CPU cycles and memory) are available. The completion of a blocking method, on the other hand, is also dependent on some external event, such as timer expiration, I/O completion, or the action of another thread (releasing a lock, setting a flag, or placing a task on a work queue). Ordinary methods complete as soon as their work can be done, but blocking methods are less predictable because they depend on external events. blocking method 何时结束是难以预测的，因为要等待external events
+
+
+Because blocking methods can potentially take forever if the event they are waiting for never occurs, it is often useful for blocking operations to be cancelable.(It is often useful for long-running non-blocking methods to be cancelable as well.)  A cancelable operation is one that can be externally moved to completion in advance of when it would ordinarily complete on its own. The interruption mechanism provided by Thread and supported by Thread.sleep() and Object.wait() is a cancellation mechanism; it allows one thread to request that another thread stop what it is doing early. When a method throws InterruptedException, it is telling you that if the thread executing the method is interrupted, it will make an attempt to stop what it is doing and return early and indicate its early return by throwing InterruptedException. Well-behaved blocking library methods should be responsive to interruption and throw InterruptedException so they can be used within cancelable activities without compromising responsiveness. 既然blocking method 何时结束难以预测，那就有必要提供一个取消机制
+
+Every thread has a Boolean property associated with it that represents its interrupted status. The interrupted status is initially false; when a thread is interrupted by some other thread through a call to `Thread.interrupt()`
+
+**Interruption is a cooperative mechanism**. When one thread interrupts another, the interrupted thread does not necessarily stop what it is doing immediately. Instead, interruption is a way of **politely asking** another thread to stop what it is doing if it wants to, at its convenience.  You are free to ignore an interruption request, but doing so may compromise responsiveness. 当你在实现一个block 或者 long-running方法，发现当前线程 interrupted status 被置为true了，你可以不理它，但最好是处理一下，停下“手头”的工作，开始收尾。
+
