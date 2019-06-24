@@ -72,7 +72,7 @@ jvm 如何处理异常 [JVM4——《深入拆解java 虚拟机》笔记](http:/
 
 [Dealing with InterruptedException](https://www.ibm.com/developerworks/library/j-jtp05236/index.html)
 
-为什么会有InterruptedException？cancellation mechanism
+**为什么会有InterruptedException？cancellation mechanism**
 
 When a method throws InterruptedException, It is telling you that it is a blocking method and that it will make an attempt to unblock and return early 
 

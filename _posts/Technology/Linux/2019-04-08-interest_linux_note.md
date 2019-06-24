@@ -258,3 +258,21 @@ Linux 操作系统新添加了一个设备，且新的设备从来没有加载�
 
 为什么块设备要比字符设备多此一举呢？比如将一个硬盘的块设备 mount 成为 ext4 的时候，会调用 `ext4_mount->mount_bdev`，mount_bdev 根据 /dev/xxx 这个名字，找到相应的设备并打开它，然后根据打开的设备文件，填充 ext4 文件系统的 super_block。`/dev/sdb`的inode 结构是指向设备的，`/mnt/sdb` 的inode 结构是指向ext4 文件系统的。
 
+## 信号处理
+
+1. 我们在终端输入某些组合键的时候，会给进程发送信号，例如，Ctrl+C 产生 SIGINT 信号，Ctrl+Z 产生SIGTSTP 信号。
+2. 有的时候，硬件异常也会产生信号。比如，执行了除以 0 的指令，CPU 就会产生异常，然后把 SIGFPE 信号发送给进程。再如，进程访问了非法内存，内存管理模块就会产生异常，然后把信号 SIGSEGV 发送给进程。
+3. 最直接的发送信号的方法就是，通过命令 kill 来发送信号了。
+4. 我们还可以通过 kill 或者 sigqueue 系统调用，发送信号给某个进程，也可以通过 tkill 或者 tgkill 发送信号给某个线程。
+
+
+在用户程序里面，有两个函数可以调用，一个是 signal，一个是 sigaction，推荐使用 sigaction。在内核中，rt_sigaction 调用的是 do_sigaction 设置信号处理函数。在每一个进程的task_struct 里面，都有一个 sighand 指向struct sighand_struct，里面是一个数组，下标是信号，里面的内容是信号处理函数。
+
+||中断|信号|
+|---|---|---|
+|函数执行|在内核态|在用户态|
+|严重程度|影响整个系统|只影响一个进程|
+
+什么时候真正处理信号呢？就是在从系统调用或者中断返回的时候。无论是从系统调用返回还是从中断返回，都会调用 exit_to_usermode_loop，有一个参数标志位，如果设置了 _TIF_SIGPENDING，我们就调用 do_signal 进行处理
+
+
