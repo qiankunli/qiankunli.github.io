@@ -60,6 +60,15 @@ EventExecutorGroup 使用实例（不一定非得netty里才能用）
 
 ![](/public/upload/java/various_future.png)
 
+异步和回调是孪生兄弟，毕竟不管同步还是异步，都要对拿到的结果进行处理
+
+1. 对结果的处理，可以直接写在异步方法的回调中，也可以挂在异步方法返回的future中
+2. 异步本身分为调用线程和执行线程，对异步结果的处理（体现为callable/runnable/function等）也有几种情况
+
+    1. 执行线程处理
+    2. 额外传入一个executor线程（池）处理
+3. 不管事异步执行、还是对异步结果的处理（这个处理也可以异步）， 我们最后希望有一个总的Future，表示所有处理过程的“句柄”
+
 ### FutureTask
 
 我们来看一个Futrue的简单使用
