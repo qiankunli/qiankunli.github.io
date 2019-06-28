@@ -39,7 +39,13 @@ Future jdk源码中的接口定义与描述
 
 ## 百花齐放的executor 
 
+[java concurrent 工具类](http://qiankunli.github.io/2017/05/02/java_concurrent_tool.html)
+
 ![](/public/upload/java/various_executor.png)
+
+Executor This interface provides a way of decoupling task submission from the mechanics of how each task will be run, including details of thread use, scheduling, etc.  **Executor 是一个如此成功的抽象，就像linux的File 接口一样，其内涵逐步被泛化，已经不只是其原有的文件/线程池的概念了**。
+
+在 ExecutorService 中，正如其名字暗示的一样，定义了一个服务，定义了完整的线程池的行为，可以接受提交任务、执行任务、关闭服务。抽象类 AbstractExecutorService 类实现了 ExecutorService 接口，也实现了接口定义的默认行为。
 
 [Using as a generic library](https://netty.io/wiki/using-as-a-generic-library.html#wiki-h2-5) 将netty的并发编程库与guava 与jdk8 做了对比，Because **Netty tries to minimize its set of dependencies**, some of its utility classes are similar to those in other popular libraries, such as Guava.
 
@@ -63,11 +69,36 @@ EventExecutorGroup 使用实例（不一定非得netty里才能用）
 异步和回调是孪生兄弟，毕竟不管同步还是异步，都要对拿到的结果进行处理
 
 1. 对结果的处理，可以直接写在异步方法的回调中，也可以挂在异步方法返回的future中
-2. 异步本身分为调用线程和执行线程，对异步结果的处理（体现为callable/runnable/function等）也有几种情况
+2. 异步本身分为调用线程和执行线程，对异步结果的后续处理（体现为callable/runnable/function等）也有几种情况
 
     1. 执行线程处理
     2. 额外传入一个executor线程（池）处理
 3. 不管事异步执行、还是对异步结果的处理（这个处理也可以异步）， 我们最后希望有一个总的Future，表示所有处理过程的“句柄”
+4. 我们看jdk1.8 CompletionFutre，可以看到：各种thenXX，即便对同步调用的返回值进行各种处理，也不过如此了。**将异步代码写的如何更像 同步代码 一点，是异步抽象/封装一个发展方向**。
+
+
+    void business(){
+        Value value1 = timeConsumingOperation1();
+        Object result1 = function1(value1);
+        Object result2 = function2(value1);
+        Value value2 = timeConsumingOperation2();
+        Object result3 = function3(value1,value2);
+        ...
+    }
+
+    void business(){
+        CompletionFutre future1 = timeConsumingOperationAsync1();
+        CompletionFutre future2 = timeConsumingOperationAsync2();
+        future.thenApply(function1).thenApply(function2).thenCombine(future2,function3);
+        ...
+    }
+
+不管同步异步，都要拿到数据的结果，并且对拿到的结果进行后续处理。区别只是，同步代码是按照时间顺序书写的，更符合人类直觉，而异步代码则要转换下思维，前文提过`Future future = timeConsumingOperation()` 之后立马`future.get()` 就没什么意思了， 所以异步代码的“文风”有几种
+
+1. 连续发起多个异步操作，然后对异步结果进行组合
+2. 发起一个异步操作，然后`future.addListener()` 注册另一个异步操作，容易引发回调地域
+
+[Chaining async calls using Java Futures](https://techweek.ro/2019/chaining-async-calls-using-java-futures/)
 
 ### FutureTask
 
