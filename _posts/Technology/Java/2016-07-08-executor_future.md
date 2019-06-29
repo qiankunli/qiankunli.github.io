@@ -47,24 +47,7 @@ Executor provides a way of decoupling task submission from the mechanics of how 
 
 **同步方法有参数和返回值，异步方法也有参数和返回值，只是异步方法的返回值 统一为Future 抽象。我们可以直接对同步方法的返回值进行处理，而java 也在不断地对Future进行扩展以对异步结果进行处理**。
 
-### 对Executor 的扩展
 
-在 ExecutorService 中，正如其名字暗示的一样，定义了一个服务，定义了完整的线程池的行为，可以接受提交任务、执行任务、关闭服务。抽象类 AbstractExecutorService 类实现了 ExecutorService 接口，也实现了接口定义的默认行为。
-
-[Using as a generic library](https://netty.io/wiki/using-as-a-generic-library.html#wiki-h2-5) 将netty的并发编程库与guava 与jdk8 做了对比，Because **Netty tries to minimize its set of dependencies**, some of its utility classes are similar to those in other popular libraries, such as Guava.
-
-在上图中，netty EventExecutorGroup 的方法返回的是netty 自己实现的`io.netty.util.concurrent.Future extends java.util.concurrent.Future`，guava 则直接一点，ListeningExecutorService 直接返回自己定义的`com.google.common.util.concurrent.ListenableFuture extends java.util.concurrent.Future`
-
-EventExecutorGroup 使用实例（不一定非得netty里才能用）
-
-    EventExecutorGroup group = new DefaultEventExecutorGroup(4); // 4 threads
-    Future<?> f = group.submit(new Runnable() { ... });
-    f.addListener(new FutureListener<?> {
-        public void operationComplete(Future<?> f) {
-            ..
-        }
-    });
-    ...
 
 ## 线程复用——ThreadPoolExecutor
 
@@ -112,6 +95,8 @@ ThreadPoolExecutor 作业线程 由一个HashSet 成员专门持有， 管理/cr
 1. caller thread 提交任务，在特定场景下（核心线程数、最大线程数、任务队列长度），由addThread 创建新线程
 2. caller thread 线程调用shutdown，作业线程在 没有任务或shutdown状态下自动结束
 
+创建新的作业线程逻辑
+
     private Thread addThread(Runnable firstTask) {
         // 为当前接收到的任务 firstTask 创建 Worker
         Worker w = new Worker(firstTask);
@@ -122,6 +107,32 @@ ThreadPoolExecutor 作业线程 由一个HashSet 成员专门持有， 管理/cr
         t.start();
         return t;
     }
+
+## 对Executor 的扩展
+
+对Executor 的扩展 主要体现在几个方面
+
+1. 规范 作业线程的管理，比如ExecutorService
+2. 提供 更丰富的 异步处理返回值 ，比如guava 的ListeningExecutorService
+3. 优化特定场景，比如netty的SingleThreadEventExecutor，只有一个作业线程
+3. 针对特定业务场景，更改作业线程的处理逻辑。比如netty的EventLoopGroup，其作业线程逻辑为 io + task ，并可以根据ioRatio 调整io 与task的cpu 占比。
+
+在 ExecutorService 中，正如其名字暗示的一样，定义了一个服务，定义了完整的线程池的行为，可以接受提交任务、执行任务、关闭服务。抽象类 AbstractExecutorService 类实现了 ExecutorService 接口，也实现了接口定义的默认行为。
+
+[Using as a generic library](https://netty.io/wiki/using-as-a-generic-library.html#wiki-h2-5) 将netty的并发编程库与guava 与jdk8 做了对比，Because **Netty tries to minimize its set of dependencies**, some of its utility classes are similar to those in other popular libraries, such as Guava.
+
+在上图中，netty EventExecutorGroup 的方法返回的是netty 自己实现的`io.netty.util.concurrent.Future extends java.util.concurrent.Future`，guava 则直接一点，ListeningExecutorService 直接返回自己定义的`com.google.common.util.concurrent.ListenableFuture extends java.util.concurrent.Future`
+
+EventExecutorGroup 使用实例（不一定非得netty里才能用）
+
+    EventExecutorGroup group = new DefaultEventExecutorGroup(4); // 4 threads
+    Future<?> f = group.submit(new Runnable() { ... });
+    f.addListener(new FutureListener<?> {
+        public void operationComplete(Future<?> f) {
+            ..
+        }
+    });
+    ...
 
 ## 百花齐放的future
 
