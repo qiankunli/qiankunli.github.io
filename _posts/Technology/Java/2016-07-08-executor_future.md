@@ -17,7 +17,7 @@ keywords: future
 
 从本文内容可以看到，任何业务逻辑都可以用全异步代码来完成，其本质是**业务逻辑分拆在多个线程中**，Executor 和Future 封装了业务逻辑的分拆和中间结果的组合。PS：有种分布式任务处理的感觉。
 
-## 百花齐放的executor 
+## 百花齐放的Executor 
 
 Runnable + Thread 实现了 logic 和 runner 的分离，runner 又进一步扩展为 executor 
 
@@ -134,7 +134,7 @@ EventExecutorGroup 使用实例（不一定非得netty里才能用）
     });
     ...
 
-## 百花齐放的future
+## 百花齐放的Future
 
 [Chaining async calls using Java Futures](https://techweek.ro/2019/chaining-async-calls-using-java-futures/)
 

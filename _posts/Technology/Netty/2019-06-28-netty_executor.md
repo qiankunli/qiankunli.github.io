@@ -78,7 +78,7 @@ ThreadPoolExecutor 的作业逻辑 由Worker 定义
 
 SingleThreadEventExecutor的作业逻辑在 自己的run 方法中，是一个抽象方法，`DefaultEventExecutor.run` 是一个具体的实现
 
-   protected void run() {
+    protected void run() {
         for (;;) {
             Runnable task = takeTask();
             if (task != null) {
