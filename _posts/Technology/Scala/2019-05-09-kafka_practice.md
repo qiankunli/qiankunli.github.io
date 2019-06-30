@@ -89,7 +89,7 @@ kafka消费太慢，误以为consumer挂掉，一直rebalance。背后的原理
     2. 能够实现故障转移：即 Failover。这是 Kafka 1.1 版本新引入的强大功能。
 2. zookeeper.connect
 3. auto.create.topics.enable：是否允许自动创建 Topic，建议最好设置成 false，每个部门被分配的 Topic 应该由运维严格把控
-4. log.retention.{hour|minutes|ms}：这是个“三兄弟”，都是控制一条消息数据被保存多长时间。从优先级上来说 ms 设置最高、minutes 次之、hour最低。默认保存 7 天的数据
+4. `log.retention.{hour|minutes|ms}`：这是个“三兄弟”，都是控制一条消息数据被保存多长时间。从优先级上来说 ms 设置最高、minutes 次之、hour最低。默认保存 7 天的数据
 5. log.retention.bytes：这是指定 Broker 为消息保存的总磁盘容量大小。这个值默认是 -1，表明你想在这台 Broker 上保存多少数据都可以。这个参数对多租户场景特别有用。
 6. message.max.bytes：控制 Broker 能够接收的最大消息大小。默认的 1000012 太少了，还不到 1MB。实际场景中突破 1MB 的消息都是屡见不鲜的。这个可以依据topic 进行个性化设置
 
