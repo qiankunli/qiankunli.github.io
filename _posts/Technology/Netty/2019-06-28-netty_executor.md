@@ -162,7 +162,8 @@ channel.write 根据inEventLoop 来判断 caller 线程的性质，以判断是�
         }
     }
 
+![](/public/upload/java/use_executor.png)
 
-
+EventLoop作为AbstractChannel的成员，承接AbstractChannel 的核心逻辑，支持了AbstractChannel 对外提供异步接口。
 
 

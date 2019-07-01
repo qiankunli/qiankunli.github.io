@@ -134,6 +134,10 @@ EventExecutorGroup 使用实例（不一定非得netty里才能用）
     });
     ...
 
+## Executor的使用
+
+![](/public/upload/java/use_executor.png)
+
 ## 百花齐放的Future
 
 [Chaining async calls using Java Futures](https://techweek.ro/2019/chaining-async-calls-using-java-futures/)
@@ -183,11 +187,11 @@ One issue with complex workflows is that you might have a mixture of CPU and I/O
 
 ## 对Future 的扩展
 
-不管同步异步，都要拿到数据的结果，并且对拿到的结果进行后续处理。区别只是，同步代码是按照时间顺序书写的，更符合人类直觉，而异步代码则要转换下思维，`Future future = timeConsumingOperation()` 之后立马`future.get()` 就没什么意思了， 所以异步代码的“文风”有几种
+不管同步异步，都要拿到数据的结果，并且对拿到的结果进行后续处理。区别只是，同步代码是按照时间顺序书写的，更符合人类直觉，而异步代码则要转换下思维，`Future future = timeConsumingOperation()` 之后立马`future.get()` 就没什么意思了， 所以异步代码的“文风”（学名：异步流程控制模式）有几种
 
-1. 连续发起多个异步操作，然后对异步结果进行组合
-2. 发起一个异步操作，然后`future.addListener()` 注册另一个异步操作，容易引发回调地狱
-
+1. 串行(series)，后一个调用参数依赖前一个调用的结果。
+2. 并行(parallel)，连续发起多个异步操作，然后对异步结果进行组合
+3. 瀑布(waterfall)等，后一个调用是否执行 + 调用参数 依赖前一个调用的结果
 
 ### 解决回调地狱——promise模式
 
@@ -198,7 +202,7 @@ jdk1.8 也提供了相关的方案：CompletableFuture，A Future that may be ex
 [[concurrency-interest] CompletableFuture](http://cs.oswego.edu/pipermail/concurrency-interest/2012-December/010423.html) CompletableFuture 曾经被讨论过以下命名：SettableFuture, FutureValue, Promise, and
 probably others.
 
-### Futures 
+### 基于异步接口组织业务逻辑——编排/Futures 
 
 the biggest advantage of using Futures is composability. You might imagine that dealing with transformations which are themselves asynchronous means having to somehow extract your result from a mess that looks like `Future<Future<…<Future<T>>…>>`. The existence of methods like thenCompose means that **any sequence of asynchronous operations will be handled like one asynchronous operation** in the rest of your program and this what makes reasoning about and working with these operations much easier.  将多个异步操作组合为一个异步操作
 

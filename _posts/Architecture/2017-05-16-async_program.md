@@ -20,22 +20,8 @@ keywords: 异步
 
 2018.9.26补充，《左耳听风》提到：**异步系统主要通过消息队列来对请求做排队处理**，把调用方请求的“峰值”给削平了，后端通过自己能够处理的速度来处理请求。这样会增加系统的吞吐量，但实时性就差很多。同时还会引入消息丢失的问题，所以要对消息做持久化，这会造成“有状态”的节点，从而增加服务调度的难度。
 
-2019.1.24补充：**异步实现绝大多数时候离不开队列和对调，刚好对应操作系统的 task_struct[] 和 中断处理**。
+2019.1.24补充：**异步实现绝大多数时候离不开队列和回调，刚好对应操作系统的 task_struct[] 和 中断处理**。
 
-## 异步
-
-1. 异步的两种表现形式：future和callback，具体参见[Future](http://qiankunli.github.io/2016/07/08/future.html)和[回调](http://qiankunli.github.io/2016/07/08/callback.html)
-2. 异步的实现有两种层面：系统级（中断及中断处理，本质就是硬件+os支持的callback）和业务级，业务级别有
-
-	1. 比如zookeeper client，queue + 线程实现callback
-	2. 比如一些rpc框架，底层netty callback + 全局map 实现future
-
-3. 异步可以用在不同的地方：
-
-	||计算|IO:BIO/NIO|
-	|---|---|---|
-	|单线程|当一个函数前后代码不变，就中间的逻辑经常变时，可以考虑提个callback出去||
-	|多线程|一个queue和一个执行线程，执行线程执行任务，结果写入future返回。业务线程操作future|一个`<全局唯一id,Future>` + io线程。io线程发送请求，拿到结果后，根据全局唯一id找到future并写入结果|
 
 ## 异步的价值
 
@@ -95,7 +81,7 @@ keywords: 异步
 
 强烈推荐这篇文章[有关异步编程框架的讨论](http://www.jianshu.com/p/c4e63927ead2)，基本要点：
 
-1. 操作系统就像一个大型的中断处理库。cpu响应中断，运行中断处理程序。操作系统为了最大化利用cpu，一个进程在等待I/O时，另一个进程可以利用CPU进行计算。因此，进行阻塞操作时，操作系统会让进程/线程让出对cpu的控制权。
+1. 操作系统就像一个大型的中断处理库。cpu响应中断，运行中断处理程序。操作系统为了最大化利用cpu，一个进程在等待I/O时，另一个进程可以利用CPU进行计算。因此，**进行阻塞操作时，进程会执行Schedule让出对cpu的控制权**（goroutine也是如此）。
 
 		while(true){
 			执行任务 // 因为时间片限定，执行时间不长
@@ -107,54 +93,27 @@ keywords: 异步
 		}
 
 2. 虽然知道计算机组成原理，但还是经常误以为计算机只有cpu可以“驱动”逻辑。实际上，cpu触发网络io操作后，自有网卡当组件负责实际的io读写，并在结束时通知cpu。类比下文的rpc框架实现的话，cpu是业务线程，网卡是io线程。从这个角度看，上层和底层实现异曲同工。
-2. **os可以机智的让cpu一直忙下去，代码层面上是否可以让线程一直忙下去？**对于业务来说，肯定不想因为一个阻塞操作就放弃cpu，即便用上多进程（线程），线程数毕竟是有上限。比如一个webserver，一个请求需要读取数据库，线程阻塞了，但线程还可以去服务其它请求啊。
-3. 如果线程直接执行的代码中，**调用了可能阻塞的系统调用，失去cpu就在所难免。（这或许同步异步的本质区别）**
+3. 从业务方线程的立场看，肯定想一直占用cpu。但如果线程直接执行的代码中，**调用了可能阻塞的系统调用，失去cpu就在所难免。**
 
 	* golang直接实现了一个调度器，碰上阻塞操作（重写了阻塞操作的逻辑，不会直接调用系统调用），挂起的是goroutine，实际的物理线程执行下调度程序，找下一个goroutine接着跑。
 	* python twisted, Java Netty, Nodejs libuv 这些框架没有深入到语言层，没办法推翻重来（r/w或者nio的select操作还是得调用系统调用），而是做一个自己的事件驱动引擎。
 4. 事件驱动引擎。业务操作分为阻塞操作（差不多就是io操作）和非阻塞操作
 
-	* 从线程的角度说，代码逻辑成了，监听io（事先注册到selector的io事件，确切的说是select 系统调用），有io就处理io（从selector key中拿到必要数据，read、write等系统调用在nio中设置为不阻塞），没io就处理任务队列里的任务。
-	* 从代码角度说，io操作变成了注册selector，非io操作则添加到任务队列。
+    * 通过重构整体逻辑，自由控制阻塞和非阻塞操作比例。比如netty eventloop中有io ratio
+    * 将阻塞操作和非阻塞操作 分派给不同的线程池来执行，甚至io操作分门别类给不同的线程池来执行，比如netty中的boss和worker。
 
-	也即是说，虽然不能防止io操作的阻塞，但通过重构线程的整体逻辑，实现自由控制阻塞和非阻塞操作的事件。（netty eventloop中有io ratio）
+5.  异步编程与顺序编程差异非常大，代码要重新组织，将业务逻辑分派在不同的线程中(有点分布式系统中把任务分发到不同node的感觉，每个node上也跑了一个任务执行引擎)，并对中间结果进行组合/编排。
 	
 **文章最后小结提到：其实从某种程度来说，异步框架是程序试图跳出操作系统界定的同步模型，重新虚拟出一套执行机制，让框架的使用者看起来像一个异步模型。另外通过把很多依赖操作系统实现的笨重功能换到程序内部使用更轻量级的实现。** [全面异步化：淘宝反应式架构升级探索](https://www.infoq.cn/article/2upHTmd0pOEUNmhY5-Ay) 提到：异步化会将操作系统中的队列情况显式地提升到了应用层，使得应用层可以显式根据队列的情况来进行压力负载的感知。
 
-强烈建议看下 [各个io模型对比](http://qiankunli.github.io/2017/04/16/linux_io.html)
-
 ### 通信层面——以netty 为例
 
-下文摘自《netty in action》对channel的介绍
-
-a ChannelFuture is returned as part of an i/o operations.Here,`connect()`will return directly without blocking and the call will complete in the background.**When this will happen may depend on several factors but this concern is abstracted away from the code.**(从这个角度看，异步也是一种抽象)Because the thread is not blocked waiting for the operation to complete,it can do other work in the meantime,thus using resources  more efficiently.
-
-intercepting operations and transforming inbound or outbound data on the fly requires only that you provide callbacks or utilize the Futures that are returned by opertations.**This makes chaining operations easy** and efficient and ptomotes the writing of reusable，generic code.
-
-同时还有一个问题，方法的调用形成方法栈，方法调用的基本问题：传递参数，传递返回结果。
-
-对于同步调用来说，传递参数和传递结果，机制和约定就不说了。
-	
-![](/public/upload/architecture/async_servlet_1.png)
-			
-而对于异步调用来说，在方法被提交到实际的执行者之前，会经过多次封装调用，也会形成一个方法栈。这个栈上的所有方法都等着实际执行者的反馈，所以，观察netty可以看到
-
-chaining operations
-
-![](/public/upload/architecture/async_servlet_2.png)
-
-1. 异步操作嵌套异步操作，直到碰到一个executor直接执行或提交任务。即一个线程的业务逻辑分为事件驱动引擎和事件提交两个部分，**对外暴露的异步函数本质上是事件（及事件成功、失败处理逻辑）的提交**。此处要强调的一点是，切不可被函数封装所迷惑，比如netty的`bootstrap.connect`，看着像连接操作由调用线程触发，实际不是的。
-2. future封装下一层future的处理结果
-3. 从图中可以看到，**代码的腾挪 是一种艺术**，说白了将代码交给另一个线程执行，但调用的时候还是同步调用的感觉（要么返回future，要么传入callbck）。脑洞大一点，对于分布式系统来说，干脆就是代码交给 另一台主机的进程/线程执行。
-
-这也解释了，为什么说，异步框架中不要有同步代码？
-
-因为所有的任务代码都是由一个“事件驱动引擎”执行的，换句话说，事件驱动引擎的时间，就好比cpu时间一样， 比较宝贵，要避免为未知的阻塞操作所滞留。
+[netty中的线程池](http://qiankunli.github.io/2019/06/28/netty_executor.html)
 
 2018.6.30 补充。拿netty 和 go 类比一下，可以看到，调用go语言的阻塞方法（io方法不确定是不是这样），相当于
 
 	read(){
-		约定好上下文
+		保存上下文
 		让出goroutine 执行权
 	}
 	
@@ -168,14 +127,6 @@ netty 因为不能改写 io 语言的系统调用，为此 不敢向你直接暴
 相当于netty 提供了一个全异步 io 操作（也包括一般的任务执行）的抽象层，支持类似AIO的”系统调用“。所以上图竖着画，就是另一番滋味了。
 
 ![](/public/upload/netty/netty_io.png)
-
-netty in action 中提到
-
-non-blocking network calls free us from having to wait for the completion of an operation.fully asynchronous i/o builds on this feature and carries it a step further:an  asynchronous method returns  immediately and notifies the user when it is complete,directly or at a later time.
-
-此时的线程不再是一个我们通常理解的：一个请求过来，干活，结束。而是一个不停的运行各种任务的线程，任务的结束不是线程的结束，任何的用户请求都是作为一个任务来提交。这就是java Executors中的线程，如果这个线程既可以处理任务，还可以注册socket 事件，就成了netty的eventloop
-
-我们指定线程运行任务 ==> 提交任务，任务线程自己干自己的，不会眷顾某个任务。那么就产生了与任务线程交互的问题，也就引出了callback、future等组件。java的future可以存储异步操作的结果，但结果要手工检查（或者就阻塞），netty的future则通过listener机制
 
 ### rpc 层
 
@@ -196,6 +147,7 @@ rpc层 的异步实现
 1. 直接使用异步框架，异步直接反应在接口上。Future/Promise，比较常用的有 JDK8 之前的 Future，通过添加 Listener 来做异步回调，JDK8 之后通常使用 CompletableFuture，它支持各种复杂的异步处理策略，例如自定义线程池、多个异步操作的编排、有返回值和无返回值异步、多个异步操作的级联操作等。
 
 	![](/public/upload/architecture/async_rpc_2.jpg)
+
 2. 业务逻辑不动，异步分装。线程池 +RxJava，最经典的实现就是 Netflix 开源的 Hystrix 框架，使用 HystrixCommand（创建线程池）做一层异步封装，将同步调用封装成异步调用，利用 RxJava API，通过订阅的方式对结果做异步处理
 
 ## 异步化在工程上的推进
@@ -243,49 +195,6 @@ Apache ServiceComb/gRPC
 2. 超时控制
 3. 上下文传递，传统的同步 RPC 调用时，**业务往往通过线程变量来传递上下文**，例如：TraceID、会话 Session、IP 等信息。
 4. 回调地狱问题，如果使用的是 JDK8 的 CompletableFuture，它支持对异步操作结果做编排以及级联操作
-
-## 基于 异步接口组织业务逻辑——编排
-
-### 异步框架提供哪些异步接口
-
-传统的接口——回调函数——事件，容易有callback hell问题
-
-javascript 有一套异步编程规范 [Promises/A+](https://promisesaplus.com/) 非常给力，然后java 语言参照着实现了一把[异步编程——Promise](https://github.com/hprose/hprose-java/wiki/%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B%E2%80%94%E2%80%94Promise)
-
-所谓Promise，**简单说就是一个“容器”**，里面保存着某个未来才会结束的事件（通常是一个异步操作）的结果。 此外 “容器”持有 对返回结果(正常/异常) 的处理函数`promise.then(onFulfilled, onRejected);`
-
-jdk8 及之后的 CompletableFuture
-
-### 异步流程控制模式
-
-[async 异步编程框架](https://www.jianshu.com/p/cdddcd361567)
-
-异步流程控制模式包括
-
-1. 串行(series)，后一个调用参数依赖前一个调用的结果。
-2. 并行(parallel)，彼此无关联。 这种可以提供类似 CombinedFuture 的工具类
-3. 瀑布(waterfall)等，后一个调用是否执行 + 调用参数 依赖前一个调用的结果。这里有个问题，对于这种类型的业务，或许同步模型可读性会更好点。
-
-	    public static <V1, V2> Future<V2> then(final ListenableFuture<V1> future, final Predicate<V1> function, final AsyncFunction<V1, V2> asyncFunction) {
-	        Promise<V2> promise = new Promise<V2>();
-	        future.addListener(new Listener() {
-	            public void onSuccess() {
-	                V1 v1 = future.get();
-	                if (function.apply(v1)) {
-	                    promise = util(asyncFunction.apply(v1));
-	                }
-	            }
-	            public void onFail(){
-	                promise.setFailure()
-	            }
-	        });
-        	return promise;
-        }
-
-## 异步带来的困难
-
-1. 调试困难
-2. 难以使用线程本地变量
 
 ## 小结
 
