@@ -34,7 +34,7 @@ this model provides much better resource management than the blocking i/o model:
 
 ### Channel、ChannelPipeline、ChannelHandler和ChannelHandlerContext的一对一、一对多关系
 
-netty is asynchronous and event-driven. asynchronous说的是outbound io operations，event-driven 应该对应的是io inbound operations.
+netty is asynchronous and event-driven. 
 
 every new channel that is created is assigned a new ChannelPipeline.This association is permanent;the channel can neither attach another ChannelPipeline nor detach the current one.
 
@@ -71,50 +71,9 @@ the basic idea of an event loop
 		}
 	}
 	
-### 创建、分配和销毁
 
-当我说线程模型的时候，我在说什么？**如何创建、分配、运行(运行逻辑)和销毁一个线程，是一个线程模型（线程池）的基本内容。**
 
-1. 线程自生自灭
-2. 由一个第三方类来管理或触发，比如Executor和EventloopGroup。
-	
-java 线程池的常见用法
 
-    ExecutorService executor = Executors.newFixedThreadPool(5);
-    executor.execute(worker);
-	
-||提交|池中单元的执行逻辑|创建与销毁|分配|
-|---|---|---|---|---|---|
-|java线程池|提交runnable|执行`runnable.run`|所属单元统一创建和销毁|找一个空闲的|
-|eventloop group|绑定channel|执行 eventloop 处理inbound事件，如上图所示。执行`runnable.run`处理outbound事件|所属单元统一创建和销毁|创建时建立绑定关系，然后根据绑定关系分配|
-
-也就是说，池中的线程逻辑变了，转换过程如下
-
-	abstract class SingleThreadEventExecutor {
-		Executor executor;
-		volatile Thread thread;
-		void doStartThread(){
-			...
-			executor.execute(new Runnable() {
-				public void run() {
-					 SingleThreadEventExecutor.this.run();
-				}
-			});
-			...
-		}
-		protected abstract void run();
-		void execute(Runnable task){
-			在第一次执行时，doStartThread
-		}
-	}
-
-Executor的转换：SingleThreadEventExecutor提供类似java Executor的接口`void execute(Runnable task)`，将任务转了一下，这样做
-
-1. java Executor 只能执行runnable，而基于SingleThreadEventExecutor的NioEventloop可以起到`void execute(Channel channel)`的效果
-2. 在表现形式上，因为channel与eventloop的一对多关系，由channel维护eventloop的引用来执行outbound event（同样通过`void execute(Runnable task)`提交）。eventloop通过selector得到channel的引用来处理inbound 事件。
-3. SingleThreadEventExecutor 记录 绑定的 java Executor中的Thread，确保所有任务统交由该线程执行，这也是SingleThread的含义。有了绑定关系，就有了绑定关系的建立和释放过程（netty中无需释放）。
-
-## Codec
 
 
 
