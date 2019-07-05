@@ -51,7 +51,7 @@ kafka client (producer/consumer) 与kafka server通信时使用自定义的协�
 
 kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合和启动各个能力对象即可（kafka 称之为subsystem）。各能力对象都用到了统一的线程池，各自干各自的活儿。
 
-1. LogManager。 The entry point to the kafka log management subsystem. The log manager is responsible for log creation, retrieval, and cleaning. All read and write operations are delegated to the individual log instances. LogManager 干了日志文件的维护，单纯的日志写入交给了Log 对象
+1. LogManager。 The entry point to the kafka log management subsystem. The log manager is responsible for log creation, retrieval, and cleaning. All read and write operations are delegated to the individual log instances. LogManager 负责日志文件的维护，单纯的日志写入交给了Log 对象
 2. ReplicaManager的主要功能是管理一个Broker 范围内的Partition 信息。代码上，Partition 对象为ReplicaManager 分担一部分职能
 3. KafkaController，在Kafka集群的多个Broker中， 有一个Broker会被推举为Controller Leader，负责管理整个集群中分区和副本的状态。
 
