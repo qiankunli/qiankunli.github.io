@@ -42,6 +42,8 @@ A streaming platform has three key capabilities:
 
 每个topic包含多个分区，每个分区包含多个副本。作为producer，一个topic消息放入哪个分区，hash一下即可。 《learning apache kafka》every partition is mapped to a logical log file that is represented as a set of segment files of equal sizes. Every partition is an ordered, immutable sequence of messages; 
 
+**Kafka 的消息组织方式实际上是三级结构：主题 - 分区 - 消息**
+
 ![](/public/upload/architecture/kafka_subscribe_publish.png)
 
 整体架构图
@@ -174,6 +176,12 @@ The producer connects to any of the alive nodes and requests metadata about the 
 
 6. If the request fails, the producer can automatically retry, though since we have specified etries as 0 it won't. Enabling retries also opens up the possibility of duplicates 
 
+### bootstrap.servers
+
+bootstrap.servers 指定了Producer 启动时要连接的 Broker 地址。通常指定 3～4 台就足以了。因为 Producer 一旦连接到集群中的任一台 Broker，就能拿到整个集群的 Broker 信息
+
+在创建 KafkaProducer 实例时，生产者应用会在后台创建并启动一个名为 Sender 的线程，该 Sender线程开始运行时首先会创建与 Broker 的连接。
+
 ### 业务线程
 
 producer 在KafkaProducer 与 NetworkClient 之间玩了多好花活儿？
@@ -197,6 +205,8 @@ producer 在KafkaProducer 与 NetworkClient 之间玩了多好花活儿？
 ### 值得学习的地方——反射的另个一好处
 
 假设你的项目，用到了一个依赖jar中的类，但因为策略问题，这个类对有些用户不需要，自然也不需要这个依赖jar。此时，在代码中，你可以通过反射获取依赖jar中的类，避免了直接写在代码中时，对这个jar的强依赖。
+
+
 
 ## 消费者
 
