@@ -26,7 +26,6 @@ keywords: Docker
 ## 传统以太网络
 
 
-
 ## 交换机IP-MAC-PORT
 
 
@@ -79,9 +78,6 @@ Switching was just a fancy name for bridging, and that was a 1980s technology �
 Linux 用户想要使用网络功能，不能通过直接操作硬件完成，而需要直接或间接的操作一个Linux 为我们抽象出来的设备，即通用的 Linux 网络设备来完成。“eth0”并不是网卡，而是Linux为我们抽象（或模拟）出来的“网卡”。除了网卡，现实世界中存在的网络元素Linux都可以模拟出来，包括但不限于：电脑终端、二层交换机、路由器、网关、支持 802.1Q VLAN 的交换机、三层交换机、物理网卡、支持 Hairpin 模式的交换机。同时，既然linux可以模拟网络设备，自然提供了操作这些虚拟的网络设备的命令或interface。
 
 既然**Linux可以模拟网络设备**，那么现实世界中的网络拓扑结构，Linux自然也可以在一台（或多台）主机中模拟出来。用虚拟网络来模拟现实网络，这是虚拟化技术的重要一环。
-
-
-
 
 
 

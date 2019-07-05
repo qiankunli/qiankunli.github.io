@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Linux网络源代码学习2
+title: Linux网络源代码学习——数据包的发送与接收
 category: 技术
 tags: Network
 keywords: network 
@@ -11,6 +11,8 @@ keywords: network
 ## 简介
 
 linux网络编程中，各层有各层的struct，但有一个struct是各层通用的，这就是描述接收和发送数据的struct sk_buff.
+
+2019.7.5补充：应用层和内核互通的机制是通过 Socket 系统调用，经常有人会问，**Socket 属于哪一层？其实它哪一层都不属于**，它属于操作系统的概念，而非网络协议分层的概念。只不过操作系统选择对于网络协议的实现模式是，二到四层的处理代码在内核里面，七层的处理代码让应用自己去做，两者需要跨内核态和用户态通信，就需要一个系统调用完成这个衔接，这就是 Socket。
 
 ## sk_buff结构
 
