@@ -74,17 +74,21 @@ kafka消费太慢，误以为consumer挂掉，一直rebalance。背后的原理
 
 ### 重启项目导致rebalance
 
+![](/public/upload/scala/kafka_rebalance.png)
+
 [Partitions Rebalance in Kafka](https://www.linkedin.com/pulse/partitions-rebalance-kafka-raghunandan-gupta) 未读
 
 [In Apache Kafka why can't there be more consumer instances than partitions?](https://stackoverflow.com/questions/25896109/in-apache-kafka-why-cant-there-be-more-consumer-instances-than-partitions) 未读
 
 所以要处理三种情况
 
-1. consumer 多于 partition
-2. consumer 等于 partition
+1. consumer 多于 partition，不推荐，会有consumer 空闲
+2. consumer 等于 partition，这是理想的情况
 3. consumer 小于 partition
 
 找到一种方式，减少rebalance 造成的消费中断时长
+
+
 
 ## 生产端优化
 
