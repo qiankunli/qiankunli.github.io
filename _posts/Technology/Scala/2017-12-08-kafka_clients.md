@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 《Apache Kafka源码分析》——Producer与Consumer
+title: 《Apache Kafka源码分析》——Clients
 category: 技术
 tags: Scala
 keywords: Scala  akka
