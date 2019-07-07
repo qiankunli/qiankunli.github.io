@@ -96,30 +96,45 @@ and provides fine grained control over the communication between Kafka broker an
 
 **主动拉取 是kafka 的一个重要特征，不仅是consumer 主动拉取broker， broker partition follower 也是主动拉取leader**。
 
-### consumer group rebalance
+### consumer group 
 
 为什么要引入consumer group呢？主要是为了提升消费者端的吞吐量。多个consumer实例同时消费，加速整个消费端的吞吐量（TPS）。
-
-当consumer group 新加入一个consumer 时，首要解决的就是consumer 消费哪个分区的问题。这个方案kafka 演化了多次，在最新的方案中，分区分配的工作放到了消费端处理。
-
-所谓的consumer group，指的是多个consumer实例共同组成一个组来消费topic。topic中的每个分区都只会被组内的一个consumer实例消费，其他consumer实例不能消费它。从实现看，consumer 主动拉取的逻辑也不适合 多个consumer 同时拉取一个partition，因为宕机后无法重新消费。另外，一个consumer 一个partition，server 端也无需考虑多线程竞争问题了。
-
-![](/public/upload/scala/kafka_group_ordinator.png)
-
-![](/public/upload/scala/kafka_rebalance_sequence.png)
 
 ||broker|consumer|
 |---|---|---|
 |逻辑|topic|consumer group|
 |物理|partition|consumer instance|
 
-两个角色一个过程
+## rebalance
+
+[kafka系列之(3)——Coordinator与offset管理和Consumer Rebalance](https://www.jianshu.com/p/5aa8776868bb)
+
+[Partitions Rebalance in Kafka](https://www.linkedin.com/pulse/partitions-rebalance-kafka-raghunandan-gupta) 
+
+![](/public/upload/scala/kafka_rebalance.png)
+
+两个角色
 
 1. Consumer Group Co-ordinator
-
-    1. 某一个broker，存储元数据
 2. Group Leader 
-3. Rebalancing Process
+
+![](/public/upload/scala/kafka_rebalance_sequence.png)
+
+rebalance过程有以下几点
+
+1. rebalance本质上是一组协议。group与coordinator共同使用它来完成group的rebalance。
+2. consumer如何向coordinator证明自己还活着？ 通过定时向coordinator发送Heartbeat请求。如果超过了设定的超时时间，那么coordinator就认为这个consumer已经挂了。
+3. 一旦coordinator认为某个consumer挂了，那么它就会开启新一轮rebalance，并且在当前其他consumer的心跳response中添加“REBALANCE_IN_PROGRESS”，告诉其他consumer：不好意思各位，你们重新申请加入组吧！
+4. 所有成员都向coordinator发送JoinGroup请求，请求入组。一旦所有成员都发送了JoinGroup请求，coordinator选择第一个发送JoinGroup请求的consumer担任leader的角色，并将consumer group 信息和partition信息告诉group leader。
+5. leader负责分配消费方案（使用PartitionAssignor），即哪个consumer负责消费哪些topic的哪些partition。一旦完成分配，leader会将这个方案封装进SyncGroup请求中发给coordinator，非leader也会发SyncGroup请求，只是内容为空。coordinator接收到分配方案之后会把方案塞进SyncGroup的response中发给各个consumer。
+
+小结一下就是：coordinator负责决定leader，leader 负责分配方案，**consumer group的分区分配方案是在客户端执行的**， 分配方案由coordinator 扩散。
+
+![](/public/upload/scala/kafka_group_ordinator.png)
+
+
+
+## 位移管理（未完成）
 
 
 `<分区，位移>` 保存在内部topic中：__consumer_offsets
