@@ -72,7 +72,7 @@ fetcher线程数和topic所在多少台broker有关。一个Topic启动几个消
 
 kafka消费太慢，误以为consumer挂掉，一直rebalance。背后的原理
 
-### 重启项目导致rebalance
+### 重启项目导致rebalance（未完成）
 
 ![](/public/upload/scala/kafka_rebalance.png)
 

@@ -132,10 +132,26 @@ rebalance过程有以下几点
 
 ![](/public/upload/scala/kafka_group_ordinator.png)
 
+## 位移管理
+
+[Apache Kafka Foundation Course - Offset Management](https://www.learningjournal.guru/courses/kafka/kafka-foundation-training/offset-management/)
+
+![](/public/upload/scala/kafka_offset_management.png)
+
+`<分区，位移>` 保存在内部topic中：__consumer_offsets。
+
+如何确定consumer group的coordinator？
+
+1. 确定consumer group位移信息写入__consumers_offsets这个topic的哪个分区。具体计算公式：`__consumers_offsets partition# = Math.abs(groupId.hashCode() % groupMetadataTopicPartitionCount)`   注意：groupMetadataTopicPartitionCount由`offsets.topic.num.partitions`指定，默认是50个分区
+2. 该分区leader所在的broker就是被选定的coordinator
 
 
-## 位移管理（未完成）
+如果将consumer group 类比为partition follower，消费数据与同步数据其实也差不多。
+
+||broker|consumer|
+|---|---|---|
+|partition|leader-follower|leader-consumer|
+|描述|producer写到哪了，当前同步到哪了|当前各个consumer group消费到哪了|
 
 
-`<分区，位移>` 保存在内部topic中：__consumer_offsets
 
