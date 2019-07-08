@@ -16,6 +16,13 @@ linux网络编程中，各层有各层的struct，但有一个struct是各层通
 
 TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的网络包，就会将网络包缓存起来，等待应用层的读取。应用层通过 Socket 监听某个端口，因而读取的时候，内核会根据 TCP 头中的端口号，将网络包发给相应的Socket。
 
+## Socket 和 Sock
+
+![](/public/upload/network/tcp.png)
+
+![](/public/upload/network/tcp_object.png)
+
+socket 是用于负责对上给用户提供接口，并且和文件系统关联。而 sock，负责向下对接内核网络协议栈。
 
 ## sk_buff结构
 
