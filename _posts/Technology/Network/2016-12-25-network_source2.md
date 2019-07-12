@@ -25,7 +25,7 @@ TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的�
 1. vfs层
 1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。
 2. sock，负责向下对接内核网络协议栈
-3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责
+3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责。分层之后，诸如拥塞控制和滑动窗口的 字段和方法就只体现在struct sock和tcp_prot中，代码实现与tcp规范设计是一致的。
 
 ## sk_buff结构
 
