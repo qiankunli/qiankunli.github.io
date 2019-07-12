@@ -72,7 +72,11 @@ fetcher线程数和topic所在多少台broker有关。一个Topic启动几个消
 
 kafka消费太慢，误以为consumer挂掉，一直rebalance。背后的原理
 
-### 重启项目导致rebalance（未完成）
+### Kafka Streams error - Offset commit failed on partition, request timed out
+
+[Kafka Streams error - Offset commit failed on partition, request timed out](https://stackoverflow.com/questions/51088681/kafka-streams-error-offset-commit-failed-on-partition-request-timed-out)
+
+### 重启项目导致rebalance
 
 ![](/public/upload/scala/kafka_rebalance.png)
 
@@ -82,11 +86,10 @@ kafka消费太慢，误以为consumer挂掉，一直rebalance。背后的原理
 2. consumer 等于 partition，这是理想的情况
 3. consumer 小于 partition
 
-找到一种方式，减少rebalance 造成的消费中断时长。比如重新部署3个实例，每个实例的离开和joinGroup 会引起6次rebalance
+比如重新部署3个实例，每个实例的离开和joinGroup 会引起6次rebalance，rebalance 造成消费中断。
 
-1. 提高心跳时长，重启完都不知道重启了
-2. 修正分配策略，减少决策时间，这块逻辑耗时不大
-3. 减少一个topic partition的数量
+1. 提高心跳时长，consumer instance重启完 broker都不知道重启了
+2. 减少一个topic partition的数量
 
 直接重启一次很快，但是发布就有点慢？ ==> 重启的时候无需拷贝war包，tomcat 可以立即启动，发布的时候，cmdb 要从跳板机（jenkins会把war包发到跳板机上）把war包拷贝到各个目标机器上 ==> 有一个时间，在这个时间内重启一遍引起的reblance较少，而超过这个时间引起的rebalance 时间较长 ==> 两个办法：找到这个时间，貌似是心跳时长，延长它；并行发布项目（6个实例一起拷贝war包并重启tomcat，cmdb有这个功能）
 

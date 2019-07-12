@@ -16,13 +16,16 @@ linux网络编程中，各层有各层的struct，但有一个struct是各层通
 
 TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的网络包，就会将网络包缓存起来，等待应用层的读取。应用层通过 Socket 监听某个端口，因而读取的时候，内核会根据 TCP 头中的端口号，将网络包发给相应的Socket。
 
-## Socket 和 Sock
-
 ![](/public/upload/network/tcp.png)
+
+## Socket 和 Sock
 
 ![](/public/upload/network/tcp_object.png)
 
-socket 是用于负责对上给用户提供接口，并且和文件系统关联。而 sock，负责向下对接内核网络协议栈。
+1. vfs层
+1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。
+2. sock，负责向下对接内核网络协议栈
+3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责
 
 ## sk_buff结构
 
@@ -77,7 +80,7 @@ sk_buff部分字段如下，
 	
 head和end字段指向了buf的起始位置和终止位置。然后使用header指针指像各种协议填值。然后data就是实际数据。tail记录了数据的偏移值。
 
-sk_buff 是各层通用的，下层协议将上层协议数据作为data部分，并加上自己的header。这也是为什么代码注释中说，哪些字段必须在最前，哪些必须在最后， 这个其中的妙处可以自己体会。
+sk_buff 是各层通用的，在应用层数据包叫 data，在 TCP 层我们称为 segment，在 IP 层我们叫 packet，在数据链路层称为 frame。下层协议将上层协议数据作为data部分，并加上自己的header。这也是为什么代码注释中说，哪些字段必须在最前，哪些必须在最后， 这个其中的妙处可以自己体会。
 
 sk_buff由sk_buff_head组织
 

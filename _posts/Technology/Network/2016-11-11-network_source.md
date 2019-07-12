@@ -14,6 +14,7 @@ keywords: network
 
 linux的网络部分由网卡的驱动程序和kernel的网络协议栈部分组成，它们相互交互，完成数据的接收和发送。
 
+![](/public/upload/network/tcp_object.png)
 
 ## 网络操作的开始
 
