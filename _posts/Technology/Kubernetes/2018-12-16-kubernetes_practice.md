@@ -68,8 +68,13 @@ Node affinity, described [here](https://kubernetes.io/docs/concepts/configuratio
 
     1. k8s集群内，Service等
     2. k8s集群外，Nodeport，ingress等
-2. 提供一个dns服务器，维护`<容器名,ip>` 映射
+2. 提供一个dns服务器，维护`<容器名,ip>` 映射。 实现： codedns + etcd，ip 的变化写入etcd 即可
 3. 改写ipam插件，支持静态ip
+
+## 内存突然爆满了
+
+项目日志写满磁盘，k8s 会将pod 从该机器上驱逐出去。k8s驱逐机制（未学习）
+
 
 ## web界面管理
 

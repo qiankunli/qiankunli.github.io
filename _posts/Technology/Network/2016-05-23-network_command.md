@@ -64,26 +64,6 @@ The command `brctl addif <brname> <ifname>` will make the interface "ifname" a p
 2. 针对一个linux bridge，可以将一个interface挂到bridge或移除，可以查看“挂到”上面的所有interface
 3. 每建一个网桥，都会建一个跟网桥同名的interface，并挂在网桥上面。
 
-
-## pipework
-
-In the long run, Docker will allow complex scenarios, and Pipework should become obsolete.
-
-Pipework唯一的官方文档`https://github.com/jpetazzo/pipework/blob/master/README.md`
-
-pipework的主要功能就是容器网络的一些设置，容器以容器id（或name）标识，pipework内部会调用`docker inspect`获取容器的信息，进而对容器进行设置（其实就是对ip命令的一些封装（ip命令也可以操作netns的中的网络设备信息））。类比的说，pipework的作用相当于新版本docker的`docker network`和`docker run --net xxx --ip xxx`的组合。
-
-## ovs
-
-brctl和ovs都有interface和port的概念，并且interface和port往往是一起设置的（将网卡连在某个port上嘛）
-
-ovs的安装在centos上较为麻烦，需要将某些代码注释掉。
-
-## ovs-docker
-
-wget https://github.com/openvswitch/ovs/raw/master/utilities/ovs-docker
-
-
 ## iptables
 
 ### 从tomcat filter说起
@@ -96,13 +76,13 @@ wget https://github.com/openvswitch/ovs/raw/master/utilities/ovs-docker
 
 ### tomcat filter ==> netfilter 
 
-![](/public/upload/network/netfilter_positioning.png)
+netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则
 
-Netfilter 子系统的作用，就是 Linux 内核里挡在“网卡”和“用户态进程”之间的一道“防火墙”。
-
-![](/public/upload/network/netfilter_flow.png)
+![](/public/upload/network/linux_netfilter.png)
 
 iptables 只是一个操作 Linux 内核 Netfilter 子系统的“界面”。链路层的“检查点”对应的操作界面叫作 ebtables。
+
+![](/public/upload/network/netfilter_flow.png)
 
 ||linux 网络协议栈|http server|rpc server|
 |---|---|---|---|
@@ -113,10 +93,9 @@ iptables 只是一个操作 Linux 内核 Netfilter 子系统的“界面”。�
 |流向|有forward 和 upward 两种流向|只有upward 一种流向|只有upward 一种流向|
 |路由|路由表|Mapping|router|
 
-笔者之前只是觉得 http server 与 rpc server 很像，但宽泛的说，网络协议栈与http server、rpc server 也是异曲同工。但我们学习 网络协议栈时，往往是从chain ==> table ==> rule 开始说。而http server 和 rpc server 则是从小到达 来表述。另一个显著地差异是，netfilter 有两种流向，chain的个数 也就更多，chain 可以形象的称之为“检查站”
+笔者之前只是觉得 http server 与 rpc server 很像，但宽泛的说，网络协议栈与http server、rpc server 也是异曲同工。一个显著地差异是，netfilter 有两种流向，chain的个数 也就更多，chain 可以形象的称之为“检查站”
 
 ![](/public/upload/network/netfilter_chain_flow.png)
-
 
 iptables 表的作用，就是在某个具体的“检查点”（比如Output）上，按顺序执行几个不同的检查动作（比如，先执行nat，再执行 filter）。
 

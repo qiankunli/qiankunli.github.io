@@ -25,7 +25,13 @@ TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的�
 1. vfs层
 1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。
 2. sock，负责向下对接内核网络协议栈
-3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责。分层之后，诸如拥塞控制和滑动窗口的 字段和方法就只体现在struct sock和tcp_prot中，代码实现与tcp规范设计是一致的。
+3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责。分层之后，诸如拥塞控制和滑动窗口的 字段和方法就只体现在struct sock和tcp_prot中，代码实现与tcp规范设计是一致的
+4. ip层 负责路由等逻辑，并执行nf_hook，也就是netfilter，netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则
+
+    ![](/public/upload/network/linux_netfilter.png)
+
+5. link 层，先寻找下一跳（ip ==> mac），有了 MAC 地址，就可以调用 dev_queue_xmit发送二层网络包了，它会调用 __dev_xmit_skb 会将请求放入块设备的队列  
+6. 设备层：网络包的发送会触发一个软中断 NET_TX_SOFTIRQ 来处理队列中的数据。这个软中断的处理函数是 net_tx_action。在软中断处理函数中，会将网络包从队列上拿下来，调用网络设备的传输函数 ixgb_xmit_frame，将网络包发的设备的队列上去。
 
 ## sk_buff结构
 
