@@ -76,42 +76,43 @@ The command `brctl addif <brname> <ifname>` will make the interface "ifname" a p
 
 ### tomcat filter ==> netfilter 
 
-netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则
+netfilter 是linux内核的一个机制，用于在网络发送和转发的关键节点上加上 hook 函数。netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则
 
 ![](/public/upload/network/linux_netfilter.png)
 
 iptables 只是一个操作 Linux 内核 Netfilter 子系统的“界面”。链路层的“检查点”对应的操作界面叫作 ebtables。
 
-![](/public/upload/network/netfilter_flow.png)
+![](/public/upload/network/netfilter_chain.png)
 
-||linux 网络协议栈|http server|rpc server|
-|---|---|---|---|
-|操作界面|iptables、ebtables|xml|大部分框架为硬编码|
-|拦截的最小单位|rule|Filter|根据框架有所不同，一般为Filter|
-|最小单位的上一层单位|table|FilterChain|Filter 数组|
-|再上一层单位|Chain|||
-|流向|有forward 和 upward 两种流向|只有upward 一种流向|只有upward 一种流向|
-|路由|路由表|Mapping|router|
+笔者之前只是觉得 http server 与 rpc server 很像，但宽泛的说，网络协议栈与http server、rpc server 也是异曲同工。在数据源和数据处理逻辑之间建立“关卡”，关卡上有多条规则，串在一起就形成了链。与http server filter一样，这些rule 可以拦截甚至更改数据。
 
-笔者之前只是觉得 http server 与 rpc server 很像，但宽泛的说，网络协议栈与http server、rpc server 也是异曲同工。一个显著地差异是，netfilter 有两种流向，chain的个数 也就更多，chain 可以形象的称之为“检查站”
+因为客户端发来的报文可能并不是本机而是其他服务器，当本机的内核支持IP_FORWARD时，我们可以将报文转发给其它服务器。所以netfilter 有两种流向，chain的个数 也就更多
 
 ![](/public/upload/network/netfilter_chain_flow.png)
 
 iptables 表的作用，就是在某个具体的“检查点”（比如Output）上，按顺序执行几个不同的检查动作（比如，先执行nat，再执行 filter）。
 
-||类比于快递站点|
-|---|---|
-|chain|发货点、分拨中心、集散中心、营业点|
-|table|入库、分拨、核对、安检|
-|rule|比如入库，比如不接收xx的快递、不接收大于xx快递等|
+||linux 网络协议栈|http server|rpc server|
+|---|---|---|---|
+|操作界面|iptables、ebtables|xml|大部分框架为硬编码|
+|拦截的最小单位|rule|Filter|根据框架有所不同，一般为Filter|
+|最小单位的上一层单位|table/chain|FilterChain|Filter 数组|
+|流向|有forward 和 upward 两种流向|只有upward 一种流向|只有upward 一种流向|
+|路由|路由表|Mapping|router|
+
+表链关系
+
+
+1. 我们把具有相同功能的规则的集合叫做表。表是rule的功能描述，链则指定了rule生效的位置
+2. rule不管属于table还是chain，都是package 进行判断，做出通过、转发、丢弃等决定
+3. 某些链中注定不会 包含某类规则，也就是某个表
+4. 实际的使用中，往往通过table作为操作入口，对rule进行定义
 
 ### 操作
 
-iptbales -L -vn --line-number
-
-iptables -D INPUT 7
-
-iptables -D FORWARD 4
+    iptbales -L -vn --line-number
+    iptables -D INPUT 7
+    iptables -D FORWARD 4
 
 这样按序号删规则很方便
 
@@ -135,10 +136,6 @@ iptables -D FORWARD 4
 		target     prot opt source               destination
 		ACCEPT     all  --  anywhere             anywhere             /* cali:i7okJZpS8VxaJB3n */ mark match 0x1000000/0x1000000
 		DROP       ipencap--  anywhere             anywhere             /* cali:p8Wwvr6qydjU36AQ */ /* Drop IPIP packets from non-Calico hosts */ ! match-set cali4-all-hosts src
-
-	
-iptables 中还有表的概念，但从rule ==> chain 理解iptables 是最顺畅的。
-
 
 ## 引用
 
