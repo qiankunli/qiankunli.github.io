@@ -19,6 +19,8 @@ Ti表示Titanium钛
 
 ![](/public/upload/data/tidb_xmind.png)
 
+从TIDB 可以学习一个复杂的事情，如何分散到各层去解决。
+
 ## 基本理念
 
 [势高，则围广：TiDB 的架构演进哲学](https://zhuanlan.zhihu.com/p/67552966)未读
@@ -60,7 +62,7 @@ Ti表示Titanium钛
 
 从下往上看
 
-1. TiKV Server， pingcap 将其独立的作为 一个源码库 [tikv/tikv](https://github.com/tikv/tikv)，TiKV 是一个**支持事务的、分布式、Key-Value、存储引擎**。如果不考虑Region复制，一致性，和事务的话，TiKV其实和HBase很像，底层数据结构都是LSM-Tree, Region都是Range分区, Region都是计算和负载均衡的基本单位。
+1. TiKV Server， pingcap 将其独立的作为 一个源码库 [tikv/tikv](https://github.com/tikv/tikv)，TiKV 是一个**支持事务的、分布式、Key-Value、存储引擎**。如果不考虑Region复制，一致性，和事务的话，TiKV其实和HBase很像，底层数据结构都是LSM-Tree, Region都是Range分区, Region都是计算和负载均衡的基本单位。详情参见[TIDB存储——TIKV](http://qiankunli.github.io/2019/07/15/tidb_tikv.html)
 2. TiDB Server 负责接收 SQL 请求，生成SQL的逻辑计划和物理计划，并通过 PD 找到存储计算所需数据的 TiKV 地址，将SQL转换为TiKV的KV操作，与 TiKV 交互获取数据，最终返回结果。TiDB Server 是无状态的，其本身并不存储数据，只负责计算，可以无限水平扩展。 
 3. Placement Driver 主要有以下职责：
 
