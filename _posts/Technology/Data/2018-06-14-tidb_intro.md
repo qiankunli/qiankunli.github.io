@@ -10,6 +10,9 @@ keywords: TIDB
 
 ## 前言（持续更新）
 
+* TOC
+{:toc}
+
 [源码](https://github.com/pingcap/tidb)TiDB ("Ti" stands for Titanium) is an open-source NewSQL database that supports Hybrid Transactional and Analytical Processing (HTAP) workloads. It is MySQL compatible and features horizontal scalability, strong consistency, and high availability. [TiDB 源码阅读系列文章（一）序](https://zhuanlan.zhihu.com/p/34109413)
 
 Ti表示Titanium钛
@@ -65,80 +68,63 @@ Ti表示Titanium钛
     2. TiKV 集群进行调度和负载均衡
     3. 分配全局唯一且递增的事务 ID
 
-## 存储——TIKV
-
-好玩的是，饿了么基于TiKV 构建统一KV系统，TiKV 之上增加了redis协议
-
-### 代码访问
-
-基于golang的代码访问示例
-
-    func main() {
-        cli, err := tikv.NewRawKVClient([]string{"192.168.199.113:2379"}, config.Security{})
-        key := []byte("Company")
-        val := []byte("PingCAP")
-        // put key into tikv
-        err = cli.Put(key, val)
-        // get key from tikv
-        val, err = cli.Get(key)
-        // delete key from tikv
-        err = cli.Delete(key)
-        fmt.Printf("key: %s deleted\n", key)
-        // get key again from tikv
-        val, err = cli.Get(key)
-        fmt.Printf("found val: %s for key: %s\n", val, key)
-    }
-
-支持事务
-
-    Begin() -> Txn
-    Txn.Get(key []byte) -> (value []byte)
-    Txn.Set(key []byte, value []byte)
-    Txn.Iter(begin, end []byte) -> Iterator
-    Txn.Delete(key []byte)
-    Txn.Commit()
-
-
-### 实现原理
-
-[PingCAP公司博客](https://pingcap.com/blog-cn/)
-
-[三篇文章了解 TiDB 技术内幕——说存储](https://zhuanlan.zhihu.com/p/26967545)
-
-1. 单机存储使用了rocksdb，本质上还是kv 存储
-2. 数据的写入是通过 Raft 这一层的接口写入，通过 Raft将“log”复制到多台机器上，而不是直接写 RocksDB。
-
-![](/public/upload/data/tikv_xmind.png)
-
-
-### 数据分片
-
-[带着问题学习分布式系统之数据分片](https://www.cnblogs.com/xybaby/p/7076731.html)
-
-1. 分片的考量
-
-	* 如何划分
-	* 数据规模变大时，是否可以通过新增节点来动态适应
-	* 当某个节点故障的时候，能否将该节点上的任务均衡的分摊到其他节点
-	* 对于可修改的数据（比如数据库数据），如果某节点数据量变大，能否以及如何将部分数据迁移到其他负载较小的节点，及达到动态均衡的效果？
-	* 元数据的管理（即数据与物理节点的对应关系）规模？元数据更新的频率以及复杂度？
-2. 分片的几种方式
-
-	* hash
-	* consistent hash without virtual node
-	* consistent hash with virtual node
-	* range based。
-
-		* 假设以id 作为分片特征值，那么一个节点可能负责0~100,300~400,800~900等，元数据服务记录range与节点的映射关系
-		* 区间的大小不是固定的，以数据量的大小为片段标准。即0~100占了1M，100~150 也可能占了1M
-
-	对于range based 来说，如果一个节点负责的数据只有一个区间，range based与没有虚拟节点概念的一致性hash很类似；如果一个节点负责多个区间，range based与有虚拟节点概念的一致性hash很类似。
-3. 分片特征值的选择
-4. 分片元数据及元数据服务
-
 ## SQL 层
 
-[三篇文章了解 TiDB 技术内幕——说计算](https://zhuanlan.zhihu.com/p/27108657)未读
+[三篇文章了解 TiDB 技术内幕——说计算](https://zhuanlan.zhihu.com/p/27108657)
+
+### 关系模型到 Key-Value 模型的映射
+
+SQL 和 KV 结构之间存在巨大的区别，那么如何能够方便高效地进行映射，就成为一个很重要的问题。一个好的映射方案必须有利于对数据操作的需求。
+
+TiDB 对每个表分配一个 TableID，每一个索引都会分配一个 IndexID，每一行分配一个 RowID（如果表有整数型的 Primary Key，那么会用 Primary Key 的值当做 RowID）
+
+![](/public/upload/data/tidb_table_xmind.png)
+
+以下标为例
+
+    CREATE TABLE User {
+        ID int,
+        Name varchar(20),
+        Role varchar(20),
+        Age int,
+        PRIMARY KEY (ID)，
+        Key idxAge (age)
+    };
+
+假设有3条记录
+
+    1, "TiDB", "SQL Layer", 10
+    2, "TiKV", "KV Engine", 20
+    3, "PD", "Manager", 30
+
+假设这个表的 Table ID 为 10，因为有一个 Int 类型的 Primary Key，所以 RowID 的值即为这个 Primary Key 的值，row的数据为
+
+    t_r_10_1  --> ["TiDB", "SQL Layer", 10]
+    t_r_10_2 --> ["TiKV", "KV Engine", 20]
+    t_r_10_3 --> ["PD", "Manager", 30]
+
+假设这个 Index 的 ID 为 1，则其数据为：
+
+    t_i_10_1_10_1 —> null
+    t_i_10_1_20_2 --> null
+    t_i_10_1_30_3 --> null
+
+### SQL 运算，分布式 SQL 运算
+
+将 SQL 查询映射为对 KV 的查询，再通过 KV 接口获取对应的数据，最后执行各种计算。比如`select count(*) from user where name = "TIDB"`（没有对name建索引）
+
+1. 构造出 Key Range：一个表中所有的 RowID 都在 [0, MaxInt64) 这个范围内，那么我们用 0 和 MaxInt64 根据 Row 的 Key 编码规则，就能构造出一个 [StartKey, EndKey) 的左闭右开区间
+2. 扫描 Key Range：根据上面构造出的 Key Range，读取 TiKV 中的数据
+3. 过滤数据：对于读到的每一行数据，计算 name="TiDB" 这个表达式，如果为真，则向上返回这一行，否则丢弃这一行数据
+4. 计算 Count：对符合要求的每一行，累计到 Count 值上面
+
+这个方案肯定是可以 Work的，缺陷也是显而易见的
+
+1. 将计算尽量靠近存储节点，以避免大量的 RPC 调用
+2. 需要将 Filter 也下推到存储节点进行计算，这样只需要返回有效的行，避免无意义的网络传输
+3. 将聚合函数、GroupBy 也下推到存储节点，进行预聚合，每个节点只需要返回一个 Count 值即可，再由 tidb-server 将 Count 值 Sum 起来
+
+恍惚之间，有一个mapreduce 逻辑下发到 slave节点执行的感觉，**运算跟着数据走**，将一个集中式运算 转换一个 集中协调 + 并行计算的逻辑。
 
 ## 调度
 
