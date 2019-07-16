@@ -10,6 +10,9 @@ keywords: network
 
 ## 简介
 
+* TOC
+{:toc}
+
 linux网络编程中，各层有各层的struct，但有一个struct是各层通用的，这就是描述接收和发送数据的struct sk_buff.
 
 2019.7.5补充：应用层和内核互通的机制是通过 Socket 系统调用，经常有人会问，**Socket 属于哪一层？其实它哪一层都不属于**，它属于操作系统的概念，而非网络协议分层的概念。只不过操作系统选择对于网络协议的实现模式是，**二到四层的处理代码在内核里面**，七层的处理代码让应用自己去做，两者需要跨内核态和用户态通信，就需要一个系统调用完成这个衔接，这就是 Socket。
@@ -18,20 +21,6 @@ TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的�
 
 ![](/public/upload/network/tcp.png)
 
-## Socket 和 Sock
-
-![](/public/upload/network/tcp_object.png)
-
-1. vfs层
-1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。
-2. sock，负责向下对接内核网络协议栈
-3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责。分层之后，诸如拥塞控制和滑动窗口的 字段和方法就只体现在struct sock和tcp_prot中，代码实现与tcp规范设计是一致的
-4. ip层 负责路由等逻辑，并执行nf_hook，也就是netfilter，netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则
-
-    ![](/public/upload/network/linux_netfilter.png)
-
-5. link 层，先寻找下一跳（ip ==> mac），有了 MAC 地址，就可以调用 dev_queue_xmit发送二层网络包了，它会调用 __dev_xmit_skb 会将请求放入块设备的队列  
-6. 设备层：网络包的发送会触发一个软中断 NET_TX_SOFTIRQ 来处理队列中的数据。这个软中断的处理函数是 net_tx_action。在软中断处理函数中，会将网络包从队列上拿下来，调用网络设备的传输函数 ixgb_xmit_frame，将网络包发的设备的队列上去。
 
 ## sk_buff结构
 
@@ -98,9 +87,11 @@ sk_buff由sk_buff_head组织
 		#endif
 	};
 
-## 数据接收过程
+![](/public/upload/network/sk_buff.png)
 
+## 宏观
 
+### 数据接收过程
 
 	struct sock {
 		...
@@ -125,11 +116,127 @@ sk_buff由sk_buff_head组织
 
 当用户需要接收数据时，首先根据文件描述符inode得到socket结构和sock结构（**socket结构在用户层，sock在内核层，两者涉及到数据在内核态和用户态的拷贝**），然后从sock结构中指向的队列recieve_queue中读取数据包，将数据包COPY到用户空间缓冲区。数据就完整的从硬件中传输到用户空间。这样也完成了一次完整的从下到上的传输。
 
-## 数据的发送
+### 数据的发送
 
 用户在初始化socket之后，会得到一个fd，socket.write ==> sock.write ==> inet.write ==> tcp.write ==> ip_queue_xmit ==> dev_queue_xmit ==> ei_start_xmit.
 
 传输层将用户的数据包装成sk_buff 下放到ip层，在ip层，函数ip_queue_xmit()的功能是将数据包进行一系列复杂的操作，比如是检查数据包是否需要分片。同时，根据目的ip、iptables等规则，选取一个dev发送数据。
+
+## linux1.2.13
+
+[Linux TCP/IP 协议栈源码分析](https://www.cnblogs.com/my_life/articles/4691254.html)
+
+首先，我们从device struct开始。struct反映了很多东西，比如看一下linux的进程struct，就很容易理解进程为什么能干那么多事情。
+
+linux会维护一个device struct list，通过它能找到所有的网络设备。device struct 和设备不是一对一关系。
+	
+	include/linux/netdevice.h
+	struct device{
+		/*
+		* This is the first field of the "visible" part of this structure
+		* (i.e. as seen by users in the "Space.c" file). It is the name
+		* the interface.
+		*/
+		char *name;
+		/* I/O specific fields - FIXME: Merge these and struct ifmap into one */
+		unsigned long rmem_end; /* shmem "recv" end */
+		unsigned long rmem_start; /* shmem "recv" start */
+		unsigned long mem_end; /* shared mem end */
+		unsigned long mem_start; /* shared mem start */
+		// device 只是一个struct，可能几个struct共用一个物理网卡
+		unsigned long base_addr; /* device I/O address */
+		// 赋给中断号
+		unsigned char irq; /* device IRQ number */
+		/* Low-level status flags. */
+		volatile unsigned char start, /* start an operation */
+			tbusy, /* transmitter busy */
+			interrupt; /* interrupt arrived */
+	
+		struct device *next;
+		/* The device initialization function. Called only once. */
+		// 初始化函数
+		int (*init)(struct device *dev);
+		/* Some hardware also needs these fields, but they are not part of the
+		usual set specified in Space.c. */
+		unsigned char if_port; /* Selectable AUI, TP,..*/
+		unsigned char dma; /* DMA channel */
+		struct enet_statistics* (*get_stats)(struct device *dev);
+		/*
+		* This marks the end of the "visible" part of the structure. All
+		* fields hereafter are internal to the system, and may change at
+		* will (read: may be cleaned up at will).
+		*/
+		/* These may be needed for future network-power-down code. */
+		unsigned long trans_start; /* Time (in jiffies) of last Tx */
+		unsigned long last_rx; /* Time of last Rx */
+		unsigned short flags; /* interface flags (a la BSD) */
+		unsigned short family; /* address family ID (AF_INET) */
+		unsigned short metric; /* routing metric (not used) */
+		unsigned short mtu; /* interface MTU value */
+		unsigned short type; /* interface hardware type */
+		unsigned short hard_header_len; /* hardware hdr length */
+		void *priv; /* pointer to private data */
+		/* Interface address info. */
+		unsigned char broadcast[MAX_ADDR_LEN]; /* hw bcast add */
+		unsigned char dev_addr[MAX_ADDR_LEN]; /* hw address */
+		unsigned char addr_len; /* hardware address length */
+		unsigned long pa_addr; /* protocol address */
+		unsigned long pa_brdaddr; /* protocol broadcast addr */
+		unsigned long pa_dstaddr; /* protocol P-P other side addr */
+		unsigned long pa_mask; /* protocol netmask */
+		unsigned short pa_alen; /* protocol address length */
+		struct dev_mc_list *mc_list; /* Multicast mac addresses */
+		int mc_count; /* Number of installed mcasts*/
+		struct ip_mc_list *ip_mc_list; /* IP multicast filter chain */
+		/* For load balancing driver pair support */
+		unsigned long pkt_queue; /* Packets queued */
+		struct device *slave; /* Slave device */
+		// device的数据缓冲区
+		/* Pointer to the interface buffers. */
+		struct sk_buff_head buffs[DEV_NUMBUFFS];
+		/* Pointers to interface service routines. */
+		// 打开设备
+		int (*open)(struct device *dev);
+		// 关闭设备
+		int (*stop)(struct device *dev);
+		// 调用具体的硬件将数据发到物理介质上，网络栈最终调用它发数据
+		int (*hard_start_xmit) (struct sk_buff *skb, struct device *dev);
+		int (*hard_header) (unsigned char *buff,struct device *dev,unsigned short type,void *daddr,void *saddr,unsigned len,struct sk_buff *skb);
+		int (*rebuild_header)(void *eth, struct device *dev,unsigned long raddr, struct sk_buff *skb);
+		unsigned short (*type_trans) (struct sk_buff *skb, struct device *dev);
+		#define HAVE_MULTICAST
+		void (*set_multicast_list)(struct device *dev, int num_addrs, void *addrs);
+		#define HAVE_SET_MAC_ADDR
+		int (*set_mac_address)(struct device *dev, void *addr);
+		#define HAVE_PRIVATE_IOCTL
+		int (*do_ioctl)(struct device *dev, struct ifreq *ifr, int cmd);
+		#define HAVE_SET_CONFIG
+		int (*set_config)(struct device *dev, struct ifmap *map);
+	};
+
+耐心的看完这个结构体，网络部分的初始化就是围绕device struct的创建及其中字段（和函数）的初始化.
+
+linux内核与网络驱动程序的边界：
+
+linux内核准备好device struct和dev_base指针(这句不准确，或许是ethdev_index[])，kernel启动时，执行驱动程序事先挂好的init函数，init函数初始化device struct并挂到dev_base上(或ethdev_index上)。
+
+ei开头的都是驱动程序自己的函数。
+
+### 接收数据
+
+device struct 初始化时，会为这个设备生成一个irq(中断号)，为irq其绑定ei_interrutp（网卡的中断处理函数），同时会建立一个irq与device的映射。接收到数据后，触发ei_interrutp, ei_interrutp根据中断号得到device,执行`ei_receive（device)`, ei_receive 将数据拷贝到 数据接收队列（元素为 sk_buff，具有prev和next指针，struct device 维护了 sk_buff_head），执行内核的netif_rx,netif_rx 触发软中断 执行net_bh，net_bh 遍历 packet_type list 查看数据 符合哪个协议（不是每次都遍历），执行`packet_type.func`将数据包传递给网络层协议接收函数，`packet_type.func` 的可选值 arp_rcv,ip_rcv. ip_rcv中带有device 参数，用于校验数据包的mac 地址是否在 device.mc_list 之内，及检查是否开启IP_FORWARD等。
+
+![](/public/upload/network/data_rcv.png)
+
+![](/public/upload/linux/network_source_recv.gif)
+
+### 发送数据
+
+由网络协议栈调用hard_start_xmit(初始化时，驱动程序将ei_start_xmit函数挂到其上)
+
+总的来说，kernel有几个extern的struct、pointer和func，驱动程序初始化完毕后，为linux内核准备了一个device struct list（驱动程序自己有一些功能函数，挂到device struct的函数成员上）。收到数据时，**kernel的extern func(比如netif_rx)在中断环境下被驱动程序调用**。发送数据时，则由内核网络协议栈调用device.hard_start_xmit，进而执行驱动程序函数。
+
+![](/public/upload/linux/network_source_send.gif)
 
 ## 不同的缓存方式
 
@@ -148,7 +255,6 @@ linux文件操作中，会专门开辟一段内存，用来存储磁盘文件系
 linux网络操作中，通过socket fd ==> sock ==> write_queue, receive_queue 在缓存读写的数据。sk_buff 的管理是sock各自为政。
 
 这其中的不同，值得品味。一个重要原因是，因为linux事先加载了超级块数据，可以根据需要，精确的指定加载和写入多少数据。而对于网络编程来说，一次能读取和写出多少，都是未知的，每个sock都不同。
-
 
 ## 引用
 

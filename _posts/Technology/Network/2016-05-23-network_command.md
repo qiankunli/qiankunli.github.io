@@ -90,6 +90,7 @@ iptables 只是一个操作 Linux 内核 Netfilter 子系统的“界面”。�
 
 ![](/public/upload/network/netfilter_chain_flow.png)
 
+
 iptables 表的作用，就是在某个具体的“检查点”（比如Output）上，按顺序执行几个不同的检查动作（比如，先执行nat，再执行 filter）。
 
 ||linux 网络协议栈|http server|rpc server|
@@ -107,6 +108,48 @@ iptables 表的作用，就是在某个具体的“检查点”（比如Output�
 2. rule不管属于table还是chain，都是package 进行判断，做出通过、转发、丢弃等决定
 3. 某些链中注定不会 包含某类规则，也就是某个表
 4. 实际的使用中，往往通过table作为操作入口，对rule进行定义
+
+### 源码上的体现
+
+    // 从tcp层向ip层发送数据包
+    int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb){
+        struct iphdr *iph = ip_hdr(skb);
+        iph->tot_len = htons(skb->len);
+        skb->protocol = htons(ETH_P_IP);
+        // 可以看到第一个hook点NF_INET_LOCAL_OUT
+        return nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT,
+                net, sk, skb, NULL, skb_dst(skb)->dev,
+                dst_output);
+    }
+    // 从ip层向link层发送数据包
+    int ip_output(struct net *net, struct sock *sk, struct sk_buff *skb){
+        struct net_device *dev = skb_dst(skb)->dev;
+        skb->dev = dev;
+        skb->protocol = htons(ETH_P_IP);
+        // 可以看到第一个hook点NF_INET_POST_ROUTING
+        return NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING,
+                    net, sk, skb, NULL, dev,
+                    ip_finish_output,
+                    !(IPCB(skb)->flags & IPSKB_REROUTED));
+    }
+    // 从link到ip层的接收逻辑
+    int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev){
+        const struct iphdr *iph;
+        struct net *net;
+        u32 len;
+        ......
+        net = dev_net(dev);
+        ......
+        iph = ip_hdr(skb);
+        len = ntohs(iph->tot_len);
+        skb->transport_header = skb->network_header + iph->ihl*4;
+        ......
+        // 可以看到第一个hook点是NF_INET_PRE_ROUTING
+        return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,
+                net, NULL, skb, dev, NULL,
+                ip_rcv_finish);
+        ......
+    }
 
 ### 操作
 
