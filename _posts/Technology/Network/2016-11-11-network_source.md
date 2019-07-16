@@ -17,7 +17,7 @@ keywords: network
 
 linux的网络部分由网卡的驱动程序和kernel的网络协议栈部分组成，它们相互交互，完成数据的接收和发送。
 
-## 网络操作的开始
+## 源码目录
 
 	linux-1.2.13
 	|
@@ -41,6 +41,8 @@ linux的网络部分由网卡的驱动程序和kernel的网络协议栈部分组
 其中 unix 子文件夹中三个文件是有关 UNIX 域代码， UNIX 域是模拟网络传输方式在本机范围内用于进程间数据传输的一种机制。
 
 系统调用通过 INT $0x80 进入内核执行函数，该函数根据 AX 寄存器中的系统调用号，进一步调用内核网络栈相应的实现函数。
+
+## 网络与文件操作
 
 file_operations 结构定义了普通文件操作函数集。系统中每个文件对应一个 file 结构， file 结构中有一个 file_operations 变量，当使用 write，read 函数对某个文件描述符进行读写操作时，系统首先根据文件描述符索引到其对应的 file 结构，然后调用其成员变量 file_operations 中对应函数完成请求。
 
@@ -73,15 +75,26 @@ file_operations 结构定义了普通文件操作函数集。系统中每个文�
 
 也就是说，对linux系统，一切皆文件，由struct file描述，通过file->ops指向具体操作，由file->inode 存储一些元信息。对于ext文件系统，是载入内存的超级块、磁盘块等数据。对于网络通信，则是待发送和接收的数据块、网络设备等信息。从这个角度看，**struct socket和struct ext_inode_info 等是类似的。**
 
+## 网络分层
 
 ![](/public/upload/linux/linux_network.png)
 
 从这个图中，可以看到，到传输层时，横生枝节，**代码不再针对任何数据包都通用**。从上到下，数据包的发送使用什么传输层协议，由socket初始化时确定。从下到上，收到的数据包由哪个传输层协议处理，根据从数据包传输层header中解析的数据确定。
 
 
-## 网络协议栈
+1. vfs层
+1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。
+2. sock，负责向下对接内核网络协议栈
+3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责。分层之后，诸如拥塞控制和滑动窗口的 字段和方法就只体现在struct sock和tcp_prot中，代码实现与tcp规范设计是一致的
+4. ip层 负责路由等逻辑，并执行nf_hook，也就是netfilter，netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则
 
-### 数据struct 和 协议struct
+    ![](/public/upload/network/linux_netfilter.png)
+
+5. link 层，先寻找下一跳（ip ==> mac），有了 MAC 地址，就可以调用 dev_queue_xmit发送二层网络包了，它会调用 __dev_xmit_skb 会将请求放入块设备的队列。同时还会处理一些vlan 的逻辑
+6. 设备层：网络包的发送会触发一个软中断 NET_TX_SOFTIRQ 来处理队列中的数据。这个软中断的处理函数是 net_tx_action。在软中断处理函数中，会将网络包从队列上拿下来，调用网络设备的传输函数 ixgb_xmit_frame，将网络包发的设备的队列上去。
+
+
+## 网络协议栈实现——数据struct 和 协议struct
 
 socket分为多种，除了inet还有unix。反应在代码结构上，就是net包下只有net/unix,net/inet两个文件夹。之所以叫unix域，可能跟描述其地址时，使用`unix://xxx`有关
 
@@ -125,21 +138,6 @@ tcp_protocol是为了从下到上的数据接收，其函数集主要是handler�
 1. 这些结构如何初始化。有的结构直接就是定义好的，比如tcp_protocol等
 2. 如何接收数据。由中断程序触发。接收数据的时候，可以得到device，从数据中可以取得协议数据，进而从ptype_base及inet_protocol_base执行相应的rcv
 3. 如何发送数据。通常不直接发送，先发到queue里。可以从socket初始化时拿到protocol类型（比如tcp）、目的ip，通过route等决定device，于是一路向下执行xx_write方法
-
-### 各层职责
-
-![](/public/upload/network/tcp_object.png)
-
-1. vfs层
-1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。
-2. sock，负责向下对接内核网络协议栈
-3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责。分层之后，诸如拥塞控制和滑动窗口的 字段和方法就只体现在struct sock和tcp_prot中，代码实现与tcp规范设计是一致的
-4. ip层 负责路由等逻辑，并执行nf_hook，也就是netfilter，netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则
-
-    ![](/public/upload/network/linux_netfilter.png)
-
-5. link 层，先寻找下一跳（ip ==> mac），有了 MAC 地址，就可以调用 dev_queue_xmit发送二层网络包了，它会调用 __dev_xmit_skb 会将请求放入块设备的队列。同时还会处理一些vlan 的逻辑
-6. 设备层：网络包的发送会触发一个软中断 NET_TX_SOFTIRQ 来处理队列中的数据。这个软中断的处理函数是 net_tx_action。在软中断处理函数中，会将网络包从队列上拿下来，调用网络设备的传输函数 ixgb_xmit_frame，将网络包发的设备的队列上去。
 
 ## 面向过程/对象/ioc
 
