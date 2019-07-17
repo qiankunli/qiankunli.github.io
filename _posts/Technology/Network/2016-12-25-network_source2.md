@@ -230,6 +230,23 @@ device struct 初始化时，会为这个设备生成一个irq(中断号)，为i
 
 ![](/public/upload/linux/network_source_recv.gif)
 
+### 收到数据包的几种情况
+
+1. 来的网络包正是服务端期待的下一个网络包 seq = rcv_nxt
+2. end_seq < rcv_nxt 服务端期待 5，但来了一个3，说明3和4的ack 客户端没有收到，服务端应重新发送
+3. seq 不小于 rcv_nxt + tcp_receive_window，说明客户端发送得太猛了。本来 seq 肯定应该在接收窗口里面的，这样服务端才来得及处理，结果现在超出了接收窗口，说明客户端一下子把服务端给塞满了。这种情况下，服务端不能再接收数据包了，只能发送 ACK了，在 ACK 中会将接收窗口为 0 的情况告知客户端，客户就知道不能再发送了。**这个时候双方只能交互窗口探测数据包**，直到服务端因为用户进程把数据读走了，空出接收窗口，才能在 ACK里面再次告诉客户端，又有窗口了，又能发送数据包了。
+4. seq < rcv_nxt 但 end_seq > rcv_nxt，说明从 seq 到 rcv_nxt 这部分网络包原来的 ACK 客户端没有收到，所以客户端重新发送了一次，从 rcv_nxt到 end_seq 时新发送的
+5. 乱序包
+
+### Socket 读取
+
+1. VFS 层：read 系统调用找到 struct file，根据里面的 file_operations 的定义，调用 sock_read_iter 函数。sock_read_iter 函数调用 sock_recvmsg 函数
+2. Socket 层：从 struct file 里面的 private_data 得到 struct socket，根据里面 ops 的定义，调用 inet_recvmsg 函数
+3. Sock 层：从 struct socket 里面的 sk 得到 struct sock，根据里面 sk_prot 的定义，调用 tcp_recvmsg 函数。
+4. TCP 层：tcp_recvmsg 函数会依次读取 receive_queue 队列、prequeue 队列和 backlog 队列。
+
+socket.read 的本质就是去内核读取 receive_queue 队列、prequeue 队列和 backlog 队列 中的数据。如果实在没有数据包，则调用 sk_wait_data，等待在那里
+
 ### 发送数据
 
 由网络协议栈调用hard_start_xmit(初始化时，驱动程序将ei_start_xmit函数挂到其上)
@@ -238,7 +255,7 @@ device struct 初始化时，会为这个设备生成一个irq(中断号)，为i
 
 ![](/public/upload/linux/network_source_send.gif)
 
-## 不同的缓存方式
+## 不同的缓存方式 and 处理网络包的三个主体
 
 io数据的读写，不会一个字节一个字节的来，所以数据会缓存（缓冲）。
 
@@ -250,11 +267,24 @@ io数据的读写，不会一个字节一个字节的来，所以数据会缓存
 
 针对内核空间缓存区
 
-linux文件操作中，会专门开辟一段内存，用来存储磁盘文件系统的超级块和部分磁盘块，通过文件path ==> fd ==> inode ==> ... ==> 块索引 找到块的数据并读写。磁盘块的管理是公共的、独立的，fd记录自己相关的磁盘块索引即可。fd不用这个磁盘块了，除非空间不够，这个磁盘块数据不会被回收，下次用到时还能用。即便fd只要一部分数据，系统也会自动加载相关的多个磁盘块进来。
+linux文件操作中，会专门开辟一段内存，用来存储磁盘文件系统的超级块和部分磁盘块，通过文件path ==> fd ==> inode ==> ... ==> 块索引 找到块的数据并读写。磁盘块的管理是公共的、独立的，fd记录自己相关的磁盘块索引即可。fd不用这个磁盘块了，除非系统剩余内存不够，这个磁盘块数据不会被释放，下次用到时还能用。即便fd只要一部分数据，系统也会自动加载相关的多个磁盘块到内存。
 
 linux网络操作中，通过socket fd ==> sock ==> write_queue, receive_queue 在缓存读写的数据。sk_buff 的管理是sock各自为政。
 
 这其中的不同，值得品味。一个重要原因是，因为linux事先加载了超级块数据，可以根据需要，精确的指定加载和写入多少数据。而对于网络编程来说，一次能读取和写出多少，都是未知的，每个sock都不同。
+
+（较高版本linux）网络包的接收过程，这里面涉及三个队列：
+
+1. backlog 队列
+2. prequeue 队列
+3. sk_receive_queue 队列
+
+为什么接收网络包的过程，需要在这三个队列里面倒腾过来、倒腾过去呢？这是因为，同样一个网络包要在三个主体之间交接。
+
+1. 软中断的处理过程。我们在执行tcp_v4_rcv 函数的时候，依然处于软中断的处理逻辑里，所以必然会占用这个软中断。
+2. 用户态进程。如果用户态触发系统调用 read 读取网络包，也要从队列里面找。
+3. 内核协议栈。哪怕用户进程没有调用 read，读取网络包，当网络包来的时候，也得有一个地方收着。
+
 
 ## 引用
 
