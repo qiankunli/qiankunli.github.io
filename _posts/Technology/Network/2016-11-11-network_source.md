@@ -149,7 +149,7 @@ tcp_protocol是为了从下到上的数据接收，其函数集主要是handler�
 **重要的不是细节**，这个过程让我想到了web编程中的controller,service,dao。都是分层，区别是web请求要立即返回，网络通信则不用。
 
 1. mac ==> device  ==> ip_rcv ==> tcp_rcv ==> 上层
-2. url ==》 controller ==> service ==> dao ==> 数据库
+2. url ==> controller ==> service ==> dao ==> 数据库
 
 想一想，整个网络协议栈，其实就是一群loopbackController、eth0Controller、ipService、TcpDao组成，该是一件多么有意思的事。
 
