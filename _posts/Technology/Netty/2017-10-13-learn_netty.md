@@ -12,11 +12,21 @@ keywords: JAVA netty
 
 到目前为止，笔者关于netty写了十几篇博客，内容非常零碎，笔者一直想着有一个总纲的东西来作为主干，将这些零碎place it in context。所以梳理了一张图，从上往下“俯视”看，netty有哪些东西?
 
+一个稍微复杂的框架，必然伴随几个抽象以及抽象间的依赖关系，那么依赖的关系的管理，可以选择spring（像大多数j2ee项目那样），也可以硬编码。这就是我们看到的，每个抽象对象有一套自己的继承体系，然后抽象对象子类之间又彼此复杂的交织。比如Netty的eventloop、unsafe和pipeline，**channel作为最外部操作对象**，聚合这三者，根据聚合的子类的不同，Channel也有多个子类来体现。
+
+同时，做一个粗略的对应
+
+|模型|代码抽象|
+|---|---|
+|io模型|unsafe|
+|线程模型|eventloop|
+|数据处理模型|pipeline|
+
 ![](/public/upload/netty/learn_netty.png)
 
 当这个图画了一个雏形时，笔者突然有了一个意外收获，心中很久以来的疑惑也得到了解答，那就是为什么很多人会觉得学习netty代码比较难（这也是笔者最初的感受）？**因为对于大部分人来说，是先接触了netty，才第一次接触nio、同步操作异步化 等技术/套路，也就是上图“核心” 部分的东西，除了要理解netty代码本身的抽象之外，还需理解很多新概念。**并且，极易形成的错误观念是：因为netty是这样用的，便容易认为这些“新概念特性”只能这样用。比如，一想起nio便认为只能像netty那样用，但hadoop中传输文件块的代码 便与netty对nio的应用方式有所不同。 
 
-有了上图为总纲，先了解上图左侧的核心部分，再有针对性的阅读笔者先前的博客或netty的源码，心中有“成竹”而不是一堆琐碎，剩下的便是右侧的netty实现细节了，感受上应该会容易许多。
+## Netty与reactor pattern
 
 reactor pattern 理念 参见 [Understanding Reactor Pattern: Thread-Based and Event-Driven](https://dzone.com/articles/understanding-reactor-pattern-thread-based-and-eve)，并且建议你读三遍。任何框架，一定都是先有了理念和思想，然后体现在代码上。看代码之前，找到那个理念和思想。
 
@@ -31,6 +41,4 @@ reactor pattern 理念 参见 [Understanding Reactor Pattern: Thread-Based and E
 
 《反应式设计模式》 基于事件的系统通常建立在一个事件循环上。任何时刻只要发生了事情， 对应的事件就会被追加到一个队列中。事件循环持续的从队列中拉取事件，并执行绑定在事件上的回调函数。每一个回调函数通常都是一段微小的、匿名的、响应特定事件（例如鼠标点击）的过程。回调函数也可能产生新事件，这些事件随后也会被追加到队列里面等待处理。
 
-个人微信订阅号
 
-![](/public/upload/qrcode_for_gh.jpg)

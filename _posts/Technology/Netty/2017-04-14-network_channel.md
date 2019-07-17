@@ -200,122 +200,12 @@ inbound 的被称作events， outbound 的被称作operations。
 
 首先判断该 EventLoop 的线程是否是当前线程，如果是，直接添加到任务队列中去，如果不是，则尝试启动线程（但由于线程是单个的，因此只能启动一次），随后再将任务添加到队列中去。如果线程已经停止，并且删除任务失败，则执行拒绝策略，默认是抛出异常。
 
-### EventLoop 中的 Loop 到底是什么？
-
-    protected void run() {
-        for (;;) {
-			switch (...) {
-				case SelectStrategy.CONTINUE:
-					...
-				case SelectStrategy.SELECT:
-					this.select(this.wakenUp.getAndSet(false));
-					...
-				default:
-				    cancelledKeys = 0;
-					needsToSelectAgain = false;
-					final int ioRatio = this.ioRatio;
-					if (ioRatio == 100) {
-						try {
-							processSelectedKeys();
-						} finally {
-							runAllTasks();
-						}
-					} else {
-						final long ioStartTime = System.nanoTime();
-						try {
-							processSelectedKeys();
-						} finally {
-							// Ensure we always run tasks.
-							final long ioTime = System.nanoTime() - ioStartTime;
-							runAllTasks(ioTime * (100 - ioRatio) / ioRatio);
-						}
-					}
-			}			
-            // Always handle shutdown even if the loop processing threw an exception.
-			...
-        }
-    }
-
-整个 run 方法做了3件事情：
-
-1. selector 获取感兴趣的事件。
-2. processSelectedKeys 处理事件。
-3. runAllTasks 执行队列中的任务。
-
-在 Netty 中，有2种任务，一种是 IO 任务，一种是非 IO 任务，ioRatio 的作用就是限制执行任务队列的时间。
-
-	private void select(boolean oldWakenUp) throws IOException {
-        Selector selector = this.selector;
-		int selectCnt = 0;
-		long currentTimeNanos = System.nanoTime();
-		long selectDeadLineNanos = currentTimeNanos + this.delayNanos(currentTimeNanos);
-		while(true) {
-			long timeoutMillis = (selectDeadLineNanos - currentTimeNanos + 500000L) / 1000000L;
-			if (timeoutMillis <= 0L) {
-				if (selectCnt == 0) {
-					selector.selectNow();
-					selectCnt = 1;
-				}
-				break;
-			}
-			if (this.hasTasks() && this.wakenUp.compareAndSet(false, true)) {
-				selector.selectNow();
-				selectCnt = 1;
-				break;
-			}
-			int selectedKeys = selector.select(timeoutMillis);
-			++selectCnt;
-			if (selectedKeys != 0 || oldWakenUp || this.wakenUp.get() || this.hasTasks() || this.hasScheduledTasks()) {
-				break;
-			}
-			if (Thread.interrupted()) {
-				selectCnt = 1;
-				break;
-			}
-			long time = System.nanoTime();
-			if (time - TimeUnit.MILLISECONDS.toNanos(timeoutMillis) >= currentTimeNanos{
-				selectCnt = 1;
-			} else if (SELECTOR_AUTO_REBUILD_THRESHOLD > 0 && selectCnt >= SELECTOR_AUTO_REBUILD_THRESHOLD) {
-				this.rebuildSelector();
-				selector = this.selector;
-				selector.selectNow();
-				selectCnt = 1;
-				break;
-			}
-		}
-    }
-
-整段代码都在弄一个事情：是`selector.selectNow();` 还是 `selector.select(timeoutMillis)`
-
-这段逻辑可不孤单，[Redis源码分析](http://qiankunli.github.io/2019/04/20/redis_source.html) 中的eventloop 异曲同工
 
 ## channel 以及 unsafe pipeline eventloop 三国杀
 
 **Channel是netty提供的操作对象，其能力是通过聚合unsafe、pipeline和eventloop来实现的。 也即是说，channel只是外皮，分析unsafe、pipeline和eventloop的相互作用才是学习Netty的关键。**
 
-eventloop 有一个selector 成员，selector.select() 得到selectorKey，selectorKey 可以获取到channel（channel执行 `SelectionKey register(Selector sel, int ops, Object att)`时会将自己作为attr传入），进而通过channel得到unsafe进行读写操作。（channel提供的操作能力，一方面供coder使用，一方面供eventloop使用）
-
-对于读取，是eventloop ==> channel.unsafe.read ==>              channel.pipeline.fireChannelRead(byteBuf);
-
-对于实际的写，eventloop ==> unsafe.forceFlush()
-
-也就是说，三国杀里，eventloop只需负责在合适的时间通过channel操作unsafe==>pipeline或pipeline ==> unsafe即可。
-
-对于写，则是 channel.write ==> pipeline.writeAndFlush(msg) ==> HeadContext.write ==> unsafe.write ==> outboundBuffer.addMessage
+通过聚合eventloop ，channel 有了提供异步接口的能力，参见[netty中的线程池](http://qiankunli.github.io/2019/06/28/netty_executor.html)
 
 
-java nio channel每次读写都要缓冲区。对于netty channel来说（具体是unsafe），读缓冲区是读取时临时申请一个buffer，写则事先分配的一个缓冲区。
 
-一个channel自打注册到selector后，不是一直interest r/w事件的，比如out buffer有数据了才关心，没数据了就remove interest，这样可以提高性能。
-
-## 小结
-
-一个稍微复杂的框架，必然伴随几个抽象以及抽象间的依赖关系，那么依赖的关系的管理，可以选择spring（像大多数j2ee项目那样），也可以硬编码。这就是我们看到的，每个抽象对象有一套自己的继承体系，然后抽象对象子类之间又彼此复杂的交织。比如Netty的eventloop、unsafe和pipeline，channel作为最外部操作对象，聚合这三者，根据聚合的子类的不同，Channel也有多个子类来体现。
-
-同时，做一个粗略的对应
-
-|模型|代码抽象|
-|---|---|
-|io模型|unsafe|
-|线程模型|eventloop|
-|数据处理模型|pipeline|
