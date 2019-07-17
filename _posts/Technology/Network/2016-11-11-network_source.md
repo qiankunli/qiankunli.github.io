@@ -126,6 +126,7 @@ The difference is that an INET socket is bound to an IP address-port tuple, whil
 1. struct一般由一个数组或链表组织，数组用index，链表用header(比如packet_type_base、inet_protocol_base)指针查找数据。
 2. **协议struct是怎么回事呢？通常是一个函数操作集，类似于controller-server-dao之间的interface定义**，类似于本文开头的file_operations，有open、close、read等方法，但对ext是一回事，对socket操作是另一回事。
 3. 数据struct实例可以有很多，比如一个主机有多少个连接就有多少个struct sock，而协议struct个数由协议类型个数决定，具体的协议struct比如tcp_prot就只有一个。比较特别的是，通过tcp_prot就可以找到所有的struct sock实例。
+4. socket、sock、device等数据struct经常被作为分析的重点，**其实各种协议struct 才是流程的关键，并且契合了网络协议分层的理念**。 
 
 以ip.c为例，在该文件中定义了ip_rcv（读数据）、ip_queue_xmit(用于写数据)，链路层收到数据后，通过ptype_base找到ip_packet_type,进而执行ip_rcv。tcp发送数据时，通过tcp_proto找到ip_queue_xmit并执行。
 
