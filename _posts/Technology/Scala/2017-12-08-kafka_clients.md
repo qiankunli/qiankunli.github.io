@@ -142,7 +142,7 @@ rebalance过程有以下几点
 
 __consumer_offsets。位移topic就是普通的 Kafka topic。你可以手动地创建它、修改它，甚至是删除它。但它的消息格式却是 Kafka 自己定义的，用户不能修改，也就是说你不能随意地向这个topic写消息，因为一旦你写入的消息不满足 Kafka 规定的格式，那么 Kafka 内部无法成功解析，就会造成 Broker 的崩溃。
 
-假设 Consumer 当前消费到了某个topic的最新一条消息，位移是 100，之后该topic没有任何新消息产生，故 Consumer 无消息可消费了，所以位移永远保持在 100。由于是自动提交位移，__consumer_offsets中会不停地写入位移 =100 的消息。Kafka 是怎么删除__consumer_offsets中的过期消息的呢？答案就是Compaction。对于同一个 Key 的两条消息 M1 和 M2，如果 M1 的发送时间早于 M2，那么 M1 就是过期消息。Compact 的过程就是扫描日志的所有消息，剔除那些过期的消息，然后把剩下的消息整理在一起。Kafka 提供了专门的后台线程定期地巡检待Compact 的topic，看看是否存在满足条件的可删除数据。这个后台线程叫 Log Cleaner。很多实际生产环境中都出现过__consumer_offsets无限膨胀占用过多磁盘空间的问题，如果你的环境中也有这个问题，建议你去检查一下 Log Cleaner 线程的状态，通常都是这个线程挂掉了导致的。
+假设 Consumer 当前消费到了某个topic的最新一条消息，位移是 100，之后该topic没有任何新消息产生，故 Consumer 无消息可消费了，所以位移永远保持在 100。**由于是自动提交位移，__consumer_offsets中会不停地写入位移 =100 的消息**。Kafka 是怎么删除__consumer_offsets中的过期消息的呢？答案就是Compaction。对于同一个 Key 的两条消息 M1 和 M2，如果 M1 的发送时间早于 M2，那么 M1 就是过期消息。Compact 的过程就是扫描日志的所有消息，剔除那些过期的消息，然后把剩下的消息整理在一起。Kafka 提供了专门的后台线程定期地巡检待Compact 的topic，看看是否存在满足条件的可删除数据。这个后台线程叫 Log Cleaner。很多实际生产环境中都出现过__consumer_offsets无限膨胀占用过多磁盘空间的问题，如果你的环境中也有这个问题，建议你去检查一下 Log Cleaner 线程的状态，通常都是这个线程挂掉了导致的。
 
 如何确定为consumer group服务的coordinator？
 
