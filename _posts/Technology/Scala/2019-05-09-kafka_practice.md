@@ -31,7 +31,7 @@ kafka 较新的1.0 和 2.0 也主要集中于kafka streams的改进。
 从[spring kafka 源码分析](http://qiankunli.github.io/2019/05/06/kafka_spring_source.html) 可以看到， spring-kafka 仅使用了一个线程来 操作consumer 从broker 拉取消息，一个线程够用么？ 是否可以通过加线程 提高consumer的消费能力呢？
 
 
-[【原创】探讨kafka的分区数与多线程消费](https://raising.iteye.com/blog/2252456) 一个消费线程可以对应若干个分区，但**一个分区只能被一个consumer 消费 + consumer 对象是线程不安全的==> 一个分区只能被具体某一个消费线程消费**。因此，topic 的分区数必须大于一个（由server.properties 的 num.partitions 控制），否则消费端再怎么折腾，也用不了多线程。
+[【原创】探讨kafka的分区数与多线程消费](https://raising.iteye.com/blog/2252456) 一个消费线程可以对应若干个分区，但**一个分区只能被一个KafkaConsumer对象 消费 + KafkaConsumer 对象是线程不安全的==> 一个分区只能被具体某一个线程消费**。因此，topic 的分区数必须大于一个（由server.properties 的 num.partitions 控制），否则消费端再怎么折腾，也用不了多线程。
 
 [【原创】Kafka Consumer多线程实例](https://www.cnblogs.com/huxi2b/p/6124937.html)KafkaConsumer和KafkaProducer不同，后者是线程安全的，因此我们鼓励用户在多个线程中共享一个KafkaProducer实例，这样通常都要比每个线程维护一个KafkaProducer实例效率要高。但对于KafkaConsumer而言，它不是线程安全的，所以实现多线程时通常由两种实现方法：
 
@@ -66,16 +66,6 @@ kafka 较新的1.0 和 2.0 也主要集中于kafka streams的改进。
 fetcher线程数和topic所在多少台broker有关。一个Topic启动几个消费者线程，会生成几个KafkaStream。一个KafkaStream对应的是一个Queue(有界的LinkedBlockingQueue)
 
 
-### 什么时候commit 消息
-
-### 消费慢的坑（未完成）
-
-kafka消费太慢，误以为consumer挂掉，一直rebalance。背后的原理
-
-### Kafka Streams error - Offset commit failed on partition, request timed out
-
-[Kafka Streams error - Offset commit failed on partition, request timed out](https://stackoverflow.com/questions/51088681/kafka-streams-error-offset-commit-failed-on-partition-request-timed-out)
-
 ### 重启项目导致rebalance
 
 ![](/public/upload/scala/kafka_rebalance.png)
@@ -92,6 +82,10 @@ kafka消费太慢，误以为consumer挂掉，一直rebalance。背后的原理
 2. 减少一个topic partition的数量
 
 直接重启一次很快，但是发布就有点慢？ ==> 重启的时候无需拷贝war包，tomcat 可以立即启动，发布的时候，cmdb 要从跳板机（jenkins会把war包发到跳板机上）把war包拷贝到各个目标机器上 ==> 有一个时间，在这个时间内重启一遍引起的reblance较少，而超过这个时间引起的rebalance 时间较长 ==> 两个办法：找到这个时间，貌似是心跳时长，延长它；并行发布项目（6个实例一起拷贝war包并重启tomcat，cmdb有这个功能）
+
+### Kafka Streams error - Offset commit failed on partition, request timed out
+
+[Kafka Streams error - Offset commit failed on partition, request timed out](https://stackoverflow.com/questions/51088681/kafka-streams-error-offset-commit-failed-on-partition-request-timed-out)
 
 ## 生产端优化
 
