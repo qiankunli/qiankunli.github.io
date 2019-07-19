@@ -105,6 +105,12 @@ and provides fine grained control over the communication between Kafka broker an
 |逻辑|topic|consumer group|
 |物理|partition|consumer instance|
 
+### 消费者的线程数
+
+我们说 KafkaConsumer 是单线程的设计，严格来说这是不准确的。因为，从 Kafka 0.10.1.0 版本开始，KafkaConsumer 就变为了双线程的设计，即用户主线程和心跳线程。
+
+
+
 ## rebalance
 
 [kafka系列之(3)——Coordinator与offset管理和Consumer Rebalance](https://www.jianshu.com/p/5aa8776868bb)
