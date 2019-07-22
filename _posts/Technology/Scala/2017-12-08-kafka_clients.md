@@ -81,6 +81,8 @@ KafkaConsumer 依赖SubscriptionState 管理订阅的Topic集合和Partition的�
 
 ![](/public/upload/scala/consumer_object.png)
 
+poll 的核心逻辑在pollOnce 中， Do one round of polling. In addition to checking for new data, this does any needed heart-beating, auto-commits, and offset updates.
+
 ![](/public/upload/scala/consumer_poll.png)
 
 Kafka对外暴露了一个非常简洁的poll方法，其内部实现了协作、分区重平衡、心跳、数据拉取等功能，但使用时这些细节都被隐藏了
@@ -95,6 +97,31 @@ and provides fine grained control over the communication between Kafka broker an
 (the position within the message partition where the consumer left off consuming the message), read from a specific partition in Zookeeper. This offset is stored based on the consumer group name provided to Kafka at the beginning of the process.
 
 **主动拉取 是kafka 的一个重要特征，不仅是consumer 主动拉取broker， broker partition follower 也是主动拉取leader**。
+
+### KafkaConsumer线程安全
+
+    private final AtomicLong currentThread = new AtomicLong(NO_CURRENT_THREAD);
+    private final AtomicInteger refcount = new AtomicInteger(0);
+    public ConsumerRecords<K, V> poll(long timeout) {
+        acquire();
+        try {
+            ...
+        } finally {
+            release();
+        }
+    }
+
+currentThread holds the threadId of the current thread accessing KafkaConsumer and is used to prevent multi-threaded access.refcount is used to allow reentrant （re  entry）access by the thread who has acquired currentThread
+
+    private void acquire() {
+        ensureNotClosed();
+        long threadId = Thread.currentThread().getId();
+        if (threadId != currentThread.get() && !currentThread.compareAndSet(NO_CURRENT_THREAD, threadId))
+            throw new ConcurrentModificationException("KafkaConsumer is not safe for multi-threaded access");
+        refcount.incrementAndGet();
+    }
+
+Acquire the light lock protecting this consumer from multi-threaded access. Instead of blocking when the lock is not available, however, we just throw an exception (since multi-threaded usage is not supported). acquire只是做了简单的线程监测， 如果KafkaConsumer 已被线程占用，则另一个线程调用时会抛出异常
 
 ### consumer group 
 
@@ -172,33 +199,8 @@ __consumer_offsets。位移topic就是普通的 Kafka topic。你可以手动地
 
 
 
-## poll 的详细过程（未完成）
 
-### 线程安全监测
 
-    private final AtomicLong currentThread = new AtomicLong(NO_CURRENT_THREAD);
-    private final AtomicInteger refcount = new AtomicInteger(0);
-    public ConsumerRecords<K, V> poll(long timeout) {
-        acquire();
-        try {
-            ...
-        } finally {
-            release();
-        }
-    }
 
-currentThread holds the threadId of the current thread accessing KafkaConsumer and is used to prevent multi-threaded access.refcount is used to allow reentrant （re  entry）access by the thread who has acquired currentThread
 
-    private void acquire() {
-        ensureNotClosed();
-        long threadId = Thread.currentThread().getId();
-        if (threadId != currentThread.get() && !currentThread.compareAndSet(NO_CURRENT_THREAD, threadId))
-            throw new ConcurrentModificationException("KafkaConsumer is not safe for multi-threaded access");
-        refcount.incrementAndGet();
-    }
 
-Acquire the light lock protecting this consumer from multi-threaded access. Instead of blocking when the lock is not available, however, we just throw an exception (since multi-threaded usage is not supported). acquire只是做了简单的线程监测， 如果KafkaConsumer 已被线程占用，则另一个线程调用时会抛出异常
-
-### pollOnce
-
-poll 的核心逻辑在pollOnce 中， Do one round of polling. In addition to checking for new data, this does any needed heart-beating, auto-commits, and offset updates.
