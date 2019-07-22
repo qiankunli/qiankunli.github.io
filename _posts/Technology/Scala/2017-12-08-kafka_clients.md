@@ -104,6 +104,11 @@ and provides fine grained control over the communication between Kafka broker an
 |---|---|---|
 |逻辑|topic|consumer group|
 |物理|partition|consumer instance|
+|partition|leader-follower|leader-consumer|
+|描述|producer写到哪了，当前同步到哪了|当前各个consumer group消费到哪了|
+
+如果将consumer group 类比为partition follower，消费数据与同步数据其实也差不多。
+
 
 ### 消费者的线程数
 
@@ -114,6 +119,7 @@ and provides fine grained control over the communication between Kafka broker an
 虽然有心跳线程，但实际的消息获取逻辑依然是在用户主线程中完成的。因此，在消费消息的这个层面上，我们依然可以安全地认为 KafkaConsumer 是单线程的设计。
 
 [多线程消费的变迁](http://qiankunli.github.io/2019/05/09/kafka_practice.html)
+
 
 ## rebalance
 
@@ -163,12 +169,36 @@ __consumer_offsets。位移topic就是普通的 Kafka topic。你可以手动地
 
 
 
-如果将consumer group 类比为partition follower，消费数据与同步数据其实也差不多。
-
-||broker|consumer|
-|---|---|---|
-|partition|leader-follower|leader-consumer|
-|描述|producer写到哪了，当前同步到哪了|当前各个consumer group消费到哪了|
 
 
 
+## poll 的详细过程（未完成）
+
+### 线程安全监测
+
+    private final AtomicLong currentThread = new AtomicLong(NO_CURRENT_THREAD);
+    private final AtomicInteger refcount = new AtomicInteger(0);
+    public ConsumerRecords<K, V> poll(long timeout) {
+        acquire();
+        try {
+            ...
+        } finally {
+            release();
+        }
+    }
+
+currentThread holds the threadId of the current thread accessing KafkaConsumer and is used to prevent multi-threaded access.refcount is used to allow reentrant （re  entry）access by the thread who has acquired currentThread
+
+    private void acquire() {
+        ensureNotClosed();
+        long threadId = Thread.currentThread().getId();
+        if (threadId != currentThread.get() && !currentThread.compareAndSet(NO_CURRENT_THREAD, threadId))
+            throw new ConcurrentModificationException("KafkaConsumer is not safe for multi-threaded access");
+        refcount.incrementAndGet();
+    }
+
+Acquire the light lock protecting this consumer from multi-threaded access. Instead of blocking when the lock is not available, however, we just throw an exception (since multi-threaded usage is not supported). acquire只是做了简单的线程监测， 如果KafkaConsumer 已被线程占用，则另一个线程调用时会抛出异常
+
+### pollOnce
+
+poll 的核心逻辑在pollOnce 中， Do one round of polling. In addition to checking for new data, this does any needed heart-beating, auto-commits, and offset updates.
