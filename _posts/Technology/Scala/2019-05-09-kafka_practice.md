@@ -87,6 +87,18 @@ fetcher线程数和topic所在多少台broker有关。一个Topic启动几个消
 
 [Kafka Streams error - Offset commit failed on partition, request timed out](https://stackoverflow.com/questions/51088681/kafka-streams-error-offset-commit-failed-on-partition-request-timed-out)
 
+### 消费进度的监控
+
+对于 Kafka 消费者来说，最重要的事情就是监控它们的消费进度了，或者说是监控它们消费的滞后程度。这个滞后程度有个专门的名称：消费者 Lag 或 Consumer Lag。
+
+由于消费者的速度无法匹及生产者的速度，极有可能导致它消费的数据已经不在操作系统的页缓存中了，那么这些数据就会失去享有 Zero Copy 技术的资格。这样的话，消费者就不得不从磁盘上读取它们，这就进一步拉大了与生产者的差距，进而出现马太效应
+
+监控消费进度的3个方法
+
+1. 使用kafka 自带的命令行工具kafka-consumer-groups.sh
+2. 使用java consumer api编程
+3. 使用kafka 自带的JMX 监控指标
+
 ## 生产端优化
 
 ### 分区策略
