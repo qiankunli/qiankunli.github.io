@@ -58,3 +58,44 @@ A Java virtual machine crash is analogous to getting a Windows Blue Screen of De
 A crash, or fatal error, causes a process to terminate abnormally. There are various possible reasons for a crash. For example, a crash can occur due to a bug in the Java HotSpot VM, in a system library, in a Java SE library or an API, in application native code, or even in the operating system (OS). External factors, such as resource exhaustion in the OS can also cause a crash.
 
 Crashes caused by bugs in the Java HotSpot VM or in the Java SE library code are rare.
+
+## tomcat 进程突然关闭（未完成）
+
+[Tomcat进程意外退出的问题分析](https://www.jianshu.com/p/0ed131c2e76e)
+
+监控软件跟踪到 日志显示 如下
+
+	{
+	    "appName": "xxx", 
+	    "blockedCount": 8656, 
+	    "blockedTime": -1, 
+	    "hostname": "xx", 
+	    "inNative": false, 
+	    "lockOwnerId": 0, 
+	    "stackTrace": "sun.misc.Unsafe.park(Native Method)
+	java.util.concurrent.locks.LockSupport.parkNanos(LockSupport.java:215)
+	java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject.awaitNanos(AbstractQueuedSynchronizer.java:2078)
+	java.util.concurrent.LinkedBlockingQueue.poll(LinkedBlockingQueue.java:467)
+	org.springframework.amqp.rabbit.listener.BlockingQueueConsumer.nextMessage(BlockingQueueConsumer.java:188)
+	org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer.doReceiveAndExecute(SimpleMessageListenerContainer.java:466)
+	org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer.receiveAndExecute(SimpleMessageListenerContainer.java:455)
+	org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer.access$300(SimpleMessageListenerContainer.java:58)
+	org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer$AsyncMessageProcessingConsumer.run(SimpleMessageListenerContainer.java:548)
+	java.lang.Thread.run(Thread.java:745)
+	", 
+	    "suspended": false, 
+	    "threadID": 419, 
+	    "threadName": "SimpleAsyncTaskExecutor-171", 
+	    "threadState": "TIMED_WAITING", 
+	    "timestamp": 1526904360000, 
+	    "waitedCount": 3685416, 
+	    "waitedTime": -1
+	}
+
+看懂这个公式 表示的问题，有助于了解问题，比如waitedCount 的含义等
+
+java 进程挂掉的几个分析方向
+
+1. 在jvm 脚本中 增加 -XX:+HeapDumpOnOutOfMemoryError 看看进程退出时的堆内存数据
+2. 被Linux OOM killer 干掉。该killer 会在内存不足的时候 kill 掉任何不受保护的进程，从而释放内存，保证kernel 的运行。若进程 是被 killer 干掉的，则`/var/log/messages` 会有相关的日志，比如`Out of memory：Kill process 31201(java) score 783 or sacrifice child`，也可以使用`dmesg | egrep -i ‘killed process’` 此时通常有两个办法：将自己的进程设置为受保护；找一个内存富余点的服务器。==> 分析下挂掉的几次 是否是同一台服务器。
+	
