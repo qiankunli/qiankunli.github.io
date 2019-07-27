@@ -98,6 +98,8 @@ and provides fine grained control over the communication between Kafka broker an
 
 **主动拉取 是kafka 的一个重要特征，不仅是consumer 主动拉取broker， broker partition follower 也是主动拉取leader**。
 
+![](/public/upload/scala/kafka_replica_follower.png)
+
 ### KafkaConsumer线程安全
 
     private final AtomicLong currentThread = new AtomicLong(NO_CURRENT_THREAD);

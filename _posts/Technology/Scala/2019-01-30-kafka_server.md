@@ -106,6 +106,18 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 
 副本机制可以保证数据的持久化或消息不丢失，但倘若Leader副本积累了太多的数据以至于单台 Broker 机器都无法容纳了，此时应该怎么办呢？如果你了解其他分布式系统，你可能听说过分片、分区域等提法，比如 MongoDB 和 Elasticsearch 中的 Sharding、HBase 中的 Region，其实它们都是相同的原理，只是 Partitioning 是最标准的名称。
 
+## 副本
+
+follower replica是不对外提供服务的，只是定期地异步拉取领导者副本中的数据而已。既然是异步的，就存在着不可能与 Leader 实时同步的风险。
+
+
+
+![](/public/upload/scala/kafka_replica_follower.png)
+
+Kafka 引入了 In-sync Replicas，也就是所谓的 ISR 副本集合。ISR 中的副本都是与 Leader 同步的副本，相反，不在 ISR 中的追随者副本就被认为是与 Leader 不同步的。那么，到底什么副本能够进入到 ISR 中呢？
+
+这个标准就是 Broker 端参数 `replica.lag.time.max.ms` 参数值。这个参数的含义是 Follower 副本能够落后 Leader 副本的最长时间间隔，当前默认值是 10 秒。这就是说，只要一个 Follower 副本落后 Leader 副本的时间不连连续超过 10 秒，那么 Kafka 就认为该 Follower 副本与 Leader 是同步的
+
 ## zookeeper
 
 ### 为什么要zookeeper，因为关联业务要交换元数据
