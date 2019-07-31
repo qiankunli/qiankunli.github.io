@@ -68,6 +68,18 @@ kafka 服务端核心是 KafkaServer，KafkaServer 没什么特别的，聚合�
 
 从单机角度看，自定义协议 + 主流程 + 旁路subsystem，与mysql 有点神似。
 
+### 请求处理
+
+![](/public/upload/scala/kafka_server_request_process.png)
+
+kafka 的请求多达45种（2.3版本），分为两类：数据类请求；控制类请求。
+
+当网络线程拿到请求后，它不是自己处理，而是将请求放入到一个共享请求队列中。Broker 端还有个 IO 线程池，负责从该队列中取出请求，执行真正的处理。如果是 PRODUCE 生产请求，则将消息写入到底层的磁盘日志中；如果是 FETCH 请求，则从磁盘或页缓存中读取消息。
+
+上图的请求处理流程对于所有请求都是适用的，但因为控制类请求的重要性，社区于 2.3 版本正式实现了数据类请求和控制类请求的分离。
+
+
+
 ### 写日志过程
 
 ![](/public/upload/scala/kafka_server_write_log.png)
