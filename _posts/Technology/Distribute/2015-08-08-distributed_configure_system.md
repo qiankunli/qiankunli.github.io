@@ -125,6 +125,82 @@ etcd启动时，有三种模式`static`,`etcd Discovery`和`DNS Discovery`三种
 
 集群配置时，集群有哪些节点，已在所有节点的配置文件中讲明，比如这里的`server.1,server.2,server.3`
 
+### consul
+
+因为consul 是新近流行的，所以专门介绍一下
+
+[官网](https://www.consul.io/) [github](https://github.com/hashicorp/consul)
+
+Consul 和其它配置中心通用的一些特性
+
+1. Service Discovery，比较有特色的是支持dns 或http interface
+2. Key/Value Storage - A flexible key/value store enables storing dynamic configuration, feature flagging, coordination, leader election and more. The simple HTTP API makes it easy to use anywhere.
+
+Consul 独有支持的一些特性
+
+1. Health Checking - Health Checking enables Consul to quickly alert operators about any issues in a cluster. The integration with service discovery prevents routing traffic to unhealthy hosts and enables service level circuit breakers. 没有HealthCheck时，zk 一般通过心跳做简单判断
+2. Multi-Datacenter - Consul is built to be datacenter aware, and can support any number of regions without complex configuration.
+
+![](/public/upload/distribute/consul_arch.png)
+
+[Consul 集群部署](https://www.hi-linux.com/posts/28048.html)
+
+consul 两个角色：server，client（都叫consul agent）。 先说server 的安装，假设存在192.168.60.100,192.168.60.101,192.168.60.102 三个节点
+
+    nohup consul agent -server -bootstrap -syslog \ ## -bootstrap 只需一个节点即可
+        -ui-dir=/opt/consul/web \
+        -data-dir=/opt/consul/data \
+        -config-dir=/opt/consul/conf \
+        -pid-file=/opt/consul/run/consul.pid \
+        -client='127.0.0.1 192.168.60.100' \
+        -bind=192.168.60.100 \
+        -node=192.168.60.100 2>&1 &
+
+每个server 节点相机改下 ip地址即可。
+
+当一个Consul agent启动后，它并不知道其它节点的存在，它是一个孤立的单节点集群。它必须加入到一个现存的集群来感知到其它节点的存在。
+
+    consul join --http-addr 192.168.60.100:8500 192.168.60.101
+    consul join --http-addr 192.168.60.100:8500 192.168.60.102
+
+然后执行 `consul member` 即可列出当前的集群状态。 
+
+Consul默认是在前台运行的，所以使用systemd 来启动和consul 是最佳方案。
+
+`/etc/systemd/system/consul.service`
+
+    [Unit]
+    Description=Consul service discovery agent
+    Requires=network-online.target
+    After=network-online.target
+
+    [Service]
+    #User=consul
+    #Group=consul
+    EnvironmentFile=-/etc/default/consul
+    Environment=GOMAXPROCS=2
+    Restart=on-failure
+    #ExecStartPre=[ -f "/opt/consul/run/consul.pid" ] && /usr/bin/rm -f /opt/consul/run/consul.pid
+    ExecStartPre=-/usr/local/bin/consul configtest -config-dir=/opt/consul/conf
+    ExecStart=/usr/local/bin/consul agent $CONSUL_OPTS
+    ExecReload=/bin/kill -HUP $MAINPID
+    KillSignal=SIGTERM
+    TimeoutStopSec=5
+
+    [Install]
+    WantedBy=multi-user.target
+
+`/etc/default/consul`
+
+CONSUL_OPTS="-server -syslog -data-dir=/opt/consul/data -config-dir=/opt/consul/conf -pid-file=/opt/consul/run/consul.pid -client=0.0.0.0 -bind=192.168.60.100 -join=192.168.60.100 -node=192.168.60.100"
+
+
+为什么要有一个 consul client？
+
+1. 因为除了consul server外，consul 推荐数据中心所有的节点上部署 consul client ，这样所有的服务只需与本地的consul client 交互即可，业务本身无需感知 consul server 的存在。PS： 有点service mesh的意思
+2. consul 的一个重要特性是健康检查，就像Kubernetes 一样 可以为容器注册一个readinessProbe，如果让有限数量的consul server 去执行数据中心成百上千服务的healthcheck，负担就太大了。
+
+consul 启动时，默认有一个`-dc` 参数，默认是dc1。
 
 ## 数据模型
 
@@ -135,6 +211,8 @@ ZooKeeper的数据结构, 与普通的文件系统类似，每个节点称为一
 1. stat. 此为状态信息, 描述该znode的版本, 权限等信息.
 2. data. 与该znode关联的数据.
 3. children. 该znode下的子节点.
+
+
 
 ## 小结
 
