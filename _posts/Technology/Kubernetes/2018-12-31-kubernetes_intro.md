@@ -102,6 +102,3 @@ A Container Engine cluster is a group of Compute Engine instances running Kubern
 3. Controller Manager 是实现任务调度的
 4. Scheduler 是用来做资源调度的
 
-### 一位大牛的整理
-
-![](/public/upload/kubernetes/kubernetes_impl.jpg)
