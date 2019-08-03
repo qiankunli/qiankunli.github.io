@@ -78,13 +78,16 @@ kafka 的请求多达45种（2.3版本），分为两类：数据类请求；控
 
 上图的请求处理流程对于所有请求都是适用的，但因为控制类请求的重要性，社区于 2.3 版本正式实现了数据类请求和控制类请求的分离。
 
+### 控制器
 
+Broker 在启动时，会尝试去 ZooKeeper 中创建/controller 节点。Kafka 当前选举控制器的规则是：第一个成功创建 /controller 节点的 Broker 会被指定为控制器。
 
-### 写日志过程
+![](/public/upload/scala/kafka_controller.png)
 
-![](/public/upload/scala/kafka_server_write_log.png)
+假定最开始Broker 0 是控制器。当 Broker 0 宕机后，ZooKeeper 通过 Watch 机制感知到并删除了 `/controller` 临时节点。之后，所有存活的 Broker 开始竞选新的控制器身份。Broker 3 最终赢得了选举，成功地在 ZooKeeper 上重建了 `/controller` 节点。之后，Broker 3 会从ZooKeeper 中读取集群元数据信息，并初始化到自己的缓存中。至此，控制器的 Failover 完成，可以行使正常的工作职责了。
 
 ## 日志存储
+
 
 ### 整体思想
 
@@ -114,15 +117,16 @@ kafka 的请求多达45种（2.3版本），分为两类：数据类请求；控
 
 当写满了一个日志段后，Kafka 会自动切分出一个新的日志段，并将老的日志段封存起来。Kafka 在后台还有定时任务会定期地检查老的日志段是否能够被删除，从而实现回收磁盘空间的目的。
 
-## 分区
+### 写日志过程
+
+![](/public/upload/scala/kafka_server_write_log.png)
+
+## 分区 and 副本
 
 副本机制可以保证数据的持久化或消息不丢失，但倘若Leader副本积累了太多的数据以至于单台 Broker 机器都无法容纳了，此时应该怎么办呢？如果你了解其他分布式系统，你可能听说过分片、分区域等提法，比如 MongoDB 和 Elasticsearch 中的 Sharding、HBase 中的 Region，其实它们都是相同的原理，只是 Partitioning 是最标准的名称。
 
-## 副本
 
 follower replica是不对外提供服务的，只是定期地异步拉取领导者副本中的数据而已。既然是异步的，就存在着不可能与 Leader 实时同步的风险。
-
-
 
 ![](/public/upload/scala/kafka_replica_follower.png)
 
