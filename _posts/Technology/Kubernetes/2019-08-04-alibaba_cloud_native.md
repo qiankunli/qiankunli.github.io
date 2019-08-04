@@ -36,4 +36,7 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 ## 向阿里学习什么？
 
+1. 一切问题 都可以变着法儿用技术问题去解决。
+2. 就一个故障恢复，想不透的只能空口抱怨，若是想透了， 拉一个部门这个活儿都干不完。
+
 ![](/public/upload/kubernetes/fault_analysis_handle.png)
