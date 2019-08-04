@@ -134,6 +134,19 @@ Kafka 引入了 In-sync Replicas，也就是所谓的 ISR 副本集合。ISR 中
 
 这个标准就是 Broker 端参数 `replica.lag.time.max.ms` 参数值。这个参数的含义是 Follower 副本能够落后 Leader 副本的最长时间间隔，当前默认值是 10 秒。这就是说，只要一个 Follower 副本落后 Leader 副本的时间不连连续超过 10 秒，那么 Kafka 就认为该 Follower 副本与 Leader 是同步的
 
+![](/public/upload/scala/kafka_high_watermark.png)
+
+
+
+我们假设这是某个分区 Leader 副本的高水位图。在分区高水位以下的消息被认为是已提交消息，反之就是未提交消息。消费者只能消费已提交消息，即图中位移小于 8 的所有消息。图中还有一个日志末端位移的概念，即 Log End Offset，简写是 LEO。它表示副本写入下一条消息的位移值。Kafka 所有副本都有对应的高水位和 LEO 值，只不过 Leader 副本比较特殊，Kafka 使用 Leader 副本的高水位来定义所在分区的高水位。
+
+通过高水位，Kafka 既界定了消息的对外可见性（高水位之前的），又实现了异步的副本同步机制（高水位与LEO 之间的）。
+
+||leader replica|follower replica|
+|---|---|---|
+|leo|接收到producer 发送的消息，写入到本地磁盘，更新其leo|follower replica从leader replica拉取消息，会告诉leader replica 从哪个位移处开始拉取<br>写入到本地磁盘后，会更新其leo|
+|高水位|`currentHW = min(currentHW,LEO-1，LEO-2，……，LEO-n)`<br>所有replica leo的变化都会引起HW的重新计算|follower replica 更新完leo 之后，会比较其leo 与leader replica 发来的高水位值，用两者较小值作为自己的高水位|
+
 ## zookeeper
 
 ### 为什么要zookeeper，因为关联业务要交换元数据
