@@ -1,14 +1,14 @@
 ---
 
 layout: post
-title: 聊聊并发
+title: 那些年梳理过的并发
 category: 架构
 tags: Architecture
 keywords: window
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -19,6 +19,8 @@ keywords: window
 ## 硬件对软件的影响
 
 [硬件对软件设计的影响](http://qiankunli.github.io/2018/01/07/hardware_software.html)
+
+[AQS1——并发相关的硬件与内核支持](http://qiankunli.github.io/2016/03/13/aqs.html)
 
 ## 共享内存 vs 消息传递
 
@@ -40,8 +42,17 @@ keywords: window
 
 ## 并发模型
 
-[多线程设计模式/《Concurrency Models》笔记
-](http://qiankunli.github.io/2015/06/19/Threads_Pattern.html)
+[多线程设计模式/《Concurrency Models》笔记](http://qiankunli.github.io/2015/06/19/Threads_Pattern.html)
+
+[从Go并发编程模型想到的](http://qiankunli.github.io/2017/02/04/go_concurrence.html)
+
+[java系并发模型的发展](http://qiankunli.github.io/2017/09/05/akka.html)
+
+## 异步
+
+[异步执行抽象——Executor与Future](http://qiankunli.github.io/2016/07/08/executor_future.html)
+
+[netty中的线程池](http://qiankunli.github.io/2019/06/28/netty_executor.html)
 
 ## 服务器端编程
 
