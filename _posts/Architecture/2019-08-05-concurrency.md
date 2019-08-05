@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 那些年梳理过的并发
+title: 那些年追过的并发
 category: 架构
 tags: Architecture
 keywords: window
@@ -39,6 +39,10 @@ keywords: window
 ### 共享内存
 
 [JVM3——java内存模型](http://qiankunli.github.io/2017/05/02/java_memory_model.html)
+
+### 共享内存数据结构
+
+[无锁数据结构和算法](http://qiankunli.github.io/2018/10/15/lock_free.html)
 
 ## 并发模型
 
