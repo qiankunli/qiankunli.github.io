@@ -150,6 +150,52 @@ Approximate timing for various operations on a typical PC:
 |send packet US to Europe and back	|150 milliseconds = 150,000,000 nanosec|
 |上下文切换|数千个CPU时钟周期，1微秒|
 
+### 线程创建的成本
+
+2018.7.7 补充：[线程池的原理](https://toutiao.io/posts/396080/app_preview)
+我们首先来看，为什么说每次处理任务的时候再创建并销毁线程效率不高？
+
+	Thread t = new Thread();	// 此时只是在java 层面创建了一个对象
+	t.start()	
+
+native 的start 指令做了很多事情
+
+	JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
+	JVMWrapper("JVM_StartThread");
+	JavaThread *native_thread = NULL;
+	{
+		MutexLocker mu(Threads_lock);
+		if (java_lang_Thread::is_stillborn(JNIHandles::resolve_non_null(jthread)) ||
+	java_lang_Thread::thread(JNIHandles::resolve_non_null(jthread)) != NULL) {	
+			throw_illegal_thread_state = true;
+		} else {
+			jlong size =	java_lang_Thread::stackSize(JNIHandles::resolve_non_null(jthread));
+			size_t sz = size > 0 ? (size_t) size : 0;
+			native_thread = new JavaThread(&thread_entry, sz);
+			if (native_thread->osthread() != NULL) {
+				// Note: the current thread is not being used within "prepare".
+				native_thread->prepare(jthread);
+			}
+		} 
+	}
+	Thread::start(native_thread);
+	JVM_END
+	
+这段代码我也不懂，只是想表明， native 做了很多事情。包括但不限于：
+
+1. 创建一个native 线程
+2. 分配线程栈。jvm 参数`-Xss`,每个线程的堆栈大小,JDK5.0以后每个线程堆栈大小为1M,以前每个线程堆栈大小为256K.根据应用的线程所需内存大小进行调整.在相同物理内存下,减小这个值能生成更多的线程.但是操作系统对一个进程内的线程数还是有限制的,不能无限生成,经验值在3000~5000左右.小的应用，如果栈不是很深，128k应该是够用的，大的应用建议使用256k。这个选项对性能影响比较大，需要严格的测试。从这里可以看到两点：
+
+	1. 如果xss不显式设置， 新建线程时 os分配1m的空间绝对不是一个很easy的操作
+	2. 线程数量 不准确的说 是一个内存耗费问题，**在这个角度看，空间和算力有了一个对应关系。**
+3. 将java 线程 关联到 native 线程上
+
+从中可以看到：尽管java 线程和 os 线程具备一对一关系，但java 仍在jvm 层面上 为线程 维持了一些 数据结构。就好像 线程池中的线程 不是单纯的 `new Thread`，java 线程 也不是 单纯的 os 线程。
+
+如果没有这些微观细节，人就很难直观上 感受 线程池的好处。 [线程切换的成本](http://qiankunli.github.io/2018/01/07/hardware_software.html)
+
+2019.5.27补充：[Linux内核基础知识](http://blog.zhifeinan.top/2019/05/01/linux_kernel_basic.html)
+
 ### 线程切换的成本
 
 不仅创建线程的代价高，线程切换的开销也很高
