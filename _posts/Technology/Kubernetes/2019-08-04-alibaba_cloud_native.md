@@ -38,8 +38,8 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
     ![](/public/upload/kubernetes/kubernetes_multi_tenancy.png)
 
-在web级集群中动态调整Pod资源限制 https://github.com/openkruise
-大规模k8s集群下的巡检 k8s集群运维通过巡检走向AIOPS
+3. 在web级集群中动态调整Pod资源限制 https://github.com/openkruise
+4. 大规模k8s集群下的巡检 k8s集群运维通过巡检走向AIOPS
 
 ## Serverless
 
