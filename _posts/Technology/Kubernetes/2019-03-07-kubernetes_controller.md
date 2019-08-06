@@ -13,6 +13,8 @@ keywords: kubernetes scheduler
 * TOC
 {:toc}
 
+《阿里巴巴云原生实践15讲》 K8S 的关键词就是最终一致性，所有的 Controller 都会朝着最终一致 性不断 sync。PS：文章里经常出现一个词：面向终态。
+
 ## 一种新的模型
 
 [Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)

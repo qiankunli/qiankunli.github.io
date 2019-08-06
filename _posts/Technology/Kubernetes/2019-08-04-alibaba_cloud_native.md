@@ -8,7 +8,7 @@ keywords: kubernetes cni
 
 ---
 
-## 简介
+## 简介（持续更新）
 
 * TOC
 {:toc}
@@ -38,7 +38,10 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
     ![](/public/upload/kubernetes/kubernetes_multi_tenancy.png)
 
-## serverless
+在web级集群中动态调整Pod资源限制 https://github.com/openkruise
+大规模k8s集群下的巡检 k8s集群运维通过巡检走向AIOPS
+
+## Serverless
 
 相 比容器技术，Serverless 可以将资源管理的粒度更加细化，使开发者更快上手云原 生，并且倡导事件驱动模型支持业务发展。从而帮助用户解决了资源管理复杂、低频业务资源占用等问题;实现**面向资源使用**，以取代**面向资源分配**的模式。
 
