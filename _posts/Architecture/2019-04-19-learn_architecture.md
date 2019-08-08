@@ -77,6 +77,8 @@ keywords: project
 
 ### 并发读写
 
+[那些年追过的并发](http://qiankunli.github.io/2019/08/05/concurrency.html)
+
 《软件架构设计》要让各式各样的业务功能与逻辑最终在计算机系统里实现，只能通过两种操作：读和写。PS：[并发读写是线程安全的核心问题](http://qiankunli.github.io/2014/10/09/Threads.html)
 
 ![](/public/upload/architecture/high_concurrency.png)
@@ -88,6 +90,9 @@ keywords: project
 ## 业务架构
 
 《软件架构设计》为什么要区分“业务架构”和“技术架构”？要时刻意识到我们面对的是业务问题还是技术问题。
+
+1. 能够通过架构设计降低业务代码修改（对应功能的增删改）的难度吗？
+2. 如果能，如何通过架构设计降低业务代码修改的难度？
 
 ### 方法论
 
