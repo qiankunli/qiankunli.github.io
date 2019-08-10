@@ -35,6 +35,8 @@ keywords: network
 
 ### 原理
 
+![](/public/upload/linux/linux_namespace_object.png)
+
 [Namespaces in operation, part 1: namespaces overview](https://lwn.net/Articles/531114/) 是一个介绍 namespace 的系列文章，要点如下：
 
 1.  The purpose of each namespace is to wrap a particular global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource. 对global system resource的封装
@@ -93,9 +95,6 @@ namespace 简单说，就是进程的task_struct 以前都直接 引用资源id�
 
 4. network namespace 倒是没有根， 但docker 创建 veth pair，root namespace 一个，child namespace 一个。此外 为 root namespace 额外加 iptables 和 路由规则，为 各个ethxx 提供路由和数据转发，并提供跨network namesapce 通信。
 
-[Mount Point Definition](http://www.linfo.org/mount_point.html)A mount point is a directory in the currently accessible filesystem on which an additional filesystem is mounted. 对于一个linux 来说，一般顶层rootfs，然后加载`/etc/fstab` 加载那些默认的挂载点
-
-从mnt 和 network namespace 可以看到， 一个可用的 容器主要 是一个隔离的 环境，其次还需要 docker 进行 各种微操以补充。 
 
 《深入剖析kubernetes》：用户运行在容器里的应用进程，跟宿主机上的其他进程一样，都由宿主机操作系统统一管理，只不过这些被隔离的进程拥有额外设置过的Namespace 参数。而docker 在这里扮演的角色，更多的是旁路式的辅助和管理工作。 
 

@@ -13,6 +13,23 @@ keywords: network
 * TOC
 {:toc}
 
+## vfs 数据结构 / 两个关系
+
+[从文件 I/O 看 Linux 的虚拟文件系统](https://www.ibm.com/developerworks/cn/linux/l-cn-vfs/index.html)
+
+![](/public/upload/linux/linux_vfs_xmind.png)
+
+### 超级块、安装点和具体的文件系统的关系
+
+![](/public/upload/linux/linux_vfs_1.jpg)
+
+1. 被Linux支持的文件系统，都有且仅有一个file_system_type结构
+2. 每安装一个文件系统，就对应有一个超级块和安装点
+
+### 进程与超级块、文件、索引结点、目录项的关系
+
+![](/public/upload/linux/linux_vfs_2.jpg)
+
 linux系统的进程结构体有以下几个字段
 
     struct task_struct {
@@ -28,38 +45,45 @@ linux系统的进程结构体有以下几个字段
         ...
     }
 
-每个进程有一个文件系统的数据结构，还有一个打开文件的数据结构
+    struct files_struct {//打开的文件集
+            atomic_t count;              /*结构的使用计数*/
+            ……
+            int max_fds;                 /*文件对象数的上限*/
+            int max_fdset;               /*文件描述符的上限*/
+            int next_fd;                 /*下一个文件描述符*/
+            struct file ** fd;           /*全部文件对象数组*/
+            ……
+    };
+    
+    struct fs_struct {//建立进程与文件系统的关系
+            atomic_t count;              /*结构的使用计数*/
+            rwlock_t lock;               /*保护该结构体的锁*/
+            int umask；                  /*默认的文件访问权限*/
+            struct dentry * root;        /*根目录的目录项对象*/
+            struct dentry * pwd;         /*当前工作目录的目录项对象*/
+            struct dentry * altroot；    /*可供选择的根目录的目录项对象*/
+            struct vfsmount * rootmnt;   /*根目录的安装点对象*/
+            struct vfsmount * pwdmnt;    /*pwd的安装点对象*/
+            struct vfsmount * altrootmnt;/*可供选择的根目录的安装点对象*/
+    };
 
 ## 文件访问
 
-在文件系统的实现中，每个在硬盘上的结构，在内存中也对应相同格式的结构。当所有的数据结构都读到内存里面，内核就可以通过操作这些数据结构，来操作文件系统了。
-
-1. VFS 是文件系统事实上的规范，定义了挂载点、超级块、目录和索引节点等基本数据结构，定义了open/close/write/read 等基本接口
-2. 一般来说，每个文件系统在VFS层都是由挂载点、超级块、目录和索引节点组成。当挂载一个文件系统时，实际也就是创建这四个数据结构的过程，因此这四个数据结构的地位很重要，关系也很紧密。
-3. **由于VFS要求实际的文件系统必须提供以上数据结构，所以不同的文件系统在VFS层可以互相访问。**
-4. 如果进程打开了某个文件，还会创建file(文件)数据结构，这样进程就可以通过file来访问VFS的文件系统了。
-
-对于每一个进程，打开的文件都有一个文件描述符，在 files_struct 里面会有文件描述符数组。每一个文件描述符是这个数组的下标，里面的内容指向一个 file 结构，表示打开的文件。这个结构里面有这个文件对应的 inode，最重要的是这个文件对应的操作 file_operation。如果操作这个文件，就看这个file_operation 里面的定义了。
+查找时，在遍历路径的过程中，会逐层地将各个路径组成部分解析成目录项对象，如果此目录项对象在目录项缓存中，则直接从缓存中获得；如果该目录项在缓存中不存在，则进行一次实际的读盘操作，从磁盘中读取该目录项所对应的索引节点。得到索引节点后，则建立索引节点与该目录项的联系。如此循环，直到最终找到目标文件对应的目录项，也就找到了索引节点，这样就建立了文件对象与实际的物理文件的关联。
 
 ![](/public/upload/linux/linux_file_class_diagram.png)
 
-如果说 file 结构是一个文件打开以后才创建的，dentry 是放在一个 dentry cache 里面的，文件关闭了，他依然存在，因而他可以更长期的维护内存中的文件的表示和硬盘上文件的表示之间的关系。
+文件对象所对应的文件操作函数 列表是通过索引结点的域i_fop得到的
 
-## mount ==> 使磁盘上的文件可以被访问
+## mount 过程
 
 一个磁盘如何被使用？
 
 1. `insmod xx.ko` 加载块设备驱动
 2. `mknod /dev/xx type major minor` 创建设备文件，实质将文件操作与设备驱动程序关联，对于字符设备，操作`/dev/xx`便是读写字符设备了，对于块设备，会复杂一点。
-3. 例如，`mount -t ext3 /dev/sdb /mnt/alan`，`/dev/sdb`块设备被mount到`/mnt/alan`目录。mount会调用 `ext3_mount->mount_bdev`，mount_bdev 根据 /dev/xxx 这个名字，找到相应的设备并打开它，然后根据打开的设备文件，**填充 ext3 文件系统的 super_block**。`/dev/sdb`的inode 结构是指向设备的，`/mnt/sdb` 的inode 结构是指向ext3 文件系统的。
+3. 例如，`mount -t ext3 /dev/sdb /mnt/alan`，`/dev/sdb`块设备被mount到`/mnt/alan`目录。
 
-**访问块设备要解决的问题是：将对 VFS 目录树中某一目录的操作转化为具体安装到其上的实际文件系统的对应操作，进一步转化为对块设备的操作**。insmod、mknod、mount 加载驱动、创建设备文件，加载super block等来打通上述环节。
-
-对目录或文件的操作将最终由目录或文件所对应的 inode 结构中的 i_op 和 i_fop 所指向的函数表中对应的函数来执行。即对 `/mnt/alan` 目录所对应的 inode 中 i_op 和 i_fop 的调用转换到 `/dev/sdb`上文件系统根目录所对应的 inode 中 i_op 和 i_fop 的操作。
-
-### 实现原理
-
-mount系统调用
+那么mount 如何实现这个神奇的效果呢？mount系统调用 入口
 
     SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name, char __user *, type, unsigned long, flags, void __user *, data){
         ......
@@ -67,7 +91,34 @@ mount系统调用
         ......
     }
 
-接下里的调用链：do_mount->do_new_mount->vfs_kern_mount。
+接下里的调用链：do_mount->do_new_mount
+
+    static int do_new_mount(struct path *path, const char *fstype, int flags,
+                int mnt_flags, const char *name, void *data)
+    {
+        ...
+        mnt = vfs_kern_mount(type, flags, name, data);
+        ...
+        err = do_add_mount(real_mount(mnt), path, mnt_flags);
+        ...
+    }
+
+do_new_mount()函数主要分成两大部分：
+
+1. 建立vfsmount对象和superblock对象，必要时从设备上获取文件系统元数据；
+2. 将vfsmount对象加入到mount树和Hash Table中，并且将原来的dentry对象无效掉。
+
+`/dev/sdb`被mount之后，用户想要访问该设备上的一个文件ab.c，假设该文件的地址为：`/mnt/alan/ab.c`。
+
+1. 在打开该文件的时候，首先需要进行path解析。
+2. 在解析到`/mnt/alan`的时候，得到`/mnt/alan`的dentry目录项，并且发现该目录项已经被标识为DCACHE_MOUNTED。
+2. 之后，会采用`/mnt/alan`计算HASH值去检索VFSMOUNT Hash Table，得到对应的vfsmount对象。
+3. 然后采用vfsmount指向的mnt_root目录项替代`/mnt/alan`原来的dentry，从而实现了dentry和inode的重定向。
+4. 在新的dentry的基础上，解析程序继续执行，最终得到表示ab.c文件的inode对象。
+
+总结一下就是：[Mount Point Definition](http://www.linfo.org/mount_point.html)The mount point becomes the root directory of the newly added filesystem, and that filesystem becomes accessible from that directory. 
+
+### vfs_kern_mount
 
     struct vfsmount *
     vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void *data){
@@ -85,7 +136,24 @@ mount系统调用
         return &mnt->mnt;
     }
 
-vfs_kern_mount 先是创建 struct mount 结构，每个挂载的文件系统都对应于这样一个结构。
+    struct dentry * mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
+    {
+        struct dentry *root;
+        struct super_block *sb;
+        char *secdata = NULL;
+        int error = -ENOMEM;
+        ...
+        root = type->mount(type, flags, name, data);
+        ...
+        sb = root->d_sb;
+        ...	
+    }
+
+
+1. alloc_vfsmnt，vfs_kern_mount 先是创建 struct mount 结构，内部包含一个vfsmount 结构
+2. mount_fs，mount_fs()函数中会调用特定文件系统的mount方法，对于 `/dev/sdb`设备上的ext3文件系统，ext3_mount--> mount_bdev，Mount_bdev()函数主要完成superblock对象的内存初始化，并且加入到全局superblock链表中。
+3. Vfsmount中的mnt_root指向superblock对象的s_root根目录项。
+
 
     struct mount {
         struct hlist_node mnt_hash;
@@ -111,34 +179,15 @@ vfs_kern_mount 先是创建 struct mount 结构，每个挂载的文件系统都
         int mnt_flags;
     } __randomize_layout;
 
+### do_add_mount
 
-mount并没有直接改变`/mnt/alan`目录所对应的 inode 结构中的 i_op 和 i_fop 指针，而且 `/mnt/alan`所对应的 dentry结构仍然在 VFS 的目录树中，并没有被从其中隐藏起来，那么这之间的转化到底是如何实现的呢？如果读者阅读过 Linux 关于文件系统部分的代码，应该知道 path_lookup() 函数在整个 Linux 繁琐的文件系统代码中属于一个重要的基础性的函数。简单说来，这个函数用于解析文件路径名。从 VFS 的操作到实际文件系统操作的转化就是由它完成的。当 path_lookup() 函数搜索到 `/mnt/alan`时，返回`/dev/sdb` 的根节点dentry
+do_add_mount--> graft_tree--> attach_recursive_mnt
 
-### 挂载点
-
-[Mount Point Definition](http://www.linfo.org/mount_point.html)
-
-1. A filesystem is a hierarchy of directories (also referred to as a directory tree) that is used to organize files on a computer system. On Linux and other Unix-like operating systems, at the very top of this hierarchy is the root directory. 一个文件 系统是一个directory tree，根节点被称为root directory
-2. The mount point becomes the root directory of the newly added filesystem, and that filesystem becomes accessible from that directory. 
-3. `/etc/fstab` 列出vfs 当前挂载的文件系统以及它们的挂载点
-
-		UUID=2d147dd5-0227-40e5-a143-1923112cb1bd /                       ext4    defaults        1 1
-		UUID=1d44ef13-382c-49e5-925a-9eac34bc575d swap                    swap    defaults        0 0
-		tmpfs                   /dev/shm                tmpfs   defaults        0 0
-		devpts                  /dev/pts                devpts  gid=5,mode=620  0 0
-		sysfs                   /sys                    sysfs   defaults        0 0
-		proc                    /proc                   proc    defaults        0 0
-		
+将创建的vfsmount对象加入到mount树和VFSMOUNT Hash Table中，并且将老的dentry目录项标识成DCACHE_MOUNTED，一旦dentry被标识成DCACHE_MOUNTED，也就意味着在访问路径上对其进行了屏蔽。
 
 ## 挂载方式
 
 **如果将mount的过程理解为：inode被替代的过程。**除了将设备mount到rootfs上，根据被替代方式的不同，mount的花样可多了。
-
-||一般用途|备注|
-|---|---|---|
-|mount|挂载设备|**需要加载设备的super block**，关联到inode| 
-|bind mount|挂载目录|替代inode| 
-|union mount|合并目录|有机的整合几个inode为一个新的inode，替代原来的inode| 
 
 ### bind mount
 
@@ -169,13 +218,6 @@ rootfs是基于内存的文件系统，所有操作都在内存中完成；也�
 
 参见`https://www.kernel.org/doc/Documentation/filesystems/ramfs-rootfs-initramfs.txt`
 
-What is rootfs?
-
-Rootfs is a special instance of ramfs (or tmpfs, if that's enabled), which is
-always present in 2.6 systems.it's smaller and simpler for the kernel
-to just make sure certain lists can't become empty.Most systems just mount another filesystem over rootfs and ignore it（一般情况下，通过某种文件系统挂载内容至挂载点的话，挂载点目录中原先的内容将会被隐藏）.
-
-
 What is initramfs?
 
 All 2.6 Linux kernels contain a gzipped "cpio" format archive, which is
@@ -189,33 +231,6 @@ to locate and mount a root partition, then exec some variant of /sbin/init
 out of that.
 
 所以一个linux的启动过程经历了rootfs ==> 挂载initramfs ==> 挂载磁盘上的真正的fs
-
-为什么要有initrd？
-
-linux系统在启动时，会执行文件系统中的`/sbin/init`进程完成linux系统的初始化，执行`/sbin/init`进程的前提是linux内核已经拿到了存在硬盘上的系统镜像文件（加载设备驱动，挂载文件系统）。linux 发行版必须适应各种不同的硬件架构，将所有的驱动编译进内核是不现实的。Linux发行版在内核中只编译了基本的硬件驱动
-，在 linux内核启动前，boot loader会将存储介质中的initrd文件(cpio是其中的一种)加载到内存，内核启动时会在访问真正的根文件系统前先访问该内存中的initrd文件系统，执行initrd文件系统的某个文件（不同的linux版本差异较大），扫描设备，加载驱动。
-
-## 几大文件系统
-
-文件系统有内存文件系统，磁盘文件系统，还有基于磁盘文件系统之上的联合文件系统。
-
-aufs,vfs,devicemapper,btrfs,它们之间的关系。参见[容器（Docker）概念中存储驱动的深入解析](http://weibo.com/ttarticle/p/show?id=2309404039168383667054)
-
-1. vfs，屏蔽底层的文件系统差异，比如ext2，ext3。在docker 场景下，vfsgraph指的是不提供共享layer的特性。对于vfs来说，Driver.create layer最上层，就是将镜像所有的分层依次拷贝到静态的子文件夹中，然后将这个文件夹挂载到容器的根文件系统。
-
-2. 联合文件系统，aufs,它不是一个真正的文件系统，如ext4或者xfs，它仅仅是站在一个已有的文件系统上提供了这些功能。对于aufs来说，Driver.create layer最上层，就是创建一个新的文件夹（读写layer），将镜像的所有只读层挂进来，然后将这个文件夹挂载到容器的根文件系统。至于说，写时复制，这个就是aufs 文件系统的功能，跟graphDriver就没有关系了。
-
-3. 特定文件系统的实现（devicemapper，btrfs等）。是一个具体的文件系统，有一定的内置特性，比如快照。在这每一个情形中，你都需要新建一个磁盘(准确的说是块设备)并用该文件系统格式化磁盘（或者为了快速测试，用循环挂载的文件作为磁盘），来使用这些选项作为Docker引擎的存储后端。CentOS 7开始，预设的文件系统由原来的EXT4变成了XFS文件系统
-
-
-所以，总结起来，参见[Supported Filesystems](http://www.projectatomic.io/docs/filesystems/)
-
-
-All backends except the vfs one shares diskspace between base images. However, they work on different levels, so the behaviour is somewhat different. Both devicemapper and btrfs share data on the **block level**, so a single change in a file will cause just the block containing that byte being duplicated. However the aufs backend works on the **file level**, so any change to a file means the entire file will be copied to the top layer and then changed there. The exact behaviour here therefore depends on what kind of write behaviour an application does.
-
-However, any kind of write-heavy load(写负载比较大) inside a container (such as databases or large logs) should generally be done to a volume.（共享文件系统有共享文件系统的问题，所以写负载比较大的操作，还要弄到volume中） A volume is a plain directory from the host mounted into the container, which means it has none of the overhead(天花板) that the storage backends may have. It also means you can easily access the data from a new container if you update the image, or if you want to access the same data from multiple concurrent containers.（这段解释了我们为什么要用volume）
-
-## 引用
 
 [存储之道 - 51CTO技术博客 中的《一个IO的传奇一生》](http://alanwu.blog.51cto.com/3652632/d-8)
 
