@@ -77,6 +77,8 @@ linux系统的进程结构体有以下几个字段
 
 ## mount 过程
 
+[linux文件系统之mount流程分析](https://www.cnblogs.com/cslunatic/p/3683117.html)
+
 一个磁盘如何被使用？
 
 1. `insmod xx.ko` 加载块设备驱动
