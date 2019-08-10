@@ -19,13 +19,6 @@ keywords: network
 
 ![](/public/upload/linux/linux_vfs_xmind.png)
 
-### 超级块、安装点和具体的文件系统的关系
-
-![](/public/upload/linux/linux_vfs_1.jpg)
-
-1. 被Linux支持的文件系统，都有且仅有一个file_system_type结构
-2. 每安装一个文件系统，就对应有一个超级块和安装点
-
 ### 进程与超级块、文件、索引结点、目录项的关系
 
 ![](/public/upload/linux/linux_vfs_2.jpg)
@@ -66,6 +59,15 @@ linux系统的进程结构体有以下几个字段
             struct vfsmount * pwdmnt;    /*pwd的安装点对象*/
             struct vfsmount * altrootmnt;/*可供选择的根目录的安装点对象*/
     };
+
+### 超级块、安装点和具体的文件系统的关系
+
+linux 和 windows 一个很大区别就是，window 有c盘、d盘等，而linux 则都是从根目录开始，好像只有一个磁盘一样。为了实现这个效果，linux 就要引入vfsmount 等概念。
+
+![](/public/upload/linux/linux_vfs_1.jpg)
+
+1. 被Linux支持的文件系统，都有且仅有一个file_system_type结构
+2. 每安装一个文件系统，就对应有一个超级块和安装点
 
 ## 文件访问
 
