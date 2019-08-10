@@ -25,6 +25,10 @@ keywords: network
 
 ## namespace
 
+![](/public/upload/linux/linux_namespace_object.png)
+
+《深入剖析kubernetes》：用户运行在容器里的应用进程，跟宿主机上的其他进程一样，都由宿主机操作系统统一管理，只不过这些被隔离的进程拥有额外设置过的Namespace 参数。而docker 在这里扮演的角色，更多的是旁路式的辅助和管理工作。 
+
 ### 来源
 
 命名空间最初是用来解决命名唯一性问题的，即解决不同编码人员编写的代码模块在合并时可能出现的重名问题。
@@ -34,8 +38,6 @@ keywords: network
 我们不想让进程之间相互影响，就必须将它们隔离起来，最好都不知道对方的存在。而所谓的隔离，便是隔离他们使用的资源（比如），进而资源的管理也不在是全局的了。
 
 ### 原理
-
-![](/public/upload/linux/linux_namespace_object.png)
 
 [Namespaces in operation, part 1: namespaces overview](https://lwn.net/Articles/531114/) 是一个介绍 namespace 的系列文章，要点如下：
 
@@ -68,37 +70,37 @@ namespace 简单说，就是进程的task_struct 以前都直接 引用资源id�
 
 [Separation Anxiety: A Tutorial for Isolating Your System with Linux Namespaces](https://www.toptal.com/linux/separation-anxiety-isolating-your-system-with-linux-namespaces) 该文章 用图的方式，解释了各个namespace 生效的机理，值得一读。其实要理解的比较通透，首先就得对 linux 进程、文件、网络这块了解的比较通透。**此外，虽说都是隔离，但他们隔离的方式不一样，比如root namespace是否可见，隔离的资源多少（比如pid只隔离了pid，mnt则隔离了root directory 和 挂载点，network 则隔离网卡、路由表、端口等所有网络资源），隔离后跨namespace如何交互**
 
-1. 进程和 namespace 通常是多对多关系
-2. 进程是树结构的，每个namespace 理解的 根不一样，pid root namespace  最终提供完整视图
+### pid namespace
 
-	![](/public/upload/linux/pid_namespace.png)
+进程是树结构的，每个namespace 理解的 根不一样，pid root namespace  最终提供完整视图
 
-3. mount 也是有树的，每个namespace 理解的根 不一样, 挂载点目录彼此看不到. task_struct  ==> nsproxy 包括 mnt_namespace。
+![](/public/upload/linux/pid_namespace.png)
 
-		struct mnt_namespace {
-			atomic_t		count;
-			struct vfsmount *	root;///当前namespace下的根文件系统
-			struct list_head	list; ///当前namespace下的文件系统链表（vfsmount list）
-			wait_queue_head_t poll;
-			int event;
-		};
-		struct vfsmount {
-			...
-			struct dentry *mnt_mountpoint;	/* dentry of mountpoint,挂载点目录 */
-			struct dentry *mnt_root;	/* root of the mounted tree,文件系统根目录 */
-			...
-		}
+### mount namespace
+
+mount 也是有树的，每个namespace 理解的根 不一样, 挂载点目录彼此看不到. task_struct  ==> nsproxy 包括 mnt_namespace。
+
+    struct mnt_namespace {
+        atomic_t		count;
+        struct vfsmount *	root;///当前namespace下的根文件系统
+        struct list_head	list; ///当前namespace下的文件系统链表（vfsmount list）
+        wait_queue_head_t poll;
+        int event;
+    };
+    struct vfsmount {
+        ...
+        struct dentry *mnt_mountpoint;	/* dentry of mountpoint,挂载点目录 */
+        struct dentry *mnt_root;	/* root of the mounted tree,文件系统根目录 */
+        ...
+    }
 		
-	[Mount Point Definition](http://www.linfo.org/mount_point.html)A mount point is a directory in the currently accessible filesystem on which an additional filesystem is mounted, 对于一个linux 来说，一般顶层rootfs，然后加载`/etc/fstab` 加载那些默认的挂载点。
-	
-	只是单纯一个隔离的 mnt namespace 环境是不够的，还要"change root"，参见《自己动手写docker》P45
-
-4. network namespace 倒是没有根， 但docker 创建 veth pair，root namespace 一个，child namespace 一个。此外 为 root namespace 额外加 iptables 和 路由规则，为 各个ethxx 提供路由和数据转发，并提供跨network namesapce 通信。
-
-
-《深入剖析kubernetes》：用户运行在容器里的应用进程，跟宿主机上的其他进程一样，都由宿主机操作系统统一管理，只不过这些被隔离的进程拥有额外设置过的Namespace 参数。而docker 在这里扮演的角色，更多的是旁路式的辅助和管理工作。 
+只是单纯一个隔离的 mnt namespace 环境是不够的，还要"change root"，参见《自己动手写docker》P45
 
 《阿里巴巴云原生实践15讲》chroot 的作用是“重定向进程及其子进程的根目录到一个文件系统 上的新位置”，使得该进程再也**看不到也没法接触到这个位置上层的“世界”**。所以这 个被隔离出来的新环境就有一个非常形象的名字，叫做 Chroot Jail。
+
+### network namespace
+
+network namespace 倒是没有根， 但docker 创建 veth pair，root namespace 一个，child namespace 一个。此外 为 root namespace 额外加 iptables 和 路由规则，为 各个ethxx 提供路由和数据转发，并提供跨network namesapce 通信。
 
 ## cgroups
 

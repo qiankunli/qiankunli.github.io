@@ -156,6 +156,7 @@ do_new_mount()函数主要分成两大部分：
 2. mount_fs，mount_fs()函数中会调用特定文件系统的mount方法，对于 `/dev/sdb`设备上的ext3文件系统，ext3_mount--> mount_bdev，Mount_bdev()函数主要完成superblock对象的内存初始化，并且加入到全局superblock链表中。
 3. Vfsmount中的mnt_root指向superblock对象的s_root根目录项。
 
+相关的数据结构
 
     struct mount {
         struct hlist_node mnt_hash;
