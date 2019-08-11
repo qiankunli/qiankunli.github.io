@@ -106,8 +106,6 @@ network namespace 倒是没有根， 但docker 创建 veth pair，root namespace
 
 [使用cgroups控制进程cpu配额](http://www.pchou.info/linux/2017/06/24/cgroups-cpu-quota.html)
 
-cgroups Control Group，原来叫process group，是分配资源的基本单位。cgroup 具备继承关系，因此可以组成 hierarchy。子系统（subsystem），一个子系统就是一个（只是一个）资源控制器，子系统必须附加（attach）到一个hierarchy上才能起作用
-
 从操作上看：
 
 1. 可以创建一个目录（比如叫cgroup-test）， `mount -t cgroup -o none  cgroup-test ./cgroup-test` cgroup-test 便是一个hierarchy了，一个hierarchy 默认自动创建很多文件
@@ -146,6 +144,59 @@ cgroups Control Group，原来叫process group，是分配资源的基本单位�
 	- cpu.stat
 	
 cpu 开头的都跟cpu 子系统有关。可以一次挂载多个子系统，比如`-o cpu,mem`
+
+
+### 从左向右 ==> 从 task 结构开始找到 cgroup 结构
+
+[Docker 背后的内核知识——cgroups 资源限制](https://www.infoq.cn/article/docker-kernel-knowledge-cgroups-resource-isolation/)
+
+在图中使用的回环箭头，均表示可以通过该字段找到所有同类结构
+
+![](/public/upload/linux/linux_task_cgroup.png)
+
+### 从右向左 ==> 查看一个cgroup 有哪些task
+
+![]()(/public/upload/linux/linux_task_cgroup.png)
+
+为什么要使用cg_cgroup_link结构体呢？因为 task 与 cgroup 之间是多对多的关系。熟悉数据库的读者很容易理解，在数据库中，如果两张表是多对多的关系，那么如果不加入第三张关系表，就必须为一个字段的不同添加许多行记录，导致大量冗余。通过从主表和副表各拿一个主键新建一张关系表，可以提高数据查询的灵活性和效率。
+
+### 整体
+
+![](/public/upload/linux/linux_cgroup_object.png)
+
+在系统运行之初，内核的主函数就会对root cgroups和css_set进行初始化，每次 task 进行 fork/exit 时，都会附加（attach）/ 分离（detach）对应的css_set。
+
+struct cgroup { 
+    unsigned long flags; 
+    atomic_t count; 
+    struct list_head sibling; 
+    struct list_head children; 
+    struct cgroup *parent; 
+    struct dentry *dentry; 
+    struct cgroup_subsys_state *subsys[CGROUP_SUBSYS_COUNT]; 
+    struct cgroupfs_root *root;
+    struct cgroup *top_cgroup; 
+    struct list_head css_sets; 
+    struct list_head release_list; 
+    struct list_head pidlists;
+    struct mutex pidlist_mutex; 
+    struct rcu_head rcu_head; 
+    struct list_head event_list; 
+    spinlock_t event_list_lock; 
+};
+
+sibling,children 和 parent 三个嵌入的 list_head 负责将统一层级的 cgroup 连接成一棵 cgroup 树。
+
+### 为什么是vfs操作而不是命令行？为什么符合vfs 的关系
+
+![](/public/upload/linux/linux_cgroup.jpg)
+
+1. 对task 进行资源限制，最直觉得做法就是 task 和 subsystem 直接关联
+2. 因为task 与subsystem 是一对多关系，且想复用 subsystem，因此提取了 cgroup 作为中间层。这样想对10个进程限定 1cpu和2g内存 就不用 创建那么多`<task,subsystem>`了
+3. 如果每种 subsystem 的组合就是一个 cgroup ，则每次 新需求都要创建新的cgroup，可以将共性抽取出来，使得cgroup 具有父子/继承关系
+
+为了让 cgroups 便于用户理解和使用，也为了用精简的内核代码为 cgroup 提供熟悉的权限和命名空间管理，内核开发者们按照 Linux 虚拟文件系统转换器（VFS：Virtual Filesystem Switch）的接口实现了一套名为cgroup的文件系统，非常巧妙地用来表示 cgroups 的 hierarchy 概念，把各个 subsystem 的实现都封装到文件系统的各项操作中。除了 cgroup 文件系统以外，内核没有为 cgroups 的访问和操作添加任何系统调用。
+
 
 
 ## linux网桥
