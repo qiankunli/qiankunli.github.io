@@ -166,24 +166,24 @@ cpu 开头的都跟cpu 子系统有关。可以一次挂载多个子系统，比
 
 在系统运行之初，内核的主函数就会对root cgroups和css_set进行初始化，每次 task 进行 fork/exit 时，都会附加（attach）/ 分离（detach）对应的css_set。
 
-struct cgroup { 
-    unsigned long flags; 
-    atomic_t count; 
-    struct list_head sibling; 
-    struct list_head children; 
-    struct cgroup *parent; 
-    struct dentry *dentry; 
-    struct cgroup_subsys_state *subsys[CGROUP_SUBSYS_COUNT]; 
-    struct cgroupfs_root *root;
-    struct cgroup *top_cgroup; 
-    struct list_head css_sets; 
-    struct list_head release_list; 
-    struct list_head pidlists;
-    struct mutex pidlist_mutex; 
-    struct rcu_head rcu_head; 
-    struct list_head event_list; 
-    spinlock_t event_list_lock; 
-};
+    struct cgroup { 
+        unsigned long flags; 
+        atomic_t count; 
+        struct list_head sibling; 
+        struct list_head children; 
+        struct cgroup *parent; 
+        struct dentry *dentry; 
+        struct cgroup_subsys_state *subsys[CGROUP_SUBSYS_COUNT]; 
+        struct cgroupfs_root *root;
+        struct cgroup *top_cgroup; 
+        struct list_head css_sets; 
+        struct list_head release_list; 
+        struct list_head pidlists;
+        struct mutex pidlist_mutex; 
+        struct rcu_head rcu_head; 
+        struct list_head event_list; 
+        spinlock_t event_list_lock; 
+    };
 
 sibling,children 和 parent 三个嵌入的 list_head 负责将统一层级的 cgroup 连接成一棵 cgroup 树。
 
