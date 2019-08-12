@@ -25,8 +25,6 @@ keywords: network
 
 ## namespace
 
-![](/public/upload/linux/linux_namespace_object.png)
-
 《深入剖析kubernetes》：用户运行在容器里的应用进程，跟宿主机上的其他进程一样，都由宿主机操作系统统一管理，只不过这些被隔离的进程拥有额外设置过的Namespace 参数。而docker 在这里扮演的角色，更多的是旁路式的辅助和管理工作。 
 
 ### 来源
@@ -37,7 +35,7 @@ keywords: network
 
 我们不想让进程之间相互影响，就必须将它们隔离起来，最好都不知道对方的存在。而所谓的隔离，便是隔离他们使用的资源（比如），进而资源的管理也不在是全局的了。
 
-### 原理
+### namespace 内核数据结构
 
 [Namespaces in operation, part 1: namespaces overview](https://lwn.net/Articles/531114/) 是一个介绍 namespace 的系列文章，要点如下：
 
@@ -69,6 +67,10 @@ namespace 简单说，就是进程的task_struct 以前都直接 引用资源id�
 
 
 [Separation Anxiety: A Tutorial for Isolating Your System with Linux Namespaces](https://www.toptal.com/linux/separation-anxiety-isolating-your-system-with-linux-namespaces) 该文章 用图的方式，解释了各个namespace 生效的机理，值得一读。其实要理解的比较通透，首先就得对 linux 进程、文件、网络这块了解的比较通透。**此外，虽说都是隔离，但他们隔离的方式不一样，比如root namespace是否可见，隔离的资源多少（比如pid只隔离了pid，mnt则隔离了root directory 和 挂载点，network 则隔离网卡、路由表、端口等所有网络资源），隔离后跨namespace如何交互**
+
+### namespace 生效机制
+
+![](/public/upload/linux/linux_namespace_object.png)
 
 ### pid namespace
 
@@ -145,6 +147,9 @@ network namespace 倒是没有根， 但docker 创建 veth pair，root namespace
 	
 cpu 开头的都跟cpu 子系统有关。可以一次挂载多个子系统，比如`-o cpu,mem`
 
+### 从右向左 ==> 和docker run放在一起看 
+
+![](/public/upload/linux/linux_cgroup_docker.png)
 
 ### 从左向右 ==> 从 task 结构开始找到 cgroup 结构
 
@@ -159,6 +164,31 @@ cpu 开头的都跟cpu 子系统有关。可以一次挂载多个子系统，比
 ![]()(/public/upload/linux/linux_task_cgroup.png)
 
 为什么要使用cg_cgroup_link结构体呢？因为 task 与 cgroup 之间是多对多的关系。熟悉数据库的读者很容易理解，在数据库中，如果两张表是多对多的关系，那么如果不加入第三张关系表，就必须为一个字段的不同添加许多行记录，导致大量冗余。通过从主表和副表各拿一个主键新建一张关系表，可以提高数据查询的灵活性和效率。
+
+### 使cgroups 数据生效
+
+我们知道， 任何内存申请都是从缺页中断开始的，`handle_pte_fault ==> do_anonymous_page ==> mem_cgroup_newpage_charge（不同linux版本方法名不同） ==> mem_cgroup_charge_common ==> __mem_cgroup_try_charge`
+
+
+    static int __mem_cgroup_try_charge(struct mm_struct *mm,
+                    gfp_t gfp_mask,
+                    unsigned int nr_pages,
+                    struct mem_cgroup **ptr,
+                    bool oom){
+
+        ...
+        struct mem_cgroup *memcg = NULL;
+        ...
+        memcg = mem_cgroup_from_task(p);
+        ...
+    }
+
+`mem_cgroup_from_task ==> mem_cgroup_from_css` 
+
+    struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p){
+        ...
+        return mem_cgroup_from_css(task_subsys_state(p, mem_cgroup_subsys_id));
+    }
 
 ### 整体
 
@@ -196,8 +226,6 @@ sibling,children 和 parent 三个嵌入的 list_head 负责将统一层级的 c
 3. 如果每种 subsystem 的组合就是一个 cgroup ，则每次 新需求都要创建新的cgroup，可以将共性抽取出来，使得cgroup 具有父子/继承关系
 
 为了让 cgroups 便于用户理解和使用，也为了用精简的内核代码为 cgroup 提供熟悉的权限和命名空间管理，内核开发者们按照 Linux 虚拟文件系统转换器（VFS：Virtual Filesystem Switch）的接口实现了一套名为cgroup的文件系统，非常巧妙地用来表示 cgroups 的 hierarchy 概念，把各个 subsystem 的实现都封装到文件系统的各项操作中。除了 cgroup 文件系统以外，内核没有为 cgroups 的访问和操作添加任何系统调用。
-
-
 
 ## linux网桥
 
