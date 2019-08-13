@@ -13,6 +13,16 @@ keywords: kubernetes
 * TOC
 {:toc}
 
+## Kubernetes——集群操作系统
+
+2019.8.13：刘超《趣谈linux操作系统》
+
+最初使用汇编语言的前辈，在程序中需要指定使用的硬件资源，例如，指定使用哪个寄存器、放在内存的哪个位置、写入或者读取那个串口等等。对于这些资源的使用，需要程序员自己心里非常地清楚，要不然一旦 jump 错了位置，程序就无法运行。为了将程序员从对硬件的直接操作中解放出来，我们有了操作系统这一层，用来实现对于硬件资源的统一管理。某个程序使用哪个 CPU、哪部分内存、哪部分硬盘，都由操作系统自行分配和管理。其实操作系统最重要的事情，就是调度（当前任务需要多少资源，当前空闲多少资源，做一个适配）。因此，在内核态就产生这些模块：进程管理子系统、内存管理子系统、文件子系统、设备子系统网络子系统。这些模块通过统一的 API，也就是系统调用，对上提供服务。基于 API，用户态有很多的工具可以帮我们使用好 Linux 操作系统，比如用户管理、软件安装、软件运行、周期性进程、文件管理、网络管理和存储管理。但是到目前为止，我们能管理的还是少数几台机器。当我们面临数据中心成千上万台机器的时候，仍然非常“痛苦”。
+
+![](/public/upload/kubernetes/linux_vs_kubernetes.jpg)
+
+PS：上图很有意思的一点是，将Kubernetes 的各项机制，根据内核态和用户态做了一个梳理。
+
 2019.8.3：《阿里巴巴云原生实践15讲》读后感
 
 ![](/public/upload/kubernetes/application_delivery.jpg)
@@ -21,16 +31,9 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 我们学习linux的时候，知道linux 提供了一种抽象：一切皆文件。没有人会质疑基本单元为何是文件不是磁盘块？linux 还提供了一种抽象叫“进程”，没有人会好奇为何 linux 不让你直接操纵cpu 和 内存。一个复杂的系统，最终会在某个层面收敛起来，就好像一个web系统，搞到最后就是一系列object 的crud。类似的，如果我们要实现一个“集群操作系统”，容器的粒度未免太小。也就是说，镜像和容器之间仍然有鸿沟要去填平？kubernetes 叫pod，marathon叫Application，中文名统一叫“应用”。在这里，应用是一组容器的有机组 合，同时也包括了应用运行所需的网络、存储的需求的描述。而像这样一个“描述” 应用的 YAML 文件，放在 etcd 里存起来，然后通过控制器模型驱动整个基础设施的 状态不断地向用户声明的状态逼近，就是 Kubernetes 的核心工作原理了。“有了 Pod 和容 器设计模式，我们的**应用基础设施才能够与应用(而不是容器)进行交互和响应的能力**，实现了“云”与“应用”的直接对接。而有了声明式 API，我们的应用基础而设 施才能真正同下层资源、调度、编排、网络、存储等云的细节与逻辑解耦”。PS：笔者最近在团队管理上也有一些困惑， 其实，你直接告诉小伙伴怎么做并不是一个很好的方式，他们不自由，你也很心累。比较好的方式是做好目标管理，由他们自己不断去填平目标与现实的鸿沟。
 
-## 一些材料
+[Reasons Kubernetes is cool](https://jvns.ca/blog/2017/10/05/reasons-kubernetes-is-cool/)once you have a working Kubernetes cluster you really can set up a production **HTTP service** (“run 5 of this application, set up a load balancer, give it this DNS name, done”) with just one configuration file. 对运维来说部署java application 和 部署mysql 是两个事情，但对于k8s 来说，就是一个事情。 
 
-有时候不得不承认，一些概念可能都火了五六年了， 但在实践层面仍然是滞后。能用是不够的，好用才行。有一个大牛说过：ci/cd 和 devops 是一体两面的。比如对于java 开发来说，用物理机部署（拷贝文件、配置nginx等） 和使用k8s 发布服务一样复杂（虽说k8s可以一键发布，但理解k8s对他来说是个负担），至少前者他还懂一点。
-
-
-[Kubernetes何时才会消于无形却又无处不在？](https://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649699253&idx=1&sn=7f47db06b63c4912c2fd8b4701cb8d79&chksm=88930cd6bfe485c04b99b1284d056c886316024ba4835be8967c4266d9364cffcfedaf397acc&mpshare=1&scene=23&srcid=1102iGdvWF6lcNRaDD19ieRy%23rd)一项技术成熟的标志不仅仅在于它有多流行，还在于它有多不起眼并且易于使用。Kubernetes依然只是一个半成品，还远未达到像Linux内核及其周围操作系统组件在过去25年中所做到的那种“隐形”状态。
-
-[解读2018：我们处在一个什么样的技术浪潮当中？](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651011968&idx=1&sn=3d500660f7dd47c9fa4033bd9fa69c2f&chksm=bdbec3d38ac94ac523355e1e21f04af71e47a0841d1af0afedecc528b5eb4a5f9fe83f105a11&mpshare=1&scene=1&srcid=12217gWDeJ0aPl8BVBUycQyh#rd)Kubernetes 还是太底层了，真正的云计算并不应该是向用户提供的 Kubernetes 集群。2014 年 AWS 推出 Lambda 服务，Serverless 开始成为热词。从理论上说，Serverless 可以做到 NoOps、自动扩容和按使用付费，也被视为云计算的未来。Serverless 是我们过去 25 年来在 SaaS 中走的最后一步，因为我们已经渐渐将越来越多的职责交给了服务提供商。——Joe Emison 《为什么 Serverless 比其他软件开发方法更具优势》
-
-### 赢在orchestrator
+## 赢在orchestrator
 
 一般orchestrator 包括但不限于以下功能：
 
@@ -48,15 +51,7 @@ The unit of scheduling in Kubernetes is a pod. Essentially, this is a tightly co
 
 Kubernetes is highly extensible, from defining new workloads and resource types in general to customizing its user-facing parts, such as the CLI tool kubectl (pronounced cube cuddle).
 
-### Julia Evans 系列
-
-[Reasons Kubernetes is cool](https://jvns.ca/blog/2017/10/05/reasons-kubernetes-is-cool/)
-
-once you have a working Kubernetes cluster you really can set up a production HTTP service (“run 5 of this application, set up a load balancer, give it this DNS name, done”) with just one configuration file. 然后业务开发会说，我基于物理机虽然没有这么快，但tomcat、nginx、dns 这些都是一次就好了呀，后续的开发也是一键发布呀。k8s 优势在于：它可以横推，对开发来说部署java application 和 部署mysql 是两个事情，但对于k8s 来说，就是一个事情。 
-
-这个事情在商业上是类似，最开始都是先垂直发展，然后面横向打通。你搞电商，我搞外卖，但到最后发现物流、资金流、云计算可以打通。
-
-###  Container Engine cluster
+##  Container Engine cluster
 
 本小节主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs)的摘抄，有删减。
 
@@ -99,4 +94,11 @@ A Container Engine cluster is a group of Compute Engine instances running Kubern
 2. api server，各个组件并不是直接访问 ETCD，而是访问一个代理，这个代理是通过标准的RESTFul API，重新封装了对 ETCD 接口调用，除此之外，这个代理还实现了一些附加功能，比如身份的认证、缓存等
 3. Controller Manager 是实现任务调度的
 4. Scheduler 是用来做资源调度的
+
+## Kubernetes 仍需进一步发展
+
+[Kubernetes何时才会消于无形却又无处不在？](https://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649699253&idx=1&sn=7f47db06b63c4912c2fd8b4701cb8d79&chksm=88930cd6bfe485c04b99b1284d056c886316024ba4835be8967c4266d9364cffcfedaf397acc&mpshare=1&scene=23&srcid=1102iGdvWF6lcNRaDD19ieRy%23rd)一项技术成熟的标志不仅仅在于它有多流行，还在于它有多不起眼并且易于使用。Kubernetes依然只是一个半成品，还远未达到像Linux内核及其周围操作系统组件在过去25年中所做到的那种“隐形”状态。
+
+[解读2018：我们处在一个什么样的技术浪潮当中？](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651011968&idx=1&sn=3d500660f7dd47c9fa4033bd9fa69c2f&chksm=bdbec3d38ac94ac523355e1e21f04af71e47a0841d1af0afedecc528b5eb4a5f9fe83f105a11&mpshare=1&scene=1&srcid=12217gWDeJ0aPl8BVBUycQyh#rd)Kubernetes 还是太底层了，真正的云计算并不应该是向用户提供的 Kubernetes 集群。2014 年 AWS 推出 Lambda 服务，Serverless 开始成为热词。从理论上说，Serverless 可以做到 NoOps、自动扩容和按使用付费，也被视为云计算的未来。Serverless 是我们过去 25 年来在 SaaS 中走的最后一步，因为我们已经渐渐将越来越多的职责交给了服务提供商。——Joe Emison 《为什么 Serverless 比其他软件开发方法更具优势》
+
 
