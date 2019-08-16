@@ -171,3 +171,7 @@ spring-boot-autoconfigure `META-INF/spring.factories`内容示例
     ...
 
 总结一下就是，@EnableAutoConfiguration 会push springboot 加载各个依赖jar `META-INF/spring.factories` 中key=org.springframework.boot.autoconfigure.EnableAutoConfiguration 指定的@Configuration 类
+
+## 其它
+
+[你写的代码是别人的噩梦吗？从领域建模的必要性谈起](https://mp.weixin.qq.com/s/UHrJ-6ruC_HkhUXvWvDX0A)通过Annotation注解的方式对领域能力和扩展点进行标注，然后在系统bootstrap阶段，通过代码扫描的方式，将这些能力点和扩展点收集起来上传到中心服务器。类似的，starter 就有这么点意思。
