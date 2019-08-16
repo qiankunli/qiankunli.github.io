@@ -8,7 +8,7 @@ keywords: window
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -16,6 +16,8 @@ keywords: window
 本文主要来自对阿里巴巴高级技术专家张建飞 公众号文章《从码农到工匠》的梳理和总结。
 
 作为技术人员，我们不能忘记我们技术人的首要技术使命是治理软件复杂度。
+
+![](/public/upload/architecture/handle_complexity.png)
 
 ## 组织层面
 
@@ -30,13 +32,7 @@ keywords: window
 
 ![](/public/upload/architecture/architecture_category.png)
 
-[你写的代码是别人的噩梦吗？从领域建模的必要性谈起](https://mp.weixin.qq.com/s?__biz=MzIxMzEzMjM5NQ==&mid=2651032533&idx=1&sn=20fdc59184edab32225194086640fd2c&chksm=8c4c5ed1bb3bd7c7bec8f4ca1e3e2815d22420a17ab8b7d2b21c4d41b59ea550ea81121b2821&scene=27#wechat_redirect)
-
-
-[阿里高级技术专家方法论：如何写复杂业务代码？](https://mp.weixin.qq.com/s?__biz=MzIxMzEzMjM5NQ==&mid=2651032533&idx=1&sn=20fdc59184edab32225194086640fd2c&chksm=8c4c5ed1bb3bd7c7bec8f4ca1e3e2815d22420a17ab8b7d2b21c4d41b59ea550ea81121b2821&scene=27#wechat_redirect)
-
-
-### 应用架构
+## 业务逻辑和技术细节的分离
 
 [应用架构之道：分离业务逻辑和技术细节](https://mp.weixin.qq.com/s/F5BWyALjJxryZXfb8WcH9g)架构始于建筑，是因为人类发展（原始人自给自足住在树上，也就不需要架构），分工协作的需要，将目标系统按某个原则进行切分，**切分的原则，是要便于不同的角色进行并行工作**。
 
@@ -46,7 +42,7 @@ keywords: window
 
 六边形架构、洋葱圈架构、以及COLA架构的核心职责就是要做核心业务逻辑和技术细节的分离和解耦。
 
-## 抽象
+## 业务逻辑抽象
 
 按照Wikipedia上的解释，抽象是指为了某种目的，对一个概念或一种现象包含的信息进行过滤，移除不相关的信息，只保留与某种最终目的相关的信息。例如，一个 皮质的足球 ，我们可以过滤它的质料等信息，得到更一般性的概念，也就是 球 。从另外一个角度看，抽象就是简化事物，抓住事物本质的过程。
 
@@ -57,6 +53,30 @@ OOP可以看作一种在程序中包含各种独立而又互相调用的对象�
 在程序设计中，也是一样，如果在一个类或者一个函数中涉及过多的内容和概念，我们大脑也会显得不知所措，会觉得很复杂，不能理解。将一个大方法，按照逻辑关系，整理成一组更高层次的小而内聚的子程序的集合，那么整个代码逻辑就会呈现出完全不一样的风貌，显得干净、容易理解的多。
 
 分层是一种常见的根据系统中的角色（职责拆分）和组织代码单元的常规实践。
+
+[你写的代码是别人的噩梦吗？从领域建模的必要性谈起](https://mp.weixin.qq.com/s/UHrJ-6ruC_HkhUXvWvDX0A)
+
+## 写复杂业务逻辑的方法论
+
+### 过程分解和对象建模相结合
+
+![](/public/upload/architecture/structure_and_object.jpg)
+
+### ”能力下沉“
+
+[阿里高级技术专家方法论：如何写复杂业务代码？](https://mp.weixin.qq.com/s/pdjlf9I73sXDr30t-5KewA)
+
+![](/public/upload/architecture/ability_down.jpg)
+
+一般来说实践DDD有两个过程：
+
+1. 套概念阶段：了解了一些DDD的概念，然后在代码中“使用”Aggregation Root，Bounded Context，Repository等等这些概念。更进一步，也会使用一定的分层策略。然而这种做法一般对复杂度的治理并没有多大作用。
+2. 融会贯通阶段：术语已经不再重要，理解DDD的本质是统一语言、边界划分和面向对象分析的方法。
+
+指导下沉有两个关键指标：
+
+1. 复用性，复用性是告诉我们When（什么时候该下沉了），即有重复代码的时候
+2. 内聚性，内聚性是告诉我们How（要下沉到哪里），功能有没有内聚到恰当的实体上，有没有放到合适的层次上（因为Domain层的能力也是有两个层次的，一个是Domain Service这是相对比较粗的粒度，另一个是Domain的Model这个是最细粒度的复用）。
 
 ## 《能力陷阱》
 
