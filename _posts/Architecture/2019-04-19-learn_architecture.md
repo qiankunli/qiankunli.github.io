@@ -56,6 +56,10 @@ keywords: project
 
 ![](/public/upload/architecture/tech_value.png)
 
+## 分类
+
+![](/public/upload/architecture/architecture_category.png)
+
 ## 系统架构
 
 * 微服务 
