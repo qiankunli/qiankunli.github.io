@@ -3,7 +3,7 @@
 layout: post
 title: 微服务1——业务程序猿眼中的微服务
 category: 架构
-tags: Architecture
+tags: Practice
 keywords: dubbo micro service
 
 ---

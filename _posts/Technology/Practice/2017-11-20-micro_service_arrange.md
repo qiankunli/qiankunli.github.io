@@ -3,7 +3,7 @@
 layout: post
 title: 微服务2——微服务编排
 category: 架构
-tags: Architecture
+tags: Practice
 keywords: micro service
 
 ---

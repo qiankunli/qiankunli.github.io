@@ -3,7 +3,7 @@
 layout: post
 title: 系统故障排查汇总及教训
 category: 架构
-tags: Architecture
+tags: Practice
 keywords: abtest
 
 ---

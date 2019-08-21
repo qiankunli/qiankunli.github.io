@@ -3,7 +3,7 @@
 layout: post
 title: 形而上之设计模式
 category: 架构
-tags: Architecture
+tags: Practice
 keywords: 设计模式
 
 ---

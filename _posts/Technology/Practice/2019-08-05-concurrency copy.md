@@ -3,7 +3,7 @@
 layout: post
 title: 那些年追过的并发
 category: 架构
-tags: Architecture
+tags: Practice
 keywords: window
 
 ---

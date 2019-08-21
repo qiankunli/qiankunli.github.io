@@ -3,7 +3,7 @@
 layout: post
 title: 平台支持类系统的几个点
 category: 架构
-tags: Architecture
+tags: Practice
 keywords: abtest
 
 ---

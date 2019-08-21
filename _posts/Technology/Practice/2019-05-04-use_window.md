@@ -3,7 +3,7 @@
 layout: post
 title: 窗口机制
 category: 架构
-tags: Architecture
+tags: Practice
 keywords: window
 
 ---
