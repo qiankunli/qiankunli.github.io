@@ -30,6 +30,12 @@ keywords: kubernetes yaml
     3. 
     4. 
 
+## 美团实践
+
+[美团点评Kubernetes集群管理实践](https://mp.weixin.qq.com/s/lYDYzEUlvXQhCO1xCJ7HAg) 笔者从中得到一个启发就是，整个kubernetes 的实践是分层次的。
+
+![](/public/upload/kubernetes/meituan_kubernetes_practice.png)
+
 ## “划一片地”来测试
 
 假设集群一共有10个节点，我们希望一般任务只调度到其中的8多个节点，另外2个节点用来试验一些新特性。
