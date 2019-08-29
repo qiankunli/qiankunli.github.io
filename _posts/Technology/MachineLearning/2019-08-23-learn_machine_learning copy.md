@@ -23,6 +23,8 @@ keywords: 深度学习
 
 斯坦福大学今年上半年开了一门课程，叫做 CS20SI: Tensorflow for Deep Learning Research。可以说这门课程为上面所说的第二条路径规划了一个非常漂亮的框架。学习斯家的课程，你很容易找到一种文武双修、理论与实践生命大和谐的感觉。特别是斯家课程的课件之细致完备、练习之精到舒适，处处体现一种“生怕你学不会、学不懂”的关怀。[stanford-tensorflow-tutorials](https://github.com/chiphuyen/stanford-tensorflow-tutorials)
 
+王天一：人工智能的价值在于落地，它的优势则是几乎所有领域都有用武之地。与其星辰大海，不如近水楼台。将自身专业的领域知识和人工智能的方法结合，以解决实际问题，才是搭上人工智能这趟快列的正确方法。 
+
 ## 机器学习的数学基础
 
 [分层的概念——认知的基石](https://mp.weixin.qq.com/s?__biz=MzA4NTg1MjM0Mg==&mid=2657261549&idx=1&sn=350d445acf339ce19e7aab1ff19d92d0&chksm=84479e34b3301722aea0aaaa6f74656dd3e9509d70bf5719fb3992d744312bdd1484fc0c1852&mpshare=1&scene=23&srcid=1105hMUVZrVwuoX8KbtS0Vl0%23rd)
@@ -40,8 +42,34 @@ keywords: 深度学习
 4. 研究信息论，才能够准确地度量不同概率分布之间的差异。
 
 
+王天一：人工智能虽然复杂，但并不神秘。它建立在数学基础上，通过简单模型的组合实现复杂功能。在工程上，深度神经网络通常以其恒河沙数般的参数让人望而却步；可在理论上，各种机器学习方法的数学原理却具有更优的可解释性。从事高端研究工作固然需要非凡的头脑，但理解人工智能的基本原理绝非普通人的遥不可及的梦想。
+
 ## 学习材料
 
 三百多页ppt，就说比较好的学习材料[李宏毅一天搞懂深度學習](https://www.slideshare.net/tw_dsconf/ss-62245351?qid=108adce3-2c3d-4758-a830-95d0a57e46bc)
 
 [Deep Learning](http://www.deeplearningbook.org/)
+
+## 一文读懂深度学习：从神经元到BERT
+
+[一文读懂深度学习：从神经元到BERT](https://www.jiqizhixin.com/articles/2019-05-28-5)
+
+### 拟合
+
+形象的说,拟和就是把平面上一系列的点,用一条光滑的曲线连接起来.因为这条曲线有无数种可能,从而有各种拟和方法.拟和的曲线一般可以用函数表示.根据这个函数的不同有不同的拟和的名字.
+
+## 自动编码器
+
+如何学习特征，用到了自编码器。参考文章
+
+1. [Deep Learning模型之：AutoEncoder自编码器](http://blog.csdn.net/u010555688/article/details/24438311)
+2. [系统学习深度学习（二） --自编码器，DA算法，SDA，稀疏自编码器
+](http://www.voidcn.com/blog/app_12062011/article/p-6370385.html)
+
+自动编码器基于这样一个事实：原始input（设为x）经过加权（W、b)、映射/传递函数（Sigmoid）之后得到y，再对y反向加权映射回来成为z。
+
+通过反复迭代训练（W、b），使得误差函数最小，即尽可能保证z近似于x，即完美重构了x。
+
+那么可以说（W、b）是成功的，很好的学习了input中的关键特征，不然也不会重构得如此完美。Vincent在2010年的论文中做了研究，发现只要训练W就可以了。
+
+[深度学习系列（四）：什么是稀疏编码](http://blog.csdn.net/on2way/article/details/50389968)
