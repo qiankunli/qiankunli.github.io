@@ -162,3 +162,17 @@ web技术事实上没有改变任何东西，只是GUI的一种， 只是从1960
 
 ### 应用程序框架是实现细节
 
+## 代码设计/结构
+
+以一个订单系统为例
+
+||切分方式|包的组织|优缺点|
+|---|---|---|---|
+|按层封装|水平切分|com.mycompany.myapp.web OrdersController<br>com.mycompany.myapp.service OrdersService,OrdersServiceImpl<br>com.mycompany.myapp.dao OrdersRepository,JdbcOrdersRepository|在代码初期很合适<br>无法体现具体业务领域的信息<br>|
+|按功能封装|垂直切分|com.mycompany.myapp.orders OrdersController,OrdersService,OrdersServiceImpl,OrdersRepository,JdbcOrdersRepository|
+|端口和适配器|内部代码domain与外部代码Infrastructure分离|com.mycompany.myapp.web OrdersController<br>com.mycompany.myapp.domain OrdersService,OrdersServiceImpl,Orders<br>com.mycompany.myapp.dao JdbcOrdersRepository|
+|按组件封装|UI与粗粒度组件分离|com.mycompany.myapp.web OrdersController<br>com.mycompany.myapp.orders OrdersComponent,OrdersComponentImpl,OrdersRepository,JdbcOrdersRepository|
+
+如果我们将java 中所有程序类型都设置为public，那么包就仅仅是一种组织形式了（类似于文件夹），而不是一种封装方式。由于public 可以在代码库任何位置调用， 我们事实上就可以忽略包的概念，因为它并不提供什么价值。那么想要采用任何架构风格都不重要了， 四种架构方式事实上并没有任何区别。
+
+瀑布模型/大型架构像恐龙一样消失了，前期设计够用、后期进行大量重构的思想如小巧玲珑的哺乳动物一样替代了它们，软件架构迎来了响应式设计的时代/大型架构时代让位给易碎型（Fragile Architecture）架构。把架构设计工作交给程序猿的问题就是，程序猿必须学会像架构师一样思考问题。我们的每一项决策都必须为未来的变化敞开大门。就像打台球一样，我们的每一杆击球都不只是为了要把球打进洞里，它也事关下一次击球时所在的位置。让我们现在编写的代码不对未来的代码产生阻碍是一项非常重要的技能，通常需要花费多年时间才能掌握。
