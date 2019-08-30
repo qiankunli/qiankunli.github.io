@@ -3,7 +3,7 @@
 layout: post
 title: 链式处理的那些套路
 category: 技术
-tags: Java
+tags: Practice
 keywords: commons-chain
 
 ---
@@ -12,6 +12,12 @@ keywords: commons-chain
 
 * TOC
 {:toc}
+
+几个基本问题
+
+1. 事先构造好每个步骤之间的顺序，步骤之间如何连接？
+2. 每个步骤是否可以异步执行， 若是异步执行， 一个步骤完成后如何通知下一个步骤
+3. 中间某个步骤执行异常时，如何处理？
 
 ## 用责任链模式来简化web开发逻辑
 
@@ -155,4 +161,16 @@ Feeder
         for (StageDriver driver: this.drivers) driver.start();
         for (Pipeline branch : branches.values()) branch.start();
         
-### 线程实现
+## netty中的pipeline
+
+![](/public/upload/java/netty_pipeline_object.png)
+
+1. ChannelHandler. A ChannelHandler is provided with a ChannelHandlerContext object. A ChannelHandler is supposed to interact with the ChannelPipeline it belongs to via a context object. Using the context object, the ChannelHandler can pass events upstream or downstream, modify the pipeline dynamically, or store the information (using AttributeKeys) which is specific to the handler.
+2. ChannelHandlerContext. Enables a ChannelHandler to interact with its ChannelPipeline and other handlers. A handler can notify the next ChannelHandler in the ChannelPipeline, modify the ChannelPipeline it belongs to dynamically.
+
+![](/public/upload/java/netty_pipeline_diagram.png)
+
+可以看到ChannelHandler 基本就只管业务处理了， ChannelHandler逻辑处理完，进行下一步工作，都是`ctx.writexxx,ctx.firexxx` 来进行
+
+
+
