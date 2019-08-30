@@ -112,6 +112,35 @@ netty中的IO Handler组件，便整合了上述三个组件（Servlet，Filter�
 
 handler可以形成一个pipeline，依次对数据进行处理。比如在pipeline中可以添加一个encoder（也继承自ChannelHandlerAdapter），在对数据进行处理前，先进行编码。
 
+## demo代码
+
+    public class TimeClient {
+        public static void main(String[] args) throws InterruptedException {
+            String host = "127.0.0.1";
+            int port = 8080;
+            new TimeClient().connect(host, port);
+        }
+        public void connect(String host,int port) throws InterruptedException{
+            EventLoopGroup workerGroup = new NioEventLoopGroup();
+            try {
+                Bootstrap b = new Bootstrap();
+                b.group(workerGroup).channel(NioSocketChannel.class).option(ChannelOption.SO_KEEPALIVE, true)
+                        .handler(new ChildChannelHandler());
+                ChannelFuture f = b.connect(host, port).sync();
+                // 此处，你其实可以直接使用f.writeAndFlush发送数据
+                // 等待关闭
+                f.channel().closeFuture().sync();
+            } finally {
+                workerGroup.shutdownGracefully();
+            }
+        }
+        private class ChildChannelHandler extends ChannelInitializer<SocketChannel> {
+            protected void initChannel(SocketChannel arg0) throws Exception {
+                arg0.pipeline().addLast(new TimeClientHandler());
+            }
+        }
+    }
+
 ## 其它
 
 netty既然可以实现tcp数据的接收，处理和发送（j2ee实现对http数据的接收，处理和发送），自然也可以实现其它在tcp基础上的各种协议，比如http、websocket和rpc（hadoop中的rpc组件，便是基于netty实现的）等。
