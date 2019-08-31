@@ -26,9 +26,29 @@ keywords: kubernetes cni
 
 Knative 是以 Kubernetes 的一组自定义资源类型（CRD）的方式来安装的
 
+![](/public/upload/kubernetes/knative_xmind.png)
+
 ## kubernetes serving
 
 ![](/public/upload/kubernetes/knative_serving.jpg)
+
+创建示例Configuration`kubectl apply -f configuration.yaml`
+
+    apiVersion: serving.knative.dev/v1alpha1
+    kind: Configuration
+    metadata:
+    name: knative-helloworld
+    namespace: default
+    spec:
+    revisionTemplate:
+        spec:
+        container:
+            image: docker.io/gswk/knative-helloworld:latest
+            env:
+            - name: MESSAGE
+                value: "Knative!"
+
+Knative 转换 Configuration 定义为一些 Kubernetes 对象并在集群中创建它们。在启用 Configuration 后，可以看到相应的 Deployment、ReplicaSet 和 Pod
 
 ## kubernetes eventing
 
