@@ -91,9 +91,9 @@ $$\theta=(X^TX)^{-1}X^TY$$
 
 梯度方向由J(w1,w2,b)对(w1,w2,b)的偏导数确定
 
-### 为什么使用平方和作为loss function
+### 为什么使用平方和作为loss function（没看懂）
 
-假设根据特征的预测结果与实际结果有误差Ei，那么预测结果hi和真实结果yi满足下式：
+假设根据特征的预测结果与实际结果有误差\\(E^i\\)，那么预测结果\\(h^i\\)和真实结果\\(y^i\\)满足下式：
 
 $$y^i=h^i+E^i$$
 
@@ -109,6 +109,12 @@ $$y^i=\theta^T X^i+E^i$$
 这样就估计了一条样本的结果概率，然而我们期待的是模型能够在全部样本上预测最准，也就是概率积最大。注意这里的概率积是概率密度函数积，连续函数的概率密度函数与离散值的概率函数不同。这个概率积成为最大似然估计。我们希望在最大似然估计得到最大值时确定(w1,w2,b)。那么需要对最大似然估计公式求导，求导结果即是
 
 $$\frac{1}{2}\sum_{i=1}^{m}(y^i-\theta^T X^i)^2$$
+
+[逻辑回归模型(Logistic Regression, LR)基础](https://www.cnblogs.com/sparkwen/p/3441197.html)
+
+![](/public/upload/machine/logistic_regression.jpg)
+
+[从后验概率到逻辑回归，从逻辑回归到神经网络](https://blog.csdn.net/olizxq/article/details/89919376)
 
 ### 几何意义 vs 概率意义
 
