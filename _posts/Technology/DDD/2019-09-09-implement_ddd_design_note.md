@@ -17,6 +17,13 @@ DDD绝非是什么标新立异之物，我更倾向于将其看成是软件发�
 
 如果你的项目完全以数据为中心，所有的操作都通过对数据库的crud完成，那么你并不需要DDD。此时你的团队只需要一个漂亮的数据库表编辑器。如果你的系统只有25到30个业务操作， 这应该是相当简单的，你没有感受到由复杂性和业务变化所带来的痛苦。 当你的系统有三四十个use case的时候，软件的复杂性便暴露出来了，如果软件功能在未来几年不断变化，ddd将有助于你管理复杂性和应对变化。
 
+
+守住三个基本原则
+
+1. 必须通过领域建模来驱动设计
+1. One principle behind DDD is to bridge the gap between domain experts and developers by using the same language to create the same understanding. 
+2. Another principle is to reduce complexity by applying object oriented design and design patters to avoid reinventing the wheel.
+
 ### DDD入门
 
     public void saveConsumer(String id,name,age,address,...){
