@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: ddd前传——controller-service-dao的败笔
+title: ddd前传——CRUD的败笔
 category: 架构
 tags: DDD
 keywords: ddd cqrs
@@ -15,7 +15,7 @@ keywords: ddd cqrs
 
 一下子说DDD，很多人可能观念转变不过来，我们今天吐槽一下controller-service-dao的“坑”，挖一挖它的墙角。如果你觉得controller-service-dao 很不错，那说明你应对的场景还不够复杂，暂时还不适合谈论ddd。
 
-## controller-service-dao的败笔
+## CRUD/controller-service-dao的败笔
 
 [Spring Web 应用的最大败笔](https://www.jdon.com/45857)
 
@@ -33,7 +33,9 @@ keywords: ddd cqrs
 
 [阿里盒马领域驱动设计实践](http://www.infoq.com/cn/articles/alibaba-freshhema-ddd-practice) 形容这类代码“面条代码”，从（客户）端上一条线杀到数据库完成一个操作，仅有的一些设计集中在数据库上。
 
-大道理说完了，讲点实际的例子。
+[领域驱动设计学习输出](https://zhuanlan.zhihu.com/p/69056667)「CRUD工程师」认为自己没有创造任何东西，他们只是数据库表的搬运工。而**如果不是「CRUD」，业务系统后端工程师的价值在哪里**？**理解并抽象出业务逻辑，建立满足需求的业务模型，以此设计实现出可靠的系统，并有效地控制复杂性**。这才是大部分业务系统后端工程师的工作重点，也是解决他们工作中遇到的问题和难点的关键。
+
+![](/public/upload/ddd/crud_defect.png)
 
 ## 贫血模型 VS 充血模型
 
