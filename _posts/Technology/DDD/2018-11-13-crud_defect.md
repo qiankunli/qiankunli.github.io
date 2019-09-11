@@ -13,7 +13,7 @@ keywords: ddd cqrs
 * TOC
 {:toc}
 
-一下子说DDD，很多人可能观念转变不过来，我们今天吐槽一下controller-service-dao的“坑”，挖一挖它的墙角。如果你觉得controller-service-dao 很不错，那说明你应对的场景还不够复杂，暂时还不适合谈论ddd。
+[浅谈我对DDD领域驱动设计的理解](https://www.cnblogs.com/netfocus/p/5548025.html) 很多项目（尤其是互联网项目，为了赶工）都是一开始模型没想清楚，一上来就开始建表写代码，代码写的非常冗余，完全是过程式的思考方式，最后导致系统非常难以维护。我们今天吐槽一下controller-service-dao的“坑”，挖一挖它的墙角。如果你觉得controller-service-dao 很不错，那说明你应对的场景还不够复杂，暂时还不适合谈论ddd。
 
 ## CRUD/controller-service-dao的败笔
 
@@ -36,70 +36,6 @@ keywords: ddd cqrs
 [领域驱动设计学习输出](https://zhuanlan.zhihu.com/p/69056667)「CRUD工程师」认为自己没有创造任何东西，他们只是数据库表的搬运工。而**如果不是「CRUD」，业务系统后端工程师的价值在哪里**？**理解并抽象出业务逻辑，建立满足需求的业务模型，以此设计实现出可靠的系统，并有效地控制复杂性**。这才是大部分业务系统后端工程师的工作重点，也是解决他们工作中遇到的问题和难点的关键。
 
 ![](/public/upload/ddd/crud_defect.png)
-
-## 贫血模型 VS 充血模型
-
-我们必须将应用程序的业务逻辑从服务层迁移到领域模型类中，为何呢？ 先来看看贫血模型和充血模型的对比。
-
-假设我是一个服务类，你是一个域模型对象。如果我让你从屋顶上跳下来，你会喜欢我这样的决定吗？跳下来会摔伤，自己没有脑子或被洗脑，变成僵尸，只听从执行，不思考自己的安全，这就是贫血模型的问题。
-
-举个具体的例子，假设一个用户有很多收货地址
-
-	class User{
-		List<Address> addresses;
-		setter
-		getter
-	}
-	
-那么在为用户添加收货地址时，不得不有很多判空操作
-	
-	class UserService{
-		void addAddress(User user,Address address){
-			List<Address> addresses = user.getAddresses();
-			if(null == addresses){
-				addresses = new ArrayList<Address>();
-				user.setAddresses(addresses);
-			}
-			addresses.add(address);
-		}
-	}
-
-
-想象一下
-
-1. 如果有多个位置操作User的Address（这个例子针对这一点不是很适当），`if(null == addresses){...}` 会大量出现，代码量不大， 但会很丑。如果是电商业务，每一次购物都要做优惠券、红包、满减检查、余额不足检查等，这些逻辑有可能重复在各个Service中。
-1. 更复杂的成员变量 `List<List>` 或者 `List<Map<String,String>>`
-2. 更复杂的逻辑，比如设定默认地址，地址判重等。
-
-`UserService.addAddress`吐血表示，我只想添加个地址而已。 
-
-换成充血模型
-
-	class User{
-		List<Address> addresses;
-		public User(){
-			addresses = new ArrayList<Address>();
-		}
-		void addAddress(Address address){
-			addresses.addAddress(address)
-		}
-	}
-	class UserService{
-		void addAddress(User user,Address address){
-			...
-			user.addAddress(address);	
-			...
-		}
-	}
-
-	
-从中可以看到，addresses的 初始化和 添加都由User 负责，代码简洁很多。
-
-将业务逻辑从服务层迁移到域模型类有下面三个优势：
-
-1. 我们的代码将以逻辑方式切割，服务层只要关注应用逻辑（这个词儿不是很懂，比如哪几个操作一定要放在一起以保证事务安全？），而我们的领域模型关注业务逻辑。
-2. 业务逻辑只存在一个地方，容易发现修改。
-3. 服务层的源代码是清洁的，不包含任何复制粘贴代码
 
 
 ## 搞得好像一切为了持久化
