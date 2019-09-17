@@ -65,13 +65,7 @@ keywords: 深度学习
 [CS231n课程笔记翻译：Python Numpy教程](https://zhuanlan.zhihu.com/p/20878530?refer=intelligentunit) 未读
 
 
-## 一文读懂深度学习：从神经元到BERT
 
-[一文读懂深度学习：从神经元到BERT](https://www.jiqizhixin.com/articles/2019-05-28-5)
-
-### 拟合
-
-形象的说,拟和就是把平面上一系列的点,用一条光滑的曲线连接起来.因为这条曲线有无数种可能,从而有各种拟和方法.拟和的曲线一般可以用函数表示.根据这个函数的不同有不同的拟和的名字.
 
 ## 自动编码器
 
