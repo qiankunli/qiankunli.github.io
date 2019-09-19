@@ -13,6 +13,10 @@ keywords: kubernetes yaml
 * TOC
 {:toc}
 
+[容器化在一下科技的落地实践](http://www.10tiao.com/html/217/201811/2649699541/1.html)
+
+[荔枝运维平台容器化实践](https://mp.weixin.qq.com/s/Q4t5IptqQmQZ6z4vOIhcjQ) 从打包、监控、日志、网络、存储各方面阐述了一下，还比较全面
+
 ## 总纲
 
 两个基本工作
@@ -86,18 +90,9 @@ Node affinity, described [here](https://kubernetes.io/docs/concepts/configuratio
 
 [Qihoo360/wayne](https://github.com/Qihoo360/wayne) Wayne 是一个通用的、基于 Web 的 Kubernetes 多集群管理平台。通过可视化 Kubernetes 对象模板编辑的方式，降低业务接入成本， 拥有完整的权限管理系统，适应多租户场景，是一款适合企业级集群使用的发布平台。
 
-## 扩容缩容
 
-[容器化在一下科技的落地实践](http://www.10tiao.com/html/217/201811/2649699541/1.html)
 
-HPA 扩容缩容范围
 
-健康检查
-
-1. 存活检查
-2. 就绪检查
-
-[荔枝运维平台容器化实践](https://mp.weixin.qq.com/s/Q4t5IptqQmQZ6z4vOIhcjQ) 从打包、监控、日志、网络、存储各方面阐述了一下，还比较全面
 
 ## 工作流
 
