@@ -3,7 +3,7 @@
 layout: post
 title: Kubernetes监控
 category: 技术
-tags: Docker
+tags: Kubernetes
 keywords: jib
 
 ---
@@ -53,12 +53,14 @@ keywords: jib
 
 Kubernetes的核心组件提供了Prometheus的采集接口
 
-## 可以根据监控数据做什么
+## Metrics Server
 
-1. 根据容器内存的耗费统计，个性化容器的内存 limit
-2. cpu 负载过高时，报警提醒
-3. 混部
-4. Auto Scaling
+![](/public/upload/kubernetes/kubernetes_metric_server.png)
+
+1. Metrics API 只可以查询当前的度量数据，并不保存历史数据
+2. Metrics API URI 为 `/apis/metrics.k8s.io/`，在 `k8s.io/metrics` 维护
+3. 必须部署 metrics-server 才能使用该 API，metrics-server 通过调用 Kubelet Summary API 获取数据，Summary API 返回的信息，既包括了 cAdVisor 的监控数据，也包括了 kubelet 本身汇总的信息。Pod 的监控数据是从kubelet 的 Summary API （即 `<kubelet_ip>:<kubelet_port>/stats/summary`）采集而来的。
+
 
 
 
