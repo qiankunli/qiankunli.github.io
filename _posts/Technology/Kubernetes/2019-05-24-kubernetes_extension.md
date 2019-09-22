@@ -160,13 +160,9 @@ pod2 资源类型在服务器端的注册的工作，APIServer 会自动帮我�
 
 [Kubernetes Deep Dive: Code Generation for CustomResources](https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/)
 
-## 实操——Ingress（未完成）
+## 实例——autoscaler
 
-Ingress 背景及作用参见[访问Kubernetes上的服务](http://qiankunli.github.io/2015/03/04/kubernetes_service.html)
-
-[Kubernetes Ingress（2）Controller源码分析](http://shareinto.github.io/2017/04/13/KubernetesIngress(2)/)未理解
-
-[Kubernetes Ingress Controller的使用介绍及高可用落地](http://www.servicemesher.com/blog/kubernetes-ingress-controller-deployment-and-ha/)未读
+![](/public/upload/kubernetes/auto_scaler.png)
 
 ## 另一种扩展——operator
 

@@ -8,7 +8,7 @@ keywords: kubernetes yaml
 
 ---
 
-## 简介（持续更新）
+## 简介
 
 * TOC
 {:toc}
@@ -20,7 +20,7 @@ keywords: kubernetes yaml
 ![](/public/upload/kubernetes/kubernetes_resource_manager.png)
 
 
-[Kubernetes Autoscaling 101: Cluster Autoscaler, Horizontal Pod Autoscaler, and Vertical Pod Autoscaler](https://medium.com/magalix/kubernetes-autoscaling-101-cluster-autoscaler-horizontal-pod-autoscaler-and-vertical-pod-2a441d9ad231) 未读完
+[Kubernetes Autoscaling 101: Cluster Autoscaler, Horizontal Pod Autoscaler, and Vertical Pod Autoscaler](https://medium.com/magalix/kubernetes-autoscaling-101-cluster-autoscaler-horizontal-pod-autoscaler-and-vertical-pod-2a441d9ad231) 
 
 **Kubernetes at its core is a resources management and orchestration tool**. It is ok to focus day-1 operations to explore and play around with its cool features to deploy, monitor and control your pods. However, you need to think of day-2 operations as well. You need to focus on questions like:
 
@@ -36,12 +36,109 @@ keywords: kubernetes yaml
 
 对于公有云来说，Cluster Auto Scaler 就是监控这个集群因为资源不足而 pending 的 pod，根据用户配置的阈值调用公有云的接口来申请创建机器或者销毁机器。对于私有云，则需要对接内部的管理平台。
 
+## HPA和VPA工作原理——CRD的典型应用
+
+![](/public/upload/kubernetes/auto_scaler.png)
+
+
+1. hpa 和 vpa 做出决策依赖 metric server 提供的metric 数据
+
+	![](/public/upload/kubernetes/kubernetes_metric_server.png)
+2. Kubernetes 本身“安装” hpa 和 vpa 的CRD，以支持vpa or hpa Kubernetes object 
+3. 对于每个应用，创建一个对象的vpa or hpa对象
+4. hpa or vpa CRD 不停的拉取metric 数据，根据hpa or vpa 对象配置的策略，计算出pod 的最佳replica（hpa）或resource（vpa），更改deployment 配置，重启deployment
+
 ## Horizontal Pod Autoscaler 
+
+配置示例`kubectl apply sample-metrics-app.yaml` 该示例根据一个custom metric 来决定是否进行横向扩容。 
+
+	kind: HorizontalPodAutoscaler
+	apiVersion: autoscaling/v2beta1
+	metadata:
+	  name: sample-metrics-app-hpa
+	spec:
+	  scaleTargetRef:
+	    apiVersion: apps/v1
+	    kind: Deployment
+	    name: sample-metrics-app
+	  minReplicas: 2
+	  maxReplicas: 10
+	  metrics:
+	  - type: Object
+	    object:
+	      target:
+	        kind: Service
+	        name: sample-metrics-app
+	      metricName: http_requests
+	      targetValue: 100
+
+
+1. scaleTargetRef,指定了被监控的对象是名叫 sample-metrics-app的Deployment
+2. 最小的实例数目是 2，最大是 10
+3. 在 metrics 字段，我们指定了这个 HPA 进行 Scale 的依据，是名叫 http_requests 的 Metrics。而获取这个 Metrics 的途径，则是访问名叫 sample-metrics-app 的 Service。
+4. 有了上述约定，hpa 就可以向请求`https://<apiserver_ip>/apis/custom-metrics.metrics.k8s.io/v1beta1/namespaces/default/services/sample-metrics-app/http_requests` 来获取custome metric 的值了。
+
+
+
 
 ## Vertical Pod Autoscaler
 
 [Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
 
+
+配置示例
+
+	apiVersion: autoscaling.k8s.io/v1beta2
+	kind: VerticalPodAutoscaler
+	metadata:
+	  name: my-rec-vpa
+	spec:
+	  targetRef:
+	    apiVersion: "extensions/v1beta1"
+	    kind:       Deployment
+	    name:       my-rec-deployment
+	  updatePolicy:
+	    updateMode: "Off"
+	    
+1. targetRef 指定了被监控的对象是名叫 my-rec-deployment的Deployment
+2. `kubectl create -f my-rec-vpa.yaml` 稍等片刻，然后查看 VerticalPodAutoscaler：`kubectl get vpa my-rec-vpa --output yaml`
+
+输出结果显示推荐的 CPU 和内存请求：
+
+	  recommendation:
+    	containerRecommendations:
+	    - containerName: my-rec-container
+	      lowerBound:
+	        cpu: 25m
+	        memory: 262144k
+	      target:
+	        cpu: 25m
+	        memory: 262144k
+	      upperBound:
+	        cpu: 7931m
+	        memory: 8291500k
+	        
+target 推荐显示，容器请求25 milliCPU 和 262144 千字节的内存时将以最佳状态运行。
+
+
+配置示例
+
+	apiVersion: autoscaling.k8s.io/v1beta2
+	kind: VerticalPodAutoscaler
+	metadata:
+	  name: my-vpa
+	spec:
+	  targetRef:
+	    apiVersion: "extensions/v1beta1"
+	    kind:       Deployment
+	    name:       my-deployment
+	  updatePolicy:
+	    updateMode: "Auto"
+
+
+1. targetRef 指定了被监控的对象是名叫 my-deployment的Deployment
+2. updateMode 字段的值为 Auto，意味着VerticalPodAutoscaler 可以删除 Pod，调整 CPU 和内存请求，然后启动一个新 Pod。
+3. VerticalPodAutoscaler 使用 lowerBound 和 upperBound 推荐值来决定是否删除 Pod 并将其替换为新 Pod。如果 Pod 的请求小于下限或大于上限，则 VerticalPodAutoscaler 将删除 Pod 并将其替换为具有目标推荐值的 Pod。
 
 
 ## 其它
