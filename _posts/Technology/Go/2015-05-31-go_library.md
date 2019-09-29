@@ -17,6 +17,10 @@ keywords: Go
 
 ## 如何组织一个大项目的go 代码
 
+![](/public/upload/go/go_module.png)
+
+### 项目代码划分
+
 [使用 Go 语言开发的一些经验（含代码示例）](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651008064&idx=2&sn=cdc19d0db8decad85b671ba79fd2d1f5&chksm=bdbed4138ac95d05dbfd6672babba8e4d4a547d7845cd46b23fe3802dd5a1c49777b476fadd5&mpshare=1&scene=23&srcid=0708wchJyw4BGm9vtQxV8qaT%23rd) 要点如下
 
 1. 可见性和代码划分
@@ -50,6 +54,7 @@ A reflection based dependency injection toolkit for Go.
 **设计模式分为创建、结构和行为三大类，如果自己构造依赖关系， 则创建 与 行为 两个目的的代码容易耦合在一起， 代码较长，给理解造成困难。**
 
 ## 二 日志
+
 golang中涉及到日志的库有很多，除了golang自带的log外，还有glog和log4go等，不过由于bug、更新缓慢和功能不强等原因，笔者推荐使用seelog。
 
 ### 2.1 安装
