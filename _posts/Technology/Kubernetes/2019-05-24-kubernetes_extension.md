@@ -91,19 +91,23 @@ Spring 提供了扩展 xml 的机制，用来编写自定义的 xml bean ，例�
 
 ### 定义custom object使得apiserver 支持crud
 
+一个自定义的crd（Network） 实现 [resouer/k8s-controller-custom-resource](https://github.com/resouer/k8s-controller-custom-resource)
 
-pod2 资源类型在服务器端的注册的工作，APIServer 会自动帮我们完成。但与之对应的，我们还需要让客户端也能“知道”pod2资源类型的定义。这就需要 `pkg/apis/pod2/v1/register.go`。
+Network 资源类型在服务器端的注册的工作，APIServer 会自动帮我们完成。但与之对应的，我们还需要让客户端也能“知道”Network资源类型的定义。这就需要 `pkg/apis/pod2/v1/register.go`。
 
 1. 自定义资源类型的 API 描述，包括：组（Group）、版本（Version）等
 2. 自定义资源类型的对象描述，包括：Spec、Status 等  
-5. `kubectl apply -f crd/pod2.yaml`
-6. `kubectl apply -f example/example-pod2.yaml`
+5. `kubectl apply -f crd/network.yaml`
+6. `kubectl apply -f example/example-network.yaml`
 
-然后可以发现，单纯pod2 数据的crud 是没问题了，但crud 不是目的，我们希望能够根据 pod2 crud 做出反应，这就需要Controller 的协作了
+然后可以发现，单纯Network数据的crud 是没问题了，但crud 不是目的，我们希望能够根据 Network crud 做出反应，这就需要Controller 的协作了
 
 ### 定义custom controller使得custom object起作用
 
-**使用 Kubernetes 提供的代码生成工具，为上面定义的pod2资源类型自动生成 clientset、informer和 lister**。clientset 就是操作pod2 对象所需要使用的客户端。Informer，其实就是一个带有本地缓存和索引机制的、可以注册 EventHandler 的 client（三个 Handler（AddFunc、UpdateFunc 和 DeleteFunc）。通过监听到的事件变化，Informer 就可以实时地更新本地本地缓存，并且调用这些事件对应的 EventHandler
+**使用 Kubernetes 提供的代码生成工具，为上面定义的pod2资源类型自动生成 clientset、informer和 lister**。
+
+1. clientset 就是操作pod2 对象所需要使用的客户端。
+2. Informer，其实就是一个带有本地缓存和索引机制的、可以注册 EventHandler 的 client（三个 Handler（AddFunc、UpdateFunc 和 DeleteFunc）。通过监听到的事件变化，Informer 就可以实时地更新本地本地缓存，并且调用这些事件对应的 EventHandler
 
 		$ tree
 		.
@@ -133,40 +137,41 @@ pod2 资源类型在服务器端的注册的工作，APIServer 会自动帮我�
 
 ![](/public/upload/kubernetes/k8s_custom_controller.png)
 
+### main 函数逻辑
+
+![](/public/upload/kubernetes/crd_sequence.png)
+
+因为Controller 包含kubeClient,networkClient,networkInformer成员
+
+    type Controller struct {
+        // kubeclientset is a standard kubernetes clientset 可以理解为api server的客户端
+        kubeclientset kubernetes.Interface
+        // networkclientset is a clientset for our own API group 可以理解api server的客户端，但专门访问自定义的resource
+        networkclientset clientset.Interface
+        networksLister listers.NetworkLister
+        ...
+    }
+
+所以main 函数的主要逻辑
+
+1. 构造kubeClient,networkClient,networkInformer 对象，进而构造Controller，其中networkInformer比较复杂，各种封装和工厂模式
+2. 异步启动networkInformer
+3. 启动Controller 主流程，即run方法
+
+### controller逻辑
+
+![](/public/upload/kubernetes/crd_object.png)
+
+1. 在main 函数构造Controller 时，NewController方法中执行了`networkInformer.AddEventHandler`逻辑，当informer 收到network对象时 ==> AddEventHandler ==> network 对象加入到workqueue中
+2. Controller processNextWorkItem 中仅负责 从workqueue中取出network对象 执行自己的逻辑即可
+
+### 其它
+
 这套流程不仅可以用在自定义 API 资源上，也完全可以用在Kubernetes 原生的默认 API 对象上。
 
 不管 built-in resource 还是 custom resource ，controller 不是 api server的一部分，自然也不用和 apiserver 一起启动，apiserver 只管crud etcd。
 
-其它例子：一个自定义的crd（CustomResourceDefinition） 实现 [resouer/k8s-controller-custom-resource](https://github.com/resouer/k8s-controller-custom-resource)
-
 [Kubernetes Deep Dive: Code Generation for CustomResources](https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/)
-
-### [扩展API](https://jimmysong.io/kubernetes-handbook/concepts/custom-resource.html)
-
-自定义资源实际上是为了扩展kubernetes的API，向kubenetes API中增加新类型，可以使用以下三种方式：
-
-1. 修改kubenetes的源码，显然难度比较高，也不太合适
-2. 创建自定义API server并聚合到API中 Aggregated APIs are subordinate APIServers that sit behind the primary API server, which acts as a proxy. 
-
-	![](/public/upload/kubernetes/kubernetes_aggregator.png)
-
-3. 1.7以下版本编写TPR，kubernetes1.7及以上版本用CRD
-
-使用CRD 有如下优势
-
-1. 你的API是否属于声明式的
-2. 是否想使用kubectl命令来管理
-3. 是否要作为kubenretes中的对象类型来管理，同时显示在kuberetes dashboard上
-4. 是否可以遵守kubernetes的API规则限制，例如URL和API group、namespace限制
-4. 是否可以接受该API只能作用于集群或者namespace范围
-5. 想要复用kubernetes API的公共功能，比如CRUD、watch、内置的认证和授权等
-
-
-
-
-k8s核心对象的api，带上各种自定义api/非核心api，apiserver 支持的url就很多了
-
-![](/public/upload/kubernetes/k8s_api.png)
 
 ## 实例——autoscaler
 
@@ -207,6 +212,31 @@ k8s核心对象的api，带上各种自定义api/非核心api，apiserver 支持
 	    name:       my-rec-deployment
 	  updatePolicy:
 	    updateMode: "Off"
+
+## [扩展API](https://jimmysong.io/kubernetes-handbook/concepts/custom-resource.html)
+
+自定义资源实际上是为了扩展kubernetes的API，向kubenetes API中增加新类型，可以使用以下三种方式：
+
+1. 修改kubenetes的源码，显然难度比较高，也不太合适
+2. 创建自定义API server并聚合到API中 Aggregated APIs are subordinate APIServers that sit behind the primary API server, which acts as a proxy. 
+
+	![](/public/upload/kubernetes/kubernetes_aggregator.png)
+
+3. 1.7以下版本编写TPR，kubernetes1.7及以上版本用CRD
+
+使用CRD 有如下优势
+
+1. 你的API是否属于声明式的
+2. 是否想使用kubectl命令来管理
+3. 是否要作为kubenretes中的对象类型来管理，同时显示在kuberetes dashboard上
+4. 是否可以遵守kubernetes的API规则限制，例如URL和API group、namespace限制
+4. 是否可以接受该API只能作用于集群或者namespace范围
+5. 想要复用kubernetes API的公共功能，比如CRUD、watch、内置的认证和授权等
+
+
+k8s核心对象的api，带上各种自定义api/非核心api，apiserver 支持的url就很多了
+
+![](/public/upload/kubernetes/k8s_api.png)
 
 ## 另一种扩展——operator
 
