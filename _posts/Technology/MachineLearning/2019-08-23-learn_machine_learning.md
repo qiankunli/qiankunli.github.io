@@ -64,7 +64,11 @@ keywords: 深度学习
 
 [CS231n课程笔记翻译：Python Numpy教程](https://zhuanlan.zhihu.com/p/20878530?refer=intelligentunit) 未读
 
+基本原理搞懂之后，可以先找个实际问题+dataset 实操一下 [Kaggle入门，看这一篇就够了](https://zhuanlan.zhihu.com/p/25686876)Kaggle成立于2010年，是一个进行数据发掘和预测竞赛的在线平台。入门级的三个经典练习题目：
 
+1. [逻辑回归应用之Kaggle泰坦尼克之灾](https://blog.csdn.net/han_xiaoyang/article/details/49797143)未做
+2. [Kaggle竞赛 — 2017年房价预测](https://www.kaggle.com/neviadomski/how-to-get-to-top-25-with-simple-model-sklearn)未做
+3. [大数据竞赛平台——Kaggle 入门](https://blog.csdn.net/u012162613/article/details/41929171)未做
 
 
 ## 自动编码器
