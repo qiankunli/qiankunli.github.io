@@ -27,6 +27,8 @@ keywords: springboot
 
 ## 启动过程
 
+![](/public/upload/spring/SpringBootApplication_annotation.png)
+
 ![](/public/upload/spring/spring_application_run.png)
 
 	public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {

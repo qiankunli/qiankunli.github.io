@@ -26,6 +26,12 @@ Spring Boot starters were built to address exactly this problem. Starter POMs ar
 |rabbitmq|spring-rabbit|spring-boot-starter-amqp|
 |...|...|...|
 
+### 将starter jar的bean import 到ioc
+
+![](/public/upload/spring/SpringBootApplication_annotation.png)
+
+**starter 的本质是采用import 方式，在如何引用bean 做了创新，最终实现：只要配置了`META-INF/spring.factories`的jar 在classpath 下即可进入spring ioc的效果**。
+
 ## 创建Bean的那些事儿
 
 ### 根据xml, annotations or java code创建Bean
