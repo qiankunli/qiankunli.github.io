@@ -129,27 +129,37 @@ paxos 与线程安全问题不同的地方是，paxos的node之间 是为了形�
 
 ![](/public/upload/distribute/raft_copy_log.png)
 
-Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader的地位，把整个协议可以清楚的分割成两个部分，并利用日志的连续性做了一些简化：
+Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader的地位，**把整个协议可以清楚的分割成两个部分**，并利用日志的连续性做了一些简化：
 
 1. Leader在时。由Leader向Follower同步日志
 2. Leader挂掉了，选一个新Leader
 
 ## 选主过程对比
 
-不管名词如何变化，paxos 和 raft 都分为两个阶段，先决定听谁的，再将“决议”广播出去形成一致。 
+不管名词如何变化，paxos 和 raft 都分为两个阶段：先决定听谁的，再将“决议”广播出去形成一致。 
 
 ### paxos
 
 **Proposer 之间并不直接交互**，Acceptor除了一个“存储”的作用外，还有一个信息转发的作用。
 
-**从Acceptor的视角看**，basic-paxos 及 multi-paxos 选举过程是协商一个值，每个Proposer提出的value 都可能不一样。所以第一阶段，先经由Acceptor将ProposerId 最大的value 尽可能扩散到Proposer（即决定哪个Proposer 是“意见领袖”）。第二阶段，再将“多数意见”形成“决议”（Acceptor持久化value）
+**从Acceptor的视角看**，basic-paxos 及 multi-paxos 选举过程是协商一个值，每个Proposer提出的value 都可能不一样。
+
+所以第一阶段，先经由Acceptor将**已提交的**ProposerId 最大的value 尽可能扩散到Proposer（即决定哪个Proposer 是“意见领袖”）。第二阶段，再将“多数意见”形成“决议”（Acceptor持久化value）
  
 ### raft
+
+候选人视角：
 
 1. 处于candidate 状态的节点向所有节点发起广播
 2. 超过半数回复true，则成为Leader（同时广播自己是leader），否则重新选举
 
-在任一任期内，单个节点最多只能投一票。如果出现平票的情况，那么就延长了系统不可用的时间（没有leader是不能处理客户端写请求的），因此raft引入了randomized election timeouts来尽量避免平票情况。同时，leader-based 共识算法中，节点的数目都是奇数个，尽量保证majority的出现。
+投票人视角:
+
+1. 在任一任期内，单个节点最多只能投一票
+2. first-come-first-served 先到先得。
+
+
+如果出现平票的情况，那么就延长了系统不可用的时间（没有leader是不能处理客户端写请求的），因此raft引入了randomized election timeouts来尽量避免平票情况。同时，leader-based 共识算法中，节点的数目都是奇数个，尽量保证majority的出现。
 
 ## 其它
 
