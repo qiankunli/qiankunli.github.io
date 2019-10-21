@@ -49,7 +49,7 @@ top 命令输出
     32080 root      20   0 8300552 4.125g  11524 S  86.4 26.6   1157:05 java
     995 root      20   0  641260  41312  39196 S  28.6  0.3   7420:54 rsyslogd
 
-top 命令找到`%CPU` 排位最高的进程id=32080，根据`docker ps -q | xargs docker inspect -f '{{.State.Pid}} {{.Id}}'| grep 32080`  找到对应的容器
+top 命令找到`%CPU` 排位最高的进程id=32080，进而找到对应的容器
 
 ### docker
 
