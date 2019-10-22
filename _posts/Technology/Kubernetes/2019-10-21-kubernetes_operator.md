@@ -31,6 +31,9 @@ keywords: kubernetes yaml
 
 使用etcd operator 有一个比较好玩的地方，仅需调整 size 和 version 配置，就可以控制etcd cluster 个数和版本，比第一种方法方便的多了。
 
+我们都知道在 Kubernetes 上安装应用可以使用 Helm 直接安装各种打包成 Chart 形式的 Kubernetes 应用，但随着 Kubernetes Operator 的流行，Kubernetes 社区又推出了 [OperatorHub](https://operatorhub.io/)，你可以在这里分享或安装 Operator：https://www.operatorhub.io。
+
+
 ## 内涵
 
 An Operator is a method of packaging, deploying and managing a **Kubernetes application**. A Kubernetes application is an application that is both deployed on Kubernetes and managed using the Kubernetes APIs and kubectl tooling.
@@ -73,7 +76,8 @@ An Operator is an application-specific controller that extends the Kubernetes AP
 |扩展|自定义namespace及NamespaceHandler|CRD|
 |微创新|比如整合rabbitmq `<rabbit:template>`|etcd/redis operator|
 
+## 原理
 
-我们都知道在 Kubernetes 上安装应用可以使用 Helm 直接安装各种打包成 Chart 形式的 Kubernetes 应用，但随着 Kubernetes Operator 的流行，Kubernetes 社区又推出了 [OperatorHub](https://operatorhub.io/)，你可以在这里分享或安装 Operator：https://www.operatorhub.io。
+
 
 
