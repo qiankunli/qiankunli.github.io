@@ -50,8 +50,13 @@ keywords: 深度学习
 
 ## sklearn（待理解）
 
+[sklearn库的学习](https://blog.csdn.net/u014248127/article/details/78885180)
+
 所谓逻辑回归，正向传播、反向传播、梯度下降等 体现在python上，就是两行代码：
 
+    //C Inverse of regularization strength
+    //penalty penalty参数可选择的值为"l1"和"l2".分别对应L1的正则化和L2的正则化. 
+    //tol 停止求解的标准
     clf = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
     clf.fit(xx)
     predictions = clf.predict(xx)

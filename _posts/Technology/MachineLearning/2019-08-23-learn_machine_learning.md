@@ -11,6 +11,7 @@ keywords: 深度学习
 
 ## 前言
 
+![](/public/upload/machine/machine_learning_xmind.png)
 
 ## 学习路线
 

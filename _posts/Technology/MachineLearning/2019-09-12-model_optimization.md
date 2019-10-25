@@ -84,5 +84,11 @@ keywords: 深度学习
 
 [机器学习之 特征工程](https://juejin.im/post/5b569edff265da0f7b2f6c65) 未读，是一个系列，建议学习一下
 
+特征： 是指数据中抽取出来的对结果预测有用的信息，也就是数据的相关属性。
+
+特征工程：使用专业背景知识和技巧处理数据，使得 特征能在机器学习算法上发挥更好的作用的过程
+
+![](/public/upload/machine/feature_enginering.png)
+
 [机器学习之特征工程](https://blog.csdn.net/Dream_angel_Z/article/details/49388733)未读，脑图画的不错，学习一下
 

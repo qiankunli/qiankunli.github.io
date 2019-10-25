@@ -16,10 +16,6 @@ keywords: Container-Networking-Docker-Kubernetes
 
 Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes 中的容器网络的小册子，本文是其读书笔记。
 
-容器网络仍然非常年轻，年轻就意味着多变，笔者之前博客总结几套方案都落伍了， 这更加需要我们对容器网络有一个梳理。
-
-**service discovery and container orchestration are two sides of the same idea.**
-
 建议先看下[程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)
 
 ## container networking stack
@@ -68,19 +64,25 @@ Nginx 公司的 Michael Hausenblas 发布了一本关于 docker 和 kubernetes �
 
 ## CNI
 
+CNI (Container Network Interface): Specification that act as interface between Container runtime and networking model implementations。
+
 The cni specification is lightweight; it only deals with the network connectivity of containers,as well as the garbage collection of resources once containers are deleted.
-
-
-
-cni 接口规范，不是很长[Container Network Interface Specification](https://github.com/containernetworking/cni/blob/master/SPEC.md)，原来技术的世界里很多规范用Specification 来描述。
 
 ![](/public/upload/docker/cni_3.png)
 
-对 CNI SPEC 的解读 [Understanding CNI (Container Networking Interface)](http://www.dasblinkenlichten.com/understanding-cni-container-networking-interface/)
+cni 接口规范，不是很长[Container Network Interface Specification](https://github.com/containernetworking/cni/blob/master/SPEC.md)（原来技术的世界里很多规范用Specification 来描述）。对 CNI SPEC 的解读 [Understanding CNI (Container Networking Interface)](http://www.dasblinkenlichten.com/understanding-cni-container-networking-interface/)
 
-1. If you’re used to dealing with Docker this doesn’t quite seem to fit the mold. 习惯了docker 之后， 再看cni 有点别扭。原因就在于，docker 类似于操作系统领域的windows，把很多事情都固化、隐藏掉了，以至于认为docker 才是标准。
-2. The CNI plugin is responsible wiring up the container.  That is – it needs to do all the work to get the container on the network.  In Docker, this would include connecting the container network namespace back to the host somehow. 在cni 的世界里，container刚开始时没有网络的，是container runtime 操作cni plugin 将container add 到 network 中。
+kubernetes 对CNI 的实现（**SPEC复杂的描述体现在 code 上就是几个函数**）
 
+    ## github.com/containernetworking/cni/libcni/api.go
+    type CNI interface {
+        AddNetworkList(net *NetworkConfigList, rt *RuntimeConf) (types.Result, error)
+        DelNetworkList(net *NetworkConfigList, rt *RuntimeConf) error
+        AddNetwork(net *NetworkConfig, rt *RuntimeConf) (types.Result, error)
+        DelNetwork(net *NetworkConfig, rt *RuntimeConf) error
+    }
+
+wiki 在描述驱动系统时提到：**A driver provides a software interface to hardware devices**, enabling operating systems and other computer programs to access hardware functions without needing to know precise details about the hardware being used. CNI interface 将一个复杂的系统收敛到几个“入口”，运用之妙存乎一心。
 
 ### "裸机" 使用cni
 

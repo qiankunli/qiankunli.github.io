@@ -372,6 +372,16 @@ docker service 作为grpc server 实现，最终还是操作了 CNI，CNIConfig�
 		return stdout.Bytes(), nil
 	}
 
+kubernetes 对CNI 的实现（SPEC复杂的描述体现在 code 上就是几个函数）
+
+    ## github.com/containernetworking/cni/libcni/api.go
+    type CNI interface {
+        AddNetworkList(net *NetworkConfigList, rt *RuntimeConf) (types.Result, error)
+        DelNetworkList(net *NetworkConfigList, rt *RuntimeConf) error
+        AddNetwork(net *NetworkConfig, rt *RuntimeConf) (types.Result, error)
+        DelNetwork(net *NetworkConfig, rt *RuntimeConf) error
+    }
+
 ## 其它 
 
 |k8s涉及的组件|功能交付方式|
