@@ -42,11 +42,75 @@ keywords: 深度学习
 
 ## pandas
 
-假设有一个学生表，想知道是女生多还是男生多，用sql 来表示就是`select sex,count(*) from student group by sex`
+Pandas 有两种自己独有的基本数据结构：Series 和 DataFrame，其功能非常强大，**可以从execl/csv 行列处理的视角来入手学习**。
 
-那么给定一个数据集/csv文件等，如何用python 做类似的分析呢？
+### DataFrame
 
-[pandas与sql 对比,持续更新...](https://blog.csdn.net/weixin_39791387/article/details/81391621)
+假设有一个学生表，想知道是女生多还是男生多，用sql 来表示就是`select sex,count(*) from student group by sex`。那么给定一个数据集/csv文件等，如何用python 做类似的分析呢？[pandas与sql 对比,持续更新...](https://blog.csdn.net/weixin_39791387/article/details/81391621)
+
+
+[Pandas DataFrame: A lightweight Intro](https://towardsdatascience.com/pandas-dataframe-a-lightweight-intro-680e3a212b96)Pandas DataFrame is nothing but an in-memory representation of an excel sheet via Python programming language
+
+创建DataFrame
+
+    my_dict = { 
+        'name' : ["a", "b", "c", "d", "e","f", "g"],
+        'age' : [20,27, 35, 55, 18, 21, 35],
+        'designation': ["VP", "CEO", "CFO", "VP", "VP", "CEO", "MD"]
+    }
+    df = pd.DataFrame(my_dict)
+    my_list = [[1,2,3,4],
+            [5,6,7,8],
+            [9,10,11,12],
+            [13,14,15,16],
+            [17,18,19,20]]
+    df = pd.DataFrame(my_list)
+
+DataFrame 操作
+
+    df.head()   # Displays 1st Five Rows
+    df.head(2)   # Displays 1st two Rows
+    df.tail()    # Displays last Five Rows
+    df.tail(7)     # Displays last 7 Rows
+    df.drop('age',1)  # Delete Column "age"   1表示列0表示行
+    df.drop(3,0)      # Delete the Row with Index "3"
+    df * df
+    df * 10
+    df + 100
+    df & 0
+
+### Series
+
+[Pandas Series: A Lightweight Intro](https://towardsdatascience.com/pandas-series-a-lightweight-intro-b7963a0d62a2)
+
+In layman terms, Pandas Series is nothing but a column in an excel sheet.  通俗的说， Series 代表excel的一列
+
+Creating Pandas Series from python Dictionary
+
+    series_list = pd.Series([1,2,3,4,5,6])
+    series_index = pd.Series(
+            np.array([10,20,30,40,50,60]), 
+            index=['a', 'b', 'c', 'd', 'e', 'f' ] 
+    )
+
+Getting a Series out of a Pandas DataFrame
+
+    my_dict = { 
+    'name' : ["a", "b", "c", "d", "e"],
+    'age' : [10,20, 30, 40, 50],
+    'designation': ["CEO", "VP", "SVP", "AM", "DEV"]
+    }
+    df = pd.DataFrame( my_dict, 
+    index = [
+    "First -> ",
+    "Second -> ", 
+    "Third -> ", 
+    "Fourth -> ", 
+    "Fifth -> "])
+    series_name = df.name
+    series_age = df.age
+    series_age.mean() # 求平均年龄
+
 
 ## sklearn（待理解）
 
