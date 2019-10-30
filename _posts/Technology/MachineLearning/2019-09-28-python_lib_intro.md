@@ -16,6 +16,21 @@ keywords: 深度学习
 
 ![](/public/upload/machine/numpy.png)
 
+### 数组访问
+
+    import numpy as np
+    b = np.array([[1,2,3],[4,5,6],[7,8,9],[10,11,12]],dtype=int)
+    c = b[0,1]  #1行 第二个单元元素
+    # 输出： 2
+    d = b[:,1]  #所有行 第二个单元元素
+    # 输出： [ 2  5  8 11]
+    e = b[1,:]  #2行 所有单元元素
+    # 输出： [4 5 6]
+    f = b[1,1:]  #2行 第2个单元开始以后所有元素
+    # 输出： [5 6]
+    g = b[1,:2]  #2行 第1个单元开始到索引为2以前的所有元素
+
+
 ## Matplotlib
 
 [十分钟入门Matplotlib](https://codingpy.com/article/a-quick-intro-to-matplotlib/) Matplotlib 是 Python 的一个绘图库。它包含了大量的工具，你可以使用这些工具创建各种图形，包括简单的散点图，正弦曲线，甚至是三维图形。Python 科学计算社区经常使用它完成数据可视化的工作。
