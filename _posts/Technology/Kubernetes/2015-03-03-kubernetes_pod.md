@@ -161,7 +161,16 @@ Manifest部分的内容不再赘述（所包含字段，是否必须，以及其
     
 ## Pod 的生命周期
 
-1. pod的生命周期
+1. pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) 
+
+    1. Pending
+    2. Running
+    3. Succeeded
+    4. Failed
+    5. Unknown  For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod.用户可以执行 `kubectl delete pods <pod> --grace-period=0 --force` 强制删除 Pod
+
+    其实观察pod 状态最全面的是kubernetes 源码中的[event.go](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/events/event.go) For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod.
+
 2. container的生命周期
 3. pod restartPolicy
 4. pod livenessProbe
@@ -171,6 +180,14 @@ restartPolicy 和 Pod 里容器的状态，以及Pod 状态的对应关系（最
 
 1. 只要 Pod 的 restartPolicy 指定的策略允许重启异常的容器（比如：Always），那么这个 Pod 就会保持 Running 状态，并进行容器重启。否则，Pod 就会进入 Failed 状态 。
 2. 对于包含多个容器的 Pod，只有它里面所有的容器都进入异常状态后，Pod 才会进入 Failed 状态。在此之前，Pod都是 Running 状态。此时，Pod 的 READY 字段会显示正常容器的个数
+
+[Kubernetes 排错之 Pod 异常](https://zhuanlan.zhihu.com/p/34332367)
+
+一般来说，无论 Pod 处于什么异常状态，都可以执行以下命令来查看 Pod 的状态
+
+    kubectl get pod <pod-name> -o yaml 查看 Pod 的配置是否正确
+    kubectl describe pod <pod-name> 查看 Pod 的事件
+    kubectl logs <pod-name> [-c <container-name>] 查看容器日志
 
 
 
