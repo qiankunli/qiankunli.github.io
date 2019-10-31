@@ -120,7 +120,7 @@ https://zhuanlan.zhihu.com/p/46928319
 
 正向传播过程
 
-$$f(x)=\theta^Tx=w_1x\_1+w\_2x\_2+b$$
+$$f(x)=\theta^Tx=w_1x_1+w_2x_2+b$$
 
 
 $$g(z)=\frac{1}{1+e^{-z}}$$
