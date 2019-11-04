@@ -90,4 +90,6 @@ keywords: 深度学习
 
 ![](/public/upload/machine/feature_enginering.png)
 
+数据经过整理变成信息，信息能解决某个问题就是知识，知识通过反复实践形成才能，才能融会贯通就是智慧。 
+
 
