@@ -1,16 +1,90 @@
 ---
 
 layout: post
-title: 机器学习用到的一些python库
+title: kaggle泰坦尼克问题实践
 category: 技术
 tags: MachineLearning
 keywords: 深度学习
 
 ---
 
-## 前言（未完成）
+## 前言
+
+* TOC
+{:toc}
+
+pyhone 库安装命令：`python3 -m pip install xx`
+
+## kaggle泰坦尼克问题实践
 
 [逻辑回归应用之Kaggle泰坦尼克之灾](https://blog.csdn.net/han_xiaoyang/article/details/49797143)
+
+基于上述文档，对机器学习过程做了进一步简化
+
+1. 只选取Sex、Age、Pclass 作为有效数据
+2. 空的数据全部 丢弃
+3. 将性别转换为0和1
+4. 使用`sklearn.preprocessing.StandardScaler`将Age 转换为`[-1，1]`
+5. 使用逻辑回归 `sklearn.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)`
+
+代码如下
+
+    import pandas as pd  ## 数据分析  
+    import numpy as np  ## 科学计算
+    import sklearn.preprocessing as preprocessing
+    from sklearn import linear_model
+
+
+    data_train = pd.read_csv("train.csv")
+    # data_train.info()
+    ## 性别、年龄、Pclass
+    data_train = data_train.filter(regex='Survived|Age|Sex|Pclass')
+    ## 丢弃带有Nan 的行
+    data_train = data_train.dropna()
+    ## 将性别数值化
+    data_train['Sex'] = pd.factorize(data_train['Sex'])[0].astype(np.uint16)
+    ## 将年龄特征化到[-1,1]之内
+    scaler = preprocessing.StandardScaler()
+    age_scale_param = scaler.fit(data_train['Age'].values.reshape(-1, 1))
+    data_train['Age'] = scaler.fit_transform(data_train['Age'].values.reshape(-1, 1), age_scale_param)
+
+    print(data_train)
+
+    ## 进行逻辑回归
+    train_np = data_train.values
+    # y即Survival结果
+    y = train_np[:, 0]
+    # X即特征属性值
+    X = train_np[:, 1:]
+    clf = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
+    clf.fit(X, y)
+    ## 对测试集进行和训练集一样的数据处理
+
+    data_test = pd.read_csv("test.csv")
+    data_t = data_test.filter(regex='PassengerId|Age|Sex|Pclass')
+    data_t = data_t.dropna()
+    data_t['Sex'] = pd.factorize(data_t['Sex'])[0].astype(np.uint16)
+    data_t['Age'] = scaler.fit_transform(data_t['Age'].values.reshape(-1, 1), age_scale_param)
+
+    ## 预测下
+    test_np = data_t.values
+    X_t = test_np[:, 1:]
+    predictions = clf.predict(X_t)
+
+    ## 处理结果
+    result = pd.DataFrame(
+        {'PassengerId': data_t['PassengerId'].values,
+        'Survived': predictions.astype(np.int32)
+        })
+
+    df = pd.merge(data_test, result, how='left', on='PassengerId')
+    r = df.filter(regex='PassengerId|Survived')
+    ## NaN数据全部预测为Survived=0
+    r['Survived'] = r.Survived.fillna(0)
+    print(r)
+    r.to_csv("result.csv", index=False)
+
+提交result.csv 到kaggle ，可能因为简化的太狠了，得了一个0分，尴尬
 
 ## numpy
 
@@ -127,15 +201,23 @@ Getting a Series out of a Pandas DataFrame
     series_age.mean() # 求平均年龄
 
 
-## sklearn（待理解）
+## sklearn
 
 [sklearn库的学习](https://blog.csdn.net/u014248127/article/details/78885180)
 
 所谓逻辑回归，正向传播、反向传播、梯度下降等 体现在python上，就是两行代码：
 
-    //C Inverse of regularization strength
-    //penalty penalty参数可选择的值为"l1"和"l2".分别对应L1的正则化和L2的正则化. 
-    //tol 停止求解的标准
+    
     clf = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
     clf.fit(xx)
     predictions = clf.predict(xx)
+
+
+前两个参数c 和 penalty 都和正则化相关，tol是停止求解的标准，float类型，默认为1e-4。就是求解到多少的时候，停止，认为已经求出最优解。
+
+
+
+
+
+
+
