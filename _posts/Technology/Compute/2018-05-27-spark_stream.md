@@ -3,7 +3,7 @@
 layout: post
 title: Spark Stream 学习
 category: 技术
-tags: Data
+tags: Compute
 keywords: Spark
 
 ---

@@ -3,7 +3,7 @@
 layout: post
 title: influxdb入门
 category: 技术
-tags: Data
+tags: Storage
 keywords: influxdb
 
 ---

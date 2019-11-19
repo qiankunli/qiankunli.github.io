@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 多线程设计模式/《Concurrency Models》笔记
+title: 《Concurrency Models》笔记
 category: 技术
 tags: Java
 keywords: 多线程 JAVA

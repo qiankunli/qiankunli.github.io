@@ -3,7 +3,7 @@
 layout: post
 title: 《mysql技术内幕》笔记2
 category: 技术
-tags: Data
+tags: Storage
 keywords: mysql innodb
 
 ---

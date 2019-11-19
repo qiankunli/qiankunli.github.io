@@ -3,7 +3,7 @@
 layout: post
 title: mybatis学习
 category: 技术
-tags: Data
+tags: Storage
 keywords: mysql mybatis
 
 ---

@@ -3,7 +3,7 @@
 layout: post
 title: mysql 批量操作优化
 category: 技术
-tags: Data
+tags: Storage
 keywords: mysql
 
 ---

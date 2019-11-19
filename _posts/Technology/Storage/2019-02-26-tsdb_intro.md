@@ -3,7 +3,7 @@
 layout: post
 title: 时序性数据库介绍及对比
 category: 技术
-tags: Data
+tags: Storage
 keywords: tsdb
 
 ---

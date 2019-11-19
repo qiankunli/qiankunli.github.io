@@ -3,7 +3,7 @@
 layout: post
 title: TIDB 学习
 category: 技术
-tags: Data
+tags: Storage
 keywords: TIDB
 
 ---
