@@ -3,8 +3,8 @@
 layout: post
 title: 《Concurrency Models》笔记
 category: 技术
-tags: Java
-keywords: 多线程 JAVA
+tags: Compute
+keywords: 多线程 
 
 ---
 
