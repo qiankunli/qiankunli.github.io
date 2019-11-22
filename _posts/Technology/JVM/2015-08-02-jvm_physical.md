@@ -18,13 +18,15 @@ jvm 作为 a model of a whole computer，便与os 有许多相似的地方，包
 
 这三者是三个不同的部分，又相互关联，比如jvm基于栈的解释器与jvm 内存模型 相互依存。
 
-## 内存布局
+## 进程内存布局
 
 [Linux内核基础知识](http://qiankunli.github.io/2019/05/01/linux_kernel_basic.html)进程内存布局
 
 ![](/public/upload/linux/virtual_memory_space.jpg)
 
 左右两侧均表示虚拟地址空间，左侧以描述内核空间为主，右侧以描述用户空间为主。右侧底部有一块区域“read from binary image on disk by execve(2)”，即来自可执行文件加载，jvm的方法区来自class文件加载，那么 方法区、堆、栈 便可以一一对上号了。
+
+![](/public/upload/java/jvm_process.png)
 
 ## JVM内存区域新画法 
 
@@ -70,6 +72,8 @@ Metaspace is a new memory space – starting from the Java 8 version; it has rep
 
 ### 基于栈的解释器
 
+![](/public/upload/jvm/run_java_code.png)
+
 java是一种跨平台的编程语言，为了跨平台，jvm抽象出了一套内存模型和基于栈的解释器，进而创建一套在该模型基础上运行的字节码指令。（这也是本文不像其它书籍一样先从"class文件格式"讲起的原因）
 
 1. 为了跨平台，不能假定平台特性，因此抽象出一个新的层次来屏蔽平台特性，因此推出了基于栈的解释器，与以往基于寄存器的cpu执行有所区别。
@@ -84,7 +88,42 @@ java是一种跨平台的编程语言，为了跨平台，jvm抽象出了一套�
 
     同一段代码，编译器可以给出不同的字节码（最后执行效果是一样的），还可以在此基础上进行优化。比如，对于传统os，将内存中的变量缓存到寄存器。对于jvm，将堆中对象的某个实例属性缓存到线程对应的栈。而c语言和java语言是通过共享内存，而不是共享寄存器或线程的私有栈来进行线程“交流”的，因此就会带来线程安全问题。因此，c语言和java语言都有volatile关键字。（虽然这不能完全解决线程安全问题）
 
+## 线程的状态
 
+[Understanding Linux Process States](https://access.redhat.com/sites/default/files/attachments/processstates_20120831.pdf)
+
+|进程的基本状态|运行|就绪|阻塞|退出|
+|---|---|---|---|---|
+|Linux| TASK_RUNNING ||TASK_INTERRUPTIBLE、TASK_UNINTERRUPTIBLE|TASK_STOPPED/TASK_TRACED、TASK_DEAD/EXIT_ZOMBIE|
+|java|| RUNNABLE | BLOCKED、WAITING、TIMED_WAITING|TERMINATED|
+
+在 POSIX 标准中（POSIX标准定义了操作系统应该为应用程序提供的接口标准），thread_block 接受一个参数 stat ，这个参数也有三种类型，TASK_BLOCKED， TASK_WAITING， TASK_HANGING，而调度器只会对线程状态为 READY 的线程执行调度，另外一点是线程的阻塞是线程自己操作的，相当于是线程主动让出 CPU 时间片，所以等线程被唤醒后，他的剩余时间片不会变，该线程只能在剩下的时间片运行，如果该时间片到期后线程还没结束，该线程状态会由 RUNNING 转换为 READY ，等待调度器的下一次调度。
+
+![](/public/upload/java/thread_status.jpg)
+
+[Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)对进程而言，就三种状态，就绪，运行，阻塞，而在 JVM 中，阻塞有四种类型，我们可以通过 jstack 生成 dump 文件查看线程的状态。
+
+1. BLOCKED （on object monitor)  通过 synchronized(obj) 同步块获取锁的时候，等待其他线程释放对象锁，dump 文件会显示 waiting to lock <0x00000000e1c9f108>
+2. TIMED WAITING (on object monitor) 和 WAITING (on object monitor) 在获取锁后，调用了 object.wait() 等待其他线程调用 object.notify()，两者区别是是否带超时时间
+3. TIMED WAITING (sleeping) 程序调用了 thread.sleep()，这里如果 sleep(0) 不会进入阻塞状态，会直接从运行转换为就绪
+4. TIMED WAITING (parking) 和 WAITING (parking) 程序调用了 Unsafe.park()，线程被挂起，等待某个条件发生，waiting on condition
+
+从linux内核来看， BLOCKED、WAITING、TIMED_WAITING都是等待状态。做这样的区分，是jvm出于管理的需要（两个原因的线程放两个队列里管理，如果线程运行出了synchronized这段代码，jvm只需要去blocked队列放一个线程出来。而某人调用了notify()，jvm只需要去waitting队列里取个出来。），本质上是：who when how唤醒线程。
+
+[Java线程中wait状态和block状态的区别? - 赵老师的回答 - 知乎](
+https://www.zhihu.com/question/27654579/answer/128050125)
+
+|从上到下|常规java code|synchronized java code|volatile java code|
+|---|---|---|---|
+|编译|编译器加点私货|monitor enter/exist|除了其变量定义的时候有一个Volatile外，之后的字节码跟有无Volatile完全一样|
+||class 字节码 |扩充后的class 字节码 ||
+|运行|jvm加点私货|锁升级：自旋/偏向锁/轻量级锁/重量级锁 ||
+||机器码|扩充后的机器码| 加入了lock指令，查询IA32手册，它的作用是使得本CPU的Cache写入了内存，该写入动作也会引起别的CPU invalidate其Cache |
+|用户态|||
+||系统调用|mutex系统调用|
+|内核态|||
+|||可能用到了 semaphore struct|
+|||线程加入等待队列 + 修改自己的状态 + 触发调度|
 
 ## 重排序
 

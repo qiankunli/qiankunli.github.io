@@ -19,10 +19,11 @@ A pod models an application-specific "logical host(逻辑节点)" in a container
 
 Like running containers, pods are considered to be relatively ephemeral rather than durable entities. Pods are scheduled to nodes and remain there until termination (according to restart policy) or deletion. When a node dies, the pods scheduled to that node are deleted. Specific pods are never rescheduled to new nodes; instead, they must be replaced.
 
-重点不是pod 是什么，而是什么情况下， 我们要将多个容器放在pod 里。 "为什么需要一个pod?" 详细论述 [kubernetes objects再认识](http://qiankunli.github.io/2018/11/04/kubernetes_objects.html)
+A pod is a relatively tightly coupled group of containers that are scheduled onto the same host. 
 
-
-### Uses of pods（应用场景）
+1. It models an application-specific(面向应用) "virtual host" in a containerized environment. 
+2. Pods serve as units of scheduling, deployment, and horizontal scaling/replication. 
+3. Pods share fate（命运）, and share some resources, such as storage volumes and IP addresses.(网络通信和数据交互就非常方便且高效)
 
 Pods can be used to host vertically integrated application stacks, but their primary motivation is to support co-located, co-managed （这两个形容词绝了）helper programs, such as:
 
@@ -33,14 +34,6 @@ Pods can be used to host vertically integrated application stacks, but their pri
 5. Controllers, managers, configurators, and updaters.
 
 **Individual pods are not intended to run multiple instances of the same application**, in general.
-
-### 小结
-
-A pod is a relatively tightly coupled group of containers that are scheduled onto the same host. 
-
-1. It models an application-specific(面向应用) "virtual host" in a containerized environment. 
-2. Pods serve as units of scheduling, deployment, and horizontal scaling/replication. 
-3. Pods share fate（命运）, and share some resources, such as storage volumes and IP addresses.(网络通信和数据交互就非常方便且高效)
 
 ## 为什么需要pod？
 
@@ -57,16 +50,19 @@ A pod is a relatively tightly coupled group of containers that are scheduled ont
 3. 亲密关系 ==> 亲密关系为什么不在调度层面解决掉？非得提出pod 的概念？[容器设计模式](https://www.usenix.org/system/files/conference/hotcloud16/hotcloud16_burns.pdf)
 4. Pod，其实是一组共享了某些资源的容器。当然，共享Network Namespace和Volume 可以通过`通过docker run --net=B --volumes-from=B --name-=A image-A...`来实现，但这样 容器 B 就必须比容器 A 先启动，这样一个 Pod 里的多个容器就不是对等关系，而是拓扑关系了。
 5. **Pod 最重要的一个事实是：它只是一个逻辑概念。有了Pod，我们可以说Network Namespace和Volume 不是container A 的，也不是Container B的，而是Pod 的。哪怕Container A/B 还没有启动，我们也可以 配置Network Namespace和Volume**。以network namespace 为例，为什么需要一个pause 容器参见[《Container-Networking-Docker-Kubernetes》笔记](http://qiankunli.github.io/2018/10/11/docker_to_k8s_network_note.html)
-4. Pod 这种“超亲密关系”容器的设计思想，实际上就是希望，当用户想在一个容器里跑多个功能并不相关的应用时，应该优先考虑它们是不是更应该被描述成一个 Pod 里的多个容器。你就可以把整个虚拟机想象成为一个 Pod，把这些进程分别做成分别做成容器镜像，把有顺序关系的容器，定义为 Init Container。 作者提到了tomcat 镜像和war 包（war包单独做一个镜像）的例子，非常精彩，好就好在 分别做镜像 肯定比 镜像做在一起要方便。**重点不是pod 是什么，而是什么情况下， 我们要将多个容器放在pod 里。 **
+4. **Pod 这种“超亲密关系”容器的设计思想，实际上就是希望，当用户想在一个容器里跑多个功能并不相关的应用时，应该优先考虑它们是不是更应该被描述成一个 Pod 里的多个容器**。你就可以把整个虚拟机想象成为一个 Pod，把这些进程分别做成分别做成容器镜像，把有顺序关系的容器，定义为 Init Container。 作者提到了tomcat 镜像和war 包（war包单独做一个镜像）的例子，非常精彩，好就好在 分别做镜像 肯定比 镜像做在一起要方便。**重点不是pod 是什么，而是什么情况下， 我们要将多个容器放在pod 里。 **
 5. [https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs) Pods also simplify application deployment and management by providing a higher-level abstraction than the raw, low-level container interface. **Pods serve as units of deployment and horizontal scaling/replication. Co-location, fate sharing, coordinated replication, resource sharing, and dependency management are handled automatically.**
 
+“容器”镜像虽然好用，但是容器这样一个“沙盒”的概念，对于描述应用来说，还是太过简单了。Pod 对象，其实就是容器的升级版。它对容器进行了组合，添加了更多的属性和字段，将pod 单纯的理解为 多个容器 数字上的叠加 是不科学的。
 
-综上，我们可以有一个不太成熟的理解：pod本质是一个场景的最佳实践的普适化。
+[Podman: Managing pods and containers in a local container runtime](https://developers.redhat.com/blog/2019/01/15/podman-managing-containers-pods/)Most people coming from the Docker world of running single containers do not envision the concept of running pods.  我们对pod的感觉不是很亲切一个原因是：它是k8s第一次引入的，从docker切到k8s本来就差异比较大，让人觉得pod和docker container是两个概念范畴。podman作为一个CRI 实现支持runnig pod locally
 
-“容器”镜像虽然好用，但是容器这样一个“沙盒”的概念，对于描述应用来说，还是太过简单了。Pod 对象，其实就是容器的升级版。它对容器进行了组合，添加了更多的属性和字段。
-Pod 这个看似复杂的 API 对象，实际上就是对容器的进一步抽象和封装而已。
 
-所以，将pod 单纯的理解为 多个容器 数字上的叠加 是不科学的。
+    ## 创建一个容器并将其 加入到demopod 中，实际还额外创建了一个类似k8s infra container
+    podman run -dt --pod demopod alpine:latest top
+
+如果当年的学习路径是 docker container ==> podman pod ==> k8s pod，感觉就自然多了，碰到类似 `docker run --link` 之类的场景，就可以用local pod来实现。
+
 
 ## Pod Operations
 
@@ -159,17 +155,30 @@ Manifest部分的内容不再赘述（所包含字段，是否必须，以及其
 
     kubectl delete pod xxx
     
-## Pod 的生命周期
+## Pod 的运行
 
-1. pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) 
+![](/public/upload/kubernetes/pod_status.png)
 
-    1. Pending
-    2. Running
-    3. Succeeded
-    4. Failed
-    5. Unknown  For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod.用户可以执行 `kubectl delete pods <pod> --grace-period=0 --force` 强制删除 Pod
 
-    其实观察pod 状态最全面的是kubernetes 源码中的[event.go](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/events/event.go) For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod.
+### pod生命周期
+
+pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) 
+
+![](/public/upload/kubernetes/pod_lifecycle.png)
+
+1. Pending
+2. Running
+3. Succeeded
+4. Failed
+5. Unknown  For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod. 用户可以执行 `kubectl delete pods <pod> --grace-period=0 --force` 强制删除 Pod
+
+其实观察pod 状态最全面的是kubernetes 源码中的[event.go](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/events/event.go) For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod.
+
+### 健康状态探测
+
+### 容器状态及其它状态
+
+ready 等
 
 2. container的生命周期
 3. pod restartPolicy

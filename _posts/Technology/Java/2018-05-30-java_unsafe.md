@@ -128,15 +128,7 @@ Unsafe 提供 Direct memory access methods.
 
 ### java 状态图
 
-![](/public/upload/java/thread_status.jpg)
-
-
-[Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)对进程而言，就三种状态，就绪，运行，阻塞，而在 JVM 中，阻塞有四种类型，我们可以通过 jstack 生成 dump 文件查看线程的状态。
-
-1. BLOCKED （on object monitor)  通过 synchronized(obj) 同步块获取锁的时候，等待其他线程释放对象锁，dump 文件会显示 waiting to lock <0x00000000e1c9f108>
-2. TIMED WAITING (on object monitor) 和 WAITING (on object monitor) 在获取锁后，调用了 object.wait() 等待其他线程调用 object.notify()，两者区别是是否带超时时间
-3. TIMED WAITING (sleeping) 程序调用了 thread.sleep()，这里如果 sleep(0) 不会进入阻塞状态，会直接从运行转换为就绪
-4. TIMED WAITING (parking) 和 WAITING (parking) 程序调用了 Unsafe.park()，线程被挂起，等待某个条件发生，waiting on condition
+[JVM内存与执行](http://qiankunli.github.io/2015/08/02/jvm_physical.html)
 
 ### 为什么需要 park 和 unpark
 
@@ -147,6 +139,25 @@ Unsafe 提供 Direct memory access methods.
 3. **this applies per-thread, not per-synchronizer.** 这或许解释了 很多场景下，synchronized 除了性能依然不够用的原因。
 
 其实Solaris-9/WIN32/Linux NPTL 都有类似的thread library，java 支持的比较晚，总之，java 的synchronized 关键字 不是java并发的全部， java也是在不断发展的。
+
+### 工作原理
+
+[Understanding Java and native thread details](https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/com.ibm.java.vm.80.doc/docs/javadump_tags_javaandnative_thread_detail.html) A Java thread runs on a native thread, java thread 和native thread 有一个Attach 和Unattach 的过程。native thread 驱动 java thread 代码序列
+
+    ## java(字节码)代码序列
+    java class code1
+    java class code2
+    unsafe.park(xx) ==> 进入native code 执行流程
+    object.wait(xx)
+        java class code1 of wait function
+        java class code2 of wait function
+        native code ==> 进入native code 执行流程
+            ...
+            xx.park(xx)
+
+`unsafe.park(xx)` works directly on the thread, the less work you do, the more efficient. 当然代价是 一些必要的block 线程的准备工作 park 也没做，比如 not synchronizing on anything, you don't pay to have your thread check with main memory for updates from other threads.
+
+[Java的LockSupport.park()实现分析](https://blog.csdn.net/hengyunabc/article/details/28126139)
 
 ### 其它
 
