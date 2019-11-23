@@ -174,16 +174,9 @@ pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads
 
 其实观察pod 状态最全面的是kubernetes 源码中的[event.go](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/events/event.go) For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod.
 
-### 健康状态探测
+
 
 ### 容器状态及其它状态
-
-ready 等
-
-2. container的生命周期
-3. pod restartPolicy
-4. pod livenessProbe
-
 
 restartPolicy 和 Pod 里容器的状态，以及Pod 状态的对应关系（最终体现在`kube get pod pod_name` 时 status 的状态） [有一系列复杂的情况](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#example-states) ，可以概括为两条基本原则：
 
