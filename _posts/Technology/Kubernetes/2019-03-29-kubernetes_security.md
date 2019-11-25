@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes安全机制
+title: docker和k8s安全机制
 category: 技术
 tags: Kubernetes
 keywords: kubernetes security
@@ -23,6 +23,40 @@ keywords: kubernetes security
 
 ![](/public/upload/kubernetes/container_security.png)
 
+### docker 多用户
+
+[理解 docker 容器中的 uid 和 gid](https://www.cnblogs.com/sparkdev/p/9614164.html)默认情况下，容器中的进程以 root 用户权限运行，并且这个 root 用户和宿主机中的 root 是同一个用户。这就意味着一旦容器中的进程有了适当的机会，它就可以控制宿主机上的一切！
+
+1. 内核使用的是 uid 和 gid，而不是用户名和组名
+2. 可能会看到同一个 uid 在不同的容器中显示为不同的用户名
+3. 相同的 uid 不能有不同的特权，即使在不同的容器中也是如此
+4. docker 默认并没有启用 user namesapce，新创建的容器进程和宿主机上的进程在相同的 user namespace 中， docker 并没有为容器创建新的 user namespace
+
+docker 启用user namesapce（此处只是普及，不推荐使用）
+
+1. `/etc/docker/daemon.json`  增加如下内容 并重启
+
+        {
+            "userns-remap": "default"
+        }
+
+2. 没启用user namesapce 时，docker 拿root 来运行容器中进程。启用后， docker 拿什么用户来运行容器中进程呢？
+3. 启用user namesapce 后，docker daemon 会在宿主机上创建一个 dockremap 的用户
+4. 启动容器时，docker 会拿dockremap 的一个“从uid” 作为容器的root 用户来启动容器进程。该从uid 在容器内具有最高权限，在宿主机上具有和dockermap 一致的权限（操作宿主机volume 目录文件的时候）。PS：有点网络设备从设备的意思
+
+### 多用户的使用
+
+我们可以在 Dockerfile 中添加一个用户 dev，并使用 USER 命令指定以该用户的身份运行程序，Dockerfile 的内容如下：
+
+    FROM ubuntu
+    RUN groupadd -r dev && useradd -r -g dev dev
+    USER dev
+    ENTRYPOINT ["sleep", "infinity"]
+
+则限定了 项目不能在随意位置 写日志，强制项目在 一个特定目录比如 `/logs` 下写日志（为dev 开放`/logs`目录写权限），并将`/logs` 映射到物理机的某个目录，定期整理`/logs` 目录即可。
+
+但该方案带来的问题是：对项目限制比较大，需要一个完备的白名单，理论上不能限制项目对磁盘目录的读写。 
+
 ## 概念
 
 ### 用户
@@ -31,6 +65,8 @@ keywords: kubernetes security
 
 1. User accounts are for humans. Service accounts are for processes, which run in pods.
 2. User accounts are intended to be global. Names must be unique across all namespaces of a cluster, future user resource will not be namespaced. Service accounts are namespaced.
+
+
 
 
 ### access the API 
