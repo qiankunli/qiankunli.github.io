@@ -10,6 +10,12 @@ keywords: tomcat
 
 ## 简介
 
+对一个java web应用来说，Tomcat是首，SSM是中，JVM是尾。我们通常对于SSM是比较了解的，而忽略了首尾，而Tomcat在目前的网络编程中是举足轻重的。如果能够掌握Tomcat的原理，那么是非常有用的，比如：
+
+1. Tomcat到底是如何处理一个请求的？这对于针对Tomcat的性能调优是必备的。
+2. 目前Spring Boot和Dubbo等框架中都是使用的内嵌Tomcat，那么一个内嵌的Tomcat到底是如何运行的？
+3. Tomcat的架构设计其实非常优秀的，如果能明白Tomcat为什么要那么设计，那么对于Tomcat的原理和自己的架构设计思维都能有很大提升。
+
 《how tomcat works》的书写方式类似于 从0到1 写tomcat，从一个入门级程序猿的demo 代码开始，逐渐演化 出一个web 容器。
 
 ## 代码的演化
