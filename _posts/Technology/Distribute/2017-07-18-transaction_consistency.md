@@ -111,12 +111,32 @@ keywords: 分布式事务
 
 ![](/public/upload/distribute/tcc.PNG)
 
-TCC借鉴2PC的思路，对比上一小节可以看到，调用方充当了协调者的角色。那么它是如何解决2PC的问题的呢？也就是说，在阶段2，调用方发生宕机，或者某个服务超时了，如何处理呢？**答案是：不断重试（Confirm/Cancel）！**不管是Confirm失败了，还是Cancel失败了，都不断重试。这就要求Confirm和Cancel都必须是幂等操作。注意，这里的重试是由TCC的框架来执行的，而不是让业务方自己去做。
+TCC借鉴2PC的思路，对比上一小节可以看到，**调用方充当了协调者的角色**。那么它是如何解决2PC的问题的呢？也就是说，在阶段2，调用方发生宕机，或者某个服务超时了，如何处理呢？**答案是：不断重试（Confirm/Cancel）！**不管是Confirm失败了，还是Cancel失败了，都不断重试。这就要求Confirm和Cancel都必须是幂等操作。注意，这里的重试是由TCC的框架来执行的，而不是让业务方自己去做。
 
 github 案例项目
 
 1. [QNJR-GROUP/EasyTransaction](https://github.com/QNJR-GROUP/EasyTransaction)
 2. [moonufo/galaxyLight](https://github.com/moonufo/galaxyLight)
+
+## AT
+
+[分布式事务 GTS 的价值和原理浅析](https://mp.weixin.qq.com/s/po8gWGrvU63hbDphzV10Iw) 代码已开源
+
+![](/public/upload/distribute/ali_gts_overview.png)
+
+执行阶段：GTS 的 JDBC 数据源代理通过对业务 SQL 的解析，把业务数据在更新前后的数据镜像组织成回滚日志，利用 本地事务 的 ACID 特性，将业务数据的更新和回滚日志的写入在同一个 本地事务 中提交。这样，可以保证：**任何提交的业务数据的更新一定有相应的回滚日志存在**。
+
+![](/public/upload/distribute/ali_gts_try.png)
+
+完成阶段：如果 TM 发出的决议是全局提交，此时分支事务此时已经完成提交，不需要同步协调处理（只需要异步清理回滚日志），完成阶段 可以非常快速地完成。
+
+![](/public/upload/distribute/ali_gts_commit_success.png)
+
+完成阶段：如果 TM 发出的决议是全局回滚，RM 收到协调器发来的回滚请求，通过 XID 和 Branch ID 找到相应的回滚日志记录，通过回滚记录生成反向的更新 SQL 并执行，以完成分支的回滚。
+
+![](/public/upload/distribute/ali_gts_commit_rollback.png)
+
+综上，GTS 创新地基于 SQL 解析实现对**业务无侵入的**自动补偿回滚机制。说人话就是：由GTS 本身负责 事务过程中间数据的产生（比如undo log table）和处理（比如callback）
 
 ## 最终一致性+消息中间件
 

@@ -37,8 +37,6 @@ keywords: tomcat
 
 ![](/public/upload/java/servlet_tomcat_object.png)
 
-![](/public/upload/java/tomcat_request.png)
-
 在tomcat server.xml 中体现的也非常直观
 
     <Server port="8005" shutdown="SHUTDOWN">
@@ -73,15 +71,19 @@ tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支�
 
 ### connector 架构
 
-![](public/upload/java/tomcat_connector.png)
+![](/public/upload/java/tomcat_connector.png)
 
-## 启动入口
+## 启动过程
 
 `/usr/java/jdk1.8.0_191/bin/java -Dxx  -Xxx org.apache.catalina.startup.Bootstrap start`
 
 ![](/public/upload/java/tomcat_start.png)
 
 webapps 下没有war包 也可以启动。有了war 包，通过事件 触发war 包的解压和加载
+
+## 一次请求的处理
+
+![](/public/upload/java/tomcat_handle_request.png)
 
 ## 其它
 
