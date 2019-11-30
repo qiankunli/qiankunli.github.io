@@ -45,10 +45,7 @@ The userspace perf command present a simple to use interface with commands like:
 
 当算法已经优化，代码不断精简，人们调到最后，便需要斤斤计较了。cache 啊，流水线啊一类平时不大注意的东西也必须精打细算了。
 
-[Perf -- Linux下的系统性能调优工具，第 2 部分](https://www.ibm.com/developerworks/cn/linux/l-cn-perf2/index.html)未读
-
-
-[干货携程容器偶发性超时问题案例分析（一）](https://mp.weixin.qq.com/s/bSNWPnFZ3g_gciOv_qNhIQ)[干货携程容器偶发性超时问题案例分析（二）](https://mp.weixin.qq.com/s/7ZZqWPE1XNf9Mn_wj1HjUw) 这两篇文章中，使用perf 排查问题是如何体现的？
+[干货携程容器偶发性超时问题案例分析（一）](https://mp.weixin.qq.com/s/bSNWPnFZ3g_gciOv_qNhIQ)[干货携程容器偶发性超时问题案例分析（二）](https://mp.weixin.qq.com/s/7ZZqWPE1XNf9Mn_wj1HjUw) 这两篇文章中，使用perf sched 发现了物理上存在的调度延迟问题。
 
 ### perf stat
 
@@ -83,3 +80,9 @@ perf stat 给出了其他几个最常用的统计信息：
 9. Cache-misses: cache 失效的次数。
 
 通过指定 -e 选项，可以改变 perf stat 的缺省事件 ( 可以通过 perf list 来查看 )。假如你已经有很多的调优经验，可能会使用 -e 选项来查看您所感兴趣的特殊的事件。
+
+### perf sched
+
+[Perf -- Linux下的系统性能调优工具，第 2 部分](https://www.ibm.com/developerworks/cn/linux/l-cn-perf2/index.html)未读
+
+perf sched 使用了转储后再分析 (dump-and-post-process) 的方式来分析内核调度器的各种事件

@@ -17,12 +17,16 @@ http://fishcried.com/ 有一个linux 网络的基础知识系列，要研读下
 
 ## tcpdump
 
+[tcpdump抓包使用小结](https://segmentfault.com/a/1190000017346947)
+
     ## 监听某个网卡的数据包
     tcpdump -i eth0
     ## 监听某个端口的数据包，默认是第一个网卡     
     tcpdump port 1024
     ## 监控本机 eth0 网卡与目标主机的往来数据包
     tcpdump -i eth0 -nn 'host 目标主机ip'
+
+Wireshark 还可以用来读取 tcpdump 保存的 pcap 文件。你可以使用 tcpdump 命令行在没有 GUI 界面的远程机器上抓包然后在 Wireshark 中分析数据包。
 
 ## ip命令
 

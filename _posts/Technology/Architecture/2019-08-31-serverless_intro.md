@@ -41,3 +41,9 @@ keywords: window
     2. 其生态发展非常迅速和健康。很有可能未来所有云厂商都要去兼容 Knative 的标准，就像今天所有云厂商都在兼容 Kubernetes 一样。
 
 3. 框架和运行时层呢，由于个人经验所限，我看的仅仅是 Java 领域，其实核心的还是在解决 Java 应用程序启动慢的问题（GraalVM）。当然框架如何避免 vendor lock-in 也很重要，谁都怕被一家云厂商绑定，怕换个云厂商要改代码，这方面主要是 Spring Cloud Function 在做。
+
+
+
+[当我们在聊 Serverless 时你应该知道这些](https://mp.weixin.qq.com/s/Krfhpi7G93el4avhv9UN4g)
+
+![](/public/upload/architecture/ali_cloud_function.png)
