@@ -13,29 +13,6 @@ keywords: AQS
 * TOC
 {:toc}
 	
-## synchronized关键字
-
-在java5.0之前，使线程安全的执行临界区代码，会用到synchronized关键字，可以达到以下效果：
-
-1. 如果临界区没被其它线程占用，则执行代码。
-2. 如果临界区被占用，则阻塞当前线程。
-
-那么问题来了，如何实现synchronized关键字的效果呢？
-
-1. 如何标记临界区被占用？
-2. 临界区被占用后，当前线程如何被阻塞？
-3. 临界区被释放后，如何通知被阻塞的线程？
-4. 很明显，我们需要一个存储被阻塞线程的数据结构，这个数据结构是什么样子的？
-
-从[Java中synchronized的实现原理与应用](http://blog.csdn.net/u012465296/article/details/53022317) [聊聊并发（二）——Java SE1.6中的Synchronized](http://www.infoq.com/cn/articles/java-se-16-synchronized/) 可以看到:
-
-
-1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
-
-	* JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走操作系统。
-	* 每一个线程都有一个可用monitor record列表，JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor record 的地址。
-	* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了。
-
 ## 为什么提出一种新的锁方案
 
 java5.0之后有了新的接口Lock，提供了一种无条件的，可轮询的，定时的以及可中断的锁获取操作，所有加锁和解锁的方法都是显式的。为什么有了内置锁，还要提供一种新的加锁方式呢？
@@ -59,16 +36,6 @@ java5.0之后有了新的接口Lock，提供了一种无条件的，可轮询的
             Condition newCondition();
         }
     
-
-## 锁与同步器Synchronizer的关系
-
-
-java的并发，锁其中一个很重要的工具。同时，编写复杂的并发程序，仅用锁是远远不够的，还需Semaphore,CountDownLatch和FutureTask等。在锁和各种同步工具类背后，有一个“看不见的手”：AbstractQueuedSynchronizer。
-
-借用[AbstractQueuedSynchronizer的介绍和原理分析][]中的描述：锁的API是面向使用者的，它定义了与锁交互的公共行为。但锁的实现是依托给同步器来完成；**同步器面向的是线程访问和资源控制，它定义了线程对资源是否能够获取以及线程的排队等操作。**锁和同步器很好的隔离了二者所需要关注的领域，严格意义上讲，同步器可以适用于除了锁以外的其他同步设施上。
-
-AbstractQueuedSynchronizer作为一个同步器，显式的处理了上节提到的几个问题。
-
 ## AbstractQueuedSynchronizer
 
 AbstractQueuedSynchronizer的java类介绍：
@@ -214,6 +181,38 @@ AbstractQueuedSynchronizer支持多种工作模式及其组合，包括共享模
 
 
 线程的阻塞和唤醒，使用LockSupport的park和unpark方法。
+
+## synchronized关键字
+
+在java5.0之前，使线程安全的执行临界区代码，会用到synchronized关键字，可以达到以下效果：
+
+1. 如果临界区没被其它线程占用，则执行代码。
+2. 如果临界区被占用，则阻塞当前线程。
+
+那么问题来了，如何实现synchronized关键字的效果呢？
+
+1. 如何标记临界区被占用？
+2. 临界区被占用后，当前线程如何被阻塞？
+3. 临界区被释放后，如何通知被阻塞的线程？
+4. 很明显，我们需要一个存储被阻塞线程的数据结构，这个数据结构是什么样子的？
+
+从[Java中synchronized的实现原理与应用](http://blog.csdn.net/u012465296/article/details/53022317) [聊聊并发（二）——Java SE1.6中的Synchronized](http://www.infoq.com/cn/articles/java-se-16-synchronized/) 可以看到:
+
+
+1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
+
+	* JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走操作系统。
+	* 每一个线程都有一个可用monitor record列表，JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor record 的地址。
+	* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了。
+
+## 锁与同步器Synchronizer的关系
+
+
+java的并发，锁其中一个很重要的工具。同时，编写复杂的并发程序，仅用锁是远远不够的，还需Semaphore,CountDownLatch和FutureTask等。在锁和各种同步工具类背后，有一个“看不见的手”：AbstractQueuedSynchronizer。
+
+借用[AbstractQueuedSynchronizer的介绍和原理分析][]中的描述：锁的API是面向使用者的，它定义了与锁交互的公共行为。但锁的实现是依托给同步器来完成；**同步器面向的是线程访问和资源控制，它定义了线程对资源是否能够获取以及线程的排队等操作。**锁和同步器很好的隔离了二者所需要关注的领域，严格意义上讲，同步器可以适用于除了锁以外的其他同步设施上。
+
+AbstractQueuedSynchronizer作为一个同步器，显式的处理了上节提到的几个问题。
 
 ## 引用
 

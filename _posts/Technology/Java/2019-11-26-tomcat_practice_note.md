@@ -13,9 +13,22 @@ keywords: tomcat
 * TOC
 {:toc}
 
-几个问题
+[tomcat8源码maven方式组织](https://github.com/emacsist/tomcat-source-maven)
 
-1. Request 和 Response 是如何读取和写回数据的
+使用golang 语言 实现一个http server，只需几行代码即可，为何用java 实现如何“沉重”呢？这背后tomcat 是一个什么角色呢？
+
+    package main
+    import (
+        "io"
+        "net/http"
+    )
+    func helloHandler(w http.ResponseWriter, req *http.Request) {
+        io.WriteString(w, "hello, world!\n")
+    }
+    func main() {
+        http.HandleFunc("/", helloHandler)
+        http.ListenAndServe(":12345", nil)
+    }
 
 ## tomcat是一个Servlet 容器？
 
@@ -73,17 +86,30 @@ tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支�
 
 ![](/public/upload/java/tomcat_connector.png)
 
+### io 和线程模型
+
+![](/public/upload/java/tomcat_connector_object.png)
+
+1. 异步accept(), 并将得到的socket 注册到poller中
+
 ## 启动过程
 
 `/usr/java/jdk1.8.0_191/bin/java -Dxx  -Xxx org.apache.catalina.startup.Bootstrap start`
 
 ![](/public/upload/java/tomcat_start.png)
 
+分别启动连接管理部分和业务处理部分
+
+![](/public/upload/java/tomcat_object_overview.png)
+
+
 webapps 下没有war包 也可以启动。有了war 包，通过事件 触发war 包的解压和加载
 
 ## 一次请求的处理
 
 ![](/public/upload/java/tomcat_handle_request.png)
+
+## Request 和 Response 是如何读取和写回数据的
 
 ## 其它
 
