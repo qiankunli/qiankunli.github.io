@@ -32,7 +32,9 @@ keywords: tomcat
 
 本文整体结构受周瑜《Tomcat底层源码解析与性能调优》培训视频的启发。
 
-## tomcat是一个Servlet 容器？
+## 从各个视角看tomct
+
+### tomcat是一个Servlet 容器？
 
 
 单纯的思考一下这句话，我们可以抽象出来这么一段代码：
@@ -54,8 +56,7 @@ keywords: tomcat
 
 绿色的类定义 在servlet-api 包中，其它类除自定义外在tomcat 包中
 
-## 从各个视角看tomct
-
+### 整体架构
 
 ![](/public/upload/java/tomcat_war.png)
 
