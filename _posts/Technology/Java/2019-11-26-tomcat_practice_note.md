@@ -8,7 +8,7 @@ keywords: tomcat
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -107,7 +107,7 @@ tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支�
 
 同样一个颜色的是内部类的关系
 
-![](/public/upload/java/tomcat_handle_request.png)
+![](/public/upload/java/tomcat_handle_request_io.png)
 
 1. Http11NioProtocol start 时会分别启动poller 和 acceptor 线程
 2. acceptor 持有ServerSocket/ServerSocketChannel， 负责监听新的连接，并将得到的Socket 注册到Poller 上
@@ -129,11 +129,57 @@ tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支�
     }
 
 
-## 业务处理（待补充）
+## 业务处理
+
+### container 架构
+
+![](/public/upload/java/tomcat_container.png)
+
+为了更清晰一点，上图只画出了Host 类族，Engine、Context、Wrapter 与Host 类似。黄色部分组成了一个pipeline，可以看到Engine、Context、Wrapter 和Host 作为容器，并不亲自“干活”，而是交给对应的pipeline。
+
+    public class CoyoteAdapter implements Adapter {
+        // 有读事件时会触发该操作
+        public boolean event(org.apache.coyote.Request req,
+            org.apache.coyote.Response res, SocketStatus status) {
+            ...
+            // 将读取的数据写入到 request inputbuffer 
+            request.read();
+            ...
+            // 触发filter、servlet的执行
+            connector.getService().getContainer().getPipeline().getFirst().event(request, response, request.getEvent());
+            ...
+        }
+    }
+
+pipeline 逐步传递请求直到Servlet
+
+![](/public/upload/java/tomcat_handle_request_container.png)
 
 ## 其它
 
 ### tomcat 为什么运行war 而不是jar
 
 如果一个项目打成jar包，那么tomcat 在启动时 就要去分析下 这个jar 是一个web项目还是一个 普通二方库。 
+
+### tomcat 与热部署和热加载
+
+热部署和热加载是类似的，都是在不重启Tomcat的情况下，使得应用的最新代码生效。热部署表示重新部署应用，它的执行主体是Host，表示主机。热加载表示重新加载class，它的执行主体是Context，表示应用。
+
+[Tomcat热部署与热加载](https://www.yuque.com/renyong-jmovm/kb/emk7gt) 值得细读
+
+### Sprint Boot如何利用Tomcat加载Servlet？（待补充）
+
+### Tomcat如何支持异步Servlet？（待补充）
+
+### 安全
+
+如果你在Servlet代码中直接 加入`System.exit(1)` 你会发现，仅仅是作为一个tomcat 上层的一个“业务方”，却有能力干掉java进程，即tomcat的运行。
+
+    public class XXServlet extends HttpServlet {
+        protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException{
+            System.exit(1);
+            xxx
+        }
+    }
 
