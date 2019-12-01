@@ -50,7 +50,30 @@ keywords: tomcat
 
 ![](/public/upload/java/servlet_tomcat_object.png)
 
-在tomcat server.xml 中体现的也非常直观
+绿色的类定义 在servlet-api 包中，其它类除自定义外在tomcat 包中
+
+## 从各个视角看tomct
+
+
+![](/public/upload/java/tomcat_war.png)
+
+tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支持http
+
+![](/public/upload/java/tomcat_sample.png)
+
+![](/public/upload/java/tomcat_overview.png)
+
+## 启动过程
+
+`/usr/java/jdk1.8.0_191/bin/java -Dxx  -Xxx org.apache.catalina.startup.Bootstrap start`
+
+![](/public/upload/java/tomcat_start.png)
+
+分别启动连接管理部分和业务处理部分
+
+![](/public/upload/java/tomcat_object_overview.png)
+
+业务处理部分中，各个类的关系 在tomcat server.xml 中体现的也非常直观
 
     <Server port="8005" shutdown="SHUTDOWN">
         <Listener className="org.apache.catalina.core.ThreadLocalLeakPreventionListener" />
@@ -71,16 +94,8 @@ keywords: tomcat
         </Engine>
     </Server>
 
-## 从各个视角看tomct
 
-
-![](/public/upload/java/tomcat_war.png)
-
-tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支持http
-
-![](/public/upload/java/tomcat_sample.png)
-
-![](/public/upload/java/tomcat_overview.png)
+## io处理
 
 ### connector 架构
 
@@ -90,26 +105,31 @@ tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支�
 
 ![](/public/upload/java/tomcat_connector_object.png)
 
-1. 异步accept(), 并将得到的socket 注册到poller中
-
-## 启动过程
-
-`/usr/java/jdk1.8.0_191/bin/java -Dxx  -Xxx org.apache.catalina.startup.Bootstrap start`
-
-![](/public/upload/java/tomcat_start.png)
-
-分别启动连接管理部分和业务处理部分
-
-![](/public/upload/java/tomcat_object_overview.png)
-
-
-webapps 下没有war包 也可以启动。有了war 包，通过事件 触发war 包的解压和加载
-
-## 一次请求的处理
+同样一个颜色的是内部类的关系
 
 ![](/public/upload/java/tomcat_handle_request.png)
 
-## Request 和 Response 是如何读取和写回数据的
+1. Http11NioProtocol start 时会分别启动poller 和 acceptor 线程
+2. acceptor 持有ServerSocket/ServerSocketChannel， 负责监听新的连接，并将得到的Socket 注册到Poller 上
+3. Poller 持有Selector， 负责`selector.select()` 监听读写事件，将新的socket 注册到selector上，以及其它通过addEvent 加入到Poller中的event
+4. Http11NioProcessor 封装了 http 1.1 的协议处理部分，比如parseRequestLine，连接出问题时response设置状态码为503 或400 等。以读事件为例， 最终会将 数据读取到 Request 对象的inputBuffer 中
+
+线程数量
+
+    public class NioEndpoint extends AbstractEndpoint<NioChannel> {
+
+        private Executor executor = new ThreadPoolExecutor(getMinSpareThreads(), getMaxThreads(), 60, TimeUnit.SECONDS,taskqueue, tf);
+        
+        private int pollerThreadCount = Math.min(2,Runtime.getRuntime().availableProcessors()); // new Thread().start() 的方式
+        protected int acceptorThreadCount = 0;      // new Thread().start() 的方式
+
+        // poller  内部除了 selector.select() 逻辑外，一般通过executor 异步执行
+        // acceptor 就是简单的 accept 一个socket 并将其 加入到poller 的event 队列中（ 以将socket 注册到selector）所以没有用到executor
+        
+    }
+
+
+## 业务处理（待补充）
 
 ## 其它
 
