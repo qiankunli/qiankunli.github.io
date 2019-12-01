@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 《Tomcat底层源码解析与性能调优》笔记
+title: Tomcat源码分析
 category: 技术
 tags: Java
 keywords: tomcat
@@ -29,6 +29,8 @@ keywords: tomcat
         http.HandleFunc("/", helloHandler)
         http.ListenAndServe(":12345", nil)
     }
+
+本文整体结构受周瑜《Tomcat底层源码解析与性能调优》培训视频的启发。
 
 ## tomcat是一个Servlet 容器？
 
