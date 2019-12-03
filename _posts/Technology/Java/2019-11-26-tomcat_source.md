@@ -158,21 +158,61 @@ pipeline 逐步传递请求直到Servlet
 
 ![](/public/upload/java/tomcat_handle_request_container.png)
 
-## 其它
-
-### tomcat 为什么运行war 而不是jar
-
-如果一个项目打成jar包，那么tomcat 在启动时 就要去分析下 这个jar 是一个web项目还是一个 普通二方库。 
-
-### tomcat 与热部署和热加载
-
-热部署和热加载是类似的，都是在不重启Tomcat的情况下，使得应用的最新代码生效。热部署表示重新部署应用，它的执行主体是Host，表示主机。热加载表示重新加载class，它的执行主体是Context，表示应用。
+## tomcat的类加载
 
 [Tomcat热部署与热加载](https://www.yuque.com/renyong-jmovm/kb/emk7gt) 值得细读
 
-### Sprint Boot如何利用Tomcat加载Servlet？（待补充）
+tomcat并没有完全遵循类加载的双亲委派机制，考虑几个问题：
 
-### Tomcat如何支持异步Servlet？（待补充）
+1. 如果在一个Tomcat内部署多个应用，多个应用内使用了某个类似的几个不同版本，如何互不影响？org.apache.catalina.loader.WebappClassLoader
+2. 如果多个应用都用到了某类似的相同版本，是否可以统一提供，不在各个应用内分别提供，占用内存呢？common ClassLoader 其实质是一个指定了classpath（classpath由catalina.properties中的common.loader 指定`common.loader="${catalina.base}/lib","${catalina.base}/lib/*.jar","${catalina.home}/lib","${catalina.home}/lib/*.jar"`）的URLClassLoader
+
+![](/public/upload/java/tomcat_classloader.jpg)
+
+    public final class Bootstrap {
+        ClassLoader commonLoader = null;
+        ClassLoader catalinaLoader = null;
+        public void init() throws Exception {
+            initClassLoaders();
+            Thread.currentThread().setContextClassLoader(catalinaLoader);
+            SecurityClassLoad.securityClassLoad(catalinaLoader);
+            ...
+        }
+        private void initClassLoaders() {
+            ...
+            commonLoader = createClassLoader("common", null);
+            ...
+            catalinaLoader = createClassLoader("server", commonLoader);
+        }
+    }
+
+![](/public/upload/java/tomcat_loader.png)
+
+热部署和热加载是类似的，都是在不重启Tomcat的情况下，使得应用的最新代码生效。热部署表示重新部署应用，它的执行主体是Host，表示主机。热加载表示重新加载class，它的执行主体是Context，表示应用。
+
+## Sprint Boot如何利用Tomcat加载Servlet？
+
+tomcat 源码中直接提供Tomcat类，其java doc中有如下表述：**Tomcat supports multiple styles of configuration and startup** - the most common and stable is server.xml-based,implemented in org.apache.catalina.startup.Bootstrap. Tomcat is for use in apps that embed tomcat. 从Tomcat类的属性可以看到，该有的属性都有了，内部也符合Server ==> Service ==> connector + Engine ==> Host ==> Context ==> Wrapper 的管理关系，下图绿色部分是通用的。
+
+![](/public/upload/java/tomcat_minimal.png)
+
+所以 Minimal 情况下 new 一个tomcat 即可启动一个tomcat。
+
+    Tomcat tomcat = new Tomcat
+    tomcat.setXXX
+    tomcat.start();
+
+所以spring-boot-starter-web 主要体现在 创建 并配置Tomcat 实例，具体参见[SpringBoot 中内嵌 Tomcat 的实现原理解析](http://www.glmapper.com/2019/10/06/springboot-server-tomcat/)
+
+## Tomcat如何支持异步Servlet？（待补充）
+
+### 同步Servlet 的工作原理
+
+## 其它
+
+### tomcat为什么运行war 而不是jar
+
+如果一个项目打成jar包，那么tomcat 在启动时 就要去分析下 这个jar 是一个web项目还是一个 普通二方库。 
 
 ### 安全
 

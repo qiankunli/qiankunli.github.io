@@ -35,8 +35,6 @@ jdk 安装目录含义
 
 Class loaders are responsible for loading Java classes during runtime dynamically to the JVM (Java Virtual Machine). Also, they are part of the JRE (Java Runtime Environment). Hence, the JVM doesn’t need to know about the underlying files or file systems in order to run Java programs thanks to class loaders. 潜台词：Class loaders 是jre 类库的一部分但不是JVM 的一部分
 
-
-
 ## “可执行文件”
 
 在linux中，可执行文件没有唯一的后缀名，本文以"可执行文件"统称。
@@ -79,7 +77,6 @@ class文件中包含方法和属性信息，这些数据为反射机制提供的
 ![](/public/upload/java/jvm_class_loader.png)
 
 ![](/public/upload/java/jvm_class_loader_reference.png)
-
 
 ### 类加载器的双亲委派模型
 
@@ -135,9 +132,14 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 3. class的 加载不是一次性加载完毕的，而是根据需要延迟加载的（上文提到过）。
 4. 如果class B 不在class loader的classpath search 范围，则会报ClassNotFoundException
 
-在 Java 虚拟机中，类的唯一性是由类加载器实例以及类的全名一同确定的（。即便是同一串字节流，经由不同的类加载器加载，也会得到两个不同的类。在大型应用中，**往往借助这一特性，来运行同一个类的不同版本**。
-
 与Spring ioc 隔离的对比 [Spring IOC 级联容器原理探究](https://gitbook.cn/gitchat/activity/5b4d716d6b1c4569aa703e49)。PS：有意思的是，**classloader 和 spring ioc 都称之为容器，都具有隔离功能，这背后是否有一个统一的逻辑在？都是class loader，只是class 来源不同，加载后的组织方式不同**
+
+在 Java 虚拟机中，类的唯一性是由类加载器实例以及类的全名一同确定的（即便是同一串字节流，经由不同的类加载器加载，也会得到两个不同的类。猜测一下，如果是一致的，ClassLoader 该如何实现呢？
+
+1. ClassLoader `Class<?> defineClass(String name, byte[] b, int off, int len)` 时，如果发现name 相同， 可以直接返回。但ClassLoader 是可以自定义实现的，很难约束开发必须遵守这个规则。
+2. defineClass 时直接覆盖，那问题就更严重了，开发就有机会恶意覆盖 一些已有的java 库中的类的实现。
+
+在大型应用中，**往往借助这一特性，来运行同一个类的不同版本**。tomcat 在类加载方面就有很好的实践 [Tomcat源码分析](http://qiankunli.github.io/2019/11/26/tomcat_source.html)
 
 ## Java对象的内存布局
 
