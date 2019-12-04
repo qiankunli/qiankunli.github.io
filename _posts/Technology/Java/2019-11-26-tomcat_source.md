@@ -206,7 +206,39 @@ tomcat 源码中直接提供Tomcat类，其java doc中有如下表述：**Tomcat
 
 ## Tomcat如何支持异步Servlet？（待补充）
 
-### 同步Servlet 的工作原理
+从上文类图可知，NioEndpoint中有一个Executor，selector.select 之后，Executor 异步处理 `Socket.read`  + 协议解析 + `Servlet.service`，如果Servlet中的处理逻辑耗时越长就会导致长期地占用Executor，影响Tomcat的整体处理能力。 为此一个解决办法是
+
+    public class AsyncServlet extends HttpServlet {
+        Executor executor = xx
+        public void doGet(HttpServletRequest req, HttpServletResponse res) {
+            AsyncContext asyncContext = req.startAsync(req, res);
+            executor.execute(new AsyncHandler(asyncContext));
+        }
+    }
+    public class AsyncHandler implements Runnable {
+        private AsyncContext ctx;
+        public AsyncHandler(AsyncContext ctx) {
+            this.ctx = ctx;
+        }
+        @Override
+        public void run() {
+            //耗时操作
+            PrintWriter pw;
+            try {
+                pw = ctx.getResponse().getWriter();
+                pw.print("done!");
+                pw.flush();
+                pw.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            ctx.complete();
+        }
+    }
+
+startAsync方法其实就是创建了一个异步上下文AsyncContext对象，该对象封装了请求和响应对象。然后创建一个任务用于处理耗时逻辑，后面通过AsyncContext对象获得响应对象并对客户端响应，输出“done!”。完成后要通过complete方法告诉Tomcat已经处理完，Tomcat就会请求对象和响应对象进行回收处理或关闭连接。
+
+![](/public/upload/java/tomcat_async.png)
 
 ## 其它
 
