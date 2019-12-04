@@ -240,6 +240,24 @@ startAsync方法其实就是创建了一个异步上下文AsyncContext对象，�
 
 ![](/public/upload/java/tomcat_async.png)
 
+    public class Request
+        implements HttpServletRequest {
+        public AsyncContext startAsync(ServletRequest request,
+                ServletResponse response) {
+            ...
+            asyncContext = new AsyncContextImpl(this);
+            ...
+            asyncContext.setStarted(getContext(), request, response,
+                    request==getRequest() && response==getResponse().getResponse());
+            asyncContext.setTimeout(getConnector().getAsyncTimeout());
+            return asyncContext;
+        }
+    }
+
+写回数据由Response 完成，从代码看，AsyncContextImpl.complete 方法表示 tomcat 可以重新开始关注该socket read事件了（之前一直在等socket 写回客户端数据）。
+
+![](/public/upload/java/tomcat_async_complete.png)
+
 ## 其它
 
 ### tomcat为什么运行war 而不是jar
