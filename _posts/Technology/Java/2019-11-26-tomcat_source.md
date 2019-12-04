@@ -204,7 +204,7 @@ tomcat 源码中直接提供Tomcat类，其java doc中有如下表述：**Tomcat
 
 所以spring-boot-starter-web 主要体现在 创建 并配置Tomcat 实例，具体参见[SpringBoot 中内嵌 Tomcat 的实现原理解析](http://www.glmapper.com/2019/10/06/springboot-server-tomcat/)
 
-## Tomcat如何支持异步Servlet？（待补充）
+## Tomcat如何支持异步Servlet？
 
 从上文类图可知，NioEndpoint中有一个Executor，selector.select 之后，Executor 异步处理 `Socket.read`  + 协议解析 + `Servlet.service`，如果Servlet中的处理逻辑耗时越长就会导致长期地占用Executor，影响Tomcat的整体处理能力。 为此一个解决办法是
 
