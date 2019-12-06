@@ -17,16 +17,6 @@ keywords: AQS
 
 [AbstractQueuedSynchronizer的介绍和原理分析](http://ifeve.com/introduce-abstractqueuedsynchronizer/)锁的API是面向使用者的，它定义了与锁交互的公共行为。但锁的实现是依托给同步器来完成；**同步器面向的是线程访问和资源控制，它定义了线程对资源是否能够获取以及线程的排队等操作。**锁和同步器很好的隔离了二者所需要关注的领域
 
-## synchronized 
-
-从[Java中synchronized的实现原理与应用](http://blog.csdn.net/u012465296/article/details/53022317) [聊聊并发（二）——Java SE1.6中的Synchronized](http://www.infoq.com/cn/articles/java-se-16-synchronized/) 可以看到:
-
-1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
-* JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走操作系统。
-* 每一个线程都有一个可用monitor record列表，JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor record 的地址。
-* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了。
-
-
 ## AbstractQueuedSynchronizer 父类和子类
 
 ![](/public/upload/java/aqs_inheritance.png)
@@ -99,9 +89,11 @@ Mutex是面向用户的，用户使用Mutext时只需`mutex.await`和`mutex.sign
 1. 上图中有颜色的为Method，无颜色的为Attribution。
 2. 当有自定义同步器接入时，只需重写第一层所需要的部分方法即可，不需要关注底层具体的实现流程。当自定义同步器进行加锁或者解锁操作时，先经过第一层的API进入AQS内部方法，然后经过第二层进行锁的获取，接着对于获取锁失败的流程，进入第三层和第四层的等待队列处理，而这些处理方式均依赖于第五层的基础数据提供层。
 
+**一个线程的AQS之旅： 入队 ==> 自旋 ==> 获取锁失败 ==>  阻塞 ==>  被唤醒 ==> 获取锁 ==> 出队 ==>  干业务逻辑 ==>  唤醒其它线程。 这个过程中，除了不能自己唤醒自己，入队、出队等都当前线程操作自己干的**。 真的是“师傅领进门，修行靠个人”
+
 ### 从队列开始说起
 
-AQS中的队列（并且是一个双向队列）采用链表作为存储结构，通过节点中的next指针维护队列的完整。AbstractQueuedSynchronizer关于队列操作的部分如下：
+AQS中的队列（并且是一个双向队列，头结点为虚结点）采用链表作为存储结构，通过节点中的next指针维护队列的完整。AbstractQueuedSynchronizer关于队列操作的部分如下：
 
     public abstract class AbstractQueuedSynchronizer{
         private transient volatile Node head;
@@ -118,7 +110,9 @@ AQS中的队列（并且是一个双向队列）采用链表作为存储结构�
         // 将一个Node的相关指向置为空，并不再让其它节点指向它，即可（GC）释放该节点
     }
 
+AQS实际上通过头尾指针来管理同步队列，实现包括获取锁失败的线程进行入队，释放锁时unpark 队首节点/线程等核心逻辑
 
+![](/public/upload/java/aqs_overview.jpg)
 
 
 ### 入队——AbstractQueuedSynchronizer.acquire
@@ -127,48 +121,77 @@ AQS中的队列（并且是一个双向队列）采用链表作为存储结构�
 
 ![Alt text](/public/upload/java/aqs_acquire.png) 
 
-**上图中的循环过程就是完成了自旋的过程**，也正是有了这个循环，为支持超时和中断提供了条件。
+**上图中的循环过程就是完成了自旋的过程**，也正是有了这个循环，为支持超时和中断提供了条件。跳出当前循环的条件是当“前置节点是头结点，且当前线程获取锁成功”。为了防止因死循环导致CPU资源被浪费，我们会判断前置节点的状态来决定是否要将当前线程挂起.
+
+![](/public/upload/java/aqs_wait_queue.jpg)
+
+流程与代码相结合
+
+![](/public/upload/java/aqs_acquire_advanced.jpg)
 
 ### 出队
 
-判断退出队列的条件
+当前线程判断自己退出队列的条件
 
 1. 当前线程对应队列节点是首节点。如果是，说明轮到自己了。
 2. 获取“状态”是否成功。如果是，说明上一个首节点已经“忙完了”
 
-节点挂起后，何时被唤醒？前置（首）节点的release操作会唤醒当前节点。共享模式下，前置节点的唤醒也会间接唤醒当前节点。
 
-### AQS方法简介
+将当前节点通过setHead()方法设置为队列的头结点，然后将之前的头结点的next域设置为null并且pre域也为null，即与队列断开，无任何引用方便GC时能够将内存进行回收。
 
-AbstractQueuedSynchronizer支持多种工作模式及其组合，包括共享模式、排他模式、是否支持中断、是否超时等。
+![](/public/upload/java/aqs_leave_queue.jpg)
 
-各个模式对应的方法如下（部分）
+### 节点挂起后，何时被唤醒？
+
+前置（首）节点的release操作会唤醒当前节点。共享模式下，前置节点的唤醒也会间接唤醒当前节点。
+
+    // java.util.concurrent.locks.AbstractQueuedSynchronizer
+    public final boolean release(int arg) {
+        // 上边自定义的tryRelease如果返回true，说明该锁没有被任何线程持有
+        if (tryRelease(arg)) {
+            // 获取头结点
+            Node h = head;
+            // 头结点不为空并且头结点的waitStatus不是初始化节点情况，解除线程挂起状态
+            if (h != null && h.waitStatus != 0)
+                unparkSuccessor(h);
+            return true;
+        }
+        return false;
+    }
+
+## AQS VS synchronized 
+
+### synchronized原理
+
+从[Java中synchronized的实现原理与应用](http://blog.csdn.net/u012465296/article/details/53022317) [聊聊并发（二）——Java SE1.6中的Synchronized](http://www.infoq.com/cn/articles/java-se-16-synchronized/) 可以看到:
+
+1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
+* JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走操作系统。
+* 每一个线程都有一个可用monitor record列表，JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor record 的地址。
+* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了。
+
+[Java synchronized原理总结](https://zhuanlan.zhihu.com/p/29866981)
+
+### DK1.6 之后性能优势不大了，只剩下功能优势
+
+**由于Java的线程是映射到操作系统的原生线程之上的，如果要阻塞或唤醒一条线程，都需要操作系统来帮忙完成**，这就需要从用户态转换到核心态中，因此状态转换需要耗费很多的处理器时间。所以synchronized是Java语言中的一个重量级操作。在JDK1.6中，虚拟机进行了一些优化，譬如在通知操作系统阻塞线程之前加入一段自旋等待过程，避免频繁地切入到核心态中：
+
+synchronized与java.util.concurrent包中的ReentrantLock相比，由于JDK1.6中加入了针对锁的优化措施（见后面），使得synchronized与ReentrantLock的性能基本持平。ReentrantLock只是提供了synchronized更丰富的功能，而不一定有更优的性能，所以在synchronized能实现需求的情况下，优先考虑使用synchronized来进行同步。
+
+### 惊群效应
+
+[AbstractQueuedSynchronizer与synchronized优缺对比及AQS 源码分析笔记](https://blog.csdn.net/zqz_zqz/article/details/61935253)
+
+羊群效应，当有多个线程去竞争同一个锁的时候，假设锁被某个线程释放，那么如果有成千上万个线程在等待锁，有一种做法是同时唤醒这成千上万个线程去去竞争锁，这个时候就发生了羊群效应，海量的竞争必然造成资源的剧增和浪费（缓存同步开销，我们知道volatile 的工作原理，强制线程从内存读取数据 是有开销的。所有等待线程 突然去争抢一个锁（也就是检测锁变量），必然会所有等待线程强制去内存读取这个变量的值）。因为终究只能有一个线程竞争成功，其他线程还是要老老实实的回去等待。
+
+AQS的FIFO的等待队列给解决在锁竞争方面的羊群效应问题提供了一个思路：AQS使用了变种的CLH队列，因为队列里的线程只监视其前面节点线程的状态，根据前面节点来判断自己是继续争用锁，还是需要被阻塞; 线程唤醒也只唤醒队头等待线程。因为每个线程只会读写前一个线程的状态值，这个值只会被当前线程使用到，相比传统的所有线程都监视读写一个同步变量，CLH可以减少变量的变更带来的多处理器缓存同步的开销；
+
+如果你的目标是让端到端的延迟只有 10毫秒，而其中花80纳秒去主存拿一些未命中数据的过程将占很重的一块。
+
+[沪江——写个AQS](http://mp.weixin.qq.com/s?__biz=MzI1MTE2NTE1Ng==&mid=2649517864&idx=1&sn=0b7d88aaa58c8e94e1c3bf8c433dc7cb&chksm=f1efefa3c69866b570fb9accb38c1be1f4dae8c6091b5c75619321902bcbe758ffe137f663de&mpshare=1&scene=23&srcid=#rd) 是个系列，值得一读
+	
 
 
-- 排他模式
-
-        public final void acquire(int arg)
-        final boolean acquireQueued(final Node node, int arg)
-        // 恢复锁的状态（“为0”），唤醒后继节点
-        public final boolean release(int arg)
-        
-- 支持中断
-
-        // 每次“干活”前，先检查下当前线程的中断状态，如果当前线程被中断了，就放弃当前操作
-        public final void acquireInterruptibly(int arg)
-        
-- 支持超时
-        
-        // 每次“干活（循环）”前，先检查下剩余时间，在循环的最后更新下时间
-        public final boolean tryAcquireNanos(int arg, long nanosTimeout)
-        
-- 共享模式
-
-        // 如果共享状态获取成功之后会判断后继节点是否是共享模式，如是就直接对其进行唤醒操作，也就是同时激发多个线程并发的运行。
-        public final void acquireShared(int arg)
-        public final boolean releaseShared(int arg)
-
-线程的阻塞和唤醒，使用LockSupport的park和unpark方法。
 
 
 
