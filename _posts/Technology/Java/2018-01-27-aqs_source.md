@@ -13,30 +13,23 @@ keywords: AQS
 * TOC
 {:toc}
 	
-## 为什么提出一种新的锁方案
+## 锁是同步器？同步器是锁？ 
 
-java5.0之后有了新的接口Lock，提供了一种无条件的，可轮询的，定时的以及可中断的锁获取操作，所有加锁和解锁的方法都是显式的。为什么有了内置锁，还要提供一种新的加锁方式呢？
+[AbstractQueuedSynchronizer的介绍和原理分析](http://ifeve.com/introduce-abstractqueuedsynchronizer/)锁的API是面向使用者的，它定义了与锁交互的公共行为。但锁的实现是依托给同步器来完成；**同步器面向的是线程访问和资源控制，它定义了线程对资源是否能够获取以及线程的排队等操作。**锁和同步器很好的隔离了二者所需要关注的领域
 
-1. 效率问题
+## synchronized 
 
-    1. synchronized是通过MonitorEnter和MonitorExit专用字节码指令来实现。因为java线程是靠操作系统原生线程实现的，挂起线程还涉及到内核态与用户态的转换（还要劳烦OS介入）。加锁时，使用synchronized并不是高效的办法，其配套的同步手段wait和notify也不是（提高效率可用Condition，这不是本文的重点）。
-    2. 在java.util.concurrent包中的一些方法通过**结合使用Java代码和使用sun.misc.Unsafe的实现本地调用。这样，同步的大部分工作可以由JVM线程内部解决**。
+从[Java中synchronized的实现原理与应用](http://blog.csdn.net/u012465296/article/details/53022317) [聊聊并发（二）——Java SE1.6中的Synchronized](http://www.infoq.com/cn/articles/java-se-16-synchronized/) 可以看到:
 
-2. 内置锁不够灵活，比如取消、设置进入临界区的线程数量等
+1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
+* JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走操作系统。
+* 每一个线程都有一个可用monitor record列表，JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor record 的地址。
+* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了。
 
-	比如内置锁无法中断一个正在获取锁的线程，（正在获取锁的线程）在得不到锁时会无限等待下去。而Lock接口可以为我们提供更丰富的选择。
-	
-    
-    	public interface Lock {
-            void lock();
-            void lockInterruptibly() throws InterruptedException;
-            boolean tryLock();
-            boolean tryLock(long time, TimeUnit unit) throws InterruptedException;
-            void unlock();
-            Condition newCondition();
-        }
-    
-## AbstractQueuedSynchronizer
+
+## AbstractQueuedSynchronizer 父类和子类
+
+![](/public/upload/java/aqs_inheritance.png)
 
 AbstractQueuedSynchronizer的java类介绍：
 
@@ -49,7 +42,6 @@ Provides a framework for implementing blocking locks and related synchronizers (
 
 1. 对于ReentrantLock，它是所有者线程已经重复获取该锁的次数
 2. Semaphore，它表示剩余的许可数量
-3. FutureTask，它表示任务的状态（尚未开始，正在运行，已完成以及已取消）
 
 父类和子类的工作分别是
     
@@ -71,7 +63,8 @@ AbstractQueuedSynchronizer留给子类实现的方法，一般以try开头，父
         
 一般情况下，在tryAcquire中判断state值，判断是否阻塞线程，如果阻塞，cas增加state值，在tryRelease减少state值。
       
-### AbstractQueuedSynchronizer实现类示例
+
+![](/public/upload/java/aqs_custom_child.png)
 
 在AQS框架下，我们可以自定义一个锁的实现
 
@@ -94,26 +87,21 @@ AbstractQueuedSynchronizer留给子类实现的方法，一般以try开头，父
     }
       
 
-Mutex是面向用户的，用户使用Mutext时只需`mutex.await`和`mutex.signal`即可。同步器面向的是线程访问和资源控制，使用时除调用acquire和release方法外，还要设置具体的参数值，**为数据的变化赋予意义**（此处参数是没用的）。
+Mutex是面向用户的，用户使用Mutext时只需`mutex.await`和`mutex.signal`即可。同步器面向的是线程访问和资源控制，使用时除调用acquire和release方法外，还要设置具体的参数值，**为数据的变化赋予意义**（Mutex中参数是没用的）。
 
-**从锁及其它同步工具类中抽取出同步器，这在我们抽象自己的代码时，有很强的借鉴意义。**
 
-AbstractQueuedSynchronizer子类的实现比较丰富，除了提供类似pv操作。比如，如果为子类添加成员的话
+## AQS架构
 
-    static final class Sync<V> extends AbstractQueuedSynchronizer{
-    	private V value;
-        private Throwable exception;
-        V get() throws xxxException;
-        boolean set(V v);
-    }
-    Sync<V> sync = new Sync<V>();
-   
-此处Sync就可以作为一个类的包装类，ThreadLocal用来做一个线程内（不同方法间）数据传递，此处Sync就可以作为线程间的数据传递。
+[从ReentrantLock的实现看AQS的原理及应用](https://mp.weixin.qq.com/s/sA01gxC4EbgypCsQt5pVog) 入队出队过程未读完
 
+![](/public/upload/java/aqs_framework.png)
+
+1. 上图中有颜色的为Method，无颜色的为Attribution。
+2. 当有自定义同步器接入时，只需重写第一层所需要的部分方法即可，不需要关注底层具体的实现流程。当自定义同步器进行加锁或者解锁操作时，先经过第一层的API进入AQS内部方法，然后经过第二层进行锁的获取，接着对于获取锁失败的流程，进入第三层和第四层的等待队列处理，而这些处理方式均依赖于第五层的基础数据提供层。
 
 ### 从队列开始说起
 
-说起队列，笔者的直接反应是“有一个数组，一前一后两个指针，入队出队通过移动指针来解决”（队列的存储结构基于数组方式）。AQS中的队列（并且是一个双向队列）采用链表作为存储结构，通过节点中的next指针维护队列的完整。AbstractQueuedSynchronizer关于队列操作的部分如下：
+AQS中的队列（并且是一个双向队列）采用链表作为存储结构，通过节点中的next指针维护队列的完整。AbstractQueuedSynchronizer关于队列操作的部分如下：
 
     public abstract class AbstractQueuedSynchronizer{
         private transient volatile Node head;
@@ -131,15 +119,17 @@ AbstractQueuedSynchronizer子类的实现比较丰富，除了提供类似pv操�
     }
 
 
-### AbstractQueuedSynchronizer.acquire和Object.wait对比
 
-#### AbstractQueuedSynchronizer.acquire
+
+### 入队——AbstractQueuedSynchronizer.acquire
 
 在排他模式下，线程执行一次acquire所需要经历的过程
 
 ![Alt text](/public/upload/java/aqs_acquire.png) 
 
 **上图中的循环过程就是完成了自旋的过程**，也正是有了这个循环，为支持超时和中断提供了条件。
+
+### 出队
 
 判断退出队列的条件
 
@@ -178,48 +168,20 @@ AbstractQueuedSynchronizer支持多种工作模式及其组合，包括共享模
         public final void acquireShared(int arg)
         public final boolean releaseShared(int arg)
 
-
-
 线程的阻塞和唤醒，使用LockSupport的park和unpark方法。
 
-## synchronized关键字
-
-在java5.0之前，使线程安全的执行临界区代码，会用到synchronized关键字，可以达到以下效果：
-
-1. 如果临界区没被其它线程占用，则执行代码。
-2. 如果临界区被占用，则阻塞当前线程。
-
-那么问题来了，如何实现synchronized关键字的效果呢？
-
-1. 如何标记临界区被占用？
-2. 临界区被占用后，当前线程如何被阻塞？
-3. 临界区被释放后，如何通知被阻塞的线程？
-4. 很明显，我们需要一个存储被阻塞线程的数据结构，这个数据结构是什么样子的？
-
-从[Java中synchronized的实现原理与应用](http://blog.csdn.net/u012465296/article/details/53022317) [聊聊并发（二）——Java SE1.6中的Synchronized](http://www.infoq.com/cn/articles/java-se-16-synchronized/) 可以看到:
 
 
-1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
-
-	* JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走操作系统。
-	* 每一个线程都有一个可用monitor record列表，JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor record 的地址。
-	* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了。
-
-## 锁与同步器Synchronizer的关系
 
 
-java的并发，锁其中一个很重要的工具。同时，编写复杂的并发程序，仅用锁是远远不够的，还需Semaphore,CountDownLatch和FutureTask等。在锁和各种同步工具类背后，有一个“看不见的手”：AbstractQueuedSynchronizer。
 
-借用[AbstractQueuedSynchronizer的介绍和原理分析][]中的描述：锁的API是面向使用者的，它定义了与锁交互的公共行为。但锁的实现是依托给同步器来完成；**同步器面向的是线程访问和资源控制，它定义了线程对资源是否能够获取以及线程的排队等操作。**锁和同步器很好的隔离了二者所需要关注的领域，严格意义上讲，同步器可以适用于除了锁以外的其他同步设施上。
 
-AbstractQueuedSynchronizer作为一个同步器，显式的处理了上节提到的几个问题。
 
-## 引用
 
-[AbstractQueuedSynchronizer的介绍和原理分析][]
 
-[Java并发包源码学习之AQS框架][]
 
-[AbstractQueuedSynchronizer的介绍和原理分析]: http://ifeve.com/introduce-abstractqueuedsynchronizer/
-[队列的操作的C语言实现 ]: http://blog.chinaunix.net/uid-20788636-id-1841327.html
-[Java并发包源码学习之AQS框架]: http://www.cnblogs.com/zhanjindong/p/java-concurrent-package-aqs-overview.html
+
+
+
+
+
