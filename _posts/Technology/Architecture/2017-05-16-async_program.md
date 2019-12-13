@@ -3,7 +3,7 @@
 layout: post
 title: 不同层面的异步
 category: 架构
-tags: Practice
+tags: Architecture
 keywords: 异步
 
 ---

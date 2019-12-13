@@ -3,7 +3,7 @@
 layout: post
 title: 为什么出现Service Mesh 
 category: 架构
-tags: Practice
+tags: Architecture
 keywords: service mesh
 
 ---
