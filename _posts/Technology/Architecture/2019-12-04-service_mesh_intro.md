@@ -16,7 +16,7 @@ keywords: service mesh
 
 Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's a service mesh? And why do I need one?](https://buoyant.io/2017/04/25/whats-a-service-mesh-and-why-do-i-need-one/) 提到的：A service mesh is a dedicated infrastructure layer for handling service-to-service communication. It’s responsible for the reliable delivery of requests through the complex topology of services that comprise a modern, cloud native application. In practice, the service mesh is typically implemented as an array of lightweight network proxies that are deployed alongside application code, without the application needing to be aware. Service Mesh 通常以轻量级的网络代理的方式跟应用的代码部署在一起，从而以**应用无感知的**方式实现服务治理。
 
-## 微服务视角
+## 什么是 Service Mesh
 
 [为什么说 Service Mesh 是微服务发展到今天的必然产物？](https://www.infoq.cn/article/2017/12/why-service-mesh)
 
@@ -31,6 +31,8 @@ Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's 
 3. 我们手里多了一堆 SDK，已有的（未接入微服务）应用，必须用这些 SDK 重新开发；而对于新开发的应用，我们又发现这些 SDK 体积过大。对比单机上动态链接过程的顺畅，这种基于 SDK 的微服务动态链接方案简直是难用的不得了。
 
 在三到五年之后，Kubernetes 会成为服务器端的标准环境，就像现在的 Linux，而 Service Mesh 就是运行在 Kubernetes 上的分布式应用的动态链接器，届时开发一个分布式应用将会像开发单机程序一样简单，**业界在分布式操作系统上长达三十多年的努力将以这种方式告一段落**。
+
+总结：**微服务技术的普及，增加了对跨语言服务调用的需求 + 微服务框架与容器如何整合（调度与流量管理是不分家的） ==> 架构不侵入代码/架构与业务代码分离 + pod 中container+sidecar 理念 ==> service mesh**。PS：笔者曾经创新的提出了一个资源位个性化系统，即app启动时向服务端请求属于自己的资源， 除了一些硬性的匹配条件外， 我们希望根据用户画像进行个性化（比如不同用户资源的顺序不同）。已有的业务系统依次进行个性化改造无疑是很笨的方式， 因此我们将个性化能力集中到一个系统上，并与原有系统协作 ，进而实现所有系统的个性化。其实可以认为是架构层面的AOP。
 
 ### 传统微服务架构
 
