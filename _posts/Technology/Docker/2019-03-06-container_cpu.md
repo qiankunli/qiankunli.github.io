@@ -19,37 +19,7 @@ keywords: jib
 
 ## 如何感知某个项目占用了过多的cpu
 
-### 进程cpu耗费如何计算
 
-[CFS Bandwidth Control](https://www.kernel.org/doc/Documentation/scheduler/sched-bwc.txt)
-
-The bandwidth allowed for a group（进程所属的组） is specified using a quota and period. Within
-each given "period" (microseconds), a group is allowed to consume only up to
-"quota" microseconds of CPU time.  When the CPU bandwidth consumption of a
-group exceeds this limit (for that period), the tasks belonging to its
-hierarchy will be throttled and are not allowed to run again until the next
-period. 有几个点
-
-1. cpu 不像内存 一样有明确的大小单位，单个cpu 是独占的，只能以cpu 时间片来衡量。
-2. 进程耗费的限制方式：在period（毫秒/微秒） 内该进程只能占用 quota （毫秒/微秒）。PS：内存隔离是 申请内存的时候判断 判断已申请内存有没有超过阈值。cpu 隔离则是 判断period周期内，已耗费时间有没有超过 quota。PS： 频控、限流等很多系统也是类似思想
-3. period 指的是一个判断周期，quota 表示一个周期内可用的多个cpu的时间和。 所以quota 可以超过period ，比如period=100 and  quota=200，表示在100单位时间里，进程要使用cpu 200单位，需要两个cpu 各自执行100单位
-4. 每次拿cpu 说事儿得提两个值（period 和 quota）有点麻烦，可以通过进程消耗的 CPU 时间片quota来统计出进程占用 CPU 的百分比。这也是我们看到的各种工具中都使用百分比来说明 CPU 使用率的原因（下文多出有体现）。
-
-### linux
-
-top 命令输出
-
-    top - 18:31:39 up 158 days,  4:45,  2 users,  load average: 2.63, 3.48, 3.53
-    Tasks: 260 total,   2 running, 258 sleeping,   0 stopped,   0 zombie
-    %Cpu(s): 38.1 us,  4.2 sy,  0.0 ni, 53.5 id,  2.3 wa,  0.0 hi,  1.9 si,  0.0 st
-    KiB Mem : 16255048 total,   238808 free,  7608872 used,  8407368 buff/cache
-    KiB Swap: 33554428 total, 31798304 free,  1756124 used.  7313144 avail Mem
-
-    PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
-    32080 root      20   0 8300552 4.125g  11524 S  86.4 26.6   1157:05 java
-    995 root      20   0  641260  41312  39196 S  28.6  0.3   7420:54 rsyslogd
-
-top 命令找到`%CPU` 排位最高的进程id=32080，进而找到对应的容器
 
 ### docker
 

@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 微服务1——业务程序猿眼中的微服务
+title: 业务程序猿眼中的微服务管理
 category: 架构
 tags: Practice
 keywords: dubbo micro service
@@ -11,6 +11,12 @@ keywords: dubbo micro service
 ## 简介
 
 本文主要以框架实现的角度 来阐述微服务治理，主要包括两个方面：“业务层面”（微服务应该有什么）和工程层面（如何code实现）。此外，篇幅有限，多从客户端（即业务使用方）角度来阐述问题。
+
+20191213补充：[What is Istio?](https://istio.io/docs/concepts/what-is-istio/)The term service mesh is used to describe the network of microservices that make up such applications and the interactions between them. As a service mesh grows in size and complexity, it can become harder to understand and manage. Its requirements can include discovery, load balancing, failure recovery, metrics, and monitoring. A service mesh also often has more complex operational requirements, like A/B testing, canary rollouts, rate limiting, access control, and end-to-end authentication. 理解: service mesh 可以理解为 the network of microservices， 随着service mesh 规模的扩大， 会产生 discovery, load balancing, failure recovery, metrics,  monitoring, A/B testing, canary rollouts, rate limiting, access control, and end-to-end authentication 等一系列问题。
+
+## 整体架构
+
+![](/public/upload/practice/traditional_micro_service.png)
 
 ## 三大基本套路
 
@@ -215,6 +221,3 @@ rpc 就好像函数调用一样，有数据有状态的往来。也就是需要�
 
 [微服务编排](http://qiankunli.github.io/2017/11/20/micro_service_arrange.html)
 
-笔者个人订阅号
-
-![](/public/upload/qrcode_for_gh.jpg)

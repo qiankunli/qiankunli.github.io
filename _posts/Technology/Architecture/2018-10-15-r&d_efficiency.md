@@ -3,7 +3,7 @@
 layout: post
 title: 研发效能平台
 category: 架构
-tags: Practice
+tags: Architecture
 keywords: 研发效能
 
 ---

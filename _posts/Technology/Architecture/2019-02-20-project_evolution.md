@@ -3,7 +3,7 @@
 layout: post
 title: 项目的演化特点
 category: 架构
-tags: Practice
+tags: Architecture
 keywords: project
 
 ---

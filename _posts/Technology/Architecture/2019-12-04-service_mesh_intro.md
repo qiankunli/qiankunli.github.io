@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 为什么出现Service Mesh 
+title: 下一代微服务Service Mesh 
 category: 架构
 tags: Architecture
 keywords: service mesh
@@ -13,6 +13,8 @@ keywords: service mesh
 * TOC
 {:toc}
 
+
+Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's a service mesh? And why do I need one?](https://buoyant.io/2017/04/25/whats-a-service-mesh-and-why-do-i-need-one/) 提到的：A service mesh is a dedicated infrastructure layer for handling service-to-service communication. It’s responsible for the reliable delivery of requests through the complex topology of services that comprise a modern, cloud native application. In practice, the service mesh is typically implemented as an array of lightweight network proxies that are deployed alongside application code, without the application needing to be aware. Service Mesh 通常以轻量级的网络代理的方式跟应用的代码部署在一起，从而以**应用无感知的**方式实现服务治理。
 
 ## 微服务视角
 
@@ -29,6 +31,14 @@ keywords: service mesh
 3. 我们手里多了一堆 SDK，已有的（未接入微服务）应用，必须用这些 SDK 重新开发；而对于新开发的应用，我们又发现这些 SDK 体积过大。对比单机上动态链接过程的顺畅，这种基于 SDK 的微服务动态链接方案简直是难用的不得了。
 
 在三到五年之后，Kubernetes 会成为服务器端的标准环境，就像现在的 Linux，而 Service Mesh 就是运行在 Kubernetes 上的分布式应用的动态链接器，届时开发一个分布式应用将会像开发单机程序一样简单，**业界在分布式操作系统上长达三十多年的努力将以这种方式告一段落**。
+
+### 传统微服务架构
+
+![](/public/upload/practice/traditional_micro_service.png)
+
+### Service Mesh架构
+
+![](/public/upload/practice/service_mesh.png)
 
 ## Service Mesh 所带来的变化
 
@@ -87,6 +97,8 @@ Service Mesh 使得应用与技术基础设施之间的关系变得更松且稳�
 服务之间的互联互通，服务流量的控制、观测和安全加固是微服务软件架构下所要解决的关键问题，这些问题与规模化下的服务可用性和安全性紧密相关。
 
 [阿里巴巴 Service Mesh 落地的架构与挑战](http://dict.youdao.com/w/eng/Nacos/#keyfrom=dict2.index)兑现 Service Mesh 的价值，让业务与技术设施能以更高的效率彼此独立演进
+
+## SideCr
 
 ## 其它
 
