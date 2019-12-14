@@ -42,15 +42,17 @@ Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's 
 
 ## 整体架构
 
+内容主要来自胡忠想在极客时间上的《从0开始学微服务》
+
 ![](/public/upload/architecture/service_mesh.png)
 
 ### SideCar
 
 业务和sidecar如何交互？
 
-![](/service_mesh_sidecar_proxy.png)
+![](/public/upload/architecture/service_mesh_sidecar_proxy.png)
 
-![](/service_mesh_sidecar_direct.png)
+![](/public/upload/architecture/service_mesh_sidecar_direct.png)
 
 ### Control Plane 
 
