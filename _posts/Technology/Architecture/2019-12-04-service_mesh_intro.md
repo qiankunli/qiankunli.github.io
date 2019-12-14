@@ -40,6 +40,22 @@ Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's 
 
 ![](/public/upload/practice/service_mesh.png)
 
+## 整体架构
+
+![](/public/upload/architecture/service_mesh.png)
+
+### SideCar
+
+业务和sidecar如何交互？
+
+![](/service_mesh_sidecar_proxy.png)
+
+![](/service_mesh_sidecar_direct.png)
+
+### Control Plane 
+
+![](/public/upload/architecture/service_mesh_control_plan.png)
+
 ## Service Mesh 所带来的变化
 
 基本摘抄自[Service Mesh 是新瓶装旧酒吗？](https://mp.weixin.qq.com/s/jtJ1kSYQHsK8o9AnTFEzAQ)
@@ -97,8 +113,6 @@ Service Mesh 使得应用与技术基础设施之间的关系变得更松且稳�
 服务之间的互联互通，服务流量的控制、观测和安全加固是微服务软件架构下所要解决的关键问题，这些问题与规模化下的服务可用性和安全性紧密相关。
 
 [阿里巴巴 Service Mesh 落地的架构与挑战](http://dict.youdao.com/w/eng/Nacos/#keyfrom=dict2.index)兑现 Service Mesh 的价值，让业务与技术设施能以更高的效率彼此独立演进
-
-## SideCr
 
 ## 其它
 
