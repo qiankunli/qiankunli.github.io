@@ -10,6 +10,8 @@ keywords: datacenter
 
 ## 前言（未完成）
 
+The objectives of this book are to introduce readers to this new design space(新的设计领域), describe some of the requirements and characteristics of WSCs(ware house-scale computers), highlight some of the important challenges unique to this space, and share some of our experience designing, programming, and operating them within Google
+
 ### ot just a collection of servers
 
 互联网时代，有比较重的pc端，然后是互联网时代，计算主要放在server-side，然后服务端应用的规模开始越来越大。
