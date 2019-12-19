@@ -118,11 +118,15 @@ sk_buff由sk_buff_head组织
 
 当用户需要接收数据时，首先根据文件描述符inode得到socket结构和sock结构（**socket结构在用户层，sock在内核层，两者涉及到数据在内核态和用户态的拷贝**），然后从sock结构中指向的队列recieve_queue中读取数据包，将数据包COPY到用户空间缓冲区。数据就完整的从硬件中传输到用户空间。这样也完成了一次完整的从下到上的传输。
 
+![](/public/upload/network/linux_package_receive.png)
+
 ### 数据的发送
 
 用户在初始化socket之后，会得到一个fd，socket.write ==> sock.write ==> inet.write ==> tcp.write ==> ip_queue_xmit ==> dev_queue_xmit ==> ei_start_xmit.
 
 传输层将用户的数据包装成sk_buff 下放到ip层，在ip层，函数ip_queue_xmit()的功能是将数据包进行一系列复杂的操作，比如是检查数据包是否需要分片。同时，根据目的ip、iptables等规则，选取一个dev发送数据。
+
+![](/public/upload/network/linux_package_send.png)
 
 ## linux1.2.13
 
@@ -288,11 +292,24 @@ linux网络操作中，通过socket fd ==> sock ==> write_queue, receive_queue �
 3. 内核协议栈。哪怕用户进程没有调用 read，读取网络包，当网络包来的时候，也得有一个地方收着。
 
 
-## 发送与接收成本
+## 发送与接收成本 和 优化
 
 [浅谈Service Mesh体系中的Envoy](https://yq.aliyun.com/articles/606655)
 
-Linux正常协议处理过程中内核态与用户态的转换成本：以对我们最直观的内存拷贝为例，正常情况下，一个网络数据包从网卡到应用程序需要经过如下的过程：数据从网卡通过 DMA 等方式传到内核开辟的缓冲区，然后从内核空间拷贝到用户态空间，在 Linux 内核协议栈中，这个耗时操作甚至占到了数据包整个处理流程的 57.1%
+linux 一次发送或接收处理链路还是比较长的，且需要在内核态与用户态之间做内存拷贝、上下文切换、软硬件中断等。以对我们最直观的内存拷贝为例，正常情况下，一个网络数据包从网卡到应用程序需要经过如下的过程：数据从网卡通过 DMA 等方式传到内核开辟的缓冲区，然后从内核空间拷贝到用户态空间，在 Linux 内核协议栈中，这个耗时操作甚至占到了数据包整个处理流程的 57.1%
+
+虽然Linux设计初衷是以通用性为目的的，但随着Linux在服务器市场的广泛应用，其原有的网络数据包处理方式已很难跟上人们对高性能网络数据处理能力的诉求。在这种背景下DPDK应运而生，其利用UIO技术，在Driver层直接将数据包导入到用户态进程，绕过了Linux协议栈，接下来由用户进程完成所有后续处理，再通过Driver将数据发送出去。原有内核态与用户态之间的内存拷贝采用mmap将用户内存映射到内核，如此就规避了内存拷贝、上下文切换、系统调用等问题，然后再利用大页内存、CPU亲和性、无锁队列、基于轮询的驱动模式、多核调度充分压榨机器性能，从而实现高效率的数据包处理。
+
+DPDK全称Intel Data Plane Development Kit，是Intel提供的数据平面开发工具集，为Intel Architecture（IA）处理器架构下用户空间高效的数据包处理提供库函数和驱动的支持。VPP是the vector packet processor的简称，是一套基于DPDK的网络帧处理解决方案，是一个可扩展框架，提供开箱即用的交换机/路由器功能。是Linux基金会下开源项目FD.io的一个子项目，由思科贡献的开源版本，目前是FD.io的最核心的项目。
+
+![](/public/upload/network/dpdk_package_send.png)
+
+![](/public/upload/network/dpdk_package_receive.png)
+
+通过对比得知，DPDK拦截中断，不触发后续中断流程，并绕过内核协议栈，通过UIO（Userspace I/O）技术将网卡收到的报文拷贝到应用层处理，报文不再经过内核协议栈。减少了中断，DPDK的包全部在用户空间使用内存池管理，内核空间与用户空间的内存交互不用进行拷贝，只做控制权转移，减少报文拷贝过程，提高报文的转发效率。
+
+DPDK能够绕过内核协议栈，本质上是得益于 UIO 技术，UIO技术也不是DPDK创立的，是内核提供的一种运行在用户空间的I/O技术，Linux系统中一般的驱动设备都是运行在内核空间，在用户空间用的程序调用即可，UIO则是将驱动的很少一部分运行在内核空间，绝大多数功能在用户空间实现，通过 UIO 能够拦截中断，并重设中断回调行为，从而绕过内核协议栈后续的处理流程。
+
 
 ## 引用
 

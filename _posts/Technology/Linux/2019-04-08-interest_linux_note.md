@@ -268,6 +268,11 @@ Linux 操作系统新添加了一个设备，且新的设备从来没有加载�
 
 为什么块设备要比字符设备多此一举呢？比如将一个硬盘的块设备 mount 成为 ext4 的时候，会调用 `ext4_mount->mount_bdev`，mount_bdev 根据 /dev/xxx 这个名字，找到相应的设备并打开它，然后根据打开的设备文件，填充 ext4 文件系统的 super_block。`/dev/sdb`的inode 结构是指向设备的，`/mnt/sdb` 的inode 结构是指向ext4 文件系统的。
 
+2019.12.19补充：[浅谈Service Mesh体系中的Envoy](https://yq.aliyun.com/articles/606655)一个设备驱动的两个主要职责：
+
+1. 存取设备的内存
+2. 处理设备产生的中断
+
 ## 信号处理
 
 1. 我们在终端输入某些组合键的时候，会给进程发送信号，例如，Ctrl+C 产生 SIGINT 信号，Ctrl+Z 产生SIGTSTP 信号。
