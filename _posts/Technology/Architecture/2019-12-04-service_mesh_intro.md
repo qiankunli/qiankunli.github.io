@@ -34,6 +34,8 @@ Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's 
 
 [浅谈Service Mesh体系中的Envoy](https://yq.aliyun.com/articles/606655)：如果用一句话来解释什么是Service Mesh，**可以将其比作微服务间的TCP/IP层**，负责服务之间的调用、限流、熔断和监控等。PS：如果你熟悉linux内核，就不会把协程和线程认为是两个东西。类似的，如果你熟悉通信协议分层，就不会把Service Mesh 和TCP 认为是两个东西。
 
+SideCar的一种实现[MOSN](https://www.sofastack.tech/projects/sofa-mosn/overview/) 全称是 Modular Observable Smart Network——模块化的、可观测的智能网络。这也是一些文章将Service Mesh 称为更广泛意义上的SDN。
+
 总结：**微服务技术的普及，增加了对跨语言服务调用的需求 + 微服务框架与容器如何整合（调度与流量管理是不分家的） ==> 架构不侵入代码/架构与业务代码分离 + pod 中container+sidecar 理念 ==> service mesh**。PS：笔者曾经创新的提出了一个资源位个性化系统，即app启动时向服务端请求属于自己的资源， 除了一些硬性的匹配条件外， 我们希望根据用户画像进行个性化（比如不同用户资源的顺序不同）。已有的业务系统依次进行个性化改造无疑是很笨的方式， 因此我们将个性化能力集中到一个系统上，并与原有系统协作 ，进而实现所有系统的个性化。其实可以认为是架构层面的AOP。
 
 ### 传统微服务架构

@@ -13,6 +13,7 @@ keywords: window
 * TOC
 {:toc}
 
+类似产品 [SOFAMesh 介绍](https://www.sofastack.tech/projects/sofa-mesh/overview/)
 
 ## 整体架构
 
@@ -23,6 +24,10 @@ keywords: window
 Envoy 是 Istio 中最基础的组件，所有其他组件的功能都是通过调用 Envoy 提供的 API，在请求经过 Envoy 转发时，由 Envoy 执行相关的控制逻辑来实现的。
 
 [浅谈Service Mesh体系中的Envoy](https://yq.aliyun.com/articles/606655)
+
+类似产品 [MOSN](https://github.com/sofastack/sofa-mosn) [MOSN 文档](https://github.com/sofastack/sofa-mosn)
+
+
 
 
 ## 其它
