@@ -19,6 +19,15 @@ keywords: JAVA Spring
 
 [History of Spring Framework and Spring Boot](https://www.quickprogrammingtips.com/spring-boot/history-of-spring-framework-and-spring-boot.html)It currently consists of a large number of modules providing a range of services. These include a component container, aspect oriented programming support for building cross cutting concerns, security framework, data access framework, web application framework and support classes for testing components. **All the components of the spring framework are glued together by the dependency injection architecture pattern**. Dependency injection(also known as inversion of control) makes it easy to design and test loosely coupled software components. 依赖注入的关键就是有一个component container//bean container/IOC container，它持有所有对象的实例，负责所有对象的创建和销毁问题，在创建对象时可以夹一点自己的私货。
 
+||tomcat|spring|
+|---|---|---|
+|组成|包含Connector和Container|包含ioc和其它特性|
+|容器部分|servlet容器|bean容器|
+|初始化|根据web.xml文件初始化servlet|根据xml初始化bean|
+|Servlet/Bean扩展点|基于同一的Servlet接口定义|基于BeanPostProcessor等类来定义|
+|依赖关系|Servlet之间无依赖关系|Bean之间可能有依赖关系|
+|扩展||事件、外部资源/配置|
+
 ### 外在表现
 
 1. 是一个应用平台，它不像hibernate等只是解决某一个领域的问题，它对企业应用资源（比如数据库、事务处理等）都提供了简化的、模板化的操作方式。类似于os简化了我们对计算机各种硬件资源的使用。
