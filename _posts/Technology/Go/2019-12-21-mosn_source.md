@@ -13,12 +13,14 @@ keywords: Go
 * TOC
 {:toc}
 
-
 SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[sofastack/sofa-mosn](https://github.com/sofastack/sofa-mosn)
 
-可以学到一个代理程序可以玩多少花活儿
-
 [Envoy 官方文档中文版](https://www.servicemesher.com/envoy/)
+
+理解mosn 主要有两个方向
+
+1. 任何tcp server 都要处理的：网络io，拿到字节流后如何根据协议解析数据（协议层/encoder/decoder）。 mosn 的特别之处是 在Connection 和 协议层之间加了 Stream（可能是为了兼容http2）
+2. 代理业务特别需要的：loader balancer、router 等如何可插拔的 加入到代理 逻辑中。
 
 ## 手感
 
@@ -112,18 +114,17 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 ![](/public/upload/go/mosn_package.png)
 
+几乎所有的interface 定义在 `pkg/types` 中，mosn 基于四层 架构实现（见下文），每一个layer 在types 中有一个go 文件，在`pkg` 下有一个专门的文件夹。因为是支持多协议的，所以每一个layer 协议的自定义部分 又会独立拆分文件夹。
+
+## 连接管理
+
+该图主要说的连接管理部分
+
 ![](/public/upload/go/mosn_object.png)
 
 1. 不同颜色 表示所处的 package 不同
 2. 因为mosn主要是的用途是“代理”， 所以笔者一开始一直在找代理如何实现，但其实呢，mosn 首先是一个tcp server，像tomcat一样，mosn 主要分为连接管理和业务处理两个部分
-3. 业务处理的入口 就是filterManager， 主要由`filterManager.onRead` 和 `filterManager.onWrite` 来时间。 filterManager 聚合ReadFilter 链和WriterFilter链，构成对数据的处理
-
-
-**proxy 和 tcpproxy 是两种不同的proxy**
-
-## 启动流程
-
-该图主要说的连接管理部分
+3. 业务处理的入口 就是filterManager， 主要由`filterManager.onRead` 和 `filterManager.onWrite` 来实现。 filterManager 聚合ReadFilter 链和WriterFilter链，构成对数据的处理
 
 ![](/public/upload/go/mosn_start.png)
 
@@ -133,9 +134,8 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 1. 一定是先进行协议的解析，再进行router、cluster 等操作，因为可能根据协议的某个字段进行router
 2. mosn 作为一个tcp server，从收到数据，转发数据到 Upstream 并拿到响应，再返回给请求方，整个流程都是高层 类定制好的，不同的协议只是实现对应的“子类”即可。
-3. 
 
-一次请求的处理过程
+一次http请求的处理过程
 
 ![](/public/upload/go/mosn_http_read.png)
 
@@ -303,6 +303,10 @@ In mosn, we have 4 layers to build a mesh,
 2. protocol is the core layer to do protocol related encode/decode.
 3. stream is the inheritance layer to bond protocol layer and proxy layer together.Stream layer leverages protocol's ability to do binary-model conversation. In detail, Stream uses Protocols's encode/decode facade method and DecodeFilter to receive decode event call.
 
+代码的组织  跟上述架构是一致的
+
+![](/public/upload/go/mosn_layer.png)
+
 ### net/io层
 
 `pkg/types/network.go` 的描述如下：
@@ -324,22 +328,6 @@ Both listener and connection have a extension mechanism, implemented as listener
         - Filter
             - ReadFilter
             - WriteFilter
-
-Below is the basic relation on listener and connection:
-
-    --------------------------------------------------
-    |                                      			|
-    | 	  EventListener       EventListener     		|
-    |        *|                   |*          		    |
-    |         |                   |       				|
-    |        1|     1      *      |1          			|
-    |	    Listener --------- Connection      			|
-    |        1|      [accept]     |1          			|
-    |         |                   |-----------         |
-    |        *|                   |*          |*       |
-    |	 ListenerFilter       ReadFilter  WriteFilter   |
-    |                                                  |
-    --------------------------------------------------
 
 ### Stream 层
 
@@ -370,37 +358,6 @@ From an abstract perspective, stream represents a virtual process on underlying 
 Specifically, ClientStreamConnection uses a NewStream to exchange StreamReceiveListener with StreamSender.
 Engine provides a callbacks(StreamSenderFilterHandler/StreamReceiverFilterHandler) to let filter interact with stream engine.
 As a example, a encoder filter stopped the encode process, it can continue it by StreamSenderFilterHandler.ContinueSending later. Actually, a filter engine is a encoder/decoder itself.
-
-Below is the basic relation on stream and connection:
-
-    --------------------------------------------------------------------------------------------------------------
-    |																												|
-    |                              ConnPool                                                                         |  
-    |                                 |1                                                                            |
-    |                                 |                                                                             |
-    |                                 |*                                                                            |
-    |                               Client                                                                          |
-    |                                 |1                                                                            |
-    | 	  EventListener   			   |				StreamEventListener											|
-    |        *|                       |                       |*													|
-    |         |                       |                       |													    |
-    |        1|        1    1  	   |1 		1        *     |1													    |
-    |	    Connection -------- StreamConnection ---------- Stream													|
-    |        1|                   	   |1				   	   |1                                                   |
-    |		   |					   |				   	   |                                                    |
-    |         |                   	   |					   |--------------------------------					|
-    |        *|                   	   |					   |*           	 				|*					|
-    |	 ConnectionFilter    		   |			      StreamSender      		        StreamReceiveListener	|
-    |								   |*					   |1				 				|1					|
-    |						StreamConnectionEventListener	   |				 				|					|
-    |													       |*				 				|*					|
-    |										 	 		StreamSenderFilter	   			StreamReceiverFilter	    |
-    |													   	   |1								|1					|
-    |													   	   |								|					|
-    |													       |1								|1					|
-    |										 		StreamSenderFilterHandler     StreamReceiverFilterHandler	    |
-    |																												|
-    --------------------------------------------------------------------------------------------------------------
 
 ## 与control plan 的交互（未完成）
 
