@@ -286,11 +286,6 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 ## 分层架构
 
-### net/io层
-
-`pkg/types/network.go` 的描述如下：
-
-In mosn, we have 4 layers to build a mesh, net/io layer is the fundamental layer to support upper level's functionality.
 
     -----------------------
     |        PROXY          |
@@ -301,6 +296,16 @@ In mosn, we have 4 layers to build a mesh, net/io layer is the fundamental layer
     -----------------------
     |         NET/IO        |
     -----------------------
+
+In mosn, we have 4 layers to build a mesh,
+
+1. net/io layer is the fundamental layer to support upper level's functionality.
+2. protocol is the core layer to do protocol related encode/decode.
+3. stream is the inheritance layer to bond protocol layer and proxy layer together.Stream layer leverages protocol's ability to do binary-model conversation. In detail, Stream uses Protocols's encode/decode facade method and DecodeFilter to receive decode event call.
+
+### net/io层
+
+`pkg/types/network.go` 的描述如下：
 
 Core model in network layer are listener and connection. Listener listens specified port, waiting for new connections.
 Both listener and connection have a extension mechanism, implemented as listener and filter chain, which are used to fill in customized logic.
@@ -341,18 +346,6 @@ Below is the basic relation on listener and connection:
 `pkg/types/stream.go` 的描述如下：
 
 The bunch of interfaces are structure skeleton to build a extensible stream multiplexing architecture. The core concept is mainly refer to golang HTTP2 and envoy.
-
-In mosn, we have 4 layers to build a mesh, stream is the inheritance layer to bond protocol layer and proxy layer together.
-
-    -----------------------
-    |        PROXY          |
-    -----------------------
-    |       STREAMING       |
-    -----------------------
-    |        PROTOCOL       |
-    -----------------------
-    |         NET/IO        |
-    -----------------------
 
 Core model in stream layer is stream, which manages process of a round-trip, a request and a corresponding response.
 Event listeners can be installed into a stream to monitor event.Stream has two related models, encoder and decoder:
