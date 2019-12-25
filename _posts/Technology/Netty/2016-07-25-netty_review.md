@@ -10,10 +10,8 @@ keywords: JAVA netty review
 
 ## 前言 
 
-**2016-11-17补充：**参见[Redis与Reactor模式](http://www.dengshenyu.com/%E5%90%8E%E7%AB%AF%E6%8A%80%E6%9C%AF/2016/01/09/redis-reactor-pattern.html)，
-**通过select/poll/epoll/kqueue这些I/O多路复用函数库，我们解决了一个线程处理多个连接的问题**，我觉得这是nio与bio的根本区别。
-
-netty更进一步，将accept时间与read/write事件分开处理。
+* TOC
+{:toc}
 
 ## 几种io模型代码的直观感受
 

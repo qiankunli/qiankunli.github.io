@@ -42,3 +42,38 @@ reactor pattern 理念 参见 [Understanding Reactor Pattern: Thread-Based and E
 《反应式设计模式》 基于事件的系统通常建立在一个事件循环上。任何时刻只要发生了事情， 对应的事件就会被追加到一个队列中。事件循环持续的从队列中拉取事件，并执行绑定在事件上的回调函数。每一个回调函数通常都是一段微小的、匿名的、响应特定事件（例如鼠标点击）的过程。回调函数也可能产生新事件，这些事件随后也会被追加到队列里面等待处理。
 
 
+## 与golang对比
+
+[Go语言TCP Socket编程](https://tonybai.com/2015/11/17/tcp-programming-in-golang/)从tcp socket诞生后，网络编程架构模型也几经演化，大致是：“每进程一个连接” –> “每线程一个连接” –> “Non-Block + I/O多路复用(linux epoll/windows iocp/freebsd darwin kqueue/solaris Event Port)”。伴随着模型的演化，服务程序愈加强大，可以支持更多的连接，获得更好的处理性能。不过I/O多路复用也给使用者带来了不小的复杂度，以至于后续出现了许多高性能的I/O多路复用框架， 比如libevent、libev、libuv等，以帮助开发者简化开发复杂性，降低心智负担。不过Go的设计者似乎认为I/O多路复用的这种**通过回调机制割裂控制流的方式依旧复杂，且有悖于“一般逻辑”设计**，为此Go语言将该“复杂性”隐藏在Runtime中了：Go开发者无需关注socket是否是 non-block的，也无需亲自注册文件描述符的回调，只需在每个连接对应的goroutine中以“block I/O”的方式对待socket处理即可。PS：netty 在屏蔽java nio底层细节方面做得不错， 但因为java/jvm的限制，“回调机制割裂控制流”的问题依然无法避免。
+
+
+个典型的Go server端程序大致如下：
+
+    func handleConn(c net.Conn) {
+        defer c.Close()
+        for {
+            // read from the connection
+            // ... ...
+            // write to the connection
+            //... ...
+        }
+    }
+
+    func main() {
+        l, err := net.Listen("tcp", ":8888")
+        if err != nil {
+            fmt.Println("listen error:", err)
+            return
+        }
+
+        for {
+            c, err := l.Accept()
+            if err != nil {
+                fmt.Println("accept error:", err)
+                break
+            }
+            // start a new goroutine to handle
+            // the new connection.
+            go handleConn(c)
+        }
+    }
