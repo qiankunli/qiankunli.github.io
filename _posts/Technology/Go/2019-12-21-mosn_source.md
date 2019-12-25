@@ -15,11 +15,15 @@ keywords: Go
 
 SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[sofastack/sofa-mosn](https://github.com/sofastack/sofa-mosn)
 
+阿里官方介绍文档[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md)
+
 [Envoy 官方文档中文版](https://www.servicemesher.com/envoy/)
+
+[蚂蚁金服大规模微服务架构下的Service Mesh探索之路](https://www.servicemesher.com/blog/the-way-to-service-mesh-in-ant-financial/) 很不错的文章值得多看几遍。
 
 理解mosn 主要有两个方向
 
-1. 任何tcp server 都要处理的：网络io，拿到字节流后如何根据协议解析数据（协议层/encoder/decoder）。 mosn 的特别之处是 在Connection 和 协议层之间加了 Stream（可能是为了兼容http2）
+1. 任何tcp server 都要处理的：网络io，拿到字节流后如何根据协议解析数据（协议层/encoder/decoder）。 mosn 的特别之处是 在Connection 和 协议层之间加了 Stream的概念（可能是为了兼容http2，在http1协议中这一层的实现就很单薄）
 2. 代理业务特别需要的：loader balancer、router 等如何可插拔的 加入到代理 逻辑中。
 
 ## 手感
@@ -128,12 +132,58 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 ![](/public/upload/go/mosn_start.png)
 
+
+
+Listener 配置详细描述了 MOSN 启动时监听的端口，以及对应的端口对应不同逻辑的配置。
+
+    {
+    "name":"",
+    "type":"",
+    "address":"",
+    "bind_port":"",
+    "use_original_dst":"",
+    "access_logs":[],
+    "filter_chains":[],
+    "stream_filters":[],
+    "inspector":"",
+    "connection_idle_timeout":""
+    }
+
+1. filter_chains，一组 FilterChain 配置，但是目前 MOSN 仅支持一个 filter_chain。**FilterChain 是 MOSN Listener 配置中核心逻辑配置，不同的 FilterChain 配置描述了 Listener 会如何处理请求**。
+2. stream_filters，一组 stream_filter 配置，目前只在 filter_chain 中配置了 filter 包含 proxy 时生效。实例有 healthcheck
+
+
+
 ## 数据处理
 
 ![](/public/upload/go/mosn_http_object.png)
 
 1. 一定是先进行协议的解析，再进行router、cluster 等操作，因为可能根据协议的某个字段进行router
 2. mosn 作为一个tcp server，从收到数据，转发数据到 Upstream 并拿到响应，再返回给请求方，整个流程都是高层 类定制好的，不同的协议只是实现对应的“子类”即可。
+
+
+network filter 描述了 MOSN 在连接建立以后如何在 4 层处理连接数据。
+
+    {
+        "tls_context": {},
+        "tls_context_set": [],
+        "filters": []
+    }
+network filter 可自定义扩展实现，默认支持的 type 包括 proxy、tcp proxy、connection_manager。
+
+    {
+        "downstream_protocol":"",
+        "upstream_protocol":"",
+        "router_config_name":"",
+        "extend_config":{}
+    }
+
+1. downstream_protocol 描述 proxy 期望收到的请求协议，在连接收到数据时，会使用此协议去解析数据包并完成转发，如果收到的数据包协议和配置不符，MOSN 会将连接断开。PS：**这就算指定了4层的协议层**
+2. upstream_protocol 描述 proxy 将以何种协议转发数据，通常情况下应该和downstream_protocol 保持一致，只有特殊的场景会进行对应协议的转换。
+3. router_config_name 描述 proxy 的路由配置的索引，通常情况下，这个配置会和同 listener 下的 connection_manager 中配置的 router_config_name 保持一致。
+
+connection_manager 是一个特殊的 network filter，它需要和 proxy 一起使用，用于描述 proxy 中路由相关的配置，是一个兼容性质的配置，后续可能有修改。
+
 
 一次http请求的处理过程
 
@@ -286,16 +336,7 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 ## 分层架构
 
-
-    -----------------------
-    |        PROXY          |
-    -----------------------
-    |       STREAMING       |
-    -----------------------
-    |        PROTOCOL       |
-    -----------------------
-    |         NET/IO        |
-    -----------------------
+![](/public/upload/go/mosn_layer_process.png)
 
 In mosn, we have 4 layers to build a mesh,
 
@@ -306,6 +347,14 @@ In mosn, we have 4 layers to build a mesh,
 代码的组织  跟上述架构是一致的
 
 ![](/public/upload/go/mosn_layer.png)
+
+[蚂蚁金服Service Mesh新型网络代理的思考与实践](https://www.servicemesher.com/blog/microservice-with-service-mesh-at-ant-financial/)
+
+![](/public/upload/go/mosn_multi_protocol.png)
+
+[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md)
+
+![](/public/upload/go/mosn_io_process.png)
 
 ### net/io层
 
