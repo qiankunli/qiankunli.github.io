@@ -176,8 +176,6 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 ## 数据处理
 
-![](/public/upload/go/mosn_http_object.png)
-
 一次http1协议请求的处理过程
 
 ![](/public/upload/go/mosn_http_read.png)
