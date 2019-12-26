@@ -135,7 +135,7 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 除了主线之外，listener 和filter 比较好理解：Method in listener will be called on event occur, but not effect the control flow.Filters are called on event occurs, it also returns a status to effect control flow. Currently 2 states are used: Continue to let it go, Stop to stop the control flow.
 
-[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md) **类与layer 之间不存在一一对应关系**，比如proxy package 中包含ReadFilter 和 StreamReceiveListener 实现，分别属于多个层次。 
+**类与layer 之间不存在一一对应关系**，比如proxy package 中包含ReadFilter 和 StreamReceiveListener 实现，分别属于多个层次。 [SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md) 
 
 ![](/public/upload/go/mosn_io_process.png)
 
@@ -176,11 +176,15 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 ## 数据处理
 
+### 数据“上传”
+
 一次http1协议请求的处理过程
 
 ![](/public/upload/go/mosn_http_read.png)
 
 绿色部分表示另起一个协程
+
+### 转发流程
 
 Downstream stream, as a controller to handle downstream and upstream proxy flow `downStream.OnReceive` 逻辑
 
@@ -205,27 +209,6 @@ Downstream stream, as a controller to handle downstream and upstream proxy flow 
             }
         }
     }
-
-`pkg/types/proxy.go` 有phase 的定义
-
-    type Phase int
-    const (
-        InitPhase Phase = iota
-        DownFilter
-        MatchRoute
-        DownFilterAfterRoute
-        DownRecvHeader
-        DownRecvData
-        DownRecvTrailer
-        Oneway
-        Retry
-        WaitNofity
-        UpFilter
-        UpRecvHeader
-        UpRecvData
-        UpRecvTrailer
-        End
-    )
 
 `downStream.receive` 会根据当前所处的phase 进行对应的处理
 
@@ -300,6 +283,27 @@ Downstream stream, as a controller to handle downstream and upstream proxy flow 
         }
         return types.End
     }
+
+
+`pkg/types/proxy.go` 有phase 的定义
+
+|phase|对应方法|执行逻辑（部分）|
+|---|---|---|
+|InitPhase|||
+|DownFilter|runReceiveFilters|
+|MatchRoute|matchRoute|
+|DownFilterAfterRoute|runReceiveFilters||
+|DownRecvHeader|receiveHeaders|==> upstreamRequest.appendHeaders|
+|DownRecvData|receiveData|==> upstreamRequest.appendData|
+|DownRecvTrailer|receiveTrailers|==> upstreamRequest.appendTrailers()|
+|Oneway/Retry/WaitNofity||
+|UpFilter|runAppendFilters|
+|UpRecvHeader|upstreamRequest.receiveHeaders|==> downStream.onUpstreamData|
+|UpRecvData|upstreamRequest.receiveData|==> downStream.onUpstreamData|
+|UpRecvTrailer|upstreamRequest.receiveTrailers|==> downStream.onUpstreamTrailers|
+|End||
+
+上述流程才像是一个 proxy 层的活儿，请求转发到 upstream，从upstream 拿到响应， 再转回给downStream
 
 ## 与control plan 的交互（未完成）
 
