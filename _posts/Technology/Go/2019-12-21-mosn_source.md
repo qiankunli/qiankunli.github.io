@@ -118,7 +118,48 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 ![](/public/upload/go/mosn_package.png)
 
-几乎所有的interface 定义在 `pkg/types` 中，mosn 基于四层 架构实现（见下文），每一个layer 在types 中有一个go 文件，在`pkg` 下有一个专门的文件夹。因为是支持多协议的，所以每一个layer 协议的自定义部分 又会独立拆分文件夹。
+几乎所有的interface 定义在 `pkg/types` 中，mosn 基于四层 架构实现（见下文），每一个layer 在types 中有一个go 文件，在`pkg` 下有一个专门的文件夹。
+
+## 分层架构
+
+![](/public/upload/go/mosn_layer_process.png)
+
+一般的服务端编程，二级制数据经过协议解析为 协议对应的model（比如HttpServletRequest） 进而交给上层业务方处理，对于mosn 
+
+1. 协议上数据统一划分为header/data/Trailers 三个部分，转发也是以这三个子部分为基本单位
+2. 借鉴了http2 的stream 的理念（所以Stream interface 上有一个方法是`ID()`），Stream 可以理解为一个子Connection，Stream 之间可以并行请求和响应，通过StreamId关联，用来实现在一个Connection 之上的“多路复用”。PS：为了连接数量与请求数量解耦。
+
+代码的组织（pkg/stream,pkg/protocol,pkg/proxy）  跟上述架构是一致的。但是类的组织 就有点不明觉厉。
+
+![](/public/upload/go/mosn_layer.png)
+
+除了主线之外，listener 和filter 比较好理解：Method in listener will be called on event occur, but not effect the control flow.Filters are called on event occurs, it also returns a status to effect control flow. Currently 2 states are used: Continue to let it go, Stop to stop the control flow.
+
+[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md) **类与layer 之间不存在一一对应关系**，比如proxy package 中包含ReadFilter 和 StreamReceiveListener 实现，分别属于多个层次。 
+
+![](/public/upload/go/mosn_io_process.png)
+
+1. MOSN 在 IO 层读取数据，通过 read filter 将数据发送到 Protocol 层进行 Decode
+2. Decode 出来的数据，根据不同的协议，**回调到 stream 层**，进行 stream 的创建和封装
+3. stream 创建完毕后，会回调到 Proxy 层做路由和转发，Proxy 层会关联上下游（upstream,downstream）间的转发关系
+4. Proxy 挑选到后端后，会根据后端使用的协议，将数据发送到对应协议的 Protocol 层，对数据重新做 Encode
+5. Encode 后的数据会发经过 write filter 并最终使用 IO 的 write 发送出去
+
+
+跨层次调用 通过注册 listener、filter  或者 直接跨层次类的“组合” 来实现，也有一些特别的，比如http net/io 和 stream 分别启动goroutine read/write loop，通过共享数据来 变相的实现跨层调用。此外，protocol 和 stream 两个layer 因和协议有关，不同协议之间实现差异很大，层次不是很清晰。
+
+该表格自相矛盾，有待进一步完善。
+
+|层次|interface|关键成员/方法|实现类|所在文件|
+|---|---|---|---|---|
+|Net/IO|Listener|OnAccept|activeListener|server/handler.go|
+|Net/IO|Connection||connection|network/connection.go|								
+|Net/IO|ReadFilter|OnData<br>OnNewConnection|proxy|proxy/proxy.go|
+|衔接|StreamConnection|map[uint32]*serverStream<br>types.ProtocolEngine<br>方法：Dispatch|streamConnection|stream/http2/stream.go|
+|Protocol|Decoder|Decode|serverCodec|protocol/http/codec.go|
+|衔接|Stream|types.StreamReceiveListener<br>types.HeaderMap<br>*serverStreamConnection|serverStream|stream/http2/stream.go|   	
+|proxy|StreamReceiveListener|OnReceive|downStream|proxy/downstream.go|
+
 
 ## 连接管理
 
@@ -133,63 +174,17 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 ![](/public/upload/go/mosn_start.png)
 
 
-
-Listener 配置详细描述了 MOSN 启动时监听的端口，以及对应的端口对应不同逻辑的配置。
-
-    {
-    "name":"",
-    "type":"",
-    "address":"",
-    "bind_port":"",
-    "use_original_dst":"",
-    "access_logs":[],
-    "filter_chains":[],
-    "stream_filters":[],
-    "inspector":"",
-    "connection_idle_timeout":""
-    }
-
-1. filter_chains，一组 FilterChain 配置，但是目前 MOSN 仅支持一个 filter_chain。**FilterChain 是 MOSN Listener 配置中核心逻辑配置，不同的 FilterChain 配置描述了 Listener 会如何处理请求**。
-2. stream_filters，一组 stream_filter 配置，目前只在 filter_chain 中配置了 filter 包含 proxy 时生效。实例有 healthcheck
-
-
-
 ## 数据处理
 
 ![](/public/upload/go/mosn_http_object.png)
 
-1. 一定是先进行协议的解析，再进行router、cluster 等操作，因为可能根据协议的某个字段进行router
-2. mosn 作为一个tcp server，从收到数据，转发数据到 Upstream 并拿到响应，再返回给请求方，整个流程都是高层 类定制好的，不同的协议只是实现对应的“子类”即可。
-
-
-network filter 描述了 MOSN 在连接建立以后如何在 4 层处理连接数据。
-
-    {
-        "tls_context": {},
-        "tls_context_set": [],
-        "filters": []
-    }
-network filter 可自定义扩展实现，默认支持的 type 包括 proxy、tcp proxy、connection_manager。
-
-    {
-        "downstream_protocol":"",
-        "upstream_protocol":"",
-        "router_config_name":"",
-        "extend_config":{}
-    }
-
-1. downstream_protocol 描述 proxy 期望收到的请求协议，在连接收到数据时，会使用此协议去解析数据包并完成转发，如果收到的数据包协议和配置不符，MOSN 会将连接断开。PS：**这就算指定了4层的协议层**
-2. upstream_protocol 描述 proxy 将以何种协议转发数据，通常情况下应该和downstream_protocol 保持一致，只有特殊的场景会进行对应协议的转换。
-3. router_config_name 描述 proxy 的路由配置的索引，通常情况下，这个配置会和同 listener 下的 connection_manager 中配置的 router_config_name 保持一致。
-
-connection_manager 是一个特殊的 network filter，它需要和 proxy 一起使用，用于描述 proxy 中路由相关的配置，是一个兼容性质的配置，后续可能有修改。
-
-
-一次http请求的处理过程
+一次http1协议请求的处理过程
 
 ![](/public/upload/go/mosn_http_read.png)
 
-`downStream.OnReceive` 逻辑
+绿色部分表示另起一个协程
+
+Downstream stream, as a controller to handle downstream and upstream proxy flow `downStream.OnReceive` 逻辑
 
     func (s *downStream) OnReceive(ctx context.Context,..., data types.IoBuffer, ...) {
         ...
@@ -236,183 +231,86 @@ connection_manager 是一个特殊的 network filter，它需要和 proxy 一起
 
 `downStream.receive` 会根据当前所处的phase 进行对应的处理
 
-浏览器发出一次 `http://localhost:2045` 对应的debug 日志
 
-    2019-12-25 11:08:47,169 [DEBUG] [server] [listener] accept connection from 127.0.0.1:2045, condId= 3, remote addr:127.0.0.1:62683
-    2019-12-25 11:08:47,171 [DEBUG] [network] [check use writeloop] Connection = 3, Local Address = 127.0.0.1:2045, Remote Address = 127.0.0.1:62683
-    2019-12-25 11:08:47,167 [DEBUG] [server] [listener] accept connection from 127.0.0.1:2045, condId= 2, remote addr:127.0.0.1:62681
-    2019-12-25 11:08:47,189 [DEBUG] [network] [check use writeloop] Connection = 2, Local Address = 127.0.0.1:2045, Remote Address = 127.0.0.1:62681
-    2019-12-25 11:08:47,205 [DEBUG] [2,c0a87072157724332720510012708] [stream] [http] new stream detect, requestId = 1
-    2019-12-25 11:08:47,208 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] new stream, proxyId = 1 , requestId =1, oneway=false
-    2019-12-25 11:08:47,212 [DEBUG] [2,c0a87072157724332720510012708] [proxy][downstream] 0 stream filters in config
-    2019-12-25 11:08:47,214 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] OnReceive headers:GET / HTTP/1.1
-    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36
-    Host: localhost:2045
-    ...
-    , data:<nil>, trailers:<nil>
-    2019-12-25 11:08:47,220 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] enter phase 1, proxyId = 1
-    2019-12-25 11:08:47,221 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] enter phase 2, proxyId = 1
-    2019-12-25 11:08:47,224 [DEBUG] [router] [routers] [MatchRoute] GET / HTTP/1.1
-    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36
-    Host: localhost:2045
-    ...
-
-    2019-12-25 11:08:47,224 [DEBUG] [router] [routers] [findVirtualHost] found default virtual host only
-    2019-12-25 11:08:47,224 [DEBUG] [router] [config utility] [try match header] GET / HTTP/1.1
-    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36
-    Host: localhost:2045
-    ...
-
-    2019-12-25 11:08:47,226 [DEBUG] [2,c0a87072157724332720510012708] [router] [DefaultHandklerChain] [MatchRoute] matched a route: &{0xc0003c7000 /}
-    2019-12-25 11:08:47,226 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] enter phase 3, proxyId = 1
-    2019-12-25 11:08:47,227 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] enter phase 4, proxyId = 1
-    2019-12-25 11:08:47,227 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] route match result:&{RouteRuleImplBase:0xc0003c7000 prefix:/}, clusterName=clientCluster
-    2019-12-25 11:08:47,227 [DEBUG] [upstream] [cluster manager] clusterSnapshot.loadbalancer.ChooseHost result is 127.0.0.1:2046, cluster name = clientCluster
-    2019-12-25 11:08:47,227 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] timeout info: {GlobalTimeout:1m0s TryTimeout:0s}
-    2019-12-25 11:08:47,227 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [upstream] append headers: GET / HTTP/1.1
-    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36
-    Host: localhost:2045
-    ...
-
-    2019-12-25 11:08:47,230 [DEBUG] [network] [check use writeloop] Connection = 4, Local Address = 127.0.0.1:62686, Remote Address = 127.0.0.1:2046
-    2019-12-25 11:08:47,231 [DEBUG] [network] [client connection connect] connect raw tcp, remote address = 127.0.0.1:2046 ,event = ConnectedFlag, error = <nil>
-    2019-12-25 11:08:47,232 [DEBUG] [5,-] new http2 server stream connection
-    2019-12-25 11:08:47,232 [DEBUG] [server] [listener] accept connection from 127.0.0.1:2046, condId= 5, remote addr:127.0.0.1:62686
-    2019-12-25 11:08:47,232 [DEBUG] [network] [check use writeloop] Connection = 5, Local Address = 127.0.0.1:2046, Remote Address = 127.0.0.1:62686
-    2019-12-25 11:08:47,233 [ERROR] [normal] [4,-] new http2 client stream connection
-    2019-12-25 11:08:47,233 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [upstream] connPool ready, proxyId = 1, host = 127.0.0.1:2046
-    2019-12-25 11:08:47,234 [DEBUG] [2,c0a87072157724332720510012708] http2 client AppendHeaders: id = 0, headers = map[Accept:[text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,...]]
-    2019-12-25 11:08:47,235 [DEBUG] [2,c0a87072157724332720510012708] http2 client SendRequest id = 1
-    2019-12-25 11:08:47,235 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] start a request timeout timer
-    2019-12-25 11:08:47,235 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] enter phase 9, proxyId = 1
-    2019-12-25 11:08:47,235 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] waitNotify begin 0xc0004ce000, proxyId = 1
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy] [downstream] new stream, proxyId = 2 , requestId =1, oneway=false
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy][downstream] 0 stream filters in config
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] http2 server header: 1, map[Accept:[text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,...]]
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy] [downstream] OnReceive headers:&{HeaderMap:0xc000336040 Req:0xc000378100}, data:<nil>, trailers:<nil>
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy] [downstream] enter phase 1, proxyId = 2
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy] [downstream] enter phase 2, proxyId = 2
-    2019-12-25 11:08:47,238 [DEBUG] [router] [routers] [MatchRoute] &{0xc000336040 0xc000378100}
-    2019-12-25 11:08:47,238 [DEBUG] [router] [routers] [findVirtualHost] found default virtual host only
-    2019-12-25 11:08:47,238 [DEBUG] [router] [config utility] [try match header] &{0xc000336040 0xc000378100}
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [router] [DefaultHandklerChain] [MatchRoute] matched a route: &{0xc0003c6e00 /}
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy] [downstream] enter phase 3, proxyId = 2
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy] [downstream] enter phase 4, proxyId = 2
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy] [downstream] route match result:&{RouteRuleImplBase:0xc0003c6e00 prefix:/}, clusterName=serverCluster
-    2019-12-25 11:08:47,238 [DEBUG] [upstream] [cluster manager] clusterSnapshot.loadbalancer.ChooseHost result is 127.0.0.1:8080, cluster name = serverCluster
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy] [downstream] timeout info: {GlobalTimeout:1m0s TryTimeout:0s}
-    2019-12-25 11:08:47,238 [DEBUG] [5,-] [proxy] [upstream] append headers: &{HeaderMap:0xc000336040 Req:0xc000378100}
-    2019-12-25 11:08:47,242 [DEBUG] [network] [check use writeloop] Connection = 6, Local Address = 127.0.0.1:62687, Remote Address = 127.0.0.1:8080
-    2019-12-25 11:08:47,242 [DEBUG] [network] [client connection connect] connect raw tcp, remote address = 127.0.0.1:8080 ,event = ConnectedFlag, error = <nil>
-    2019-12-25 11:08:47,242 [DEBUG] client OnEvent ConnectedFlag, connected false
-    2019-12-25 11:08:47,243 [DEBUG] [5,-] [proxy] [upstream] connPool ready, proxyId = 2, host = 127.0.0.1:8080
-    2019-12-25 11:08:47,243 [DEBUG] [5,-] [stream] [http] send client request, requestId = 2
-    2019-12-25 11:08:47,243 [DEBUG] [5,-] [proxy] [downstream] start a request timeout timer
-    2019-12-25 11:08:47,243 [DEBUG] [5,-] [proxy] [downstream] enter phase 9, proxyId = 2
-    2019-12-25 11:08:47,243 [DEBUG] [5,-] [proxy] [downstream] waitNotify begin 0xc0004ce300, proxyId = 2
-    2019-12-25 11:08:47,244 [DEBUG] [5,-] [stream] [http] receive response, requestId = 2
-    2019-12-25 11:08:47,244 [DEBUG] [5,-] [proxy] [upstream] OnReceive headers: HTTP/1.1 200 OK
-    Date: Wed, 25 Dec 2019 03:08:46 GMT
-    Content-Type: text/plain
-    ...
-
-    2019-12-25 11:08:47,245 [DEBUG] [5,-] [proxy] [downstream] enter phase 10, proxyId = 2
-    2019-12-25 11:08:47,245 [DEBUG] [5,-] [proxy] [downstream] enter phase 11, proxyId = 2
-    2019-12-25 11:08:47,245 [DEBUG] [5,-] http2 server ApppendHeaders id = 1, headers = map[Content-Length:[814] Content-Type:[text/plain] Date:[Wed, 25 Dec 2019 03:08:47 GMT]]
-    2019-12-25 11:08:47,245 [DEBUG] [5,-] [proxy] [downstream] enter phase 12, proxyId = 2
-    2019-12-25 11:08:47,245 [DEBUG] [5,-] http2 server ApppendData id = 1
-    2019-12-25 11:08:47,246 [DEBUG] [5,-] http2 server SendResponse id = 1
-    2019-12-25 11:08:47,247 [DEBUG] [2,c0a87072157724332720510012708] http2 client header: id = 1, headers = map[Content-Length:[814] Content-Type:[text/plain] Date:[Wed, 25 Dec 2019 03:08:47 GMT] X-Mosn-Status:[200]]
-    2019-12-25 11:08:47,247 [DEBUG] [2,c0a87072157724332720510012708] http2 client receive data: id = 1
-    2019-12-25 11:08:47,248 [DEBUG] [2,c0a87072157724332720510012708] http2 client data: id = 1
-    2019-12-25 11:08:47,246 [DEBUG] [5,-] [proxy] [downstream] giveStream 0xc0004ce300 &{ID:2 proxy:0xc0000b60d0 route:0xc00046eae0 cluster:0xc0003fb680 element:0xc00032cc90 bufferLimit:0 timeout:{GlobalTimeout:60000000000 TryTimeout:0} retryState:0xc000340460 requestInfo:0xc0004ce530 responseSender:0xc0000d57c0 upstreamRequest:0xc0004ce4a8 perRetryTimer:<nil> responseTimer:<nil> downstreamReqHeaders:0xc00016e480 downstreamReqDataBuf:<nil> downstreamReqTrailers:<nil> downstreamRespHeaders:{ResponseHeader:0xc0001d2258 EmptyValueHeaders:map[]} downstreamRespDataBuf:0xc00003c600 downstreamRespTrailers:<nil> downstreamResponseStarted:true downstreamRecvDone:true upstreamRequestSent:true upstreamProcessDone:true noConvert:false directResponse:false oneway:false notify:0xc00035c360 downstreamReset:0 downstreamCleaned:1 upstreamReset:0 reuseBuffer:1 resetReason: senderFilters:[] senderFiltersIndex:0 receiverFilters:[] receiverFiltersIndex:0 receiverFiltersAgain:false context:0xc0000f8500 streamAccessLogs:[] logDone:1 snapshot:0xc00043a180}
-    2019-12-25 11:08:47,248 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [upstream] OnReceive headers: &{HeaderMap:0xc0000ca030 Rsp:0xc0003ae120}, data: , trailers: <nil>
-    2019-12-25 11:08:47,248 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] OnReceive send downstream response &{HeaderMap:0xc0000ca030 Rsp:0xc0003ae120}
-    2019-12-25 11:08:47,248 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] enter phase 10, proxyId = 1
-    2019-12-25 11:08:47,248 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] enter phase 11, proxyId = 1
-    2019-12-25 11:08:47,248 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] enter phase 12, proxyId = 1
-    2019-12-25 11:08:47,248 [DEBUG] [2,c0a87072157724332720510012708] [stream] [http] send server response, requestId = 1
-    2019-12-25 11:08:47,248 [DEBUG] [2,c0a87072157724332720510012708] [proxy] [downstream] giveStream 0xc0004ce000 &{ID:1 proxy:0xc00048c000 route:0xc00046edc0 cluster:0xc000438000 element:0xc000322bd0 bufferLimit:0 timeout:{GlobalTimeout:60000000000 TryTimeout:0} retryState:0xc000340000 requestInfo:0xc0004ce230 responseSender:0xc0004bc000 upstreamRequest:0xc0004ce1a8 perRetryTimer:<nil> responseTimer:<nil> downstreamReqHeaders:{RequestHeader:0xc0004bc088 EmptyValueHeaders:map[]} downstreamReqDataBuf:<nil> downstreamReqTrailers:<nil> downstreamRespHeaders:0xc00018e110 downstreamRespDataBuf:0xc00012c3c0 downstreamRespTrailers:<nil> downstreamResponseStarted:true downstreamRecvDone:true upstreamRequestSent:true upstreamProcessDone:true noConvert:false directResponse:false oneway:false notify:0xc0000a89c0 downstreamReset:0 downstreamCleaned:1 upstreamReset:0 reuseBuffer:1 resetReason: senderFilters:[] senderFiltersIndex:0 receiverFilters:[] receiverFiltersIndex:0 receiverFiltersAgain:false context:0xc000486140 streamAccessLogs:[] logDone:1 snapshot:0xc00043a300}
-
-## 分层架构
-
-![](/public/upload/go/mosn_layer_process.png)
-
-In mosn, we have 4 layers to build a mesh,
-
-1. net/io layer is the fundamental layer to support upper level's functionality.
-2. protocol is the core layer to do protocol related encode/decode.
-3. stream is the inheritance layer to bond protocol layer and proxy layer together.Stream layer leverages protocol's ability to do binary-model conversation. In detail, Stream uses Protocols's encode/decode facade method and DecodeFilter to receive decode event call.
-
-代码的组织  跟上述架构是一致的
-
-![](/public/upload/go/mosn_layer.png)
-
-[蚂蚁金服Service Mesh新型网络代理的思考与实践](https://www.servicemesher.com/blog/microservice-with-service-mesh-at-ant-financial/)
-
-![](/public/upload/go/mosn_multi_protocol.png)
-
-[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md)
-
-![](/public/upload/go/mosn_io_process.png)
-
-### net/io层
-
-`pkg/types/network.go` 的描述如下：
-
-Core model in network layer are listener and connection. Listener listens specified port, waiting for new connections.
-Both listener and connection have a extension mechanism, implemented as listener and filter chain, which are used to fill in customized logic.
-
-1. Event listeners are used to subscribe important event of Listener and Connection. Method in listener will be called on event occur, but **not effect the control flow**.
-2. Filters are called on event occurs, it also returns a status to effect control flow. Currently 2 states are used: Continue to let it go, Stop to stop the control flow.Filter has a callback handler to interactive with core model. For example, ReadFilterCallbacks can be used to continue filter chain in connection, on which is in a stopped state.
-
-    Listener:
-        - Event listener
-            - ListenerEventListener
-    - Filter
-            - ListenerFilter
-    Connection:
-        - Event listener
-            - ConnectionEventListener
-        - Filter
-            - ReadFilter
-            - WriteFilter
-
-### Stream 层
-
-`pkg/types/stream.go` 的描述如下：
-
-The bunch of interfaces are structure skeleton to build a extensible stream multiplexing architecture. The core concept is mainly refer to golang HTTP2 and envoy.
-
-Core model in stream layer is stream, which manages process of a round-trip, a request and a corresponding response.
-Event listeners can be installed into a stream to monitor event.Stream has two related models, encoder and decoder:
-
-- StreamSender: a sender encodes request/response to binary and sends it out, flag 'endStream' means data is ready to sendout, no need to wait for further input.
-- StreamReceiveListener: It's more like a decode listener to get called on a receiver receives binary and decodes to a request/response.
-- Stream does not have a predetermined direction, so StreamSender could be a request encoder as a client or a response encoder as a server. It's just about the scenario, so does StreamReceiveListener.
-
-    Stream:
-    - Encoder
-            - StreamSender
-        - Decoder
-            - StreamReceiveListener
-
-    Event listeners:
-        - StreamEventListener: listen stream event: reset, destroy.
-        - StreamConnectionEventListener: listen stream connection event: goaway.
-
-In order to meet the expansion requirements in the stream processing, StreamSenderFilter and StreamReceiverFilter are introduced as a filter chain in encode/decode process.Filter's method will be called on corresponding stream process stage and returns a status(Continue/Stop) to effect the control flow.
-
-From an abstract perspective, stream represents a virtual process on underlying connection. To make stream interactive with connection, some intermediate object can be used.**StreamConnection is the core model to connect connection system to stream system**. As a example, when proxy reads binary data from connection, it dispatches data to StreamConnection to do protocol decode.
-Specifically, ClientStreamConnection uses a NewStream to exchange StreamReceiveListener with StreamSender.
-Engine provides a callbacks(StreamSenderFilterHandler/StreamReceiverFilterHandler) to let filter interact with stream engine.
-As a example, a encoder filter stopped the encode process, it can continue it by StreamSenderFilterHandler.ContinueSending later. Actually, a filter engine is a encoder/decoder itself.
+    func (s *downStream) receive(ctx context.Context, id uint32, phase types.Phase) types.Phase {
+        for i := 0; i <= int(types.End-types.InitPhase); i++ {
+            switch phase {
+            // init phase
+            case types.InitPhase:
+                phase++
+            // downstream filter before route
+            case types.DownFilter:
+                s.runReceiveFilters(phase, s.downstreamReqHeaders, s.downstreamReqDataBuf, s.downstreamReqTrailers)
+                phase++
+            // match route
+            case types.MatchRoute:
+                s.matchRoute()
+                phase++
+            // downstream filter after route
+            case types.DownFilterAfterRoute:
+                s.runReceiveFilters(phase, s.downstreamReqHeaders, s.downstreamReqDataBuf, s.downstreamReqTrailers)
+                phase++
+            // downstream receive header
+            case types.DownRecvHeader:
+                //check not null
+                s.receiveHeaders(s.downstreamReqDataBuf == nil && s.downstreamReqTrailers == nil)
+                phase++
+            // downstream receive data
+            case types.DownRecvData:
+                //check not null
+                s.receiveData(s.downstreamReqTrailers == nil)
+                phase++
+            // downstream receive trailer
+            case types.DownRecvTrailer:
+                // check not null
+                s.receiveTrailers()
+                phase++
+            // downstream oneway
+            case types.Oneway:
+                ...
+            case types.Retry:
+                ...
+            case types.WaitNofity:
+                ...
+            // upstream filter
+            case types.UpFilter:
+                s.runAppendFilters(phase, s.downstreamRespHeaders, s.downstreamRespDataBuf, s.downstreamRespTrailers)
+                // maybe direct response
+                phase++
+            // upstream receive header
+            case types.UpRecvHeader:
+                // send downstream response
+                // check not null
+                s.upstreamRequest.receiveHeaders(s.downstreamRespDataBuf == nil && s.downstreamRespTrailers == nil)
+                phase++
+            // upstream receive data
+            case types.UpRecvData:
+                // check not null
+                s.upstreamRequest.receiveData(s.downstreamRespTrailers == nil)
+                phase++
+            // upstream receive triler
+            case types.UpRecvTrailer:
+                //check not null
+                s.upstreamRequest.receiveTrailers()
+                phase++
+            // process end
+            case types.End:
+                return types.End
+            default:
+                return types.End
+            }
+        }
+        return types.End
+    }
 
 ## 与control plan 的交互（未完成）
 
 ## 学到的
 
-不要硬看代码，通过打印日志、打断点的方式来 查看代码的执行链条
+不要硬看代码，尤其对于多协程程序
+
+1. 打印日志
+2. `debug.printStack` 来查看某一个方法之前的调用栈
 
 
 
