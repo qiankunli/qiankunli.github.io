@@ -21,9 +21,14 @@ keywords: window
 
 ## 整体架构
 
-![](/public/upload/practice/istio.png)
+![](/public/upload/practice/istio.jpg)
 
 
+控制平面的三大模块，其中的Pilot和Citadel/Auth都不直接参与到traffic的转发流程，因此他们不会对运行时性能产生直接影响。
+
+|组件名|代码|对应进程|
+|---|---|---|
+|pilot||istio-pilot|
 
 ## Envoy
 
@@ -35,13 +40,28 @@ Envoy 是 Istio 中最基础的组件，所有其他组件的功能都是通过�
 
 ## Mixer
 
-Why does Istio need Mixer? Mixer provides a rich intermediation layer between the Istio components as well as Istio-based services, and the infrastructure backends used to perform access control checks and telemetry capture. 没有Mixer，control plan 的几个组件就要直面 无数个envoy 了。
+![](/public/upload/practice/istio_mixer.png)
 
-Mixer enables extensible policy enforcement and control within the Istio service mesh. It is responsible for insulating the proxy (Envoy) from details of the current execution environment and the intricacies of infrastructure backends.
+mixer 的变更是比较多的，有v1 architecture 和 v2 architecture，社区还尝试将其与proxy/envoy 合并。
+
+[WHY DOES ISTIO NEED MIXER?](https://istio.io/faq/mixer/#why-mixer)Mixer provides a rich intermediation layer between the Istio components as well as Istio-based services, and the infrastructure backends used to perform access control checks and telemetry capture. Mixer enables extensible policy enforcement and control within the Istio service mesh. It is responsible for insulating（隔离） the proxy (Envoy) from details of the current execution environment and the intricacies of infrastructure backends. 
+
+理解“为什么需要一个Mixer” 的关键就是 理解infrastructure backend， 它们可以是Logging/metric 等，mixer 将proxy 与这些系统隔离（proxy通常是按照无状态目标设计的），代价就是每一次proxy间请求需要两次与mixer的通信 影响了性能，这也是社区想将proxy与mixer合并的动机（所以现在proxy是不是无状态就有争议了）。
+
+[Service Mesh 发展趋势(续)：棋到中盘路往何方 | Service Mesh Meetup 实录](https://www.sofastack.tech/blog/service-mesh-development-trend-2/)
+
+![](/public/upload/practice/istio_mixer_evolution.png)
 
 ## pilot
 
-[Istio Pilot代码深度解析](https://www.servicemesher.com/blog/201910-pilot-code-deep-dive/)
+[服务网格 Istio 初探 -Pilot 组件](https://www.infoq.cn/article/T9wjTI2rPegB0uafUKeR)
+
+![](/public/upload/practice/istio_pilot_detail.png)
+
+1. Pilot 的架构，最下面一层是 Envoy 的 API，提供 Discovery Service 的 API，这个 API 的规则由 Envoy 约定，Pilot 实现 Envoy API Server，**Envoy 和 Pilot 之间通过 gRPC 实现双向数据同步**。
+2. Pilot 最上面一层称为 Platform Adapter，这一层不是 Kubernetes 调用 Pilot，而是 **Pilot 通过调用 Kubernetes 来发现服务之间的关**系，Pilot 通过在 Kubernetes 里面注册一个 Controller 来监听事件，从而获取 Service 和 Kubernetes 的 Endpoint 以及 Pod 的关系。
+
+Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无缝的从 Kubernets 的资源定义过度到 Pilot 的资源定义。
 
 
 ## 其它

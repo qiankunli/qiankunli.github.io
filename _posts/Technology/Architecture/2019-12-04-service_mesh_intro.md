@@ -140,6 +140,10 @@ Service Mesh 使得应用与技术基础设施之间的关系变得更松且稳�
 
 ![](/public/upload/architecture/service_mesh_future.png)
 
+[Service Mesh 发展趋势(续)：棋到中盘路往何方](https://www.sofastack.tech/blog/service-mesh-development-trend-2/)
+
+![](/public/upload/practice/service_mesh_future.png)
+
 ## 其它
 
 **软件设计的质量主要体现在“概念”和“关系”两个词上。同样功能的一个系统，不同的概念塑造与切分将产生完全不同的设计成果，甚至影响到最终软件产品的工程质量与效率。当概念确定后，关系也随之确立，而关系的质量水平体现在解耦的程度上**。
