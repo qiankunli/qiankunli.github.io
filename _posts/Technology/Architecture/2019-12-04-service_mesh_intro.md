@@ -35,7 +35,7 @@ Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's 
 
 [浅谈Service Mesh体系中的Envoy](https://yq.aliyun.com/articles/606655)：如果用一句话来解释什么是Service Mesh，**可以将其比作微服务间的TCP/IP层**，负责服务之间的调用、限流、熔断和监控等。PS：如果你熟悉linux内核，就不会把协程和线程认为是两个东西。类似的，如果你熟悉通信协议分层，就不会把Service Mesh 和TCP 认为是两个东西。
 
-SideCar的一种实现[MOSN](https://www.sofastack.tech/projects/sofa-mosn/overview/) 全称是 Modular Observable Smart Network——模块化的、可观测的智能网络。这也是一些文章将Service Mesh 称为更广泛意义上的SDN。
+SideCar的一种实现[MOSN](https://www.sofastack.tech/projects/sofa-mosn/overview/) 全称是 Modular Observable Smart Network——模块化的、可观测的智能网络。这也是[Service Mesh是下一代SDN吗？](https://www.servicemesher.com/blog/201910-what-can-service-mesh-learn-from-sdn/)将Service Mesh 称为更广泛意义上的SDN。
 
 李云 Service Mesh 带来的变化与发展机遇：阿里巴巴在分布式应用的开发和治理的整体解决方案的探索有超过10年的历程，且探索过程持续的通过双11这样的严苛场景做检验和孵化，采用单一的Java语言打造了一整套技术。即便如此，**应对分布式应用的规模问题依然不轻松，体现于因为缺乏顶层设计而面临体系性不足**，加之对技术产品自身的用户体验缺乏重视，最终导致运维成本和技术门槛都偏高。
 
@@ -64,6 +64,32 @@ SideCar的一种实现[MOSN](https://www.sofastack.tech/projects/sofa-mosn/overv
 ### Control Plane 
 
 ![](/public/upload/architecture/service_mesh_control_plan.png)
+
+## 传统IP网络 ==> SDN ==> Service Mesh/控制面+数据面
+
+[Service Mesh是下一代SDN吗？](https://www.servicemesher.com/blog/201910-what-can-service-mesh-learn-from-sdn/)
+
+传统的IP网络是一个分布式的无中心架构，**各个网络设备包含完整的控制面和数据面**，单个设备通过网络协议探测网络中其他设备的状态，自主决定如何对流量进行路由。该架构的好处是容错性强，即使网络局部出现故障，整个网络也可以自主恢复，不会影响整个网络的运行。这种去中心的架构在基于文本和图片的web浏览器应用时代运作良好，但随着互联网业务的爆炸式增长，各种各样的业务纷纷承载在了IP网络上，包括各种实时业务如语音视频通话，对网络提出了新的挑战。
+
+1. 缺少网络质量保证： 绝大多数IP网络都是基于无连接的，只有基于大带宽的粗放带宽保障措施，缺乏质量保证和监控，业务体验较差。
+2. 低效的业务部署： 网络配置是通过命令行或者网管、由管理员手工配置到网络设备上，并且各种网络设备之间的控制命令互不兼容，导致业务的部署非常低效。
+3. 缓慢的业务适应： 业务由硬件实现，导致新业务的开发周期过长。需要持续数年的特性和架构调整、引入新设备，才能推出新的业务，无法快速适应市场，满足用户的需求。
+
+为了应对这些问题，提出了SDN的解决方案
+
+![](/public/upload/network/sdn.jpg)
+
+从图中可以看到，SDN从下至上划分为三层体系结构（PS：**说白了就是网络设施API化**）：
+
+1. 基础设施层（Infrastructure Layer）： 是网络的数据平面，由各种网络设备构成，根据控制层下发的路由规则对网络数据进行处理和转发。
+2. 控制层（Control Layer）： 是一个逻辑上集中的控制平面，维护了整个网络的信息，如网络拓扑和状态信息等，控制层根据业务逻辑生成配置信息下发给基础设施层，以管理整个网络的运行。
+3. 应用层（Application Layer）：通过控制层提供的编程接口，可以编写各种应用利用控制层的能力对网络进行灵活的配置。
+
+Service Mesh是下一代SDN吗？答案是否定的，因为两者之间还是有显著的不同。**SDN主要面对L1到L4层**，即网络层的基本转发和控制功能；**Service Mesh则主要面对L7层及以上**，用于处理应用层的服务发现，服务路由等功能，但两者采用了相似的理念，我们可以把Service Mesh看作SDN的理念在应用层的扩展和实践。
+
+![](/public/upload/network/service_mesh_overview.jpg)
+
+在该架构中，数据面承担的是一个白盒交换机的角色，不管何种实现，其功能都是类似的，不存在太多争议，目前envoy已经成为数据面的标准实现，因此数据面和控制面之间也采用了Envoy的xDS v2作为标准的数据面协议。各个Service Mesh项目的创新和争夺的战场主要在控制面上
 
 ## Service Mesh 所带来的变化
 

@@ -13,6 +13,11 @@ keywords: JAVA Spring
 * TOC
 {:toc}
 
+wiki[Inversion of control](https://en.wikipedia.org/wiki/Inversion_of_control) In software engineering, inversion of control (IoC) is a programming principle. IoC inverts the flow of control as compared to traditional control flow. In IoC, custom-written portions of a computer program receive the flow of control from a generic framework. A software architecture with this design inverts control as compared to traditional procedural programming: in traditional programming, the custom code that expresses the purpose of the program calls into reusable libraries to take care of generic tasks, but with inversion of control, it is the framework that calls into the custom, or task-specific, code. traditional control flow 是从开始到结束都是自己写代码，IoC 中control flow的发起是由一个framework 触发的。类只是干自己的活儿，然后ioc在需要的时候调用。
+
+
+![](/public/upload/spring/spring_ioc.png)
+
 ## Spring是什么？
 
 ### 内在本质——component container
@@ -39,17 +44,7 @@ keywords: JAVA Spring
 
 面向对象出来之后，一个项目的代码通常由一系列对象组成，而理解一个项目的难点变成了：如何理解对象之间复杂的依赖关系。读过netty源码的都知道，channel、pipeline、eventloop三个组件之间，复杂的依赖关系，简直不忍直视。比如A依赖B，B可以作为A的成员、方法参数等，而Spring统一成了一种：B作为A的成员。c、go之类，即便按照面向对象的思路来编程，因为没有类似spring的组件，业务本身的复杂性 + 对象之间的复杂的依赖关系，增加了理解的难度。
 
-IoC 容器控制了对象；控制什么呢？那就是主要控制了外部资源获取。包括
 
-1. 对象
-
-	* 对象可以直接创建
-	* 对象由复杂的构造过程，比如FactoryBean/代理实现。
-	* 第三方自定义xsd，自定义NamespaceHandler，并将创建的对象加入到容器中
-	
-2. 配置文件等，我们获取一个配置，不用自己读取文件、解析文件，直接在类中@value就搞定了。本质上还是创建对象时，顺带处理其需要的各方面资源。component container 不仅是object container，也是property container.
-
-得益于此，我们可以聚焦于拿到对象做什么事（也就是侧重业务），而对象如何创建，则交给框架或框架扩展的一部分。 
 
 ## ioc 带来的改变：“解耦”
 
@@ -81,13 +76,6 @@ IOC设计模式的两个重要支持：
 1. **对象间依赖关系的建立和应用系统的运行状态没有很强的关联性**，因此对象的依赖关系可以在启动时建立好，ioc容器（负责建立对象的依赖关系）不会对应用系统有很强的侵入性。
 2. 面向对象系统中，除了一部分对象是数据对象外，其他很大一部分是用来处理数据的，这些对象并不经常发生变化，在系统中以单件的形式起作用就可以满足应用的需求。
 
-ioc的实现不只spring一种，可以多方对比观察。谷歌的guice也是一个ioc实现
-
-	configUtil = InjectorUtils.getInstance(ConfigUtil.class);
-	
-对应到spring
-
-	configUtil = (ConfigUtil)beanFactory.getBean("configUtil");
 
 ## ioc的实现
 
@@ -132,13 +120,12 @@ BeanFactory是最简单的ioc容器，看了BeanFactory接口方法，也许会�
 
 bean在不同阶段的表现形式
 
-||表现形式|
-|---|---|
-|配置文件|`<bean class=""></bean>`|
-|ioc初始化|BeanDefinition|
-|getBean|Object|
+||表现形式|与jvm类比|
+|---|---|---|
+|配置文件|`<bean class=""></bean>`|java代码|
+|ioc初始化|BeanDefinition|class二进制 ==> 内存中的Class对象|
+|getBean|Object|堆中的对象实例|
     
-就像jvm不会为classpath下的每一个类文件都生成实例一样，ioc也不会将applicaton-context.xml中的每一个`<bean></bean>`都生成实例。同时，jvm将class文件加载成class文件暂存，ioc则是将`<bean></bean>`加载为BeanDefinition管理。
 
 ### BeanFactory
 
@@ -268,3 +255,5 @@ Interface representing the environment in which the current application is runni
 并不是所有的Bean 都会被纳入到ioc管理，A profile is a named, **logical group of bean definitions** to be registered with the container only if the given profile is active. Beans may be assigned to a profile whether defined in XML or via annotations; see the spring-beans 3.1 schema or the  @Profile annotation for syntax details.
 
 Properties play an important role in almost all applications,and may originate from a variety of sources: properties files, JVM system properties, system environment variables, JNDI, servlet context parameters, ad-hoc Properties objects,Maps, and so on. The role of the environment object with relation to properties is to provide the user with a convenient service interface for configuring property sources and resolving properties from them.
+
+![](/public/upload/spring/spring_env.png)

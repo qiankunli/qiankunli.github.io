@@ -8,7 +8,7 @@ keywords: proxyFactoryBean
 
 ---
 
-## 简介
+## 简介（待整理）
 
 * TOC
 {:toc}
@@ -71,6 +71,7 @@ AOP是一个编程模型，aspectj和jboss AOP对于Aop模型进行了具体的�
         
 Pointcut和advice在spring aop中都是一套类图（较多的父子层级关系）。它们既是aop模型中的概念，也对应配置文件中为我们提供的数据。
 
+![](/public/upload/spring/spring_aop.png)
 
 ## 使用
 

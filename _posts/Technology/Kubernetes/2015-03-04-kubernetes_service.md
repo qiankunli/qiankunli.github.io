@@ -33,7 +33,9 @@ A Container Engine service is an abstraction which defines a logical set of pods
 
 Service 是由 kube-proxy 组件，加上 iptables 来共同实现的。
 
-Every node in a Kubernetes cluster runs a kube-proxy. **This application watches the Kubernetes master for the addition and removal of Service and Endpoints objects. For each Service it opens a port (random) on the local node. Any connections made to that port will be proxied to one of the corresponding backend Pods.（这句非常关键）** Which backend to use is decided based on the AffinityPolicy of the Service. Lastly, it installs iptables rules which capture traffic to the Service's Port on the Service's portal IP and redirects that traffic to the previously described port.
+[服务网格（Service Mesh）与Kubernetes的服务发现](http://weng.ai/post/1009/)Kubernetes通过抽象出Service对象来支持微服务架构，运行应用的多个Pod实例通过定义Service对象对外提供服务。应用之间通过Service名来相互访问，通过Service名的DNS解析完成服务发现。具体的，Pod实例运行时会将实例的地址端口等信息注册到kube-apiserver，与相关的Service建立关联（数据存储于背后的etcd存储），同时K8S节点会监听到该Service与Pod实例节点映射关系的变化。对于通常的一个Service名（非Headless Service），它会被DNS服务解析到一个虚拟IP（Virtual IP），而K8S节点上的kube-proxy进程会根据Service的信息建立这个虚拟IP的iptables转发规则：将发送到该虚拟IP的数据均衡的转发到若干个提供该服务的Pod实例所在的节点，以提供L4层的负载均衡功能。
+
+Every node in a Kubernetes cluster runs a kube-proxy. **This application watches the Kubernetes master for the addition and removal of Service and Endpoints objects. For each Service it opens a port (random) on the local node. Any connections made to that port will be proxied to one of the corresponding backend Pods.** Which backend to use is decided based on the AffinityPolicy of the Service. Lastly, it installs iptables rules which capture traffic to the Service's Port on the Service's portal IP and redirects that traffic to the previously described port.
 
 The net result is that any traffic bound for the Service is proxied to an appropriate backend without the clients knowing anything about Kubernetes or Services or Pods.
 
