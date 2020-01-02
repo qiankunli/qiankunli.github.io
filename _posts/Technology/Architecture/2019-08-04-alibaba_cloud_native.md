@@ -48,6 +48,10 @@ keywords: kubernetes cni
 
 ## 云原生如何落地
 
+[蚂蚁金服 Service Mesh 深度实践](https://mp.weixin.qq.com/s/XjbmCxdJLKVcFlEUiM7Pig)
+
+![](/public/upload/architecture/cloud_native_practice.png)
+
 当我们回顾云计算的发展历程，会看到**基础架构**经历了从物理机到虚拟机，从虚 拟机再到容器的演进过程。在这大势之下，**应用架构**也在同步演进，从单体过渡到多层，再到当下的微服务。在变化的背后，有一股持续的动力，它来自于三个不变的追求:
 
 1. 提高资源利用率
