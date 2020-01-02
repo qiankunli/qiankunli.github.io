@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 项目隔离1——案例研究
+title: 项目隔离——案例研究
 category: 架构
 tags: Practice
 keywords: test environment

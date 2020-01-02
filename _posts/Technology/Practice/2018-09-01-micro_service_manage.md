@@ -12,7 +12,9 @@ keywords: dubbo micro service
 
 本文主要以框架实现的角度 来阐述微服务治理，主要包括两个方面：“业务层面”（微服务应该有什么）和工程层面（如何code实现）。此外，篇幅有限，多从客户端（即业务使用方）角度来阐述问题。
 
-20191213补充：[What is Istio?](https://istio.io/docs/concepts/what-is-istio/)The term service mesh is used to describe the network of microservices that make up such applications and the interactions between them. As a service mesh grows in size and complexity, it can become harder to understand and manage. Its requirements can include discovery, load balancing, failure recovery, metrics, and monitoring. A service mesh also often has more complex operational requirements, like A/B testing, canary rollouts, rate limiting, access control, and end-to-end authentication. 理解: service mesh 可以理解为 the network of microservices， 随着service mesh 规模的扩大， 会产生 discovery, load balancing, failure recovery, metrics,  monitoring, A/B testing, canary rollouts, rate limiting, access control, and end-to-end authentication 等一系列问题。
+[服务治理在猫眼的演进之路-Service Mesh](http://qiankunli.github.io/2015/05/31/go_library.html)服务治理的包含了非常多的能力，比如服务通讯、服务注册发现、负载均衡、路由、失败重试等等
+
+2019.12.13补充：[What is Istio?](https://istio.io/docs/concepts/what-is-istio/)The term service mesh is used to describe the network of microservices that make up such applications and the interactions between them. As a service mesh grows in size and complexity, it can become harder to understand and manage. Its requirements can include discovery, load balancing, failure recovery, metrics, and monitoring. A service mesh also often has more complex operational requirements, like A/B testing, canary rollouts, rate limiting, access control, and end-to-end authentication. 理解: service mesh 可以理解为 the network of microservices， 随着service mesh 规模的扩大， 会产生 discovery, load balancing, failure recovery, metrics,  monitoring, A/B testing, canary rollouts, rate limiting, access control, and end-to-end authentication 等一系列问题。
 
 ## 整体架构
 
