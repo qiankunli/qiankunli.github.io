@@ -11,9 +11,47 @@ keywords: CoreOS Docker Kubernetes
 ## 简介
 
 
-本文主要讲了service组件一些其它特性，以及kubernete的pod之间协作的时候的一些问题。
+## 访问多个kubernetes 集群
 
-### Environment variables
+1. 一般情况，kubernetes 单独搭建在一个集群上，开发者通过开发机 或某一个跳板机上 通过kubectl 操作kubernetes，kubectl 会读取`~/.kube/config` 文件读取集群信息
+2. kubernetes 一般会有多个集群：测试环境（运行公司测试环境的服务），开发环境（用来验证新功能）==> developer 需要在本机 上使用kubectl 访问多个k8s集群
+
+[配置对多集群的访问](https://kubernetes.io/zh/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
+
+`~/.kube/config` 是一个yaml 文件，可以配置多个集群的信息
+
+    apiVersion: v1
+    kind: Config
+    clusters:
+    users:
+    contexts:
+
+可以看到 几个核心配置都是数组
+
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - cluster:
+    name: development
+    - cluster:
+    name: scratch
+    users:
+    - name: developer
+    - name: experimenter
+    contexts:
+    - context:
+        cluster: development
+        user: developer
+      name: dev-frontend
+    name: dev-frontend
+    - context:
+        cluster: scratch
+        user: experimenter
+      name: exp-scratch
+
+
+
+## Environment variables
 
 (类似于docker container中的`--link`)
 
@@ -33,7 +71,7 @@ This does imply an ordering requirement - **any Service that a Pod wants to acce
 
 
 
-### DNS
+## DNS
 
 问题，为什么kubernete 需要dns服务？
 
@@ -47,17 +85,7 @@ An optional (though strongly recommended) cluster add-on is a DNS server. The DN
 
 For example, if you have a Service called "my-service" in Kubernetes Namespace "my-ns" a DNS record for "my-service.my-ns" is created. Pods which exist in the "my-ns" Namespace should be able to find it by simply doing a name lookup for "my-service". Pods which exist in other Namespaces must qualify the name as "my-service.my-ns". The result of these name lookups is the virtual portal IP.
 
-## External Services（将service 暴漏到 实际环境中（非k8s网络））
 
-For some parts of your application (e.g. frontends) you may want to expose a Service onto an external (outside of your cluster, maybe public internet) IP address.（有时候我们想通过一个特定的外部ip来访问这个service）
-
-（对于在云环境部署的k8s集群来说）
-On cloud providers which support external load balancers, this should be as simple as setting the createExternalLoadBalancer flag of the Service to true. This sets up a cloud-specific load balancer and populates the publicIPs field (see below). Traffic from the external load balancer will be directed at the backend Pods, though exactly how that works depends on the cloud provider.
-
-（对于没有云环境的k8s集群）
-For cloud providers which do not support external load balancers, there is another approach that is a bit more "do-it-yourself" - the publicIPs field.（配置service publicIPs属性） Any address you put into the publicIPs array will be handled the same as the portal IP - the kube-proxy will install iptables rules which proxy traffic through to the backends.（配置后，kube-proxy将配置相应的iptables 规则） You are then responsible for ensuring that traffic to those IPs gets sent to one or more Kubernetes Nodes. As long as the traffic arrives at a Node, it will be be subject to the iptables rules.
-
-An example situation might be when a Node has both internal and an external network interfaces. If you assign that Node's external IP as a publicIP, you can then aim traffic at the Service port on that Node and it will be proxied to the backends.
 
 ## k8s 在 etcd中的存在
 
@@ -150,26 +178,5 @@ etcd-endpoints.json
 
 那么在pod中，就可以通过myetcd的`serviceip:80`来访问master主机上的etcd服务了。
 
-## pod内，pod之间，pod与外界访问小结
 
-在不同的层面，如何相互访问呢？
 
-1. pod内container的互访
-
-    1.1 网络方面，通过通过`localhost:port`
-    
-    1.2 文件方面：通过volume（通过emptydir类型的volume即可）
-    
-2. pod之间
-
-    2.1 网络方面：通过彼此的service ip
-    2.2 文件方面：volume（通过hostdir类型的volume）
-    
-3. pod与外界
-
-   3.1 外界访问pod
-      - 通过iptables（或`PublicIPs`）
-      - 通过apiserver代理（`http://xxx:8080/api/xxx/proxy/xxx`）
-    
-   3.2 pod访问外界
-    - 为外界服务创建 endpoints 和 k8s service  

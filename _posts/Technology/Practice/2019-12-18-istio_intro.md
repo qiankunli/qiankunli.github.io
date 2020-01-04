@@ -19,12 +19,58 @@ keywords: window
 
 [使用 Istio 实现基于 Kubernetes 的微服务应用](https://www.ibm.com/developerworks/cn/cloud/library/cl-lo-implementing-kubernetes-microservice-using-istio/index.html)
 
+
+## 安装手感
+
+[Istio 1.4 部署指南](https://juejin.im/post/5e0062ae6fb9a0163a483ea5)istioctl 提供了多种安装配置文件，可以通过下面的命令查看：
+
+    $ istioctl profile list
+    Istio configuration profiles:
+        default
+        demo
+        minimal
+        remote
+        sds
+
+istio 包含istio-citadel/istio-egressgateway/istio-galley/istio-ingressgateway/istio-nodeagent/istio-pilot/istio-policy/istio-sidecar-injector/istio-telemetry/Grafana/istio-tracing/kiali/prometheus等组件。不同模式对各个组件进行了取舍，其中 minimal 模式下，只启动了istio-pilot 一个组件。
+
+安装profile=demo的 istio
+
+    $ istioctl manifest apply --set profile=demo \
+    --set cni.enabled=true --set cni.components.cni.namespace=kube-system \
+    --set values.gateways.istio-ingressgateway.type=ClusterIP
+
+容器列表如下：
+
+    ➜  ~ kubectl get pods -n istio-system
+    NAME                                      READY   STATUS             RESTARTS   AGE
+    grafana-6b65874977-bc8tm                  1/1     Running            0          141m
+    istio-citadel-86dcf4c6b-kp52x             1/1     Running            0          8d
+    istio-egressgateway-68f754ccdd-sndrl      1/1     Running            0          141m
+    istio-galley-5fc6d6c45b-sg6dw             1/1     Running            0          141m
+    istio-ingressgateway-6d759478d8-b476j     1/1     Running            0          141m
+    istio-pilot-5c4995d687-jfp7l              1/1     Running            0          141m
+    istio-policy-57b99968f-xckd9              1/1     Running            36         141m
+    istio-sidecar-injector-746f7c7bbb-xzzpw   1/1     Running            0          8d
+    istio-telemetry-854d8556d5-9754v          1/1     Running            1          141m
+    istio-tracing-c66d67cd9-pszx9             0/1     CrashLoopBackOff   47         141m
+    kiali-8559969566-5svn6                    1/1     Running            0          141m
+    prometheus-66c5887c86-62c9l               1/1     Running            0          8d
+
+istioctl 提供了一个子命令来从本地打开各种 Dashboard。例如，要想在本地打开 Grafana 页面，只需执行下面的命令：
+
+    ## 自动打开浏览器
+    $ istioctl dashboard grafana
+    http://localhost:36813
+
+
 ## 整体架构
 
 ![](/public/upload/practice/istio.jpg)
 
-
 控制平面的三大模块，其中的Pilot和Citadel/Auth都不直接参与到traffic的转发流程，因此他们不会对运行时性能产生直接影响。
+
+表格未完成
 
 |组件名|代码|对应进程|
 |---|---|---|
@@ -48,7 +94,7 @@ mixer 的变更是比较多的，有v1 architecture 和 v2 architecture，社�
 
 理解“为什么需要一个Mixer” 的关键就是 理解infrastructure backend， 它们可以是Logging/metric 等，mixer 将proxy 与这些系统隔离（proxy通常是按照无状态目标设计的），代价就是每一次proxy间请求需要两次与mixer的通信 影响了性能，这也是社区想将proxy与mixer合并的动机（所以现在proxy是不是无状态就有争议了）。
 
-[Service Mesh 发展趋势(续)：棋到中盘路往何方 | Service Mesh Meetup 实录](https://www.sofastack.tech/blog/service-mesh-development-trend-2/)
+[Service Mesh 发展趋势(续)：棋到中盘路往何方](https://www.sofastack.tech/blog/service-mesh-development-trend-2/)
 
 ![](/public/upload/practice/istio_mixer_evolution.png)
 
@@ -63,6 +109,43 @@ mixer 的变更是比较多的，有v1 architecture 和 v2 architecture，社�
 
 Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无缝的从 Kubernets 的资源定义过度到 Pilot 的资源定义。
 
+## 流转
+
+一个istio 自带的Bookinfo 为例，全流程都是 http 协议
+
+![](/public/upload/practice/istio_bookinfo.jpg)
+
+![](/public/upload/practice/istio_envoy_flow.png)
+
+`istioctl pc listener $podname` 可以查看Pod 中的具有哪些 Listener
+
+### Productpage服务调用Reviews服务的请求流程
+
+[Istio流量管理实现机制深度解析](https://zhaohuabing.com/post/2018-09-25-istio-traffic-management-impl-intro/)
+
+![](/public/upload/practice/bookinfo_envoy_flow.png)
+
+### 请求从ingress/gateway 流向productpage
+
+[istio网络转发分析](https://yq.aliyun.com/articles/564983)
+
+涉及到的 istio kubernetes resource
+
+1.  Gateway描述了在网络边缘运行的负载均衡器，用于接收传入或传出的HTTP / TCP连接。
+
+        apiVersion: networking.istio.io/v1alpha3
+        kind: Gateway
+
+2. VirtualService实际上将Kubernetes服务连接到Istio网关。
+
+        apiVersion: networking.istio.io/v1alpha3
+        kind: VirtualService
+
+端到端调用分析
+
+1. 所以请求路径是 request ==> Gateway ，gateway 根据VirtualService 解析到目标 service
+2. gateway 根据 service 选择一个pod ip，将请求转发出去
+3. productpage pod 收到请求，经过 iptables 转入envoy proxy，proxy 转发请求到业务上
 
 ## 其它
 

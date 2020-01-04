@@ -66,9 +66,6 @@ docker 启用user namesapce（此处只是普及，不推荐使用）
 1. User accounts are for humans. Service accounts are for processes, which run in pods.
 2. User accounts are intended to be global. Names must be unique across all namespaces of a cluster, future user resource will not be namespaced. Service accounts are namespaced.
 
-
-
-
 ### access the API 
 
 [ssl证书是什么东西](https://kubernetes.io/docs/reference/access-authn-authz/controlling-access/)

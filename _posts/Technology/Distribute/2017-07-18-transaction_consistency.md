@@ -15,6 +15,8 @@ keywords: 分布式事务
 
 事务一致性属于 一致性问题的一种(另一种是副本一致性)，建议先看下 [串一串一致性协议](http://qiankunli.github.io/2018/09/27/consistency_protocol.html)
 
+[再有人问你分布式事务和解决方案，把这篇文章扔给他！](https://mp.weixin.qq.com/s/NIoQ0yTFK3CW8w_bjcSvUQ)未读
+
 在实际的业务中，分布式事务有以下表现形式：
 
 1. 跨数据库操作
