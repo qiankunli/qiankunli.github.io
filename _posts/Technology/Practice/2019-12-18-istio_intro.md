@@ -8,7 +8,7 @@ keywords: window
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -20,7 +20,9 @@ keywords: window
 [使用 Istio 实现基于 Kubernetes 的微服务应用](https://www.ibm.com/developerworks/cn/cloud/library/cl-lo-implementing-kubernetes-microservice-using-istio/index.html)
 
 
-## 安装手感
+## 安装手感——使用istioctl安装
+
+[istio-1.4.2-linux.tar.gz](https://github.com/istio/istio/releases/download/1.4.2/istio-1.4.2-linux.tar.gz)
 
 [Istio 1.4 部署指南](https://juejin.im/post/5e0062ae6fb9a0163a483ea5)istioctl 提供了多种安装配置文件，可以通过下面的命令查看：
 
@@ -70,13 +72,7 @@ istioctl 提供了一个子命令来从本地打开各种 Dashboard。例如，�
 
 控制平面的三大模块，其中的Pilot和Citadel/Auth都不直接参与到traffic的转发流程，因此他们不会对运行时性能产生直接影响。
 
-表格未完成
-
-|组件名|代码|对应进程|
-|---|---|---|
-|pilot||istio-pilot|
-
-## Envoy
+### Envoy
 
 Envoy 是 Istio 中最基础的组件，所有其他组件的功能都是通过调用 Envoy 提供的 API，在请求经过 Envoy 转发时，由 Envoy 执行相关的控制逻辑来实现的。
 
@@ -84,7 +80,7 @@ Envoy 是 Istio 中最基础的组件，所有其他组件的功能都是通过�
 
 类似产品 [MOSN](https://github.com/sofastack/sofa-mosn) [MOSN 文档](https://github.com/sofastack/sofa-mosn)
 
-## Mixer
+### Mixer
 
 ![](/public/upload/practice/istio_mixer.svg)
 
@@ -98,7 +94,7 @@ mixer 的变更是比较多的，有v1 architecture 和 v2 architecture，社�
 
 ![](/public/upload/practice/istio_mixer_evolution.png)
 
-## pilot
+### pilot
 
 [服务网格 Istio 初探 -Pilot 组件](https://www.infoq.cn/article/T9wjTI2rPegB0uafUKeR)
 
@@ -109,22 +105,36 @@ mixer 的变更是比较多的，有v1 architecture 和 v2 architecture，社�
 
 Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无缝的从 Kubernets 的资源定义过度到 Pilot 的资源定义。
 
-## 流转
+## 端到端流转
 
-一个istio 自带的Bookinfo 为例，全流程都是 http 协议
+一个istio 自带的Bookinfo 为例，对应[istio-1.4.2-linux.tar.gz](https://github.com/istio/istio/releases/download/1.4.2/istio-1.4.2-linux.tar.gz) 解压后`istio-1.4.2/samples/bookinfo`
+
+    kubectl label namespace default istio-injection=enabled
+    kubectl apply -f samples/bookinfo/platform/kube/bookinfo.yaml
+    # 安装 bookinfo 的 ingress gateway：
+    kubectl apply -f samples/bookinfo/networking/bookinfo-gateway.yaml
+
+全流程都是 http 协议
 
 ![](/public/upload/practice/istio_bookinfo.jpg)
 
 ![](/public/upload/practice/istio_envoy_flow.png)
 
-`istioctl pc listener $podname` 可以查看Pod 中的具有哪些 Listener
+`istioctl proxy-config listener $podname` 可以查看Pod 中的具有哪些 Listener，也可以使用`istioctl proxy-config listener $podname -o json` 查看更详细的配置
 
 ### Productpage服务调用Reviews服务的请求流程
 
-[Istio流量管理实现机制深度解析](https://zhaohuabing.com/post/2018-09-25-istio-traffic-management-impl-intro/)
+[Istio流量管理实现机制深度解析](https://zhaohuabing.com/post/2018-09-25-istio-traffic-management-impl-intro/)Productpage服务调用Reviews服务的请求流程
 
 ![](/public/upload/practice/bookinfo_envoy_flow.png)
 
+将details 服务扩容到2个实例，可以通过Pilot的调试接口获取该Cluster的endpoint`http://pilot_service_ip:15014/debug/edsz` ，可以看到 details 对应的cluster的endpoints 变成了两个。查看 productpage pod中 envoy 的endpoint 配置发现也对应有了2个endpoint
+
+    $ istioctl pc endpoint productpage-v1-596598f447-nn64q
+    ENDPOINT                STATUS      OUTLIER CHECK     CLUSTER
+    10.20.0.10:9080         HEALTHY     OK                outbound|9080||details.default.svc.cluster.local
+    10.20.0.2:9080          HEALTHY     OK                outbound|9080||details.default.svc.cluster.local
+   
 ### 请求从ingress/gateway 流向productpage
 
 [istio网络转发分析](https://yq.aliyun.com/articles/564983)
@@ -140,12 +150,6 @@ Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无�
 
         apiVersion: networking.istio.io/v1alpha3
         kind: VirtualService
-
-端到端调用分析
-
-1. 所以请求路径是 request ==> Gateway ，gateway 根据VirtualService 解析到目标 service
-2. gateway 根据 service 选择一个pod ip，将请求转发出去
-3. productpage pod 收到请求，经过 iptables 转入envoy proxy，proxy 转发请求到业务上
 
 ## 其它
 

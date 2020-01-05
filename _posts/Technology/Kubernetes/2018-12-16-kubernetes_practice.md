@@ -96,6 +96,7 @@ Node affinity, described [here](https://kubernetes.io/docs/concepts/configuratio
 
 ![](/public/upload/kubernetes/container_security.png)
 
+[Kubernetic](https://kubernetic.com/)一款kubenretes桌面客户端, Kubernetic uses `~/.kube/config` file to find existing cluster contexts and handle authentication. This means that as soon as you have a kubectl client configured to your machine Kubernetic will be able to login to your configured clusters.
 
 ## Garbage Collection
 
