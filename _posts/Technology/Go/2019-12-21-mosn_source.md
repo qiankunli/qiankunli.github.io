@@ -46,12 +46,6 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
                     server.go     
 
 
-单机视角
-
-![](/public/upload/go/mosn_http_example_single.png)
-
-多机视角
-
 ![](/public/upload/go/mosn_http_example.png)  
 
 使用`http://localhost:8080` 和 `http://localhost:2345` 都可以拿到数据
@@ -129,13 +123,18 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 1. 协议上数据统一划分为header/data/Trailers 三个部分，转发也是以这三个子部分为基本单位
 2. 借鉴了http2 的stream 的理念（所以Stream interface 上有一个方法是`ID()`），Stream 可以理解为一个子Connection，Stream 之间可以并行请求和响应，通过StreamId关联，用来实现在一个Connection 之上的“多路复用”。PS：为了连接数量与请求数量解耦。
 
-代码的组织（pkg/stream,pkg/protocol,pkg/proxy）  跟上述架构是一致的。但是类的组织 就有点不明觉厉。
+代码的组织（pkg/stream,pkg/protocol,pkg/proxy）  跟上述架构是一致的
 
 ![](/public/upload/go/mosn_layer.png)
 
-除了主线之外，listener 和filter 比较好理解：Method in listener will be called on event occur, but not effect the control flow.Filters are called on event occurs, it also returns a status to effect control flow. Currently 2 states are used: Continue to let it go, Stop to stop the control flow.
-
-**类与layer 之间不存在一一对应关系**，比如proxy package 中包含ReadFilter 和 StreamReceiveListener 实现，分别属于多个层次。 [SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md) 
+1. `pkg/types/connection.go` Connection
+2. `pkg/types/stream.go` StreamConnection is a connection runs multiple streams
+3. `pkg/types/stream.go` Stream is a generic protocol stream
+4. 一堆listener 和filter 比较好理解：Method in listener will be called on event occur, but not effect the control flow.Filters are called on event occurs, it also returns a status to effect control flow. Currently 2 states are used: Continue to let it go, Stop to stop the control flow.
+5. protocol 和 stream 两个layer 因和协议有关，不同协议之间实现差异很大，层次不是很清晰
+6. 跨层次调用/数据传输通过跨层次struct 的“组合”来实现。也有一些特别的，比如http net/io 和 stream 分别启动goroutine read/write loop，通过共享数据来 变相的实现跨层调用
+ 
+[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md) 
 
 ![](/public/upload/go/mosn_io_process.png)
 
@@ -144,22 +143,6 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 3. stream 创建完毕后，会回调到 Proxy 层做路由和转发，Proxy 层会关联上下游（upstream,downstream）间的转发关系
 4. Proxy 挑选到后端后，会根据后端使用的协议，将数据发送到对应协议的 Protocol 层，对数据重新做 Encode
 5. Encode 后的数据会发经过 write filter 并最终使用 IO 的 write 发送出去
-
-
-跨层次调用 通过注册 listener、filter  或者 直接跨层次类的“组合” 来实现，也有一些特别的，比如http net/io 和 stream 分别启动goroutine read/write loop，通过共享数据来 变相的实现跨层调用。此外，protocol 和 stream 两个layer 因和协议有关，不同协议之间实现差异很大，层次不是很清晰。
-
-该表格自相矛盾，有待进一步完善。
-
-|层次|interface|关键成员/方法|实现类|所在文件|
-|---|---|---|---|---|
-|Net/IO|Listener|OnAccept|activeListener|server/handler.go|
-|Net/IO|Connection||connection|network/connection.go|								
-|Net/IO|ReadFilter|OnData<br>OnNewConnection|proxy|proxy/proxy.go|
-|衔接|StreamConnection|map[uint32]*serverStream<br>types.ProtocolEngine<br>方法：Dispatch|streamConnection|stream/http2/stream.go|
-|Protocol|Decoder|Decode|serverCodec|protocol/http/codec.go|
-|衔接|Stream|types.StreamReceiveListener<br>types.HeaderMap<br>*serverStreamConnection|serverStream|stream/http2/stream.go|   	
-|proxy|StreamReceiveListener|OnReceive|downStream|proxy/downstream.go|
-
 
 ## 连接管理
 
@@ -305,7 +288,104 @@ Downstream stream, as a controller to handle downstream and upstream proxy flow 
 
 上述流程才像是一个 proxy 层的活儿，请求转发到 upstream，从upstream 拿到响应， 再转回给downStream
 
-## 与control plan 的交互（未完成）
+## 与control plan 的交互
+
+`pkg/xds/v2/adssubscriber.go` 启动发送线程和接收线程
+
+    func (adsClient *ADSClient) Start() {
+        adsClient.StreamClient = adsClient.AdsConfig.GetStreamClient()
+        utils.GoWithRecover(func() {
+            adsClient.sendThread()
+        }, nil)
+        utils.GoWithRecover(func() {
+            adsClient.receiveThread()
+        }, nil)
+    }
+
+定时发送请求
+
+    func (adsClient *ADSClient) sendThread() {
+        refreshDelay := adsClient.AdsConfig.RefreshDelay
+        t1 := time.NewTimer(*refreshDelay)
+        for {
+            select {
+            ...
+            case <-t1.C:
+                err := adsClient.reqClusters(adsClient.StreamClient)
+                if err != nil {
+                    log.DefaultLogger.Infof("[xds] [ads client] send thread request cds fail!auto retry next period")
+                    adsClient.reconnect()
+                }
+                t1.Reset(*refreshDelay)
+            }
+        }
+    }
+
+接收响应
+
+    func (adsClient *ADSClient) receiveThread() {
+        for {
+            select {
+        
+            default:
+                adsClient.StreamClientMutex.RLock()
+                sc := adsClient.StreamClient
+                adsClient.StreamClientMutex.RUnlock()
+                ...
+                resp, err := sc.Recv()
+                ...
+                typeURL := resp.TypeUrl
+                HandleTypeURL(typeURL, adsClient, resp)
+            }
+        }
+    }
+
+处理逻辑是事先注册好的函数
+
+    func HandleTypeURL(url string, client *ADSClient, resp *envoy_api_v2.DiscoveryResponse) {
+        if f, ok := typeURLHandleFuncs[url]; ok {
+            f(client, resp)
+        }
+    }
+    func init() {
+        RegisterTypeURLHandleFunc(EnvoyListener, HandleEnvoyListener)
+        RegisterTypeURLHandleFunc(EnvoyCluster, HandleEnvoyCluster)
+        RegisterTypeURLHandleFunc(EnvoyClusterLoadAssignment, HandleEnvoyClusterLoadAssignment)
+        RegisterTypeURLHandleFunc(EnvoyRouteConfiguration, HandleEnvoyRouteConfiguration)
+    }
+
+以cluster 信息为例 HandleEnvoyCluster
+
+    func HandleEnvoyCluster(client *ADSClient, resp *envoy_api_v2.DiscoveryResponse) {
+        clusters := client.handleClustersResp(resp)
+        ...
+        conv.ConvertUpdateClusters(clusters)
+        clusterNames := make([]string, 0)
+        ...
+        for _, cluster := range clusters {
+            if cluster.GetType() == envoy_api_v2.Cluster_EDS {
+                clusterNames = append(clusterNames, cluster.Name)
+            }
+        }
+        ...
+    }
+
+会触发ClusterManager 更新cluster 
+
+    func ConvertUpdateEndpoints(loadAssignments []*envoy_api_v2.ClusterLoadAssignment) error {
+        for _, loadAssignment := range loadAssignments {
+            clusterName := loadAssignment.ClusterName
+            for _, endpoints := range loadAssignment.Endpoints {
+                hosts := ConvertEndpointsConfig(&endpoints)
+                clusterMngAdapter := clusterAdapter.GetClusterMngAdapterInstance()
+                ...
+                clusterAdapter.GetClusterMngAdapterInstance().TriggerClusterHostUpdate(clusterName, hosts); 
+                ...
+                
+            }
+        }
+        return errGlobal
+    }
 
 ## 学到的
 
@@ -313,7 +393,7 @@ Downstream stream, as a controller to handle downstream and upstream proxy flow 
 
 1. 打印日志
 2. `debug.printStack` 来查看某一个方法之前的调用栈
-
+3. `fmt.Printf("==> %T\n",xx)`  如果一个interface 有多个“实现类” 可以通过`%T` 查看struct 的类型
 
 
 
