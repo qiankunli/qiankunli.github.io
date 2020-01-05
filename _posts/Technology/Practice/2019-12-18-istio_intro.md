@@ -86,7 +86,7 @@ Envoy 是 Istio 中最基础的组件，所有其他组件的功能都是通过�
 
 ## Mixer
 
-![](/public/upload/practice/istio_mixer.png)
+![](/public/upload/practice/istio_mixer.svg)
 
 mixer 的变更是比较多的，有v1 architecture 和 v2 architecture，社区还尝试将其与proxy/envoy 合并。
 
