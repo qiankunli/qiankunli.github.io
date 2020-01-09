@@ -40,6 +40,10 @@ keywords: kubernetes yaml
 
 ![](/public/upload/kubernetes/meituan_kubernetes_practice.png)
 
+## helm
+
+[Helm安装使用](https://www.qikqiak.com/k8s-book/docs/42.Helm%E5%AE%89%E8%A3%85.html)
+
 ## “划一片地”来测试
 
 假设集群一共有10个节点，我们希望一般任务只调度到其中的8多个节点，另外2个节点用来试验一些新特性。

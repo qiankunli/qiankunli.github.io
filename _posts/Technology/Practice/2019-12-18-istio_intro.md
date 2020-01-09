@@ -134,7 +134,7 @@ Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无�
     ENDPOINT                STATUS      OUTLIER CHECK     CLUSTER
     10.20.0.10:9080         HEALTHY     OK                outbound|9080||details.default.svc.cluster.local
     10.20.0.2:9080          HEALTHY     OK                outbound|9080||details.default.svc.cluster.local
-   
+
 ### 请求从ingress/gateway 流向productpage
 
 [istio网络转发分析](https://yq.aliyun.com/articles/564983)
