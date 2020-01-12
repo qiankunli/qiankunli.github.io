@@ -98,8 +98,16 @@ vendor属性就是让go编译时，优先从项目源码树根目录下的vendor
 
 Go Modules 提供了统一的依赖包管理工具 go mod，其思想类似maven：摒弃vendor和GOPATH，拥抱本地库。
 
-1. 依赖包统一收集在 `$GOPATH/pkg/mod` 中进行集中管理。有点mvn `.m2` 文件夹的意思。并且go build 代码时，自动解析代码中的import 生成 go.mode 文件。PS：相当于maven pom.xml 解析代码自动生成。
-2. 将 import 路径与项目代码的实际存放路径解耦。PS：import 依赖包在$GOPATH 中的路径，编译时使用依赖包在`$GOPATH/pkg/mod`中的文件。
+1. 依赖包统一收集在 `$GOPATH/pkg/mod` 中进行集中管理。有点mvn `.m2` 文件夹的意思
+2. `$GOPATH/pkg/mod` 中的按版本管理
+
+        $GOPATH/pkg/mod/k8s.io
+            api@v0.17.0
+            client-go@v0.17.0
+            kube-openapi@v0.0.0-20191107075043-30be4d16710a
+
+3. go build 代码时，自动解析代码中的import 生成 go.mod 文件。PS：相当于`maven package` 解析代码自动生成pom.xml。
+4. 将 import 路径与项目代码的实际存放路径解耦。PS：import 依赖包在$GOPATH 中的路径，编译时使用依赖包在`$GOPATH/pkg/mod`中的文件。
 
 ## Go代码中的依赖注入
 
