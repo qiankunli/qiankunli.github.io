@@ -8,7 +8,7 @@ keywords: Go
 
 ---
 
-## 前言（未完成）
+## 前言
 
 * TOC
 {:toc}
@@ -29,7 +29,7 @@ keywords: Go
 
 ![](/public/upload/mesh/pilot_input_output.svg)
 
-## 架构在model 设计上的体现
+## 处理输入
 
 底层平台 多种多样，istio 抽象一套自己的数据模型，以进行平台间的交互。
 
@@ -38,6 +38,8 @@ keywords: Go
 [Istio 服务注册插件机制代码解析](https://zhaohuabing.com/post/2019-02-18-pilot-service-registry-code-analysis/)
 
 ![](/public/upload/mesh/pilot_discovery.png)
+
+中间Abstract Model 层 实现如下
 
 ![](/public/upload/mesh/pilot_service_object.png)
 
@@ -69,6 +71,10 @@ IstioConfigStore扩展ConfigStore，增加一些针对Istio资源的操控接口
 
 Environment provides an aggregate environmental API for Pilot. Environment为Pilot提供聚合的环境性的API
 
+由上文可知，启动时，向  Controller 和ConfigStoreCache 注册handler，执行 ConfigStoreCache.Run 和  Controller.Run，便可以同步 service 和config 数据，并在数据变动时 触发handler 执行。**pilot数据输入的部分就解决了**
+
+![](/public/upload/mesh/pilot_component.svg)
+
 ## 启动
 
 启动命令示例：`/usr/local/bin/pilot-discovery discovery --monitoringAddr=:15014 --log_output_level=default:info --domain cluster.local --secureGrpcAddr  --keepaliveMaxServerConnectionAge 30m`
@@ -90,21 +96,93 @@ Environment provides an aggregate environmental API for Pilot. Environment为Pil
         s.initSDSCA(args)
     }
 
-## 组件图
+## 处理请求
 
-![](/public/upload/mesh/pilot_component.svg)
+### envoy 向pilot 发送请求
 
-### envoy 向pilot 发送请求（未完成）
-
-ads.proto 文件
+envoy 通过grpc 协议与 pilot-discovery 交互，因此首先找 ads.proto 文件
 
 [ads.proto](https://github.com/envoyproxy/data-plane-api/blob/master/envoy/service/discovery/v2/ads.proto)
 
 基于ads.proto 生成 ads.pb.go 文件`github.com/envoyproxy/go-control-plane/envoy/service/discovery/v2/ads.pb.go` 其中定义了 服务接口 AggregatedDiscoveryServiceServer，其实现类 DiscoveryServer，DiscoveryServer 方法分散于多个go 文件中
 
-下面就是深挖 DiscoveryServer 代码实现，看下DiscoveryServer 从哪拿的数据
+![](/public/upload/mesh/pilot_discovery_server.png)
 
-上层是model 是逻辑，下层是adapter [Istio 技术与实践01： 源码解析之 Pilot 多云平台服务发现机制](https://juejin.im/post/5b965d646fb9a05d37617754)
+grpc 请求通过 StreamAggregatedResources 来处理
+
+    func (s *DiscoveryServer) StreamAggregatedResources(stream ads.AggregatedDiscoveryService_StreamAggregatedResourcesServer) error {
+        peerInfo, ok := peer.FromContext(stream.Context())
+        ...
+        con := newXdsConnection(peerAddr, stream)
+        ...
+        reqChannel := make(chan *xdsapi.DiscoveryRequest, 1)
+        go receiveThread(con, reqChannel, &receiveError)
+        for {
+            select {
+            case discReq, ok := <-reqChannel:
+                switch discReq.TypeUrl {
+                case ClusterType:
+                    ...
+                    err := s.pushCds(con, s.globalPushContext(), versionInfo())
+                case ListenerType:
+                    ...
+                case RouteType:
+                    ...
+                case EndpointType:
+                    ...
+                }
+            case pushEv := <-con.pushChannel:
+                ...
+            }
+        }
+    }
+
+DiscoveryServer 收到 ClusterType 的请求要生成 cluster 数据响应
+
+    func (s *DiscoveryServer) pushCds(con *XdsConnection, push *model.PushContext, version string) error {
+        rawClusters := s.generateRawClusters(con.node, push)
+        ...
+        response := con.clusters(rawClusters, push.Version)
+        err := con.send(response)
+        ...
+        return nil
+    }
+
+cluster 数据实际由ConfigGenerator 生成
+
+    func (s *DiscoveryServer) generateRawClusters(node *model.Proxy, push *model.PushContext) []*xdsapi.Cluster {
+        rawClusters := s.ConfigGenerator.BuildClusters(node, push)
+        ...
+        return rawClusters
+    }
+
+数据来自PushContext.Services 方法
+
+    func (configgen *ConfigGeneratorImpl) buildOutboundClusters(proxy *model.Proxy, push *model.PushContext) []*apiv2.Cluster {
+        clusters := make([]*apiv2.Cluster, 0)
+        networkView := model.GetNetworkView(proxy)
+        for _, service := range push.Services(proxy) {
+            ...
+        }
+        return clusters
+    }
+
+cluster 数据来自 PushContext的privateServicesByNamespace 和 publicServices， 通过代码可以发现，它们都是初始化时从model.Environment 取Service 数据的。并通过更新机制（待研究） 保持数据最新。
+
+    func (ps *PushContext) Services(proxy *Proxy) []*Service {
+        ...
+        out := make([]*Service, 0)
+        if proxy == nil {
+            for _, privateServices := range ps.privateServicesByNamespace {
+                out = append(out, privateServices...)
+            }
+        } else {
+            out = append(out, ps.privateServicesByNamespace[proxy.ConfigNamespace]...)
+        }
+        out = append(out, ps.publicServices...)
+        return out
+    }
+
 
 ### pilot 监控到配合变化 将数据推给envoy（未完成）
 
