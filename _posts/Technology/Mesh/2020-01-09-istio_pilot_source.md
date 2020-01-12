@@ -75,6 +75,35 @@ Environment provides an aggregate environmental API for Pilot. Environment为Pil
 
 ![](/public/upload/mesh/pilot_component.svg)
 
+### proxy
+
+Proxy contains information about an specific instance of a proxy (envoy sidecar, gateway,etc). The Proxy is initialized when a sidecar connects to Pilot, and populated from 'node' info in the protocol as well as data extracted from registries.
+
+    type Proxy struct {
+        ClusterID string
+        // Type specifies the node type. First part of the ID.
+        Type NodeType
+        IPAddresses []string
+        ID string
+        Locality *core.Locality
+        // DNSDomain defines the DNS domain suffix for short hostnames (e.g.
+        // "default.svc.cluster.local")
+        DNSDomain string
+        ConfigNamespace string
+        // Metadata key-value pairs extending the Node identifier
+        Metadata *NodeMetadata
+        // the sidecarScope associated with the proxy
+        SidecarScope *SidecarScope
+        // The merged gateways associated with the proxy if this is a Router
+        MergedGateway *MergedGateway
+        // service instances associated with the proxy
+        ServiceInstances []*ServiceInstance
+        // labels associated with the workload
+        WorkloadLabels labels.Collection
+        // Istio version associated with the Proxy
+        IstioVersion *IstioVersion
+    }
+
 ## 启动
 
 启动命令示例：`/usr/local/bin/pilot-discovery discovery --monitoringAddr=:15014 --log_output_level=default:info --domain cluster.local --secureGrpcAddr  --keepaliveMaxServerConnectionAge 30m`
