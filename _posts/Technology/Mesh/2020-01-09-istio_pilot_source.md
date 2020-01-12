@@ -13,11 +13,11 @@ keywords: Go
 * TOC
 {:toc}
 
-[Istio Pilot代码深度解析](https://www.servicemesher.com/blog/201910-pilot-code-deep-dive/)
-
-![](/public/upload/mesh/pilot_package.svg)
+![](/public/upload/mesh/pilot_package.png)
 
 ## pilot-discovery
+
+[Istio Pilot代码深度解析](https://www.servicemesher.com/blog/201910-pilot-code-deep-dive/)
 
 **如果把Pilot看成一个处理数据的黑盒，则其有两个输入，一个输出**。
 
@@ -29,21 +29,47 @@ keywords: Go
 
 ![](/public/upload/mesh/pilot_input_output.svg)
 
+## 架构在model 设计上的体现
 
-对应的struct 的设计上，服务数据部分
+底层平台 多种多样，istio 抽象一套自己的数据模型，以进行平台间的交互。
+
+### 服务数据部分
+
+[Istio 服务注册插件机制代码解析](https://zhaohuabing.com/post/2019-02-18-pilot-service-registry-code-analysis/)
+
+![](/public/upload/mesh/pilot_discovery.png)
 
 ![](/public/upload/mesh/pilot_service_object.png)
 
-配置数据部分
+Service describes an Istio service (e.g., catalog.mystore.com:8080)Each service has a fully qualified domain name (FQDN) and one or more ports where the service is listening for connections. Service用于表示Istio服务网格中的一个服务（例如 catalog.mystore.com:8080)。每一个服务有一个全限定域名(FQDN)和一个或者多个接收客户端请求的监听端口。
+
+SercieInstance中存放了服务实例相关的信息，一个Service可以对应到一到多个Service Instance，Istio在收到客户端请求时，会根据该Service配置的LB策略和路由规则从可用的Service Instance中选择一个来提供服务。
+
+ServiceDiscovery抽象了一个服务发现的接口，所有接入istio 的平台应提供该接口实现。
+
+Controller抽象了一个Service Registry变化通知的接口，该接口会将Service及Service Instance的增加，删除，变化等消息通知给ServiceHandler(也就是一个func)。**调用Controller的Run方法后，Controller会一直执行，将监控Service Registry的变化，并将通知到注册到Controller中的ServiceHandler中**。
+
+由上图可知，底层平台 接入时必须实现 ServiceDiscovery 和 Controller，提供Service 数据，并在Service 变动时 执行handler。 整个流程 由Controller.Run 触发，将平台数据 同步and 转换到 istio 内部数据模型（ServiceDiscovery实现），若数据有变化，则触发handler。 
+
+### 配置数据部分
 
 ![](/public/upload/mesh/pilot_config_object.png)
 
+ConfigStore describes a set of platform agnostic APIs that must be supported by the underlying platform to store and retrieve Istio configuration. ConfigStore定义一组平台无关的，但是底层平台（例如K8S）必须支持的API，通过这些API可以存取Istio配置信息每个配置信息的键，由type + name + namespace的组合构成，确保每个配置具有唯一的键。写操作是异步执行的，也就是说Update后立即Get可能无法获得最新结果。
 
+ConfigStoreCache表示ConfigStore的本地完整复制的缓存，此缓存主动和远程存储保持同步，并且在获取更新时提供提供通知机制。为了获得通知，事件处理器必须在Run之前注册，缓存需要在Run之后有一个初始的同步延迟。
 
+IstioConfigStore扩展ConfigStore，增加一些针对Istio资源的操控接口
 
-整体的感觉就是 configcontroller servicecontroller 想办法拿到数据，discovery server 根据 数据答复 envoy grpc 请求 或者监听到 变化后主动push （待验证）
+由上图可知，底层平台 接入时必须实现 ConfigStoreCache，提供Config 数据，并在Config 变动时 执行handler。 整个流程 由ConfigStoreCache.Run 触发，将平台数据 同步and 转换到 istio 内部数据模型（ConfigStore实现），若数据有变化，则触发handler。 
 
-![](/public/upload/mesh/pilot_object.png)
+### Environment 聚合
+
+![](/public/upload/mesh/pilot_environment_object.png)
+
+Environment provides an aggregate environmental API for Pilot. Environment为Pilot提供聚合的环境性的API
+
+## 启动
 
 启动命令示例：`/usr/local/bin/pilot-discovery discovery --monitoringAddr=:15014 --log_output_level=default:info --domain cluster.local --secureGrpcAddr  --keepaliveMaxServerConnectionAge 30m`
 
@@ -63,6 +89,10 @@ keywords: Go
         s.initSidecarInjector(args)
         s.initSDSCA(args)
     }
+
+## 组件图
+
+![](/public/upload/mesh/pilot_component.svg)
 
 ### envoy 向pilot 发送请求（未完成）
 
