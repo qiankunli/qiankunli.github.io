@@ -89,38 +89,19 @@ The command `brctl addif <brname> <ifname>` will make the interface "ifname" a p
 
 ### tomcat filter ==> netfilter 
 
-netfilter 是linux内核的一个机制，用于在网络发送和转发的关键节点上加上 hook 函数。netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则
+netfilter 是linux内核的一个机制，用于在网络发送和转发的关键节点上加上 hook 函数。netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则， iptables只是一个操作 Linux 内核 Netfilter 子系统的“界面”
 
 ![](/public/upload/network/linux_netfilter.png)
 
-iptables 只是一个操作 Linux 内核 Netfilter 子系统的“界面”。链路层的“检查点”对应的操作界面叫作 ebtables。
-
-![](/public/upload/network/netfilter_chain.png)
-
-笔者之前只是觉得 http server 与 rpc server 很像，但宽泛的说，网络协议栈与http server、rpc server 也是异曲同工。在数据源和数据处理逻辑之间建立“关卡”，关卡上有多条规则，串在一起就形成了链。与http server filter一样，这些rule 可以拦截甚至更改数据。
-
-因为客户端发来的报文可能并不是本机而是其他服务器，当本机的内核支持IP_FORWARD时，我们可以将报文转发给其它服务器。所以netfilter 有两种流向，chain的个数 也就更多
+因为客户端发来的报文可能并不是本机而是其他服务器，当本机的内核支持IP_FORWARD时，我们可以将报文转发给其它服务器。**不考虑这种特殊情况，若将上图的forward chain 移除掉时，会清晰很多**。
 
 ![](/public/upload/network/netfilter_chain_flow.png)
 
+1. 链 是指iptables 过滤的时机，类比到 java ee filter，就是你的逻辑是加在 `filterChain.doFilter(req, res);` 之前 还是之后。或者说 类似于 springmvc HandlerInterceptor的preHandle  和 postHandle 方法。
+2. 表是负责 完成某个过滤 功能的模块
 
-iptables 表的作用，就是在某个具体的“检查点”（比如Output）上，按顺序执行几个不同的检查动作（比如，先执行nat，再执行 filter）。
-
-||linux 网络协议栈|http server|rpc server|
-|---|---|---|---|
-|操作界面|iptables、ebtables|xml|大部分框架为硬编码|
-|拦截的最小单位|rule|Filter|根据框架有所不同，一般为Filter|
-|最小单位的上一层单位|table/chain|FilterChain|Filter 数组|
-|流向|有forward 和 upward 两种流向|只有upward 一种流向|只有upward 一种流向|
-|路由|路由表|Mapping|router|
-
-表链关系
-
-
-1. 我们把具有相同功能的规则的集合叫做表。表是rule的功能描述，链则指定了rule生效的位置
-2. rule不管属于table还是chain，都是package 进行判断，做出通过、转发、丢弃等决定
-3. 某些链中注定不会 包含某类规则，也就是某个表
-4. 实际的使用中，往往通过table作为操作入口，对rule进行定义
+    1. filter 表，确定是否放行数据包
+    2. nat表，**修改数据包的源ipport 和 目的ipport**
 
 ### 源码上的体现
 

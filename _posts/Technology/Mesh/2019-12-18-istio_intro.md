@@ -80,6 +80,18 @@ Envoy 是 Istio 中最基础的组件，所有其他组件的功能都是通过�
 
 类似产品 [MOSN](https://github.com/sofastack/sofa-mosn) [MOSN 文档](https://github.com/sofastack/sofa-mosn)
 
+Envoy按照使用 场景可以分三种：
+
+1. sidecar，和应用一起部署在容器中，对进出应用服务的容量进行拦截
+2. router，作为独立的代理服务，对应用的L4/L7层流量进行代理
+3. ingress，作为集群入口的Ingress代理，对集群的入口流量进行拦截和代理
+
+router 和ingress 均属于和应用服务不在一起的纯代理场景，可以归为一类，成为Gateway模式。对于sidecar 模式来说， envoy 负责服务出入方向流量的透明拦截，并且出入方向的流量在监听管理、路由管理等方面有很大的区别，因此**sidecar 的xds配置是按照出入方向分别进行组织和管理**。因此从xds 配置的视角上 配置可以划分为
+
+1. sidecar inbound，inbound 将发往本节点的流量转发到 对应的服务节点，因此inbound 方向的集群和路由信息都比较确定：单一的集群，单一的VirtualHost，并且集群固定只有一个节点信息。对于Http来说，会拼装HTTP 对应的路由信息，对于TCP来说，直接通过Tcp Proxy方式进行路由，只做全局统计和管控，无法进行协议相关的链路治理。
+2. sidecar outbound，从当前节点发往节点外的流量。根据协议的不同有所不同，待进一步认识。
+3. gateway
+
 ### Mixer
 
 ![](/public/upload/practice/istio_mixer.svg)

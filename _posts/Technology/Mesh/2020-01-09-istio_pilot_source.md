@@ -127,7 +127,7 @@ Proxy contains information about an specific instance of a proxy (envoy sidecar,
 
 ## 处理请求
 
-### envoy 向pilot 发送请求
+![](/public/upload/mesh/pilot_discovery_overview.png)
 
 envoy 通过grpc 协议与 pilot-discovery 交互，因此首先找 ads.proto 文件
 
@@ -137,6 +137,35 @@ envoy 通过grpc 协议与 pilot-discovery 交互，因此首先找 ads.proto �
 
 ![](/public/upload/mesh/pilot_discovery_server.png)
 
+DiscoveryServer 通过Environment 间接持有了 config和 service 数据。此外， pilot-discovery Server启动时便 为DiscoveryServer 注册了config service 变更处理函数，不管config/service 如何变更，都会触发 DiscoveryServer.ConfigUpdate。
+
+代码中 Server.EnvoyXdsServer 就是DiscoveryServer
+
+    func (s *Server) initEventHandlers() error {
+        // Flush cached discovery responses whenever services configuration change.
+        serviceHandler := func(svc *model.Service, _ model.Event) {
+            pushReq := &model.PushRequest{...}
+            s.EnvoyXdsServer.ConfigUpdate(pushReq)
+        }
+        s.ServiceController().AppendServiceHandler(serviceHandler)
+        instanceHandler := func(si *model.ServiceInstance, _ model.Event) {
+            s.EnvoyXdsServer.ConfigUpdate(&model.PushRequest{...})
+        }
+        s.ServiceController().AppendInstanceHandler(instanceHandler)
+        if s.configController != nil {
+            configHandler := func(old, curr model.Config, _ model.Event) {
+                ...
+                s.EnvoyXdsServer.ConfigUpdate(pushReq)
+            }
+            for _, descriptor := range schemas.Istio {
+                s.configController.RegisterEventHandler(descriptor.Type, configHandler)
+            }
+        }
+        return nil
+    }
+
+### envoy 向pilot 发送请求
+
 grpc 请求通过 StreamAggregatedResources 来处理
 
     func (s *DiscoveryServer) StreamAggregatedResources(stream ads.AggregatedDiscoveryService_StreamAggregatedResourcesServer) error {
@@ -144,6 +173,7 @@ grpc 请求通过 StreamAggregatedResources 来处理
         ...
         con := newXdsConnection(peerAddr, stream)
         ...
+        // xds请求消息接收，接收后存放到reqChannel中
         reqChannel := make(chan *xdsapi.DiscoveryRequest, 1)
         go receiveThread(con, reqChannel, &receiveError)
         for {
@@ -165,6 +195,8 @@ grpc 请求通过 StreamAggregatedResources 来处理
             }
         }
     }
+
+StreamAggregatedResources 函数的for循环是无限循环流程，这里会监控两个channel 通道的消息，一个是reqChannel的新连接消息， 一个是pushChannel的配置变更消息。reqChannel 接收到新数据时，会从reqChannel 取出xds 请求消息discReq， 然后根据不同类型的xds请求，调用相应的xds下发逻辑。在v2版本的xds 协议实现中，**为了保证多个xds数据下发的顺序，lds、rds、cds和eds 等所有的交互均在一个grpc 连接上完成**，因此StreamAggregatedResources 接收到第一个请求时，会将连接保存起来，供后续配置变更时使用。
 
 DiscoveryServer 收到 ClusterType 的请求要生成 cluster 数据响应
 
@@ -196,7 +228,7 @@ cluster 数据实际由ConfigGenerator 生成
         return clusters
     }
 
-cluster 数据来自 PushContext的privateServicesByNamespace 和 publicServices， 通过代码可以发现，它们都是初始化时从model.Environment 取Service 数据的。并通过更新机制（待研究） 保持数据最新。
+cluster 数据来自 PushContext的privateServicesByNamespace 和 publicServices， 通过代码可以发现，它们都是初始化时从model.Environment 取Service 数据的。
 
     func (ps *PushContext) Services(proxy *Proxy) []*Service {
         ...
@@ -212,8 +244,87 @@ cluster 数据来自 PushContext的privateServicesByNamespace 和 publicServices
         return out
     }
 
+### pilot 监控到配合变化 将数据推给envoy
 
-### pilot 监控到配合变化 将数据推给envoy（未完成）
+istio 收到变更事件并没有立即处理，而是创建一个定时器事件，通过定时器事件延迟一段时间。这样做的初衷：
+
+1. 减少配置变更的下发频率（会对多次变更进行合并），进而减少pilot 和 envoy 的通信开销（毕竟是广播，每一个envoy 都要发）
+2. 延迟对配置变更消息的处理， 可以保证配置下发时变更的完整性
+
+config 或 service 数据变更触发 DiscoveryServer.ConfigUpdate 发送请求到 pushChannel
+
+    func (s *DiscoveryServer) ConfigUpdate(req *model.PushRequest) {
+        inboundConfigUpdates.Increment()
+        s.pushChannel <- req
+    }
+
+
+DiscoveryServer 启动时 触发了handleUpdates 负责DiscoveryServer.pushChannel 的消费
+
+    func (s *DiscoveryServer) Start(stopCh <-chan struct{}) {
+        go s.handleUpdates(stopCh)
+        go s.periodicRefreshMetrics(stopCh)
+        go s.sendPushes(stopCh)
+    }
+
+handleUpdates 触发 debounce(防抖动)
+
+    // 第一个参数ch实际是 pushChannel
+    func debounce(ch chan *model.PushRequest, stopCh <-chan struct{}, pushFn func(req *model.PushRequest)) {
+        var req *model.PushRequest
+        pushWorker := func() {
+            ...	
+            // 符合一定条件 执行 pushFn
+            go push(req)
+            ...
+        }
+        for {
+            select {
+            case <-freeCh:
+                ...
+            case r := <-ch:
+                ...
+                req = req.Merge(r)
+            case <-timeChan:
+                if free {
+                    pushWorker()
+                }
+            case <-stopCh:
+                return
+            }
+        }
+    }
+
+pushFn 实际是DiscoveryServer.Push ==> AdsPushAll ==> startPush  将数据塞入 PushQueue中。 
+
+    func (s *DiscoveryServer) Push(req *model.PushRequest) {
+        if !req.Full {
+            req.Push = s.globalPushContext()
+            go s.AdsPushAll(versionInfo(), req)
+            return
+        }
+        ...
+        req.Push = push
+        go s.AdsPushAll(versionLocal, req)
+    }
+
+DiscoveryServer 启动时 触发sendPushes ，负责消费PushQueue ==> doSendPushes  最终发给每一个envoy/conneciton 的pushChannel ，envoy/conneciton 的pushChannel 的消费逻辑在DiscoveryServer.StreamAggregatedResources的for 循环中 
+
+    func (s *DiscoveryServer) StreamAggregatedResources(stream ads.AggregatedDiscoveryService_StreamAggregatedResourcesServer) error {
+        ...
+        for {
+            select {
+            case discReq, ok := <-reqChannel:
+                ...
+            case pushEv := <-con.pushChannel:
+                err := s.pushConnection(con, pushEv)
+			    pushEv.done()
+			    if err != nil {
+				    return nil
+			    }
+            }
+        }
+    }
 
 ### Mesh Configuration Protocol（未完成）
 
