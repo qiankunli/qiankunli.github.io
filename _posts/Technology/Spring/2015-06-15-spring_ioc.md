@@ -18,7 +18,7 @@ wiki[Inversion of control](https://en.wikipedia.org/wiki/Inversion_of_control) I
 
 ![](/public/upload/spring/spring_ioc.png)
 
-## ioc 带来的改变：“解耦”
+## 控制反转 带来的改变：“解耦”
 
 假设有两个类A和B
 
@@ -105,7 +105,7 @@ bean在不同阶段的表现形式
 
 The root interface for accessing a Spring bean container.This is the basic client view of a bean container;The point of this approach is that the BeanFactory is a **central registry** of application components, and **centralizes configuration** of application components (no more do individual objects need to read properties files,for example). 
 
-Note that it is generally better to rely on Dependency Injection("push" configuration) to configure application objects through setters or constructors, rather than use any form of "pull" configuration like a BeanFactory lookup. Spring's Dependency Injection functionality is implemented using this BeanFactory interface and its subinterfaces.
+Note that it is generally better to rely on Dependency Injection("push" configuration) to configure application objects through setters or constructors, rather than use any form of "pull" configuration like a BeanFactory lookup. Spring's Dependency Injection functionality is implemented using this BeanFactory interface and its subinterfaces. 
 
 ![](/public/upload/spring/bean_factory_class_diagram.png)
 
@@ -119,6 +119,21 @@ Note that it is generally better to rely on Dependency Injection("push" configur
 ![](/public/upload/spring/application_context_class_diagram.png)
 
 属于spring-context包
+
+AbstractRefreshableApplicationContext 虽然实现了BeanFactory接口，但其实是**组合了一个beanFactory**，这是讨论BeanFactory 和 ApplicationContext 差异时最核心的一点。
+
+    public abstract class AbstractRefreshableApplicationContext extends AbstractApplicationContext {
+        private DefaultListableBeanFactory beanFactory;
+        public final ConfigurableListableBeanFactory getBeanFactory() {
+            synchronized (this.beanFactoryMonitor) {
+                if (this.beanFactory == null) {
+                    throw new IllegalStateException("BeanFactory not initialized or already closed - " +
+                            "call 'refresh' before accessing beans via the ApplicationContext");
+                }
+                return this.beanFactory;
+            }
+        }
+    }
 
 
 In contrast to a **plain BeanFactory**, an ApplicationContext is supposed to detect special beans(BeanFactoryPostProcessor/BeanPostProcessor/ApplicationListener）defined in its internal bean factory
