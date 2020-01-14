@@ -4,7 +4,7 @@ layout: post
 title: Pilot源码分析
 category: 技术
 tags: Mesh
-keywords: Go
+keywords: pilot service mesh
 
 ---
 

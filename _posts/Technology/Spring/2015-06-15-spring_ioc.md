@@ -120,7 +120,7 @@ Note that it is generally better to rely on Dependency Injection("push" configur
 
 属于spring-context包
 
-AbstractRefreshableApplicationContext 虽然实现了BeanFactory接口，但其实是**组合了一个beanFactory**，这是讨论BeanFactory 和 ApplicationContext 差异时最核心的一点。
+AbstractRefreshableApplicationContext 虽然实现了BeanFactory接口，但其实是**组合了一个beanFactory**，这是讨论BeanFactory 和 ApplicationContext 差异时最核心的一点。 也正因此，ApplicationContext is a complete superset of the BeanFactory.
 
     public abstract class AbstractRefreshableApplicationContext extends AbstractApplicationContext {
         private DefaultListableBeanFactory beanFactory;
@@ -170,7 +170,7 @@ In contrast to a **plain BeanFactory**, an ApplicationContext is supposed to det
 
 ApplicationContexts can autodetect BeanPostProcessor beans in their bean definitions and apply them to any beans subsequently created.Plain bean factories allow for **programmatic registration** of post-processors,applying to all beans created through this factory.
 
-可以说，BeanFactory 基本实现了一个bean container 需要的所有功能，但其一些特性要programmatic，ApplicationContext在简单容器BeanFactory的基础上，增加了许多面向框架的特性。《Spring技术内幕》中参照XmlBeanFactory的实现，以编程方式使用DefaultListableBeanFactory，从中我们可以看到Ioc容器使用的一些基本过程。
+可以说，BeanFactory 基本实现了一个bean container 需要的所有功能，但其一些特性要通过programmatic来支持，ApplicationContext在简单容器BeanFactory的基础上，增加了许多面向框架的特性。《Spring技术内幕》中参照XmlBeanFactory的实现，以编程方式使用DefaultListableBeanFactory，从中我们可以看到Ioc容器使用的一些基本过程。
 
 	ClassPathResource res = new ClassPathResource("beans.xml");
 	DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
@@ -178,6 +178,68 @@ ApplicationContexts can autodetect BeanPostProcessor beans in their bean definit
 	reader.loadBeanDefinitions(res);
 	
 **简单来说，`reader.loadBeanDefinitions(res);`将类信息从`beans.xml` 读取到DefaultListableBeanFactory及其父类的各种map中。然后`factory.getBean`时即可做出对应的反应。**
+
+## 容器启动与停止
+
+AbstractApplicationContext.refresh(): Load or refresh the persistent representation of the configuration such as xml. ApplicationContext 支持的很多特性都可以在个启动方法里找到迹象。
+
+	public void refresh() throws BeansException, IllegalStateException {
+		synchronized (this.startupShutdownMonitor) {
+			// Prepare this context for refreshing.
+			prepareRefresh();
+			// Tell the subclass to refresh the internal bean factory.
+			ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+			// Prepare the bean factory for use in this context. 加入了Bean依赖以及非Bean依赖（比如Environment）
+			prepareBeanFactory(beanFactory);
+			try {
+				// Allows post-processing of the bean factory in context subclasses.
+				postProcessBeanFactory(beanFactory);
+				// Invoke factory processors registered as beans in the context.
+				invokeBeanFactoryPostProcessors(beanFactory);
+				// Register bean processors that intercept bean creation.
+				registerBeanPostProcessors(beanFactory);
+				// Initialize message source for this context.
+				initMessageSource();
+				// Initialize event multicaster for this context.
+				initApplicationEventMulticaster();
+				// Initialize other special beans in specific context subclasses.
+				onRefresh();
+				// Check for listener beans and register them.
+				registerListeners();
+				// Instantiate all remaining (non-lazy-init) singletons.
+				finishBeanFactoryInitialization(beanFactory);
+				// Last step: publish corresponding event.
+				finishRefresh();
+			}catch (BeansException ex) {
+				// Destroy already created singletons to avoid dangling resources.
+				destroyBeans();
+				// Reset 'active' flag.
+				cancelRefresh(ex);
+				// Propagate exception to caller.
+				throw ex;
+			}finally {
+				// Reset common introspection caches in Spring's core, since we
+				// might not ever need metadata for singleton beans anymore...
+				resetCommonCaches();
+			}
+		}
+	}
+
+停止逻辑
+
+	public void close() {
+		synchronized (this.startupShutdownMonitor) {
+			doClose();
+			// If we registered a JVM shutdown hook, we don't need it anymore now:We've already explicitly closed the context.
+			if (this.shutdownHook != null) {
+				try {
+					Runtime.getRuntime().removeShutdownHook(this.shutdownHook);
+				}catch (IllegalStateException ex) {
+					// ignore - VM is already shutting down
+				}
+			}
+		}
+	}
 
 ## 细说BeanDefinition
 
