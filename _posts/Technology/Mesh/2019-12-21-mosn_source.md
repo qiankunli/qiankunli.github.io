@@ -151,6 +151,10 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 ![](/public/upload/go/mosn_start.png)
 
+envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)
+
+![](/public/upload/mesh/envoy_new_connection.jpg)
+
 
 ## 数据处理
 
@@ -167,6 +171,14 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 1. 必须获取到destination信息，得到转发的目的地，才能进行服务发现类的寻址
 2. 必须要能够正确的拆包，然后以请求为单位进行转发，这是负载均衡的基础
 3. 可选的RequestId，这是开启多路复用的基础
+
+[深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)下文以envoy 实现做一下类比 用来辅助理解mosn 相关代码的理念：
+
+![](/public/upload/mesh/envoy_on_data.jpg)
+
+对于每一个Filter，都调用onData函数，咱们上面解析过，其中HTTP对应的ReadFilter是ConnectionManagerImpl，因而调用ConnectionManagerImpl::onData函数。ConnectionManager 是协议插件的处理入口，**同时也负责对整个处理过程的流程编排**。
+
+![](/public/upload/mesh/envoy_data_parse.jpg)
 
 ### 数据“上传”
 

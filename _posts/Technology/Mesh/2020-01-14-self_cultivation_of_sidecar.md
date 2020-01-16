@@ -38,7 +38,7 @@ envoy 是一个proyx 组件，一个proxy 具体的说是listener、filter、rou
 
 ![](/public/upload/practice/istio_envoy_flow.png)
 
-istio 对流量采取了透明拦截的方式
+[深入解读Service Mesh背后的技术细节](https://mp.weixin.qq.com/s/hq9KTc9fm8Nou8hXmqdKuw)istio 对流量采取了透明拦截的方式
 
 ![](/public/upload/mesh/envoy_iptables.jpeg)
 
