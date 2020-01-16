@@ -29,18 +29,6 @@ keywords: JAVA netty channel
 
 ![](/public/upload/architecture/network_communication.png)
 
-
-## netty 与 tomcat 对比理解
-
-有一个本书叫《how tomcat works》，从几行代码开始，一步一步的叙述tomcat的实现。我们通过对照，就可以发现此类网络通信框架，要处理或涉及的一些共同问题。
-
-1. io 模型
-2. 线程模型，以及io模型与线程模型的结合问题
-3. 组件化的数据处理模型，对netty是channelhandler，对tomcat是fillter和tomcat
-4. 元数据配置，此类系统都需要传入大量的参数，配置文件的形式是什么，如何读取，又如何在各个组件之间流转。
-5. 即使功能已经非常强大，仍然要上层框架支持以完成复杂的业务逻辑。对tomcat是spring mvc等，对netty则是一系列的rpc框架。
-
-
 ## java nio channel
 
 java源码中channel的注释：A nexus（连结、连系） for I/O operations。
@@ -201,11 +189,7 @@ inbound 的被称作events， outbound 的被称作operations。
 首先判断该 EventLoop 的线程是否是当前线程，如果是，直接添加到任务队列中去，如果不是，则尝试启动线程（但由于线程是单个的，因此只能启动一次），随后再将任务添加到队列中去。如果线程已经停止，并且删除任务失败，则执行拒绝策略，默认是抛出异常。
 
 
-## channel 以及 unsafe pipeline eventloop 三国杀
 
-**Channel是netty提供的操作对象，其能力是通过聚合unsafe、pipeline和eventloop来实现的。 也即是说，channel只是外皮，分析unsafe、pipeline和eventloop的相互作用才是学习Netty的关键。**
-
-通过聚合eventloop ，channel 有了提供异步接口的能力，参见[netty中的线程池](http://qiankunli.github.io/2019/06/28/netty_executor.html)
 
 
 

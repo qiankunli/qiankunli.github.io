@@ -29,6 +29,10 @@ keywords: pilot service mesh
 
 ![](/public/upload/mesh/pilot_input_output.svg)
 
+代码、配置、架构一体化视角 [深入解读Service Mesh背后的技术细节](https://mp.weixin.qq.com/s/hq9KTc9fm8Nou8hXmqdKuw)
+
+![](/public/upload/mesh/pilot_package.jpeg)
+
 ## 处理输入
 
 底层平台 多种多样，istio 抽象一套自己的数据模型（`pilot/pkg/model`）及数据存取接口，以屏蔽底层平台。
@@ -123,6 +127,26 @@ Proxy contains information about an specific instance of a proxy (envoy sidecar,
         // Will run the sidecar injector in pilot.Only operates if /var/lib/istio/inject exists
         s.initSidecarInjector(args)
         s.initSDSCA(args)
+    }
+
+启动的逻辑很多，但从config+service+grcServer 视角看 启动代码的核心如下：
+
+    func NewServer(args *PilotArgs) (*Server, error) {
+        s.addStartFunc(func(stop <-chan struct{}) error {
+            go s.configController.Run(stop)
+            return nil
+	    })
+        s.addStartFunc(func(stop <-chan struct{}) error {
+            go serviceControllers.Run(stop)
+            return nil
+	    })
+        ## DiscoveryServer 注册config/service 事件handler
+        s.initEventHandlers(){
+            s.ServiceController().AppendServiceHandler(serviceHandler)
+            s.ServiceController().AppendInstanceHandler(instanceHandler)
+            s.configController.RegisterEventHandler(descriptor.Type, configHandler)
+        }
+        s.initGrpcServer(args.KeepaliveOptions)
     }
 
 ## 处理请求

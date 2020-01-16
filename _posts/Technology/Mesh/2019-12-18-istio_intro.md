@@ -19,6 +19,8 @@ keywords: istio
 
 [使用 Istio 实现基于 Kubernetes 的微服务应用](https://www.ibm.com/developerworks/cn/cloud/library/cl-lo-implementing-kubernetes-microservice-using-istio/index.html)
 
+[蚂蚁金服大规模微服务架构下的Service Mesh探索之路](https://www.servicemesher.com/blog/the-way-to-service-mesh-in-ant-financial/) 很不错的文章 
+
 ## 安装手感——使用istioctl安装
 
 [istio-1.4.2-linux.tar.gz](https://github.com/istio/istio/releases/download/1.4.2/istio-1.4.2-linux.tar.gz)
@@ -105,6 +107,7 @@ mixer 的变更是比较多的，有v1 architecture 和 v2 architecture，社�
 Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无缝的从 Kubernets 的资源定义过度到 Pilot 的资源定义。
 
 
+[深入解读Service Mesh背后的技术细节](https://sq.163yun.com/blog/article/218831472301936640)**pilot使用Kubernetes的Service，仅仅使用它的服务发现功能，而不使用它的转发功能**，pilot通过在kubernetes里面注册一个controller来监听事件，从而获取Service和Kubernetes的Endpoint以及Pod的关系，但是在转发层面，就不会再使用kube-proxy根据service下发的iptables规则进行转发了，而是将这些映射关系转换成为pilot自己的转发模型，下发到envoy进行转发，这样就把控制面和数据面彻底分离开来，服务之间的相互关系是管理面的事情，不要和真正的转发绑定在一起。
 
 ## 其它
 

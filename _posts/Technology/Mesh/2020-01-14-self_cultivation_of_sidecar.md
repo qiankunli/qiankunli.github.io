@@ -13,6 +13,12 @@ keywords: pilot service mesh
 * TOC
 {:toc}
 
+[Envoy 官方文档中文版](https://www.servicemesher.com/envoy/)
+
+![](/public/upload/mesh/envoy_work.jpg)
+
+Envoy的工作模式如图所示，横向是管理平面/管理流，纵向是数据流。Envoy会暴露admin的API，可以通过API查看Envoy中的路由或者集群的配置。
+
 ## 分类与配置分类
 
 Envoy按照使用 场景可以分三种：
@@ -34,10 +40,12 @@ envoy 是一个proyx 组件，一个proxy 具体的说是listener、filter、rou
 
 istio 对流量采取了透明拦截的方式
 
-    ## 所有入口流量 redirect 到 8090 端口
-    Iptables -t nat -A PREROUTING -p tcp -j REDIRECT -to-port 8090
-    ## 所有出口流量 redirect 到 8090 端口
-    Iptables -t nat -A OUTPUT -p tcp -j REDIRECT -to-port 8090
+![](/public/upload/mesh/envoy_iptables.jpeg)
+
+1. 在PREROUTING规则中，使用这个转发链，从而进入容器的所有流量，都被先转发到envoy的15000端口。
+2. envoy作为一个代理，已经被配置好了，将请求转发给productpage程序。
+3. productpage程序接受到请求，会转向调用外部的reviews或者ratings，当productpage往后端进行调用的时候，就碰到了output链，这个链会使用转发链，将所有出容器的请求都转发到envoy的15000端口。**这样无论是入口的流量，还是出口的流量，全部用envoy做成了汉堡包**。
+4. envoy根据服务发现的配置，知道reviews或者ratings如何访问，于是做最终的对外调用。iptables规则会对从envoy出去的流量做一个特殊处理，允许他发出去，不再使用上面的output规则。
 
 目标端口被改写后， 可以通过SO_ORIGINAL_DST TCP 套件获取原始的ipport
 
@@ -46,6 +54,18 @@ istio 对流量采取了透明拦截的方式
 1. 虚拟监听器，需要绑定相应的端口号，iptables 拦截的流量会转发到这个端口上
 2. 真实监听器，用于处理iptables 拦截前的”真实目的地址“，虚拟机监听器接收到监听请求时，按照一定的匹配规则找到对应的真实监听器进行处理。真实监听器因为不需要和网络交互，因此不需要配置和绑定端口号。
 
+## 配置与xds协议
+
+Envoy是一个高性能的C++写的proxy转发器，那Envoy如何转发请求呢？需要定一些规则，然后按照这些规则进行转发。规则可以是静态的，放在配置文件中的，启动的时候加载，要想重新加载，一般需要重新启动。当然最好的方式是规则设置为动态的，放在统一的地方维护，这个统一的地方在Envoy眼中看来称为Discovery Service，Envoy过一段时间去这里拿一下配置，就修改了转发策略。无论是静态的，还是动态的，在配置里面往往会配置四个东西。
+
+||xds|备注|
+|---|---|---|
+|Listener|LDS|既然是proxy，就得监听一个端口|
+|Endpoints|EDS|目标的ip地址和端口，这个是proxy最终将请求转发到的地方|
+|Routes|RDS|一个cluster是具有完全相同行为的多个endpoint<br>它们组成一个Cluster，从cluster到endpoint的过程称为负载均衡|
+|Cluters|CDS|有时候多个cluster具有类似的功能，但是是不同的版本号，<br>可以通过route规则，选择将请求路由到某一个版本号|
+
+![](/public/upload/mesh/envoy_config.png)
 
 ## 端到端流转案例
 

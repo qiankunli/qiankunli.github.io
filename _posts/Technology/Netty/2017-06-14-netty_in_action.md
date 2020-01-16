@@ -30,7 +30,7 @@ this model provides much better resource management than the blocking i/o model:
 
 ## netty
 
-在提交netty的一些组件时，作者提到think of them as domain objects rather than concrete java classes.
+在提交netty的一些组件时，作者提到**think of them as domain objects rather than concrete java classes**.
 
 ### Channel、ChannelPipeline、ChannelHandler和ChannelHandlerContext的一对一、一对多关系
 
@@ -46,7 +46,6 @@ a ChannelHandler can belong to more than one ChannelPipeline,it can be bound to 
 
 ### thread model
 
-in netty3,the threading model used in previous releases guaranteed only that inbound (previously called upstream) events would be executed in the so-called i/o thread(corresponding to netty4's eventloop).all outbound(downstream) events were handled by the calling thread,which might be the i/o thread or any other.netty3的问题就是，处理由多个calling thread线程触发的outbound事件时，要通过加锁等方式解决线程安全问题。
 
 **同步io，线程和连接通常要维持一对一关系。异步io才可以一个线程处理多个io。**
 

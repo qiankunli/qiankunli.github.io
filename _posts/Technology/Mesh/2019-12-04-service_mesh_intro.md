@@ -47,6 +47,12 @@ SideCar的一种实现[MOSN](https://www.sofastack.tech/projects/sofa-mosn/overv
 
 ![](/public/upload/practice/service_mesh.png)
 
+[深入解读Service Mesh背后的技术细节](https://sq.163yun.com/blog/article/218831472301936640)Service Mesh是Kubernetes支撑微服务能力**拼图的最后一块**
+
+![](/public/upload/mesh/service_mesh_with_kubernetes.jpg)
+
+[要想业务中台建得快，最好用Service Mesh来带](https://sq.163yun.com/blog/article/347893049177018368)从架构上看，中台是一种基础设施的下沉，微服务框架则是一种不彻底的下沉，因为它还是在业务开发代码里面的。而这种对业务的侵入性，也造成了服务框架升级的困难。
+
 ## 整体架构
 
 内容主要来自胡忠想在极客时间上的《从0开始学微服务》

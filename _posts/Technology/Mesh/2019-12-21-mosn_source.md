@@ -17,14 +17,7 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 
 阿里官方介绍文档[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md)
 
-[Envoy 官方文档中文版](https://www.servicemesher.com/envoy/)
-
-[蚂蚁金服大规模微服务架构下的Service Mesh探索之路](https://www.servicemesher.com/blog/the-way-to-service-mesh-in-ant-financial/) 很不错的文章值得多看几遍。
-
-理解mosn 主要有两个方向
-
-1. 任何tcp server 都要处理的：网络io，拿到字节流后如何根据协议解析数据（协议层/encoder/decoder）。 mosn 的特别之处是 在Connection 和 协议层之间加了 Stream的概念（可能是为了兼容http2，在http1协议中这一层的实现就很单薄）
-2. 代理业务特别需要的：loader balancer、router 等如何可插拔的 加入到代理 逻辑中。
+[一个sidecar的自我修养](http://qiankunli.github.io/2020/01/14/self_cultivation_of_sidecar.html) 对sidecar 的基本概念 原理有所了解。
 
 ## 手感
 
@@ -143,6 +136,8 @@ SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[so
 3. stream 创建完毕后，会回调到 Proxy 层做路由和转发，Proxy 层会关联上下游（upstream,downstream）间的转发关系
 4. Proxy 挑选到后端后，会根据后端使用的协议，将数据发送到对应协议的 Protocol 层，对数据重新做 Encode
 5. Encode 后的数据会发经过 write filter 并最终使用 IO 的 write 发送出去
+
+一个请求可能会触发多次 读取操作，因此单个请求可能会多次调用插件的onData 函数。
 
 ## 连接管理
 
