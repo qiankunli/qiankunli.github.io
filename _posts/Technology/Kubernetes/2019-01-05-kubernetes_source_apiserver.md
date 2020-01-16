@@ -33,7 +33,7 @@ keywords: kubernetes 源码分析
 
 	||声明式|命令式|
 	|---|---|---|
-	|描述任务|期望目标 desired state|如何做： command|
+	|描述任务|期望目标 desired state|如何做： command<br>不管最后结果是否符合你的预期|
 	|执行器|根据  desired state 决定自己的行为<br>通常用到控制器模式|直接执行 command|
 	
 **命令式api 描述和执行 是一体的，声明式api 则需要额外的 执行器**（下文叫Controller） sync desired state 和 real state。declarative API 的感觉也可以参见 [ansible 学习](http://qiankunli.github.io/2018/12/29/ansible.html) ，Controller 有点像 ansible 中的module

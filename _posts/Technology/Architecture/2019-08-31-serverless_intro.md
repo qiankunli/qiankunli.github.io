@@ -47,3 +47,16 @@ keywords: window
 [当我们在聊 Serverless 时你应该知道这些](https://mp.weixin.qq.com/s/Krfhpi7G93el4avhv9UN4g)
 
 ![](/public/upload/architecture/ali_cloud_function.png)
+
+
+## 其它
+
+Serverless 架构和之前的架构相比，最大的差异是：业务服务不再是固定的常驻进程，而是真正按需启动和关闭的服务实例。
+
+在简化微服务管理复杂度上，Serverless 和Service Mesh的目标是一致的，都是将微服务通信和服务治理相关的非功能需求 从业务中剥离， 对于Serverless 是交给Serverless 框架负责处理，各功能函数之间的交互由Serverless接管， 开发者不再需要关注功能函数交互的细节。对于Service Mesh 是下沉到底层，成为通信基础设施的一部分。
+
+在Serverless 中按需执行的代码片段称为函数，它是Serverless 资源管理和调度的基本单位（有点类似进程之于os），Serverless 架构大体由以下几个部分组成：
+
+1. 函数管理，Serverless 需要对用户编写的函数进行管理，通过一定的方式将用户变成可调度、可运行的实例。为了支持多个语言的Serverless 函数，函数管理需要针对每种语言定义函数规范和标准， 提供相应的实现机制。
+2. 事件触发器，事件驱动是Serverless 中非常重要的部分，函数需要事先注册好 关注的事件类型，事件触发时，Serverless 查找关注这个事件的函数 触发执行。
+3. 函数的路由和伸缩管理

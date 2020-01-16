@@ -13,6 +13,8 @@ keywords: kubernetes crd
 * TOC
 {:toc}
 
+Kubernetes 的代码生成工具当前已变成独立的项目[code-generator](https://github.com/kubernetes/code-generator)，使用code-generator 可以非常快捷的开发自定义的资源控制器，从而直接控制Kubernetes api。
+
 ## CRD概念
 
 建议先查看[Kubernetes 控制器模型](http://qiankunli.github.io/2019/03/07/kubernetes_controller.html)
