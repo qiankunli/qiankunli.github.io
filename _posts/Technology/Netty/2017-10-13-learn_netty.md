@@ -48,9 +48,11 @@ reactor pattern 理念 参见 [Understanding Reactor Pattern: Thread-Based and E
 
 ## netty 代码是如何驱动的
 
-netty 首先是由线程池驱动的，其次，与我们熟悉的“并发执行体”之间只有竞争关系不同，“执行体”之前可以移交数据（也就是合作），一个线程除了处理io 还可以处理task
+netty 首先是由线程池驱动的，其次，与我们熟悉的“并发执行体”之间只有竞争关系不同，**“执行体”之前可以移交数据（也就是合作）**，一个线程除了处理io 还可以处理task
 
 ![](/public/upload/netty/netty_run.png)
+
+从执行体内部来说，我们习惯对象 被“线程”驱动， 而不是让线程作为对象的成员，让对象成为一个具有执行能力的主体。
 
 ## io编程的理想姿势
 

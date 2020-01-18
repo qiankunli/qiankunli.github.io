@@ -243,58 +243,14 @@ AbstractApplicationContext.refresh(): Load or refresh the persistent representat
 
 ## 细说BeanDefinition
 
-    public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccessor
-		implements BeanDefinition, Cloneable {
-        private volatile Object beanClass;  
-    	private String scope = SCOPE_DEFAULT;  
-    	private boolean singleton = true;  
-    	private boolean prototype = false;  
-    	private boolean abstractFlag = false;  
-    	private boolean lazyInit = false;  
-    	private int autowireMode = AUTOWIRE_NO;  
-    	private int dependencyCheck = DEPENDENCY_CHECK_NONE;  
-    	private String[] dependsOn;  
-    	private boolean autowireCandidate = true;  
-    	private boolean primary = false;  
-    	private final Map<String, AutowireCandidateQualifier> qualifiers =
-    			new LinkedHashMap<String, AutowireCandidateQualifier>(0);  
-    	private boolean nonPublicAccessAllowed = true;  
-    	private boolean lenientConstructorResolution = true;  
-    	private ConstructorArgumentValues constructorArgumentValues;  
-    	private MutablePropertyValues propertyValues;  
-    	private MethodOverrides methodOverrides = new MethodOverrides();  
-    	private String factoryBeanName;  
-    	private String factoryMethodName;  
-    	private String initMethodName;  
-    	private String destroyMethodName;  
-    	private boolean enforceInitMethod = true;  
-    	private boolean enforceDestroyMethod = true;
-    	private boolean synthetic = false;
-    	private int role = BeanDefinition.ROLE_APPLICATION;
-    	private String description;
-    	private Resource resource;
-    }
-	
+![](/public/upload/spring/bean_definition.png)
+
+![](/public/upload/spring/bean_definition_xmind.png)
+
 首先要将配置文件描述的bean信息加载到内存中，再根据这些信息构建bean实例，这些信息在内存中的存在形式便是BeanDefinition。spring ioc的基本功能可由以下过程实现：
 
 1. 将BeanDefinition（以配置文件，注解形式存在）加载到内存
 2. 根据BeanDefinition创建并管理bean实例以及它们之间的依赖
-
-创建bean实例的几种方式：
-
-1. class.newInstance，然后为其各种属性赋值
-2. FactoryBean.getBean
-3. Proxy.newProxyInstance
-4. BeanDefinition
-
-BeanDefinition的几种来源
-
-1. xml解析，对应BeanDefinitionParser
-
-	* `<bean></bean>`直接解析
-	* `<tx:annotation-driven transaction-manager="txManager" />` 系统解析到该配置后，会根据配置，手动register若干个BeanDefinition
-
-2. 注解扫描
 
 
 ## Bean的管理Environment

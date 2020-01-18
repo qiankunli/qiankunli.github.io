@@ -151,6 +151,8 @@ Proxy contains information about an specific instance of a proxy (envoy sidecar,
 
 ## 处理请求
 
+如果golang 里有类似 tomcat、springmvc 的组件，那源码看起来就很简单了。
+
 ![](/public/upload/mesh/pilot_discovery_overview.png)
 
 envoy 通过grpc 协议与 pilot-discovery 交互，因此首先找 ads.proto 文件
