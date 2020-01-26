@@ -4,7 +4,7 @@ layout: post
 title: 硬件对软件设计的影响
 category: 技术
 tags: Basic
-keywords: Permission
+keywords: hardware software
 
 ---
 

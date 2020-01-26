@@ -4,7 +4,7 @@ layout: post
 title: 并发控制相关的硬件与内核支持
 category: 技术
 tags: Basic
-keywords: AQS
+keywords: concurrency control
 
 ---
 
