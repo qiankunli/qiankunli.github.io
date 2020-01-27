@@ -73,7 +73,7 @@ keywords: Linux
 三类进程
 
 1. pid=1 init进程Systemd
-2. pid=2 内核线程kthreadd，用户态不带中括号， 内核态带中括号
+2. pid=2 内核线程kthreadd，用户态不带中括号， 内核态带中括号。在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.
 3. tty 带问号的，说明不是前台启动的，一般都是后台启动的服务
 
 ## Linux中的引号 ##
