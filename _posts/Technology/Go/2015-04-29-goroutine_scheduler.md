@@ -91,19 +91,13 @@ go1.1 之前都是该模型
 
 1. 为什么引入Processor 的概念
 2. 为什么把全局队列打散. 对该队列的操作均需要竞争同一把锁, 导致伸缩性不好.
-新生成的协程也会放入全局的队列, 大概率是被其他 m(可以理解为底层线程的一个表示)运行了, 内存亲和性不好. 
-3. mcache 为什么跟随 P
+新生成的协程也会放入全局的队列, 大概率是被其他 m运行了, 内存亲和性不好. 
+3. mcache 为什么跟随 P。 参见[内存管理](http://qiankunli.github.io/2020/01/28/memory_management.html) 了解mcache
 4. 为什么 P 的个数默认是 CPU 核数: Go 尽量提升性能, 那么在一个 n 核机器上, 如何能够最大利用 CPU 性能呢? 当然是同时有 n 个线程在并行运行中, 把 CPU 喂饱, 即所有核上一直都有代码在运行.
 
 ![](/public/upload/go/go_scheduler_gpm.jpg)
 
 ![](/public/upload/go/go_scheduler_goroutine_status.jpg)
-
-并没有一个一直在运行调度的调度器实体. 当一个协程切换出去或新生成的 m, go 的运行时从 stw 中恢复等情况时, 那么接下来就需要发生调度. go 的调度是通过线程(m)执行 runtime.schedule 函数来完成的. PS：就好像linux 进程会主动调用schedule() 触发调度，只是linux 多了时间片中断主动触发调度而已。
-
-在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.在 go 运行时中也有类似的协程, sysmon.功能比较多: 定时从 netpoll 中获取 ready 的协程, 进行抢占, 定时 GC,打印调度信息,归还内存等定时任务.
-
-协作式抢占：基本流程是 sysmon 协程标记某个协程运行过久, 需要切换出去, 该协程在运行函数时会检查栈标记, 然后进行切换.
 
 ## 函数运行
 
@@ -185,7 +179,7 @@ newproc1 函数的主要作用就是创建一个运行传入参数 fn 的 g 结�
 3. 抢占式调度时间片结束；
 4. 垃圾回收
 
-**所有触发 Goroutine 调度的方式最终都会调用 gopark 函数让出当前处理器 P 的控制权**
+**所有触发 Goroutine 调度的方式最终都会调用 gopark 函数让出当前处理器 P 的控制权**。就好像linux 进程会主动调用schedule() 触发调度让出cpu 控制权，只是linux 多了时间片中断主动触发调度而已。
 
 
     func gopark(unlockf func(*g, unsafe.Pointer) bool, lock unsafe.Pointer, reason waitReason, traceEv byte, traceskip int) {
@@ -299,6 +293,8 @@ gogo 在不同处理器架构上的实现都不相同，但是不同的实现其
 ![](/public/upload/go/go_scheduler_sysmon.jpg)
 
 在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.在 go 运行时中也有类似的协程, sysmon.功能比较多: 定时从 netpoll 中获取 ready 的协程, 进行抢占, 定时 GC,打印调度信息,归还内存等定时任务.
+
+协作式抢占：基本流程是 sysmon 协程标记某个协程运行过久, 需要切换出去, 该协程在运行函数时会检查栈标记, 然后进行切换. PS： 有点类似linux 的时间片中断。
 
 ## 系统调用
 
