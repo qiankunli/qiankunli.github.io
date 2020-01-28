@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 内存管理
+title: 内存管理通论
 category: 技术
 tags: Basic
 keywords: Permission
