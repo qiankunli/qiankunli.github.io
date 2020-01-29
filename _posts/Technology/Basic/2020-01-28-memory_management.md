@@ -123,3 +123,8 @@ span是用于管理arena页的关键数据结构（src/runtime/mheap.go type spa
 
 [Redis源码分析](http://qiankunli.github.io/2019/04/20/redis_source.html)
 
+## gc
+
+[深入浅出垃圾回收（一）简介篇](https://liujiacai.net/blog/2018/06/15/garbage-collection-intro/) 是一个系列，垃圾回收的很多机制是语言无关的。
+
+![](/public/upload/jvm/gc.png)
