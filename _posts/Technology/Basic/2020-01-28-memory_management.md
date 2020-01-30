@@ -128,3 +128,62 @@ span是用于管理arena页的关键数据结构（src/runtime/mheap.go type spa
 [深入浅出垃圾回收（一）简介篇](https://liujiacai.net/blog/2018/06/15/garbage-collection-intro/) 是一个系列，垃圾回收的很多机制是语言无关的。
 
 ![](/public/upload/jvm/gc.png)
+
+### gc 策略
+
+![](/public/upload/basic/gc_strategy.png)
+
+### 最基本的 mark-and-sweep 算法伪代码
+
+mutator 通过 new 函数来申请内存
+
+    new():
+        ref = allocate()
+        if ref == null
+            collect()
+            ref = allocate()
+            
+            if ref == null
+                error "Out of memory"
+        return ref
+
+collect 分为mark 和 sweep 两个基本步骤
+
+    atomic collect():  // 这里 atomic 表明 gc 是原子性的，mutator 需要暂停
+        markFromRoots()
+        sweep(heapStart, heapEnd)
+
+从roots 对象开始mark
+        
+    markFromRoots():
+        initialize(worklist)
+        for each reference in Roots  // Roots 表示所有根对象，比如全局对象，stack 中的对象
+            if ref != null && !isMarked(reference)
+                setMarked(reference)
+                add(worklist, reference)
+                mark()          // mark 也可以放在循环外面
+                       
+    initialize():
+        // 对于单线程的collector 来说，可以用队列实现 worklist
+        worklist = emptyQueue()
+
+    //如果 worklist 是队列，那么 mark 采用的是 BFS（广度优先搜索）方式来遍历引用树                
+    mark():
+        while !isEmpty(worklist):
+            ref = remove(worklist)  // 从 worklist 中取出第一个元素
+            for each field in Pointers(ref)  // Pointers(obj) 返回一个object的所有属性，可能是数据，对象，指向其他对象的指针
+                child = *field
+                if child != null && !isMarked(child)
+                    setMarked(child)
+                    add(worklist, child)
+
+sweep逻辑
+
+    sweep(start, end):
+        scan = start
+        while scan < end
+            if isMarked(scan)
+                unsetMarked(scan)
+            else
+                free(scan)
+            scan = nextObject(scan)

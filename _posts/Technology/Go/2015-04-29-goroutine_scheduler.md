@@ -4,7 +4,7 @@ layout: post
 title: Goroutine 调度模型
 category: 技术
 tags: Go
-keywords: Go goroutine
+keywords: Go goroutine scheduler
 
 ---
 
