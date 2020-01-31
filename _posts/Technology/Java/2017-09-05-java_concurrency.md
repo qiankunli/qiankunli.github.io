@@ -1,32 +1,120 @@
 ---
 
 layout: post
-title: java系并发模型的发展
+title: java系并发的发展
 category: 技术
-tags: Scala
-keywords: Scala  akka
+tags: Java
+keywords: Java  
 
 ---
 
 ## 前言
 
-
-[万字长文深入浅出 Golang Runtime](https://zhuanlan.zhihu.com/p/95056679)对操作系统有过一些了解, 知道 linux 下的线程其实是 task_struct 结构, 线程其实并不是真正运行的实体, 线程只是代表一个执行流和其状态.真正运行驱动流程往前的其实是 CPU. CPU 在时钟的驱动下, 根据 PC 寄存器从程序中取指令和操作数, 从 RAM 中取数据, 进行计算, 处理, 跳转, 驱动执行流往前. CPU 并不关注处理的是线程还是协程, 只需要设置 PC 寄存器, 设置栈指针等(这些称为上下文), 那么 CPU 就可以欢快的运行这个线程或者这个协程了.线程的运行, 其实是被运行.其阻塞, 其实是切换出调度队列, 不再去调度执行这个执行流. 其他执行流满足其条件, 便会把被移出调度队列的执行流重新放回调度队列.
-
-
 笔者到目前学习过scala、java、go，它们在并发程序的实现上模型不同，汇总一下是个蛮有意思的事情。
 
-我们在说并发模型时，我们在说什么？
+## 线程操作
 
-1. 如何创建、停止、结束一个并发执行体
-2. 如何获取一个并发执行体的执行结果，并发执行体之间如何通信
-3. 模型对应的问题如何解决，比如java的共享内存方式带来的线程安全问题
+1. 创建它：继承Thread，实现Runnable，实现TimerTask（现在不推荐）
+2. 启动它：start
+3. 暂停它（唤醒它）：sleep（自动唤醒），wait和notify
+4. 停止它（取消它）：
+    
+    a. interrupt，注意这种停止并不是抢占式的，代码中要遵守一定的约定。 [java exception](http://qiankunli.github.io/2017/04/22/exception.html)
+    
+    b. 设置一个变量（显式的interrupt）
+        
+        class thread{
+            public boolean isRun = "true";
+            void run(){
+                 while(isRun){
+                     xx
+                 }
+            }
+            void stop(){
+                isRun = false;
+            }
+        }
 
-2019.4.27补充：《软件架构设计》：用Java的人通常写的是“单进程多线程”程序，而用C++的人还可以写“多进程多线程”程序。因为Java 并不直接运行在Linux上，而是运行在JVM之上。JVM 是一个Linux进程，每一个JVM 都是一个独立的“沙盒”，互不通信。而C++直接运行在Linux 系统上，可以直接利用Linux 提供的进程间通信机制创建多个进程并通信。**之所以要开多线程，主要是为了应对 IO密集型应用**。
+## Java/Jvm 内部工作线程
 
-进程是资源分配的基本单位，进程间不共享资源（当然也可以共享内存），通过管道或Socket 方式通信，这种通信方式天生符合“不要通过共享内存来实现通信，而应通过通信实现共享内存” 的原则。
+看看C语言下写多线程程序什么感觉
 
-[Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)线程的出现是为了减少进程的上下文切换（线程的上下文切换比进程小很多），以及更好适配多核心 CPU 环境
+
+        #include <stddef.h>
+        #include <stdio.h>
+        #include <unistd.h>
+        #include <pthread.h>		//用到了pthread库
+        #include <string.h>
+        void print_msg(char *ptr);
+        int main(){
+            pthread_t thread1, thread2;
+            int i,j;
+            char *msg1="do sth1\n";
+            char *msg2="do sth2\n";
+            pthread_create(&thread1,NULL, (void *)(&print_msg), (void *)msg1);
+            pthread_create(&thread2,NULL, (void *)(&print_msg), (void *)msg2);
+            sleep(1);
+            return 0;
+        }
+        void  print_msg(char *ptr){
+            int retval;
+            int id=pthread_self();
+            printf("Thread ID: %x\n",id);
+            printf("%s",ptr);
+            // 一个运行中的线程可以调用 pthread_exit 退出线程, 参数表示线程的返回值
+            pthread_exit(&retval);
+        }
+
+pthread_create 四个参数
+
+1. 线程对象
+2. 线程的属性，比如线程栈大小
+3. 线程运行函数
+4. 线程运行函数的参数
+    
+从c语言中线程的代码实例和操作系统的基本原理（进程通常是执行一个命令，或者是fork），我们可以看到，线程可以简单的认为是在并发执行一个函数（pthread_create类似于go 代码中常见的`go function(){xxx}`）。
+
+[java 内部工作线程介绍](http://java-boy.iteye.com/blog/464953)哪怕仅仅 简单的跑一个hello world ，java 进程也会创建如下线程
+
+	"Low Memory Detector" 
+	"CompilerThread0"
+	"Signal Dispatcher"
+	"Finalizer"
+	"Reference Handler"
+	"main" 
+	"VM Thread"
+	"VM Periodic Task Thread"
+
+
+笔者有一次，试验一个小程序，main 函数运行完毕后，idea 显示 java 进程并没有退出，笔者还以为是出了什么bug。thread dump之后，发现一个thread pool线程在waiting，才反应过来是因为thread pool 没有shutdown。进而[Java中的main线程是不是最后一个退出的线程](https://blog.csdn.net/anhuidelinger/article/details/10414829)
+
+1. JVM会在所有的非守护线程（用户线程）执行完毕后退出；
+2. main线程是用户线程；
+3. 仅有main线程一个用户线程执行完毕，不能决定JVM是否退出，也即是说main线程并不一定是最后一个退出的线程。
+
+这也是为什么thread pool 若没有shutdown，则java 进程不会退出的原因。
+
+## java并发的发展历程
+
+1. 使用原始的synchronized关键字，wait和notify等方法，实现锁和同步。
+
+2. jkd1.5和jdk1.6提供了concurrent包，包含Executor，高效和并发的数据容器，原子变量和多种锁。更多的封装减少了程序员自己动手写并发程序的场景，并提供lock和Condition对象的来替换替换内置锁和内置队列。
+
+3. jdk1.7提供ForkJoinTask支持，还未详细了解，估计类似于MapReduce，其本身就是立足于编写可并行执行程序的。
+
+通过阅读《java并发编程实战》全书的脉络如下
+
+1. 什么是线程安全，什么导致了线程不安全？
+2. 如何并行程序串行化，常见的并行化程序结构是什么？Executor，生产者消费者模式
+3. 如何构造一个线程安全的类（提高竞争效率），如何构造一个依赖状态的类（提高同步效率）？提高性能的手段有哪些？ 使用现有工具类 or 扩充已有父类？
+
+性能优化的基本点就是：减少上下文切换和线程调度（挂起与唤醒）操作。从慢到快的性能对比：
+
+1. synchronized操作内置锁，wait和notify操作内置队列。考虑到现在JVM对其实现进行了很大的优化，其实性能也还好。
+2. AQS及AQS包装类
+3. Lock和Condition（如果业务需要多个等待线程队列的话）
+
+从上到下，jvm为我们做的越少，灵活性越高，更多的问题要调用者自己写在代码里（执行代码当然比劳烦jvm和os效率高很多），使用的复杂性越高。
 
 ## 理念变化
 
@@ -101,22 +189,6 @@ keywords: Scala  akka
 
 golang从设计上就支持协程，goroutine是默认的并行单元，单独开辟线程反而要特别的代码。不像java有历史负担，fork-join着眼点更多在于，基于现有的基本面，如何提高并发性 ==> 需要先分解任务等。fork-join只是提高在特定场景（可以进行子任务分解与合并）下的并行性。所以，goroutine和fork-join根本就不是一回事。**前者是匹敌进程、线程的并发模型，后者是特定问题的并发框架**
 
-## 为什么java系不能实现goroutine
 
-《软件架构设计》：多线程除了锁的问题， 还有一个问题是线程太多时切换的开销很大。协程相比线程，有两个关键特点：
 
-1. 更好地利用CPU，线程的调度由操作系统完成，应用程序干预不了，协程可以由应用程序自己调度
-2. 更好地利用内存，协程的堆栈大小不是固定的，按需使用，内存利用率更高
-
-[关于Golang和JVM中并发模型实现的探讨](http://www.nyankosama.com/2015/04/03/java-goroutine/) 基本要点：
-
-goroutine中最重要的一个设计就在于它将所有的语言层次上的api都限制在了goroutine这一层，进而屏蔽了执行代码与具体线程交互的机会。JDK中存在许多已有的阻塞操作，而这些阻塞操作的调用会直接让线程被阻塞。不管你怎么进行设计，你都始终无法摆脱JDK中协程状态和线程状态不统一的情况。除非做到像Go中一样，所有的阻塞操作均被wrap到协程的层次来进行操作。
-
-## 自己的一点感觉
-
-对于网络io来说，我们知道有bio、nio和aio，为何效率逐渐变高呢？因为我们尽可能的利用了内核的机制(select、epoll这些)，io内核来调度。
-
-而对于并发/并行，从进程、线程到协程，越来越轻量级，调度也有系统级上移到了语言级、语言库级。
-
-从java1.5 到java1.8，一开始直接暴露线程的接口，到丰富各种工具类、集合，提供线程池的封装，再到forkjoin，新的东西也不全是原有接口的替代，而是进一步细化场景。谈不上forkjoin 干的Executor 不能干，更不用说直接用Thread了。只是部分场景下，新东西的存在，让老东西看起来很笨拙。并且，即便用了java8，对于一个简单任务，兴许还是`new Thread(()->{}).start()` 最合适。
 

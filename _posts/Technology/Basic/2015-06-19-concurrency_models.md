@@ -3,22 +3,19 @@
 layout: post
 title: 《Concurrency Models》笔记
 category: 技术
-tags: Compute
+tags: Basic
 keywords: 多线程 
 
 ---
 
 ## 前言
 
-写本文的初衷，是看了很多的框架后，感觉多线程代码也是有套路的，也存在类似设计模式之类的东西。 所以自己试着总结了一点，但看到[Concurrency Models](http://tutorials.jenkov.com/java-concurrency/concurrency-models.html) 之后，发现文章高屋建瓴，干脆就改成这边文章的笔记了，很多英文写的很痛快，都舍不得翻译（翻译不出来那个味道）。
-
-java性能的提高，io和多线程是其中两个重要部分，io方面java实现了nio和aio，线程则有一系列的设计模式和lambda表达式的支持，相信java在以后的很长一段时间，还会继续发光发热的。
-
-了解一些设计模式，不仅可以提高编程能力，对学习一些框架的源码也是很有帮助的。此外，[Java多线程编程模式实战指南一：Active Object模式（上）](http://www.infoq.com/cn/articles/Java-multithreaded-programming-mode-active-object-part1) 这是一个系列，作者黄文海还专门出了一本《Java多线程编程模式实战》
+* TOC
+{:toc}
 
 ## 并发模型是什么
 
-Concurrent systems can be implemented using different concurrency models. A concurrency model specifies how threads in the the system collaborate to complete the jobs they are are given. Different concurrency models split the jobs in different ways, and the threads may communicate and collaborate in different ways. 可以看到，并发模型主要关注两件事：
+[Concurrency Models](http://tutorials.jenkov.com/java-concurrency/concurrency-models.html) Concurrent systems can be implemented using different concurrency models. A concurrency model specifies how threads in the the system collaborate to complete the jobs they are are given. Different concurrency models split the jobs in different ways, and the threads may communicate and collaborate in different ways. 可以看到，并发模型主要关注两件事：
 
 1. 如何分解任务，准确的说如何分解任务序列
 2. 线程如何协作
@@ -122,14 +119,5 @@ which concurrency model is better?it depends on what your system is supposed to 
 2. 多线程
 3. 主从线程，主从线程与多线程的区别在于，多线程中的每个线程干的是一样的活儿，主从线程中的线程则有任务分工
 
-## 引用
 
-[Java多线程设计模式（一）][]
 
-[Promise, Future 和 Callback][]
-
-[JAVA并发设计模式学习笔记（一）—— JAVA多线程编程][]
-
-[JAVA并发设计模式学习笔记（一）—— JAVA多线程编程]: http://www.cnblogs.com/chenying99/p/3321866.html
-[Java多线程设计模式（一）]: http://www.cnblogs.com/chenying99/p/3322032.html
-[Promise, Future 和 Callback]: http://isouth.org/archives/354.html

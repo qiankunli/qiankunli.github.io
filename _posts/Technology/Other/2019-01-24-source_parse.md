@@ -37,7 +37,7 @@ keywords: 源码分析
 
 ### 常识比信息重要
 
-可以为任何学习行为 找到一个通用目标：提炼常识。**信息越多越心累，常识越多越通透**。
+**信息越多越心累，常识越多越通透**。可以为任何学习行为 找到一个通用目标：提炼常识。进而通过常识，碰到一个新技术时可以place it in context
 
 ![](/public/upload/other/common_sense_vs_infomation.png)
 
