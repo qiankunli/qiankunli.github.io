@@ -4,7 +4,7 @@ layout: post
 title: 内存管理玩法汇总
 category: 技术
 tags: Basic
-keywords: Permission
+keywords: memory management
 
 ---
 

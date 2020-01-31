@@ -37,9 +37,9 @@ keywords: 源码分析
 
 ### 常识比信息重要
 
-可以为任何学习行为 找到一个通用目标：提炼常识。
+可以为任何学习行为 找到一个通用目标：提炼常识。**信息越多越心累，常识越多越通透**。
 
-20年春节冠状病毒疫情，在家憋了这几日，看了linux 的调度、golang的调度，java的gc 和golang 的gc， 调度 和 gc 自有其基本规律，结合到语言、系统 很容易被细节所迷惑。调度 和 gc 的基本规律是 “常识”，linux、golang的调度java、golang 的gc 是信息/细节。**信息越多越心累，常识越多越通透**。
+![](/public/upload/other/common_sense_vs_infomation.png)
 
 ## 分析方法
 
