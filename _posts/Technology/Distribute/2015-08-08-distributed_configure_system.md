@@ -10,6 +10,8 @@ keywords: 分布式配置系统 zookeeper etcd Consul
 
 ## 简介
 
+* TOC
+{:toc}
 
 Zookeeper is a **distributed storage** that provides the following guarantees
 
@@ -214,7 +216,7 @@ ZooKeeper的数据结构, 与普通的文件系统类似，每个节点称为一
 
 ### consul
 
-Consul做服务发现是专业的
+Consul做服务发现是专业的，配置管理更像是捎带的
 
 1. node 管理，所有的分布式系统都需要 node 管理
 2. 有专门的服务管理：Service 有专门的数据对象、页面UI入口，专门的注册与查询接口
@@ -243,24 +245,34 @@ Consul做服务发现是专业的
         }
 
 3. 健康检查是其中一项必不可少的功能
-4. Consul提供了一个易用的键/值存储，可以用来保持动态配置，协助服务协调，领袖选举等。PS：这个功能更像是捎带的
+4. Consul提供了一个易用的键/值存储，可以用来保持动态配置，协助服务协调，领袖选举等。
+
+### nacos
+
+[Nacos 概念](https://nacos.io/zh-cn/docs/concepts.html)相关概念
+
+![](/public/upload/distribute/nacos_concepts.png)
+
+1. 健康检查，以指定方式检查服务下挂载的实例 (Instance) 的健康度，从而确认该实例 (Instance) 是否能提供服务。
+2. 健康保护阈值，为了防止因过多实例 (Instance) 不健康导致流量全部流向健康实例 (Instance) ，继而造成流量压力把健康 健康实例 (Instance) 压垮并形成雪崩效应，应将健康保护阈值定义为一个 0 到 1 之间的浮点数。当域名健康实例 (Instance) 占总服务实例 (Instance) 的比例小于该值时，无论实例 (Instance) 是否健康，都会将这个实例 (Instance) 返回给客户端。这样做虽然损失了一部分流量，但是保证了集群的剩余健康实例 (Instance) 能正常工作。
+
+[Nacos 架构](https://nacos.io/zh-cn/docs/architecture.html)
+
+![](/public/upload/distribute/nacos_data_model.jpeg)
+
+![](/public/upload/distribute/nacos_service_model.jpeg)
+
+## 服务注册中心
+
+![](/public/upload/distribute/service_registry.png)
+
+||健康监测|
+|---|---|
+|zookeeper|利用临时节点的机制，业务服务启动时创建临时节点，节点在服务就在，节点不存在服务就不存在|
+|etcd|利用TTL机制，业务服务启动时创建键值对，定时更新ttl，ttl过期则服务不可用|
+|consul|consul agent每个node一个，会所在节点的服务进行健康检查|
 
 ZooKeeper、etcd通过键值存储来实现服务的注册与发现，键值存储都是强一致性的，也就是说键值对会自动同步到多个节点，只要在某个节点上存在就可以认为对应的业务服务是可用的。
-
-1. ZooKeeper利用临时节点的机制，业务服务启动时创建临时节点，节点在服务就在，节点不存在服务就不存在。 
-2. etcd利用TTL机制，业务服务启动时创建键值对，定时更新ttl，ttl过期则服务不可用。 
-
-
-Consul的数据同步也是强一致性的，服务的注册信息会在Server节点之间同步，相比ZK、etcd
-
-1. 服务的信息还是持久化保存的，即使服务部署不可用了，仍旧可以查询到这个服务部署。
-2. 但是业务服务的可用状态是由注册到的Agent来维护的
-    
-    * Agent如果不能正常工作了，则无法确定服务的真实状态。但因为Consul是相当稳定了，Agent挂掉的情况下大概率服务器的状态可能是不好的 ==> 服务本身也无法正常工作
-    * 如果真的是 agent 的问题， 也不会有别的agent 来接管健康检查
-    * 服务本身不正常
-3. 服务需要注销 才可以真正从consul中“离开”
-
 
 ## 小结
 
@@ -277,15 +289,6 @@ Consul的数据同步也是强一致性的，服务的注册信息会在Server�
 
 其它，随着版本的发展，etcd和zookeeper等配置项和端口的意义会有些变化，此处不再赘述。
 
-## 典型应用场景
 
-1. 假设一个系统有多个后端，后端的状态在不断变化（后端可能会宕机，也可能有新的后端加入）。那么每个节点就需要感知到这种变化，并作出反应。
-2. 动态配置中心。假设系统的运行受一个参数的影响，那么可以在etcd等应用中更改这个参数，并将参数变化推送到各个节点，各节点据此更改内存中的状态信息，无需重启。
-3. 分布式锁。对于同一主机共享资源的访问，可以用锁来协调同一主机的多个进程（或线程）。对于跨主机共享资源的访问，etcd等工具提供相应的工具。
-4. 一个系统包括多个组件，组件间不是通过API直接通信，而是通过Watch ETCD变化来通信，从而减少组件间的耦合。
 
-## 引用
 
-[ZooKeeper 基础知识、部署和应用程序][]
-
-[ZooKeeper 基础知识、部署和应用程序]: http://www.ibm.com/developerworks/cn/data/library/bd-zookeeper/

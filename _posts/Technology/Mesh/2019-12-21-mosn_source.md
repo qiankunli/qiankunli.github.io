@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: MOSN源码分析
+title: MOSN源码浅析
 category: 技术
 tags: Mesh
 keywords: Go mosn service mesh
@@ -13,15 +13,11 @@ keywords: Go mosn service mesh
 * TOC
 {:toc}
 
-SOFAMosn是基于Go开发的sidecar，用于service mesh中的数据面代理[sofastack/sofa-mosn](https://github.com/sofastack/sofa-mosn)
-
-阿里官方介绍文档[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md)
-
-[一个sidecar的自我修养](http://qiankunli.github.io/2020/01/14/self_cultivation_of_sidecar.html) 对sidecar 的基本概念 原理有所了解。
+Mosn是基于Go开发的sidecar，用于service mesh中的数据面代理，建议先看下[一个sidecar的自我修养](http://qiankunli.github.io/2020/01/14/self_cultivation_of_sidecar.html) 对sidecar 的基本概念、原理有所了解。
 
 ## 手感
 
-[使用 SOFAMosn 作为 HTTP 代理](https://github.com/sofastack/sofa-mosn/blob/master/examples/cn_readme/http-sample/README.md)
+[使用 SOFAMosn 作为 HTTP 代理](https://github.com/mosn/mosn/tree/master/examples/cn_readme/http-sample)
 
 通过设置 log level 为debug， 代码中加更多日志 来辅助分析代码。**本文主要以http-example 为例来分析**。
 
