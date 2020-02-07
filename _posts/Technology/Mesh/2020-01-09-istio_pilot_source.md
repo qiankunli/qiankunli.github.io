@@ -139,7 +139,7 @@ envoy 通过grpc 协议与 pilot-discovery 交互，因此首先找 ads.proto �
 
 ![](/public/upload/mesh/pilot_discovery_server.png)
 
-DiscoveryServer 通过Environment 间接持有了 config和 service 数据。此外， pilot-discovery Server启动时便 为DiscoveryServer 注册了config service 变更处理函数，不管config/service 如何变更，都会触发 DiscoveryServer.ConfigUpdate。
+DiscoveryServer 通过Environment 间接持有了 config和 service 数据。此外， pilot-discovery Server启动时便 为DiscoveryServer 注册了config service 变更处理函数，**不管config/service 如何变更，都会触发 DiscoveryServer.ConfigUpdate**。
 
 代码中 Server.EnvoyXdsServer 就是DiscoveryServer
 
