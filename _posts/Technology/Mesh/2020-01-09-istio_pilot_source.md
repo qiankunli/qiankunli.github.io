@@ -15,7 +15,7 @@ keywords: pilot service mesh
 
 ![](/public/upload/mesh/pilot_package.png)
 
-## pilot-discovery
+## pilot-discovery宏观设计
 
 [Istio Pilot代码深度解析](https://www.servicemesher.com/blog/201910-pilot-code-deep-dive/)
 
@@ -23,8 +23,8 @@ keywords: pilot service mesh
 
 1. 目前Pilot的输入包括两部分数据来源：
 
-    1. 服务数据（随着服务的启停、灰度等自动的）： 来源于各个服务注册表(Service Registry)，例如Kubernetes中注册的Service，Consul Catalog中的服务等。
-    2. 配置规则（人为的）： 各种配置规则，包括路由规则及流量管理规则等，通过Kubernetes CRD(Custom Resources Definition)形式定义并存储在Kubernetes中。
+    1. 服务数据（随着服务的启停、灰度等自动的）： 来源于各个服务注册表(Service Registry)，例如Kubernetes中注册的Service，Consul/Nacos中的服务等。
+    2. 配置规则（人为的）： 各种配置规则，包括路由规则及流量管理规则等，通过Kubernetes CRD(Custom Resources Definition)形式定义并存储在Kubernetes中。PS：本质就是一些配置，只是pilot 没有提供直接的crud API，人 ==> k8s ==> pilot 
 2. Pilot的输出为符合xDS接口的数据面配置数据，并通过gRPC Streaming接口将配置数据推送到数据面的Envoy中。
 
 ![](/public/upload/mesh/pilot_input_output.svg)
@@ -33,7 +33,11 @@ keywords: pilot service mesh
 
 ![](/public/upload/mesh/pilot_package.jpeg)
 
-## 处理输入
+从协议视角看pilot-discovery
+
+![](/public/upload/mesh/pilot_protocol_overview.png)
+
+## 获取配置和服务数据
 
 底层平台 多种多样，istio 抽象一套自己的数据模型（`pilot/pkg/model`）及数据存取接口，以屏蔽底层平台。
 
@@ -79,34 +83,6 @@ Environment provides an aggregate environmental API for Pilot. Environment为Pil
 
 ![](/public/upload/mesh/pilot_component.svg)
 
-### proxy
-
-Proxy contains information about an specific instance of a proxy (envoy sidecar, gateway,etc). The Proxy is initialized when a sidecar connects to Pilot, and populated from 'node' info in the protocol as well as data extracted from registries.
-
-    type Proxy struct {
-        ClusterID string
-        // Type specifies the node type. First part of the ID.
-        Type NodeType
-        IPAddresses []string
-        ID string
-        Locality *core.Locality
-        // DNSDomain defines the DNS domain suffix for short hostnames (e.g.
-        // "default.svc.cluster.local")
-        DNSDomain string
-        ConfigNamespace string
-        // Metadata key-value pairs extending the Node identifier
-        Metadata *NodeMetadata
-        // the sidecarScope associated with the proxy
-        SidecarScope *SidecarScope
-        // The merged gateways associated with the proxy if this is a Router
-        MergedGateway *MergedGateway
-        // service instances associated with the proxy
-        ServiceInstances []*ServiceInstance
-        // labels associated with the workload
-        WorkloadLabels labels.Collection
-        // Istio version associated with the Proxy
-        IstioVersion *IstioVersion
-    }
 
 ## 启动
 
@@ -149,7 +125,7 @@ Proxy contains information about an specific instance of a proxy (envoy sidecar,
         s.initGrpcServer(args.KeepaliveOptions)
     }
 
-## 处理请求
+## 处理xds请求
 
 如果golang 里有类似 tomcat、springmvc 的组件，那源码看起来就很简单了。
 
@@ -188,6 +164,35 @@ DiscoveryServer 通过Environment 间接持有了 config和 service 数据。此
             }
         }
         return nil
+    }
+
+### proxy
+
+Proxy contains information about an specific instance of a proxy (envoy sidecar, gateway,etc). The Proxy is initialized when a sidecar connects to Pilot, and populated from 'node' info in the protocol as well as data extracted from registries. proxy struct是sidecar 在 pilot 内的一个表示。
+
+    type Proxy struct {
+        ClusterID string
+        // Type specifies the node type. First part of the ID.
+        Type NodeType
+        IPAddresses []string
+        ID string
+        Locality *core.Locality
+        // DNSDomain defines the DNS domain suffix for short hostnames (e.g.
+        // "default.svc.cluster.local")
+        DNSDomain string
+        ConfigNamespace string
+        // Metadata key-value pairs extending the Node identifier
+        Metadata *NodeMetadata
+        // the sidecarScope associated with the proxy
+        SidecarScope *SidecarScope
+        // The merged gateways associated with the proxy if this is a Router
+        MergedGateway *MergedGateway
+        // service instances associated with the proxy
+        ServiceInstances []*ServiceInstance
+        // labels associated with the workload
+        WorkloadLabels labels.Collection
+        // Istio version associated with the Proxy
+        IstioVersion *IstioVersion
     }
 
 ### envoy 向pilot 发送请求
@@ -351,8 +356,6 @@ DiscoveryServer 启动时 触发sendPushes ，负责消费PushQueue ==> doSendPu
             }
         }
     }
-
-### Mesh Configuration Protocol（未完成）
 
 ## pilot-agent
 

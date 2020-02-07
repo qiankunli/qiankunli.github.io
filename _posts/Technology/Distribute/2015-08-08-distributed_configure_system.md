@@ -335,7 +335,7 @@ ConfigService 使用demo
 
 ![](/public/upload/distribute/service_registry.png)
 
-||健康监测|
+||健康监测实现|
 |---|---|
 |zookeeper|利用临时节点的机制，业务服务启动时创建临时节点，节点在服务就在，节点不存在服务就不存在|
 |etcd|利用TTL机制，业务服务启动时创建键值对，定时更新ttl，ttl过期则服务不可用|
