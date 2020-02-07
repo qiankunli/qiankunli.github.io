@@ -204,6 +204,32 @@ CONSUL_OPTS="-server -syslog -data-dir=/opt/consul/data -config-dir=/opt/consul/
 
 consul 启动时，默认有一个`-dc` 参数，默认是dc1。
 
+### nacos
+
+[nacos下载地址](https://github.com/alibaba/nacos/releases) 下载可执行文件解压
+
+    nacos-server-$version
+        bin
+            shutdown.cmd
+            shutdown.sh
+            startup.cmd
+            startup.sh
+        conf
+            application.properties
+            application.properties.example
+            cluster.conf.example
+        target
+            nacos-server.jar
+
+单机模式启动`sh startup.sh -m standalone`
+
+集群模式下，应先设置配置文件 cluster.conf
+
+    # ip:port
+    200.8.9.16:8848
+    200.8.9.17:8848
+    200.8.9.18:8848
+
 ## 数据模型
 
 ### zookeeper
@@ -261,6 +287,49 @@ Consul做服务发现是专业的，配置管理更像是捎带的
 ![](/public/upload/distribute/nacos_data_model.jpeg)
 
 ![](/public/upload/distribute/nacos_service_model.jpeg)
+
+nacos 对外提供http api，下文进一步通过java client sdk 演示 与nacos server的互动
+
+    //服务发现注册接口
+    public interface NamingService {
+        void registerInstance(String serviceName, String groupName, String ip, int port, String clusterName) throws NacosException;
+        void deregisterInstance(String serviceName, String ip, int port) throws NacosException;
+        List<Instance> getAllInstances(String serviceName, String groupName) throws NacosException;
+        List<Instance> selectInstances(String serviceName, String groupName, List<String> clusters, boolean healthy, boolean subscribe) throws NacosException;
+        Instance selectOneHealthyInstance(String serviceName, String groupName, List<String> clusters, boolean subscribe) throws NacosException;
+        void subscribe(String serviceName, String groupName, List<String> clusters, EventListener listener) throws NacosException;
+        void unsubscribe(String serviceName, String groupName, List<String> clusters, EventListener listener) throws NacosException;
+        ListView<String> getServicesOfServer(int pageNo, int pageSize, String groupName, AbstractSelector selector) throws NacosException;
+        List<ServiceInfo> getSubscribeServices() throws NacosException;
+        String getServerStatus();
+    }
+    //Config Service Interface
+    public interface ConfigService {
+        String getConfig(String dataId, String group, long timeoutMs) throws NacosException;
+        String getConfigAndSignListener(String dataId, String group, long timeoutMs, Listener listener) throws NacosException;
+        void addListener(String dataId, String group, Listener listener) throws NacosException;
+        boolean publishConfig(String dataId, String group, String content) throws NacosException;
+        boolean removeConfig(String dataId, String group) throws NacosException;
+        void removeListener(String dataId, String group, Listener listener);
+        String getServerStatus();
+    }
+
+我们使用zk 做服务注册中心时，对zk 的api 和服务发现注册操作 之间要进行一些语义转换，NamingService 接口定义了 服务发现注册的 api。
+
+NamingService 使用demo
+
+    Properties properties = new Properties();
+    properties.setProperty("serverAddr", System.getProperty("serverAddr"));
+    properties.setProperty("namespace", System.getProperty("namespace"));
+    NamingService naming = NamingFactory.createNamingService(properties);
+    naming.registerInstance("nacos.test.3", "11.11.11.11", 8888, "TEST1");
+
+ConfigService 使用demo
+
+    Properties properties = new Properties();
+    properties.put("serverAddr", serverAddr);
+    ConfigService configService = NacosFactory.createConfigService(properties);
+    String content = configService.getConfig(dataId, group, 5000);
 
 ## 服务注册中心
 
