@@ -55,7 +55,11 @@ AST的生成有很多现成的工具，比如 Yacc（或 GNU 的版本，Bison�
 
 语义分析工作的某些成果，会作为属性**标注在抽象语法树上**。比如在 标识符节点和 字面量节点上标识它的数据类型是 int 型的。在AST上还可以标记很多属性，有些属性是在之前的两个阶段就被标注上了，比如所处的源代码行号，这一行的第几个字符。这样，在编译程序报错的时候，就可以比较清楚地了解出错的位置。
 
-### 一个简单的解释器
+### 实例分析——一个简单的解释器
+
+1. 支持变量声明和初始化语句
+2. 支持赋值语句“age = 45”；
+3. 在表达式中可以使用变量，例如“age + 10 *2”；
 
 ![](/public/upload/basic/repl.jpg)
 
@@ -80,6 +84,44 @@ java类实现
             script.evaluate(tree, "");
             ...
         }
+    }
+
+### 语法分析
+
+    public class SimpleParser {
+        // 解析脚本 生成AST
+        public ASTNode parse(String script) throws Exception {
+            SimpleLexer lexer = new SimpleLexer();
+            TokenReader tokens = lexer.tokenize(script);
+            ASTNode rootNode = prog(tokens);
+            return rootNode;
+        }
+        private SimpleASTNode prog(TokenReader tokens) throws Exception{
+            SimpleASTNode node = new SimpleASTNode(ASTNodeType.Programm, "pwc");
+            // 穷举词法分析得到的tokens 是什么语句，作为AST 根节点的子节点
+            while (tokens.peek() != null) {
+                SimpleASTNode child = intDeclare(tokens);
+                if (child == null) {
+                    child = expressionStatement(tokens);
+                }
+                if (child == null) {
+                    child = assignmentStatement(tokens);
+                }
+                if (child != null) {
+                    node.addChild(child);
+                } else {
+                    throw new Exception("unknown statement");
+                }
+            }
+            return node;
+        }
+    }
+
+### 脚本解释器
+
+AST 是语法解析的成果，解释器所谓“解释”就是对AST 的运算
+
+    public class SimpleScript {
         // 遍历AST，计算值
         private Integer evaluate(ASTNode node, String indent) throws Exception {
             switch (node.getType()) {
@@ -104,3 +146,11 @@ java类实现
             }
         }
     }
+
+从某个视角看，脚本解释跟md/OpenAPI渲染 是一样一样的，只是代码的词法规则、语法规则更多
+
+||源文件|内部处理|效果呈现|
+|---|---|---|---|
+|markdown引擎|md文本|java对象|html|
+|OpenAPI渲染|OpenAPI规范文本|java对象|html|
+|代码解释器|代码文本|AST|代码执行|
