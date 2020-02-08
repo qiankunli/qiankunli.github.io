@@ -24,7 +24,7 @@ keywords: pilot service mesh
 1. 目前Pilot的输入包括两部分数据来源：
 
     1. 服务数据（随着服务的启停、灰度等自动的）： 来源于各个服务注册表(Service Registry)，例如Kubernetes中注册的Service，Consul/Nacos中的服务等。
-    2. 配置规则（人为的）： 各种配置规则，包括路由规则及流量管理规则等，通过Kubernetes CRD(Custom Resources Definition)形式定义并存储在Kubernetes中。PS：本质就是一些配置，只是pilot 没有提供直接的crud API，人 ==> k8s ==> pilot 
+    2. 配置规则（人为的）： 各种配置规则，包括路由规则及流量管理规则等，通过Kubernetes CRD(Custom Resources Definition)形式定义并存储在Kubernetes中。PS：本质就是一些配置，只是pilot 没有提供直接的crud API，通过k8s中转一下：人 ==> k8s ==> pilot 
 2. Pilot的输出为符合xDS接口的数据面配置数据，并通过gRPC Streaming接口将配置数据推送到数据面的Envoy中。
 
 ![](/public/upload/mesh/pilot_input_output.svg)
