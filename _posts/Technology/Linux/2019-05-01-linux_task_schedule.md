@@ -13,6 +13,16 @@ keywords: linux 进程调度
 * TOC
 {:toc}
 
+[调度系统设计精要](https://mp.weixin.qq.com/s/R3BZpYJrBPBI0DwbJYB0YA)CFS 的调度过程还是由 schedule 函数完成的，该函数的执行过程可以分成以下几个步骤：
+
+1. 关闭当前 CPU 的抢占功能；
+2. 如果当前 CPU 的运行队列中不存在任务，调用 idle_balance 从其他 CPU 的运行队列中取一部分执行；
+3. 调用 pick_next_task 选择红黑树中优先级最高的任务；
+4. 调用 context_switch 切换运行的上下文，包括寄存器的状态和堆栈；
+5. 重新开启当前 CPU 的抢占功能；
+
+![](/public/upload/basic/scheduler_design.png)
+
 ## 进程数据结构
 
 ![](/public/upload/linux/linux_task_struct_data.png)

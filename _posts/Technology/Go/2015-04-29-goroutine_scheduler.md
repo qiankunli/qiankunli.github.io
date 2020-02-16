@@ -13,10 +13,15 @@ keywords: Go goroutine scheduler
 * TOC
 {:toc}
 
+[Scheduling In Go : Part I - OS Scheduler](https://www.ardanlabs.com/blog/2018/08/scheduling-in-go-part1.html)
+[Scheduling In Go : Part II - Go Scheduler](https://www.ardanlabs.com/blog/2018/08/scheduling-in-go-part2.html)
+[Scheduling In Go : Part III - Concurrency](https://www.ardanlabs.com/blog/2018/12/scheduling-in-go-part3.html)
 
 过去的语言（如C语言）只是**提供标准的库**，让你访问操作系统的线程管理功能，包括信号量、同步互斥什么的。Java语言增加了一些**专门处理多线程的元素**，比如synchronized关键字。go语言又更进一步，把操作系统的线程进行了封装，变成了轻量级的goroutine。
 
 [万字长文深入浅出 Golang Runtime](https://zhuanlan.zhihu.com/p/95056679)调度在计算机中是分配工作所需资源的方法，linux的调度为CPU找到可运行的线程，而Go的调度是为M（线程）找到P（内存、执行票据）和可运行的G。
+
+![](/public/upload/basic/scheduler_design.png)
 
 ## goroutine调度模型的四个抽象及其数据结构
 
@@ -61,7 +66,7 @@ go1.1 之前都是该模型
 
 几个问题
 
-1. 为什么引入Processor 的概念
+1. 为什么引入Processor 的概念？处理器 P 持有一个运行队列 runq，在处理器 P 的基础上实现基于工作窃取的调度器。
 2. 为什么把全局队列打散. 对该队列的操作均需要竞争同一把锁, 导致伸缩性不好.
 新生成的协程也会放入全局的队列, 大概率是被其他 m运行了, 内存亲和性不好. 
 3. mcache 为什么跟随 P。 参见[内存管理](http://qiankunli.github.io/2020/01/28/memory_management.html) 了解mcache
@@ -258,7 +263,7 @@ gogo 在不同处理器架构上的实现都不相同，但是不同的实现其
         MOVL	gobuf_pc(BX), BX
         JMP	BX
 
-这个函数会从 gobuf 中取出 Goroutine 指针、栈指针、返回值、上下文以及程序计数器并将通过 JMP 指令跳转至 Goroutine 应该继续执行代码的位置。
+这个函数会从 gobuf 中取出 Goroutine 指针、栈指针、返回值、上下文以及程序计数器并将通过 JMP 指令跳转至 Goroutine 应该继续执行代码的位置。PS：就切换几个寄存器，所以协程的切换成本更低
 
 ## sysmon 协程
 

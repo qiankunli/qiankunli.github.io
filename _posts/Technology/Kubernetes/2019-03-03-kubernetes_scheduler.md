@@ -13,6 +13,8 @@ keywords: kubernetes scheduler
 * TOC
 {:toc}
 
+![](/public/upload/basic/scheduler_design.png)
+
 ## 资源调度泛谈
 
 [Kubernetes架构为什么是这样的？](https://mp.weixin.qq.com/s/ps34qFlEzQNYbp6ughkrOA)在 Google 的一篇关于内部 Omega 调度系统的论文中，将调度系统分成三类：单体、二层调度和共享状态三种，按照它的分类方法，通常Google的 Borg被分到单体这一类，Mesos被当做二层调度，而Google自己的Omega被当做第三类“共享状态”。我认为 **Kubernetes 的调度模型也完全是二层调度的，和 Mesos 一样，任务调度和资源的调度是完全分离的，Controller Manager承担任务调度的职责，而Scheduler则承担资源调度的职责**。 
@@ -91,7 +93,13 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 调度这个事情，在不同的公司和团队里的实际需求一定是大相径庭的。上游社区不可能提供一个大而全的方案出来。所以，将默认调度器插件化是 kube-scheduler 的演进方向。
 
-## 算法
+## 谓词和优先级算法
+
+[调度系统设计精要](https://mp.weixin.qq.com/s/R3BZpYJrBPBI0DwbJYB0YA)
+
+![](/public/upload/kubernetes/predicates_priorities_schedule.png)
+
+我们假设调度器中存在一个谓词算法和一个 Map-Reduce 优先级算法，当我们为一个 Pod 在 6 个节点中选择最合适的一个时，6 个节点会先经过谓词的筛选，图中的谓词算法会过滤掉一半的节点，剩余的 3 个节点经过 Map 和 Reduce 两个过程分别得到了 5、10 和 5 分，最终调度器就会选择分数最高的 4 号节点。
 
 ### Predicate
 
@@ -120,7 +128,7 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 3. InterPodAffinityPriority
 4. ImageLocalityPriority
 
-## 优先级和抢占
+### 优先级和抢占
 
 优先级和抢占机制，解决的是 （高优先级的）Pod 调度失败时该怎么办的问题
 
@@ -149,3 +157,14 @@ Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的
 	2. 调度器会把抢占者的 nominatedNodeName，设置为被抢占的 Node 的名字。
 	3. 调度器会开启一个 Goroutine，同步地删除牺牲者。
 3. 调度器就会通过正常的调度流程把抢占者调度成功
+
+## 基于调度框架
+
+明确了 Kubernetes 中的各个调度阶段，提供了设计良好的基于插件的接口。调度框架认为 Kubernetes 中目前存在调度（Scheduling）和绑定（Binding）两个循环：
+
+1. 调度循环在多个 Node 中为 Pod 选择最合适的 Node；
+2. 绑定循环将调度决策应用到集群中，包括绑定 Pod 和 Node、绑定持久存储等工作；
+
+除了两个大循环之外，调度框架中还包含 QueueSort、PreFilter、Filter、PostFilter、Score、Reserve、Permit、PreBind、Bind、PostBind 和 Unreserve 11 个扩展点（Extension Point），这些扩展点会在调度的过程中触发，它们的运行顺序如下：
+
+![](/public/upload/kubernetes/framework_schedule.png)
