@@ -3,7 +3,7 @@
 layout: post
 title: 分布式计算系统的那些套路
 category: 技术
-tags: Distribute
+tags: Compute
 keywords: 分布式系统
 
 ---

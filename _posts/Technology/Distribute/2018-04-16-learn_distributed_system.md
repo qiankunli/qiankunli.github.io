@@ -33,11 +33,7 @@ keywords: 分布式系统
 
 ![](/public/upload/distribute/study_distribute_system.png)
 
-[分布式学习最佳实践：从分布式系统的特征开始（附思维导图）](https://www.cnblogs.com/xybaby/p/8544715.html) 作者分享了“如何学习分布式系统”的探索历程， 深有体会。
-
-**当一个知识点很复杂时，如何学习它，也是一门学问。**脑图来自作者
-
-![](/public/upload/distribute/study_distribute_system_from_feature.png)
+[分布式学习最佳实践：从分布式系统的特征开始（附思维导图）](https://www.cnblogs.com/xybaby/p/8544715.html) 作者分享了“如何学习分布式系统”的探索历程， 深有体会。**当一个知识点很复杂时，如何学习它，也是一门学问。**
 
 ## 大咖文章
 
@@ -66,36 +62,23 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 
 ## 分布式系统不可能三角——CAP
 
-以下来自对两个付费专栏的整理
-
-### 左耳听风
-
-![](/public/upload/distribute/cap.PNG)
-
-### 从0到1学架构
-
-下文来自 李运华 极客时间中的付费专栏《从0到1学架构》。
+下文来自 李运华 极客时间中的付费专栏《从0到1学架构》和韩健的《分布式协议和算法实战》。
 
 Robert Greiner （http://robertgreiner.com/about/） 对CAP 的理解也经历了一个过程，他写了两篇文章来阐述CAP理论，第一篇被标记为outdated
 
-||第一版|第二版|
-|---|---|---|
+||第一版|第二版|韩健的《分布式协议和算法实战》|
+|---|---|---|---|
 |地址|http://robertgreiner.com/2014/06/cap-theorem-explained/|http://robertgreiner.com/2014/08/cap-theorem-revisited/|
-|理论定义|Any distributed system cannot guaranty C, A, and P simultaneously.|In a distributed system (a collection of interconnected nodes that share data.), you can only have two out of the following three guarantees across a write/read pair: Consistency, Availability, and Partition Tolerance - one of them must be sacrificed.|
-|中文||在一个分布式系统（指互相连接并共享数据的节点的集合）中，当涉及读写操作时，只能保证一致性（Consistence）、可用性（Availability）、分区容错性（Partition Tolerance）三者中的两个，另外一个必须被牺牲。|
-|一致性|all nodes see the same data at the same time|A read is guaranteed to return the most recent write for a given client 总能读到 最新写入的新值|
-|可用性|Every request gets a response on success/failure|A non-failing node will return a reasonable response within a reasonable amount of time (no error or timeout)|
-|分区容忍性|System continues to work despite message loss or partial failure|The system will continue to function when network partitions occur|
+|理论定义|Any distributed system cannot guaranty C, A, and P simultaneously.|In a distributed system (a collection of interconnected nodes that share data.), you can only have two out of the following three guarantees across a write/read pair: Consistency, Availability, and Partition Tolerance - one of them must be sacrificed.<br>在一个分布式系统（指互相连接并共享数据的节点的集合）中，当涉及读写操作时，只能保证一致性（Consistence）、可用性（Availability）、分区容错性（Partition Tolerance）三者中的两个，另外一个必须被牺牲。|
+|一致性|all nodes see the same data at the same time|A read is guaranteed to return the most recent write for a given client 总能读到 最新写入的新值|客户端的每次读操作，不管访问哪个节点，要么读到的都是同一份最新的数据，要么读取失败|
+|可用性|Every request gets a response on success/failure|A non-failing node will return a reasonable response within a reasonable amount of time (no error or timeout)|任何来自客户端的请求，不管访问哪个节点，都能得到响应数据，但不保证是同一份最新数据|
+|分区容忍性|System continues to work despite message loss or partial failure|The system will continue to function when network partitions occur|当节点间出现任意数量的消息丢失或高延迟的时候，系统仍然可以继续提供服务|
 
-李运华 文中 关于Robert Greiner 两篇文章的对比 建议细读： 要点如下
 
-1. 不是所有的分布式系统都有 cap问题，必须interconnected 和 share data。比如一个简单的微服务系统 没有share data，便没有cap 问题。
-2. 强调了write/read pair 。这跟上一点是一脉相承的。cap 关注的是对数据的读写操作，而不是分布式系统的所有功能。
-
-### 其它材料
+1. 只要有网络交互就一定会有延迟和数据丢失，也就是说，分区容错性（P）是前提，是必须要保证的，**于是只能在可用性和一致性两者间做出选择。**在工程上，我们关注的往往是如何在保持相对一致性的前提下，提高系统的可用性。
+2. 大部分人对 CAP 理论有个误解，认为无论在什么情况下，分布式系统都只能在 C 和 A 中选择 1 个。 其实，在不存在网络分区的情况下，也就是分布式系统正常运行时（这也是系统在绝大部分时候所处的状态），就是说在不需要 P 时，C 和 A 能够同时保证。
+3. 还是读写问题。[多线程](http://qiankunli.github.io/2014/10/09/Threads.html) 提到，多线程本质是一个并发读写问题，数据库系统中，为了描述并发读写的安全程度，还提出了隔离性的概念。具体到cap 理论上，副本一致性本质是并发读写问题（A主机写入的数据，B主机多长时间可以读到）。
 
 [从CAP理论到Paxos算法](http://blog.longjiazuo.com/archives/5369?hmsr=toutiao.io&utm_medium=toutiao.io&utm_source=toutiao.io) 基本要点：
 
-2. cap 着力点。**网络分区是既成的现实，于是只能在可用性和一致性两者间做出选择。**在工程上，我们关注的往往是如何在保持相对一致性的前提下，提高系统的可用性。
-3. 还是读写问题。[多线程](http://qiankunli.github.io/2014/10/09/Threads.html) 提到，多线程本质是一个并发读写问题，数据库系统中，为了描述并发读写的安全程度，还提出了隔离性的概念。具体到cap 理论上，副本一致性本质是并发读写问题（A主机写入的数据，B主机多长时间可以读到）。2pc/3pc 本质解决的也是如此 ==> A主机写入的数据，成功与失败，B主机多长时间可以读到，然后决定自己的行为。
 
