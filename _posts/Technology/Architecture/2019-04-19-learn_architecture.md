@@ -4,7 +4,7 @@ layout: post
 title: 总纲——如何学习架构
 category: 架构
 tags: Architecture
-keywords: project
+keywords: learn architecture
 
 ---
 

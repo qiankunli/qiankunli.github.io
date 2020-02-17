@@ -15,8 +15,9 @@ keywords: JAVA Spring
 
 [Inversion of control](https://en.wikipedia.org/wiki/Inversion_of_control) In software engineering, inversion of control (IoC) is a programming principle. IoC inverts the flow of control as compared to traditional control flow. In IoC, custom-written portions of a computer program receive the flow of control from a generic framework. A software architecture with this design inverts control as compared to traditional procedural programming: in traditional programming, the custom code that expresses the purpose of the program calls into reusable libraries to take care of generic tasks, but with inversion of control, it is the framework that calls into the custom, or task-specific, code. traditional control flow 是从开始到结束都是自己“写代码”，IoC 中control flow的发起是由一个framework 触发的。类只是干自己的活儿——“填代码”，然后ioc在需要的时候调用。
 
-
 ![](/public/upload/spring/spring_ioc.png)
+
+从[谈元编程与表达能力](https://mp.weixin.qq.com/s/SUV6vBaqwu19-xYzkG4SxA)中，笔者收获了对运行时的一个理解：当相应的行为在当前对象上没有被找到时，运行时会提供一个改变当前对象行为的入口。从这个视角看，Spring 也可以认为是 java 的一个runtime，通过ApplicationContext 获取的bean 拥有 bean代码本身看不到的能力。
 
 ## 控制反转 带来的改变：“解耦”
 

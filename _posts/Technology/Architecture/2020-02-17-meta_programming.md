@@ -1,0 +1,70 @@
+---
+
+layout: post
+title: 元编程
+category: 架构
+tags: Architecture
+keywords: meta programming
+
+---
+
+## 简介（持续补充）
+
+* TOC
+{:toc}
+
+[谈元编程与表达能力](https://mp.weixin.qq.com/s/SUV6vBaqwu19-xYzkG4SxA)
+
+从文中，笔者收获了对运行时的一个理解：当相应的行为在当前对象上没有被找到时，运行时会提供一个改变当前对象行为的入口。从这个视角看，Spring 也可以认为是 java 的一个runtime，通过ApplicationContext 获取的bean 拥有 bean代码本身看不到的能力。
+
+## 元编程
+
+当我们刚刚开始学习和了解编程这门手艺或者说技巧时，一切的知识与概念看起来都非常有趣，随着学习的深入和对语言的逐渐了解，我们可能会发现原来看起来无所不能的编程语言成为了我们的限制，我们只能一遍一遍地写重复的代码来解决本可以轻松搞定的问题。
+
+元编程（Metaprogramming）是计算机编程中一个非常重要、有趣的概念，维基百科 上将元编程描述成一种计算机程序可以将代码看待成数据的能力。
+
+`Metaprogramming is a programming technique in which computer programs have the ability to treat programs as their data.`
+
+如果能够将代码看做数据，那么**代码就可以像数据一样在运行时被修改、更新和替换**；元编程赋予了编程语言更加强大的表达能力，通过**编译期间的展开生成代码或者允许程序在运行时改变自身的行为**。归根结底就是一种使用代码生成代码的思想，消灭重复的代码，极大地增强编程语言的表达能力。
+
+## 编译期间元编程
+
+宏和模板
+
+
+宏是很多编程语言具有的特性之一，它是一个将输入的字符串映射成其他字符串的过程，这个映射的过程也被我们称作宏展开。
+
+1. 基本文本替换的宏
+
+    ```c
+    #define plus(a, b) a + b
+    #define BUFFER_SIZE 1024
+    char *foo = (char *)malloc(BUFFER_SIZE);
+    char *foo = (char *)malloc(1024);
+    int main(int argc, const char * argv[]) {
+        printf("%d", plus(1, 2));       // => 3
+        return 0;
+    }
+    ```
+
+2. 基于语法树和语法元素的宏
+
+    ```rust
+    macro_rules! foo {
+        (x => $e:expr) => (println!("mode X: {}", $e));
+        (y => $e:expr) => (println!("mode Y: {}", $e));
+    }
+    fn main() {
+        foo!(y => 3); // => mode Y: 3
+    }
+    ```
+
+## 运行期间元编程
+
+运行时/runtime，**当相应的行为在当前对象上没有被找到时，运行时会提供一个改变当前对象行为的入口**，在篇文章中提到的运行时不是广义上的运行时系统，它特指面向对象语言在方法决议的过程中为外界提供的入口，让工程师提供的代码也能参与到当前的方法决议和信息发送的过程。
+
+Ruby 提供了一些在运行期间能够改变自身行为的入口和 API 可以帮助我们快速为当前的类添加方法或者实例变量。，当我们调用 Dog 实例的一个方法时，Ruby 会先找到当前对象的类，然后在由 superclass 构成的链上查找并调用相应的方法，这是 OOP 中非常常见的，向右再向上的方法查找过程。如果方法在整个继承链上都完全不存在时，就会调用 #method_missing 方法，并传入与这次方法调用有关的参数。 也就是说：我们可以在method_missing 中为 Dog 添加一个方法。
+
+## 其它
+
+Java 的泛型就是在编译期间实现的，它的泛型其实是伪泛型，在编译期间所有的泛型就会被编译器擦除（type erasure），生成的 Java 字节码是不包含任何的泛型信息的，但是 C# 对于泛型就有着不同的实现了，它的泛型类型在运行时进行替换，为实例化的对象保留了泛型的类型信息。

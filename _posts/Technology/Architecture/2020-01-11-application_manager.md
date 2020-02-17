@@ -4,7 +4,7 @@ layout: post
 title: 以应用为中心
 category: 架构
 tags: Architecture
-keywords: window
+keywords: application
 
 ---
 

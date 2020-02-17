@@ -4,7 +4,7 @@ layout: post
 title: 《阿里巴巴云原生实践15讲》笔记
 category: 技术
 tags: Architecture
-keywords: kubernetes cni
+keywords: alibaba cloud native
 
 ---
 

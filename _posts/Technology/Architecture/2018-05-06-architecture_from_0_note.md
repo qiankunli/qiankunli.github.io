@@ -4,7 +4,7 @@ layout: post
 title: 《从0开始学架构》笔记
 category: 架构
 tags: Architecture
-keywords: 分布式系统
+keywords: 从0开始学架构
 
 ---
 
