@@ -23,13 +23,9 @@ keywords: software mechanism
 
 通常可执行程序有一定的格式：代码段＋数据段。**但程序的一次执行过程是动态的，为了增加动态性，肯定会增加一些自己的数据结构**。进程在推进运行的过程中会调用一些数据，可能中间会产生一些数据保留在堆栈段，所以是动态的。
 
-进程的典型内存布局
+![](/public/upload/basic/os_memory_view.jpg)
 
-1. 代码段
-2. 初始化数据段/数据段 ，包括全局变量和静态变量，在编程时就已经被初始化
-3. 未初始化数据段/BSS段
-4. 堆栈段
-5. 上下文信息
+指令中的地址总要有落脚的地方，只有代码区是肯定不行的，静态数据区也不够灵活（待补充）。
 
 ### 为什么需要栈
 
@@ -44,7 +40,7 @@ keywords: software mechanism
 
 ### 为什么需要堆？
 
-光有栈，对于面向过程的程序设计还远远不够，因为栈上的数据在函数返回的时候就会被释放掉，所以**无法将数据传递至函数外部**。而全局变量没有办法动态地产生，只能在编译的时候定义，有很多情况下缺乏表现力，在这种情况下，堆（Heap）是一种唯一的选择。The heap is an area of dynamically-allocated memory that is **managed automatically by the operating system or the memory manager library**. Memory on the heap is allocated, deallocated, and resized regularly during program execution, and this can lead to a problem called fragmentation. 
+光有栈，对于面向过程的程序设计还远远不够，因为栈上的数据在函数返回的时候就会被释放掉，所以**无法将数据传递至函数外部**。而全局变量没有办法动态地产生，只能在编译的时候定义，有很多情况下缺乏表现力，在这种情况下，堆（Heap）是一种唯一的选择。The heap is an area of dynamically-allocated memory that is **managed automatically by the operating system or the memory manager library**. Memory on the heap is allocated, deallocated, and resized regularly during program execution, and this can lead to a problem called fragmentation. 堆适合管理生存期较长的一些数据，这些数据在退出作用域以后也不会消失。
 
 ## 调度系统设计精要
 

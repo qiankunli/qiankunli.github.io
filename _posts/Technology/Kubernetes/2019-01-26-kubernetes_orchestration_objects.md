@@ -13,6 +13,7 @@ keywords: kubernetes stateset
 * TOC
 {:toc}
 
+Kubernetes 对象是系统中的持久实体，描述集群的期望状态
 
 ![](/public/upload/kubernetes/kubernetes_object.png)
 
@@ -20,6 +21,18 @@ keywords: kubernetes stateset
 
 
 **Kubernetes 的各种object，就是常规的各个项目组件在 kubernetes 上的表示** [深入理解StatefulSet（三）：有状态应用实践](https://time.geekbang.org/column/article/41217) 充分体现了在我们把服务 迁移到Kubernetes 的过程中，要做多少概念上的映射。
+
+## Spec 和 Status
+
+每一个对象都包含两个嵌套对象来描述规格（Spec）和状态（Status），对象的规格其实就是我们期望的目标状态。而Status描述了对象的当前状态，这部分一般由 Kubernetes 系统本身提供和管理，是我们观察集群本身的一个接口。
+
+    type Deployment struct { 
+        metav1.TypeMeta `json:",inline"` 
+        metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"` 
+    
+        Spec DeploymentSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"` 
+        Status DeploymentStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"` 
+    } 
 
 ## 集大成者——StatefulSet
 
