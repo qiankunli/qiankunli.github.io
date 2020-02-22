@@ -8,18 +8,22 @@ keywords: JAVA Spring
 
 ---
 
-## 前言 ##
+## 前言 
 
 * TOC
 {:toc}
 
-[Inversion of control](https://en.wikipedia.org/wiki/Inversion_of_control) In software engineering, inversion of control (IoC) is a programming principle. IoC inverts the flow of control as compared to traditional control flow. In IoC, custom-written portions of a computer program receive the flow of control from a generic framework. A software architecture with this design inverts control as compared to traditional procedural programming: in traditional programming, the custom code that expresses the purpose of the program calls into reusable libraries to take care of generic tasks, but with inversion of control, it is the framework that calls into the custom, or task-specific, code. traditional control flow 是从开始到结束都是自己“写代码”，IoC 中control flow的发起是由一个framework 触发的。类只是干自己的活儿——“填代码”，然后ioc在需要的时候调用。
+Spring 容器具象化一点就是 从xml、配置类、依赖jar 等处 通过 `BeanDefinitionRegistry.registerBeanDefinition` 向容器注入Bean信息，然后通过`BeanFactory.getBean` 应用在各个位置。 笔者以前习惯于关注 BeanFactory 初始化后的getBean 部分，忽视了其初始化过程的Bean信息加载部分。
 
 ![](/public/upload/spring/spring_ioc.png)
 
 从[谈元编程与表达能力](https://mp.weixin.qq.com/s/SUV6vBaqwu19-xYzkG4SxA)中，笔者收获了对运行时的一个理解：当相应的行为在当前对象上没有被找到时，运行时会提供一个改变当前对象行为的入口。从这个视角看，Spring 也可以认为是 java 的一个runtime，通过ApplicationContext 获取的bean 拥有 bean代码本身看不到的能力。
 
-## 控制反转 带来的改变：“解耦”
+## 什么是容器？
+
+[Inversion of control](https://en.wikipedia.org/wiki/Inversion_of_control) In software engineering, inversion of control (IoC) is a programming principle. IoC inverts the flow of control as compared to traditional control flow. In IoC, custom-written portions of a computer program receive the flow of control from a generic framework. A software architecture with this design inverts control as compared to traditional procedural programming: in traditional programming, the custom code that expresses the purpose of the program calls into reusable libraries to take care of generic tasks, but with inversion of control, it is the framework that calls into the custom, or task-specific, code. traditional control flow 是从开始到结束都是自己“写代码”，IoC 中control flow的发起是由一个framework 触发的。类只是干自己的活儿——“填代码”，然后ioc在需要的时候调用。
+
+**控制反转 带来的改变：“解耦”**
 
 假设有两个类A和B
 
@@ -49,12 +53,9 @@ IOC设计模式的两个重要支持：
 1. **对象间依赖关系的建立和应用系统的运行状态没有很强的关联性**，因此对象的依赖关系可以在启动时建立好，ioc容器（负责建立对象的依赖关系）不会对应用系统有很强的侵入性。
 2. 面向对象系统中，除了一部分对象是数据对象外，其他很大一部分是用来处理数据的，这些对象并不经常发生变化，在系统中以单件的形式起作用就可以满足应用的需求。
 
-
 ## ioc的实现
 
-什么是ioc容器？
-
-BeanFactory是最简单的ioc容器，看了BeanFactory接口方法，也许会更直观(主要包括获取bean、查询bean的特性等方法)。
+什么是ioc容器？BeanFactory是最简单的ioc容器，看了BeanFactory接口方法，也许会更直观(主要包括获取bean、查询bean的特性等方法)。
 
     interface BeanFactory{
         FACTORY_BEAN_PREFIX
@@ -69,36 +70,34 @@ BeanFactory是最简单的ioc容器，看了BeanFactory接口方法，也许会�
         String[] getAliases    
     }
 
+### Bean工厂的养料——BeanDefinition
 
-当然，ioc在实现上述功能之前，必须要先初始化，从某个源（比如xml配置文件）中加载bean信息。ioc容器对针对bean的不同（比如bean是否是单例），对bean的实例化有不同的处理，下面排除各种特例，描述下最常见的bean实例化过程。
+在BeanFactory 可以getBean之前，必须要先初始化，**从各种源（比如xml配置文件）中加载bean信息**。
 
-1. ioc初始化
-
-        BeanFactory bf = new XmlBeanFactory(new ClassPathResource("beans.xml"));
-        
-    - 验证并加载xml文件
-    - 依次读取`<bean></bean>`（或扫描所有java类中的注解信息），并将其信息转化为BeanDefinition类（将bean信息由文本存储方式转换为内存存储（以java类的形式存在））
-
-
-2. 执行`bf.getBean("beanid")`得到bean的实例
-
-    - 根据beanid获取到相应的BeanDefinition
-    - 根据BeanDefinition创建bean实例（此时还未注入属性）
-    - 属性（包括其依赖对象）注入
-
-    ioc在实例化bean的过程中，还夹了不少“私货”，也称之为装配wire：
-
-    - 在属性或依赖注入逻辑的前后留有处理函数（或回调函数）
-    - 如果bean实现了一些接口，ioc将其注入该接口指定的属性
+![](/public/upload/spring/bean_definition.png)
 
 bean在不同阶段的表现形式
 
 ||表现形式|与jvm类比|
 |---|---|---|
-|配置文件|`<bean class=""></bean>`|java代码|
+|配置文件<br>@Configuration注释的class等|`<bean class=""></bean>`|java代码|
 |ioc初始化|BeanDefinition|class二进制 ==> 内存中的Class对象|
 |getBean|Object|堆中的对象实例|
-    
+
+jvm 基于Class 对象将对象实例化，想new 一个对象，得先有Class 对象，或者使用classLoader 加载，或者动态生成。spring 容器类似，想getBean 对象bean 实例， 就是先register 对应的BeanDefinition，任何来源的bean 通过`BeanDefinitionRegistry.registerBeanDefinition` 都可以纳入到IOC 的管理。
+
+![](/public/upload/spring/bean_definition_xmind.png)
+
+`BeanFactory.getBean("beanid")`得到bean的实例
+
+- 根据beanid获取到相应的BeanDefinition
+- 根据BeanDefinition创建bean实例（此时还未注入属性）
+- 属性（包括其依赖对象）注入
+
+ioc在实例化bean的过程中，还夹了不少“私货”，也称之为装配wire：
+
+- 在属性或依赖注入逻辑的前后留有处理函数（或回调函数）
+- 如果bean实现了一些接口，ioc将其注入该接口指定的属性
 
 ### BeanFactory
 
@@ -241,18 +240,6 @@ AbstractApplicationContext.refresh(): Load or refresh the persistent representat
 			}
 		}
 	}
-
-## 细说BeanDefinition
-
-![](/public/upload/spring/bean_definition.png)
-
-![](/public/upload/spring/bean_definition_xmind.png)
-
-首先要将配置文件描述的bean信息加载到内存中，再根据这些信息构建bean实例，这些信息在内存中的存在形式便是BeanDefinition。spring ioc的基本功能可由以下过程实现：
-
-1. 将BeanDefinition（以配置文件，注解形式存在）加载到内存
-2. 根据BeanDefinition创建并管理bean实例以及它们之间的依赖
-
 
 ## Bean的管理Environment
 
