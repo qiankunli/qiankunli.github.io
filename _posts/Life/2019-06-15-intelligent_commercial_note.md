@@ -4,7 +4,7 @@ layout: post
 title: 《智能商业》笔记
 category: 生活
 tags: Life
-keywords: 技术领导力
+keywords: 智能商业
 
 ---
 

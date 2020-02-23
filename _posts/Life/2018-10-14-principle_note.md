@@ -4,7 +4,7 @@ layout: post
 title: 《原则》笔记
 category: 生活
 tags: Life
-keywords: 认知
+keywords: 原则
 
 ---
 

@@ -4,7 +4,7 @@ layout: post
 title: 《智能时代》笔记
 category: 生活
 tags: Life
-keywords: technology
+keywords: 智能时代
 
 ---
 

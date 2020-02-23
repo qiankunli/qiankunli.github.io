@@ -4,7 +4,7 @@ layout: post
 title: 《技术的本质》笔记
 category: 生活
 tags: Life
-keywords: coder
+keywords: 技术的本质
 
 ---
 
