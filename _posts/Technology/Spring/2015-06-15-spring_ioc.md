@@ -88,16 +88,15 @@ jvm 基于Class 对象将对象实例化，想new 一个对象，得先有Class 
 
 ![](/public/upload/spring/bean_definition_xmind.png)
 
-`BeanFactory.getBean("beanid")`得到bean的实例
+[Spring的Bean生命周期，11 张高清流程图及代码，深度解析](https://mp.weixin.qq.com/s/Rilo9hlkwM1OvfqUx_YJ9A)`BeanFactory.getBean("beanid")`得到bean的实例
 
-- 根据beanid获取到相应的BeanDefinition
-- 根据BeanDefinition创建bean实例（此时还未注入属性）
-- 属性（包括其依赖对象）注入
+![](/public/upload/spring/get_bean.png)
 
-ioc在实例化bean的过程中，还夹了不少“私货”，也称之为装配wire：
+ioc在实例化bean的过程中，还夹了不少“私货”/“钩子”：
 
-- 在属性或依赖注入逻辑的前后留有处理函数（或回调函数）
-- 如果bean实现了一些接口，ioc将其注入该接口指定的属性
+![](/public/upload/spring/get_bean.png)
+
+
 
 ### BeanFactory
 

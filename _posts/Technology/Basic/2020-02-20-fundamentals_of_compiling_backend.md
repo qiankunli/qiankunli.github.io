@@ -327,7 +327,7 @@ IR看做是一种高层次的汇编语言，主要体现在：
 IR 格式
 
 1. 三地址代码，学习用途
-2. LLVM 的 IR，工业级，提供了一个 IR 生成的 API（应用编程接口）
+2. LLVM 的 IR，工业级
 
     1. 静态单赋值（SSA），也就是每个变量（地址）最多被赋值一次，它这种特性有利于运行代码优化算法；
     2. 有更多的细节信息。比如整型变量的字长、内存对齐方式等等
@@ -350,6 +350,53 @@ LLVM优化后的编码`clang -emit-llvm -S -O2 fun1.c -o fun1.ll`
         %4 = add i32 %3, %1
         ret i32 %4
     }
+
+### LLVM IR对象模型
+
+LLVM提供了代表 LLVM IR 的一组对象模型，我们只要生成这些对象，就相当于生成了 IR，比通过字符串拼接来生成 LLVM 的 IR方便。
+
+    int fun1(int a, int b){
+        return a+b;
+    }
+
+直接从 fun1() 函数生成 IR
+
+    Module *mod = new Module("fun1.ll", TheModule);
+    //函数原型
+    vector<Type *> argTypes(2, Type::getInt32Ty(TheContext));
+    FunctionType *fun1Type = FunctionType::get(Type::getInt32Ty(TheContext), //返回值是整数
+        argTypes, //两个整型参数
+        false);   //不是变长参数
+    //函数对象
+    Function *fun = Function::Create(fun1Type, 
+        Function::ExternalLinkage,   //链接类型
+        "fun1",                      //函数名称
+        TheModule.get());            //所在模块
+    //设置参数名称
+    string argNames[2] = {"a", "b"};
+    unsigned i = 0;
+    for (auto &arg : fun->args()){
+        arg.setName(argNames[i++]);
+    }
+    //创建一个基本块
+    BasicBlock *BB = BasicBlock::Create(TheContext,//上下文
+                "",     //基本块名称
+                fun);  //所在函数
+    Builder.SetInsertPoint(BB);   //设置指令的插入点
+    //把参数变量存到NamedValues里面备用
+    NamedValues.clear();
+    for (auto &Arg : fun->args())
+        NamedValues[Arg.getName()] = &Arg;
+    //做加法
+    Value *L = NamedValues["a"];
+    Value *R = NamedValues["b"];
+    Value *addtmp = Builder.CreateAdd(L, R);
+    //返回值
+    Builder.CreateRet(addtmp);
+    //验证函数的正确性
+    verifyFunction(*fun);
+    Function *fun1 = codegen_fun1();     //在模块中生成Function对象
+    TheModule->print(errs(), nullptr);   //在终端输出IR
 
 ### 独立于机器的优化
 

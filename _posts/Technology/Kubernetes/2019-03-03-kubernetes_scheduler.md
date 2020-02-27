@@ -15,21 +15,27 @@ keywords: kubernetes scheduler
 
 ![](/public/upload/basic/scheduler_design.png)
 
+几个主要点
+
+1. Kubernetes 调度与mesos、yarn的异同
+2. Kubernetes 调度本身的演化 [从 Kubernetes 资源控制到开放应用模型，控制器的进化之旅](https://mp.weixin.qq.com/s/AZhyux2PMYpNmWGhZnmI1g)
+
 ## 资源调度泛谈
 
 [Kubernetes架构为什么是这样的？](https://mp.weixin.qq.com/s/ps34qFlEzQNYbp6ughkrOA)在 Google 的一篇关于内部 Omega 调度系统的论文中，将调度系统分成三类：单体、二层调度和共享状态三种，按照它的分类方法，通常Google的 Borg被分到单体这一类，Mesos被当做二层调度，而Google自己的Omega被当做第三类“共享状态”。我认为 **Kubernetes 的调度模型也完全是二层调度的，和 Mesos 一样，任务调度和资源的调度是完全分离的，Controller Manager承担任务调度的职责，而Scheduler则承担资源调度的职责**。 
 
-||Mesos|K8S|
-|---|---|---|
-|资源分配|Mesos Master<br>Framework|Scheduler|
-|任务调度|Framework|Controller Manager|
+[集群调度系统的演进](https://mp.weixin.qq.com/s/3qVdnUQ3zt4eu3lZRZ_ibg)
+
+||资源调度|任务调度|任务调度对资源调度模块的请求方式|
+|---|---|---|---|
+|Mesos|Mesos Master<br>Framework|Framework|push|
+|YARN|Resource Manager|Application Master<br>Application Manager|pull|
+|K8S|Scheduler|Controller Manager|pull|
 
 Kubernetes和Mesos调度的最大区别在于资源调度请求的方式
 
 1. 主动 Push 方式。是 Mesos 采用的方式，就是 Mesos 的资源调度组件（Mesos Master）主动推送资源 Offer 给 Framework，Framework 不能主动请求资源，只能根据 Offer 的信息来决定接受或者拒绝。
-2. 被动 Pull 方式。是 Kubernetes 的方式，资源调度组件 Scheduler 被动的响应 Controller Manager的资源请求。
-
-[集群调度系统的演进](https://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649701086&idx=1&sn=2018b0a05027725f08686a73a26788ed&chksm=889305bdbfe48cabd83e49bbf321f96bd708925d89576cfcf0cfb49fb0221c0e0f6a84db602d&mpshare=1&scene=23&srcid=%23rd)Kubernetes 是一个集群调度系统，今天这篇文章主要是介绍 Kubernetes 之前一些集群调度系统的架构，**通过梳理他们的设计思路和架构特点，我们能够学习到集群调度系统的架构的演进过程，以及在架构设计时需要考虑的主要问题**，对理解 Kubernetes 的架构会非常有帮助。(未细读)
+2. 被动 Pull 方式。是 Kubernetes/YARN 的方式，资源调度组件 Scheduler 被动的响应 Controller Manager的资源请求。
 
 ### 为什么不支持横向扩展？
 
@@ -73,7 +79,7 @@ limit 不设定，默认值由 LimitRange object确定
 
 DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 DaemonSet 的 PPod 被回收，它又会立即在原宿主机上被重建出来，这就使得前面资源回收的动作，完全没有意义了。
 
-## 实现
+## Kubernetes 基于资源的调度
 
 在 Kubernetes 项目中，默认调度器的主要职责，就是为一个新创建出来的 Pod，寻找一个最合适的节点（Node）而这里“最合适”的含义，包括两层： 
 
@@ -93,7 +99,7 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 调度这个事情，在不同的公司和团队里的实际需求一定是大相径庭的。上游社区不可能提供一个大而全的方案出来。所以，将默认调度器插件化是 kube-scheduler 的演进方向。
 
-## 谓词和优先级算法
+### 谓词和优先级算法
 
 [调度系统设计精要](https://mp.weixin.qq.com/s/R3BZpYJrBPBI0DwbJYB0YA)
 

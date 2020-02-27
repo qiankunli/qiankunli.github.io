@@ -47,6 +47,10 @@ SideCar的一种实现[MOSN](https://www.sofastack.tech/projects/sofa-mosn/overv
 
 ![](/public/upload/practice/service_mesh.png)
 
+通信能力的下沉
+
+![](/public/upload/mesh/communication_go_down.png)
+
 [深入解读Service Mesh背后的技术细节](https://sq.163yun.com/blog/article/218831472301936640)Service Mesh是Kubernetes支撑微服务能力**拼图的最后一块**
 
 ![](/public/upload/mesh/service_mesh_with_kubernetes.jpg)
