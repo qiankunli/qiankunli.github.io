@@ -94,7 +94,7 @@ jvm 基于Class 对象将对象实例化，想new 一个对象，得先有Class 
 
 ioc在实例化bean的过程中，还夹了不少“私货”/“钩子”：
 
-![](/public/upload/spring/get_bean.png)
+![](/public/upload/spring/create_bean.png)
 
 
 
