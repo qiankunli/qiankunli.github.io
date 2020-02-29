@@ -3,7 +3,7 @@
 layout: post
 title: Thrift基本原理与实践（二）
 category: 技术
-tags: Java
+tags: RPC
 keywords: thrift,batch,async
 
 ---

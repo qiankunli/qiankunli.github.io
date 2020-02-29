@@ -3,8 +3,8 @@
 layout: post
 title: 网络通信协议
 category: 架构
-tags: Practice
-keywords: project
+tags: RPC
+keywords: network communication protocol
 
 ---
 

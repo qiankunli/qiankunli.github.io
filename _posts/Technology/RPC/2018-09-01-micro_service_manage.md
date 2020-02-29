@@ -3,7 +3,7 @@
 layout: post
 title: 业务程序猿眼中的微服务管理
 category: 架构
-tags: Practice
+tags: RPC
 keywords: dubbo micro service
 
 ---
@@ -18,7 +18,7 @@ keywords: dubbo micro service
 
 ## 整体架构
 
-![](/public/upload/practice/traditional_micro_service.png)
+![](/public/upload/practice/micro_service_overview.png)
 
 ## 三大基本套路
 
