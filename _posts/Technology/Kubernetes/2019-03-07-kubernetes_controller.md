@@ -19,7 +19,7 @@ keywords: kubernetes scheduler
 
 [Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)
 
-**We really like the Kubernetes ideology of seeing the entire system as a control system. That is, the system constantly tries to move its current state to a desired state**.The worker units that guarantee the desired state are called controllers.
+**We really like the Kubernetes ideology of seeing the entire system as a control system. That is, the system constantly tries to move its current state to a desired state**.The worker units that guarantee the desired state are called controllers. 控制器就是保证系统按 desired state运行。
 
 ## 一切操作皆对象
 
@@ -31,7 +31,9 @@ keywords: kubernetes scheduler
 
 [kube-controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/) **In applications of robotics and automation, a control loop is a non-terminating loop that regulates the state of the system**（在自动化行业是常见方式）. In Kubernetes, a controller is a control loop that watches the shared state of the cluster through the API server and makes changes attempting to move the current state towards the desired state. Examples of controllers that ship with Kubernetes today are the replication controller, endpoints controller, namespace controller, and serviceaccounts controller.
 
-docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就在在集群里给镜像找一个主机来运行容器。经过 [《深入剖析kubernetes》笔记](http://qiankunli.github.io/2018/08/26/parse_kubernetes_note.html)的学习，很明显不是这样。比调度更重要的是编排，那么编排如何实现呢？控制器
+docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就在在集群里给镜像找一个主机来运行容器。但实际上比调度更重要的是编排，那么编排如何实现呢？控制器
+
+现声明式API对象与控制器模型相辅相成，声明式API对象定义出期望的资源状态，控制器模型则通过控制循环（Control Loop）将Kubernetes内部的资源调整为声明式API对象期望的样子。因此可以认为声明式API对象和控制器模型，才是Kubernetes项目编排能力“赖以生存”的核心所在。
 
 ### 有什么
 
@@ -44,8 +46,6 @@ controller是一系列控制器的集合，不单指RC。
 	replicaset/             serviceaccount/         volume/
 	cronjob/                garbagecollector/       nodelifecycle/          replication/            statefulset/            daemon/
 	...
-
-**控制器是declarative API的重要组成部分**，declarative API的内涵参见[Kubernetes源码分析——apiserver](http://qiankunli.github.io/2019/01/05/kubernetes_source_apiserver.html)
 
 ### 整体逻辑
 
@@ -65,10 +65,7 @@ controller是一系列控制器的集合，不单指RC。
 
 ![](/public/upload/kubernetes/k8s_controller_definition.PNG)
 
-Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事件驱动”，有点类似 select和epoll的区别。控制器模型更有利于幂等。
 
-1. 对于控制器来说，被监听对象的变化是一个持续的信号，比如变成 ADD 状态。只要这个状态没变化，那么此后无论任何时候控制器再去查询对象的状态，都应该是 ADD。
-2. 而对于事件驱动来说，它只会在 ADD 事件发生的时候发出一个事件。如果控制器错过了这个事件，那么它就有可能再也没办法知道ADD 这个事件的发生了。
 
 ## 实现
 
@@ -77,7 +74,6 @@ Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事
 [A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html) 
 
 
-![](/public/upload/kubernetes/kubernete_controller_pattern.png)
 
 ### 控制器和Informer情感纠葛
 
@@ -87,7 +83,14 @@ Kubernetes 使用的这个“控制器模式”，跟我们平常所说的“事
 
 1. Controller 一直访问API Server 导致API Server 压力太大，于是有了Informer
 2. 由 Informer 代替Controller去访问 API Server，而Controller不管是查状态还是对资源进行伸缩都和 Informer 进行交接。而且 Informer 不需要每次都去访问 API Server，它只要在初始化的时候通过 LIST API 获取所有资源的最新状态，然后再通过 WATCH API 去监听这些资源状态的变化，整个过程被称作 ListAndWatch。
+
+    ![](/public/upload/kubernetes/kubernete_controller_pattern.png)
+
 3. Informer 也有一个助手叫 Reflector，上面所说的 ListAndWatch 事实上是由 Reflector 一手操办的。这使 API Server 的压力大大减少
+
+    ![](/public/upload/kubernetes/k8s_custom_controller.png)
+
+    Informer其实就是一个带有本地缓存和索引机制的、可以注册EventHandler( AddFunc、UpdateFunc 和 DeleteFunc)的 client。通过监听etcd数据变化，Informer 可以实时地更新本地缓存，并且调用这些事件对应的 EventHandler
 4. 后来，WATCH 数据的太多了，Informer/Reflector去 API Server 那里 WATCH 状态的时候，只 WATCH 特定资源的状态，不要一股脑儿全 WATCH。
 5. 一个controller 一个informer 还是压力大，于是针对每个（受多个控制器管理的）资源弄一个 Informer。比如 Pod 同时受 Deployment 和 StatefulSet 管理。这样当多个控制器同时想查 Pod 的状态时，只需要访问一个 Informer 就行了。
 6. 但这又引来了新的问题，SharedInformer 无法同时给多个控制器提供信息，这就需要每个控制器自己排队和重试。为了配合控制器更好地实现排队和重试，SharedInformer  搞了一个 Delta FIFO Queue（增量先进先出队列），每当资源被修改时，它的助手 Reflector 就会收到事件通知，并将对应的事件放入 Delta FIFO Queue 中。与此同时，SharedInformer 会不断从 Delta FIFO Queue 中读取事件，然后更新本地缓存的状态。
