@@ -17,7 +17,7 @@ keywords: container network
 
 ## docker 单机
 
-容器网络发端于 Docker 的网络。Docker 使用了一个比较简单的网络模型，即内部的网桥加内部的保留 IP。这种设计的好处在于容器的网络和外部世界是解耦的，无需占用宿主机的 IP 或者宿主机的资源，完全是虚拟的。
+[Kubernetes 网络模型进阶](https://mp.weixin.qq.com/s/QZYpV7ks2xxNvtqWUiS7QQ)容器网络发端于 Docker 的网络。Docker 使用了一个比较简单的网络模型，即内部的网桥加内部的保留 IP。这种设计的好处在于容器的网络和外部世界是解耦的，无需占用宿主机的 IP 或者宿主机的资源，完全是虚拟的。
 
 它的设计初衷是：当需要访问外部世界时，会采用 SNAT 这种方法来借用 Node 的 IP 去访问外面的服务。比如容器需要对外提供服务的时候，所用的是 DNAT 技术，也就是在 Node 上开一个端口，然后通过 iptable 或者别的某些机制，把流导入到容器的进程上以达到目的。简称：出宿主机采用SNAT借IP，进宿主机用DNAT借端口。
 
@@ -40,21 +40,21 @@ Kubernetes requires each pod to have an IP in a flat networking namespace with f
 
 ## 跨主机通信
 
+Network是一组可以相互通信的Endpoints，网络提供connectivity and discoverability.
+
 there are two ways for Containers or VMs to communicate to each other. 
 
 1. In Underlay network approach, VMs or Containers are directly exposed to host network. Bridge, macvlan and ipvlan network drivers are examples of this approach. 
 2. In Overlay network approach, there is an additional level of encapsulation like VXLAN, NVGRE between the Container/VM network and the underlay network
 
+一个容器的包所要解决的问题分为两步：第一步，如何从容器的空间 (c1) 跳到宿主机的空间 (infra)；第二步，如何从宿主机空间到达远端。容器网络的方案可以通过接入、流控、通道这三个层面来考虑。
+
+1. 第一个是接入，就是说我们的容器和宿主机之间是使用哪一种机制做连接，比如 Veth + bridge、Veth + pair 这样的经典方式，也有利用高版本内核的新机制等其他方式（如 mac/IPvlan 等），来把包送入到宿主机空间；
+2. 第二个是流控，就是说我的这个方案要不要支持 Network Policy，如果支持的话又要用何种方式去实现。这里需要注意的是，我们的实现方式一定需要在数据路径必经的一个关节点上。如果数据路径不通过该 Hook 点，那就不会起作用；
+3. 第三个是通道，即两个主机之间通过什么方式完成包的传输。我们有很多种方式，比如以路由的方式，具体又可分为 BGP 路由或者直接路由。还有各种各样的隧道技术等等。最终我们实现的目的就是一个容器内的包通过容器，经过接入层传到宿主机，再穿越宿主机的流控模块（如果有）到达通道送到对端。
+
+
 ### overlay 网络
-
-**Network是一组可以相互通信的Endpoints，网络提供connectivity and discoverability（这句话是容器网络的纲，纲举目张）.** ip/mac 不是物理机独有的，主机内网络配置 （网卡 + iptables + 路由表 ）加上网关，加上协议，就可以进行网络通信。
-
-|网络| Endpoints | connectivity | discoverability |
-|---|---|---|---|
-|物理机局域网络|物理机网卡|网线 + 交换机|ARP广播，物理机内完成|
-|overlay 网络|容器 veth|容器与宿主机network namespace连通，物理机连通|网络插件 + etcd，物理机内完成|
-
-这个 discoverability 宏观上有点微服务 服务发现的意思。
 
 我们找一下覆盖网络的感觉
 
@@ -73,8 +73,6 @@ there are two ways for Containers or VMs to communicate to each other.
 
 ![](/public/upload/docker/overlay_network_2.png)
 
-有时觉得物理机内部 容器的veth 与 宿主机的eth0 之间塞个网桥、vtep、tun0 等虚拟设备 + 路由表等很复杂，但真实的网络世界，也不是一个交换机解决所有的问题。在数据中心网络中，什么三层交换机、二层交换机，交换机的搭配也是一门很深的学问。
-
 #### 隧道
 
 隧道一般用到了解封包，那么问题来了，谁来解封包？怎么解封包？
@@ -86,8 +84,6 @@ there are two ways for Containers or VMs to communicate to each other.
 |calico + ipip|ip数据包 package|bgp 更新路由 + tunl0 解封包|宿主机三层连通|
 
 flannel + udp 和flannel + vxlan 有一个共性，那就是用户的容器都连接在 docker0网桥上。而网络插件则在宿主机上创建了一个特殊的设备（UDP 模式创建的是 TUN 设备，VXLAN 模式创建的则是 VTEP 设备），docker0 与这个设备之间，通过 IP 转发（路由表）进行协作。然后，**网络插件真正要做的事情，则是通过某种方法，把不同宿主机上的特殊设备连通，从而达到容器跨主机通信的目的。**
-
-VTEP 等内核实现的设备 ，包括vlan、vxlan 等内核实现的机制、协议，其实与一般的网卡、网络协议栈、arp等是一样一样的，只是前者太基础了，进了课本，后者还比较新而已。
 
 Flannel 支持三种后端实现，分别是： VXLAN；host-gw； UDP。而 UDP 模式，是 Flannel 项目最早支持的一种方式，也是性能最差的一种方式。所以，这个模式目前已经被弃用。我们在进行系统级编程的时候，有一个非常重要的优化原则，**就是要减少用户态到内核态的切换次数，并且把核心的处理逻辑都放在内核态进行**。这也是为什么，Flannel 后来支持的VXLAN 模式，逐渐成为了主流的容器网络方案的原因。
 
@@ -154,15 +150,6 @@ There are two main ways they do it:
 |ipvlan|ipvlan sub-interfaces|ipvlan sub-interfaces|
 
 [容器网络：盘点，解释与分析](http://www.dockerinfo.net/4289.html)
-
-这个归类不好做，有好几个方面：
-
-1. 支持量级的大小
-2. 拆封包还是路由
-3. 交换机是否有感知
-4. 容器所在物理机/宿主机处于一个什么样的角色
-5. 是一个L3方案（只要物理机来通就行）还是L2方案，L3网络扩展和提供在过滤和隔离网络流量方面的细粒度控制。
-6. 选择网络时，IP地址管理IPAM，组播，广播，IPv6，负载均衡，服务发现，策略，服务质量，高级过滤和性能都是需要额外考虑的。问题是这些能力是否受到支持。即使您的runtime，编排引擎或插件支持容器网络功能，您的基础架构也可能不支持该功能
 
 ## 网络隔离
 

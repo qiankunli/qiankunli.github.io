@@ -13,9 +13,6 @@ keywords: kubernetes 源码分析
 * TOC
 {:toc}
 
-
-建议先看下前文 [Kubernetes源码分析——apiserver](http://qiankunli.github.io/2019/01/05/kubernetes_source_apiserver.html)
-
 ![](/public/upload/kubernetes/controller_manager.png)
 
 ## Controller的容器——Controller Mananger
