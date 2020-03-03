@@ -7,7 +7,8 @@ tags: Docker
 keywords: Docker jenkins python
 
 ---
-## 简介
+
+## 简介（已过时）
 
 前文`基于docker搭建测试环境`展示了docker ci环境的搭建过程，本文将进一步丰富细节，主要讲述“将web项目编译，创建镜像以及将镜像部署到某个主机上，创建容器并运行”的脚本实现。
 

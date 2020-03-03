@@ -13,76 +13,30 @@ keywords: container network
 * TOC
 {:toc}
 
-阅读本文前，建议事先了解下
+容器的一个诉求：To make a VM mobile you want to be able to move it's physical location without changing it's apparent network location.
 
-[程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)
+## docker 单机
 
-[《深入剖析kubernetes》笔记](http://qiankunli.github.io/2018/08/26/parse_kubernetes_note.html)
+容器网络发端于 Docker 的网络。Docker 使用了一个比较简单的网络模型，即内部的网桥加内部的保留 IP。这种设计的好处在于容器的网络和外部世界是解耦的，无需占用宿主机的 IP 或者宿主机的资源，完全是虚拟的。
 
-[《Container-Networking-Docker-Kubernetes》笔记](http://qiankunli.github.io/2018/10/11/docker_to_k8s_network_note.html)
+它的设计初衷是：当需要访问外部世界时，会采用 SNAT 这种方法来借用 Node 的 IP 去访问外面的服务。比如容器需要对外提供服务的时候，所用的是 DNAT 技术，也就是在 Node 上开一个端口，然后通过 iptable 或者别的某些机制，把流导入到容器的进程上以达到目的。简称：出宿主机采用SNAT借IP，进宿主机用DNAT借端口。
+
+该模型的问题在于：**网络中一堆的NAT 包，外部网络无法区分哪些是容器的网络与流量、哪些是宿主机的网络与流量**。
+
+## Kubernetes IP-per-pod model
+
+针对docker 跨主机通信时网络中一堆的NAT包，Kubernetes 提出IP-per-pod model ，这个 IP 是真正属于该 Pod 的，对这个 Pod IP 的访问就是真正对它的服务的访问，中间拒绝任何的变造。比如以 10.1.1.1 的 IP 去访问 10.1.2.1 的 Pod，结果到了 10.1.2.1 上发现，它实际上借用的是宿主机的 IP，而不是源 IP，这样是不被允许的。
+
+Kubernetes 对怎么实现这个模型其实是没有什么限制的，用 underlay 网络来**控制外部路由器进行导流**是可以的；如果希望解耦，用 overlay 网络在底层网络之上再加一层叠加网，这样也是可以的。总之，只要达到模型所要求的目的即可。
+
+Rather than prescribing a certain networking solution, Kubernetes only states three fundamental requirements:
+
+* Containers can communicate with all other containers without NAT.
+* Nodes can communicate with all containers (and vice versa) without NAT.
+* The IP a container sees itself is the same IP as others see it. each pod has its own IP address that other pods can find and use. 很多业务启动时会将自己的ip 发出去（比如注册到配置中心），这个ip必须是外界可访问的。 学名叫：flat address space across the cluster.
 
 
-## 计算机发送数据包的基本过程
-
-1. 如果要访问的目标IP跟自己是一个网段的（根据CIDR就可以判断出目标端IP和自己是否在一个网段内了），就不用经过网关了，先通过ARP协议获取目标端的MAC地址，源IP直接发送数据给目标端IP即可。
-
-	<table>
-	<tr>
-		<td colspan="2">frame header</td>
-		<td colspan="3">frame body</td>
-	</tr>
-	<tr>
-		<td>A mac</td>
-		<td>B mac</td>
-		<td bgcolor="green">A ip</td>
-		<td bgcolor="green">B ip</td>
-		<td bgcolor="green">body</td>
-	</tr>
-	</table>
-
-	如何是一个局域网的, you can just send a packet with any random IP address on it, and as long as the MAC address is right it’ll get there.
-
-2. 如果访问的不是跟自己一个网段的，就会先发给网关（哪个网关由 The route table 确定），然后再由网关发送出去，网关就是路由器的一个网口，网关一般跟自己是在一个网段内的，通过ARP获得网关的mac地址，就可以发送出去了
-
-	<table>
-	<tr>
-		<td colspan="2">frame header</td>
-		<td colspan="3">frame body</td>
-	</tr>
-	<tr>
-		<td>A mac</td>
-		<td>gateway mac</td>
-		<td bgcolor="green">A ip</td>
-		<td bgcolor="green">B ip</td>
-		<td bgcolor="green">body</td>
-	</tr>
-	</table>
-
-### 主机路由对上述过程的影响
-
-	$ ip route
-	...
-	10.244.1.0/24 via 10.168.0.3 dev eth0
-
-目的 IP 地址属于 10.244.1.0/24 网段的 IP 包，应该经过本机的 eth0 设备发出去（即：dev eth0）；并且，它下一跳地址（next-hop）是 10.168.0.3（即：via 10.168.0.3）。
-
-所谓下一跳地址就是：如果 IP 包从主机 A 发到主机 B，需要经过路由设备 X 的中转。那么 X 的 IP 地址就应该配置为主机 A 的下一跳地址。一旦A配置了下一跳地址，那么接下来，当 IP 包从网络层进入链路层封装成帧的时候，eth0 设备就会使用下一跳地址X_IP对应的 MAC 地址，作为该数据帧的目的 MAC 地址。**网关/下一跳的 IP 地址不会出现在任何网络包头中**
-
-<table>
-<tr>
-	<td colspan="2">frame header</td>
-	<td colspan="3">frame body</td>
-</tr>
-<tr>
-	<td>A mac</td>
-	<td>X mac</td>
-	<td bgcolor="green">A ip</td>
-	<td bgcolor="green">B ip</td>
-	<td bgcolor="green">body</td>
-</tr>
-</table>
-
-[程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)提到：在一个网络数据包传输的过程中（跨网络+路由器），都是源/目标mac在变，源/目标ip都没变。
+Kubernetes requires each pod to have an IP in a flat networking namespace with full connectivity to other nodes and pods across the network. This IP-per-pod model yields a backward-compatible way for you to treat a pod almost identically to a VM or a physical host（**ip-per-pod 的优势**）, in the context of naming, service discovery, or port allocations. The model allows for a smoother transition from non–cloud native apps and environments.  这样就 no need to manage port allocation
 
 ## 跨主机通信
 
@@ -92,8 +46,6 @@ there are two ways for Containers or VMs to communicate to each other.
 2. In Overlay network approach, there is an additional level of encapsulation like VXLAN, NVGRE between the Container/VM network and the underlay network
 
 ### overlay 网络
-
-建议参考下[《Container-Networking-Docker-Kubernetes》笔记](http://qiankunli.github.io/2018/10/11/docker_to_k8s_network_note.html) 一起学习
 
 **Network是一组可以相互通信的Endpoints，网络提供connectivity and discoverability（这句话是容器网络的纲，纲举目张）.** ip/mac 不是物理机独有的，主机内网络配置 （网卡 + iptables + 路由表 ）加上网关，加上协议，就可以进行网络通信。
 

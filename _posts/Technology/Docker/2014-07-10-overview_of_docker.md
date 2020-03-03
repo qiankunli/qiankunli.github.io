@@ -9,6 +9,7 @@ keywords: Docker Container Image
 ---
 
 ## 1 前言 ##
+
 本文类似于一个知识点的总结，具体的细节请参见官方文档 [https://docs.docker.com](https://docs.docker.com) 。
 
 如果你事先对docker并不了解，建议先完成[http://www.slideshare.net/larrycai/learn-docker-in-90-minutes](http://www.slideshare.net/larrycai/learn-docker-in-90-minutes)的内容，通过实际操作对docker有一个感性的认识。

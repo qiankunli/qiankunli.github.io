@@ -4,7 +4,7 @@ layout: post
 title: 容器日志采集
 category: 技术
 tags: Docker
-keywords: jib
+keywords: container log collect
 
 ---
 

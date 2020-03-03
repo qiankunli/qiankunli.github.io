@@ -4,7 +4,7 @@ layout: post
 title: 容器狂打日志怎么办？
 category: 技术
 tags: Docker
-keywords: jib
+keywords: container log
 
 ---
 

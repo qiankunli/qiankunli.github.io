@@ -170,3 +170,11 @@ Ingress和Pod、Servce等等类似，被定义为kubernetes的一种资源。本
 [Kubernetes Networking 101 – Ingress resources](http://www.dasblinkenlichten.com/kubernetes-networking-101-ingress-resources/)
 
 [Getting started with Calico on Kubernetes](http://www.dasblinkenlichten.com/getting-started-with-calico-on-kubernetes/)（未读）My goal with these posts has been to focus on the primitives and to show how a Kubernetes cluster handles networking internally as well as how it interacts with the upstream or external network. 
+
+A service provides a stable virtual IP (VIP) address for a set of pods. It’s essential to realize that VIPs do not exist as such in the networking stack. For example, **you can’t ping them.** They are only Kubernetes- internal administrative entities. Also note that the format is IP:PORT, so the IP address along with the port make up the VIP. **Just think of a VIP as a kind of index into a data structure mapping to actual IP addresses.**
+
+k8s的service discovery 真的是 service 组件的discovery
+
+1. kube-proxy，给service 一个host 可访问的ip:port
+2. kube-dns/CNCF project CoreDNS，给service 一个域名
+3. Ingress，给service 一个可访问的http path

@@ -4,14 +4,16 @@ layout: post
 title: 一个容器多个进程
 category: 技术
 tags: Docker
-keywords: 持续交付
+keywords: multi-process in container
 
 ---
 
-## 简介
+## 简介（已过时）
 
 * TOC
 {:toc}
+
+在kubernetes 成为毫无疑问的容器标准后，该问题已无必要。
 
 ## 背景
 
@@ -199,6 +201,3 @@ github 有一个 [phusion/baseimage-docker](https://github.com/phusion/baseimage
 3. runit 正常会尝试不断重启，实际上往往因为代码的原因，启动一次就行了。因此启动springboot 的时候，先检查下 有没有`/etc/service/springboot/supervise`（runsv将服务的状态保存服务对应在supervise目录中） 文件，若没有则是第一次启动。有则是第二次启动，写入`/etc/service/springboot/down`（down 告知runsv 停止该服务）
 
 
-个人微信订阅号
-
-![](/public/upload/qrcode_for_gh.jpg)
