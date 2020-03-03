@@ -13,11 +13,13 @@ keywords: JAVA Spring
 * TOC
 {:toc}
 
-Spring 容器具象化一点就是 从xml、配置类、依赖jar 等处 通过 `BeanDefinitionRegistry.registerBeanDefinition` 向容器注入Bean信息，然后通过`BeanFactory.getBean` 应用在各个位置。 笔者以前习惯于关注 BeanFactory 初始化后的getBean 部分，忽视了其初始化过程的Bean信息加载部分。
-
 ![](/public/upload/spring/spring_ioc.png)
 
-从[谈元编程与表达能力](https://mp.weixin.qq.com/s/SUV6vBaqwu19-xYzkG4SxA)中，笔者收获了对运行时的一个理解：当相应的行为在当前对象上没有被找到时，运行时会提供一个改变当前对象行为的入口。从这个视角看，Spring 也可以认为是 java 的一个runtime，通过ApplicationContext 获取的bean 拥有 bean代码本身看不到的能力。
+Spring 容器具象化一点就是 从xml、配置类、依赖jar 等处 通过 `BeanDefinitionRegistry.registerBeanDefinition` 向容器注入Bean信息，然后通过`BeanFactory.getBean` 应用在各个位置。 笔者以前习惯于关注 BeanFactory 初始化后的getBean 部分，忽视了其初始化过程的Bean信息加载部分。
+
+![](/public/upload/spring/ioc_overview.png)
+
+从[谈元编程与表达能力](https://mp.weixin.qq.com/s/SUV6vBaqwu19-xYzkG4SxA)中，笔者收获了对运行时的一个理解：当相应的行为在当前对象上没有被找到时，运行时会提供一个改变当前对象行为的入口。**从这个视角看，Spring 也可以认为是 java 的一个runtime，通过ApplicationContext 获取的bean 拥有 bean代码本身看不到的能力**。
 
 ## 什么是容器？
 
@@ -69,34 +71,6 @@ IOC设计模式的两个重要支持：
         class<?> getType(String)
         String[] getAliases    
     }
-
-### Bean工厂的养料——BeanDefinition
-
-在BeanFactory 可以getBean之前，必须要先初始化，**从各种源（比如xml配置文件）中加载bean信息**。
-
-![](/public/upload/spring/bean_definition.png)
-
-bean在不同阶段的表现形式
-
-||表现形式|与jvm类比|
-|---|---|---|
-|配置文件<br>@Configuration注释的class等|`<bean class=""></bean>`|java代码|
-|ioc初始化|BeanDefinition|class二进制 ==> 内存中的Class对象|
-|getBean|Object|堆中的对象实例|
-
-jvm 基于Class 对象将对象实例化，想new 一个对象，得先有Class 对象，或者使用classLoader 加载，或者动态生成。spring 容器类似，想getBean 对象bean 实例， 就是先register 对应的BeanDefinition，任何来源的bean 通过`BeanDefinitionRegistry.registerBeanDefinition` 都可以纳入到IOC 的管理。
-
-![](/public/upload/spring/bean_definition_xmind.png)
-
-[Spring的Bean生命周期，11 张高清流程图及代码，深度解析](https://mp.weixin.qq.com/s/Rilo9hlkwM1OvfqUx_YJ9A)`BeanFactory.getBean("beanid")`得到bean的实例
-
-![](/public/upload/spring/get_bean.png)
-
-ioc在实例化bean的过程中，还夹了不少“私货”/“钩子”：
-
-![](/public/upload/spring/create_bean.png)
-
-
 
 ### BeanFactory
 
@@ -240,7 +214,41 @@ AbstractApplicationContext.refresh(): Load or refresh the persistent representat
 		}
 	}
 
-## Bean的管理Environment
+## ioc 中的对象
+
+|来源|Spring Bean对象|生命周期管理|配置元信息<br>是否lazyload/autowiring等|使用场景|
+|---|---|---|---|---|
+|Spring BeanDefinition|是|是|有|依赖查找、依赖注入|
+|单体对象|是|否|无|依赖查找、依赖注入|
+|Resolvable Dependency|否|否|有|依赖注入|
+
+### Bean工厂的养料——BeanDefinition
+
+在BeanFactory 可以getBean之前，必须要先初始化，**从各种源（比如xml配置文件）中加载bean信息**。
+
+![](/public/upload/spring/bean_definition.png)
+
+bean在不同阶段的表现形式
+
+||表现形式|与jvm类比|
+|---|---|---|
+|配置文件<br>@Configuration注释的class等|`<bean class=""></bean>`|java代码|
+|ioc初始化|BeanDefinition|class二进制 ==> 内存中的Class对象|
+|getBean|Object|堆中的对象实例|
+
+jvm 基于Class 对象将对象实例化，想new 一个对象，得先有Class 对象，或者使用classLoader 加载，或者动态生成。spring 容器类似，想getBean 对象bean 实例， 就是先register 对应的BeanDefinition，任何来源的bean 通过`BeanDefinitionRegistry.registerBeanDefinition` 都可以纳入到IOC 的管理。
+
+![](/public/upload/spring/bean_definition_xmind.png)
+
+[Spring的Bean生命周期，11 张高清流程图及代码，深度解析](https://mp.weixin.qq.com/s/Rilo9hlkwM1OvfqUx_YJ9A)`BeanFactory.getBean("beanid")`得到bean的实例
+
+![](/public/upload/spring/get_bean.png)
+
+ioc在实例化bean的过程中，还夹了不少“私货”/“钩子”：
+
+![](/public/upload/spring/create_bean.png)
+
+### 内建对象Environment
 
 Interface representing the environment in which the current application is running.Models two key aspects of the application environment: profiles and properties. Environment代表着程序的运行环境，主要包含了两种信息，一种是profiles，用来描述哪些bean definitions 是可用的；一种是properties，用来描述系统的配置，其来源可能是配置文件、jvm属性文件、操作系统环境变量等。
 
