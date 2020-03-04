@@ -21,19 +21,13 @@ keywords: kubernetes scheduler
 
 **We really like the Kubernetes ideology of seeing the entire system as a control system. That is, the system constantly tries to move its current state to a desired state**.The worker units that guarantee the desired state are called controllers. 控制器就是保证系统按 desired state运行。
 
-## 一切操作皆对象
-
-在 Kubernetes 中，在编写 Pod 模板的时候，有一种“在 YAML 文件里编程序”的感觉
-
-![](/public/upload/kubernetes/kubernetes_object.png)
-
 ## 控制器模型
 
 [kube-controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/) **In applications of robotics and automation, a control loop is a non-terminating loop that regulates the state of the system**（在自动化行业是常见方式）. In Kubernetes, a controller is a control loop that watches the shared state of the cluster through the API server and makes changes attempting to move the current state towards the desired state. Examples of controllers that ship with Kubernetes today are the replication controller, endpoints controller, namespace controller, and serviceaccounts controller.
 
 docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就在在集群里给镜像找一个主机来运行容器。但实际上比调度更重要的是编排，那么编排如何实现呢？控制器
 
-现声明式API对象与控制器模型相辅相成，声明式API对象定义出期望的资源状态，控制器模型则通过控制循环（Control Loop）将Kubernetes内部的资源调整为声明式API对象期望的样子。因此可以认为声明式API对象和控制器模型，才是Kubernetes项目编排能力“赖以生存”的核心所在。
+声明式API对象与控制器模型相辅相成，声明式API对象定义出期望的资源状态，控制器模型则通过控制循环（Control Loop）将Kubernetes内部的资源调整为声明式API对象期望的样子。因此可以认为声明式API对象和控制器模型，才是Kubernetes项目编排能力“赖以生存”的核心所在。
 
 ### 有什么
 
@@ -49,7 +43,7 @@ controller是一系列控制器的集合，不单指RC。
 
 ### 整体架构
 
-这些控制器之所以被统一放在 pkg/controller 目录下，就是因为它们都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。 （这是不是可以解释调度器 和控制器 不放在一起实现，因为两者是不同的处理逻辑，或者说编排依赖于调度）
+这些控制器之所以被统一放在 pkg/controller 目录下，就是因为它们都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。 
 
 	for {
 	  实际状态 := 获取集群中对象 X 的实际状态（Actual State）
@@ -71,28 +65,27 @@ controller是一系列控制器的集合，不单指RC。
 
 [A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html) 
 
+![](/public/upload/kubernetes/k8s_custom_controller.png)
 
-### 控制器和Informer情感纠葛
+### 控制器与Informer——如何高效监听一个http server
 
-控制器与api server的关系，从拉取到监听：In order to retrieve an object's information, the controller sends a request to Kubernetes API server.However, repeatedly retrieving information from the API server can become expensive. Thus, in order to get and list objects multiple times in code, Kubernetes developers end up using cache which has already been provided by the client-go library. Additionally, the controller doesn't really want to send requests continuously. It only cares about events when the object has been created, modified or deleted. 
+控制器与api server的关系——从拉取到监听：In order to retrieve an object's information, the controller sends a request to Kubernetes API server.However, repeatedly retrieving information from the API server can become expensive. Thus, in order to get and list objects multiple times in code, Kubernetes developers end up using cache which has already been provided by the client-go library. Additionally, the controller doesn't really want to send requests continuously. It only cares about events when the object has been created, modified or deleted. 
 
 [从 Kubernetes 资源控制到开放应用模型，控制器的进化之旅](https://mp.weixin.qq.com/s/AZhyux2PMYpNmWGhZnmI1g)
 
 1. Controller 一直访问API Server 导致API Server 压力太大，于是有了Informer
 2. 由 Informer 代替Controller去访问 API Server，而Controller不管是查状态还是对资源进行伸缩都和 Informer 进行交接。而且 Informer 不需要每次都去访问 API Server，它只要在初始化的时候通过 LIST API 获取所有资源的最新状态，然后再通过 WATCH API 去监听这些资源状态的变化，整个过程被称作 ListAndWatch。
-3. Informer 也有一个助手叫 Reflector，上面所说的 ListAndWatch 事实上是由 Reflector 一手操办的。这使 API Server 的压力大大减少
-
-    ![](/public/upload/kubernetes/k8s_custom_controller.png)
-
-    Informer其实就是一个带有本地缓存和索引机制的、可以注册EventHandler( AddFunc、UpdateFunc 和 DeleteFunc)的 数据+事件总线(event bus)。通过监听etcd数据变化，Informer 可以实时地更新本地缓存，并且调用这些事件对应的 EventHandler
+3. Informer 也有一个助手叫 Reflector，上面所说的 ListAndWatch 事实上是由 Reflector 一手操办的。这使 API Server 的压力大大减少。
 4. 后来，WATCH 数据的太多了，Informer/Reflector去 API Server 那里 WATCH 状态的时候，只 WATCH 特定资源的状态，不要一股脑儿全 WATCH。
 5. 一个controller 一个informer 还是压力大，于是针对每个（受多个控制器管理的）资源弄一个 Informer。比如 Pod 同时受 Deployment 和 StatefulSet 管理。这样当多个控制器同时想查 Pod 的状态时，只需要访问一个 Informer 就行了。
 6. 但这又引来了新的问题，SharedInformer 无法同时给多个控制器提供信息，这就需要每个控制器自己排队和重试。为了配合控制器更好地实现排队和重试，SharedInformer  搞了一个 Delta FIFO Queue（增量先进先出队列），每当资源被修改时，它的助手 Reflector 就会收到事件通知，并将对应的事件放入 Delta FIFO Queue 中。与此同时，SharedInformer 会不断从 Delta FIFO Queue 中读取事件，然后更新本地缓存的状态。
 7. 这还不行，SharedInformer 除了更新本地缓存之外，还要想办法将数据同步给各个控制器，为了解决这个问题，它又搞了个工作队列（Workqueue），一旦有资源被添加、修改或删除，就会将相应的事件加入到工作队列中。所有的控制器排队进行读取，一旦某个控制器发现这个事件与自己相关，就执行相应的操作。如果操作失败，就将该事件放回队列，等下次排到自己再试一次。如果操作成功，就将该事件从队列中删除。
 
-### Informer 演化
+**Informer 约等于apiserver client sdk**：Informer其实就是一个带有本地缓存和索引机制的、可以注册EventHandler( AddFunc、UpdateFunc 和 DeleteFunc)的 数据+事件总线(event bus)。通过监听etcd数据变化，Informer 可以实时地更新本地缓存，并且调用这些事件对应的 EventHandler。在istio pilot 以及 各种配置中心client sdk 中都有类似逻辑，与远程数据保持同步 并在数据变化时触发业务代码注册的回调函数。 **从这个视角看，Informer 直接使用go etcd client 监听etcd的话就不用这么费事了，当然可能在安全机制上或许有漏洞**。
 
-起初是一个controller 一个informer，informer 由两个部分组成
+![](/public/upload/kubernetes/control_loop.png)
+
+从代码上看 informer 由两个部分组成
 
 1. Listwatcher is a combination of a list function and a watch function for a specific resource in a specific namespace. 
 2. Resource Event Handler is where the controller handles notifications for changes on a particular resource
@@ -103,55 +96,30 @@ controller是一系列控制器的集合，不单指RC。
 			DeleteFunc func(obj interface{})
 		}
 
-The informer creates a local cache of a set of resources only used by itself.But, in Kubernetes, there is a bundle of controllers running and caring about multiple kinds of resources. This means that there will be an overlap - one resource is being cared by more than one controller. 但一个Controller 一个informer 引起了巨大的浪费：信息重复；api server 负载/连接数提高；序列化反序列化成本。
-
-SharedInformer，因为SharedInformer 是共享的，所以其Resource Event Handler 也就没什么业务逻辑，Whenever a resource changes, the Resource Event Handler puts a key to the Workqueue.  这个Workqueue 支持优先级等高级特性
-
-控制器的关键分别是informer/SharedInformer和Workqueue，前者观察kubernetes对象当前的状态变化并发送事件到workqueue，然后这些事件会被worker们从上到下依次处理。
-
 
 ## 单个Controller的工作原理
 
-来自入口 `cmd/kube-controller-manager/controller-manager.go` 的概括
+![](/public/upload/kubernetes/controller_overview.png)
 
-The Kubernetes controller manager is a daemon that embeds
-the core control loops shipped with Kubernetes. In applications of robotics and
-automation, a control loop is a non-terminating loop that regulates the state of
-the system. In Kubernetes, a controller is a control loop that watches the shared
-state of the cluster through the apiserver and makes changes attempting to move the
-current state towards the desired state.
+从DeploymentController 及 ReplicaSetController 观察到的共同点
 
-在分析之初有几个问题
+1. struct 中都包含获取 决策所以依赖 资源的lister，对于DeploymentController 是DeploymentLister/ReplicaSetLister/PodLister ，对于ReplicaSetController 是ReplicaSetLister和 PodLister
+2. struct 中都包含 workqueue， control loop 每次循环都是 从workqueue.Get 数据开始的
+3. struct 都包含 kubeClient 类型为 clientset.Interface，controller 比对新老数据 将决策 具体为“指令”使用kubeClient写入 apiserver ，然后 scheduler 和 kubelet 负责干活儿。
+4. 相同的执行链条：`Run ==> go worker ==> for processNextWorkItem ==> syncHandler`。Run 方法作为 Controller 逻辑的统一入口，启动指定数量个协程，协程的逻辑为：`wait.Until(dc.worker, time.Second, stopCh)` ，control loop 具体为Controller 的worker 方法，for 循环具体为 `for processNextWorkItem(){}`，两个Controller 的processNextWorkItem 逻辑相似度 90%： 从queue 中get一个key，使用syncHandler 处理，处理成功就标记成功，处理失败就看情况将key 重新放入queue。
 
-1. current state 和 desired state 从哪来
-2. 如何加载已有的各种controller
-3. 如何加载自定义controller
-4. 每个controller的存在形态是什么
-5. control loop 的存在形态是什么
-6. 自定义controller 与官方的controller 在实现上有哪些共通点
+    ```go
+    func processNextWorkItem() bool {
+        key, quit := queue.Get()
+        if quit { return false}
+        defer queue.Done(key)
+        err := syncHandler(key.(string))
+        handleErr(err, key)
+        return true
+    }
+    ```
 
-### Controller 与 apiserver 的交互方式
-
-[Kubernetes源码分析——apiserver](http://qiankunli.github.io/2019/01/05/kubernetes_source_apiserver.html) 提到Kubernetes CRD的实现，关于Custom Resource Controller的实现有一个很重要的点：Controller 与 apiserver 的交互方式——controller 与 apiserver 交互的部分已经被定好了，只需实现control loop 部分即可。
-
-![](/public/upload/kubernetes/k8s_custom_controller.png)
-
-
-## control loop
-
-[Kubernetes找感觉](http://qiankunli.github.io/2018/12/31/kubernetes_intro.html) 提到控制器的基本逻辑
-
-	for {
-	  实际状态 := 获取集群中对象 X 的实际状态（Actual State）
-	  期望状态 := 获取集群中对象 X 的期望状态（Desired State）
-	  if 实际状态 == 期望状态{
-	    什么都不做
-	  } else {
-	    执行编排动作，将实际状态调整为期望状态
-	  }
-	}
-
-那么实际在代码中长什么样子呢？我们先看下run 方法
+![](/public/upload/kubernetes/controller_object.png)
 
 ### 外围——循环及数据获取
 
@@ -159,8 +127,6 @@ current state towards the desired state.
 	func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 		defer utilruntime.HandleCrash()
 		defer dc.queue.ShutDown()
-		klog.Infof("Starting deployment controller")
-		defer klog.Infof("Shutting down deployment controller")
 		if !controller.WaitForCacheSync("deployment", stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 			return
 		}
@@ -203,8 +169,7 @@ syncDeployment 包含 扩容、rollback、rolloutRecreate、rolloutRolling 我�
 	func (dc *DeploymentController) syncDeployment(key string) error {
 		namespace, name, err := cache.SplitMetaNamespaceKey(key)
 		deployment, err := dc.dLister.Deployments(namespace).Get(name)
-		// List ReplicaSets owned by this Deployment, while reconciling ControllerRef
-		// through adoption/orphaning.
+		// List ReplicaSets owned by this Deployment, while reconciling ControllerRef through adoption/orphaning.
 		rsList, err := dc.getReplicaSetsForDeployment(d)
 		scalingEvent, err := dc.isScalingEvent(d, rsList)
 		if scalingEvent {
@@ -213,8 +178,7 @@ syncDeployment 包含 扩容、rollback、rolloutRecreate、rolloutRolling 我�
 		...
 	}
 
-	// sync is responsible for reconciling deployments on scaling events or when they
-	// are paused.
+	// sync is responsible for reconciling deployments on scaling events or when they are paused.
 	func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
 		newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
 		...
@@ -284,18 +248,6 @@ scale要处理 扩容或 RollingUpdate  各种情况，此处只保留扩容逻�
 		return err
 	}
 
-## Controller实例——Kubernetes副本管理
-
-参见 [Kubernetes副本管理](http://qiankunli.github.io/2015/03/03/kubernetes_replica.html)
-
-本文以Deployment Controller 为例来描述 Controller Manager的实现原理，因此要预先了解下 Deployment Controller 的实现原理。
-
-以扩展pod 实例数为例， Deployment Controller 的逻辑便是找到 关联的ReplicaSet 并更改其Replicas 的值
-
-|Kubernetes object|控制器逻辑|备注|
-|---|---|---|
-| Deployment |控制 ReplicaSet 的数目，以及每个 ReplicaSet 的属性|**Deployment 实际上是一个两层控制器**|
-| ReplicaSet |保证系统中 Pod 的个数永远等于指定的个数（比如，3 个）|一个应用的版本，对应的正是一个 ReplicaSet|
 
 
 

@@ -13,7 +13,72 @@ keywords: kubernetes 源码分析
 * TOC
 {:toc}
 
+建议先看下 Kubernetes 控制器实现，摸清楚 Controller 实现需要哪些资源，Controller Mananger 的主要逻辑便是 先初始化这些资源 并启动控制器
+
 ![](/public/upload/kubernetes/controller_manager.png)
+
+来自入口 `cmd/kube-controller-manager/controller-manager.go` 的概括
+
+The Kubernetes controller manager is a daemon that embeds the core control loops shipped with Kubernetes. In applications of robotics and
+automation, a control loop is a non-terminating loop that regulates the state of the system. In Kubernetes, a controller is a control loop that watches the shared state of the cluster through the apiserver and makes changes attempting to move the current state towards the desired state.
+
+## ControllerContext
+
+![](/public/upload/kubernetes/controller_context.png)
+
+```go
+type ControllerContext struct {
+	// ClientBuilder will provide a client for this controller to use ClientBuilder controller.ControllerClientBuilder
+	// InformerFactory gives access to informers for the controller.
+	InformerFactory informers.SharedInformerFactory
+
+	// ComponentConfig provides access to init options for a given controller
+	ComponentConfig kubectrlmgrconfig.KubeControllerManagerConfiguration
+	// DeferredDiscoveryRESTMapper is a RESTMapper that will defer
+	// initialization of the RESTMapper until the first mapping is
+	// requested.
+	RESTMapper *restmapper.DeferredDiscoveryRESTMapper
+	// AvailableResources is a map listing currently available resources
+	AvailableResources map[schema.GroupVersionResource]bool
+	// Cloud is the cloud provider interface for the controllers to use.
+	// It must be initialized and ready to use.
+	Cloud cloudprovider.Interface
+	// Control for which control loops to be run
+	// IncludeCloudLoops is for a kube-controller-manager running all loops
+	// ExternalLoops is for a kube-controller-manager running with a cloud-controller-manager
+	LoopMode ControllerLoopMode
+	// Stop is the stop channel
+	Stop <-chan struct{}
+	// InformersStarted is closed after all of the controllers have been initialized and are running.  After this point it is safe,
+	// for an individual controller to start the shared informers. Before it is closed, they should not.
+	InformersStarted chan struct{}
+	// ResyncPeriod generates a duration each time it is invoked; this is so that
+	// multiple controllers don't get into lock-step and all hammer the apiserver
+	// with list requests simultaneously.
+	ResyncPeriod func() time.Duration
+}
+```
+
+以DeploymentController 为例， 看下启动一个Controller 需要预备哪些资源
+
+```go
+func startDeploymentController(ctx ControllerContext) (http.Handler, bool, error) {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}] {
+		return nil, false, nil
+	}
+	dc, err := deployment.NewDeploymentController(
+		ctx.InformerFactory.Apps().V1().Deployments(),
+		ctx.InformerFactory.Apps().V1().ReplicaSets(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.ClientBuilder.ClientOrDie("deployment-controller"),
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("error creating Deployment controller: %v", err)
+	}
+	go dc.Run(int(ctx.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs), ctx.Stop)
+	return nil, true, nil
+}
+```
 
 ## Controller的容器——Controller Mananger
 
