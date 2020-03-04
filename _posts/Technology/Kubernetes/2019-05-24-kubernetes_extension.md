@@ -182,10 +182,6 @@ Kubernetes 的代码生成工具当前已变成独立的项目[code-generator](h
 1. 在main 函数构造Controller 时，NewController方法中执行了`networkInformer.AddEventHandler`逻辑，当informer 收到network对象时 ==> AddEventHandler ==> network 对象加入到workqueue中
 2. Controller processNextWorkItem 中仅负责 从workqueue中取出network对象 执行自己的逻辑即可
 
-### 其它
-
-不管 built-in resource 还是 custom resource ，controller 不是 api server的一部分，自然也不用和 apiserver 一起启动，apiserver 只管crud etcd。
-
 [Kubernetes Deep Dive: Code Generation for CustomResources](https://blog.openshift.com/kubernetes-deep-dive-code-generation-customresources/)
 
 ## 实例——autoscaler
