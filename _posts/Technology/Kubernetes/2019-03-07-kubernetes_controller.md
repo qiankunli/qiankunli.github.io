@@ -104,7 +104,7 @@ controller是一系列控制器的集合，不单指RC。
 从DeploymentController 及 ReplicaSetController 观察到的共同点
 
 1. struct 中都包含获取 决策所以依赖 资源的lister，对于DeploymentController 是DeploymentLister/ReplicaSetLister/PodLister ，对于ReplicaSetController 是ReplicaSetLister和 PodLister
-2. struct 中都包含 workqueue， control loop 每次循环都是 从workqueue.Get 数据开始的
+2. struct 中都包含 workqueue， workqueue 数据生产者是 Controller 注册到所以依赖的 Informer 的AddFunc/updateFunc/DeleteFunc，workqueue 数据消费者是  control loop ，每次循环都是 从workqueue.Get 数据开始的。 
 3. struct 都包含 kubeClient 类型为 clientset.Interface，controller 比对新老数据 将决策 具体为“指令”使用kubeClient写入 apiserver ，然后 scheduler 和 kubelet 负责干活儿。
 4. 相同的执行链条：`Run ==> go worker ==> for processNextWorkItem ==> syncHandler`。Run 方法作为 Controller 逻辑的统一入口，启动指定数量个协程，协程的逻辑为：`wait.Until(dc.worker, time.Second, stopCh)` ，control loop 具体为Controller 的worker 方法，for 循环具体为 `for processNextWorkItem(){}`，两个Controller 的processNextWorkItem 逻辑相似度 90%： 从queue 中get一个key，使用syncHandler 处理，处理成功就标记成功，处理失败就看情况将key 重新放入queue。
 
@@ -119,7 +119,13 @@ controller是一系列控制器的集合，不单指RC。
     }
     ```
 
+controller 与上下游的边界/接口如下图
+
 ![](/public/upload/kubernetes/controller_object.png)
+
+事实上，一个controller 通常依赖多个Informer
+
+![](/public/upload/kubernetes/controller_context.png)
 
 ### 外围——循环及数据获取
 
