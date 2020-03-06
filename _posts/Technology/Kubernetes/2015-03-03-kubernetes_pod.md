@@ -203,6 +203,6 @@ the pause container servers as an anchoring point for the pod and make it easy t
 pause container 被称为 infrastructure container，中文有的文章简称 Infra 容器。Infra 容器一定要占用极少的资源，所以它使用的是一个非常特殊的镜像，叫作：`k8s.gcr.io/pause`。这个镜像是一个用汇编语言编写的、永远处于“暂停”状态的容器，解压后的大小也只有 100~200 KB 左右。
 
 
-**Pod 最重要的一个事实是：它只是一个逻辑概念。有了Pod，我们可以说Network Namespace和Volume 不是container A 的，也不是Container B的，而是Pod 的。哪怕Container A/B 还没有启动，我们也可以 配置Network Namespace和Volume**。
+**Pod 最重要的一个事实是：它只是一个逻辑概念。有了Pod，我们可以说Network Namespace和Volume 不是container A 的，也不是Container B的，而是Pod 的。**。[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)pause 容器作为同一个 Pod 中所有其他容器的基础容器，它为 Pod 中的每个业务容器提供了大量的 Pod 级别资源，这些资源都是 Linux 命名空间（包括网络命名空间，IPC 命名空间和 PID 命名空间）。
 
 

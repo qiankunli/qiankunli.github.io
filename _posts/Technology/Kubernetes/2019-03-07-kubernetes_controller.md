@@ -99,7 +99,13 @@ controller是一系列控制器的集合，不单指RC。
 
 ## 单个Controller的工作原理
 
+controller 与上下游的边界/接口如下图
+
 ![](/public/upload/kubernetes/controller_overview.png)
+
+事实上，一个controller 通常依赖多个Informer
+
+![](/public/upload/kubernetes/controller_context.png)
 
 从DeploymentController 及 ReplicaSetController 观察到的共同点
 
@@ -119,13 +125,11 @@ controller是一系列控制器的集合，不单指RC。
     }
     ```
 
-controller 与上下游的边界/接口如下图
+Controller Mananger 的主要逻辑便是 先初始化 资源（重点就是Informer） 并启动Controller。可以将Controller 和 Informer 视为两个组件，也可以认为只有Controller 一个，比如[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)将 Deployment 记录存储到 etcd 并初始化后，就可以通过 kube-apiserver 使其可见，DeploymentController工作就是负责监听 Deployment 记录的更改——控制器通过 Informer 注册cud事件的回调函数。
 
 ![](/public/upload/kubernetes/controller_object.png)
 
-事实上，一个controller 通常依赖多个Informer
 
-![](/public/upload/kubernetes/controller_context.png)
 
 ### 外围——循环及数据获取
 

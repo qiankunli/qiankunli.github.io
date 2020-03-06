@@ -96,7 +96,7 @@ cronjob/                garbagecollector/       nodelifecycle/          replicat
 
 基于声明式 API 的业务功能实现，往往需要通过控制器模式来“监视”API 对象的变化（比如，创建或者删除Pod2），然后以此来决定实际要执行的具体工作。
 
-自定义custom controller 就有点 自定义 ansible module的意思。
+自定义custom controller 就有点 自定义 ansible module的意思。**建议学习自定义Controller 原理之前，先系统的看下 Kubernetes 自带Controller 的实现原理**。
 
 ## 实操——极客时间
 

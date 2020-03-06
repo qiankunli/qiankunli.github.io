@@ -14,9 +14,7 @@ keywords: kubernetes 源码分析
 {:toc}
 
 
-建议先看下前文 [Kubernetes源码分析——从kubectl开始](http://qiankunli.github.io/2018/12/23/kubernetes_source_kubectl.html)
-
-笔者不太喜欢抠细节，加上k8s 没有使用 [uber-go/dig](https://github.com/uber-go/dig) 之类的依赖注入库（很多代码 搞到最后就是 spring ioc干的活儿，但一换go的马甲，经常一下子没看出来），struct 组合代码 和 struct 行为代码耦合在一起，本文主要关注 行为代码。笔者认为，**关键不是一些结构体定义， 而是业务逻辑：怎么启动了一个pod？怎么管理pod 的等？与cni、csi 插件怎么结合？如何与docker 协同？**
+[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)从kubectl 命令开始，kubectl ==> apiserver ==> controller ==> scheduler 所有的状态变化仅仅只是针对保存在 etcd 中的资源记录。到Kubelet 才开始来真的。如果换一种思维模式，可以把 Kubelet 当成一种特殊的 Controller，它每隔 20 秒（可以自定义）向 kube-apiserver 通过 NodeName 获取自身 Node 上所要运行的 Pod 清单。一旦获取到了这个清单，它就会通过与自己的内部缓存进行比较来检测新增加的 Pod，如果有差异，就开始同步 Pod 列表。
 
 背景知识
 
@@ -390,10 +388,6 @@ kubernetes 对CNI 的实现（SPEC复杂的描述体现在 code 上就是几个�
 |kubelet|命令行，提供http服务|
 |cri-shim|grpc server|
 |cni plugin|命令行，程序直接使用|
-
-关于k8s 插件，可以回顾下
-
-![](/public/upload/kubernetes/parse_k8s_1.png)
 
 [kubelet 源码分析：Garbage Collect](https://cizixs.com/2017/06/09/kubelet-source-code-analysis-part-3/) gc 机制后面由  eviction 代替
 

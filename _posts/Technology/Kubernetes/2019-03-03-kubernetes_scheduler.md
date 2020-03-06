@@ -77,7 +77,7 @@ limit 不设定，默认值由 LimitRange object确定
 
 而当 Eviction 发生的时候，kubelet 具体会挑选哪些 Pod 进行删除操作，就需要参考这些 Pod 的 QoS 类别了。PS：怎么有一种 缓存 evit 的感觉。limit 越“模糊”，物理机MemoryPressure/DiskPressure 时，越容易优先被干掉。
 
-DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 DaemonSet 的 PPod 被回收，它又会立即在原宿主机上被重建出来，这就使得前面资源回收的动作，完全没有意义了。
+DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 DaemonSet 的 Pod 被回收，它又会立即在原宿主机上被重建出来，这就使得前面资源回收的动作，完全没有意义了。
 
 ## Kubernetes 基于资源的调度
 
@@ -88,7 +88,7 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 所以在具体的调度流程中，默认调度器会首先调用一组叫作 Predicate 的调度算法，来检查每个 Node。然后，再调用一组叫作 Priority 的调度算法，来给上一步得到的结果里的每个 Node 打分。最终的调度结果，就是得分最高的那个Node。
 
-![](/public/upload/kubernetes/kubernetes_object.png)
+除了Pod，Scheduler 需要调度其它对象么？不需要。因为Kubernetes 对象虽多，**但只有Pod 是调度对象**，其它对象包括数据对象（比如PVC等）、编排对象（Deployment）、Pod辅助对象（NetworkPolicy等） 都只是影响Pod的调度，本身不直接消耗计算和内存资源。
 
 **调度器对一个 Pod 调度成功，实际上就是将它的 spec.nodeName 字段填上调度结果的节点名字**。 这在k8s 的很多地方都要体现，k8s 不仅将对容器的操作“标准化” ==> “配置化”，一些配置是用户决定的，另一个些是系统决定的
 

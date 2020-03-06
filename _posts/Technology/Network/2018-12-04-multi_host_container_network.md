@@ -56,6 +56,8 @@ there are two ways for Containers or VMs to communicate to each other.
 
 ### overlay 网络
 
+[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)**overlay 网络是一种动态同步多个主机间路由的方法**。
+
 我们找一下覆盖网络的感觉
 
 1. 容器网卡不能直接发送/接收数据，而要通过宿主机网卡发送/接收数据
