@@ -28,7 +28,7 @@ keywords: kubernetes yaml
 
 ## 通用实现
 
-除apiserver/kubectl 之外，与api server 的所有组件Controller/Scheduler/kubelet 的业务逻辑几乎一致
+除apiserver/kubectl 之外（kubelet 类似，但更复杂些），与api server 的所有组件Controller/Scheduler 的业务逻辑几乎一致
 
 1. 组件需要与apiserver 交互，但核心功能组件不直接与api-server 通信，而是抽象了一个Informer 负责apiserver 数据的本地cache及监听。Informer 还会比对 资源是否变更（依靠内部的Delta FIFO Queue），只有变更的资源 才会触发handler。**因为Informer 如此通用，所以Informer 的实现在 apiserver 的 访问包client-go 中**。PS：Informer 对应java+zk 系就是curator
 2. 组件 全部采用control loop 逻辑
