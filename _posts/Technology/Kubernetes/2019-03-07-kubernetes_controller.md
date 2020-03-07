@@ -15,17 +15,15 @@ keywords: kubernetes scheduler
 
 《阿里巴巴云原生实践15讲》 K8S 的关键词就是最终一致性，所有的 Controller 都会朝着最终一致 性不断 sync。PS：文章里经常出现一个词：面向终态。
 
-## 一种新的模型
+## control system
 
 [Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)
 
 **We really like the Kubernetes ideology of seeing the entire system as a control system. That is, the system constantly tries to move its current state to a desired state**.The worker units that guarantee the desired state are called controllers. 控制器就是保证系统按 desired state运行。
 
-## 控制器模型
-
 [kube-controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/) **In applications of robotics and automation, a control loop is a non-terminating loop that regulates the state of the system**（在自动化行业是常见方式）. In Kubernetes, a controller is a control loop that watches the shared state of the cluster through the API server and makes changes attempting to move the current state towards the desired state. Examples of controllers that ship with Kubernetes today are the replication controller, endpoints controller, namespace controller, and serviceaccounts controller.
 
-docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就在在集群里给镜像找一个主机来运行容器。但实际上比调度更重要的是编排，那么编排如何实现呢？控制器
+docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就是在集群里给镜像找一个主机来运行容器。但实际上比调度更重要的是编排，那么编排如何实现呢？控制器
 
 声明式API对象与控制器模型相辅相成，声明式API对象定义出期望的资源状态，控制器模型则通过控制循环（Control Loop）将Kubernetes内部的资源调整为声明式API对象期望的样子。因此可以认为声明式API对象和控制器模型，才是Kubernetes项目编排能力“赖以生存”的核心所在。
 
@@ -43,17 +41,13 @@ controller是一系列控制器的集合，不单指RC。
 
 ### 整体架构
 
-这些控制器之所以被统一放在 pkg/controller 目录下，就是因为它们都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。 
+这些控制器之所以被统一放在 pkg/controller 目录下，就是因为它们都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。  [Writing Controllers](https://github.com/kubernetes/community/blob/8decfe4/contributors/devel/controllers.md)
 
-	for {
-	  实际状态 := 获取集群中对象 X 的实际状态（Actual State）
-	  期望状态 := 获取集群中对象 X 的期望状态（Desired State）
-	  if 实际状态 == 期望状态{
-	    什么都不做
-	  } else {
-	    执行编排动作，将实际状态调整为期望状态
-	  }
-	}
+    for {
+        desired := getDesiredState()
+        current := getCurrentState()
+        makeChanges(desired, current)
+    }
 
 实际状态往往来自于 Kubernetes 集群本身。 比如，**kubelet 通过心跳汇报的容器状态和节点状态**，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。而期望状态，一般来自于用户提交的 YAML 文件。 比如，Deployment 对象中 Replicas 字段的值，这些信息往往都保存在 Etcd 中。
 
@@ -125,10 +119,15 @@ controller 与上下游的边界/接口如下图
     }
     ```
 
+### 数据结构
+
 Controller Mananger 的主要逻辑便是 先初始化 资源（重点就是Informer） 并启动Controller。可以将Controller 和 Informer 视为两个组件，也可以认为只有Controller 一个，比如[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)将 Deployment 记录存储到 etcd 并初始化后，就可以通过 kube-apiserver 使其可见，DeploymentController工作就是负责监听 Deployment 记录的更改——控制器通过 Informer 注册cud事件的回调函数。
+
+[Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)Kubernetes offers these powerful structures to get a local representation of the API server's resources.
 
 ![](/public/upload/kubernetes/controller_object.png)
 
+The Informer just a convenient wrapper to  automagically syncs the upstream data to a downstream store and even offers you some handy event hooks.
 
 
 ### 外围——循环及数据获取

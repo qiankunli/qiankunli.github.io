@@ -14,8 +14,6 @@ keywords: kubernetes 源码分析
 {:toc}
 
 
-建议先看下前文 [Kubernetes源码分析——从kubectl开始](http://qiankunli.github.io/2018/12/23/kubernetes_source_kubectl.html)
-
 背景知识
 
 1. GO语言的http包使用
@@ -23,9 +21,7 @@ keywords: kubernetes 源码分析
 3. 声明式API
 4. Go 语言的代码生成
 
-## 铺垫一下
-
-### 声明式API
+## 声明式API
 
 1. 命令式命令行操作，比如直接 `kubectl run`
 2. 命令式配置文件操作，比如先`kubectl create -f xx.yaml` 再 `kubectl replace -f xx.yaml` 
@@ -47,16 +43,14 @@ keywords: kubernetes 源码分析
 [火得一塌糊涂的kubernetes有哪些值得初学者学习的？](https://mp.weixin.qq.com/s/iI5vpK5bVkKmdbf9sbAGWw)在分布式系统中，任何组件都可能随时出现故障。当组件恢复时，需要弄清楚要做什么，使用命令式 API 时，处理起来就很棘手。但是使用声明式 API ，组件只需查看 API 服务器的当前状态，即可确定它需要执行的操作。《阿里巴巴云原生实践15讲》 称之为：**面向终态**自动化。
 
 
-### 重新理解API Server
+## 整体架构
+
+![](public/upload/kubernetes/apiserver_overview.png)
 
 在[Kubernetes源码分析——从kubectl开始](http://qiankunli.github.io/2018/12/23/kubernetes_source_kubectl.html) [Kubernetes源码分析——kubelet](http://qiankunli.github.io/2018/12/31/kubernetes_source_kubelet.html)系列博客中，笔者都是以创建pod 为主线来学习k8s 源码。 在学习api server 之初，笔者想当然的认为 `kubectl create -f xxpod.yaml` 发出http 请求，apiserver 收到请求，然后有一个PodHandler的东西处理相关逻辑， 比如将信息保存在etcd 上。结果http.server 启动部分都正常，但PodHandler 愣是没找到。k8s apiserver 刷新了笔者对http.server 开发的认知。
 
 1. apiserver 将resource/kubernetes object 数据保存在etcd 上，因为resource 通过etcd 持久化的操作模式比较固定，一个通用http.Handler 根据resource 元数据 即可完成 crud，无需专门的PodHandler/ServiceHandler 等
-2. **apiserver 也不单是built-in resource的api server，是一个通用api server**，这也是为何相关的struct 叫 GenericAPIServer。类比到 spring mvc 领域是什么感觉呢？ 就是你定义一个user.yaml，dynamic registry user.yaml 到 apiserver上，然后就可以直接 `http://apiserver/api/users` 返回所有User 数据了。
-2. 声明式api 若想生效，每个resource 有一个对应的Controller， 但不是处理 Pod的http api的，而是跟api server 交互，比如ReplicaController 读取 Replica 和关联的pod数据， 发现pod 数不够，会通过api server 向etcd 再写一个pod
-3. Controller 和 api server 交互逻辑 的大部分 也是自动生成的。就好比一个thrift rpc server 只需要实现 thrfit interface 方法即可，其它tcp 通信、序列化的代码都是自动生成的
-
-这里的apiserver 给人的感觉更像是 api gateway，两者的目的不同。相同之处是，只要将相关信息注册到 api gateway后，api gateway 便可以接收相关的http请求，然后将请求转发到实际的后端（apiserver 叫[API Aggregation](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/apiserver-aggregation/)）。对于固定模式的业务 比如db/etcd crud，api server 干脆采用了反射方式直接crud，动态扩充自己 支持的api。
+2. apiserver 也不单是built-in resource的api server，**是一个通用api server**，这也是为何相关的struct 叫 GenericAPIServer。 就是你定义一个user.yaml，dynamic registry user.yaml 到 apiserver上，然后就可以直接 `http://apiserver/api/users` 返回所有User 数据了。
 
 ## 启动
 
@@ -136,9 +130,47 @@ init 函数 初始化了一个全局变量 `legacyscheme.Scheme`
 
 CreateServerChain 方法内 调用的CreateKubeAPIServerConfig 方法用到了 `legacyscheme.Scheme`
 
-## Admission Controller
+## 拦截api请求
 
-准入控制器是kubernetes 的API Server上的一个链式Filter，它根据一定的规则决定是否允许当前的请求生效，并且有可能会改写资源声明。
+1. Admission Controller
+2. Initializers
+3. webhooks, If you’re not planning to modify the object and intercepting just to read the object, [webhooks](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#external-admission-webhooks) might be a faster and leaner alternative to get notified about the objects. Make sure to check out [this example](https://github.com/caesarxuchao/example-webhook-admission-controller) of a webhook-based admission controller.
 
-	
+### Admission Controller
 
+准入控制器是kubernetes 的API Server上的一个链式Filter，它根据一定的规则决定是否允许当前的请求生效，并且有可能会改写资源声明。比如
+
+1. enforcing all container images to come from a particular registry, and prevent other images from being deployed in pods. 
+2. applying pre-create checks
+3. setting up default values for missing fields.
+
+The problem with admission controllers are:
+
+1. **They’re compiled into Kubernetes**: If what you’re looking for is missing, you need to fork Kubernetes, write the admission plugin and keep maintaining a fork yourself.
+2. You need to enable each admission plugin by passing its name to --admission-control flag of kube-apiserver. In many cases, this means redeploying a cluster.
+3. Some managed cluster providers may not let you customize API server flags, therefore you may not be able to enable all the admission controllers available in the source code.
+
+### Initializers
+
+[How Kubernetes Initializers work](https://ahmet.im/blog/initializers/)
+
+Initializers are not part of Kubernetes source tree, or compiled into it; you need to write a controller yourself.
+
+**When you intercept Kubernetes objects before they are created, the possibilities are endless**: You can mutate the objects in any way you like, or prevent the objects from being created.Here are some ideas for initializers, each enforce a particular policy in your cluster:
+
+1. Inject a proxy sidecar container to the pod if it has port 80, or has a particular annotation.
+2. Inject a volume with test certificates to all pods in the test namespace automatically.
+3. If a Secret is shorter than 20 characters (probably a password), prevent its creation.
+
+Anatomy of Initialization
+
+1. Configure which resource types need initialization
+2. API server will assign initializers to the new resources
+3. You will write a controller to watch for the resources
+4. Wait for your turn to modify the resource
+5. Finish modifying, yield to the next initializer
+6. No more initializers, resource ready to be realized. When Kubernetes API server sees that the object has no more pending initializers, it considers the object “initialized”. **Now the Kubernetes scheduler and other controllers can see the fully initialized object and make use of them**.
+
+从中可以看到，为啥Admission Controller 干活要改源码，Initializers 不用呢？ 因为干活要改源码，Initializer 只是给待处理资源加上了标记`metadata.initalizers.pending=InitializerName`，需要相应的Controller 打辅助。
+
+[示例](https://github.com/kelseyhightower/kubernetes-initializer-tutorial)
