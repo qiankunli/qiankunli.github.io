@@ -324,7 +324,7 @@ golang中一个接口可以包含一个或多个其他的接口，这相当于�
 
 ### 加载 CNI plugin
 
-建议参看[《Container-Networking-Docker-Kubernetes》笔记](http://qiankunli.github.io/2018/10/11/docker_to_k8s_network_note.html)了解下CNI 的相关概念及使用。
+网络是容器创建成功后分配的
 
 ![](/public/upload/kubernetes/kubelet_cni_init.png)
 

@@ -17,13 +17,15 @@ keywords: kubernetes yaml
 
 所谓学习，就是要能回答几个基本问题：
 
-1. [kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw) 这个问题 对于一个java 工程师来说，就像“在浏览器里输入一个url之后发生了什么？” 一样基础。
+1. [kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw) 这个问题 对于一个java 工程师来说，就像“在浏览器里输入一个url之后发生了什么？” 一样基础。再进一步就是 自己从kubectl 到crd 实现一遍。
 
 2. [github kubernetes community](https://github.com/kubernetes/community/tree/8decfe42b8cc1e027da290c4e98fa75b3e98e2cc/contributors/devel)
 
-其它：
+好文章在知识、信息概念上一定是跨层次的，既有宏观架构，又有微观佐证。只有原理没有代码总觉得心虚，只有代码没有原理总觉得心累。**从概念过渡到实操，从而把知识点掌握得更加扎实**。
 
-好文章在知识、信息概念上一定是跨层次的，既有宏观架构，又有微观佐证。只有原理没有代码总觉得心虚，只有代码没有原理总觉得心累。
+## 从kubernetes 看分布式系统实现
+
+hadoop 是直接把jar 传输到目标节点，其实也可以学习 k8s， 调度工作只是更改etcd 里的资源状态（给pod的nodeName赋值），然后kubelet 自己监控并拉数据处理。
 
 
 ## 通用实现
@@ -36,4 +38,8 @@ keywords: kubernetes yaml
 4. 通过Informer 提供过的Lister 拥有遍历数据的能力，将操作结果 重新通过kubeclient 写入到apiserver 
 
 ![](/public/upload/kubernetes/component_overview.png)
+
+## 一个充分支持扩展的系统
+
+![](/public/upload/kubernetes/kubernetes_extension.png)
 
