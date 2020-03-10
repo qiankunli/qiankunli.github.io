@@ -8,22 +8,14 @@ keywords: jib
 
 ---
 
-## 简介（持续更新）
+## 简介
 
 * TOC
 {:toc}
 
-## 为什么要监控
-
-参见 [容器狂打日志怎么办？](http://qiankunli.github.io/2019/03/05/container_log.html)
-
-[容器狂占cpu怎么办？](http://qiankunli.github.io/2019/03/06/container_cpu.html)
-
-参见[Prometheus 学习](http://qiankunli.github.io/2019/03/07/prometheus_intro.html)
-
 ## 容器监控和Kubernetes监控不一样
 
-[Kubernetes监控在小米的落地](https://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649701770&idx=1&sn=0da70746631327d83447fae182ab9b3d&chksm=889302e9bfe48bff7f8cd6ddbf788653e511bf5dd4fd13cef74421c188c1be34f8d54a14b6fe&mpshare=1&scene=23&srcid=#rd) 为了更方便的管理容器，Kubernetes对Container进行了封装，拥有了Pod、Deployment、Namespace、Service等众多概念。与传统集群相比，Kubernetes集群监控更加复杂：
+[Kubernetes监控在小米的落地](https://mp.weixin.qq.com/s/ewwD6A3-ClbotdfFmYY3KA) 为了更方便的管理容器，Kubernetes对Container进行了封装，拥有了Pod、Deployment、Namespace、Service等众多概念。与传统集群相比，Kubernetes集群监控更加复杂：
 
 1. 监控维度更多，除了传统物理集群的监控，还包括核心服务监控（apiserver，etcd等）、容器监控、Pod监控、Namespace监控等。
 2. 监控对象动态可变，在集群中容器的销毁创建十分频繁，无法提前预置。

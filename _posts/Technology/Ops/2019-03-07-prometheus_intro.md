@@ -63,6 +63,51 @@ Prometheus is configured via command-line flags and a configuration file. While 
 1. 给Prometheus 进程发送SIGHUP信号 `kill -HUP $Prometheus_Pid`
 2. 在Prometheus 启动时携带command line flag `--web.enable-lifecycle`的前提下，调用http reload 接口，`curl -X POST http://ip:9090/-/reload`
 
+## prometheus 服务发现
+
+在基于云(IaaS或者CaaS)的基础设施环境中用户可以像使用水、电一样按需使用各种资源（计算、网络、存储）。按需使用就意味着资源的动态性，这些资源可以随着需求规模的变化而变化。这种按需的资源使用方式对于监控系统而言就意味着没有了一个固定的监控目标，所有的监控对象(基础设施、应用、服务)都在动态的变化。对于Prometheus这一类基于Pull模式的监控系统，显然也无法继续使用的static_configs的方式静态的定义监控目标。解决方案就是引入一个中间的代理人（服务注册中心），这个代理人掌握着当前所有监控目标的访问信息，Prometheus只需要向这个代理人询问有哪些监控目标即可， 这种模式被称为服务发现。
+
+服务发现方式
+
+1. 基于文件，通过任意的方式将监控Target的信息写入文件，Prometheus会定时从文件中读取最新的Target信息
+
+    ```yaml
+    global:
+      scrape_interval: 15s
+      scrape_timeout: 10s
+       evaluation_interval: 15s
+    scrape_configs:
+    - job_name: 'file_ds'
+        file_sd_configs:
+        - files:
+          - targets.json
+    ```
+
+2. 基于DNS
+3. 基于consul
+
+    ```yaml
+    - job_name: node_exporter
+        metrics_path: /metrics
+        scheme: http
+        consul_sd_configs:
+          - server: localhost:8500
+            services:
+              - node_exporter
+    ```
+    在consul_sd_configs定义当中通过server定义了Consul服务的访问地址，services则定义了当前需要发现哪些类型服务实例的信息，这里限定了只获取node_exporter的服务实例信息。
+
+4. 平台提供的api，比如Kubernetes
+
+    ```yaml
+    - job_name: 'kubernetes-cadvisor'
+      kubernetes_sd_configs:
+      - api_server: 'http://localhost:8080';
+        role: node
+    ```
+
+[服务发现与Relabel](https://yunlzheng.gitbook.io/prometheus-book/part-ii-prometheus-jin-jie/sd/service-discovery-with-relabel)
+
 ## 存储
 
 ### data model
@@ -128,7 +173,9 @@ Prometheus includes a local on-disk time series database, but also optionally in
 
 同样地，Promthues的Remote Read（远程读）也通过了一个适配器实现。在远程读的流程当中，当用户发起查询请求后，Promthues将向remote_read中配置的URL发起查询请求（matchers，time ranges），Adapter根据请求条件从第三方存储服务中获取响应的数据。同时将数据转换为Promthues的原始样本数据返回给Prometheus Server。当获取到样本数据后，Promthues在本地使用PromQL对样本数据进行二次处理。
 
-## Prometheus expression language
+## 高级特性
+
+### Prometheus expression language
 
 [QUERYING PROMETHEUS](https://prometheus.io/docs/prometheus/latest/querying/basics/)即便一个表达语言，那也是麻雀虽小五脏俱全，字面量、运算符、语法规则、函数等都有，虽然没有编程语言全面，但也像SQL一样很完备了
 
@@ -150,13 +197,11 @@ Time series Selectors 从time series 中选择需要的数据
 
 [expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
 
-## rules
+### rules
 
 Prometheus uses rules to create new time series and to generate alerts.
 
-### recording rules
-
-Recording rules allow you to precompute frequently needed or computationally expensive expressions and save their result as a new set of time series. Querying the precomputed result will then often be much faster than executing the original expression every time it is needed. This is especially useful for dashboards, which need to query the same expression repeatedly every time they refresh.
+**Recording rules** allow you to precompute frequently needed or computationally expensive expressions and save their result as a new set of time series. Querying the precomputed result will then often be much faster than executing the original expression every time it is needed. This is especially useful for dashboards, which need to query the same expression repeatedly every time they refresh.
 
 每次query，一下子计算上千条time series 肯定会很耗时，因此可以预置一些规则，比如每5分钟汇总一次，即可大大减少计算最终结果时的数据量。
 
