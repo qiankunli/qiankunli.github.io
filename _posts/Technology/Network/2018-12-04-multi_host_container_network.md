@@ -15,6 +15,15 @@ keywords: container network
 
 容器的一个诉求：To make a VM mobile you want to be able to move it's physical location without changing it's apparent network location.
 
+|网络方案|网络上跑的什么包|辅助机制|优缺点|
+|---|---|---|---|
+|基于docker单机|NAT包/目的ip变为物理机|
+|overlay+隧道|封装后的udp包|解封包进程<br>就像运行vpn要启动一个进程才能登陆公司内网一样|不依赖底层网络<br>就像你的电脑连上网就可以连公司的vpn|
+|overlay+路由|主机路由后的包/目的mac变为物理机<br>容器所在物理机上一堆路由表（主要是直接路由）让物理机变为了一个路由器|直接路由机制需要二层连通|
+|underlay|原始数据包|linux相关网络驱动<br>网络设备支持|性能最好<br>强依赖底层网络|
+
+笔者最惊喜的就是以“网络上跑的什么包” 来切入点来梳理 容器网络模型。
+
 ## docker 单机
 
 [Kubernetes 网络模型进阶](https://mp.weixin.qq.com/s/QZYpV7ks2xxNvtqWUiS7QQ)容器网络发端于 Docker 的网络。Docker 使用了一个比较简单的网络模型，即内部的网桥加内部的保留 IP。这种设计的好处在于容器的网络和外部世界是解耦的，无需占用宿主机的 IP 或者宿主机的资源，完全是虚拟的。
@@ -51,31 +60,24 @@ there are two ways for Containers or VMs to communicate to each other.
 
 1. 第一个是接入，就是说我们的容器和宿主机之间是使用哪一种机制做连接，比如 Veth + bridge、Veth + pair 这样的经典方式，也有利用高版本内核的新机制等其他方式（如 mac/IPvlan 等），来把包送入到宿主机空间；
 2. 第二个是流控，就是说我的这个方案要不要支持 Network Policy，如果支持的话又要用何种方式去实现。这里需要注意的是，我们的实现方式一定需要在数据路径必经的一个关节点上。如果数据路径不通过该 Hook 点，那就不会起作用；
-3. 第三个是通道，即两个主机之间通过什么方式完成包的传输。我们有很多种方式，比如以路由的方式，具体又可分为 BGP 路由或者直接路由。还有各种各样的隧道技术等等。最终我们实现的目的就是一个容器内的包通过容器，经过接入层传到宿主机，再穿越宿主机的流控模块（如果有）到达通道送到对端。
+3. 第三个是通道，即两个主机之间通过什么方式完成包的传输。我们有很多种方式，比如以路由的方式，具体又可分为 **BGP 路由**或者**直接路由**。还有各种各样的**隧道技术**等等。最终我们实现的目的就是一个容器内的包通过容器，经过接入层传到宿主机，再穿越宿主机的流控模块（如果有）到达通道送到对端。
 
+![](/public/upload/network/container_network.png)
 
-### overlay 网络
+### overlay网络
 
-[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)**overlay 网络是一种动态同步多个主机间路由的方法**。
+overlay 网络主要有隧道 和 路由两种方式
 
-我们找一下覆盖网络的感觉
+1. 容器网卡不能直接发送/接收数据，而要通过双方容器所在宿主机网卡发送/接收数据
+2. “容器在哪个主机上“ 这个信息都必须专门维护。[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)**overlay 网络是一种动态同步多个主机间路由的方法**。
+3. 容器内数据包必须先发送目标容器所在的宿主机上，那么容器内原生的数据包便要进行改造（解封包或根据路由更改目标mac）
+4. 数据包到达目标宿主机上之后，目标宿主机要进行一定的操作转发到目标容器。
 
-1. 容器网卡不能直接发送/接收数据，而要通过宿主机网卡发送/接收数据
-1. 根据第一点，无论overlay 网络的所有方案，交换机都无法感知到容器的mac地址
-
-基于上述两点，容器内数据包从发送方的角度看，无法直接用目标容器mac发送，便需要先发到目标容器所在的宿主机上。于是：
-
-1. overlay 网络主要有隧道 和 路由两种方式，无论哪种方式，“容器在哪个主机上“ 这个信息都必须专门维护
-2. 容器内数据包必须先发送目标容器所在的宿主机上，那么容器内原生的数据包便要进行改造（解封包或根据路由更改目标mac）
-3. 数据包到达目标宿主机上之后，目标宿主机要进行一定的操作转发到目标容器。
-
-![](/public/upload/docker/overlay_network_1.png)
-
-覆盖网络如何解决connectivity and discoverability？connectivity由物理机之间解决，discoverability由veth 与 宿主机eth 之间解决，将上图细化一下
+覆盖网络如何解决connectivity and discoverability？connectivity由物理机之间解决，discoverability由**容器在物理机侧的veth** 与 宿主机eth 之间解决
 
 ![](/public/upload/docker/overlay_network_2.png)
 
-#### 隧道
+### 隧道
 
 隧道一般用到了解封包，那么问题来了，谁来解封包？怎么解封包？
 
@@ -89,7 +91,7 @@ flannel + udp 和flannel + vxlan 有一个共性，那就是用户的容器都�
 
 Flannel 支持三种后端实现，分别是： VXLAN；host-gw； UDP。而 UDP 模式，是 Flannel 项目最早支持的一种方式，也是性能最差的一种方式。所以，这个模式目前已经被弃用。我们在进行系统级编程的时候，有一个非常重要的优化原则，**就是要减少用户态到内核态的切换次数，并且把核心的处理逻辑都放在内核态进行**。这也是为什么，Flannel 后来支持的VXLAN 模式，逐渐成为了主流的容器网络方案的原因。
 
-#### 路由
+### 路由
 
 路由方案的关键是谁来路由？路由信息怎么感知？
 
@@ -141,6 +143,8 @@ There are two main ways they do it:
 
 1. the routes are in an etcd cluster, and the program talks to the etcd cluster to figure out which routes to set
 2. use the BGP protocol to gossip to each other about routes, and a daemon (BIRD) listens for BGP messages on every box
+
+容器所在主机的路由表 让linux 主机变成了一个路由器，路由表主要由**直接路由**构成，将数据包中目的mac 改为直接路由中下一跳主机 的mac 地址。 
 
 ### underlay/physical 网络
 
