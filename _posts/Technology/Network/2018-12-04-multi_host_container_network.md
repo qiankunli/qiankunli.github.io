@@ -62,6 +62,8 @@ there are two ways for Containers or VMs to communicate to each other.
 2. 第二个是流控，就是说我的这个方案要不要支持 Network Policy，如果支持的话又要用何种方式去实现。这里需要注意的是，我们的实现方式一定需要在数据路径必经的一个关节点上。如果数据路径不通过该 Hook 点，那就不会起作用；
 3. 第三个是通道，即两个主机之间通过什么方式完成包的传输。我们有很多种方式，比如以路由的方式，具体又可分为 **BGP 路由**或者**直接路由**。还有各种各样的**隧道技术**等等。最终我们实现的目的就是一个容器内的包通过容器，经过接入层传到宿主机，再穿越宿主机的流控模块（如果有）到达通道送到对端。
 
+[理解 CNI 和 CNI 插件](https://mp.weixin.qq.com/s/g3QECjZOgbEZ8FG9R3b9iw)
+
 ![](/public/upload/network/container_network.png)
 
 ### overlay网络
