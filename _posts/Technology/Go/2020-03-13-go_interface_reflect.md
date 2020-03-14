@@ -126,7 +126,7 @@ func toType(t *rtype) Type {
 }
 ```
 
-## ValueOf
+### ValueOf
 
 reflect.Value 表示 interface{} 里存储的实际变量，它能提供实际变量的各种信息。相关的方法常常是需要结合类型信息和值信息。例如，如果要提取一个结构体的字段信息，那就需要用到 _type (具体到这里是指 structType) 类型持有的关于结构体的字段信息、偏移信息，以及 `*data` 所指向的内容 —— 结构体的实际值。
 
@@ -168,6 +168,8 @@ func unpackEface(i interface{}) Value {
 3. To modify a reflection object, the value must be settable.如果需要操作一个反射变量，那么它必须是可设置的。翻译一下就是：**如果想要操作原变量，反射变量 Value 必须要 hold 住原变量的地址才行**。
 
 ### 与java 对比
+
+![](/public/upload/java/oop_kclass_model.png)
 
 ​**java中的反射，设计思路是，先类型后值**。意思是，无论如何，都是先找到属性和方法的描述，然后根据描述来获取属性的值、调用方法的执行。要进行这样的操作，入口都是由类的描述开始。golang设计思路为，值和类型划分的非常清晰，两条腿走路。
 
