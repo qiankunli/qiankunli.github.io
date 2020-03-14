@@ -169,6 +169,8 @@ func unpackEface(i interface{}) Value {
 
 ### 与java 对比
 
+hotspot 内部c++对java 对象的表示
+
 ![](/public/upload/java/oop_kclass_model.png)
 
 ​**java中的反射，设计思路是，先类型后值**。意思是，无论如何，都是先找到属性和方法的描述，然后根据描述来获取属性的值、调用方法的执行。要进行这样的操作，入口都是由类的描述开始。golang设计思路为，值和类型划分的非常清晰，两条腿走路。
