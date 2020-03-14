@@ -13,16 +13,6 @@ keywords: JAVA JVM
 
 [Java crashes](https://confluence.atlassian.com/confkb/java-crashes-235669496.html)The virtual machine is responsible for emulating a CPU, managing memory and devices, just like the operating system does for native applications (MS Office, web browsers etc).
 
-断断续续的在java内存、多线程、io这块写了几篇博客，跨度有两三年，回顾起来，发现它们正好构成了看待jvm的绝佳方式。
-
-![](/public/upload/java/jvm.png)
-
-1. jvm 内存模型与物理机/os内存模型的映射 [JVM3——java内存模型](http://qiankunli.github.io/2017/05/02/java_memory_model.html)
-2. jvm 线程 与 linux 进程/线程模型的映射 [AQS1——并发相关的硬件与内核支持](http://qiankunli.github.io/2016/03/13/aqs.html)
-3. java io 与 linux io 模型的映射 [java io涉及到的一些linux知识](http://qiankunli.github.io/2017/04/16/linux_io.html)
-4. jvm 一些高级指令（以支持java 高级语法） 对 机器指令的映射 [JVM4——《深入拆解java 虚拟机》笔记](http://qiankunli.github.io/2018/07/20/jvm_note.html)
-
-
 ## jvm 在java 体系中的位置
 
 ![](/public/upload/java/jdk_jre_jvm.png)
@@ -35,36 +25,9 @@ jdk 安装目录含义
 
 Class loaders are responsible for loading Java classes during runtime dynamically to the JVM (Java Virtual Machine). Also, they are part of the JRE (Java Runtime Environment). Hence, the JVM doesn’t need to know about the underlying files or file systems in order to run Java programs thanks to class loaders. 潜台词：Class loaders 是jre 类库的一部分但不是JVM 的一部分
 
-## “可执行文件”
-
-在linux中，可执行文件没有唯一的后缀名，本文以"可执行文件"统称。
-
-||java|os|
-|---|---|---|
-||jvm|linux os|
-||class 文件|可执行文件|
-
-两者有很多相象的地方，但毕竟机理不同，class文件和可执行文件的不同正是两个os机理不同的反映。而本质上的不同，则要追溯到java的起源：面向网络，为了让“可执行文件”在网络上传输并在不同的系统上执行，发散出很多机制。
-
-### class文件格式
-
-因为指令中包含了操作数，可执行文件不只是指令的堆砌。
-
-操作数大部分是地址引用，寄存器（或栈）成了存储引用的地方，作为cpu和内存的“中转站”。还有一些符号引用，需要在指令之前，描述这些符号引用。
-
-class文件中包含方法和属性信息，这些数据为反射机制提供的基础。
-
-### class文件的加载
-
-加载的本质，从磁盘上加载，得到的是一个字节数组，然后按照自己的内存模型，把字节数组中对应的数据放到对应的地方。
-
-程序和可执行文件  本身，都将“方法之类”的数据共享，“数据之类”的数据保存多份。
-
 ## 类加载——按类名加载
 
-与c/c++语言不同，c的二进制代码是c代码 + 库函数 编译链接的结果，运行时直接被加载到内存，当然也可以先加载一部分，通过缺页机制按页加载，加载哪一页跟地址有关系。而对于java，实际的“可执行文件”是jvm，像shell一样是个解释器，jvm加载java 代码开始执行，就像shell读入人的指令开始执行。**换句话说，如果条件允许，jvm启动起来，像shell一样空转都是可以的。**
-
-所以java有一个类加载过程，按名称找到Class文件并加载到内存，并对数据进行校验，转化解析和初始化，最终形成可以被虚拟机直接使用的java类型，这就是虚拟机的类加载机制。
+加载的本质，从磁盘上加载，得到的是一个字节数组，然后按照自己的内存模型，把字节数组中对应的数据放到进程内存对应的地方。并对数据进行校验，转化解析和初始化，最终形成可以被虚拟机直接使用的java类型，这就是虚拟机的类加载机制。
 
 [JVM类加载器与ClassNotFoundException和NoClassDefFoundError](http://arganzheng.life/jvm-classloader-ClassNotFoundException-NoClassDefFoundError.html)在”加载“阶段，虚拟机需要完成以下三件事：
 
@@ -73,8 +36,6 @@ class文件中包含方法和属性信息，这些数据为反射机制提供的
 3. 在内存中创建一个代表此类的java.lang.Class对象，作为方法区此类的各种数据的访问入口。
 
 ![](/public/upload/java/class_load_process.png)
-
-![](/public/upload/java/jvm_class_loader.png)
 
 ![](/public/upload/java/jvm_class_loader_reference.png)
 
@@ -141,7 +102,7 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 
 在大型应用中，**往往借助这一特性，来运行同一个类的不同版本**。tomcat 在类加载方面就有很好的实践 [Tomcat源码分析](http://qiankunli.github.io/2019/11/26/tomcat_source.html)
 
-## Java对象的内存布局
+## Java对象在内存中的表示
 
 |新建对象的方式||
 |---|---|
@@ -151,15 +112,42 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 |反序列化|直接复制已有的数据，来初始化新建对象的实例字段|
 |Unsafe.allocateInstance|未初始化实例字段|
 
+
+
+### java 对象的C++ 类表示——oop-klass model
+
+[深入理解多线程（二）—— Java的对象模型](https://juejin.im/post/5b7625aa6fb9a009910e641d)HotSpot是基于c++实现，而c++是一门面向对象的语言，本身具备面向对象基本特征，所以Java中的对象表示，最简单的做法是为每个Java类生成一个c++类与之对应。但HotSpot JVM并没有这么做，而是设计了一个OOP-Klass Model。OOP（Ordinary Object Pointer）指的是普通对象指针，而Klass用来描述对象实例的具体类型。为什么HotSpot要设计一套oop-klass model呢？答案是：HotSopt JVM的设计者不想让每个对象中都含有一个vtable（虚函数表）。oop的职能主要在于表示对象的实例数据，所以其中不含有任何虚函数。而klass为了实现虚函数多态，所以提供了虚函数表。
+
+![](/public/upload/java/oop_kclass_model.png)
+
+**在Java程序运行过程中，每创建一个新的对象，在JVM内部就会相应地创建一个对应类型的OOP对象。**在HotSpot中，根据JVM内部使用的对象业务类型，具有多种oopDesc的子类。除了oppDesc类型外，opp体系中还有很多instanceOopDesc、arrayOopDesc 等类型的实例，他们都是oopDesc的子类。
+
+![](/public/upload/java/hotspot_oop.png)
+
+JVM在运行时，需要一种用来标识Java内部类型的机制。在HotSpot中的解决方案是：为每一个已加载的Java类创建一个instanceKlass对象，用来在JVM层表示Java类。
+
+![](/public/upload/java/hotspot_kclass.png)
+
+**一个Java对象，它的存储是怎样的？**
+
+1. 一般很多人会回答：对象存储在堆上。
+2. 稍微好一点的人会回答：对象存储在堆上，对象的引用存储在栈上。
+3. 一个更加显得牛逼的回答：对象的实例（instantOopDesc)保存在堆上，对象的元数据（instantKlass）保存在方法区，对象的引用保存在栈上。
+
+### 内存布局
+
 ![](/public/upload/java/java_object_memory_layout.png)
 
-每个 Java 对象都有一个对象头 （object header） ，由标记字段和类型指针构成，标记字段用来存储对象的哈希码， GC 信息， 持有的锁信息，而类型指针指向该对象的类 Class ，在 64 位操作系统中，标记字段占有 64 位，而类型指针也占 64 位，也就是说一个  Java  对象在什么属性都没有的情况下要占有 16 字节的空间，当前 JVM 中默认开启了压缩指针，这样类型指针可以只占 32 位，所以对象头占 12 字节， 压缩指针可以作用于对象头，以及引用类型的字段。
+每个 Java 对象都有一个对象头 （object header） ，由标记字段和类型指针构成
+
+1. 标记字段用来存储对象的哈希码， GC 信息， 持有的锁信息。
+2. 类型指针指向该对象的类 Class。
+
+在 64 位操作系统中，标记字段占有 64 位，而类型指针也占 64 位，也就是说一个  Java  对象在什么属性都没有的情况下要占有 16 字节的空间，当前 JVM 中默认开启了压缩指针，这样类型指针可以只占 32 位，所以对象头占 12 字节， 压缩指针可以作用于对象头，以及引用类型的字段。
 
 以 Integer 类为例，它仅有一个 int 类型的私有字段，占 4 个字节。因此，每一个 Integer 对象的额外内存开销至少是 400%。这也是为什么 Java 要引入基本类型的原因之一。
 
 默认情况下，Java 虚拟机堆中对象的起始地址需要对齐至 8的倍数。如果一个对象用不到 8N 个字节，那么剩下的就会被填充。这些浪费掉的空间我们称之为对象间的填充（padding）。
-
-内存对齐
 
 1. 对象内存对齐， 这样对象的地址 就可以压缩一下，比如address * 8 得到对象的实际地址。
 2. 对象字段内存对齐（有六七个对齐规则），让字段只出现在同一 CPU 的缓存行中。如果字段不是对齐的，那么就有可能出现跨缓存行的字段。也就是说，该字段的读取可能需要替换两个缓存行，而该字段的存储也会同时污染两个缓存行。
