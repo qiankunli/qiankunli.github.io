@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: Go 常用的一些库
+title: Go代码组织及常用的一些库
 category: 技术
 tags: Go
-keywords: Go
+keywords: Go library
 
 ---
 
@@ -118,49 +118,6 @@ A reflection based dependency injection toolkit for Go.
 
 **设计模式分为创建、结构和行为三大类，如果自己构造依赖关系， 则创建 与 行为 两个目的的代码容易耦合在一起， 代码较长，给理解造成困难。**
 
-## 三 json字符串与结构体的转换
-
-Go中的json处理，跟结构体是密切相关的，一般要为json字符串建好相对应的struct。
-
-如果只是想获取json串中某个key的值，可以使用`github.com/bitly/go-simplejson`
-
-    js, err := simplejson.NewJson([]byte(inputStr))
-	path := js.Get("path").MustString()
-	
-如果知道json字符串对应结构体（该结构体可能会嵌套），则可以使用golang自带的encoding/json包。
-
-    type name struct {
-    	FN string `json:"fn"`
-    	LN string `json:"ln"`
-    }
-    type user struct {
-    	Id       int64  `json:"id"`            // 指定转换为字符串后，该字段显示的key值
-    	Username string `json:"username"`
-    	Password string `json:"-"`            
-    	N        name   `json:"name"`
-    }
-    func main() {
-    	n := name{
-    		FN: "li",
-    		LN: "qk",
-    	}
-    	u := user{
-    		Id:       1,
-    		Username: "lqk",
-    		Password: "123456",
-    		N:        n,
-    	}
-    	// 根据结构体生成字符串
-    	b, _ := json.Marshal(u)
-    	
-        jsonStr := string(b)
-    	fmt.Println(jsonStr)
-    	
-        var u2 user
-        // 根据字符串生成结构体
-        err := json.Unmarshal([]byte(jsonStr), &u2)
-    }
-
 ## 读写锁
 
     package main
@@ -224,6 +181,3 @@ The pattern to follow is `APPNAME VERB NOUN --ADJECTIVE`. or `APPNAME COMMAND AR
 A flag is a way to modify the behavior of a command 这句说的很有感觉
 
 
-## http
-
-go语言中的`github.com/gorilla`可以方便的进行http url 到处理方法的dispatch，`github.com/urfave/cli` 则实现了用户输入命令到处理方法的dispatch。
