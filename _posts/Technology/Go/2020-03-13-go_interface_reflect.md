@@ -15,8 +15,6 @@ keywords: Go interface reflect
 
 interface，接口，restful接口，SQL 也是一种接口
 
-go interface 及反射 代码都在runtime 包中。
-
 ## interface
 
 [深度解密Go语言之关于 interface 的 10 个问题](https://mp.weixin.qq.com/s/EbxkBokYBajkCR-MazL0ZA)

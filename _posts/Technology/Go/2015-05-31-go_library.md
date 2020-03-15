@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Go代码组织及常用的一些库
+title: Go常用的一些库
 category: 技术
 tags: Go
 keywords: Go library
@@ -15,99 +15,116 @@ keywords: Go library
 
 本文主要阐述一下golang中常用的库。
 
-## 如何组织一个大项目的go 代码
+## go runtime
 
-![](/public/upload/go/go_module.png)
-
-### 项目代码划分
-
-[使用 Go 语言开发的一些经验（含代码示例）](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651008064&idx=2&sn=cdc19d0db8decad85b671ba79fd2d1f5&chksm=bdbed4138ac95d05dbfd6672babba8e4d4a547d7845cd46b23fe3802dd5a1c49777b476fadd5&mpshare=1&scene=23&srcid=0708wchJyw4BGm9vtQxV8qaT%23rd) 要点如下
-
-1. 可见性和代码划分
-
-	* c++ 在类上，即哪怕在同一个代码文件中，仍然无法访问一个类的私有方法
-	* java 是 类 + 包名
-	* go 在包上，从其他包中引入的常量、变量、函数、结构体以及接口，都需要加上包的前缀来进行引用。Golang 也可以 dot import 来去掉这个前缀。不幸的是，这个做法并不常规，并且不被建议。
-
-1. 假设有一个用户信息管理系统，直观感觉上的分包方式
-
-	* 单一package
-	* 按mvc划分，比如controller包、model包，缺点就是你使用 controller类时 就只得`controller.UserController`,controller 重复了
-	* 按模块划分。比如`user/UserControler.go,user/User.go`，缺点就是使用User类时只得 `user.User`
-
-2. 按依赖划分，即根包下 定义接口文件`servier.go`，包含User和UserController 接口定义，然后定义`postgresql/UserService.go` 或者`mysql/UserService.go`
-
-github 也有一些demo 项目layout [golang-standards/project-layout](https://github.com/golang-standards/project-layout)
-
-[作为一名Java程序员，我为什么不在生产项目中转向Go](http://www.infoq.com/cn/articles/why-not-go)
-
-并发中处理的内容才是关键，新启一个线程或者协程才是万里长城的第一步，如果其中的业务逻辑有10个分支，还要多次访问数据库并调用远程服务，那无论用什么语言都白搭。所以在业务逻辑复杂的情况下，语言的差异并不会太明显，至少在Java和Go的对比下不明显	
-[Organizing Go source code part 2](http://neurocline.github.io/dev/2016/02/01/organizing-go-source-code.html) 未读
+提到 runtime, 大家可能会想起 java, python 的 runtime. 不过 go 和这两者不太一样, java, python 的 runtime 是虚拟机, 而 go 的 runtime 和用户代码一起编译到一个可执行文件中.用户代码和 runtime 代码除了代码组织上有界限外, 运行的时候并没有明显的界限. 一些常用的关键字被编译成 runtime 包下的一些函数调用.
 
 
-## Go 依赖包管理
+Golang runtime 是go语言运行所需要的基础设施
+1. 协程调度、内存分配、GC
+2. 操作系统及cpu 相关的操作的封装（信号处理、系统调用、寄存器操作、原子操作等）CGO。go 对系统调用进行了封装，可不依赖glibc
+3. pprof,trace,race 检测的支持
+4. map,channel,string 等内置类型及反射的实现
 
-[Go的包管理工具（一）](https://juejin.im/post/5c6ac37cf265da2de7134242)
+## unsafe
 
-[Go的包管理工具（二）：glide](https://juejin.im/post/5c769eae6fb9a049d05e682b)
+相比于 C 语言中指针的灵活，Go 的指针多了一些限制。
 
-[Go的包管理工具（三）：Go Modules](https://juejin.im/post/5c7fc2b1f265da2dac4575fc)
+1. Go的指针不能进行数学运算。
+2. 不同类型的指针不能相互转换。
+3. 不同类型的指针不能使用==或!=比较。
+4. 不同类型的指针变量不能相互赋值。
 
-[官方对比](https://github.com/golang/go/wiki/PackageManagementTools)
+**为什么有 unsafe？**Go 语言类型系统是为了安全和效率设计的，有时，安全会导致效率低下。有了 unsafe 包，高阶的程序员就可以利用它**绕过**类型系统的低效。Package unsafe contains operations that step around the **type safety** of Go programs.
 
-||版本||
-|---|---|---|
-|vendor机制|1.5发布，1.6默认启用，1.7去掉环境变量设置默认开启||
-|govendor|1.5以后可用|基于 vendor 目录机制的包管理工具|
-|godep|1.5之前可以用，1.6依赖vendor||
-|Go Modules|1.11 发布，1.12 增强，1.13正式默认开启||
+`$GOROOT/src/unsafe/unsafe.go` 里只有一个文件，内容只有几行
 
-### 最早的GOPATH
+```go
+package unsafe
+type ArbitraryType int
+type Pointer *ArbitraryType
+func Sizeof(x ArbitraryType) uintptr
+func Offsetof(x ArbitraryType) uintptr
+func Alignof(x ArbitraryType) uintptr
+```
 
-对于go来说，其实并不在意你的代码是内部还是外部的，总之都在GOPATH里，任何import包的路径都是从GOPATH开始的；唯一的区别，就是内部依赖的包是开发者自己写的，外部依赖的包是go get下来的。Go 语言原生包管理的缺陷：
+以上三个函数返回的结果都是 uintptr 类型，这和 unsafe.Pointer 可以相互转换。三个函数都是在编译期间执行，它们的结果可以直接赋给 const型变量。另外，因为三个函数执行的结果和操作系统、编译器相关，所以是不可移植的。Packages that import unsafe may be non-portable and are not protected by the Go 1 compatibility guidelines.
 
-1. 能拉取源码的平台很有限，绝大多数依赖的是 github.com
-2. 不能区分版本，以至于令开发者以最后一项包名作为版本划分
-3. 依赖 列表/关系 无法持久化到本地，需要找出所有依赖包然后一个个 go get
-4. 只能依赖本地全局仓库（GOPATH/GOROOT），无法将库放置于局部仓库（$PROJECT_HOME/vendor）
+unsafe 包提供了 2 点重要的能力：
 
-### vendor
+1. 任何类型的指针和 unsafe.Pointer 可以相互转换。
+2. uintptr 类型和 unsafe.Pointer 可以相互转换。
 
-vendor属性就是让go编译时，优先从项目源码树根目录下的vendor目录查找代码(可以理解为切了一次GOPATH)，如果vendor中有，则不再去GOPATH中去查找。
+pointer 不能直接进行数学运算，但可以把它转换成 uintptr，对 uintptr 类型进行数学运算，再转换成 pointer 类型。uintptr 并没有指针的语义，意思就是 uintptr 所指向的对象会被 gc 无情地回收。而 unsafe.Pointer 有指针语义，可以保护它所指向的对象在“有用”的时候不会被垃圾回收。
 
-通过如上vendor解决了部分问题，然而又引起了新的问题：
+## context
 
-1. vendor目录中依赖包没有版本信息。这样依赖包脱离了版本管理，对于升级、问题追溯，会有点困难。
-2. 如何方便的得到本项目依赖了哪些包，并方便的将其拷贝到vendor目录下？依靠人工实在不现实。
+Go 1.7 标准库引入 context，中文译作“上下文”，准确说它是 goroutine 的上下文，包含 goroutine 的运行状态、环境、现场等信息。
 
-### godep/govendor
+![](/public/upload/go/context_object.png)
 
-在支持vendor机制之后， gopher 们把注意力都集中在如何利用 vendor 解决包依赖问题，从手工添加依赖到 vendor、手工更新依赖，到一众包依赖管理工具的诞生，比如：govendor、glide 以及号称准官方工具的 dep，努力地尝试着按照当今主流思路解决着诸如 “钻石型依赖” 等难题。
+### 为什么有 context？
 
-`godep go build main.go` godep中的go命令，就是将原先的go命令加了一层壳，执行godep go的时候，会将当前项目的workspace目录加入GOPATH变量中。
+在 Go 的 server 里，通常每来一个请求都会启动若干个 goroutine 同时工作：有些去数据库拿数据，有些调用下游接口获取相关数据……这些 goroutine 需要共享这个请求的基本数据，例如登陆的 token，处理请求的最大超时时间（如果超过此值再返回数据，请求方因为超时接收不到）等等。当请求被取消或超时，所有正在为这个请求工作的 goroutine 需要快速退出，因为它们的“工作成果”不再被需要了。context 包就是为了解决上面所说的这些问题而开发的：在 一组 goroutine 之间传递共享的值、取消信号、deadline……
 
-`godep save`命令将会自动扫描当前目录所属包中import的所有外部依赖库（非系统库），并将所有的依赖库下来下来到当前工程中，产生文件 `Godeps/Godeps.json` 文件。把所有依赖包代码从GOPATH路径拷贝到Godeps目录下(vendor推出后也改用vendor了)
+### 为什么是context 树
 
-`govendor init`生成vendor/vendor.json
+Goroutine的创建和调用关系总是像层层调用进行的，就像人的辈分一样，而更靠顶部的Goroutine应有办法主动关闭其下属的Goroutine的执行但不会影响 其上层Goroutine的执行（不然程序可能就失控了）。为了实现这种关系，**Context结构也应该像一棵树**，叶子节点须总是由根节点衍生出来的。
 
-`govendor add +external`更新vendor/vendor.json，并拷贝GOPATH下的代码到vendor目录中。
+![](/public/upload/go/context_tree.png)
 
-**vendor机制有一个问题**：同样的库，同样的版本，就因为在不同的工程里用了，就要在vendor里单独搞一份，不浪费吗？所有这些基于vendor的包管理工具，都会有这个问题。
+如上左图，代表一棵 context 树。当调用左图中标红 context 的 cancel 方法后，该 context 从它的父 context 中去除掉了：实线箭头变成了虚线。且虚线圈框出来的 context 都被取消了，圈内的 context 间的父子关系都荡然无存了。
 
-### Go Modules 一统天下
+要创建Context树，第一步就是要得到根节点，context.Background函数的返回值就是根节点：
 
-Go Modules 提供了统一的依赖包管理工具 go mod，其思想类似maven：摒弃vendor和GOPATH，拥抱本地库。
+```go
+func Background() Context
+```
 
-1. 依赖包统一收集在 `$GOPATH/pkg/mod` 中进行集中管理。有点mvn `.m2` 文件夹的意思
-2. `$GOPATH/pkg/mod` 中的按版本管理
+有了根节点，又该怎么创建其它的子节点，孙节点呢？context包为我们提供了多个函数来创建他们：
 
-        $GOPATH/pkg/mod/k8s.io
-            api@v0.17.0
-            client-go@v0.17.0
-            kube-openapi@v0.0.0-20191107075043-30be4d16710a
+```go
+func WithCancel(parent Context) (ctx Context, cancel CancelFunc)
+func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc)
+func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc)
+func WithValue(parent Context, key interface{}, val interface{}) Context
+```
 
-3. go build 代码时，自动解析代码中的import 生成 go.mod 文件。PS：相当于`maven package` 解析代码自动生成pom.xml。
-4. 将 import 路径与项目代码的实际存放路径解耦。PS：import 依赖包在$GOPATH 中的路径，编译时使用依赖包在`$GOPATH/pkg/mod`中的文件。
+### 使用建议
+
+官方对于使用 context 提出了几点建议：
+
+1. 不要将 Context 塞到结构体里。直接将 Context 类型作为函数的第一参数，而且一般都命名为 ctx。
+2. 不要向函数传入一个 nil 的 context，如果你实在不知道传什么，标准库给你准备好了一个 context：todo。
+3. 不要把本应该作为函数参数的类型塞到 context 中，context 存储的应该是一些共同的数据。例如：登陆的 session、cookie 等。
+4. 同一个 context 可能会被传递到多个 goroutine，别担心，context 是并发安全的。
+
+context 取消和传值示例
+
+```go
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	valueCtx := context.WithValue(ctx, key, "add value")
+	go watch(valueCtx)
+	time.Sleep(10 * time.Second)
+	cancel()
+	time.Sleep(5 * time.Second)
+}
+func watch(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			//get value
+			fmt.Println(ctx.Value(key), "is cancel")
+			return
+		default:
+			//get value
+			fmt.Println(ctx.Value(key), "in goroutine")
+			time.Sleep(2 * time.Second)
+		}
+	}
+}
+```
 
 ## Go代码中的依赖注入
 
