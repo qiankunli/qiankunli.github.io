@@ -28,7 +28,7 @@ Golang runtime 是go语言运行所需要的基础设施
 
 ## unsafe
 
-相比于 C 语言中指针的灵活，Go 的指针多了一些限制。
+[深度解密Go语言之unsafe](https://mp.weixin.qq.com/s/OO-kwB4Fp_FnCaNXwGJoEw)相比于 C 语言中指针的灵活，Go 的指针多了一些限制。
 
 1. Go的指针不能进行数学运算。
 2. 不同类型的指针不能相互转换。
@@ -59,7 +59,7 @@ pointer 不能直接进行数学运算，但可以把它转换成 uintptr，对 
 
 ## context
 
-Go 1.7 标准库引入 context，中文译作“上下文”，准确说它是 goroutine 的上下文，包含 goroutine 的运行状态、环境、现场等信息。
+[深度解密Go语言之context](https://mp.weixin.qq.com/s/GpVy1eB5Cz_t-dhVC6BJNw)Go 1.7 标准库引入 context，中文译作“上下文”，准确说它是 goroutine 的上下文，包含 goroutine 的运行状态、环境、现场等信息。
 
 ![](/public/upload/go/context_object.png)
 
