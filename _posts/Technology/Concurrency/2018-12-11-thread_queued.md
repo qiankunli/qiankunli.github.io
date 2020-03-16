@@ -3,8 +3,8 @@
 layout: post
 title: 线程排队
 category: 技术
-tags: Java
-keywords: groovy
+tags: Concurrency
+keywords: thread queue
 
 ---
 

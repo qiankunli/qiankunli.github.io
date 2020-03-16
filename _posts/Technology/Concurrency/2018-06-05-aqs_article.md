@@ -3,7 +3,7 @@
 layout: post
 title: AQS1——论文学习
 category: 技术
-tags: Java
+tags: Concurrency
 keywords: java aqs
 
 ---

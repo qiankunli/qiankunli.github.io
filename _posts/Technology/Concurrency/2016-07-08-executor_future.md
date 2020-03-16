@@ -3,7 +3,7 @@
 layout: post
 title: 异步执行抽象——Executor与Future
 category: 技术
-tags: Java
+tags: Concurrency
 keywords: future
 
 ---

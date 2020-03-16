@@ -55,85 +55,68 @@ jvm 作为 a model of a whole computer，便与os 有许多相似的地方，包
 
 Metaspace is a new memory space – starting from the Java 8 version; it has replaced the older PermGen memory space. The garbage collector now automatically triggers cleaning of the dead classes once the class metadata usage reaches its maximum metaspace size.with this improvement, JVM **reduces the chance** to get the OutOfMemory error.
 
-## “可执行文件的” 执行
+## “可执行文件的” 执行——虚拟机
 
-### 基于栈和基于寄存器
+虚拟机的设计有两种技术：一是基于栈的虚拟机；二是基于寄存器的虚拟机。
+
+java是一种跨平台的编程语言，为了跨平台，jvm抽象出了一套内存模型和基于栈的解释器，进而创建一套在该模型基础上运行的字节码指令。为了跨平台，不能假定平台特性，因此抽象出一个新的层次来屏蔽平台特性，因此推出了基于栈的解释器，与以往基于寄存器的cpu执行有所区别。
+
+![](/public/upload/jvm/run_java_code.png)
 
 [Virtual Machine Showdown: Stack Versus Registers](https://www.usenix.org/legacy/events/vee05/full_papers/p153-yunhe.pdf)
 
 [虚拟机随谈（一）：解释器，树遍历解释器，基于栈与基于寄存器，大杂烩](http://rednaxelafx.iteye.com/blog/492667)
 
-1. 典型的RISC架构会要求除load和store以外，其它用于运算的指令的源与目标都要是寄存器。 `a += b; ` 对应 x86 就是` add a, b` 
-2. 基于栈的解释器，`a += b; `对应jvm 就是`iconst_1  iconst_2  iadd  istore_0  ` 
-
 ![](/public/upload/java/jvm_os_1.gif)
 
-大多数的处理器架构，都有实现**硬件栈**。有专门的栈指针寄存器，以及特定的硬件指令来完成 入栈/出栈 的操作。当然，硬件栈的主要作用是支持函数调用而不是所有的命令处理。
+```java
+public class MyClass {
+    public int foo(int a){
+        return a + 3;
+    }
+}
+```
+翻译后的部分字节码
 
-### 基于栈的解释器
+```
+public int foo(int);
+  Code:
+     0: iload_1     //把下标为1的本地变量入栈
+     1: iconst_3    //把常数3入栈
+     2: iadd        //执行加法操作
+     3: ireturn     //返回
+```
 
-![](/public/upload/jvm/run_java_code.png)
+||基于栈的虚拟机|基于寄存器的虚拟机|
+|---|---|---|
+|操作数|指令的操作数是由栈确定的，我们不需要为每个操作数显式地指定存储位置|基于寄存器的虚拟机的运行机制跟机器码的运行机制是差不多的，**它的指令要显式地指出操作数的位置（寄存器或内存地址）**|
+|优点|指令可以比较短，指令生成也比较容易|可以更充分地利用寄存器来保存中间值，从而可以进行更多的优化|
+|典型代表|jvm|Google 公司为 Android 开发的 Dalvik 虚拟机和 Lua 语言的虚拟机|
 
-java是一种跨平台的编程语言，为了跨平台，jvm抽象出了一套内存模型和基于栈的解释器，进而创建一套在该模型基础上运行的字节码指令。（这也是本文不像其它书籍一样先从"class文件格式"讲起的原因）
+栈机并不是不用寄存器，实际上，操作数栈是可以基于寄存器实现的，寄存器放不下的再溢出到内存里。**只不过栈机的每条指令，只能操作栈顶部的几个操作数**，所以也就没有办法访问其它寄存器，实现更多的优化。
 
-1. 为了跨平台，不能假定平台特性，因此抽象出一个新的层次来屏蔽平台特性，因此推出了基于栈的解释器，与以往基于寄存器的cpu执行有所区别。
-
-2. `字节码指令 = 操作码 + 操作数`,（操作数可以是立即数，可以存在栈中，也可以是指向堆的引用（引用存在栈中）） `传统的指令 = 操作码 + 操作数`,（操作数据可以是立即数，可以存在寄存器中，也可以是指向内存的引用）此处jvm的栈，说的是栈帧，跟传统的栈还是有不同的，**粗略的讲，我们可以说在jvm体系中，用栈替代了原来寄存器的功能。**
-
-    这句话的不准确在于，对于传统cpu执行，线程之间共用的寄存器，只不过在线程切换时，借助了pcb（进程控制块或线程控制块，存储在线程数据所在内存页中），pcb保存了现场环境，比如寄存器数据。轮到某个线程执行时，恢复现场环境，为寄存器赋上pcb对应的值，cpu按照pc指向的指令的执行。
+**虚拟机的一个通用优势：栈/寄存器 可以每个线程一份，一直存在内存中**。对于传统cpu执行，线程之间共用的寄存器，在线程切换时，借助了pcb（进程控制块或线程控制块，存储在线程数据所在内存页中），pcb保存了现场环境，比如寄存器数据。轮到某个线程执行时，恢复现场环境，为寄存器赋上pcb对应的值，cpu按照pc指向的指令的执行。而在jvm体系中，每个线程的栈空间是私有的，栈一直在内存中（无论其对应的线程是否正在执行），轮到某个线程执行时，线程对应的栈（确切的说是栈顶的栈帧）成为“当前栈”（无需重新初始化），执行pc指向的方法区中的指令。
     
-    而在jvm体系中，每个线程的栈空间是私有的，栈一直在内存中（无论其对应的线程是否正在执行），轮到某个线程执行时，线程对应的栈（确切的说是栈顶的栈帧）成为“当前栈”（无需重新初始化），执行pc指向的方法区中的指令。
-    
-3. 类似的编译优化策略
+## 字节码生成——ASM
 
-    同一段代码，编译器可以给出不同的字节码（最后执行效果是一样的），还可以在此基础上进行优化。比如，对于传统os，将内存中的变量缓存到寄存器。对于jvm，将堆中对象的某个实例属性缓存到线程对应的栈。而c语言和java语言是通过共享内存，而不是共享寄存器或线程的私有栈来进行线程“交流”的，因此就会带来线程安全问题。因此，c语言和java语言都有volatile关键字。（虽然这不能完全解决线程安全问题）
+从编译原理的层面看，生成 LLVM 的 IR 时，可以得到 LLVM 的 API 的帮助。字节码就是另一种 IR，而且比 LLVM 的 IR 简单多了，有ASM/Apache BCEL/Javassist 这个工具为我们生成字节码。ASM是一个开源的字节码生成工具/**字节码操纵框架**。Grovvy 语言就是用它来生成字节码的，它还能解析 Java 编译后生成的字节码，从而进行修改。
 
-## 线程的状态
+ASM 解析字节码的过程，有点像 XML 的解析器解析 XML 的过程：先解析类，再解析类的成员，比如类的成员变量（Field）、类的方法（Mothod）。在方法里，又可以解析出一行行的指令。
 
-[Understanding Linux Process States](https://access.redhat.com/sites/default/files/attachments/processstates_20120831.pdf)
+### 部分生成的字节码
 
-|进程的基本状态|运行|就绪|阻塞|退出|
-|---|---|---|---|---|
-|Linux| TASK_RUNNING ||TASK_INTERRUPTIBLE、TASK_UNINTERRUPTIBLE|TASK_STOPPED/TASK_TRACED、TASK_DEAD/EXIT_ZOMBIE|
-|java|| RUNNABLE | BLOCKED、WAITING、TIMED_WAITING|TERMINATED|
+Spring 采用的代理技术有两个：一个是 Java 的动态代理（dynamic proxy）技术；一个是采用 cglib 自动生成代理，cglib 采用了 asm 来生成字节码。Java 的动态代理技术，只支持某个类所实现的接口中的方法。如果一个类不是某个接口的实现，那么 Spring 就必须用到 cglib，从而用到字节码生成技术来生成代理对象的字节码。
 
-在 POSIX 标准中（POSIX标准定义了操作系统应该为应用程序提供的接口标准），thread_block 接受一个参数 stat ，这个参数也有三种类型，TASK_BLOCKED， TASK_WAITING， TASK_HANGING，而调度器只会对线程状态为 READY 的线程执行调度，另外一点是线程的阻塞是线程自己操作的，相当于是线程主动让出 CPU 时间片，所以等线程被唤醒后，他的剩余时间片不会变，该线程只能在剩下的时间片运行，如果该时间片到期后线程还没结束，该线程状态会由 RUNNING 转换为 READY ，等待调度器的下一次调度。
+### 系统的根据编程语言代码AST生成字节码
 
-![](/public/upload/java/thread_status.jpg)
+基于 AST 生成 JVM 的字节码的逻辑还是比较简单的，比生成针对物理机器的目标代码要简单得多，为什么这么说呢？主要有以下几个原因：
 
-[Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)对进程而言，就三种状态，就绪，运行，阻塞，而在 JVM 中，阻塞有四种类型，我们可以通过 jstack 生成 dump 文件查看线程的状态。
+1. 不用太关心指令选择的问题。针对 AST 中的每个运算，基本上都有唯一的字节码指令对应，直白地翻译就可以了，不需要用到树覆盖这样的算法。
+2. 不需要关心寄存器的分配，因为 JVM 是使用操作数栈的；
+3. 指令重排序也不用考虑，因为指令的顺序是确定的，按照逆波兰表达式的顺序就可以了；
+4. 优化算法，暂时也不用考虑。
 
-1. BLOCKED （on object monitor)  通过 synchronized(obj) 同步块获取锁的时候，等待其他线程释放对象锁，dump 文件会显示 waiting to lock <0x00000000e1c9f108>
-2. TIMED WAITING (on object monitor) 和 WAITING (on object monitor) 在获取锁后，调用了 object.wait() 等待其他线程调用 object.notify()，两者区别是是否带超时时间
-3. TIMED WAITING (sleeping) 程序调用了 thread.sleep()，这里如果 sleep(0) 不会进入阻塞状态，会直接从运行转换为就绪
-4. TIMED WAITING (parking) 和 WAITING (parking) 程序调用了 Unsafe.park()，线程被挂起，等待某个条件发生，waiting on condition
 
-从linux内核来看， BLOCKED、WAITING、TIMED_WAITING都是等待状态。做这样的区分，是jvm出于管理的需要（两个原因的线程放两个队列里管理，如果线程运行出了synchronized这段代码，jvm只需要去blocked队列放一个线程出来。而某人调用了notify()，jvm只需要去waitting队列里取个出来。），本质上是：who when how唤醒线程。
-
-[Java线程中wait状态和block状态的区别? - 赵老师的回答 - 知乎](
-https://www.zhihu.com/question/27654579/answer/128050125)
-
-|从上到下|常规java code|synchronized java code|volatile java code|
-|---|---|---|---|
-|编译|编译器加点私货|monitor enter/exist|除了其变量定义的时候有一个Volatile外，之后的字节码跟有无Volatile完全一样|
-||class 字节码 |扩充后的class 字节码 ||
-|运行|jvm加点私货|锁升级：自旋/偏向锁/轻量级锁/重量级锁 ||
-||机器码|扩充后的机器码| 加入了lock指令，查询IA32手册，它的作用是使得本CPU的Cache写入了内存，该写入动作也会引起别的CPU invalidate其Cache |
-|用户态|||
-||系统调用|mutex系统调用|
-|内核态|||
-|||可能用到了 semaphore struct|
-|||线程加入等待队列 + 修改自己的状态 + 触发调度|
-
-## 设置多少线程数
-
-[程序设计的5个底层逻辑，决定你能走多快](https://mp.weixin.qq.com/s/ar3BRRjAgGXShZ0tuFdubQ)
-
-关于应用程序中设置多少线程数合适的问题，我们一般的做法是设置 CPU 最大核心数 * 2 ，我们编码的时候可能不确定运行在什么样的硬件环境中，可以通过 Runtime.getRuntime（).availableProcessors() 获取 CPU 核心。
-
-但是具体设置多少线程数，主要和线程内运行的任务中的阻塞时间有关系，如果任务中全部是计算密集型，那么只需要设置 CPU 核心数的线程就可以达到 CPU 利用率最高，如果设置的太大，反而因为线程上下文切换影响性能，如果任务中有阻塞操作，而在阻塞的时间就可以让 CPU 去执行其他线程里的任务，我们可以通过 线程数量=内核数量 / （1 - 阻塞率）这个公式去计算最合适的线程数，阻塞率我们可以通过计算任务总的执行时间和阻塞的时间获得。
-
-目前微服务架构下有大量的RPC调用，所以利用多线程可以大大提高执行效率，**我们可以借助分布式链路监控来统计RPC调用所消耗的时间，而这部分时间就是任务中阻塞的时间**，当然为了做到极致的效率最大，我们需要设置不同的值然后进行测试。
 
 ## 重排序
 

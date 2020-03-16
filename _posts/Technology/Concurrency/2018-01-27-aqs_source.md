@@ -3,7 +3,7 @@
 layout: post
 title: AQS2——粗略的代码分析
 category: 技术
-tags: Java
+tags: Concurrency
 keywords: AQS
 
 ---
