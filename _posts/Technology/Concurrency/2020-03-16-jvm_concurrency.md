@@ -8,7 +8,21 @@ keywords: jvm concurrency
 
 ---
 
-## 简介（持续更新）
+## 简介
+
+## jvm层实现
+
+[聊聊 Java 并发——基石篇（上）](https://www.infoq.cn/article/Nwq2WyKWevl0mGk_g96C)在创建一个 Thread 对象的时候，除了一些初始化设置之外就没有什么实质性的操作，真正的工作其实是在 start 方法调用中产生的。
+
+![](/public/upload/jvm/hospot_thread_object.png)
+
+[从Java到C++,以JVM的角度看Java线程的创建与运行](https://www.jianshu.com/p/3ce1b5e5a55e)
+
+1. JavaThread: JVM中C++定义的类，一个JavaThread的instance代表了在JVM中的java.lang.Thread的instance, 它维护了线程的状态，并且维护一个指针指向java.lang.Thread创建的对象(oop)。它同时还维护了一个指针指向对应的OSThread，来获取底层操作系统创建的osthread的状态
+2. OSThread: JVM中C++定义的类，代表了JVM中对底层操作系统的osthread的抽象，它维护着实际操作系统创建的线程句柄handle，可以获取底层osthread的状态
+3. VMThread: JVM中C++定义的类，这个类和用户创建的线程无关，是JVM本身用来进行虚拟机操作的线程，比如GC
+
+![](/public/upload/jvm/hospot_thread_sequence.png)
 
 
 ## 线程的状态
