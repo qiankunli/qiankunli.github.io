@@ -167,10 +167,16 @@ AQS实际上通过头尾指针来管理同步队列，实现包括获取锁失�
 
 1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
 * JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走操作系统。
-* 每一个线程都有一个可用monitor record列表，JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor record 的地址。
-* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了。
+* 每一个线程都有一个可用monitor record列表，JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor/lock record 的地址。
+
+    ![](/public/upload/concurrency/biased_lock.png)
+* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了——重量级锁，会导致线程的状态切换，让出cpu。
 
 [Java synchronized原理总结](https://zhuanlan.zhihu.com/p/29866981)
+
+![](/public/upload/concurrency/synchronized.png)
+
+所谓悲观锁，就是认为如果我不做充分的同步的手段（包括执行重量级的操作）就肯定会出现问题；所谓乐观锁，就是会乐观地预估系统当前的状态，认为状态是符合预期的，因此不用重量级的同步也可以完成同步，如果不巧发生了竞态，就退避，然后再按照一定的策略重试。
 
 ### DK1.6 之后性能优势不大了，只剩下功能优势
 
