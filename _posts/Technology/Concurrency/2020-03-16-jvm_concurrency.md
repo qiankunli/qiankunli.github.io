@@ -10,9 +10,9 @@ keywords: jvm concurrency
 
 ## 简介
 
-## jvm层实现
+![](/public/upload/jvm/jvm_thread.png)
 
-[聊聊 Java 并发——基石篇（上）](https://www.infoq.cn/article/Nwq2WyKWevl0mGk_g96C)在创建一个 Thread 对象的时候，除了一些初始化设置之外就没有什么实质性的操作，真正的工作其实是在 start 方法调用中产生的。
+## jvm层实现
 
 ![](/public/upload/jvm/hospot_thread_object.png)
 
@@ -24,6 +24,7 @@ keywords: jvm concurrency
 
 ![](/public/upload/jvm/hospot_thread_sequence.png)
 
+[聊聊 Java 并发——基石篇（上）](https://www.infoq.cn/article/Nwq2WyKWevl0mGk_g96C)在创建一个 Thread 对象的时候，除了一些初始化设置之外就没有什么实质性的操作，真正的工作其实是在 start 方法调用中产生的。
 
 ## 线程的状态
 
