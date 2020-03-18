@@ -3,7 +3,7 @@
 layout: post
 title: 《Concurrency Models》笔记
 category: 技术
-tags: Basic
+tags: Concurrency
 keywords: 多线程 
 
 ---
