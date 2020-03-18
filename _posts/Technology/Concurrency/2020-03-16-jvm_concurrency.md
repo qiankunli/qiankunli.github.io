@@ -30,10 +30,12 @@ keywords: jvm concurrency
 
 [Understanding Linux Process States](https://access.redhat.com/sites/default/files/attachments/processstates_20120831.pdf)
 
-|进程的基本状态|运行|就绪|阻塞|退出|
-|---|---|---|---|---|
-|Linux| TASK_RUNNING ||TASK_INTERRUPTIBLE、TASK_UNINTERRUPTIBLE|TASK_STOPPED/TASK_TRACED、TASK_DEAD/EXIT_ZOMBIE|
-|java|| RUNNABLE | BLOCKED、WAITING、TIMED_WAITING|TERMINATED|
+|进程的基本状态|Linux|Java|
+|---|---|---|
+|运行|TASK_RUNNING||
+|就绪||RUNNABLE|
+|阻塞|TASK_INTERRUPTIBLE<br>TASK_UNINTERRUPTIBLE|BLOCKED<br>WAITING<br>TIMED_WAITING|
+|退出|TASK_STOPPED/TASK_TRACED<br>TASK_DEAD/EXIT_ZOMBIE|TERMINATED|
 
 在 POSIX 标准中（POSIX标准定义了操作系统应该为应用程序提供的接口标准），thread_block 接受一个参数 stat ，这个参数也有三种类型，TASK_BLOCKED， TASK_WAITING， TASK_HANGING，而调度器只会对线程状态为 READY 的线程执行调度，另外一点是线程的阻塞是线程自己操作的，相当于是线程主动让出 CPU 时间片，所以等线程被唤醒后，他的剩余时间片不会变，该线程只能在剩下的时间片运行，如果该时间片到期后线程还没结束，该线程状态会由 RUNNING 转换为 READY ，等待调度器的下一次调度。
 
