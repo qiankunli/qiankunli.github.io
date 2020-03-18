@@ -11,20 +11,6 @@ keywords: JAVA JVM
 * TOC
 {:toc}
 
-[Java crashes](https://confluence.atlassian.com/confkb/java-crashes-235669496.html)The virtual machine is responsible for emulating a CPU, managing memory and devices, just like the operating system does for native applications (MS Office, web browsers etc).
-
-## jvm 在java 体系中的位置
-
-![](/public/upload/java/jdk_jre_jvm.png)
-
-jdk 安装目录含义
-
-![](/public/upload/java/jdk_install_directory.png)
-
-[Class Loaders in Java](https://www.baeldung.com/java-classloaders)
-
-Class loaders are responsible for loading Java classes during runtime dynamically to the JVM (Java Virtual Machine). Also, they are part of the JRE (Java Runtime Environment). Hence, the JVM doesn’t need to know about the underlying files or file systems in order to run Java programs thanks to class loaders. 潜台词：Class loaders 是jre 类库的一部分但不是JVM 的一部分
-
 ## 类加载——按类名加载
 
 加载的本质，从磁盘上加载，得到的是一个字节数组，然后按照自己的内存模型，把字节数组中对应的数据放到进程内存对应的地方。并对数据进行校验，转化解析和初始化，最终形成可以被虚拟机直接使用的java类型，这就是虚拟机的类加载机制。
@@ -111,8 +97,6 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 |Object.clone|直接复制已有的数据，来初始化新建对象的实例字段|
 |反序列化|直接复制已有的数据，来初始化新建对象的实例字段|
 |Unsafe.allocateInstance|未初始化实例字段|
-
-
 
 ### java 对象的C++ 类表示——oop-klass model
 

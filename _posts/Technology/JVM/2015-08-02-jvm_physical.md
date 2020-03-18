@@ -61,6 +61,24 @@ Metaspace is a new memory space – starting from the Java 8 version; it has rep
 
 [Java 并发——基石篇（中）https://www.infoq.cn/article/BpWRQGe-TUUbMmZ5rqtC]()Java 程序编译之后，会产生很多字节码指令，每一个字节码指令在 JVM 底层执行的时候又会变成一堆 C 代码，这一堆 C 代码在编译之后又会变成很多的机器指令，这样一来，我们的 java 代码最终到机器指令一层，所产生的机器指令将是指数级的，因此就导致了 Java 执行效率非常低下。
 
+
+```c++
+// HOTSPOT/src/share/vm/intercepter/bytecodeintercepter.cpp
+BytecodeInterpreter::run(interpreterState istate){
+    ...
+    switch (opcode){
+    ...
+    CASE(_istore):
+    CASE(_fstore):
+        // 实际上便是C++代码
+        SET_LOCALS_SLOT(STACK_SLOT(-1), pc[1]);
+        UPDATE_PC_AND_TOS_AND_CONTINUE(2, -1);
+    ...
+    }
+    ...
+}
+```
+
 怎么优化这个问题呢？字节码是肯定不能动的，因为 JVM 的一处编写，到处运行的梦想就是靠它完成的。其实，我们会发现，问题的根本就在于 Java 和机器指令之间隔了一层 C/C++，而例如 GCC 之类的编译器又不能做到绝对的智能编译，所产生的机器码效率仍然不是非常高。因此，我们会想，能不能跳过 C/C++ 这个层次能，直接将 java 字节码和本地机器码进行一个对应呢？是的！可以的！HotSpot 工程师们早就想到了，因此早期的解释执行器很快就被废弃了，转而采用模版执行器。什么是模版执行器，顾名思义，模版就是将一个 java 字节码通过「人工手动」的方式编写为固定模式的机器指令，这部分不在需要 GCC 的帮助，这样就可以大大减少最终需要执行的机器指令，所以才能提高效率。 
 
 ### 基于栈的虚拟机
