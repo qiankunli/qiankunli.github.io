@@ -1,7 +1,6 @@
 ---
 layout: base
 ---
-{% include gitalk.html %}
 <div class="row">
   <div class="col-md-12 aside3-title">
     <br>
@@ -21,7 +20,7 @@ layout: base
         <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
         <script>
         var gitalk = new Gitalk({
-            id: '2020-03-18 00:00:00 +0000',
+            id: '{{ page.title }}',
             clientID: 'ddbaadab5f5d810805c3',
             clientSecret: '13b91b306680f11a55713382529b83259ef56546',
             repo: 'qiankunli.github.io',
