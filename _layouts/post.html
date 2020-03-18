@@ -1,6 +1,7 @@
 ---
 layout: base
 ---
+{% include gitalk.html %}
 <div class="row">
   <div class="col-md-12 aside3-title">
     <br>
@@ -13,6 +14,24 @@ layout: base
       {{ content }}
     </div>
     <hr>
+    <!--   gitalk       -->
+    <div class="comment">
+        <div id="gitalk-container"></div>
+        <link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css">
+        <script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>
+        <script>
+        var gitalk = new Gitalk({
+            id: '2020-03-18 00:00:00 +0000',
+            clientID: 'ddbaadab5f5d810805c3',
+            clientSecret: '13b91b306680f11a55713382529b83259ef56546',
+            repo: 'qiankunli.github.io',
+            owner: 'qiankunli',
+            admin: ['qiankunli'], 
+            labels: ['Gitalk'],
+        })
+        gitalk.render('gitalk-container')
+        </script> 
+    </div>
   </div>
   <!-- 目录 -->
   <div id="content_table" style="position:fixed;right:20px;top:120px;display:none;">
@@ -21,4 +40,5 @@ layout: base
     </div>
   </div>
 </div>
+
 
