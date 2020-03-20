@@ -43,3 +43,13 @@ hadoop 是直接把jar 传输到目标节点，其实也可以学习 k8s， 调�
 
 ![](/public/upload/kubernetes/kubernetes_extension.png)
 
+|k8s涉及的组件|功能交付方式|
+|---|---|
+|kubectl|binary，用户直接使用|
+|kubelet|binary，提供http服务|
+|cri-shim|grpc server|
+|cni plugin|binary，程序直接使用|
+|adminssion controller|webhook|
+|Scheduler plugin|被编译到Scheduler中|
+
+
