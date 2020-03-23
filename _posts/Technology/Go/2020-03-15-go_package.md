@@ -20,7 +20,7 @@ Golang使用包（package）这种语法元素来组织源码，所有**语法�
 
 ||编译|install|
 |---|---|---|
-|maven|mvn build|mvn install|
+|maven|mvn package/compile|mvn install|
 |go|go build|go install|
 
 ## 如何组织一个大项目的go 代码
