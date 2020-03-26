@@ -76,6 +76,48 @@ keywords: 异步
 |rpc||异步 + 业务回调|
 |业务层，比如Java8 的 CompletableFuture ||对多个异步操作结果进行逻辑编排|
 
+### 业务代码
+
+```java
+public class Client{
+	private Executor executor;
+	Future<String> hello(final String name){
+		Future<String> future = executor.subimit(new Callable<String>(){
+            public String call(){
+                return "hello " + name;
+            }
+        });
+		return future;
+	}
+}
+```
+
+通过聚合一个Executor， 外部调用时，client就可以给人支持异步接口的感觉
+
+```java
+Future<String> future = client.hello();
+```
+
+纯异步接口通过添加listener 或callback，也能构成复杂的业务逻辑。 
+
+```java
+public class Busienss{
+	private Client client;
+	public Future<String> greet(String name){
+		Future<String> future = new xx;
+		Future<String> clientFuture = client.hello(name);
+		clientFuture.addSuccessListener(new onSuccess(String clientResult){
+			String result = handle(clientResult);
+			future.set(result)
+		});
+		return future;
+
+	}
+	private String handle(String clientResult){
+		return clientResult + ", greet you";
+	}
+}
+```
 
 ### 操作系统和语言层面
 
