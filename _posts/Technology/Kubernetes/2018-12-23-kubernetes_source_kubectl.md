@@ -31,26 +31,6 @@ keywords: kubernetes 源码分析
 
 kubelet/api server/scheduler 本身可能会变，但它们的功能以及 彼此的交互接口 不会变的太多，it’s a good place to start
 
-### etcd: Kubernetes’ brain
-
-**Every component in Kubernetes (the API server, the scheduler, the kubelet, the controller manager, whatever) is stateless**. All of the state is stored in a key-value store called etcd, and communication between components often happens via etcd.
-
-For example! Let’s say you want to run a container on Machine X. You do not ask the kubelet on that Machine X to run a container. That is not the Kubernetes way! Instead, this happens:
-
-1. you write into etcd, “This pod should run on Machine X”. (technically you never write to etcd directly, you do that through the API server, but we’ll get there later)
-2. the kublet on Machine X looks at etcd and thinks, “omg!! it says that pod should be running and I’m not running it! I will start right now!!”
-
-
-Similarly, if you want to put a container somewhere but you don’t care where:
-
-1. you write into etcd “this pod should run somewhere”
-2. the scheduler looks at that and thinks “omg! there is an unscheduled pod! This must be fixed!“. It assigns the pod a machine (Machine Y) to run on
-3. like before, the kubelet on Machine Y sees that and thinks “omg! that is scheduled to run on my machine! Better do it now!!”
-When I understood that basically everything in Kubernetes works by watching etcd for stuff it has to do, doing it, and then writing the new state back into etcd, Kubernetes made a lot more sense to me.
-
-[Reasons Kubernetes is cool](https://jvns.ca/blog/2017/10/05/reasons-kubernetes-is-cool/)Because all the components don’t keep any state in memory(stateless), you can just restart them at any time and that can help mitigate a variety of bugs.The only stateful thing you have to operate is etcd
-
-
 
 ## 源码包结构
 
