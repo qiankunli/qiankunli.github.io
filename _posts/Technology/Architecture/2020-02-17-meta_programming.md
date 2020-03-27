@@ -8,7 +8,7 @@ keywords: meta programming
 
 ---
 
-## 简介（持续补充）
+## 简介
 
 * TOC
 {:toc}
