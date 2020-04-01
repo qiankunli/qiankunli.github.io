@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: java系并发的发展
+title: java系并发库的发展
 category: 技术
 tags: Concurrency
 keywords: Java  concurrency
@@ -10,7 +10,28 @@ keywords: Java  concurrency
 
 ## 前言
 
-笔者到目前学习过scala、java、go，它们在并发程序的实现上模型不同，汇总一下是个蛮有意思的事情。
+
+java并发的发展历程
+
+1. 使用原始的synchronized关键字，wait和notify等方法，实现锁和同步。
+
+2. jkd1.5和jdk1.6提供了concurrent包，包含Executor，高效和并发的数据容器，原子变量和多种锁。更多的封装减少了程序员自己动手写并发程序的场景，并提供lock和Condition对象的来替换替换内置锁和内置队列。
+
+3. jdk1.7提供ForkJoinTask支持，还未详细了解，估计类似于MapReduce，其本身就是立足于编写可并行执行程序的。
+
+通过阅读《java并发编程实战》全书的脉络如下
+
+1. 什么是线程安全，什么导致了线程不安全？
+2. 如何并行程序串行化，常见的并行化程序结构是什么？Executor，生产者消费者模式
+3. 如何构造一个线程安全的类（提高竞争效率），如何构造一个依赖状态的类（提高同步效率）？提高性能的手段有哪些？ 使用现有工具类 or 扩充已有父类？
+
+性能优化的基本点就是：减少上下文切换和线程调度（挂起与唤醒）操作。从慢到快的性能对比：
+
+1. synchronized操作内置锁，wait和notify操作内置队列。考虑到现在JVM对其实现进行了很大的优化，其实性能也还好。
+2. AQS及AQS包装类
+3. Lock和Condition（如果业务需要多个等待线程队列的话）
+
+从上到下，jvm为我们做的越少，灵活性越高，更多的问题要调用者自己写在代码里（执行代码当然比劳烦jvm和os效率高很多），使用的复杂性越高。
 
 ## 线程操作
 
@@ -94,27 +115,6 @@ pthread_create 四个参数
 
 这也是为什么thread pool 若没有shutdown，则java 进程不会退出的原因。
 
-## java并发的发展历程
-
-1. 使用原始的synchronized关键字，wait和notify等方法，实现锁和同步。
-
-2. jkd1.5和jdk1.6提供了concurrent包，包含Executor，高效和并发的数据容器，原子变量和多种锁。更多的封装减少了程序员自己动手写并发程序的场景，并提供lock和Condition对象的来替换替换内置锁和内置队列。
-
-3. jdk1.7提供ForkJoinTask支持，还未详细了解，估计类似于MapReduce，其本身就是立足于编写可并行执行程序的。
-
-通过阅读《java并发编程实战》全书的脉络如下
-
-1. 什么是线程安全，什么导致了线程不安全？
-2. 如何并行程序串行化，常见的并行化程序结构是什么？Executor，生产者消费者模式
-3. 如何构造一个线程安全的类（提高竞争效率），如何构造一个依赖状态的类（提高同步效率）？提高性能的手段有哪些？ 使用现有工具类 or 扩充已有父类？
-
-性能优化的基本点就是：减少上下文切换和线程调度（挂起与唤醒）操作。从慢到快的性能对比：
-
-1. synchronized操作内置锁，wait和notify操作内置队列。考虑到现在JVM对其实现进行了很大的优化，其实性能也还好。
-2. AQS及AQS包装类
-3. Lock和Condition（如果业务需要多个等待线程队列的话）
-
-从上到下，jvm为我们做的越少，灵活性越高，更多的问题要调用者自己写在代码里（执行代码当然比劳烦jvm和os效率高很多），使用的复杂性越高。
 
 ## 理念变化
 
@@ -166,16 +166,6 @@ pthread_create 四个参数
 [Fork and Join: Java Can Excel at Painless Parallel Programming Too!](http://www.oracle.com/technetwork/articles/java/fork-join-422606.html)  在介绍 forkjoin 原理的同时，详述了java 多线程这块的 演化思路。
 
 [forkjoin 泛谈](http://qiankunli.github.io/2018/04/08/forkjoin.html)
-
-## akka实现原理
-
-[akka actor的运行原理](http://colobu.com/2015/05/28/Akka-actor-scheduling/)
-
-`actor ! msg` 本质上是 `executorService execute mbox`，mox实现了ForkJoinTask和Runnable接口。所以说，actor模式的消息是异步的，除了设计理念外，实现上也是没办法。
-
-**如何理解akka代表的actor模式？** 
-
-2019.03.24补充：**actor 是一种并发计算模型**，其中所有的通信，通过发送方的消息传递机制和接收方的信箱队列，在被称为Actor的实体之间发生。Erlang使用Actor 作为它的主体架构成分，随着Akka工具在JVM平台上的成功，actor模型随后人气激增。
 
 ## 实现细粒度并行的共同点
 
