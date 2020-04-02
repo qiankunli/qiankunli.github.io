@@ -1,31 +1,30 @@
 ---
 
 layout: post
-title: 一个容器多个进程
+title: 为容器选择一个合适的entrypoint
 category: 技术
 tags: Docker
-keywords: multi-process in container
+keywords: container entrypoint
 
 ---
 
-## 简介（已过时）
+## 简介
 
 * TOC
 {:toc}
 
-在kubernetes 成为毫无疑问的容器标准后，该问题已无必要。
+容器内多进程 ==> 多进程转换为Pod内多容器 ==>  容器内只运行业务进程 ==> 业务进程可能会启动失败，所以不适合作为entrypoint ==> 选择一个合适的进程管理工具作为entrypoint
 
 ## 背景
 
-对于springboot项目，一开始是用`java -jar `方式容器中启动，并作为容器的主进程。但测试环境，经常代码逻辑可能有问题，导致主进程失败，容器启动失败，进而触发marathon/k8s健康检查失败，进而不断重启容器。开发呢也一直抱怨看不到“事故现场”。所以针对这种情况，直观的想法是 不让`java -jar` 作为容器的主进程，进而产生一个在容器中运行多进程的问题。
+在容器化早期，因为需要ssh访问容器等原因（尽量为开发提供与物理机一致的体验），需要一个容器内运行业务进程与ssh等进程。随着k8s pod 多容器的推进， 一个容器内多进程的需求减弱，但业务进程直接作为 entrypoint 仍有很多问题，因此会寻求一些进程管理工具作为pid=1进程。
 
-但容器中运行多进程，跟 one process per container 的理念相悖，我们就得探寻下来龙去脉了。
+对于springboot项目，一开始是用`java -jar `方式容器中启动，并作为容器的主进程。但测试环境，经常代码逻辑可能有问题，导致主进程失败，容器启动失败，进而触发marathon/k8s健康检查失败，进而不断重启容器。开发呢也一直抱怨看不到“事故现场”。所以针对这种情况，直观的想法是 不让`java -jar` 作为容器的主进程。
 
-从业界来说，虽然一个容器一个进程是官方推荐，但好像并不被大厂所遵守，以至于阿里甚至专门搞了一个PouchContainer 出来，[美团容器平台架构及容器技术实践](https://mp.weixin.qq.com/s?__biz=MjM5NjQ5MTI5OA==&mid=2651749434&idx=1&sn=92dcd59d05984eaa036e7fa804fccf20&chksm=bd12a5778a652c61f4a181c1967dbcf120dd16a47f63a5779fbf931b476e6e712e02d7c7e3a3&mpshare=1&scene=23&srcid=11183r23mQDITxo9cBDHbWKR%23rd)
 
-此外要注意的是，一个容器多进程 在k8s 的Pod 概念下，要相机做出一定的调整。
+## 一个容器一个进程？
 
-## 为什么推荐一个容器一个进程？
+容器中运行多进程，跟 one process per container 的理念相悖，我们就得探寻下来龙去脉了。从业界来说，虽然一个容器一个进程是官方推荐，但好像并不被大厂所遵守，以至于阿里甚至专门搞了一个PouchContainer 出来，[美团容器平台架构及容器技术实践](https://mp.weixin.qq.com/s/jojKe2MAe5btJCJ5013bgw)
 
 stack exchange [Why it is recommended to run only one process in a container?](https://devops.stackexchange.com/questions/447/why-it-is-recommended-to-run-only-one-process-in-a-container) 有一系列回答
 
@@ -35,10 +34,7 @@ stack exchange [Why it is recommended to run only one process in a container?](h
 
 There are cases where it makes sense to run multiple processes in a single container, as long as both processes support a single, modular function.
 
-
-
-## 一个容器多个进程有什么风险
-
+## 以进程管理工具作为entrypoint
 
 [理解Docker容器的进程管理](https://yq.aliyun.com/articles/5545)
 
@@ -67,11 +63,12 @@ docker stop  对PID1进程 的要求
 ||僵尸进程回收|处理SIGTERM信号|alpine 安装大小|专用镜像|备注|
 |---|---|---|---|---|---|
 |sh/bash|支持|不支持|0m||脚本中可以使用exec 顶替掉sh/bash 自身|
-|Supervisor|待确认|支持|79m||
-|runit|待确认|支持|31m| [phusion/baseimage-docker](https://github.com/phusion/baseimage-docker)|
+|Supervisor|待确认|支持|79m|要求管理的进程为前台进程，后台进程管不了|
+|runit|待确认|支持|31m| [phusion/baseimage-docker](https://github.com/phusion/baseimage-docker)|要求管理的进程为前台进程，后台进程管不了|
 |s6|||33m||
+|Systemd|支持|支持|alpine没有Systemd||systemd跑不跑前台只是说的systemctl能不能控制，那些不被控制的，关闭过程systemd也会负责回收的<br>对系统特权有要求<br>不会透传环境变量|
 
-## 一个容器多个进程的可能选择
+## 进程管理工具的选择
 
 ### 自定义脚本
 

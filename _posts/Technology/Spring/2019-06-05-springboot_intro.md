@@ -15,6 +15,15 @@ keywords: springboot
 
 ![](/public/upload/spring/springboot.png)
 
+[Spring 和 SpringBoot 之间到底有啥区别？](https://mp.weixin.qq.com/s/jWCa8qQv2E2uCrLZMs7vcg)SpringBoot基本上是 Spring框架的扩展
+
+1. 创建独立的 Spring应用。
+2. 嵌入式 Tomcat、 Jetty、 Undertow容器（无需部署war文件）。
+3. 提供的 starters 简化构建配置
+4. 尽可能自动配置 spring应用。
+5. 提供生产指标,例如指标、健壮检查和外部化配置
+6. 完全没有代码生成和 XML配置要求
+
 ## 起步依赖
 
 Dependency management is a critical aspects of any complex project. And doing this manually is less than ideal;
