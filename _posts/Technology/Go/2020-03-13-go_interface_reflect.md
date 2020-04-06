@@ -15,6 +15,10 @@ keywords: Go interface reflect
 
 interface，接口，restful接口，SQL 也是一种接口
 
+从编码的角度看：**Interfaces give programs structure**.Interfaces encourage design by composition.
+
+You must do your best to understand what could change and use interfaces to decouple.
+
 ## interface
 
 [深度解密Go语言之关于 interface 的 10 个问题](https://mp.weixin.qq.com/s/EbxkBokYBajkCR-MazL0ZA)

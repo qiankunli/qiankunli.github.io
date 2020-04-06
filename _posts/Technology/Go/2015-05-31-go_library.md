@@ -48,14 +48,17 @@ func Offsetof(x ArbitraryType) uintptr
 func Alignof(x ArbitraryType) uintptr
 ```
 
-以上三个函数返回的结果都是 uintptr 类型，这和 unsafe.Pointer 可以相互转换。三个函数都是在编译期间执行，它们的结果可以直接赋给 const型变量。另外，因为三个函数执行的结果和操作系统、编译器相关，所以是不可移植的。Packages that import unsafe may be non-portable and are not protected by the Go 1 compatibility guidelines.
+以上三个函数返回的结果都是 uintptr 类型，这和 `unsafe.Pointer` 可以相互转换。三个函数都是在编译期间执行，它们的结果可以直接赋给 const型变量。另外，因为三个函数执行的结果和操作系统、编译器相关，所以是不可移植的。Packages that import unsafe may be non-portable and are not protected by the Go 1 compatibility guidelines.
 
 unsafe 包提供了 2 点重要的能力：
 
 1. 任何类型的指针和 unsafe.Pointer 可以相互转换。
 2. uintptr 类型和 unsafe.Pointer 可以相互转换。
 
-pointer 不能直接进行数学运算，但可以把它转换成 uintptr，对 uintptr 类型进行数学运算，再转换成 pointer 类型。uintptr 并没有指针的语义，意思就是 uintptr 所指向的对象会被 gc 无情地回收。而 unsafe.Pointer 有指针语义，可以保护它所指向的对象在“有用”的时候不会被垃圾回收。
+||`unsafe.Pointer`|pointer|
+|---|---|---|
+|数学运算|不能|可以|
+|指针的语义|有|无<br>uintptr 所指向的对象会被 gc 无情地回收|
 
 ## context
 

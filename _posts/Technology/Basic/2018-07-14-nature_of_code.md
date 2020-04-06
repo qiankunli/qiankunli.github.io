@@ -75,3 +75,27 @@ Algorithm = Logic + Control
 
 
 陈皓在给《代码整洁之道》中的序文提到：无论微观世界的代码，还是宏观层面的架构，无论是三种编程范式还是微服务架构，它们都在解决一个问题：**分离控制和逻辑**。所谓控制，就是对程序流转的与业务无关的代码或系统的控制（如多线程、异步、服务发现、部署、弹性伸缩等），所谓逻辑则是实实在在的业务逻辑，是解决用户问题的逻辑。控制和逻辑控制了整体的软件复杂度，有效的分离控制和逻辑会让你的系统得到最大的简化。
+
+## 编程哲学
+
+[Design Guidelines](https://github.com/ardanlabs/gotraining/blob/master/topics/go/README.md)You must develop a design philosophy that establishes a set of guidelines. This is more important than developing a set of rules or patterns you apply blindly. **Guidelines help to formulate, drive and validate decisions**. You can't begin to make the best decisions without understanding the impact of your decisions. Every decision you make, **every line of code you write comes with trade-offs**. 做任何事都是这样。
+
+
+Philosophy 要删减
+
+1. Prepare Your Mind 有感觉但感触不深，建议看原文
+2. Reading Code. Code is read many more times than it is written.
+3. Legacy Software. There are many reasons why programs are built the way they are, although we may fail to recognize the multiplicity of reasons because we usually look at code from the outside rather than by reading it. When we do read code, we find that some of it gets written because of machine limitations, some because of language limitations, some because of programmer limitations, some because of historical accidents, and some because of specifications—both essential and inessential. - Gerald M. Weinberg 你有很多理由堆很多代码，必要也不必要
+4. Mental Models. You must constantly make sure your mental model of your projects are clear. When you can't remember where a piece of logic is or you can't remember how something works, you are losing your mental model of the code. This is a clear indication that refactoring is a must. Focus time on structuring code that provides the best mental model possible and code review for this as well. 当你看不懂代码的时候，就是该你重构的时候。Everyone knows that debugging is twice as hard as writing a program in the first place. So if you're as clever as you can be when you write it, how will you ever debug it?
+5. Correctness vs Performance. Make it correct, make it clear, make it concise, make it fast. In that order. - Wes Dyer
+6. Productivity vs Performance. "Making things easy to do is a false economy. Focus on making things easy to understand and the rest will follow." - Peter Bourgon 不要去写最容易写的代码，去写最容易懂的代码。
+
+This is about writing simple code that is easy to read and understand without the need of mental exhaustion. Just as important, it's about not hiding the cost/impact of the code per line, function, package and the overall ecosystem it runs in.
+
+You must be aware of who you are on your team. When hiring new people, you must be aware of where they fall. **The code must be written for the average developer to comprehend**. If you are below average, you have the responsibility to come up to speed. If you are the expert, you have the responsibility to reduce being clever.
+
+"Encapsulation and the separation of concerns are drivers for designing software. This is largely based on how other industries handle complexity. There seems to be a human pattern of using encapsulation to wrestle complexity to the ground." 抽象和封装驱动了软件的设计
+
+"Programmers waste enormous amounts of time thinking about, or worrying about, the speed of noncritical parts of their programs, and these attempts at efficiency actually have a strong negative impact when debugging and maintenance are considered. We should forget about small efficiencies, say about 97% of the time: **premature optimization is the root of all evil**. Yet we should not pass up our opportunities in that critical 3%." — Donald E. Knuth 
+
+Data-Oriented Design："Data dominates. If you've chosen the right data structures and organized things well, the algorithms will almost always be self-evident. Data structures, not algorthims, are central to programming." - Rob Pike
