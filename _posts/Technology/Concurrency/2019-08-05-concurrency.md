@@ -24,6 +24,12 @@ keywords: concurrency
 
 [java系并发模型的发展](http://qiankunli.github.io/2017/09/05/akka.html)
 
+## 并发读写
+
+《软件架构设计》要让各式各样的业务功能与逻辑最终在计算机系统里实现，只能通过两种操作：读和写。
+
+![](/public/upload/architecture/high_concurrency.png)
+
 ## 异步
 
 [异步执行抽象——Executor与Future](http://qiankunli.github.io/2016/07/08/executor_future.html)
