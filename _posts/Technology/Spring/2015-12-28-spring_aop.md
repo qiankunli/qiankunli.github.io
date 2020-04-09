@@ -8,7 +8,7 @@ keywords: proxyFactoryBean
 
 ---
 
-## 简介（待整理）
+## 简介
 
 * TOC
 {:toc}
@@ -92,66 +92,17 @@ spring aop中的一些概念
     }
     ```
 
-## 动态代理技术
+## 源码分析
 
-常规的说法是：Aop的实现用到了动态代理技术。但更准确的说：**动态代理 是java 内嵌的对面向切面编程的支持**，java的动态代理必须是基于接口来进行编程的，有一定的局限性。Spring 整合了ASM、CGLIB还有AspectJ 帮助java 在类上做提升（在类上做AOP拦截）。 
-
-[spring源码分析之——spring aop原理](http://michael-softtech.iteye.com/blog/814047) 从代码上看，Spring AOP的原理大致如下： 
-
-实现一个InstantiationAwareBeanPostProcessor接口的bean。在每次bean初始化的时候找到所有advisor（spring ioc启动时，会采集类信息存储在BeanDefinition中），根据pointcut 判断是不是需要为将实例化的bean生成代理，如果需要，就把advice编制在代理对象里面。
-
-AOP应用了java动态代理技术（或者cglib）：基于反射在运行时生成代理类的字节码，下面是一个简单的例子：
-
-    public class BookFacadeProxy implements InvocationHandler {  
-        private Object target;    // 委托类  
-        // 返回代理类
-        public Object createProxy(Object target) {  
-            this.target = target;  
-            //取得代理对象  
-            return Proxy.newProxyInstance(delegate.getClass().getClassLoader(),  
-                    delegate.getClass().getInterfaces(), this);   
-        }  
-        public Object invoke(Object proxy, Method method, Object[] args)  
-                throws Throwable {  
-            Object result=null;  
-            System.out.println("开始");  
-            //执行方法  
-            result=method.invoke(target, args);  
-            System.out.println("结束");  
-            return result;  
-        }  
-    }  
-
+[spring源码分析之——spring aop原理](http://michael-softtech.iteye.com/blog/814047) 
 
 ![](/public/upload/spring/spring_aop.png)
-    
-通过createProxy方法，就可以返回target的代理类实例（内部按序号命名为`$Proxy0`）。target和`$Proxy0`实现同一个接口，构建代理类时，通过`Proxy.newProxyInstance`方法生成代理类每个方法的字节码。
-    
-而在上面章节提到，ioc在实例化bean时，预留了很多回调函数。所谓的回调函数，具体到java中就是一系列BeanPostProcessor链，BeanPostProcessor包括两个方法：
-
-```java
-Object postProcessBeforeInitialization(Object, String)   // 实例化bean前执行
-Object postProcessAfterInitialization(Object, String)    // 实例化bean后执行
-```
-
-在postProcessAfterInitialization方法中：
-
-```    
-Object postProcessAfterInitialization(Object obj, String beanName){
-    1. 根据beanName收集匹配的“增强”
-    2. 判断采用何种动态代理技术
-    3. 根据obj及相关“增强”获取动态代理后的实例result
-    4. retrun result;
-}
-```
-    
-通过AOP，我们实际使用的类实例，已经不是我们源码看到的“基础类”，而是“基础类”和“增强类”的有机组合。
 
 
-## 创建代理对象（假设配置信息都已加入如内存）
+### 何时将 Pointcut替换为代理类
 
-spring中aop namespace的handler是AopNamespaceHandler
 
+spring中aop namespace的handler是AopNamespaceHandler，可以看到`aop:config`标签的解析类是：ConfigBeanDefinitionParser
 ```java
 public class AopNamespaceHandler extends NamespaceHandlerSupport {
 	@Override
@@ -166,122 +117,146 @@ public class AopNamespaceHandler extends NamespaceHandlerSupport {
 	}
 }
 ```
+ConfigBeanDefinitionParser的功能大致有两块：
 
-可以看到，aop:config标签的解析类是：ConfigBeanDefinitionParser
+1. 注册一个AspectJAwareAdvisorAutoProxyCreator类型的bean， 本质是一个BeanPostProcessor
+2. 解析主标签下面的advisor标签，并且注册advisor.
 
-代理对象由ProxyFactoryBean获取，ProxyFactoryBean是一个工厂bean，其getObject方法主要做了两件事：
 
-1.	加载配置；
-2.	创建并调用AopProxy返回代理对象。
-
-Spring通过AopProxy接口类把Aop代理对象的实现与框架的其它部分有效的分离开来。ProxyFactoryBean倒像是一个桥梁，准备了必要的环境（比如将配置文件上的配置加载到属性上），真正的代理对象靠AopProxy生成。
-
-AopProxy的getProxy()方法中调用Proxy.newProxyInstance(xx,xx,Invocationhanlder)创建代理对象，当然了，要为这个调用准备一个InvocationHanlder实现（AopProxy实现类同时也实现了InvocationHanlder接口）。在invoke方法里，触发目标对象方法对应的拦截链的执行。（拦截链的获取下文会提到）
-
-AopProxy实例由AopProxyFactory创建，相关接口描述如下：
+在bean初始化的时候（在AbstractAutoProxyCreator中），检查是否需要生成代理对象。如果需要，就生成代理。
 
 ```java
-public interface AopProxy {
-    Object getProxy();
-    Object getProxy(ClassLoader classLoader);
+// AbstractAutoProxyCreator.java
+public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) throws BeansException {
+    Object cacheKey = getCacheKey(beanClass, beanName);
+    ...
+    // Create proxy here if we have a custom TargetSource.
+    // Suppresses unnecessary default instantiation of the target bean:
+    // The TargetSource will handle target instances in a custom fashion.
+    if (beanName != null) {
+        TargetSource targetSource = getCustomTargetSource(beanClass, beanName);
+        if (targetSource != null) {
+            this.targetSourcedBeans.add(beanName);
+            Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(beanClass, beanName, targetSource);
+            Object proxy = createProxy(beanClass, beanName, specificInterceptors, targetSource);
+            this.proxyTypes.put(cacheKey, proxy.getClass());
+            return proxy;
+        }
+    }
+    return null;
 }
-class JdkDynamicAopProxy implements AopProxy, InvocationHandler{
-    private final AdvisedSupport advised;   // 包含大量配置信息
+```
+
+### 创建代理对象
+
+```java
+// AbstractAutoProxyCreator.java
+protected Object createProxy(
+        Class<?> beanClass, String beanName, Object[] specificInterceptors, TargetSource targetSource) {
+    ...
+    ProxyFactory proxyFactory = new ProxyFactory();
+    ...
+    if (!proxyFactory.isProxyTargetClass()) {
+        if (shouldProxyTargetClass(beanClass, beanName)) {
+            proxyFactory.setProxyTargetClass(true);
+        }
+        else {
+            evaluateProxyInterfaces(beanClass, proxyFactory);
+        }
+    }
+    Advisor[] advisors = buildAdvisors(beanName, specificInterceptors);
+    for (Advisor advisor : advisors) {
+        proxyFactory.addAdvisor(advisor);
+    }
+    proxyFactory.setTargetSource(targetSource);
+    customizeProxyFactory(proxyFactory);
+    ...
+    return proxyFactory.getProxy(getProxyClassLoader());
+}
+```
+Spring通过AopProxy接口类把Aop代理对象的实现与框架的其它部分有效的分离开来。
+
+```java
+// ProxyFactory.java
+public Object getProxy(ClassLoader classLoader) {
+    // 实际是JdkDynamicAopProxy.getProxy(classLoader)
+    return createAopProxy().getProxy(classLoader);
+}
+// ProxyCreatorSupport.java
+protected final synchronized AopProxy createAopProxy() {
+    ...
+    // 返回JdkDynamicAopProxy
+    return getAopProxyFactory().createAopProxy(this);
+}
+```
+真正的代理对象靠AopProxy生成。AopProxy的getProxy()方法中调用`Proxy.newProxyInstance(xx,xx,Invocationhanlder)`创建代理对象，当然了，要为这个调用准备一个InvocationHanlder实现（AopProxy自身实现类同时也实现了InvocationHanlder接口）。
+
+
+
+```java
+final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializable {
+    private final AdvisedSupport advised;
     public Object getProxy(ClassLoader classLoader) {
-        Class[] proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised);
+        ...
+        Class<?>[] proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised, true);
         findDefinedEqualsAndHashCodeMethods(proxiedInterfaces);
-        // 返回代理对象
         return Proxy.newProxyInstance(classLoader, proxiedInterfaces, this);
     }
-    // InvocationHandler接口方法实现
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-        1. 根据method拿到对应的拦截器链
-        2. 执行拦截器链
+        ...
+        // Get the interception chain for this method.
+		List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
+        if (chain.isEmpty()) {
+            ...
+            Object[] argsToUse = AopProxyUtils.adaptArgumentsIfNecessary(method, args);
+            retVal = AopUtils.invokeJoinpointUsingReflection(target, method, argsToUse);
+        }else {
+            // We need to create a method invocation...
+            invocation = new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);
+            // Proceed to the joinpoint through the interceptor chain.
+            retVal = invocation.proceed();
+        }
+        ...
+        return retVal;
     }
 }
 ```
-    
-## 加载AOP配置
 
-AOP的配置主要包括两个方面：哪些类的哪些方法需要增强，这些方法需要什么“增强”。与spring惯用的思路一样，第一次执行时，总是伴随着大量的操作（比如加载advice类），部分操作结果会被缓存，以节省下次操作的时间。
+在invoke方法里，先`AdvisedSupport.getInterceptorsAndDynamicInterceptionAdvice(method,targetClass)` 获取拦截链（或者说pointcut 和advice 被组装成了一个 chain），触发目标对象方法对应的**拦截链**的执行。
 
-    ProxyFactoryBean extends ProxyCreatorSupport (extends AdvisedSupport){
-    	private String[] interceptorNames;
-        private List<Advisor> advisors;（来自AdvisedSupport类）
-    	getObject(){
-    	    1. initializeAdvisorChain();		//加载所有的advisor
-    	    2. 返回代理对象
+### 拦截链的执行
+
+虽然同是责任链模式，但aop拦截器链跟一般的责任链模式还是有所不同的。aop的拦截器分为前置，后置和异常时拦截。而在一般的责任链模式中，前置、后置和异常时拦截是通过代码实现来区分的。
+
+```java
+// 链的执行
+class ReflectiveMethodInvocation implements ProxyMethodInvocation{
+    // 目标方法、参数和类型
+    protected final Object target,Method method,Object[] arguments,Class targetClass;
+    // 当前拦截器的索引
+    private int currentInterceptorIndex = -1;
+    protected final List interceptorsAndDynamicMethodMatchers;// 拦截器链（已经从advice转化为了interceptor（适配器模式））
+    public Object proceed() throws Throwable {
+            // 如果执行到链的最后，则直接执行目标方法
+            // 获取当前interceptor
+            Object interceptorOrInterceptionAdvice =
+                this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
+            if (interceptorOrInterceptionAdvice符合特定类型) {
+                // 执行特定逻辑
+            }else {
+                // 执行拦截器
+                return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
+            }
         }
-    }
-   
-其中initializeAdvisorChain方法的主要思路
-
-    initializeAdvisorChain(){
-    	根据interceptorNames拿到每一个interceptor（即advice）的名字
-    	根据名字通过ioc拿到advice实例，并将其加入到advisors成员中
-    }
-    
-
-advice加载进内存后，会根据方法的不同组成不同的拦截链（根据配置）。如何根据方法拿到对应的拦截链？
-
-    // 该逻辑的调用时机
-    class JdkDynamicAopProxy implements AopProxy,InvocationHandler{
-        private final AdvisedSupport advised;
-    	public Object invoke(Object proxy, Method method, Object[] args){
-    		chain = advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
-    		invocation = new ReflectiveMethodInvocation(xx, target, method, args, targetClass, chain);
-    		retVal = invocation.proceed();
-        }
-        public Object getProxy(){
-            // 准备数据
-            Proxy.newProxyInstance(xx,xx,this);
-        }
-    }
-    
-    // 如何拿到
-    class AdvisedSupport{
-        private List<Advisor> advisors;
-        getInterceptorsAndDynamicInterceptionAdvice(method, targetClass){
-            1.	先从缓存里看看
-            2.  如果缓存中没有
-            3.	遍历advisors（依据配置加载的所有advisors（advisor=advice + pointcut）），通过当前advisor中的pointcut的matches方法判断advisor是否使用这个method，使用则将其转换为Interceptor，加入到chain中
-            4.	返回chain并加入缓存
-        }
-    }
-    
-## 拦截链的执行
-
-刚才提到，虽然同是责任链模式，但aop拦截器链跟一般的责任链模式还是有所不同的。aop的拦截器分为前置，后置和异常时拦截。而在一般的责任链模式中，前置、后置和异常时拦截是通过代码实现来区分的。
-
-    // 链的执行
-    class ReflectiveMethodInvocation implements ProxyMethodInvocation{
-    	// 目标方法、参数和类型
-        protected final Object target,Method method,Object[] arguments,Class targetClass;
-        // 当前拦截器的索引
-        private int currentInterceptorIndex = -1;
-        protected final List interceptorsAndDynamicMethodMatchers;// 拦截器链（已经从advice转化为了interceptor（适配器模式））
-        public Object proceed() throws Throwable {
-        		// 如果执行到链的最后，则直接执行目标方法
-        		// 获取当前interceptor
-        		Object interceptorOrInterceptionAdvice =
-        		    this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
-        		if (interceptorOrInterceptionAdvice符合特定类型) {
-        			// 执行特定逻辑
-        		}else {
-        			// 执行拦截器
-        			return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
-        		}
-        	}
-    }
+}
+```
 
 aop拦截器链的执行逻辑如下
 
-1.	执行所有的前置通知，如果碰到后置通知，则方法入栈（递归调用）。
-2.	执行目标方法
-3.	执行后置通知（原来压栈的方法出栈）
-4.	异常通知（与后置通知类似（都是在方法的后边执行嘛），不过，貌似一个方法的异常通知只能有一个）
-
-
+1. 执行所有的前置通知，如果碰到后置通知，则方法入栈（递归调用）。
+2. 执行目标方法
+3. 执行后置通知（原来压栈的方法出栈）
+4. 异常通知（与后置通知类似（都是在方法的后边执行嘛），不过，貌似一个方法的异常通知只能有一个）
 
 ## 其它
 
