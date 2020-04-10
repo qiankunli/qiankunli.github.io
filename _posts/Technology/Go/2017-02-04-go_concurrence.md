@@ -51,6 +51,227 @@ PS,routine is a set sequence of steps, part of larger computer program.
 
 
 
+## Mechanics
+
+共享内存
+
+1. sync.Mutex,           类似lock
+2. sync.WaitGroup,       类似CountDown       
+
+CSP channel
+
+```go
+func AsyncService() chan string {
+	retCh := make(chan string, 1)
+	//retCh := make(chan string, 1)
+	go func() {
+		ret := service()
+		fmt.Println("returned result.")
+		retCh <- ret
+		fmt.Println("service exited.")
+	}()
+	return retCh
+}
+func TestAsynService(t *testing.T) {
+	retCh := AsyncService()
+	fmt.Println(<-retCh)
+	time.Sleep(time.Second * 1)
+}
+```
+
+从上述代码的感觉看，`channel string`像极了`Future<String>`
+
+### 读写锁
+
+```go
+package main
+import (
+    "errors"
+    "fmt"
+    "sync"
+)
+var (
+    pcodes         = make(map[string]string)
+    mutex          sync.RWMutex
+    ErrKeyNotFound = errors.New("Key not found in cache")
+)
+func Add(address, postcode string) {
+    // 写入的时候要完全上锁
+    mutex.Lock()
+    pcodes[address] = postcode
+    mutex.Unlock()
+}
+func Value(address string) (string, error) {
+    // 读取的时候，只用读锁就可以
+    mutex.RLock()
+    pcode, ok := pcodes[address]
+    mutex.RUnlock()
+    if !ok {
+        return "", ErrKeyNotFound
+    }
+    return pcode, nil
+}
+func main() {
+    Add("henan", "453600")
+    v, err := Value("henan")
+    if err == nil {
+        fmt.Println(v)
+    }
+}
+```
+
+### 超时
+
+```java
+public Future<String> AsyncService(){
+    Future<String> future = Executer.submit(new Callable<String>(){
+        public String call(){
+            return xx.service();
+        }
+    });
+    return future;
+}
+```
+java 的`future.get(timeout)` 体现在channel 上是
+
+```go
+select {
+    case ret:= <- ch: 
+        xx
+    case <- time.After(time.Second*1):
+        fmt.Println("time out") 
+}
+```
+java的Combine Future 体现在channel 上是
+```go
+select {
+    case ret:= <- ch1: 
+        xx
+    case ret:= <- ch2: 
+        xx
+    default:
+        fmt.Println("no one returned")
+}
+```
+
+从上述视角看，与Future 相比，channel 也更像一个“受体”。
+
+### 取消
+
+所有的channel 接收者（通常是一个goroutine） 都会在channel关闭时，立刻从阻塞等待中返回且 `v,ok <- ch` ok值为false。这个广播机制常被利用， 进行向多个订阅者同时发送信号，如：退出信号。PS：有点类似`Thread.interrupt()` 的感觉。
+
+```go
+func isCancelled(cancelChan chan struct{}) bool {
+	select {
+	case <-cancelChan:
+		return true
+	default:
+		return false
+	}
+}
+func TestCancel(t testing.T){
+    cancelChan := make(chan struct{},0)
+    go func(cancelChan chan struct{}){
+        for{
+            if isCancelled(cancelChan){
+                break
+            }
+            time.Sleep(time.Millisecond * 5)
+        }
+        fmt.Println("Cancelled")
+    }(cancelChan)
+    // 类似java future.cancel()
+    close(cancelChan)
+    time.Sleep(time.Second * 1)
+}
+```
+
+### 只执行一次
+
+GetSingletonObj 可以被多次并发调用， 但只执行一次（可比java 的单例模式清爽多了）
+```go
+var once sync.Once
+func GetSingletonObj() *SingletonObj{
+    once.Do(func(){
+        fmt.Println("Create Singleton obj.")
+        obj = &SingletonObj{}
+    })
+    return obj
+}
+```
+
+**通过buffered channel 可以变相实现对象池的效果**。
+
+## context
+
+[深度解密Go语言之context](https://mp.weixin.qq.com/s/GpVy1eB5Cz_t-dhVC6BJNw)Go 1.7 标准库引入 context，中文译作“上下文”，准确说它是 goroutine 的上下文，包含 goroutine 的运行状态、环境、现场等信息。
+
+![](/public/upload/go/context_object.png)
+
+### 为什么有 context？
+
+部分像java 中的`future.cancel()`。
+
+在 Go 的 server 里，通常每来一个请求都会启动若干个 goroutine 同时工作：有些去数据库拿数据，有些调用下游接口获取相关数据……这些 goroutine 需要共享这个请求的基本数据，例如登陆的 token，处理请求的最大超时时间（如果超过此值再返回数据，请求方因为超时接收不到）等等。当请求被取消或超时，所有正在为这个请求工作的 goroutine 需要快速退出，因为它们的“工作成果”不再被需要了。context 包就是为了解决上面所说的这些问题而开发的：在 一组 goroutine 之间传递共享的值、取消信号、deadline……
+
+### 为什么是context 树
+
+1. 根Context，通过`context.Background()` 创建
+2. 子Context，`context.WithCancel(parentContext)` 创建
+    ```go
+    func WithCancel(parent Context) (ctx Context, cancel CancelFunc)
+    func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc)
+    func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc)
+    func WithValue(parent Context, key interface{}, val interface{}) Context
+    ```
+3. 当前Context 被取消时，基于他的子context 都会被取消
+4. 接收取消通知 `<-ctx.Done()`
+
+Goroutine的创建和调用关系总是像层层调用进行的，就像人的辈分一样，而更靠顶部的Goroutine应有办法主动关闭其下属的Goroutine的执行但不会影响 其上层Goroutine的执行（不然程序可能就失控了）。为了实现这种关系，**Context结构也应该像一棵树**，叶子节点须总是由根节点衍生出来的。
+
+![](/public/upload/go/context_tree.png)
+
+如上左图，代表一棵 context 树。当调用左图中标红 context 的 cancel 方法后，该 context 从它的父 context 中去除掉了：实线箭头变成了虚线。且虚线圈框出来的 context 都被取消了，圈内的 context 间的父子关系都荡然无存了。
+
+
+### 使用建议
+
+官方对于使用 context 提出了几点建议：
+
+1. 不要将 Context 塞到结构体里。直接将 Context 类型作为函数的第一参数，而且一般都命名为 ctx。
+2. 不要向函数传入一个 nil 的 context，如果你实在不知道传什么，标准库给你准备好了一个 context：todo。
+3. 不要把本应该作为函数参数的类型塞到 context 中，context 存储的应该是一些共同的数据。例如：登陆的 session、cookie 等。
+4. 同一个 context 可能会被传递到多个 goroutine，别担心，context 是并发安全的。
+
+context 取消和传值示例
+
+```go
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	valueCtx := context.WithValue(ctx, key, "add value")
+	go watch(valueCtx)
+	time.Sleep(10 * time.Second)
+	cancel()
+	time.Sleep(5 * time.Second)
+}
+func watch(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			//get value
+			fmt.Println(ctx.Value(key), "is cancel")
+			return
+		default:
+			//get value
+			fmt.Println(ctx.Value(key), "in goroutine")
+			time.Sleep(2 * time.Second)
+		}
+	}
+}
+```
+
+
+
 
 
 

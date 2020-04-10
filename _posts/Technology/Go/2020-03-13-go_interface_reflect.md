@@ -166,6 +166,9 @@ func unpackEface(i interface{}) Value {
 
 通过 Type() 方法和 Interface() 方法可以打通 interface、 Type、 Value 三者。Type() 方法也可以返回变量的类型信息，与 reflect.TypeOf() 函数等价。Interface() 方法可以将 Value 还原成原来的 interface。
 
+1. 按名字访问结构的成员 `reflect.ValueOf(e).FieldByName("Name")`
+2. 按名字访问结构的方法 `reflect.ValueOf(e).methodByName("updateAge").Call(args)`
+
 ### 三大定律
 
 **反射建立在类型系统之上**，下列struct 基本是一个东西，只是所在包有区别。

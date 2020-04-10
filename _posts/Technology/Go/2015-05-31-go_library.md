@@ -60,76 +60,21 @@ unsafe 包提供了 2 点重要的能力：
 |数学运算|不能|可以|
 |指针的语义|有|无<br>uintptr 所指向的对象会被 gc 无情地回收|
 
-## context
+在java 中经常有一种场景
 
-[深度解密Go语言之context](https://mp.weixin.qq.com/s/GpVy1eB5Cz_t-dhVC6BJNw)Go 1.7 标准库引入 context，中文译作“上下文”，准确说它是 goroutine 的上下文，包含 goroutine 的运行状态、环境、现场等信息。
-
-![](/public/upload/go/context_object.png)
-
-### 为什么有 context？
-
-像极了java 中的future。
-
-在 Go 的 server 里，通常每来一个请求都会启动若干个 goroutine 同时工作：有些去数据库拿数据，有些调用下游接口获取相关数据……这些 goroutine 需要共享这个请求的基本数据，例如登陆的 token，处理请求的最大超时时间（如果超过此值再返回数据，请求方因为超时接收不到）等等。当请求被取消或超时，所有正在为这个请求工作的 goroutine 需要快速退出，因为它们的“工作成果”不再被需要了。context 包就是为了解决上面所说的这些问题而开发的：在 一组 goroutine 之间传递共享的值、取消信号、deadline……
-
-### 为什么是context 树
-
-Goroutine的创建和调用关系总是像层层调用进行的，就像人的辈分一样，而更靠顶部的Goroutine应有办法主动关闭其下属的Goroutine的执行但不会影响 其上层Goroutine的执行（不然程序可能就失控了）。为了实现这种关系，**Context结构也应该像一棵树**，叶子节点须总是由根节点衍生出来的。
-
-![](/public/upload/go/context_tree.png)
-
-如上左图，代表一棵 context 树。当调用左图中标红 context 的 cancel 方法后，该 context 从它的父 context 中去除掉了：实线箭头变成了虚线。且虚线圈框出来的 context 都被取消了，圈内的 context 间的父子关系都荡然无存了。
-
-要创建Context树，第一步就是要得到根节点，context.Background函数的返回值就是根节点：
-
-```go
-func Background() Context
-```
-
-有了根节点，又该怎么创建其它的子节点，孙节点呢？context包为我们提供了多个函数来创建他们：
-
-```go
-func WithCancel(parent Context) (ctx Context, cancel CancelFunc)
-func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc)
-func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc)
-func WithValue(parent Context, key interface{}, val interface{}) Context
-```
-
-### 使用建议
-
-官方对于使用 context 提出了几点建议：
-
-1. 不要将 Context 塞到结构体里。直接将 Context 类型作为函数的第一参数，而且一般都命名为 ctx。
-2. 不要向函数传入一个 nil 的 context，如果你实在不知道传什么，标准库给你准备好了一个 context：todo。
-3. 不要把本应该作为函数参数的类型塞到 context 中，context 存储的应该是一些共同的数据。例如：登陆的 session、cookie 等。
-4. 同一个 context 可能会被传递到多个 goroutine，别担心，context 是并发安全的。
-
-context 取消和传值示例
-
-```go
-func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	valueCtx := context.WithValue(ctx, key, "add value")
-	go watch(valueCtx)
-	time.Sleep(10 * time.Second)
-	cancel()
-	time.Sleep(5 * time.Second)
-}
-func watch(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			//get value
-			fmt.Println(ctx.Value(key), "is cancel")
-			return
-		default:
-			//get value
-			fmt.Println(ctx.Value(key), "in goroutine")
-			time.Sleep(2 * time.Second)
-		}
-	}
+```java
+class Business{
+    private validate Object data;
+    // sync 会被定时执行
+    void sync()(
+        Object newData = 从db 拉到新数据 构造data
+        synchronized(this){
+            this.data = newData
+        }
+    )
 }
 ```
+对应到go 中可以 `atomic.StorePointer($data,unsafe.Pointer(&newData))`
 
 ## Go代码中的依赖注入
 
@@ -139,43 +84,6 @@ A reflection based dependency injection toolkit for Go.
 依赖注入是你的组件（比如go语言中的structs）在创建时应该接收它的依赖关系。PS：这个理念在java、spring 已经普及多年。这与在初始化期间构建其自己的依赖关系的组件的相关反模式相反。
 
 **设计模式分为创建、结构和行为三大类，如果自己构造依赖关系， 则创建 与 行为 两个目的的代码容易耦合在一起， 代码较长，给理解造成困难。**
-
-## 读写锁
-
-    package main
-    import (
-    	"errors"
-    	"fmt"
-    	"sync"
-    )
-    var (
-    	pcodes         = make(map[string]string)
-    	mutex          sync.RWMutex
-    	ErrKeyNotFound = errors.New("Key not found in cache")
-    )
-    func Add(address, postcode string) {
-        // 写入的时候要完全上锁
-    	mutex.Lock()
-    	pcodes[address] = postcode
-    	mutex.Unlock()
-    }
-    func Value(address string) (string, error) {
-        // 读取的时候，只用读锁就可以
-    	mutex.RLock()
-    	pcode, ok := pcodes[address]
-    	mutex.RUnlock()
-    	if !ok {
-    		return "", ErrKeyNotFound
-    	}
-    	return pcode, nil
-    }
-    func main() {
-    	Add("henan", "453600")
-    	v, err := Value("henan")
-    	if err == nil {
-    		fmt.Println(v)
-    	}
-    }
     
 ## command line application
 
