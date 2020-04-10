@@ -13,9 +13,9 @@ keywords: java dynamic proxy
 * TOC
 {:toc}
 
-主要来自极客时间 《RPC实战与核心原理》
+部分来自极客时间 《RPC实战与核心原理》
 
-动态代理 就是在执行代码的过程中，动态生成了 代理类 Class 的`byte[]`，然后通过defineClass0 加载到jvm 中。
+动态代理 就是在执行代码的过程中，动态生成了 代理类 Class 的字节码`byte[]`，然后通过defineClass0 加载到jvm 中。
 
 ```
 Proxy.newProxyInstance
@@ -229,7 +229,7 @@ public final class $Proxy0 extends Proxy implements Hello {
 
 ![](/public/upload/java/java_dynamic_proxy.png)
 
-[动态代理的本质](https://www.jianshu.com/p/60e283ca765b) **为什么要用 InvocationHandler 插一脚呢？**因为`sun.misc.ProxyGenerator` 在生成 proxy class byte[] 时，自然希望具体的方法实现是一个**模式化的code**，这样才方便自动生成代码。所以**将差异化的逻辑转移到了 InvocationHandler** 。
+[动态代理的本质](https://www.jianshu.com/p/60e283ca765b) **为什么要用 InvocationHandler 插一脚呢？**因为`sun.misc.ProxyGenerator` 在生成 proxy 字节码 `byte[]`时，自然希望具体的方法实现是一个**模式化的code**，这样才方便自动生成代码。所以**将差异化的逻辑转移到了 InvocationHandler** 。
 
 ## dynamic interface implementations
 
