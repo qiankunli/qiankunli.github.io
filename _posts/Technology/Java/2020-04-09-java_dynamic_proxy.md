@@ -15,6 +15,19 @@ keywords: java dynamic proxy
 
 主要来自极客时间 《RPC实战与核心原理》
 
+动态代理 就是在执行代码的过程中，动态生成了 代理类 Class 的`byte[]`，然后通过defineClass0 加载到jvm 中。
+
+```
+Proxy.newProxyInstance
+    ProxyClassFactory.apply
+        byte[] proxyClassFile = ProxyGenerator.generateProxyClass(
+            proxyName, interfaces, accessFlags);
+        defineClass0(loader, proxyName,
+                                proxyClassFile, 0, proxyClassFile.length);
+```
+
+
+
 ## 从示例代码开始说起
 
 给 Hello 接口生成一个动态代理类，并调用接口 say() 方法，但真实返回的值居然是来自 Other 里面的 speak() 方法返回值。
@@ -110,7 +123,7 @@ public class Proxy implements java.io.Serializable {
 Proxy 包括一个内部类 ProxyClassFactory
 ```java
 private static final class ProxyClassFactory
-    implements BiFunction<ClassLoader, Class<?>[], Class<?>>{
+    implements BiFunction<ClassLoader, Class<?>[], Class<?>{
     // prefix for all proxy class names
     private static final String proxyClassNamePrefix = "$Proxy";
     // next number to use for generation of unique proxy class names
@@ -215,3 +228,19 @@ public final class $Proxy0 extends Proxy implements Hello {
 综上 可以得到一个类图
 
 ![](/public/upload/java/java_dynamic_proxy.png)
+
+[动态代理的本质](https://www.jianshu.com/p/60e283ca765b) **为什么要用 InvocationHandler 插一脚呢？**因为`sun.misc.ProxyGenerator` 在生成 proxy class byte[] 时，自然希望具体的方法实现是一个**模式化的code**，这样才方便自动生成代码。所以**将差异化的逻辑转移到了 InvocationHandler** 。
+
+## dynamic interface implementations
+
+[Java动态代理的实现机制](http://developer.51cto.com/art/201509/492614.htm)所谓的动态代理就是这样一种class，它是在运行时生成的class，在生成它时你必须提供一组interface给它，然后该 class就宣称它实现了这些interface，但是其实它不会替你做实质性的工作，而是根据你在生成实例时提供的参数handler(即 InvocationHandler接口的实现类),由这个Handler来接管实际的工作。 
+
+
+[Java Reflection - Dynamic Proxies](http://tutorials.jenkov.com/java-reflection/dynamic-proxies.html)Using Java Reflection you create dynamic implementations of interfaces at runtime. You do so using the class `java.lang.reflect.Proxy`. The name of this class is why I refer to these dynamic interface implementations as dynamic proxies. **我们常说的 dynamic proxies 总让人跟代理模式扯上联系，但实际上说dynamic interface implementations 更为直观。**
+
+我们按下jdk 官方对 `java.lang.reflect.Proxy` 的注释：proxy instance has an associated invocation handler object, which implements the interface  InvocationHandler. A method invocation on a proxy instance through one of its proxy interfaces will be **dispatched** to the  InvocationHandler#invoke invoke method of the instance's invocation handler, passing the proxy instance, a ` java.lang.reflect.Method` object identifying the method that was invoked, and an array of type Object containing the arguments.  The invocation handler processes the encoded method invocation as appropriate and the result that it returns will be returned as the result of the method invocation on the proxy instance.
+
+动态接口实现有什么用处呢？一些接口实现 取决于 用户的配置，只有加载了用户的配置才可以确认处理逻辑。此时你可以：
+
+1. 根据用户配置穷举所有可能性， 然后根据配置调用 不同的实现类来处理。
+2. 等运行时加载了用户的配置之后，再实现该接口。也就是 将实现接口的行为 放在 运行时。
