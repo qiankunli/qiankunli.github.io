@@ -43,6 +43,8 @@ The storage media (Disk, SSD, or memory) of a volume is determined by the media 
 |创建者|由 集群管理员 or External Provisioner 创建|由 用户 or StatefulSet 控制器（根据VolumeClaimTemplate） 创建|
 |生命周期|PV 的生命周期独立于使用 PV 的 Pod||
 
+PVC 和 PV 的设计，其实跟“面向对象”的思想完全一致。PVC 可以理解为持久化存储的“接口”，它提供了对某种持久化存储的描述，但不提供具体的实现；而这个持久化存储的实现部分则由 PV 负责完成。这样做的好处是，作为应用开发者，我们只需要跟 PVC 这个“接口”打交道，而不必关心具体的实现是 NFS 还是 Ceph
+
 ||PVC|Pod|
 |---|---|---|
 |资源|消耗 PV 资源，**PV资源是集群的**|消耗 Node 资源|
@@ -50,7 +52,7 @@ The storage media (Disk, SSD, or memory) of a volume is determined by the media 
 ||确定Node后，为Node挂载存储设备 ==> <br>Pod 为Node 带了一份嫁妆|能调度到Node上，说明Node本身的CPU和内存够用|
 ||完全是 Kubernetes 项目自己负责管理的<br>runtime 只知道mount 本地的一个目录| 容器操作基本委托给runtime|
 
-PVC 和 PV 的设计，其实跟“面向对象”的思想完全一致。PVC 可以理解为持久化存储的“接口”，它提供了对某种持久化存储的描述，但不提供具体的实现；而这个持久化存储的实现部分则由 PV 负责完成。这样做的好处是，作为应用开发者，我们只需要跟 PVC 这个“接口”打交道，而不必关心具体的实现是 NFS 还是 Ceph
+
 
 PV 对象是由运维人员事先创建在 Kubernetes 集群里待用的
 
