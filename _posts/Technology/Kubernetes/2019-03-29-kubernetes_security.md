@@ -171,3 +171,5 @@ Kubernetes 会为一个 ServiceAccount自动创建并分配一个 Secret 对象
 2. Role 表述对这些资源的操作能力
 3. User/ServiceAccount 和 Role 绑定在一起，进而拥有Role 所具有的能力
 4. Pod 和 ServiceAccount 绑定在一起， Pod内进程可以使用 k8s push到本地的ServiceAccount 数据访问 api resource
+
+开阔下视野[Kata Containers 创始人带你入门安全容器技术](https://mp.weixin.qq.com/s/w2SkC6TuSBqurvAae0RAUA)

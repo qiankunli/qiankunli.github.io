@@ -13,6 +13,7 @@ keywords: kubernetes crd
 * TOC
 {:toc}
 
+Kubernetes 通过工作负载和 CRD 抽象给**基础设施系统设计**带来了巨大变革。
 
 自定义资源实际上是为了扩展kubernetes的API，向kubenetes API中增加新类型，可以使用以下三种方式：
 
