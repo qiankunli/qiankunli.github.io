@@ -51,5 +51,6 @@ hadoop 是直接把jar 传输到目标节点，其实也可以学习 k8s， 调�
 |cni plugin|binary，程序直接使用|
 |adminssion controller|webhook|
 |Scheduler plugin|被编译到Scheduler中|
+|Operator|binary，以容器方式运行在Kubernetes 集群中<br>通过扩展API server支持与kubectl 交互|
 
 

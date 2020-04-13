@@ -3,7 +3,7 @@
 layout: post
 title: 为容器选择一个合适的entrypoint
 category: 技术
-tags: Docker
+tags: Container
 keywords: container entrypoint
 
 ---

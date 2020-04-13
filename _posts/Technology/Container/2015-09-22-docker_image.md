@@ -3,7 +3,7 @@
 layout: post
 title: 关于docker image的那点事儿
 category: 技术
-tags: Docker
+tags: Container
 keywords: Docker image registry
 
 ---

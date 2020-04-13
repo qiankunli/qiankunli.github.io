@@ -3,7 +3,7 @@
 layout: post
 title: jib源码分析之细节
 category: 技术
-tags: Docker
+tags: Container
 keywords: jib
 
 ---

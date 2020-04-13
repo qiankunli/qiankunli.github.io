@@ -3,7 +3,7 @@
 layout: post
 title: 《持续交付36讲》笔记
 category: 技术
-tags: Docker
+tags: Container
 keywords: 持续交付
 
 ---
