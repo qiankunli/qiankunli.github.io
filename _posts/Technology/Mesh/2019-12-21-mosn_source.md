@@ -101,7 +101,7 @@ Mosn是基于Go开发的sidecar，用于service mesh中的数据面代理，建�
 
 ![](/public/upload/go/mosn_package.png)
 
-几乎所有的interface 定义在 `pkg/types` 中，mosn 基于四层 架构实现（见下文），每一个layer 在types 中有一个go 文件，在`pkg` 下有一个专门的文件夹。
+很多 go 的项目都将 程序入口写在 cmd 文件夹中，然后具体的实现写在 pkg 中，MOSN 项目也是如此。几乎所有的interface 定义在 `pkg/types` 中，mosn 基于四层 架构实现（见下文），每一个layer 在types 中有一个go 文件，在`pkg` 下有一个专门的文件夹。
 
 ## 分层架构
 
@@ -135,21 +135,7 @@ Mosn是基于Go开发的sidecar，用于service mesh中的数据面代理，建�
 
 一个请求可能会触发多次 读取操作，因此单个请求可能会多次调用插件的onData 函数。
 
-## 连接管理
 
-该图主要说的连接管理部分
-
-![](/public/upload/go/mosn_object.png)
-
-1. 不同颜色 表示所处的 package 不同
-2. 因为mosn主要是的用途是“代理”， 所以笔者一开始一直在找代理如何实现，但其实呢，mosn 首先是一个tcp server，像tomcat一样，mosn 主要分为连接管理和业务处理两个部分
-3. 业务处理的入口 就是filterManager， 主要由`filterManager.onRead` 和 `filterManager.onWrite` 来实现。 filterManager 聚合ReadFilter 链和WriterFilter链，构成对数据的处理
-
-![](/public/upload/go/mosn_start.png)
-
-envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)
-
-![](/public/upload/mesh/envoy_new_connection.jpg)
 
 
 ## 数据处理

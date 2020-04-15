@@ -90,7 +90,7 @@ the Listener interface we defined above is semantically equivalent to the Consum
 	observable.sendEvent( "Hello World!" );
 
 
-
+**有人说过一句话，大意是如果语言支持，就不需要设计模式**。
 
 ## 责任链
 
