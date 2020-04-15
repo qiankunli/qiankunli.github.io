@@ -72,38 +72,22 @@ type Mosn struct {
 
 ![](/public/upload/go/mosn_start.png)
 
-## 整理逻辑
+## 整体逻辑
 
 
-
-该图主要说的连接管理部分
 
 ![](/public/upload/go/mosn_object.png)
 
 1. 不同颜色 表示所处的 package 不同
-2. 因为mosn主要是的用途是“代理”， 所以笔者一开始一直在找代理如何实现，但其实呢，mosn 首先是一个tcp server，像tomcat一样，mosn 主要分为连接管理和业务处理两个部分
+2. 因为mosn主要是的用途是“代理”， 所以笔者一开始一直在找代理如何实现，但其实mosn 首先是一个tcp server，像tomcat一样，mosn 主要分为连接管理和业务处理两个部分
 3. 业务处理的入口 就是filterManager， 主要由`filterManager.onRead` 和 `filterManager.onWrite` 来实现。 filterManager 聚合ReadFilter 链和WriterFilter链，构成对数据的处理
 
+### 数据接收
 
-envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)
+一次http1协议请求的处理过程（绿色部分表示另起一个协程）
 
-![](/public/upload/mesh/envoy_new_connection.jpg)
+![](/public/upload/go/mosn_http_read.png)
 
-## 数据处理
-
-一些细节：
-
-1. [SOFAMesh中的多协议通用解决方案x-protocol介绍系列(1)-DNS通用寻址方案](https://skyao.io/post/201809-xprotocol-common-address-solution/)iptables在劫持流量时，除了将请求转发到localhost的Sidecar处外，还额外的在请求报文的TCP options 中将 ClusterIP 保存为 original dest。在 Sidecar （Istio默认是Envoy）中，从请求报文 TCP options 的 original dest 处获取 ClusterIP
-2. [SOFAMesh中的多协议通用解决方案x-protocol介绍系列(2)-快速解码转发](https://skyao.io/post/201809-xprotocol-rapid-decode-forward/)
-
-    1. 转发请求时，由于涉及到负载均衡，我们需要将请求发送给多个服务器端实例。因此，有一个非常明确的要求：就是必须以单个请求为单位进行转发。即单个请求必须完整的转发给某台服务器端实例，负载均衡需要以请求为单位，不能将一个请求的多个报文包分别转发到不同的服务器端实例。所以，拆包是请求转发的必备基础。
-    2. 多路复用的关键参数：RequestId。RequestId用来关联request和对应的response，请求报文中携带一个唯一的id值，应答报文中原值返回，以便在处理response时可以找到对应的request。当然在不同协议中，这个参数的名字可能不同（如streamid等）。严格说，RequestId对于请求转发是可选的，也有很多通讯协议不提供支持，比如经典的HTTP1.1就没有支持。但是如果有这个参数，则可以实现多路复用，从而可以大幅度提高TCP连接的使用效率，避免出现大量连接。稍微新一点的通讯协议，基本都会原生支持这个特性，比如SOFARPC，Dubbo，HSF，还有HTTP/2就直接內建了多路复用的支持。
-
-我们可以总结到，对于Sidecar，要正确转发请求：
-
-1. 必须获取到destination信息，得到转发的目的地，才能进行服务发现类的寻址
-2. 必须要能够正确的拆包，然后以请求为单位进行转发，这是负载均衡的基础
-3. 可选的RequestId，这是开启多路复用的基础
 
 [深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)下文以envoy 实现做一下类比 用来辅助理解mosn 相关代码的理念：
 
@@ -112,14 +96,6 @@ envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun
 对于每一个Filter，都调用onData函数，咱们上面解析过，其中HTTP对应的ReadFilter是ConnectionManagerImpl，因而调用ConnectionManagerImpl::onData函数。ConnectionManager 是协议插件的处理入口，**同时也负责对整个处理过程的流程编排**。
 
 ![](/public/upload/mesh/envoy_data_parse.jpg)
-
-### 数据“上传”
-
-一次http1协议请求的处理过程
-
-![](/public/upload/go/mosn_http_read.png)
-
-绿色部分表示另起一个协程
 
 ### 转发流程
 
@@ -241,3 +217,10 @@ Downstream stream, as a controller to handle downstream and upstream proxy flow 
 |End||
 
 上述流程才像是一个 proxy 层的活儿，请求转发到 upstream，从upstream 拿到响应， 再转回给downStream
+
+### 连接管理（待补充）
+
+envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)
+
+![](/public/upload/mesh/envoy_new_connection.jpg)
+
