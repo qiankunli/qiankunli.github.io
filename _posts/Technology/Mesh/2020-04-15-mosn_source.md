@@ -8,7 +8,7 @@ keywords: mesh microservice
 
 ---
 
-## 前言（未完成）
+## 前言
 
 * TOC
 {:toc}
@@ -83,6 +83,8 @@ type Mosn struct {
 3. stream 创建完毕后，会回调到 Proxy 层做路由和转发，Proxy 层会关联上下游（upstream,downstream）间的转发关系
 4. Proxy 挑选到后端后，会根据后端使用的协议，将数据发送到对应协议的 Protocol 层，对数据重新做 Encode
 5. Encode 后的数据会发经过 write filter 并最终使用 IO 的 write 发送出去
+
+[MOSN 源码解析 - 协程模型](https://mosn.io/zh/blog/code/mosn-eventloop/)
 
 ![](/public/upload/mesh/mosn_process.png)
 
