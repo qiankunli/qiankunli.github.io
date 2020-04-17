@@ -4,7 +4,7 @@ layout: post
 title: mosn源码浅析
 category: 技术
 tags: Mesh
-keywords: mesh microservice
+keywords: mesh source
 
 ---
 
@@ -32,7 +32,7 @@ type Mosn struct {
 }
 ```
 
-1. servers 是一个数组，server.Server 是接口类型。但是目前的代码逻辑中只会有一个 server。
+1. servers 是一个数组，server.Server 是接口类型。**目前最多只支持配置一个server**。
 2. clustermanager 顾名思义就是集群管理器。 `types.ClusterManager` 也是接口类型。这里的 cluster 指得是 MOSN 连接到的一组逻辑上相似的上游主机。MOSN 通过服务发现来发现集群中的成员，并通过主动运行状况检查来确定集群成员的健康状况。MOSN 如何将请求路由到集群成员由负载均衡策略确定。
 3. routerManager 是路由管理器，MOSN 根据路由规则来对请求进行代理。
 4. adminServer 是一个服务，可以通过 http 请求获取 MOSN 的配置、状态等等
@@ -72,7 +72,7 @@ type Mosn struct {
 
 ![](/public/upload/go/mosn_start.png)
 
-## 整体逻辑
+## 数据转发
 
 [SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md) 
 
@@ -88,7 +88,7 @@ type Mosn struct {
 
 ![](/public/upload/mesh/mosn_process.png)
 
-## 数据接收
+### 数据接收
 
 network 层 读取
 
@@ -286,6 +286,8 @@ func (s *downStream) receive(ctx context.Context, id uint32, phase types.Phase) 
 }
 ```
 
+### 数据发送
+
 真正的发送数据逻辑是在receiveHeaders、receiveData、receiveTrailers这三个方法里，当然每次请求不一定都需要有这三部分的数据，这里我们以receiveHeaders方法为例来进行说明：
 
 ```go
@@ -420,6 +422,7 @@ func (s *downStream) waitNotify(id uint32) (phase types.Phase, err error) {
 	return s.processError(id)
 }
 ```
+
 ## 与envoy 对比
 
 envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)

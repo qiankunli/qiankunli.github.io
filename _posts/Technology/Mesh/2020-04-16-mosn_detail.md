@@ -4,7 +4,7 @@ layout: post
 title: mosn细节
 category: 技术
 tags: Mesh
-keywords: mesh microservice
+keywords: mosn detail
 
 ---
 
@@ -12,6 +12,12 @@ keywords: mesh microservice
 
 * TOC
 {:toc}
+
+![](/public/upload/mesh/mosn_process.png)
+
+## filter扩展机制
+
+[MOSN 源码解析 - filter扩展机制](https://mosn.io/zh/blog/code/mosn-filters/)MOSN 使用了过滤器模式来实现扩展。MOSN 把过滤器相关的代码放在了 pkg/filter 目录下，包括 accept 过程的 filter，network 处理过程的 filter，以及 stream 处理的 filter。其中 accept filters 目前暂不提供扩展（加载、运行写死在代码里面，如要扩展需要修改源码）， steram、network filters 是可以通过定义新包在 pkg/filter 目录下实现扩展。
 
 ## Stream 
 
@@ -92,6 +98,8 @@ mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应
 ![](/public/upload/mesh/mosn_Stream.png)
 
 ## ConnectionPool
+
+同样应用了工厂模式
 
 ```
 mosn/pkg/types
