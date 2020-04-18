@@ -26,6 +26,8 @@ keywords: container network
 
 ## docker 单机
 
+![](/public/upload/network/container_network_host.png)
+
 [Kubernetes 网络模型进阶](https://mp.weixin.qq.com/s/QZYpV7ks2xxNvtqWUiS7QQ)容器网络发端于 Docker 的网络。Docker 使用了一个比较简单的网络模型，即内部的网桥加内部的保留 IP。这种设计的好处在于容器的网络和外部世界是解耦的，无需占用宿主机的 IP 或者宿主机的资源，完全是虚拟的。
 
 它的设计初衷是：当需要访问外部世界时，会采用 SNAT 这种方法来借用 Node 的 IP 去访问外面的服务。比如容器需要对外提供服务的时候，所用的是 DNAT 技术，也就是在 Node 上开一个端口，然后通过 iptable 或者别的某些机制，把流导入到容器的进程上以达到目的。简称：出宿主机采用SNAT借IP，进宿主机用DNAT借端口。
@@ -48,6 +50,8 @@ Rather than prescribing a certain networking solution, Kubernetes only states th
 Kubernetes requires each pod to have an IP in a flat networking namespace with full connectivity to other nodes and pods across the network. This IP-per-pod model yields a backward-compatible way for you to treat a pod almost identically to a VM or a physical host（**ip-per-pod 的优势**）, in the context of naming, service discovery, or port allocations. The model allows for a smoother transition from non–cloud native apps and environments.  这样就 no need to manage port allocation
 
 ## 跨主机通信
+
+2020.4.18补充：很多文章都是从跨主机容器如何通信 的来阐述网络方案，这或许是一个很不好的理解曲线，从实际来说，一定是先有网络，再为Pod “连上网”。
 
 Network是一组可以相互通信的Endpoints，网络提供connectivity and discoverability.
 
@@ -147,6 +151,8 @@ There are two main ways they do it:
 2. use the BGP protocol to gossip to each other about routes, and a daemon (BIRD) listens for BGP messages on every box
 
 容器所在主机的路由表 让linux 主机变成了一个路由器，路由表主要由**直接路由**构成，将数据包中目的mac 改为直接路由中下一跳主机 的mac 地址。 
+
+![](/public/upload/network/container_network_route.png)
 
 ### underlay/physical 网络
 

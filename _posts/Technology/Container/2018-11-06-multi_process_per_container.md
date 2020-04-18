@@ -122,22 +122,24 @@ A fully­ powered Linux environment typically includes an ​init​ process tha
 
 [runit - a UNIX init scheme with service supervision](http://smarden.org/runit/)
 
-#### 使用
+
 
 Dockerfile
 
-	FROM phusion/passenger-­ruby22
-	
-	...
-	
-	#install custom bootstrap script as runit service
-	COPY myapp/start.sh /etc/service/myapp/run
-	
-	
-myapp/start.sh
+```Dockerfile
+FROM phusion/passenger-­ruby22
 
-	#!/bin/sh
-	exec command
+...
+
+#install custom bootstrap script as runit service
+COPY myapp/start.sh /etc/service/myapp/run
+```
+	
+```sh	
+#// myapp/start.sh
+#!/bin/sh
+exec command
+```
 
 	
 在这个Dockerfile 中，CMD 继承自 base image。 将`myapp/start.sh` 拷贝到 容器的 `/etc/service/myapp/run`	文件中即可 被runit 管理，runit 会管理 `/etc/service/` 下的应用（目录可配置），即 Each service is associated with a service directory
@@ -160,7 +162,7 @@ myapp/start.sh
 |utmpset| logout a line from utmp and wtmp file|
 |svlogd|runit’s service logging daemon|
 
-#### runit 工作原理
+runit 工作原理
 
 ![](/public/upload/docker/runit.png)
 
@@ -168,7 +170,9 @@ myapp/start.sh
 
 [Managing multiple processes in Docker containers](https://medium.com/@beld_pro/managing-multiple-processes-in-docker-containers-455480f959cc) 
 
-## Docker-friendliness image
+## 其它
+
+### Docker-friendliness image
 
 与其在init 进程工具的选型上挣扎，是否有更有魄力的工具呢？
 
@@ -187,7 +191,7 @@ github 有一个 [phusion/baseimage-docker](https://github.com/phusion/baseimage
 1. multi-user
 2. multi-process
 
-## 优雅的管理springboot 项目
+### 优雅的管理springboot 项目
 
 回到文开始提到的问题：
 
@@ -196,5 +200,25 @@ github 有一个 [phusion/baseimage-docker](https://github.com/phusion/baseimage
 1. 多进程方式，使得不管springboot 是否启动成功，容器都会启动成功
 2. 另外采取 措施监控 springboot 的健康状态，以决定是否 向该容器打入流量
 3. runit 正常会尝试不断重启，实际上往往因为代码的原因，启动一次就行了。因此启动springboot 的时候，先检查下 有没有`/etc/service/springboot/supervise`（runsv将服务的状态保存服务对应在supervise目录中） 文件，若没有则是第一次启动。有则是第二次启动，写入`/etc/service/springboot/down`（down 告知runsv 停止该服务）
+
+### 和ssh的是是非非
+
+2018.12.01 补充 [ssh连接远程主机执行脚本的环境变量问题](http://feihu.me/blog/2014/env-problem-when-ssh-executing-command-on-remote/)
+
+背景：
+
+1. 容器启动时会运行sshd，所以可以ssh 到容器
+2. 镜像dockerfile中 包含`ENV PATH=${PATH}:/usr/local/jdk/bin`
+2. `docker exec -it container bash` 可以看到 PATH 环境变量中包含 `/usr/local/jdk/bin`
+3. `ssh root@xxx` 到容器内，观察 PATH 环境变量，则不包含  `/usr/local/jdk/bin`
+
+这个问题涉及到 bash的四种模式
+
+1. 通过ssh登陆到远程主机  属于bash 模式的一种：login + interactive
+2. 不同的模式，启动shell时会去查找并加载 不同而配置文件，比如`/etc/bash.bashrc`、`~/.bashrc` 、`/etc/profile` 等
+3. login + interactive 模式启动shell时会 第一加载`/etc/profile`
+4. `/etc/profile` 文件内容默认有一句 `export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`
+
+所以 `docker exec `可以看到 正确的PATH 环境变量值，而ssh 到容器不可以，解决方法之一就是 制作镜像时 向`/etc/profile` 追加 一个export 命令
 
 

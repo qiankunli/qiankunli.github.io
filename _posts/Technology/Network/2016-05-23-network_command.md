@@ -126,6 +126,12 @@ netfilter 是linux内核的一个机制，用于在网络发送和转发的关�
     1. filter 表，确定是否放行数据包
     2. nat表，**修改数据包的源ipport 和 目的ipport**
 
+netfilter 在网络包收发及路由的 管道上，一共切了 5 个口，分别是 PREROUTING，FORWARD，POSTROUT- ING，INPUT 以及 OUTPUT;同时 netfilter 定义了包括 nat、filter 在内的若干个**网络包处理方式**。
+
+![](/public/upload/network/iptables.png)
+
+需要注意的是，routing 和 forwarding 很大程度上增加了以上 netfilter 的复杂 程度，如果我们不考虑 routing 和 forwarding，那么 netfilter 会变得跟一般过 滤器框架一样简单。
+
 ### 源码上的体现
 
     // 从tcp层向ip层发送数据包

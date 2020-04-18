@@ -68,6 +68,8 @@ docker 启用user namesapce（此处只是普及，不推荐使用）
 
 ### access the API 
 
+客户端和 API Server 作为通信的普 通参与者，各有一张证书。而这两张证书，都是由 CA 签发。客户端信任**集群 CA**，所以它信任拥有集群 CA 签发证书的 API Server;反过来 API Server 需要信任**客户端 CA**，它才愿意与客户端通信。
+
 [ssl证书是什么东西](https://kubernetes.io/docs/reference/access-authn-authz/controlling-access/)
 
 [Controlling Access to the Kubernetes API](https://kubernetes.io/docs/reference/access-authn-authz/controlling-access/)

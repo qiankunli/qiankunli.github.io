@@ -20,6 +20,8 @@ keywords: Docker Kubernetes
 
 ## What is a service?
 
+K8S 集群的服务，本质上是负载均衡，即反向代理;在实际实现中，这个反向代理，并不是部署在集群某一个节点上（有单点问题），而 是作为集群节点的边车，部署在每个节点上的。把服务照进反向代理这个现实的，是 K8S 集群的一个控制器，即 kube-proxy。简单来 说，kube-proxy 通过集群 API Server 监听 着集群状态变化。当有新的服务被创建的时候，kube-proxy 则会把集群服务的状 态、属性，翻译成反向代理的配置。**K8S 集群节点实现服务反向代理的方法，目前主要有三种，即 userspace、 iptables 以及 ipvs**，k8s service 选了iptables。实现反向代理，归根结底，就是做 DNAT，即把发送给集群服务 IP 和端口的数 据包，修改成发给具体容器组的 IP 和端口。
+
 Container Engine pods are ephemeral（短暂的）. They can come and go over time, especially when driven by things like replication controllers. While each pod gets its own IP address, **those IP addresses cannot be relied upon to be stable over time（直接通过一个pod的ip来访问它是不可靠的）**. This leads to a problem: if some set of pods (let's call them backends) provides functionality to other pods (let's call them frontends) inside a cluster, how do those frontends find the backends?
 (Pod组件的状态经常变化，也可能存在多个副本，那么其他组件如何来访问它呢)
 
