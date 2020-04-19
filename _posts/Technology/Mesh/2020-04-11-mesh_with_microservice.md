@@ -25,6 +25,8 @@ keywords: mesh microservice
 |RPC 协议|协议编解码等|无|
 |配置下发|路由字段支持|路由字段支持|
 
+对于服务注册发现部分
+
 1. client 查询服务节点
 
     1. 发现 处在容器环境，并有sidecar 运行。则将请求 导向sidecar 的ip和port。
