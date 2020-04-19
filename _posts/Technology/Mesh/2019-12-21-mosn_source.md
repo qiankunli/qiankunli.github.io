@@ -182,9 +182,11 @@ func (sc *streamConn) handleRequest(ctx context.Context, frame xprotocol.XFrame,
 }
 ```
 
+mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应协议的`serverStreamConnection.Dispatch` 经过协议解析， **字节流转成了协议的数据包**，转给了`StreamReceiveListener.OnReceive`。proxy.downStream 实现了 StreamReceiveListener。
 
+[MOSN 多协议机制解析](https://mosn.io/zh/blog/posts/multi-protocol-deep-dive/)  协议解析过程比较复杂，涉及到多路复用等机制，具体细节参见[mosn细节](http://qiankunli.github.io/2020/04/16/mosn_detail.html)。 
 
-mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应协议的`serverStreamConnection.Dispatch` ==> 根据协议解析数据 ，经过协议解析，收到一个完整的请求时`serverStreamConnection.handleFrame` 会创建一个 Stream，然后逻辑 转给了`StreamReceiveListener.OnReceive`。proxy.downStream 实现了 StreamReceiveListener。
+![](/public/upload/mesh/mosn_protocol.png)
 
 
 ## 转发流程
