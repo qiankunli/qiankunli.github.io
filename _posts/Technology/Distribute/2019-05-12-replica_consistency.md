@@ -31,7 +31,7 @@ keywords: 一致性协议
 
 ![](/public/upload/distribute/consistency_copy_log.png)
 
-假设KV集群有三台机器，机器之间相互通信，把自己的值传播给其他机器，三个客户端并发的向集群发送三个请求，值X 应该是多少？是多少没关系，135都行，向一个client返回成功、其它client返回失败（或实际值）即可，关键是Node1、Node2、Node3 一致。
+假设KV集群有三台机器，机器之间相互通信，把自己的值传播给其他机器，三个客户端并发的向集群发送三个请求，值X 应该是多少？是多少没关系，135都行，向一个client返回成功、其它client返回失败（或实际值）也可，关键是Node1、Node2、Node3 一致。
 
 ||Replicated State Machine|Primary-Backup System|
 |---|---|---|
@@ -74,23 +74,17 @@ keywords: 一致性协议
 
 上文所说的“日志位置” 在这里是一个Proposer生成的自增ID，不需要全局有序。
 
-每个Node 同时充当了两个角色：Proposer和Acceptor，在实现过程中， 两个角色在同一个进程里面。
+每个Node 同时充当了两个角色：Proposer和Acceptor，在实现过程中， 两个角色在同一个进程里面。专门提一个Proposer概念（只是一个角色概念）的好处是：对业务代码没有侵入性，也就是说，我们不需要在业务代码中实现算法逻辑，就可以像使用数据库一样访问后端的数据。
 
-* Prepare阶段——针对一个“位置”的提议，充分的听取大家的意见
+![](/public/upload/distribute/paxos_role.jpg)
 
-	![](/public/upload/distribute/paxos_propose_stage.png)
 
-	1. Proposer 广播 prepare(n)
-	2. Proposer 如果收到半数以上yes，则支持在位置n写入 收到的新值（按一定的算法规则）。否则n 自增，重新请求。
+||proposer|acceptor|
+|---|---|---|
+|prepare阶段|proposer 生成全局唯一且自增的proposal id，广播propose<br>只广播proposal id即可，无需value|Acceptor 收到 propose 后，做出“两个承诺，一个应答”<br>1. 不再应答 proposal id **小于等于**当前请求的propose<br>2. 不再应答 proposal id **小于** 当前请求的 accept<br>3. 若是符合应答条件，返回已经accept 过的提案中proposal id最大的那个 propose 的value 和 proposal id， 没有则返回空值|
+|accept阶段|提案生成规则<br>1. 从acceptor 应答中选择proposalid 最大的value 作为本次的提案<br>2. 如果所有的应答的天value为空，则可以自己决定value|在不违背“两个承诺”的情况下，持久化当前的proposal id和value|
 
-* Accept阶段——选取一个“意见”，向大家确认
-		
-	![](/public/upload/distribute/paxos_accept_stage.png)
-
-	1. Proposer 广播 accept(n,v)
-	2. Proposer 如果收到半数以上yes，并且收到的n与accept n一致，则结束。否则n 自增，重新从零开始。
-
-Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0开始，陷入“不断”循环，即“活锁”问题（一直得动，但没有结果）。
+Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0开始，陷入“不断”循环，即“活锁”问题。
 
 目前比较好的通俗解释，以贿选来描述 [如何浅显易懂地解说 Paxos 的算法？ - GRAYLAMB的回答 - 知乎](https://www.zhihu.com/question/19787937/answer/107750652)。
 
@@ -118,6 +112,8 @@ Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0�
 |结果|失败|成功|
 
 paxos 与线程安全问题不同的地方是，paxos的node之间 是为了形成一致，而线程安全则是要么成功要么失败，所以有一点差异。 
+
+生活中面临的任何选择，最后都可以转换为一个问题：你想要什么（以及为此愿意牺牲什么）。任何不一致问题， 本质上都可以转换为一个一致问题。 一个队伍谁当老大 可以各不服气，但大家可以对“多票当选”取得一致。**你可以不尊重老大，但必须尊重规则**。而在basic-poxos 中，底层的一致就是：谁的ProposerId 大谁的优先级更高。
 
 ## multi-paxos
 

@@ -29,7 +29,7 @@ keywords: mosn detail
 
 ### 多路复用
 
-借鉴了http2 的stream 的理念（所以Stream interface 上有一个方法是`ID()`），Stream 是虚拟的，**在“连接”的层面上看，消息却是乱序收发的“帧”（http2 frame）**，通过StreamId关联，用来实现在一个Connection 之上的“多路复用”。
+借鉴了http2 的stream 的理念（所以Stream interface 上有一个方法是`ID()`），Stream 是虚拟的，**在“连接”的层面上看，消息却是乱序收发的“帧”（http2 frame）**，通过StreamId关联，用来实现在一个Connection 之上的“多路复用”。tcp 数据包在网络上流转，os 维护了socket 对象，随着连接创建、关闭而新建和销毁。 frame 数据包在 连接中传输，网络 应用层维护了 stream 对象，随着 request-response 产生、结束而新建和销毁。 
 
 ![](/public/upload/network/network_buffer.png)
 
