@@ -83,7 +83,9 @@ overlay 网络主要有隧道 和 路由两种方式
 
 ![](/public/upload/docker/overlay_network_2.png)
 
-### 隧道
+### 封包方式
+
+![](/public/upload/network/container_network_vpn.png)
 
 隧道一般用到了解封包，那么问题来了，谁来解封包？怎么解封包？
 
@@ -97,7 +99,9 @@ flannel + udp 和flannel + vxlan 有一个共性，那就是用户的容器都�
 
 Flannel 支持三种后端实现，分别是： VXLAN；host-gw； UDP。而 UDP 模式，是 Flannel 项目最早支持的一种方式，也是性能最差的一种方式。所以，这个模式目前已经被弃用。我们在进行系统级编程的时候，有一个非常重要的优化原则，**就是要减少用户态到内核态的切换次数，并且把核心的处理逻辑都放在内核态进行**。这也是为什么，Flannel 后来支持的VXLAN 模式，逐渐成为了主流的容器网络方案的原因。
 
-### 路由
+### 路由方式
+
+![](/public/upload/network/container_network_route_2.png)
 
 路由方案的关键是谁来路由？路由信息怎么感知？
 
@@ -156,14 +160,20 @@ There are two main ways they do it:
 
 ### underlay/physical 网络
 
-
+[容器网络：盘点，解释与分析](http://www.dockerinfo.net/4289.html)
 ||容器的网卡 来自哪里？|真正与外界通信的网卡是哪个？ external connectivity|容器与物理机网卡的关系及数据连通|
 |---|---|---|---|
 |bridge|veth|物理机网卡|veth pair 挂在bridge上，NAT 连通 物理机网卡|
 |macvlan|macvlan sub-interfaces|macvlan sub-interfaces|
 |ipvlan|ipvlan sub-interfaces|ipvlan sub-interfaces|
 
-[容器网络：盘点，解释与分析](http://www.dockerinfo.net/4289.html)
+[阿里云如何构建高性能云原生容器网络？](https://mp.weixin.qq.com/s/tAlEtCap6bvv6-N96sKJjw)云原生容器网络是直接使用云上原生云资源配置容器网络：
+
+1. 容器和节点同等网络平面，同等网络地位；
+2. Pod 网络可以和云产品无缝整合；
+3. 不需要封包和路由，网络性能和虚机几乎一致。
+
+![](/public/upload/network/container_network_cloud.png)
 
 ## 网络隔离
 
