@@ -27,7 +27,7 @@ keywords: kubernetes 源码分析
 
 ### 节点状况的监视器
 
-Kubelet 会使用上图中的 NodeStatus 机制，定期检查集群节点状况，并把节点 状况同步到 API Server。而 NodeStatus 判断节点就绪状况的一个主要依据，就是 PLEG。
+Kubelet 会使用上图中的 NodeStatus 机制，定期检查集群节点状况，并把节点 状况同步到 API Server。而 **NodeStatus 判断节点就绪状况的一个主要依据，就是 PLEG**。
 
 PLEG 是 Pod Lifecycle Events Generator 的缩写，基本上它的执行逻辑，是 定期检查节点上 Pod 运行情况，如果发现感兴趣的变化，PLEG 就会把这种变化包 装成 Event 发送给 Kubelet 的主同步机制 syncLoop 去处理。
 

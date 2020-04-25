@@ -34,7 +34,7 @@ router 和ingress 均属于和应用服务不在一起的纯代理场景，可�
 3. gateway
 
 
-envoy 是一个proyx 组件，一个proxy 具体的说是listener、filter、route、cluster、endpoint 的协同工作
+envoy 是一个proxy 组件，一个proxy 具体的说是listener、filter、route、cluster、endpoint 的协同工作
 
 ![](/public/upload/practice/istio_envoy_flow.png)
 

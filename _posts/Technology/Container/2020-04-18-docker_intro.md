@@ -38,6 +38,7 @@ docker-containerd-shim $containerId /var/run/docker/libcontainerd/  $containerId
 
 1. 使用` kill -USR1 <pid>`命令发送 USR1 信号给 docker daemon， docker daemon 收到信号之后，会把其所有线程调用栈输出 到文件 /var/run/docker 文件夹里。
 2. 我们可以通过` kill -SIGUSR1 <pid>` 命令来输出 containerd 的调用栈。不同的是，这次调用栈会直接输出到 messages 日志。
+3. 向 kubelet 进程发送 SIGABRT 信号，golang 运行时就会帮我们输出 kubelet 进程的所有调 用栈。需要注意的是，这个操作会杀死 kubelet 进程。
 
 
 

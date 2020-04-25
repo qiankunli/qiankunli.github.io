@@ -191,7 +191,10 @@ mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应
 
 ### 转发流程
 
-Downstream stream, as a controller to handle downstream and upstream proxy flow `downStream.OnReceive` 逻辑
+在http/http2/xprotocol 对应的ServerStreamConnection 中，**每次收到一个新的Stream，`sc.serverCallbacks.NewStreamDetect` ==> newActiveStream 生成一个新的downStream struct 对应**， sc.serverCallbacks 其实就是proxy struct。downStream 代码注释中提到： Downstream stream, as a controller to handle downstream and upstream proxy flow 
+
+
+`downStream.OnReceive` 逻辑
 
 ```go
 func (s *downStream) OnReceive(ctx context.Context,..., data types.IoBuffer, ...) {

@@ -49,7 +49,7 @@ PVC 和 PV 的设计，其实跟“面向对象”的思想完全一致。PVC �
 |---|---|---|
 |资源|消耗 PV 资源，**PV资源是集群的**|消耗 Node 资源|
 ||可以请求特定存储卷的大小及访问模式|Pod 可以请求特定级别的资源（CPU 和内存）|
-||确定Node后，为Node挂载存储设备 ==> <br>Pod 为Node 带了一份嫁妆|能调度到Node上，说明Node本身的CPU和内存够用|
+||确定Node后，为Node挂载存储设备 ==> <br>Pod 为Node 带了一份“嫁妆”|能调度到Node上，说明Node本身的CPU和内存够用|
 ||完全是 Kubernetes 项目自己负责管理的<br>runtime 只知道mount 本地的一个目录| 容器操作基本委托给runtime|
 
 
