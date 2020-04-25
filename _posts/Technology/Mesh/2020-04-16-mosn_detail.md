@@ -15,49 +15,7 @@ keywords: mosn detail
 
 ![](/public/upload/mesh/mosn_process.png)
 
-## filter扩展机制
 
-[MOSN 源码解析 - filter扩展机制](https://mosn.io/zh/blog/code/mosn-filters/)MOSN 使用了过滤器模式来实现扩展。MOSN 把过滤器相关的代码放在了 pkg/filter 目录下，包括 accept 过程的 filter，network 处理过程的 filter，以及 stream 处理的 filter。其中 accept filters 目前暂不提供扩展（加载、运行写死在代码里面，如要扩展需要修改源码）， steram、network filters 是可以通过定义新包在 pkg/filter 目录下实现扩展。
-
-mosn 的配置文件config.json 中的Listener 配置就包含 stream filter 配置
-
-```json
-{
-  "name":"",
-  "address":"", ## Listener 监听的地址
-  "filter_chains":[],  ##  MOSN 仅支持一个 filter_chain
-  "stream_filters":[], ## 一组 stream_filter 配置，目前只在 filter_chain 中配置了 filter 包含 proxy 时生效
-}
-```
-代码中的示例
-```
-mosn/pkg/filter/stream
-    faultinject
-        factory.go
-            func init() {
-                api.RegisterStream(v2.FaultStream, CreateFaultInjectFilterFactory)
-            }
-            type FilterConfigFactory struct {
-                Config *v2.StreamFaultInject
-            }
-    mixer
-        func init() {
-            api.RegisterStream(v2.MIXER, CreateMixerFilterFactory)
-        }
-        type FilterConfigFactory struct {
-	        MixerConfig *v2.Mixer
-        }
-mosn.io/api
-    filter_factory.go
-        func init() {
-            creatorListenerFactory = make(map[string]ListenerFilterFactoryCreator)
-            creatorStreamFactory = make(map[string]StreamFilterFactoryCreator)
-            creatorNetworkFactory = make(map[string]NetworkFilterFactoryCreator)
-        }
-        func RegisterStream(filterType string, creator StreamFilterFactoryCreator) {
-            creatorStreamFactory[filterType] = creator
-        }
-```
 
 ## 多协议机制
 
@@ -274,7 +232,51 @@ bolt、dubbo 都属于 xprotocol ，它们的区别在于 协议格式的不同�
 ![](/public/upload/mesh/mosn_frame.png)
 
 
+## filter扩展机制
 
+[MOSN 源码解析 - filter扩展机制](https://mosn.io/zh/blog/code/mosn-filters/)MOSN 使用了过滤器模式来实现扩展。MOSN 把过滤器相关的代码放在了 pkg/filter 目录下，包括 accept 过程的 filter，network 处理过程的 filter，以及 stream 处理的 filter。其中 accept filters 目前暂不提供扩展（加载、运行写死在代码里面，如要扩展需要修改源码）， steram、network filters 是可以通过定义新包在 pkg/filter 目录下实现扩展。
+
+mosn 的配置文件config.json 中的Listener 配置包含 stream filter 配置
+
+```json
+"listeners":[
+    {
+        "name":"",
+        "address":"", ## Listener 监听的地址
+        "filter_chains":[],  ##  MOSN 仅支持一个 filter_chain
+        "stream_filters":[], ## 一组 stream_filter 配置，目前只在 filter_chain 中配置了 filter 包含 proxy 时生效
+    }
+]
+```
+代码中的示例
+```
+mosn/pkg/filter/stream
+    faultinject
+        factory.go
+            func init() {
+                api.RegisterStream(v2.FaultStream, CreateFaultInjectFilterFactory)
+            }
+            type FilterConfigFactory struct {
+                Config *v2.StreamFaultInject
+            }
+    mixer
+        func init() {
+            api.RegisterStream(v2.MIXER, CreateMixerFilterFactory)
+        }
+        type FilterConfigFactory struct {
+	        MixerConfig *v2.Mixer
+        }
+mosn.io/api
+    filter_factory.go
+        func init() {
+            creatorListenerFactory = make(map[string]ListenerFilterFactoryCreator)
+            creatorStreamFactory = make(map[string]StreamFilterFactoryCreator)
+            creatorNetworkFactory = make(map[string]NetworkFilterFactoryCreator)
+        }
+        func RegisterStream(filterType string, creator StreamFilterFactoryCreator) {
+            creatorStreamFactory[filterType] = creator
+        }
+```
 
 ## 与control plan 的交互
 

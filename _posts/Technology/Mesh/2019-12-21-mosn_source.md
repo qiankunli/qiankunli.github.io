@@ -191,7 +191,7 @@ mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应
 
 ### 转发流程
 
-在http/http2/xprotocol 对应的ServerStreamConnection 中，**每次收到一个新的Stream，`sc.serverCallbacks.NewStreamDetect` ==> newActiveStream 生成一个新的downStream struct 对应**， sc.serverCallbacks 其实就是proxy struct。downStream 代码注释中提到： Downstream stream, as a controller to handle downstream and upstream proxy flow 
+在http/http2/xprotocol 对应的ServerStreamConnection 中，**每次收到一个新的Stream，`sc.serverCallbacks.NewStreamDetect` ==> newActiveStream 生成一个新的downStream struct 对应**， sc.serverCallbacks 其实就是proxy struct。downStream 代码注释中提到： Downstream stream, as a controller to handle downstream and upstream proxy flow。 downStream  同时持有responseSender 成员指向Stream，用于upstream收到响应数据时 回传给client。
 
 
 `downStream.OnReceive` 逻辑
@@ -211,7 +211,23 @@ func (s *downStream) OnReceive(ctx context.Context,..., data types.IoBuffer, ...
 }
 ```
 
-`downStream.receive` 总体来说在请求转发阶段，依次需要经过DownFilter -> MatchRoute -> DownFilterAfterRoute -> DownRecvHeader -> DownRecvData -> DownRecvTrailer -> WaitNofity这么几个阶段，从字面意思可以知道MatchRoute就是构建路由信息，也就是转发给哪个服务，而WaitNofity则是转发成功以后，等待被响应数据唤醒。
+`downStream.receive` 总体来说在请求转发阶段，依次需要经过DownFilter -> MatchRoute -> DownFilterAfterRoute -> DownRecvHeader -> DownRecvData -> DownRecvTrailer -> WaitNofity这么几个阶段。
+
+1. DownFilter, mosn 的配置文件config.json 中的Listener 配置包含 stream filter 配置，就是在此处被使用
+
+    ```json
+    "listeners":[
+        {
+            "name":"",
+            "address":"", ## Listener 监听的地址
+            "filter_chains":[],  ##  MOSN 仅支持一个 filter_chain
+            "stream_filters":[], ## 一组 stream_filter 配置，目前只在 filter_chain 中配置了 filter 包含 proxy 时生效
+        }
+    ]
+    ```
+2. MatchRoute，一个请求所属的domains  绑定了许多路由规则，目的将一个请求 路由到一个cluster 上
+3. ChooseHost，每一个cluster 对应一个连接池
+3. WaitNofity则是转发成功以后，等待被响应数据唤醒。
 
 ```go
 func (s *downStream) receive(ctx context.Context, id uint32, phase types.Phase) types.Phase {
@@ -327,7 +343,10 @@ func (r *upstreamRequest) appendHeaders(endStream bool) {
 	r.connPool.NewStream(r.downStream.context, r, r)
 }
 ```
+**与一个 downStream  struct 对应的是upstreamRequest** ，倒不算一对一关系。downStream  聚合一个upstreamRequest 成员，从bufferPool（本质是go的对象池sync.Pool）取出一个成员赋给 downStream.upstreamRequest，结束后会调用 downStream.cleanStream 回收。
+
 connPool也是每个协议 不同的，以xprotocol 为例
+
 ```go
 func (p *connPool) NewStream(ctx context.Context, responseDecoder types.StreamReceiveListener, listener types.PoolEventListener) {
 	subProtocol := getSubProtocol(ctx)

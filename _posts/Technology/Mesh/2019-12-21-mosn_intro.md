@@ -146,64 +146,74 @@ Mosn是基于Go开发的sidecar，用于service mesh中的数据面代理，建�
 Listener 的配置可以通过Listener动态接口进行添加和修改。
 
 ```json
-{
-  "name":"",
-  "type":"",
-  "address":"", ## Listener 监听的地址
-  "bind_port":"", 
-  "use_original_dst":"",
-  "access_logs":[],
-  "filter_chains":[  ##  MOSN 仅支持一个 filter_chain
-      {
-         "filters": [ ## 一组 network filter 配置，描述了 MOSN 在连接建立以后如何在 4 层处理连接数据
+"listeners":[
+    {
+        "name":"",
+        "type":"",
+        "address":"", ## Listener 监听的地址
+        "bind_port":"", 
+        "use_original_dst":"",
+        "access_logs":[],
+        "filter_chains":[  ##  MOSN 仅支持一个 filter_chain
             {
-              "type":"",
-              "config": {}
+                "filters": [ ## 一组 network filter 配置，描述了 MOSN 在连接建立以后如何在 4 层处理连接数据
+                    {
+                    "type":"",
+                    "config": {}
+                    }
+                ]
             }
-         ]
-      }
-    ],
-  "stream_filters":[], ## 一组 stream_filter 配置，目前只在 filter_chain 中配置了 filter 包含 proxy 时生效
-  "inspector":"",
-  "connection_idle_timeout":""
-}
+            ],
+        "stream_filters":[], ## 一组 stream_filter 配置，目前只在 filter_chain 中配置了 filter 包含 proxy 时生效
+        "inspector":"",
+        "connection_idle_timeout":""
+    }
+]
 ```
 network filter 可自定义扩展实现，默认支持的 type 包括 proxy、tcp proxy、connection_manager。
 connection_manager 是一个特殊的 network filter，它需要和 proxy 一起使用，用于描述 proxy 中路由相关的配置，是一个兼容性质的配置，后续可能有修改。
 
-路由 配置
+**路由 ，一个请求所属的domains  绑定了许多路由规则，目的将一个请求 路由到一个cluster 上**。
 
 ```json
-{
-  "router_config_name":"",
-  "virtual_hosts": [ ## 描述具体的路由规则细节
+"routers":[
     {
-      "domains":[], ## 表示一组可以匹配到该 virtual host 的 domain，支持配置通配符
-      "routers":[] ## 一组具体的路由匹配规则
+        "router_config_name":"",
+        "virtual_hosts": [ ## 描述具体的路由规则细节
+            {
+                "domains":[], ## 表示一组可以匹配到该 virtual host 的 domain，支持配置通配符
+                "routers":[] ## 一组具体的路由匹配规则
+            }
+        ]
     }
-  ]
-}
+]
 ```
-Router
+Router prefix,path,regex优先级从高到低。
 ```json
-{
-  "match":{ ## 路由的匹配参数。
-    "prefix":"", ## 路由会匹配 path 的前缀
-    "path":"",   ## 路由会匹配精确的 path
-    "regex":"",  ## 路由会按照正则匹配的方式匹配 path
-    "headers": [] ## 组请求需要匹配的 header。请求需要满足配置中所有的 Header 配置条件才算匹配成功
-  },   
-  "route":{## 路由行为，描述请求将被路由的 upstream 信息
-    "cluster_name":"", ## 表示请求将路由到的 upstream cluster
-    "metadata_match":"",
-    "timeout":"",   ## 表示默认情况下请求转发的超时时间
-    "retry_policy":{} ## 表示如果请求在遇到了特定的错误时采取的重试策略，默认没有配置的情况下，表示没有重试
-  },   
-  "per_filter_config":{} ## 其中 key 需要匹配一个 stream filter 的 type，key 对应的 json 是该 stream filter 的 config。
-}
+"virtual_hosts": [
+    {
+        "routers":[
+            {
+                "match":{ ## 路由的匹配参数。
+                    "prefix":"", ## 路由会匹配 path 的前缀
+                    "path":"",   ## 路由会匹配精确的 path
+                    "regex":"",  ## 路由会按照正则匹配的方式匹配 path
+                    "headers": [] ## 组请求需要匹配的 header。请求需要满足配置中所有的 Header 配置条件才算匹配成功
+                },   
+                "route":{## 路由行为，描述请求将被路由的 upstream 信息
+                    "cluster_name":"", ## 表示请求将路由到的 upstream cluster
+                    "metadata_match":"",
+                    "timeout":"",   ## 表示默认情况下请求转发的超时时间
+                    "retry_policy":{} ## 表示如果请求在遇到了特定的错误时采取的重试策略，默认没有配置的情况下，表示没有重试
+                },   
+                "per_filter_config":{} ## 其中 key 需要匹配一个 stream filter 的 type，key 对应的 json 是该 stream filter 的 config。
+            }
+        ]
+    }
+]
 ```
 
-prefix,path,regex优先级从高到低。
+
 
 
 
