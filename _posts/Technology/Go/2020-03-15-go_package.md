@@ -4,7 +4,7 @@ layout: post
 title: go打包机制
 category: 技术
 tags: Go
-keywords: Go interface reflect
+keywords: Go 打包
 
 ---
 

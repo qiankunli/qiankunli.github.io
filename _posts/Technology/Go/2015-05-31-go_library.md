@@ -76,9 +76,7 @@ class Business{
 ```
 对应到go 中可以 `atomic.StorePointer($data,unsafe.Pointer(&newData))`
 
-## sync
-
-### sync.pool
+## sync.pool
 
 [深度解密Go语言之sync.pool](https://mp.weixin.qq.com/s/O8EY0M4_Rt_0BLCcM8OwFw)
 

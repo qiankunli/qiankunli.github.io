@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: 从Go并发编程模型想到的
+title: Go并发机制及语言层工具
 category: 技术
 tags: Go
-keywords: Go
+keywords: Go Concurrence
 
 ---
 

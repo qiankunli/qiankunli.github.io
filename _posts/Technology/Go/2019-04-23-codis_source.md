@@ -4,7 +4,7 @@ layout: post
 title: Codis源码分析
 category: 技术
 tags: Go
-keywords: Go
+keywords: Codis
 
 ---
 
