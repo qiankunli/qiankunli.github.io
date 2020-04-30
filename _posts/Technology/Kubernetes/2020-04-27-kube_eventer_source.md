@@ -40,7 +40,7 @@ k8s 多个组件均会产生 event， 下文以Kubelet 为例
 3. 直接或间接使用`EventBroadcaster.StartEventWatcher` 为Broadcaster 注册一个 watcher/eventhandler（也就是一个函数），eventhandler 定义了处理event 的方法，比如写到apiserver 或写到日志上
 4. EventBroadcaster 和 EventRecorder 的中介是Broadcaster
 
-    1. EventRecorder 提供event 入口，传递到 Broadcaster
+    1. EventRecorder 提供event 入口，传递event到 Broadcaster。就像log4j日志中的logger 对象一样只负责将log 写入到缓冲区。
     2. Broadcaster 的作用就是接收所有的 events 并广播到 注册的watcher
 
 5. golang 里喜欢 拿channel 当队列使用
