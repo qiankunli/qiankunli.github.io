@@ -227,7 +227,12 @@ Kubernetes 的代码生成工具当前已变成独立的项目[code-generator](h
 
 ## [扩展API](https://jimmysong.io/kubernetes-handbook/concepts/custom-resource.html)
 
-k8s核心对象的api，带上各种自定义api/非核心api，apiserver 支持的url就很多了
+集群 API Server 有扩展自己的机制，开发者可以利用这个机制，来实现 API Server 的“外挂”。这个“外挂”的主要功能，就是实现新的 API 分组 / 版本。API Server 作为代理，会把相应的 API 调用，转发给自己的“外挂”。
 
 ![](/public/upload/kubernetes/k8s_api.png)
+
+k8s核心对象的api，带上各种自定义api/非核心api，apiserver 支持的url就很多了
+
+
+
 

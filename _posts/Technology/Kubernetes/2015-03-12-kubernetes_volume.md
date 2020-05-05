@@ -13,27 +13,106 @@ keywords: Docker Kubernetes Volume
 
 与CPU 和 Mem 这些资源相比，“存储”对k8s 来说更像是“外设”，k8s 提供统一的“总线”接入。[Kata Containers 创始人带你入门安全容器技术](https://mp.weixin.qq.com/s/w2SkC6TuSBqurvAae0RAUA)OCI规范规定了容器之中应用被放到什么样的环境下、如何运行，比如说容器的根文件系统上哪个可执行文件会被执行，是用什么用户执行，需要什么样的 CPU，有什么样的内存资源、**外置存储**，还有什么样的共享需求等等。
 
-## 和Volume
+## Volume 背景介绍
 
 A Volume is a directory, possibly with some data in it, which is accessible to a Container. Kubernetes Volumes are similar to but not the same as Docker Volumes.
 
 A Pod specifies which Volumes its containers need in its ContainerManifest property.
 
-**A process in a Container sees a filesystem view composed from two sources: a single Docker image and zero or more Volumes**（这种表述方式很有意思）. A Docker image is at the root of the file hierarchy. Any Volumes are mounted at points on the Docker image; Volumes do not mount on other Volumes and do not have hard links to other Volumes. Each container in the Pod independently specifies where on its image to mount each Volume（一个pod中的container各自挂自己的volume）. This is specified a VolumeMounts property.
+**A process in a Container sees a filesystem view composed from two sources: a single Docker image and zero or more Volumes**（这种表述方式很有意思）. A Docker image is at the root of the file hierarchy. Any Volumes are mounted at points on the Docker image; Volumes do not mount on other Volumes and do not have hard links to other Volumes. Each container in the Pod independently specifies where on its image to mount each Volume. This is specified a VolumeMounts property.
 
 The storage media (Disk, SSD, or memory) of a volume is determined by the media of the filesystem holding the kubelet root dir (typically `/var/lib/kubelet`)(volumn的存储类型（硬盘，固态硬盘等）是由kubelet所在的目录决定的). There is no limit on how much space an EmptyDir or PersistentDir volume can consume（大小也是没有限制的）, and no isolation between containers or between pods.
 
 可以与 [docker volume](http://qiankunli.github.io/2015/09/24/docker_volume.html) 对比下异同
 
-## Persistent Volume（PV）和 Persistent Volume Claim（PVC）
+## PV 和 PVC
+
+### 为何引入PV、PVC以及StorageClass？
+
+[Kubernetes云原生开源分布式存储介绍](https://mp.weixin.qq.com/s/lHY6cvaag1TdIist-Xg0Bg)早期Pod使用Volume的写法
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+labels:
+    role: web-frontend
+spec:
+containers:
+- name: web
+    image: nginx
+    ports:
+    - name: web
+        containerPort: 80
+    volumeMounts:
+        - name: nfs
+        mountPath: "/usr/share/nginx/html"
+volumes:
+- name: nfs
+    nfs:
+      server: 10.244.1.4
+      path: /
+```
+
+这种方式至少存在两个问题：
+
+1. Pod声明与底层存储耦合在一起，每次声明Volume都需要配置存储类型以及该存储插件的一堆配置，如果是第三方存储，配置会非常复杂。
+2. 开发人员的需求可能只是需要一个20GB的卷，这种方式却不得不强制要求开发人员了解底层存储类型和配置。
+
+于是引入了PV（Persistent Volume），PV其实就是把Volume的配置声明部分从Pod中分离出来，PV的spec部分几乎和前面Pod的Volume定义部分是一样的由运维人员事先创建在 Kubernetes 集群里待用
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+name: nfs
+spec:
+storageClassName: manual
+capacity:
+    storage: 1Gi
+accessModes:
+    - ReadWriteMany
+nfs:
+    server: 10.244.1.4
+    path: "/"
+```
+
+有了PV，在Pod中就可以不用再定义Volume的配置了，**直接引用**即可。但是这没有解决Volume定义的第二个问题，存储系统通常由运维人员管理，开发人员并不知道底层存储配置，也就很难去定义好PV。为了解决这个问题，引入了PVC（Persistent Volume Claim），声明与消费分离，开发与运维责任分离。
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+labels:
+    role: web-frontend
+spec:
+containers:
+- name: web
+    image: nginx
+    ports:
+    - name: web
+        containerPort: 80
+    volumeMounts:
+        - name: nfs
+        mountPath: "/usr/share/nginx/html"
+volumes:
+- name: nfs
+    persistentVolumeClaim:
+    claimName: nfs
+```
+
+运维人员负责存储管理，可以事先根据存储配置定义好PV，而开发人员无需了解底层存储配置，只需要通过PVC声明需要的存储类型、大小、访问模式等需求即可，然后就可以在Pod中引用PVC，完全不用关心底层存储细节。
+
+汇总一下：**不想和Pod定义写在一起**。所以定义一个kind=PV 的Kubernetes Object
+    1. Pod 一般有开发编写，而开发通常不懂 存储相关的配置
+    2. 每一次 编写Pod 都copy 一份 Volume 配置（对于一些分布式存储方案来说，配置非常复杂）有点浪费。
+
+感觉上，在Pod的早期，以Pod 为核心，Pod 运行所需的资源都定义在Pod yaml 中，导致Pod 越来越臃肿。后来，Kubernetes 集群中出现了一些 与Pod 生命周期不一致的资源，并单独管理。 Pod 与他们 更多是引用关系， 而不是共生 关系了。 
+
+### Persistent Volume（PV）和 Persistent Volume Claim（PVC）
 
 ![](/public/upload/kubernetes/k8s_pvc.jpg)
 
-||Volume|Persistent Volume|
-|---|---|---|
-|持久性|有可能被 kubelet 清理掉，也不能被“迁移”到其他节点|不会因为容器的删除而被清理掉，也不会跟当前的宿主机绑定|
-|依赖||依赖远程文件存储比如NFS、GlusterFS<br>远程块存储（比如，公有云提供的远程磁盘）|
-|载体|宿主机上的目录|宿主机上的目录，该目录同时还是一个远程文件存储比如NFS目录的挂载点|
 
 [一文读懂 K8s 持久化存储流程](https://mp.weixin.qq.com/s/jpopq16BOA_vrnLmejwEdQ)
 
@@ -52,121 +131,6 @@ PVC 和 PV 的设计，其实跟“面向对象”的思想完全一致。PVC �
 ||确定Node后，为Node挂载存储设备 ==> <br>Pod 为Node 带了一份“嫁妆”|能调度到Node上，说明Node本身的CPU和内存够用|
 ||完全是 Kubernetes 项目自己负责管理的<br>runtime 只知道mount 本地的一个目录| 容器操作基本委托给runtime|
 
-
-
-PV 对象是由运维人员事先创建在 Kubernetes 集群里待用的
-
-  apiVersion: v1
-  kind: PersistentVolume
-  metadata:
-    name: nfs
-  spec:
-    storageClassName: manual
-    capacity:
-      storage: 1Gi
-    accessModes:
-      - ReadWriteMany
-    nfs:
-      server: 10.244.1.4
-      path: "/"
-
-PVC 对象通常由开发人员创建，描述的是 Pod 所希望使用的持久化存储的属性。
-
-  apiVersion: v1
-  kind: Pod
-  metadata:
-    labels:
-      role: web-frontend
-  spec:
-    containers:
-    - name: web
-      image: nginx
-      ports:
-        - name: web
-          containerPort: 80
-      volumeMounts:
-          - name: nfs
-            mountPath: "/usr/share/nginx/html"
-    volumes:
-    - name: nfs
-      persistentVolumeClaim:
-        claimName: nfs
-
-在 Kubernetes 中，实际上存在着一个专门处理持久化存储的控制器，叫作 Volume Controller。这个Volume Controller 维护着多个控制循环，其中有一个循环，扮演的就是撮合 PV 和 PVC 的“红娘”的角色。它的名字叫作 PersistentVolumeController
-
-
-### Dynamic Provision
-
-## Types of Volumes
-
-目前支持三种类型
-
-### EmptyDir（仅container或container之间使用）
-
-An EmptyDir volume is created when a Pod is bound to a Node. It is initially empty, when the first Container command starts. Containers in the same pod can all read and write the same files in the EmptyDir（这是pod之间信息共享的另一种方式）. When a Pod is unbound, the data in the EmptyDir is deleted forever.
-
-Some uses for an EmptyDir are:
-
-- scratch space, such as for a disk-based mergesort or checkpointing a long computation.
-- a directory that a content-manager container fills with data while a webserver container serves the data.
-Currently, the user cannot control what kind of media is used for an EmptyDir. If the Kubelet is configured to use a disk drive, then all EmptyDirectories will be created on that disk drive. In the future, it is expected that Pods can control whether the EmptyDir is on a disk drive, SSD, or tmpfs.
-
-### HostDir（和主机共同使用某个目录）
-
-A Volume with a HostDir property allows access to files on the current node.
-
-Some uses for a HostDir are:
-
-- running a container that needs access to Docker internals; use a HostDir of /var/lib/docker.
-- running cAdvisor in a container; use a HostDir of /dev/cgroups.
-
-Watch out when using this type of volume, because:
-
-- pods with identical configuration (such as created from a podTemplate) may behave differently on different nodes due to different files on different nodes.
-- When Kubernetes adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostDir.
-
-## Sample
-
-### EmptyDir
-
-    apiVersion: "v1beta1"
-    id: "share-apache2-controller"
-    kind: "ReplicationController"
-    desiredState:
-      replicas: 1
-      replicaSelector:
-        name: "share-apache2"
-      podTemplate:
-        desiredState:
-          manifest:
-            version: "v1beta1"
-            id: "share-apache2"
-            containers:
-              - name: "share-apache2-1"
-                image: "docker-registry.sh/myapp"
-                ports:
-                  - containerPort: 8080
-                volumeMounts:
-                  - name: data
-                    mountPath: /data
-              - name: "share-apache2-2"
-                image: "docker-registry.sh/apache2"
-                ports:
-                  - containerPort: 80
-                volumeMounts:
-                  - name: data
-                    mountPath: /data
-            volumes:
-              - name: data
-                source:
-                  emptyDir: {}
-        labels:
-          name: "share-apache2"
-    labels:
-      name: "share-apache2"
-      
-此时，share-apache2-1 container对`/data`目录所做操作都将反映到 share-apache2-2的`/data`目录中。
-
 ## K8s 持久化存储流程
 
 [一文读懂 K8s 持久化存储流程](https://mp.weixin.qq.com/s/jpopq16BOA_vrnLmejwEdQ)
@@ -182,7 +146,15 @@ Watch out when using this type of volume, because:
 5. 在 Worker 节点上，Kubelet 中的 Volume Manager 等待存储设备挂接完成，并通过 Volume Plugin 将设备挂载到全局目录：`/var/lib/kubelet/pods/[pod uid]/volumes/kubernetes.io~iscsi/[PV name]`（以 iscsi 为例）；
 6. Kubelet 通过 Docker 启动 Pod 的 Containers，用 bind mount 方式将已挂载到本地全局目录的卷映射到容器中。
 
+在 Kubernetes 中，实际上存在着一个专门处理持久化存储的控制器，叫作 Volume Controller。这个Volume Controller 维护着多个控制循环，其中有一个循环，扮演的就是撮合 PV 和 PVC 的“红娘”的角色。它的名字叫作 PersistentVolumeController
+
 ## CSI
+
+Kubernetes存储方案发展过程概述
+
+1. 最开始是通过Volume Plugin实现集成外部存储系统，即不同的存储系统对应不同的Volume Plugin。Volume Plugin实现代码全都放在了Kubernetes主干代码中（in-tree)，也就是说这些插件与核心Kubernetes二进制文件一起链接、编译、构建和发布。
+2. 从1.8开始，Kubernetes停止往Kubernetes代码中增加新的存储支持。从1.2开始，推出了一种新的插件形式支持外部存储系统，即FlexVolume。FlexVolume类似于CNI插件，通过外部脚本集成外部存储接口，这些脚本默认放在`/usr/libexec/kubernetes/kubelet-plugins/volume/exec/`，需要安装到所有Node节点上。
+3. 从1.9开始又引入了Container Storage Interface（CSI）容器存储接口
 
 ![](/public/upload/kubernetes/k8s_csi.png)
 
@@ -193,7 +165,8 @@ CSI 的设计思想，把插件的职责从“两阶段处理”，扩展成了P
 一个 CSI 插件只有一个二进制文件，但它会以 gRPC 的方式对外提供三个服务（gRPC Service），分别叫作：CSI Identity、CSI Controller 和 CSI Node。
 
 
-
-![](/public/upload/kubernetes/kubernetes_object.png)
+1. Identity Service用于返回一些插件信息；
+2. Controller Service实现Volume的CURD操作；
+3. Node Service运行在所有的Node节点，用于实现把Volume挂载在当前Node节点的指定目录，该服务会监听一个Socket，controller通过这个Socket进行通信，可以参考官方提供的样例CSI Hostpath driver Sample[2]。
 
 
