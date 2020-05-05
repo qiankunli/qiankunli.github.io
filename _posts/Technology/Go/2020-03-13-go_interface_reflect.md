@@ -45,6 +45,14 @@ You must do your best to understand what could change and use interfaces to deco
 1. 如果类型具备“原始的本质”，也就是说它的成员都是由 Go 语言里内置的原始类型，如字符串，整型值等，那就定义值接收者类型的方法。像内置的引用类型，如 slice，map，interface，channel，这些类型比较特殊，声明他们的时候，实际上是创建了一个 header， 对于他们也是直接定义值接收者类型的方法。这样，调用函数时，是直接 copy 了这些类型的 header，而 header 本身就是为复制设计的。
 2. 如果类型具备非原始的本质，不能被安全地复制，这种类型总是应该被共享，那就定义指针接收者的方法。比如 go 源码里的文件结构体（struct File）就不应该被复制，应该只有一份实体。
 
+在一些框架代码中，会将指针接收者命名为 this，很有感觉
+
+```go
+func (this *Person)GetFullName() string{
+    return fmt.Println("%s %s",this.Name,this.Surname)
+}
+```
+
 ## interface 底层实现
 
 ![](/public/upload/go/go_interface_object.png)

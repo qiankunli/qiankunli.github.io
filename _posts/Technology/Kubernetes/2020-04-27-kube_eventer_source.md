@@ -4,11 +4,11 @@ layout: post
 title: Kubernetes events学习及应用
 category: 架构
 tags: Kubernetes
-keywords: CRI Kubernetes
+keywords:  Kubernetes event
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -130,4 +130,79 @@ func main() {
 	go startHTTPServer()
 	<-quitChannel
 }
+```
+
+SourceFactory.BuildAll ==> SourceFactory.Build ==> NewKubernetesSource  ==> KubernetesEventSource.watch作为生产者 通过apiServer 的event api 往KubernetesEventSource.localEventsBuffer  塞event
+
+```go
+func NewKubernetesSource(uri *url.URL) (*KubernetesEventSource, error) {
+	kubeConfig, err := kubeconfig.GetKubeClientConfig(uri)
+	kubeClient, err := kubeclient.NewForConfig(kubeConfig)
+	eventClient := kubeClient.CoreV1().Events(kubeapi.NamespaceAll)
+	result := KubernetesEventSource{
+		localEventsBuffer: make(chan *kubeapi.Event, LocalEventsBufferSize),
+		stopChannel:       make(chan struct{}),
+		eventClient:       eventClient,
+	}
+	go result.watch()
+	return &result, nil
+}
+func (this *KubernetesEventSource) watch() {
+	// Outer loop, for reconnections.
+	for {
+		events, err := this.eventClient.List(metav1.ListOptions{})
+		// Do not write old events.
+		resourceVersion := events.ResourceVersion
+		watcher, err := this.eventClient.Watch(
+			metav1.ListOptions{
+				Watch:           true,
+				ResourceVersion: resourceVersion})
+		watchChannel := watcher.ResultChan()
+		// Inner loop, for update processing.
+	inner_loop:
+		for {
+			select {
+			case watchUpdate, ok := <-watchChannel:
+				if event, ok := watchUpdate.Object.(*kubeapi.Event); ok {
+                    ...
+                    this.localEventsBuffer <- event:
+                    ...
+				}
+			case <-this.stopChannel:
+				klog.Infof("Event watching stopped")
+				return
+			}
+		}
+	}
+}
+```
+realManager.Start ==> realManager.Housekeep ==> realManager.housekeep ==> KubernetesEventSource.GetNewEvents 作为消费者 从KubernetesEventSource.localEventsBuffer 取出event，触发EventSink.ExportEvents 来执行。 
+
+```go
+func (this *KubernetesEventSource) GetNewEvents() *core.EventBatch {
+	startTime := time.Now()
+	defer func() {
+		lastEventTimestamp.Set(float64(time.Now().Unix()))
+		scrapEventsDuration.Observe(float64(time.Since(startTime)) / float64(time.Millisecond))
+	}()
+	result := core.EventBatch{
+		Timestamp: time.Now(),
+		Events:    []*kubeapi.Event{},
+	}
+	// Get all data from the buffer.
+event_loop:
+	for {
+		select {
+		case event := <-this.localEventsBuffer:
+			result.Events = append(result.Events, event)
+		default:
+			break event_loop
+		}
+	}
+
+	totalEventsNum.Add(float64(len(result.Events)))
+
+	return &result
+}
+
 ```
