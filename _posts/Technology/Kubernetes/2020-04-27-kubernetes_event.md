@@ -57,11 +57,17 @@ Events 量非常大，只能存在一个很短的时间，很有必要将它们e
 
 ![](/public/upload/kubernetes/kubernetes_event_monitor_2.png)
 
-## 源码包
+## 获取event 数据
 
-[AliyunContainerService/kube-eventer](https://github.com/AliyunContainerService/kube-eventer)
+因为Event 一般会暂存在 apiserver，因此想要获取到 k8s 的event 数据，有多种方式
 
-同类的 [opsgenie/kubernetes-event-exporter](https://github.com/opsgenie/kubernetes-event-exporter)
+1. 通过client-go 的informer 机制监听 event 数据，[opsgenie/kubernetes-event-exporter](https://github.com/opsgenie/kubernetes-event-exporter) 即使用该方式
+2. 直接使用kubeClient api `kubeClient.CoreV1().Events`，[AliyunContainerService/kube-eventer](https://github.com/AliyunContainerService/kube-eventer) 即使用该方式
+ 
+
+## kube-eventer
+
+### 源码包
 
 ```
 kube-eventer
@@ -78,7 +84,7 @@ kube-eventer
     eventer.go  // main入口
 ```
 
-## 核心概念
+### 核心概念
 
 ![](/public/upload/kubernetes/kube_eventer.png)
 
@@ -109,8 +115,9 @@ type EventSink interface {
 }
 ```
 
-## 启动
+### event 读写
 
+启动
 ```go
 // kube-eventer/eventer.go
 func main() {
@@ -204,5 +211,30 @@ event_loop:
 
 	return &result
 }
+```
 
+## kubernetes-event-exporter
+
+主要是 EventWatcher 和 Engine  两个角色的交互，watcher 拿到事件 通过Engine 传递给Sink 消费。
+
+![](/public/upload/kubernetes/kubernetes_event_exporter.png)
+
+构造watcher时，初始化了 k8s apiclient ，进而构造了event Informer. watcher 本身实现了 ResourceEventHandler（onAdd/onUpdate/onDelete）
+
+```go
+func NewEventWatcher(config *rest.Config, fn EventHandler) *EventWatcher {
+	clientset := kubernetes.NewForConfigOrDie(config)
+	factory := informers.NewSharedInformerFactory(clientset, 0)
+	informer := factory.Core().V1().Events().Informer()
+
+	watcher := &EventWatcher{
+		informer:        informer,
+		stopper:         make(chan struct{}),
+		labelCache:      NewLabelCache(config),
+		annotationCache: NewAnnotationCache(config),
+		fn:              fn,
+	}
+	informer.AddEventHandler(watcher)
+	return watcher
+}
 ```
