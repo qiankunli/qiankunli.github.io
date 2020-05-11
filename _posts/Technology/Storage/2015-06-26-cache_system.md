@@ -249,3 +249,7 @@ cdn位于站点和用户之间， 也是一种变相的缓存系统。[看不见
 当节点数较少时，可能会出现节点在哈希环上分布不均匀的情况。这样每个节点实际占据环上的区间大小不一，最终导致业务对节点的访问冷热不均。这个问题可以通过引入更多的虚拟节点来解决：就是对每一个服务器节点计算多个哈希值，在每个计算结果位置上，都放置一个虚拟节点，并将虚拟节点映射到实际节点。比如，可以在主机名的后面增加编号，分别计算 “Node-A-01”“Node-A-02”“Node-B-01”“Node-B-02”“Node-C-01”“Node-C-02”的哈希值，于是形成 6 个虚拟节点：
 
 ![](/public/upload/data/consistent_cache_virtual_node.jpg)
+
+一致性哈希实现
+
+1. [ConsistentHash](https://github.com/bootsrc/flycache/blob/master/flycache-core/src/main/java/io/github/flylib/flycache/hash/ConsistentHash.java) 哈希环由一个 TreeMap 表示，对输入的 key 使用 `TreeMap.ceilingKey(key)` 找到最近的节点
