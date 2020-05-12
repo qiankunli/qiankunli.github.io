@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: mecha 理念学习
+title: mecha 架构学习
 category: 架构
 tags: Architecture
 keywords: system design principle 
@@ -26,7 +26,7 @@ rpc 有mesh，db、mq、redis 都搞mesh，mesh 的未来一定不是更多的si
 
 ![](/public/upload/architecture/four_needs_of_app.jpg)
 
-单机时代，我们习惯性认为 应用 ==> systemcall ==> 应用。  但实际上，换个视角（以应用为中心），应用 对外的需求由systemcall 抽象，最终由内核提供服务。那么在分布式时代，就缺一个类似systemcall 的分布式原语，把分布式的能力 统一标准化之后 给到应用。
+单机时代，我们习惯性认为 应用 ==> systemcall ==> 内核。  但实际上，换个视角（以应用为中心），应用 对外的需求由systemcall 抽象，最终由内核提供服务。那么在分布式时代，就缺一个类似systemcall 的分布式原语，把分布式的能力 统一标准化之后 给到应用。
 
 ![](/public/upload/architecture/mecha_overview.png)
 
@@ -56,7 +56,7 @@ public interface DaprClient {
 }
 ```
 
-## Mecha 架构中
+## Mecha 架构
 
 ![](/public/upload/architecture/mecha_intro.png)
 
