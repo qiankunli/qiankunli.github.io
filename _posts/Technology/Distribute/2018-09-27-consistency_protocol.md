@@ -45,6 +45,8 @@ keywords: 一致性协议
 
 在《区块链核心算法解析》中，则采用另一种描述方式：对于一组节点，如果所有节点均以相同的顺序执行一个（可能是无限的）命令序列c1,c2,c3...，则这组节点 实现了状态复制。
 
+[《In Search of an Understandable Consensus Algorithm》](https://raft.github.io/raft.pdf)Consensus algorithms allow a collection of machines to work as a coherent group that can survive the fail- ures of some of its members. Because of this, they play a key role in building reliable large-scale software systems.
+
 ### 一致性算法
 
 下面看下 《区块链核心算法解析》 中的思维线条
