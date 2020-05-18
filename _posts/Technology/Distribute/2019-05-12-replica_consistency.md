@@ -17,39 +17,24 @@ keywords: 一致性协议
 
 ![](/public/upload/distribute/consistency.png)
 
-《软件架构设计》有一个关于Paxos、Raft和Zab 的分析对比，包括
-
-1. 复制模型
-2. 写入方式：多点/单点写入， 乱序/顺序提交
-3. 同步方向：双向/单向同步
-4. 心跳检测：有/无
-
-我们使用“一致性”这个字眼太频繁了，国外的 Consistency 被称为一致性、Consensus 也唤作一致性，甚至是 Coherence 都翻译成一致性。比如大名鼎鼎的 Raft 算法和 Paxos 算法。了解它的人都知道它们的作用是在分布式系统中让多个节点就某个决定达成共识，都属于 Consensus Algorithm 一族
-
-## 如何在多节点间确定某变量的值
-
-### basic-paxos——不断循环的2PC
-
-上文所说的“日志位置” 在这里是一个Proposer生成的自增ID，不需要全局有序。
+## basic-paxos——不断循环的2PC
 
 每个Node 同时充当了两个角色：Proposer和Acceptor，在实现过程中， 两个角色在同一个进程里面。专门提一个Proposer概念（只是一个角色概念）的好处是：对业务代码没有侵入性，也就是说，我们不需要在业务代码中实现算法逻辑，就可以像使用数据库一样访问后端的数据。
 
 ![](/public/upload/distribute/paxos_role.jpg)
-
 
 ||proposer|acceptor||
 |---|---|---|---|
 |prepare阶段|proposer 生成全局唯一且自增的proposal id，广播propose<br>只广播proposal id即可，无需value|Acceptor 收到 propose 后，做出“两个承诺，一个应答”<br>1. 不再应答 proposal id **小于等于**当前请求的propose<br>2. 不再应答 proposal id **小于** 当前请求的 accept<br>3. 若是符合应答条件，返回已经accept 过的提案中proposal id最大的那个 propose 的value 和 proposal id， 没有则返回空值|proposer 通过prepare请求来发现之前被大多数节点通过的提案|
 |accept阶段|提案生成规则<br>1. 从acceptor 应答中选择proposalid 最大的value 作为本次的提案<br>2. 如果所有的应答的天value为空，则可以自己决定value|在不违背“两个承诺”的情况下，持久化当前的proposal id和value|
 
-Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0开始，陷入“不断”循环，即“活锁”问题。
 
 **Proposer 之间并不直接交互**，Acceptor除了一个“存储”的作用外，还有一个信息转发的作用。**从Acceptor的视角看**，basic-paxos 及 multi-paxos 选举过程是协商一个值，每个Proposer提出的value 都可能不一样。所以第一阶段，先经由Acceptor将**已提交的**ProposerId 最大的value 尽可能扩散到Proposer（即决定哪个Proposer 是“意见领袖”）。第二阶段，再将“多数意见”形成“决议”（Acceptor持久化value）
 
 目前比较好的通俗解释，以贿选来描述 [如何浅显易懂地解说 Paxos 的算法？ - GRAYLAMB的回答 - 知乎](https://www.zhihu.com/question/19787937/answer/107750652)。
 
 
-### multi-paxos
+## multi-paxos
 
 《分布式协议与算法实战》Multi-Paxos 是一种思想，不是算法，缺失实现算法的必须编程细节。而 Multi-Paxos 算法是一个统称，它是指基于 Multi-Paxos 思想，通过多个 Basic Paxos 实例实现一系列值的共识的算法（比如 Chubby 的 Multi-Paxos 实现、Raft 算法等）。
 
@@ -60,7 +45,25 @@ Paxos 是一个“不断循环”的2pc，两个阶段都可能会失败，从0�
 3. 在 Chubby 中实现了兰伯特提到的，“当领导者处于稳定状态时，省掉准备阶段，直接进入接受阶段”这个优化机制，减少非必须的协商步骤来提升性能。
 4. 在 Chubby 中，为了实现了强一致性，所有的读请求和写请求都由主节点来处理。也就是说，只要数据写入成功，之后所有的客户端读到的数据都是一致的。
 
-### Raft
+## Raft
+
+建议细读 [《In Search of an Understandable Consensus Algorithm》](https://raft.github.io/raft.pdf) 论文，说清楚好多事情。 
+
+通过选出leader，Raft 将一致性问题分解成为三个相对独立的子问题：
+
+1. leader选取， 在一个leader宕机之后必须要选取一个新的leader
+2. 日志复制，leader必须从client接收日志然后复制到集群中的其他服务器，并且强制要求其他服务器的日志保持和自己相同
+3. 安全性（Safety）
+
+针对 正场情况 和 leader 崩溃后的恢复场景 定义了一系列规则，最终达到一致性的要求。
+
+||正常情况|leader崩溃后的恢复|
+|---|---|---|
+|Leader 选举|参见论文|参见论文|
+|日志复制|参见论文|参见论文|
+|安全性||选举限制<br>提交之前任期的日志条目|
+
+### Raft 和 Paxos
 
 Raft 算法属于 Multi-Paxos 算法，它是在兰伯特 Multi-Paxos 思想的基础上，做了一些简化和限制，比如增加了日志必须是连续的，只支持领导者、跟随者和候选人三种状态，在理解和算法实现上都相对容易许多。Raft 算法是现在分布式系统开发首选的共识算法。绝大多数选用 Paxos 算法的系统（比如 Cubby、Spanner）都是在 Raft 算法发布前开发的，当时没得选；而全新的系统大多选择了 Raft 算法（比如 Etcd、Consul、CockroachDB）。
 
@@ -70,11 +73,15 @@ Raft 算法属于 Multi-Paxos 算法，它是在兰伯特 Multi-Paxos 思想的�
 
 [《In Search of an Understandable Consensus Algorithm》](https://raft.github.io/raft.pdf)单决策（Single-decree）Paxos 是晦涩且微妙的：它被划分为两个没有简单直观解释的阶段，并且难以独立理解。正因为如此，它不能很直观的让我们知道为什么单一决策协议能够工作。为多决策 Paxos 设计的规则又添加了额外的复杂性和精巧性。我们相信多决策问题能够分解为其它更直观的方式。PS： 现实问题是多决策的，paxos 单决策出现在 多决策之前，彼时是以单决策的视角来考虑问题（在单决策场景下，选主不是很重要），又简单的以为将单决策 组合起来就可以支持 多决策。 
 
+Raft 和 Paxos 最大的不同之处就在于 Raft 的**强领导特性**：Raft 使用leader选举作为一致性协议里必不可少的部分，**并且将尽可能多的功能集中到了leader身上**。这样就可以使得算法更加容易理解。例如，在 Paxos 中，leader选举和基本的一致性协议是正交的：leader选举仅仅是性能优化的手段，而且不是一致性所必须要求的。但是，这样就增加了多余的机制：Paxos 同时包含了针对基本一致性要求的两阶段提交协议和针对leader选举的独立的机制。相比较而言，Raft 就直接将leader选举纳入到一致性算法中，并作为两阶段一致性的第一步。这样就减少了很多机制。
+
+### Leader 选举
+
 ![](/public/upload/distribute/raft_copy_log.png)
 
 Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader的地位，**把整个协议可以清楚的分割成两个部分**，并利用日志的连续性做了一些简化：
 
-1. Leader在时。由Leader向Follower同步日志
+1. Leader在时。leader来处理所有来自客户端的请求，由Leader向Follower同步日志 ==> **日志流动是单向的**
 2. Leader挂掉了，选一个新Leader
     1. 在初始状态下，集群中所有的节点都是跟随者的状态。
     2. Raft 算法实现了随机超时时间的特性。也就是说，每个节点等待领导者节点心跳信息的超时时间间隔是随机的。等待超时时间最小的节点（以下称节点 A），它会最先因为没有等到领导者的心跳信息，发生超时。
@@ -98,35 +105,13 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 1. 跟随者等待领导者心跳信息超时的时间间隔，是随机的；
 2. 如果候选人在一个随机时间间隔内，没有赢得过半票数，那么选举无效了，然后候选人发起新一轮的选举，也就是说，等待选举超时的时间间隔，是随机的。
 
-## 如何实现各节点日志的一致
+### 日志复制
 
-[Raft 日志复制 Log replication](https://www.jianshu.com/p/b28e73eefa88)简单来说，**保证复制日志相同，才是分布式一致性算法的最终任务**。Leader 选举只是为了保证日志复制相同的辅助工作。实际上，在更为学术的 Paxos 里面，是没有 leader 的概念的（大部分 Paxos 的实现通常会加入 leader 机制提高性能）。
+一旦选出了leader，它就开始接收客户端的请求。每一个客户端请求都包含一条需要被复制状态机（replicated state machine）执行的命令。leader把这条命令作为新的日志条目加入到它的日志中去，然后并行的向其他服务器发起 AppendEntries RPC ，要求其它服务器复制这个条目。当这个条目被安全的复制之后，leader会将这个条目应用到它的状态机中并且会向客户端返回执行结果。如果追随者崩溃了或者运行缓慢或者是网络丢包了，leader会无限的重试 AppendEntries RPC（甚至在它向客户端响应之后）直到所有的追随者最终存储了所有的日志条目。
 
-### 复制模型
+一旦被leader创建的条目已经复制到了大多数的服务器上，这个条目就称为可被提交的（commited）
 
-![](/public/upload/distribute/consistency_copy_log.png)
-
-假设KV集群有三台机器，机器之间相互通信，把自己的值传播给其他机器，三个客户端并发的向集群发送三个请求，值X 应该是多少？是多少没关系，135都行，向一个client返回成功、其它client返回失败（或实际值）也可，关键是Node1、Node2、Node3 一致。
-
-||Replicated State Machine|Primary-Backup System|
-|---|---|---|
-|中文|复制状态机|
-|应用的协议|Paxos、Raft|Zab|
-|mysql binlog的数据格式|statement<br>存储的是原始的sql语句|raw<br>数据表的变化数据|
-|redis持久化的两种方式|AOF<br>持久化的是客户端的set/incr/decr命令|RDB<br>持久化的是内存的快照|
-|数据同步次数|客户端的写请求都要在节点之间同步|有时可以合并|
-
-### Replicated State Machine
-
-![](/public/upload/distribute/replica_consistency_evolution.jpeg)
-
-|共识算法拆解|含义|basic-paxos|multi-paxos|raft|kafka|
-|---|---|---|---|---|---|
-|选主||无|node分为Proposer和Acceptor|有<br>random timeout approach|有专门的coordinator|
-|日志复制||无|允许并发写log|请求顺序提交|
-|安全性|哪些follower有资格成为leader?<br>哪些日志记录被认为是commited?|无|任意|只有最新log的node才能成为leader|
-
-以Raft为例，**副本数据是以日志的形式存在的**，日志是由日志项组成，日志项是一种数据格式，它主要包含用户指定的数据，也就是指令（Command），还包含一些附加信息，比如索引值（Log index）、任期编号（Term）。
+**副本数据是以日志的形式存在的**，日志是由日志项组成，日志项是一种数据格式，它主要包含用户指定的数据，也就是指令（Command），还包含一些附加信息，比如索引值（Log index）、任期编号（Term）。
 
 1. 指令：一条由客户端请求指定的、状态机需要执行的指令。你可以将指令理解成客户端指定的数据。
 2. 索引值：日志项对应的整数索引值。它其实就是用来标识日志项的，是一个连续的、单调递增的整数号码。
@@ -148,6 +133,20 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 跟随者中的不一致日志项会被领导者的日志覆盖，而且领导者从来不会覆盖或者删除自己的日志。
 
 ## 补充
+
+### 复制模型
+
+![](/public/upload/distribute/consistency_copy_log.png)
+
+假设KV集群有三台机器，机器之间相互通信，把自己的值传播给其他机器，三个客户端并发的向集群发送三个请求，值X 应该是多少？是多少没关系，135都行，向一个client返回成功、其它client返回失败（或实际值）也可，关键是Node1、Node2、Node3 一致。
+
+||Replicated State Machine|Primary-Backup System|
+|---|---|---|
+|中文|复制状态机|
+|应用的协议|Paxos、Raft|Zab|
+|mysql binlog的数据格式|statement<br>存储的是原始的sql语句|raw<br>数据表的变化数据|
+|redis持久化的两种方式|AOF<br>持久化的是客户端的set/incr/decr命令|RDB<br>持久化的是内存的快照|
+|数据同步次数|客户端的写请求都要在节点之间同步|有时可以合并|
 
 ### 如何理解ProposerId——逻辑锁
 
