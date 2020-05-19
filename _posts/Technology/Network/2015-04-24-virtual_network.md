@@ -21,12 +21,15 @@ keywords: Docker
 1. 虚拟设备  一般伴随网络驱动
 2. 虚拟网路
 
-## vlan 
+## vlan
 
-[VLAN是二层技术还是三层技术-车小胖的回答知乎]
-(https://www.zhihu.com/question/52278720/answer/140914508)先用生活里的例子来比喻一下什么是VLAN，以及VLAN解决哪些问题。在魔都中心城区，经常有一些大房子被用来群租，有时大客厅也会放几张床用于出租，睡在客厅里的人肯定不爽的，因为有打呼噜的、有磨牙的、有梦游的、有说梦话的，一地鸡毛。为了克服以上的互相干扰，房东将客厅改造成若干个小房间，小房间还有门锁，这样每个房间就有了自己的私密空间，又可以有一定的安全性，至少贵重的物品可以放在房间里不怕别人拿错了。
+[VLAN是二层技术还是三层技术-车小胖的回答知乎](https://www.zhihu.com/question/52278720/answer/140914508)先用生活里的例子来比喻一下什么是VLAN，以及VLAN解决哪些问题。在魔都中心城区，经常有一些大房子被用来群租，有时大客厅也会放几张床用于出租，睡在客厅里的人肯定不爽的，因为有打呼噜的、有磨牙的、有梦游的、有说梦话的，一地鸡毛。为了克服以上的互相干扰，房东将客厅改造成若干个小房间，小房间还有门锁，这样每个房间就有了自己的私密空间，又可以有一定的安全性，至少贵重的物品可以放在房间里不怕别人拿错了。
 
 **隔断间**形象的解释了划分vlan的理由，一个vlan一个广播域。我们将大广播域所对应的网段10.1.0.0/16分割成255个，那它们所对应的网段为10.1.1.0/24、10.1.2.0/24、10.1.3.0/24…10.1.255.0/24，它们对应的VLAN ID为1、2、3…255，这样每个广播域理论可以容纳255个终端，广播冲突的影响指数下降。
+
+以太网/Ethernet 对vlan 的支持
+
+![](/public/upload/network/vlan_vlanId.png)
 
 ### vlan 划分
 
@@ -73,9 +76,14 @@ keywords: Docker
 	* VXLAN evolved as a Data Center technology，所以分析vxlan 优势时一切以 数据中心的需求为出发点。一个超大型数据中心，交换机怎么联都是有技术含量的 [What is a Networking Switch Fabric](https://www.sdxcentral.com/sdn/definitions/what-is-networking-switch-fabric/)
 	* vlan 4096 数量限制 不是问题
 	* TOR（Top Of Rack）交换机MAC地址表限制。数据中心的虚拟化给网络设备带来的最直接影响就是：之前TOR（Top Of Rack）交换机的一个端口连接一个物理主机对应一个MAC地址，但现在交换机的一个端口虽然还是连接一个物理主机但是可能进而连接几十个甚至上百个虚拟机和相应数量的MAC地址。
-	* VTEP 在微服务领域有点像现在的service mesh，一个vm/container 是一个微服务，微服务只需和sevice mesh sidecar 沟通
+	* **VTEP 在微服务领域有点像现在的service mesh**，一个vm/container 是一个微服务，微服务只需和sevice mesh sidecar 沟通
 
-![](/public/upload/basic/datacenter_network.png)
+
+**使用报文解耦二三层**
+
+![](/public/upload/network/vxlan_vtep.png)
+
+[为什么集群需要 Overlay 网络](https://mp.weixin.qq.com/s/x7jLgThS2uwoPJcqsJE29w)Overlay 网络其实与软件定义网络（Software-defined networking、SDN）密切相关，而 SDN 引入了数据平面和控制平面，其中**数据平面负责转发数据，而控制平面负责计算并分发转发表**。VxLAN 的 RFC7348 中只定义了数据平面的内容，由该技术组成的网络可以通过传统的自学习模式学习网络中的 MAC 与 ARP 表项，但是在大规模的集群中，我们仍然需要引入控制平面分发路由转发表。
 
 ## macvlan 和 ipvlan
 
