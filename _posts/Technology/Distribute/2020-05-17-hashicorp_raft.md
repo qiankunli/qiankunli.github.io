@@ -125,6 +125,15 @@ runFollower ==> processRPC ==> appendEntries
 2. 将新日志项存放在本地
 3. 根据领导者最新提交的日志项索引值，来计算当前需要被应用的日志项，并应用到本地状态机。
 
+## 集群变更
+
+1. 集群最开始的时候，只有一个节点，我们让第一个节点通过 bootstrap 的方式启动，它启动后成为领导者：`raftNode.BootstrapCluster(configuration)`
+2. 后续的节点在启动的时候，可以通过向第一个节点发送加入集群的请求，然后加入到集群中。
+    1. `raftNode.AddVoter(id,  addr, prevIndex, timeout)`一般只需要设置服务器 ID 信息和地址信息 ，其他参数使用默认值 0
+    2. AddNonvoter()，将一个节点加入到集群中，但不赋予它投票权。这个函数一般不用到
+3. 移除集群节点，在领导者节点上运行`raftNode.RemoveServer(id, prevIndex, timeout)`
+4. 可以通过 Raft.Leader() 函数，查看当前领导者的地址信息，也可以通过 Raft.State() 函数，查看当前节点的状态，是跟随者、候选人，还是领导者。
+
 ## InfluxDB 企业版的架构
 
 InfluxDB 企业版是由 META 节点和 DATA 节点 2 个逻辑单元组成的
