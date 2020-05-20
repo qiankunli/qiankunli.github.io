@@ -45,7 +45,25 @@ raft
 
 ![](/public/upload/distribute/raft_object.png)
 
-在 Hashicorp Raft 中，可以通过 NewRaft() 函数来创建 Raft 节点。**跟随者、候选人、领导者 3 种节点状态都有分别对应的功能函数**
+在 Hashicorp Raft 中，可以通过 NewRaft() 函数来创建 Raft 节点。
+
+```go
+func NewRaft(
+        conf *Config, 
+        fsm FSM, 
+        logs LogStore, 
+        stable StableStore, 
+        snaps SnapshotStore, 
+        trans Transport) (*Raft, error)
+```
+1. Config（节点的配置信息）
+2. FSM（有限状态机）
+3. LogStore（用来存储 Raft 的日志），可以用raft-boltdb来实现底层存储，raft-boltdb 是 Hashicorp 团队专门为 Hashicorp Raft 持久化存储而开发设计的
+4. StableStore（稳定存储，用来存储 Raft 集群的节点信息等），比如，当前任期编号、最新投票时的任期编号等
+5. SnapshotStore（快照存储，用来存储节点的快照信息），也就是压缩后的日志数据
+6. Transport（Raft 节点间的通信通道），节点之间需要通过这个通道来进行日志同步、领导者选举等等
+
+**跟随者、候选人、领导者 3 种节点状态都有分别对应的功能函数**
 
 ```go
 func (r *Raft) run() {
