@@ -81,13 +81,15 @@ sk_buff 是各层通用的，在应用层数据包叫 data，在 TCP 层我们�
 
 sk_buff由sk_buff_head组织
 
-	struct sk_buff_head {
-	  	struct sk_buff		* volatile next;
-	  	struct sk_buff		* volatile prev;
-		#if CONFIG_SKB_CHECK
-	  	int				magic_debug_cookie;
-		#endif
-	};
+```c
+struct sk_buff_head {
+    struct sk_buff		* volatile next;
+    struct sk_buff		* volatile prev;
+    #if CONFIG_SKB_CHECK
+    int				magic_debug_cookie;
+    #endif
+};
+```
 
 ![](/public/upload/network/sk_buff.png)
 
