@@ -156,6 +156,8 @@ runFollower ==> processRPC ==> appendEntries
 
 ## 实战——基于raft的kv系统
 
+《分布式协议与算法实践》 提供了一个简单版实现：[hanj4096/raftdb](https://github.com/hanj4096/raftdb) is a simple distributed key value store based on the Raft consensus protocol
+
 ### raft 与应用层分工
 
 ![](/public/upload/distribute/application_raft.png)
@@ -170,7 +172,7 @@ runFollower ==> processRPC ==> appendEntries
     1. default：偶尔读到旧数据。
     2. consistent：一定不会读到旧数据。
     3. stale：会读到旧数据。
-    
+
 ## InfluxDB 企业版的架构
 
 InfluxDB 企业版是由 META 节点和 DATA 节点 2 个逻辑单元组成的
