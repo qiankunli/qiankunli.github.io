@@ -15,7 +15,7 @@ keywords: 分布式系统
 
 本文主要内容 来自极客时间《分布式协议与算法实践》
 
-## 实现
+## 整体结构
 
 [hashicorp/raft](https://github.com/hashicorp/raft) 是常用的 Golang 版 Raft 算法的实现，被众多流行软件使用，如 Consul、InfluxDB、IPFS 等
 
@@ -57,7 +57,9 @@ func NewRaft(
         trans Transport) (*Raft, error)
 ```
 1. Config（节点的配置信息）
-2. FSM（有限状态机）
+2. FSM（有限状态机），raft 只是定义了一个接口，最终交给应用层实现。应用层收到 Log 后按 业务需求 还原为 引用数据保存起来。
+    1. Raft 启动时 便Raft.runFSM 起一个goroutine 从 fsmMutateCh channel 消费log
+    2. 调用流程：Raft.appendEntries ==> Raft.processLogs ==> Raft.fsmMutateCh ==> FSM.Apply
 3. LogStore（用来存储 Raft 的日志），可以用raft-boltdb来实现底层存储，raft-boltdb 是 Hashicorp 团队专门为 Hashicorp Raft 持久化存储而开发设计的
 4. StableStore（稳定存储，用来存储 Raft 集群的节点信息等），比如，当前任期编号、最新投票时的任期编号等
 5. SnapshotStore（快照存储，用来存储节点的快照信息），也就是压缩后的日志数据
@@ -152,6 +154,23 @@ runFollower ==> processRPC ==> appendEntries
 3. 移除集群节点，在领导者节点上运行`raftNode.RemoveServer(id, prevIndex, timeout)`
 4. 可以通过 Raft.Leader() 函数，查看当前领导者的地址信息，也可以通过 Raft.State() 函数，查看当前节点的状态，是跟随者、候选人，还是领导者。
 
+## 实战——基于raft的kv系统
+
+### raft 与应用层分工
+
+![](/public/upload/distribute/application_raft.png)
+
+### 读写操作
+
+1. 写操作
+    1. 跟随者接收到客户端的写请求后，拒绝处理这个请求，并将领导者的地址信息返回给客户端，然后客户端直接访问领导者节点，直到该领导者退位
+    2. 跟随者接收到客户端的写请求后，将写请求转发给领导者，并将领导者处理后的结果返回给客户端，也就是说，这时跟随者在扮演“代理”的角色。
+    一般情况下，在绝大部分的时间内（比如 Google Chubby 团队观察到的值是数天），领导者是处于稳定状态的，某个节点一直是领导者，那么引入中间节点，就会增加大量的不必要的消息和性能消耗。
+2. 读操作，在实际系统中，并不是实现了强一致性就是最好的，因为实现了强一致性，必然会限制集群的整体性能。我们可以实现多种读一致性模型，将最终的一致性选择权交给用户，让用户去选择。。比如，类似 Consul 的 3 种读一致性模型。
+    1. default：偶尔读到旧数据。
+    2. consistent：一定不会读到旧数据。
+    3. stale：会读到旧数据。
+    
 ## InfluxDB 企业版的架构
 
 InfluxDB 企业版是由 META 节点和 DATA 节点 2 个逻辑单元组成的
