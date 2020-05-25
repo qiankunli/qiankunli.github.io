@@ -17,6 +17,25 @@ keywords: reactive
 
 异步分为不同的层次，有代码/框架上的、架构上的 [不同层面的异步](http://qiankunli.github.io/2017/05/16/async_program.html)。类似的，反应式思想也分为不同的层次， 有架构层面的，代码层面的——[rxjava1——概念](http://qiankunli.github.io/2018/06/20/rxjava.html)
 
+## 20200522补充
+
+[Reactive 架构才是未来](https://mp.weixin.qq.com/s/01SQuSYkNSHQz-0cbxzh_g)
+
+![](/public/upload/reactive/reactive_overview.png)
+
+```java
+public static void main(String[] args) {
+    FluxProcessor<Integer, Integer> publisher = UnicastProcessor.create();
+    publisher.doOnNext(event -> System.out.println("receive event: " + event)).subscribe();
+    publisher.onNext(1); // print 'receive event: 1'
+    publisher.onNext(2); // print 'receive event: 2'
+}
+```
+
+笔者最近看golang的源码有一点感触：当go并发的成本非常低之后，比hashicorp raft 内部的代码 干脆以 channel 串通了。一些独立的逻辑 在启动之后 就新启 goroutine long running 了，goroutine 消费channel 发channel。即便是 web 处理也是 收到请求 发channel，接收channel 响应response。业务逻辑是通过channel 串起来的（接口就是channel）。 这就有点reactive 的意思了，怎么处理数据已经写好了，你发数据即可。
+
+坦白讲 Reactive programing 方式目前接受程度并不高。特别是使用 Java 语言开发同学，这和 Java 面向命令控制流程的编程思维方式有较大差异。
+
 ## 架构层——全面异步化：淘宝反应式架构升级探索
 
 [全面异步化：淘宝反应式架构升级探索](https://www.infoq.cn/article/2upHTmd0pOEUNmhY5-Ay)

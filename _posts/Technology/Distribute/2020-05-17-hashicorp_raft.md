@@ -57,9 +57,7 @@ func NewRaft(
         trans Transport) (*Raft, error)
 ```
 1. Config（节点的配置信息）
-2. FSM（有限状态机），raft 只是定义了一个接口，最终交给应用层实现。应用层收到 Log 后按 业务需求 还原为 引用数据保存起来。
-    1. Raft 启动时 便Raft.runFSM 起一个goroutine 从 fsmMutateCh channel 消费log
-    2. 调用流程：Raft.appendEntries ==> Raft.processLogs ==> Raft.fsmMutateCh ==> FSM.Apply
+2. FSM（有限状态机），raft 只是定义了一个接口，最终交给应用层实现。应用层收到 Log 后按 业务需求 还原为 应用数据保存起来。Raft 启动时 便Raft.runFSM 起一个goroutine 从 fsmMutateCh channel 消费log ==> FSM.Apply
 3. LogStore（用来存储 Raft 的日志），可以用raft-boltdb来实现底层存储，raft-boltdb 是 Hashicorp 团队专门为 Hashicorp Raft 持久化存储而开发设计的
 4. StableStore（稳定存储，用来存储 Raft 集群的节点信息等），比如，当前任期编号、最新投票时的任期编号等
 5. SnapshotStore（快照存储，用来存储节点的快照信息），也就是压缩后的日志数据
