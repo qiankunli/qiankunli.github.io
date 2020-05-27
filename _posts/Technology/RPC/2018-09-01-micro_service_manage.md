@@ -16,6 +16,12 @@ keywords: dubbo micro service
 
 2019.12.13补充：[What is Istio?](https://istio.io/docs/concepts/what-is-istio/)The term service mesh is used to describe the network of microservices that make up such applications and the interactions between them. As a service mesh grows in size and complexity, it can become harder to understand and manage. Its requirements can include discovery, load balancing, failure recovery, metrics, and monitoring. A service mesh also often has more complex operational requirements, like A/B testing, canary rollouts, rate limiting, access control, and end-to-end authentication. 理解: service mesh 可以理解为 the network of microservices， 随着service mesh 规模的扩大， 会产生 discovery, load balancing, failure recovery, metrics,  monitoring, A/B testing, canary rollouts, rate limiting, access control, and end-to-end authentication 等一系列问题。
 
+1. 服务注册发现
+2. 路由，流量转移。 红绿灯是一种流量控制；黑白名单也是一种流量控制
+3. 弹性能力（熔断、超时、重试）
+4. 安全
+5. 可观察性
+
 ## 整体架构
 
 ![](/public/upload/practice/micro_service_overview.png)
@@ -202,6 +208,8 @@ rpc 就好像函数调用一样，有数据有状态的往来。也就是需要�
 一个大牛开源的限流框架：[wangzheng0822/ratelimiter4j](https://github.com/wangzheng0822/ratelimiter4j)
 
 ## 微服务不是银弹
+
+20200527 补充：一些比较好的解决方法 [如何提升微服务的幸福感](https://mp.weixin.qq.com/s/y0tsSbigbRe2AyqaAIzeSQ)
 
 ### 带来的问题
 

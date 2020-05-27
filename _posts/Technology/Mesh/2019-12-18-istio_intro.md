@@ -13,66 +13,62 @@ keywords: istio
 * TOC
 {:toc}
 
-类似产品 [SOFAMesh 介绍](https://www.sofastack.tech/projects/sofa-mesh/overview/)
-
-[Istio 庖丁解牛一：组件概览](https://www.servicemesher.com/blog/istio-analysis-1/)未读
-
-[使用 Istio 实现基于 Kubernetes 的微服务应用](https://www.ibm.com/developerworks/cn/cloud/library/cl-lo-implementing-kubernetes-microservice-using-istio/index.html)
-
-[蚂蚁金服大规模微服务架构下的Service Mesh探索之路](https://www.servicemesher.com/blog/the-way-to-service-mesh-in-ant-financial/) 很不错的文章 
-
 ## 安装手感——使用istioctl安装
 
-[istio-1.4.2-linux.tar.gz](https://github.com/istio/istio/releases/download/1.4.2/istio-1.4.2-linux.tar.gz)
+github 下载istio，解压完毕后，istio-${version}/bin 下包含istioctl，用来进行istio 的安装及日常运维
 
-[Istio 1.4 部署指南](https://juejin.im/post/5e0062ae6fb9a0163a483ea5)istioctl 提供了多种安装配置文件，可以通过下面的命令查看：
+```
+$ istioctl profile list
+Istio configuration profiles:
+    default
+    demo
+    minimal
+    remote
+    sds
+```
 
-    $ istioctl profile list
-    Istio configuration profiles:
-        default
-        demo
-        minimal
-        remote
-        sds
+istio 包含多个组件，不同模式对各个组件进行了取舍
 
-istio 包含istio-citadel/istio-egressgateway/istio-galley/istio-ingressgateway/istio-nodeagent/istio-pilot/istio-policy/istio-sidecar-injector/istio-telemetry/Grafana/istio-tracing/kiali/prometheus等组件。不同模式对各个组件进行了取舍，其中 minimal 模式下，只启动了istio-pilot 一个组件。
+![](/public/upload/mesh/istio_configuration_profile.png)
+
 
 安装profile=demo的 istio
-
-    $ istioctl manifest apply --set profile=demo \
-    --set cni.enabled=true --set cni.components.cni.namespace=kube-system \
-    --set values.gateways.istio-ingressgateway.type=ClusterIP
+```
+$ istioctl manifest apply --set profile=demo \
+--set cni.enabled=true --set cni.components.cni.namespace=kube-system \
+--set values.gateways.istio-ingressgateway.type=ClusterIP
+```
 
 容器列表如下：
 
-    ➜  ~ kubectl get pods -n istio-system
-    NAME                                      READY   STATUS             RESTARTS   AGE
-    grafana-6b65874977-bc8tm                  1/1     Running            0          141m
-    istio-citadel-86dcf4c6b-kp52x             1/1     Running            0          8d
-    istio-egressgateway-68f754ccdd-sndrl      1/1     Running            0          141m
-    istio-galley-5fc6d6c45b-sg6dw             1/1     Running            0          141m
-    istio-ingressgateway-6d759478d8-b476j     1/1     Running            0          141m
-    istio-pilot-5c4995d687-jfp7l              1/1     Running            0          141m
-    istio-policy-57b99968f-xckd9              1/1     Running            36         141m
-    istio-sidecar-injector-746f7c7bbb-xzzpw   1/1     Running            0          8d
-    istio-telemetry-854d8556d5-9754v          1/1     Running            1          141m
-    istio-tracing-c66d67cd9-pszx9             0/1     CrashLoopBackOff   47         141m
-    kiali-8559969566-5svn6                    1/1     Running            0          141m
-    prometheus-66c5887c86-62c9l               1/1     Running            0          8d
+```
+➜  ~ kubectl get pods -n istio-system
+NAME                                      READY   STATUS             RESTARTS   AGE
+grafana-6b65874977-bc8tm                  1/1     Running            0          141m
+istio-citadel-86dcf4c6b-kp52x             1/1     Running            0          8d
+istio-egressgateway-68f754ccdd-sndrl      1/1     Running            0          141m
+istio-galley-5fc6d6c45b-sg6dw             1/1     Running            0          141m
+istio-ingressgateway-6d759478d8-b476j     1/1     Running            0          141m
+istio-pilot-5c4995d687-jfp7l              1/1     Running            0          141m
+istio-policy-57b99968f-xckd9              1/1     Running            36         141m
+istio-sidecar-injector-746f7c7bbb-xzzpw   1/1     Running            0          8d
+istio-telemetry-854d8556d5-9754v          1/1     Running            1          141m
+istio-tracing-c66d67cd9-pszx9             0/1     CrashLoopBackOff   47         141m
+kiali-8559969566-5svn6                    1/1     Running            0          141m
+prometheus-66c5887c86-62c9l               1/1     Running            0          8d
+```
 
 istioctl 提供了一个子命令来从本地打开各种 Dashboard。例如，要想在本地打开 Grafana 页面，只需执行下面的命令：
 
-    ## 自动打开浏览器
-    $ istioctl dashboard grafana
-    http://localhost:36813
-
+```
+## 自动打开浏览器
+$ istioctl dashboard grafana
+http://localhost:36813
+```
 
 ## 整体架构
 
-![](/public/upload/practice/istio.jpg)
-
-控制平面的三大模块，其中的Pilot和Citadel/Auth都不直接参与到traffic的转发流程，因此他们不会对运行时性能产生直接影响。
-
+![](/public/upload/mesh/istio.png)
 
 ### Envoy
 
@@ -82,7 +78,53 @@ Envoy 是 Istio 中最基础的组件，所有其他组件的功能都是通过�
 
 类似产品 [MOSN](https://github.com/sofastack/sofa-mosn) [MOSN 文档](https://github.com/sofastack/sofa-mosn)
 
-### Mixer
+### pilot
+
+[服务网格 Istio 初探 -Pilot 组件](https://www.infoq.cn/article/T9wjTI2rPegB0uafUKeR)
+
+![](/public/upload/practice/istio_pilot_detail.png)
+
+1. Pilot 的架构，最下面一层是 Envoy 的 API，提供 Discovery Service 的 API，这个 API 的规则由 Envoy 约定，Pilot 实现 Envoy API Server，**Envoy 和 Pilot 之间通过 gRPC 实现双向数据同步**。
+2. Pilot 最上面一层称为 Platform Adapter，这一层不是 Kubernetes 调用 Pilot，而是 **Pilot 通过调用 Kubernetes 来发现服务之间的关**系，Pilot 通过在 Kubernetes 里面注册一个 Controller 来监听事件，从而获取 Service 和 Kubernetes 的 Endpoint 以及 Pod 的关系。
+
+Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无缝的从 Kubernets 的资源定义过度到 Pilot 的资源定义。
+
+[深入解读Service Mesh背后的技术细节](https://sq.163yun.com/blog/article/218831472301936640)**pilot使用Kubernetes的Service，仅仅使用它的服务发现功能，而不使用它的转发功能**，pilot通过在kubernetes里面注册一个controller来监听事件，从而获取Service和Kubernetes的Endpoint以及Pod的关系，但是在转发层面，就不会再使用kube-proxy根据service下发的iptables规则进行转发了，而是将这些映射关系转换成为pilot自己的转发模型，下发到envoy进行转发，这样就把控制面和数据面彻底分离开来，服务之间的相互关系是管理面的事情，不要和真正的转发绑定在一起。
+
+## 流量管理（未完成）
+
+![](/public/upload/mesh/traffic_manage.png)
+
+### 网格内流量管理
+
+||k8s Service|k8s Ingress|istio Virtual Service|
+|---|---|---|---|
+|面向的pod|一个service 对应一个项目的pod||一个Virtual Service 对应多个项目的pod|
+|路由规则|权重|||
+|实现原理|kube-proxy+iptables|||
+
+整体来说，istio Virtual Service 更像k8s Ingress
+
+### 进出网格的流量管理
+
+## 其它
+
+任何软件架构设计，其核心都是围绕数据展开的，基本上如何定义数据结构就决定了其流程的走向，剩下的不外乎加上一些设计手法，抽离出变与不变的部分，不变的部分最终会转化为程序的主流程，基本固化，变的部分尽量保证拥有良好的扩展性、易维护性，最终会转化为主流程中各个抽象的流程节点。
+
+控制平面和数据平面解耦，主要基于变和不变的考虑， 数据平面可以说是Service Mesh的内核，负责提供Service Mesh的最核心价值， 因此从架构设计上考虑， 应该尽量减少核心内核的变化，而将变化频繁的控制逻辑移到控制平面，可以很好的保证数据平面的稳定性和可维护性。
+
+任何一个系统，随着使用场景和使用方式的不断变化，随时会面对很多新的挑战。为了应对这些挑战，需要保证在内核基本稳定的前提下建立一套完善的插件机制。插件从实现层面看其实很简单，本质上是一个钩子回调函数，插件注册就是将钩子回调函数挂在插件机制上，在事件到来时，触发回调函数的调用。因此研究插件机制有两点：
+
+1. 插件的抽象
+2. 回调和通知的机制
+
+### 相关文章
+
+[使用 Istio 实现基于 Kubernetes 的微服务应用](https://www.ibm.com/developerworks/cn/cloud/library/cl-lo-implementing-kubernetes-microservice-using-istio/index.html)
+
+[蚂蚁金服大规模微服务架构下的Service Mesh探索之路](https://www.servicemesher.com/blog/the-way-to-service-mesh-in-ant-financial/) 很不错的文章 
+
+### Mixer（已被进行重大调整）
 
 ![](/public/upload/practice/istio_mixer.svg)
 
@@ -97,28 +139,3 @@ mixer 的变更是比较多的，有v1 architecture 和 v2 architecture，社�
 ![](/public/upload/practice/istio_mixer_evolution.png)
 
 istio中的mixer 模板、adapter 适配器均可通过代码自动生成功能 生成，增加新的模板时，只需增加模板的proto 描述，调用mixer_codegen.sh即可。
-
-### pilot
-
-[服务网格 Istio 初探 -Pilot 组件](https://www.infoq.cn/article/T9wjTI2rPegB0uafUKeR)
-
-![](/public/upload/practice/istio_pilot_detail.png)
-
-1. Pilot 的架构，最下面一层是 Envoy 的 API，提供 Discovery Service 的 API，这个 API 的规则由 Envoy 约定，Pilot 实现 Envoy API Server，**Envoy 和 Pilot 之间通过 gRPC 实现双向数据同步**。
-2. Pilot 最上面一层称为 Platform Adapter，这一层不是 Kubernetes 调用 Pilot，而是 **Pilot 通过调用 Kubernetes 来发现服务之间的关**系，Pilot 通过在 Kubernetes 里面注册一个 Controller 来监听事件，从而获取 Service 和 Kubernetes 的 Endpoint 以及 Pod 的关系。
-
-Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无缝的从 Kubernets 的资源定义过度到 Pilot 的资源定义。
-
-
-[深入解读Service Mesh背后的技术细节](https://sq.163yun.com/blog/article/218831472301936640)**pilot使用Kubernetes的Service，仅仅使用它的服务发现功能，而不使用它的转发功能**，pilot通过在kubernetes里面注册一个controller来监听事件，从而获取Service和Kubernetes的Endpoint以及Pod的关系，但是在转发层面，就不会再使用kube-proxy根据service下发的iptables规则进行转发了，而是将这些映射关系转换成为pilot自己的转发模型，下发到envoy进行转发，这样就把控制面和数据面彻底分离开来，服务之间的相互关系是管理面的事情，不要和真正的转发绑定在一起。
-
-## 其它
-
-任何软件架构设计，其核心都是围绕数据展开的，基本上如何定义数据结构就决定了其流程的走向，剩下的不外乎加上一些设计手法，抽离出变与不变的部分，不变的部分最终会转化为程序的主流程，基本固化，变的部分尽量保证拥有良好的扩展性、易维护性，最终会转化为主流程中各个抽象的流程节点。
-
-控制平面和数据平面解耦，主要基于变和不变的考虑， 数据平面可以说是Service Mesh的内核，负责提供Service Mesh的最核心价值， 因此从架构设计上考虑， 应该尽量减少核心内核的变化，而将变化频繁的控制逻辑移到控制平面，可以很好的保证数据平面的稳定性和可维护性。
-
-任何一个系统，随着使用场景和使用方式的不断变化，随时会面对很多新的挑战。为了应对这些挑战，需要保证在内核基本稳定的前提下建立一套完善的插件机制。插件从实现层面看其实很简单，本质上是一个钩子回调函数，插件注册就是将钩子回调函数挂在插件机制上，在事件到来时，触发回调函数的调用。因此研究插件机制有两点：
-
-1. 插件的抽象
-2. 回调和通知的机制

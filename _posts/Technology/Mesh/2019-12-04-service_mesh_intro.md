@@ -15,7 +15,9 @@ keywords: service mesh
 
 [Service Mesh技术社区的官方网站](https://www.servicemesher.com/)
 
-Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's a service mesh? And why do I need one?](https://buoyant.io/2017/04/25/whats-a-service-mesh-and-why-do-i-need-one/) 提到的：A service mesh is a dedicated infrastructure layer for handling service-to-service communication. It’s responsible for the reliable delivery of requests through the complex topology of services that comprise a modern, cloud native application. In practice, the service mesh is typically implemented as an array of lightweight network proxies that are deployed alongside application code, without the application needing to be aware. Service Mesh 通常以轻量级的网络代理的方式跟应用的代码部署在一起，从而以**应用无感知的**方式实现服务治理。
+Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's a service mesh? And why do I need one?](https://buoyant.io/2017/04/25/whats-a-service-mesh-and-why-do-i-need-one/) 提到的
+
+![](/public/upload/mesh/service_mesh_intro.png)
 
 ## 什么是 Service Mesh
 
@@ -50,6 +52,8 @@ SideCar的一种实现[MOSN](https://www.sofastack.tech/projects/sofa-mosn/overv
 通信能力的下沉
 
 ![](/public/upload/mesh/communication_go_down.png)
+
+![](/public/upload/mesh/sidecar.png)
 
 [深入解读Service Mesh背后的技术细节](https://sq.163yun.com/blog/article/218831472301936640)Service Mesh是Kubernetes支撑微服务能力**拼图的最后一块**
 
