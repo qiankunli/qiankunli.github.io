@@ -20,7 +20,7 @@ keywords: dubbo micro service
 2. 路由，流量转移。 红绿灯是一种流量控制；黑白名单也是一种流量控制
 3. 弹性能力（熔断、超时、重试）
 4. 安全
-5. 可观察性
+5. 可观察性（指标、日志、追踪）。四个基本的服务监控需求：延迟、流量、错误、 饱和
 
 ## 整体架构
 
@@ -92,9 +92,7 @@ rpc 就好像函数调用一样，有数据有状态的往来。也就是需要�
 
 额外提一个问题：框架实现的哪些功能部分适合下放到PaaS 层去做？
 
-2018.12.15 补充：[个推基于Docker和Kubernetes的微服务实践](https://segmentfault.com/a/1190000017103122)
-
-服务发现的几种实现方式
+2018.12.15 补充：[个推基于Docker和Kubernetes的微服务实践](https://segmentfault.com/a/1190000017103122)服务发现的几种实现方式
 
 ![](/public/upload/architecture/service_discovery.png)
 

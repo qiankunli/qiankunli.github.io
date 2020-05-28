@@ -3,7 +3,7 @@
 layout: post
 title: 换个角度看待设计模式
 category: 技术
-tags: Other
+tags: Code
 keywords: java design pattern
 
 ---

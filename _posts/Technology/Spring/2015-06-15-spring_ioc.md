@@ -25,35 +25,12 @@ Spring 容器具象化一点就是 从xml、配置类、依赖jar 等处 通过 
 
 [Inversion of control](https://en.wikipedia.org/wiki/Inversion_of_control) In software engineering, inversion of control (IoC) is a programming principle. IoC inverts the flow of control as compared to traditional control flow. In IoC, custom-written portions of a computer program receive the flow of control from a generic framework. A software architecture with this design inverts control as compared to traditional procedural programming: in traditional programming, the custom code that expresses the purpose of the program calls into reusable libraries to take care of generic tasks, but with inversion of control, it is the framework that calls into the custom, or task-specific, code. traditional control flow 是从开始到结束都是自己“写代码”，IoC 中control flow的发起是由一个framework 触发的。类只是干自己的活儿——“填代码”，然后ioc在需要的时候调用。
 
-**控制反转 带来的改变：“解耦”**
-
-假设有两个类A和B
-
-    class A{
-        private B b;
-        void fun(){
-            创建b对象
-            b.fun2()
-        }
-        public void setB(B b){
-            this.b = b;
-        }
-    }
-
-    class B{
-        void fun2(){}
-    }
-    
-在A的fun方法中，为调用b的fun2方法，需要先创建b对象，如果b对象的创建过程比较复杂（比如B还依赖其它类，那么还要先创建其他类），`a.fun`方法将非常臃肿，并且大部分代码都有点“不务正业”（都花在创建b对象上了），事实上，`a.fun`方法只是想单纯的运行`b.fun2()`。
-
-按照书中的说法：许多非凡的应用都是由两个或多个类通过彼此的合作来实现业务逻辑的，这使得每个对象都需要与其合作的对象的引用（有时候这个获取过程会占用多行代码）。如果这个获取过程要靠自身实现，将导致代码高度耦合并且难以测试。
-
-控制反转后，A类中B类引用的获得，不再是new（很多时候，new是不够的，需要多个操作才能获取一个可用的B实例），而是“别人”调用A类的set方法。**如果，把面向对象编程中需要执行的诸如新建对象、为对象引用赋值等操作交由容器统一完成，这样一来，这些散落在不同代码中的功能相同的部分(也就是上述代码中“创建b对象”和"setB"部分)就集中成为容器的一部分，也就是成为面向对象系统的基础设施的一部分。**（话说，如果大部分框架也使用spring实现该多好啊，至少容易看懂）
-
 IOC设计模式的两个重要支持：
 
 1. **对象间依赖关系的建立和应用系统的运行状态没有很强的关联性**，因此对象的依赖关系可以在启动时建立好，ioc容器（负责建立对象的依赖关系）不会对应用系统有很强的侵入性。
 2. 面向对象系统中，除了一部分对象是数据对象外，其他很大一部分是用来处理数据的，这些对象并不经常发生变化，在系统中以单件的形式起作用就可以满足应用的需求。
+
+**控制反转 带来的改变：“解耦”**
 
 ## ioc的实现
 

@@ -3,8 +3,8 @@
 layout: post
 title: apple 推送那些事儿
 category: 技术
-tags: Other
-keywords: apns
+tags: Practice
+keywords: Practice
 
 ---
 
@@ -26,8 +26,7 @@ keywords: apns
 
 	If APNs decides to terminate an established HTTP/2 connection, it sends a GOAWAY frame. The GOAWAY frame includes JSON data in its payload with a reason key, whose value indicates the reason for the connection termination. **For a list of possible values for the reason key, see [Table 8-6](https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/CommunicatingwithAPNs.html#//apple_ref/doc/uid/TP40008194-CH11-SW17).**
 
-2. 如果设备离线，假设某个时间间隔收到两个推送，则apns只会发送most recent notification。参见[Local and Remote Notification Programming Guide
-](https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/APNSOverview.html#//apple_ref/doc/uid/TP40008194-CH8-SW1)的“Quality of Service, Store-and-Forward, and Coalesced Notifications”章节。
+2. 如果设备离线，假设某个时间间隔收到两个推送，则apns只会发送most recent notification。参见[Local and Remote Notification Programming Guide](https://developer.apple.com/library/content/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/APNSOverview.html#//apple_ref/doc/uid/TP40008194-CH8-SW1)的“Quality of Service, Store-and-Forward, and Coalesced Notifications”章节。
 
 ### 系统方面
 
