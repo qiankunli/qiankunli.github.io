@@ -68,5 +68,6 @@ keywords: kubernetes yaml
 |adminssion controller|webhook|
 |Scheduler plugin|被编译到Scheduler中|
 |Operator|binary，以容器方式运行在Kubernetes 集群中<br>通过扩展API server支持与kubectl 交互|
+|Ingress Controller|pod 部署在 Kubernetes 集群里，根据api server 中Ingress 数据做出处理即可|
 
 
