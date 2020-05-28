@@ -95,15 +95,17 @@ Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无�
 
 ![](/public/upload/mesh/traffic_manage.png)
 
-### 网格内流量管理
-
 ||k8s Service|k8s Ingress|istio Virtual Service|
 |---|---|---|---|
-|面向的pod|一个service 对应一个项目的pod||一个Virtual Service 对应多个项目的pod|
-|路由规则|权重|||
-|实现原理|kube-proxy+iptables|||
+|面向的pod|一个service 对应一个项目的pod|一个Ingress 对应多个Service|一个Virtual Service 对应多个项目的pod|
+|路由规则|权重|url path 匹配||
+|实现原理|kube-proxy+iptables|nginx-ingress+kube-proxy+iptables||
 
 整体来说，istio Virtual Service 更像k8s Ingress
+
+### 网格内流量管理
+
+
 
 ### 进出网格的流量管理
 
