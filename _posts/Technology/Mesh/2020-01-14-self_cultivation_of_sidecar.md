@@ -52,11 +52,22 @@ Envoy是一个高性能的C++写的proxy转发器，那Envoy如何转发请求�
 
 ![](/public/upload/mesh/traffic_manage.png)
 
-### 容器内流量 管理
+一个istio 自带的Bookinfo 为例，对应[istio-1.4.2-linux.tar.gz](https://github.com/istio/istio/releases/download/1.4.2/istio-1.4.2-linux.tar.gz) 解压后`istio-1.4.2/samples/bookinfo`
 
-envoy 是一个proxy 组件，一个proxy 具体的说是listener、filter、route、cluster、endpoint 的协同工作
+    kubectl label namespace default istio-injection=enabled
+    kubectl apply -f samples/bookinfo/platform/kube/bookinfo.yaml
+    # 安装 bookinfo 的 ingress gateway：
+    kubectl apply -f samples/bookinfo/networking/bookinfo-gateway.yaml
 
-![](/public/upload/practice/istio_envoy_flow.png)
+全流程都是 http 协议
+
+![](/public/upload/practice/istio_bookinfo.jpg)
+
+下文 大部分时候 以bookinfo 为例
+
+## Pod内流量 管理
+
+### 流量拦截
 
 [深入解读Service Mesh背后的技术细节](https://mp.weixin.qq.com/s/hq9KTc9fm8Nou8hXmqdKuw)istio 对流量采取了透明拦截的方式
 
@@ -69,23 +80,19 @@ envoy 是一个proxy 组件，一个proxy 具体的说是listener、filter、rou
 
 目标端口被改写后， 可以通过SO_ORIGINAL_DST TCP 套件获取原始的ipport
 
+### envoy 内部流转
+
+envoy 是一个proxy 组件，一个proxy 具体的说是listener、filter、route、cluster、endpoint 的协同工作
+
 为了实现正确的流量路由与转发，envoy 的监听器分为两类
 
 1. 虚拟监听器，需要绑定相应的端口号，iptables 拦截的流量会转发到这个端口上
 2. 真实监听器，用于处理iptables 拦截前的”真实目的地址“，虚拟机监听器接收到监听请求时，按照一定的匹配规则找到对应的真实监听器进行处理。真实监听器因为不需要和网络交互，因此不需要配置和绑定端口号。
 
-### 网格内流量管理
+![](/public/upload/mesh/istio_envoy_flow.png)
 
-一个istio 自带的Bookinfo 为例，对应[istio-1.4.2-linux.tar.gz](https://github.com/istio/istio/releases/download/1.4.2/istio-1.4.2-linux.tar.gz) 解压后`istio-1.4.2/samples/bookinfo`
 
-    kubectl label namespace default istio-injection=enabled
-    kubectl apply -f samples/bookinfo/platform/kube/bookinfo.yaml
-    # 安装 bookinfo 的 ingress gateway：
-    kubectl apply -f samples/bookinfo/networking/bookinfo-gateway.yaml
-
-全流程都是 http 协议
-
-![](/public/upload/practice/istio_bookinfo.jpg)
+## 网格内流量管理
 
 `istioctl proxy-config listener $podname` 可以查看Pod 中的具有哪些 Listener，也可以使用`istioctl proxy-config listener $podname -o json` 查看更详细的配置
 
@@ -101,7 +108,7 @@ envoy 是一个proxy 组件，一个proxy 具体的说是listener、filter、rou
     10.20.0.10:9080         HEALTHY     OK                outbound|9080||details.default.svc.cluster.local
     10.20.0.2:9080          HEALTHY     OK                outbound|9080||details.default.svc.cluster.local
 
-### 进出网格的流量管理
+## 进出网格的流量管理
 
 [istio网络转发分析](https://yq.aliyun.com/articles/564983)
 
@@ -192,7 +199,7 @@ spec:
 1. istio 只是指定了 流量入口，具体的 路由工作由 绑定的VirtualService 负责
 2. VirtualService 负责配置路由规则 match，demo 中为简单起见没有配置，表示所有流量都路由到 http.route 指定的destination（也就是一个service）
 
-####  相关组件
+###  相关组件
 
 与istio ingress 功能对应的 是istio-ingressgateway Pod 以及附属的 istio-ingressgateway Service
 
@@ -241,7 +248,7 @@ root        13     1  0 02:02 ?        00:01:13 /usr/local/bin/envoy -c etc/isti
 root        27     0  0 05:48 pts/0    00:00:00 bash
 ```
 
-#### 请求包流转
+### 请求包流转
 
 [istio网络转发分析](https://yq.aliyun.com/articles/564983)
 
@@ -249,7 +256,7 @@ root        27     0  0 05:48 pts/0    00:00:00 bash
 2. 通过iptables，流量被转发到 istio-ingressgateway Pod
 3. 进入pod 查看envoy实时配置 `curl http://127.0.0.1:15000/config_dump`
 4. `/` path 下的流量被转发到 `outbound_.80_._.nginx-service.default.svc.cluster.local` 对应的 k8s service `outbound|80||nginx-service.default.svc.cluster.local`
-5. 值得注意的是enovy应该并没有通过iptables（kube-proxy）转发 ，而是直接发给了 pod ip
+5. [深入解读Service Mesh背后的技术细节](https://sq.163yun.com/blog/article/218831472301936640)**pilot使用Kubernetes的Service，仅仅使用它的服务发现功能，而不使用它的转发功能**，pilot通过在kubernetes里面注册一个controller来监听事件，从而获取Service和Kubernetes的Endpoint以及Pod的关系，但是在转发层面，就不会再使用kube-proxy根据service下发的iptables规则进行转发了，而是将这些映射关系转换成为pilot自己的转发模型，下发到envoy进行转发，这样就把控制面和数据面彻底分离开来，服务之间的相互关系是管理面的事情，不要和真正的转发绑定在一起。
 
 
 ```json
