@@ -91,24 +91,6 @@ Istio 通过 Kubernets CRD 来定义自己的领域模型，使大家可以无�
 
 [深入解读Service Mesh背后的技术细节](https://sq.163yun.com/blog/article/218831472301936640)**pilot使用Kubernetes的Service，仅仅使用它的服务发现功能，而不使用它的转发功能**，pilot通过在kubernetes里面注册一个controller来监听事件，从而获取Service和Kubernetes的Endpoint以及Pod的关系，但是在转发层面，就不会再使用kube-proxy根据service下发的iptables规则进行转发了，而是将这些映射关系转换成为pilot自己的转发模型，下发到envoy进行转发，这样就把控制面和数据面彻底分离开来，服务之间的相互关系是管理面的事情，不要和真正的转发绑定在一起。
 
-## 流量管理（未完成）
-
-![](/public/upload/mesh/traffic_manage.png)
-
-||k8s Service|k8s Ingress|istio Virtual Service|
-|---|---|---|---|
-|面向的pod|一个service 对应一个项目的pod|一个Ingress 对应多个Service|一个Virtual Service 对应多个项目的pod|
-|路由规则|权重|url path 匹配||
-|实现原理|kube-proxy+iptables|nginx-ingress+kube-proxy+iptables||
-
-整体来说，istio Virtual Service 更像k8s Ingress
-
-### 网格内流量管理
-
-
-
-### 进出网格的流量管理
-
 ## 其它
 
 任何软件架构设计，其核心都是围绕数据展开的，基本上如何定义数据结构就决定了其流程的走向，剩下的不外乎加上一些设计手法，抽离出变与不变的部分，不变的部分最终会转化为程序的主流程，基本固化，变的部分尽量保证拥有良好的扩展性、易维护性，最终会转化为主流程中各个抽象的流程节点。

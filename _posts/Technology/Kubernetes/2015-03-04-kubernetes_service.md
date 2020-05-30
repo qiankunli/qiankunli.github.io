@@ -106,23 +106,7 @@ KUBE-SVC-NWV5X2332I4OT4T3 规则实际上是一组随机模式（–mode random�
 
 在yaml 配置层面 LoadBalancer/NodePort/ExternalName 的kind 都是 Service
 
-### PublicIPs
 
-service configure文件中有一个`PublicIPs`属性
-
-    {
-      "id": "myapp",
-      "kind": "Service",
-      "apiVersion": "v1beta1",
-      "selector": {
-        "app": "example"
-      },
-      "containerPort": 9376,
-      "port": 8765
-      "PublicIPs": [192.168.56.102,192.168.56.103]
-    }
-
-在这里`192.168.56.102`和`192.168.56.103`是k8s集群从节点的ip（**主节点ip不行**）。这样，我们就可以通过`192.168.56.102:8765`和`192.168.56.102:8765`来访问这个service了。其好处是，kube-proxy为我们映射的端口是确定的。
 
 ### LoadBalancer
 

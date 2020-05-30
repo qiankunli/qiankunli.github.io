@@ -172,20 +172,8 @@ yaml配置参见[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/ku
 
 ## 小结
 
-[认知的几点规律](http://qiankunli.github.io/2018/11/05/cognition.html)任何知识体系都是分层的，k8s也不例外，理念 ==> 核心组件 apiserver,kuberlet,controler ==> pod、rs之类。Kubernetes 项目的成功，是成千上万云计算平台上的开发者用脚投票的结果。云计算平台上的开发者们所关心的，并不是调度，也不是资源管管理，更不是网络或者存储，他们关心的只有一件事，那就是 Kubernetes 的 API。也就是声明式 API 和控制器模式；这个 API 独有的编程范式，即 Controller 和 Operator。declarative API的内涵参见[Kubernetes源码分析——apiserver](http://qiankunli.github.io/2019/01/05/kubernetes_source_apiserver.html)
-
-
 Kubernetes 项目的本质其实只有一个，那就是“控制器模式”。这个思想，不仅仅是 Kubernetes 项目里每一个组件的“设计模板”，也是 Kubernetes 项目能够将开发者们紧紧团结到自己身边的重要原因。作为一个云计算平台的用户，能够用一个 YAML 文件表达我开发的应用的最终运行状态，并且自动地对我的应用进行运维和管理。**这种信赖关系，就是连接Kubernetes 项目和开发者们最重要的纽带。**
-
-作者的另一篇文章[后Kubernetes时代，2019的容器技术生态会发生些什么？](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651013514&idx=2&sn=39cc372cd50e021b4bf545732877b994&chksm=bdbeb9d98ac930cfdaa577282f6fb40e85670abe680e3f00c7bfbca4ad36812acee81b92bf05&scene=27#wechat_redirect)不同于一个只能生产资源的集群管理工具，Kubernetes 项目最大的价值，乃在于它从一开始就提倡的声明式 API 和以此为基础“控制器”模式。Kubernetes 项目为使用者提供了宝贵的 API 可扩展能力和良好的 API 编程范式，催生出了一个完全基于 Kubernetes API 构建出来的上层应用服务生态。可以说，正是这个生态的逐步完善与日趋成熟，才确立了 Kubernetes 项目如今在云平台领域牢不可破的领导地位，也间接宣告了竞品方案的边缘化。
-
-[未来：应用交付的革命不会停止](https://mp.weixin.qq.com/s/x7lTp9fJXav6nIJH_bgVMA)Kubernetes 项目一直在做的，其实是在进一步清晰和明确“应用交付”这个亘古不变的话题。只不过，相比于交付一个容器和容器镜像， Kubernetes 项目正在尝试明确的定义云时代“应用”的概念。在这里，应用是一组容器的有机组合，同时也包括了应用运行所需的网络、存储的需求的描述。而像这样一个“描述”应用的 YAML 文件，放在 etcd 里存起来，然后通过控制器模型驱动整个基础设施的状态不断地向用户声明的状态逼近，就是 Kubernetes 的核心工作原理了。PS: 以后你给公有云一个yaml 文件就可以发布自己的应用了。
-
-[解读容器 2019：把“以应用为中心”进行到底](https://www.kubernetes.org.cn/6408.html)云原生的本质是一系列最佳实践的结合；更详细的说，云原生为实践者指定了一条低心智负担的、能够以可扩展、可复制的方式最大化地利用云的能力、发挥云的价值的最佳路径。这种思想，以一言以蔽之，就是“以应用为中心”。正是因为以应用为中心，云原生技术体系才会无限强调**让基础设施能更好的配合应用**、以更高效方式为应用“输送”基础设施能力，而不是反其道而行之。而相应的， Kubernetes 、Docker、Operator 等在云原生生态中起到了关键作用的开源项目，就是让这种思想落地的技术手段。
 
 
 ![](/public/upload/kubernetes/parse_k8s_ad.JPG)
 
-笔者个人微信订阅号
-
-![](/public/upload/qrcode_for_gh.jpg)
