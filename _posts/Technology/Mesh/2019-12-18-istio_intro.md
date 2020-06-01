@@ -13,6 +13,8 @@ keywords: istio
 * TOC
 {:toc}
 
+![](/public/upload/mesh/istio_functions.png)
+
 ## 安装手感——使用istioctl安装
 
 github 下载istio，解压完毕后，istio-${version}/bin 下包含istioctl，用来进行istio 的安装及日常运维

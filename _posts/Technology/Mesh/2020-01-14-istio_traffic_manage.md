@@ -13,15 +13,23 @@ keywords: pilot service mesh
 * TOC
 {:toc}
 
+istio 流量管理支持一下功能
+1. 路由、流量转移（灰度、ab、黑白名单等）
+2. 测试能力：故障注入、流量镜像
+3. 弹性能力：超时重试、熔断等
+
+本文主要上述功能 在配置和代码上如何体现
+
+## 流量管理配置
+
+### envoy配置
+
 [Envoy 官方文档中文版](https://www.servicemesher.com/envoy/)
 
 ![](/public/upload/mesh/envoy_work.jpg)
 
 Envoy的工作模式如图所示，横向是管理平面/管理流，纵向是数据流。Envoy会暴露admin的API，可以通过API查看Envoy中的路由或者集群的配置。
 
-## 配置
-
-### 分类与配置分类
 
 Envoy按照使用 场景可以分三种：
 
@@ -35,8 +43,6 @@ router 和ingress 均属于和应用服务不在一起的纯代理场景，可�
 2. sidecar outbound，从当前节点发往节点外的流量。**根据协议的不同有所不同，待进一步认识**。
 3. gateway
 
-### 配置与xds协议
-
 Envoy是一个高性能的C++写的proxy转发器，那Envoy如何转发请求呢？需要定一些规则，然后按照这些规则进行转发。规则可以是静态的，放在配置文件中的，启动的时候加载，要想重新加载，一般需要重新启动。当然最好的方式是规则设置为动态的，放在统一的地方维护，这个统一的地方在Envoy眼中看来称为Discovery Service，Envoy过一段时间去这里拿一下配置，就修改了转发策略。无论是静态的，还是动态的，在配置里面往往会配置四个东西。
 
 ||xds|备注|
@@ -47,6 +53,22 @@ Envoy是一个高性能的C++写的proxy转发器，那Envoy如何转发请求�
 |Cluters|CDS|有时候多个cluster具有类似的功能，但是是不同的版本号，<br>可以通过route规则，选择将请求路由到某一个版本号|
 
 ![](/public/upload/mesh/envoy_config.png)
+
+### 流量管理api 与 xds 配置的映射
+
+istio 的流控支持那么多功能，由用户直接 决定 给某个pod 的envoy 发送 xds 数据是不现实的。[Traffic Management](https://istio.io/docs/concepts/traffic-management/)You can do all this and more by adding your own traffic configuration to Istio using Istio’s traffic management API.
+
+|流量管理|traffic management API|
+|---|---|
+|traffic routing|VirtualService + DestinationRule|
+|Timeouts|VirtualService.spec.http.timeout|
+|Retries|VirtualService.spec.http.retries|
+|Circuit breakers|DestinationRule.spec.trafficPolicy|
+|Fault injection|VirtualService.spec.http.fault|
+
+1. With a virtual service, you can specify traffic behavior for one or more hostnames. You use routing rules in the virtual service that tell Envoy how to send the virtual service’s traffic to appropriate destinations. 
+2. **You can think of virtual services as how you route your traffic to a given destination, and then you use destination rules to configure what happens to traffic for that destination**. 
+3.  Gateway configurations are applied to standalone Envoy proxies that are running at the edge of the mesh, rather than sidecar Envoy proxies running alongside your service workloads. Istio’s Gateway resource just lets you configure layer 4-6 load balancing properties such as ports to expose, TLS settings, and so on. Then instead of adding application-layer traffic routing (L7) to the same API resource, you bind a regular Istio virtual service to the gateway. This lets you basically manage gateway traffic like any other data plane traffic in an Istio mesh. Gateway 负责4~6层，与其绑定的VirtualService 负责七层，管理gateway就像管理普通的数据面代理一样。
 
 ## 流量管理
 
