@@ -54,6 +54,41 @@ keywords: kubernetes yaml
 
 ![](/public/upload/kubernetes/component_overview.png)
 
+## 从技术实现角度的整体设计
+
+[A few things I've learned about Kubernetes](https://jvns.ca/blog/2017/06/04/learning-about-kubernetes/) 值得读三遍
+
+[47 advanced tutorials for mastering Kubernetes](https://techbeacon.com/top-tutorials-mastering-kubernetes) 设计k8s 的方方面面，未详细读
+
+### 从单机到集群到调度
+
+一个逻辑链条是 kubelet ==> api server ==> scheduler。当你一想k8s有点懵的时候，可以从这个角度去发散。
+
+1. the “kubelet” is in charge of running containers on nodes
+2. If you tell the API server to run a container on a node, it will tell the kubelet to get it done (indirectly)
+3. the scheduler translates “run a container” to “run a container on node X”
+
+kubelet/api server/scheduler 本身可能会变，但它们的功能以及 彼此的交互接口 不会变的太多，it’s a good place to start
+
+### 源码包结构
+
+[kubernetes源码解读——源码结构](https://blog.csdn.net/ZQZ_QiZheng/article/details/54729869)
+
+![](/public/upload/kubernetes/k8s_source_package.png)
+
+1. pkg是kubernetes的主体代码，里面实现了kubernetes的主体逻辑
+2. cmd是kubernetes的所有后台进程的代码，主要是各个子模块的启动代码，具体的实现逻辑在pkg下
+3. plugin主要是kube-scheduler和一些插件
+
+源码地址 [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes)
+
+	go get -d k8s.io/kubernetes
+	cd $GOPATH/src/k8s.io/kubernetes
+	
+然后使用ide 工具比如goland 等就可以打开Kubernetes 文件夹查看源码了。
+
+感觉你 `go get github.com/kubernetes` 也没什么错，但因为代码中 都是 `import k8s.io/kubernetes/xxx` 所以推荐前者
+
 ## 一个充分支持扩展的系统
 
 ![](/public/upload/kubernetes/kubernetes_extension.png)

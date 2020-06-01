@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 一个sidecar的自我修养
+title: istio流量管理
 category: 技术
 tags: Mesh
 keywords: pilot service mesh
