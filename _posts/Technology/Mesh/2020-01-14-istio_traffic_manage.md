@@ -113,6 +113,8 @@ envoy 是一个proxy 组件，一个proxy 具体的说是listener、filter、rou
 
 ![](/public/upload/mesh/istio_envoy_flow.png)
 
+[理解 Istio Service Mesh 中 Envoy Sidecar 代理的路由转发](https://jimmysong.io/blog/envoy-sidecar-routing-of-istio-service-mesh-deep-dive/) 未读
+
 
 ## 网格内流量管理
 

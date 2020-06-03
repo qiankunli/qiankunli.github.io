@@ -21,7 +21,90 @@ Spring 容器具象化一点就是 从xml、配置类、依赖jar 等处 通过 
 
 从[谈元编程与表达能力](https://mp.weixin.qq.com/s/SUV6vBaqwu19-xYzkG4SxA)中，笔者收获了对运行时的一个理解：当相应的行为在当前对象上没有被找到时，运行时会提供一个改变当前对象行为的入口。**从这个视角看，Spring 也可以认为是 java 的一个runtime，通过ApplicationContext 获取的bean 拥有 bean代码本身看不到的能力**。
 
-## 什么是容器？
+## 容器解决了什么问题？
+
+DI 容器要解决的问题是什么呢？它解决的是组件创建和组装的问题，但是为什么这是一个需要解决的问题呢？软件设计需要有一个分解的过程，所以，它必然还要面对一个组装的过程，也就是把分解出来的各个组件组装到一起，完成所需要的功能。
+
+假设我们有一个文章服务（ArticleService）提供根据标题查询文章的功能。当然，数据是需要持久化的，所以，这里还有一个 ArticleRepository，用来与持久化数据打交道。
+
+```java
+class ArticleService {
+  //提供根据标题查询文章的服务
+  Article findByTitle(final String title) {
+    ...
+  }
+}
+```
+在 ArticleService 处理业务的过程中，需要用到 ArticleRepository 辅助它完成功能，也就是说，ArticleService 要依赖于 ArticleRepository。这时你该怎么做呢？一个直接的做法就是在 ArticleService 中增加一个字段表示 ArticleRepository。
+```java
+class ArticleService {
+  private ArticleRepository repository;
+  public Article findByTitle(final String title) {
+    // 做参数校验
+    return this.repository.findByTitle(title);
+  }
+}
+```
+这个字段怎么初始化呢？程序员一般最直接的反应就是直接创建这个对象。
+```java
+class ArticleService {
+  private ArticleRepository repository = new DBArticleRepository();
+  public Article findByTitle(final String title) {
+    // 做参数校验
+    return this.repository.findByTitle(title);
+  }
+}
+```
+在真实的项目中，由于资源所限，我们一般不会在应用中任意打开数据库连接，而是会选择共享数据库连接。所以，DBArticleRepository 需要一个数据库连接（Connection）的参数。
+```java
+class ArticlService {
+  private ArticleRepository repository;
+  public ArticlService(final Connection connection) {
+    this.repository = new DBArticleRepository(connection);
+  }
+  public Article findByTitle(final String title) {
+    // 做参数校验
+    return this.repository.findByTitle(title);
+  }
+}
+```
+一旦开始准备测试，你就会发现，要让 ArticleService 跑起来，那就得让 ArticleRepository 也跑起来；要让 ArticleRepository 跑起来，那就得准备数据库连接。是不是觉得太麻烦？然后，真正开始写测试时，你才发现，要测试，你还要在数据库里准备各种数据。
+
+问题出在哪儿呢？其实就在你创建对象的那一刻，问题就出现了。当我们创建一个对象时，就必须要有一个具体的实现类，对应到我们这里，就是那个 DBArticleRepository。虽然我们的 ArticleService 写得很干净，其他部分根本不依赖于 DBArticleRepository，只在构造函数里依赖了，但依赖就是依赖。与此同时，由于要构造 DBArticleRepository 的缘故，我们这里还引入了 Connection 这个类，这个类只与 DBArticleRepository 的构造有关系，与我们这个 ArticleService 的业务逻辑一点关系都没有。你看到了，只是因为引入了一个具体的实现，我们就需要把它周边配套的东西全部引入进来，而这一切与这个类本身的业务逻辑没有任何关系。这还只是最简单的场景，在真实的项目中，构建一个对象可能还会牵扯到更多的内容：
+
+1. 根据不同的参数，创建不同的实现类对象，你可能需要用到工厂模式。
+2. 为了了解方法的执行时间，需要给被依赖的对象加上监控。
+3. 依赖的对象来自于某个框架，你自己都不知道具体的实现类是什么。
+
+既然直接构造存在这么多的问题，那么最简单的办法就是把创建的过程拿出去，只留下与字段关联的过程：
+```java
+class ArticleService {
+  private ArticleRepository repository;
+  public ArticleService(final ArticleRepository repository) {
+    this.repository = repository;
+  }
+  public Article findByTitle(final String title) {
+    // 做参数校验
+    return this.repository.findByTitle(title);
+  }
+}
+```
+现在，对象的创建已经分离了出去，但还是要要有一个地方完成这个工作，最简单的解决方案自然是，把所有的对象创建和组装在一个地方完成：
+```java
+...
+ArticleRepository repository = new DBArticleRepository(connection);
+AriticleService service = new ArticleService(repository);
+...
+```
+相比于业务逻辑，组装过程并没有什么复杂的部分。一般而言，纯粹是一个又一个对象的创建以及传参的过程，这部分的代码看上去会非常的无聊。虽然很无聊，但这一部分代码很重要，最好的解决方案就是有一个框架把它解决掉。在 Java 世界里，这种组装一堆对象的东西一般被称为“容器”，我们也用这个名字。
+```java
+Container container = new Container();
+container.bind(Connection.class).to(connection);
+container.bind(ArticleReposistory.class).to(DBArticleRepository.class);
+container.bind(ArticleService.class).to(ArticleService.class)
+ArticleService service = container.getInstance(ArticleService.class);
+```
+一个容器就此诞生。因为它解决的是依赖的问题，把被依赖的对象像药水一样，注入到了目标对象中，所以，它得名“依赖注入”（Dependency Injection，简称 DI）。这个容器也就被称为 DI 容器了。在没有 DI 容器之前，那是怎样的一个蛮荒时代啊！有了 DI 容器之后呢？你的代码就只剩下关联的代码，对象的创建和组装都由 DI 容器完成了。甚至在不经意间，你有了一个还算不错的设计：至少你做到了面向接口编程，它的实现是可以替换的，它还是可测试的。
 
 [Inversion of control](https://en.wikipedia.org/wiki/Inversion_of_control) In software engineering, inversion of control (IoC) is a programming principle. IoC inverts the flow of control as compared to traditional control flow. In IoC, custom-written portions of a computer program receive the flow of control from a generic framework. A software architecture with this design inverts control as compared to traditional procedural programming: in traditional programming, the custom code that expresses the purpose of the program calls into reusable libraries to take care of generic tasks, but with inversion of control, it is the framework that calls into the custom, or task-specific, code. traditional control flow 是从开始到结束都是自己“写代码”，IoC 中control flow的发起是由一个framework 触发的。类只是干自己的活儿——“填代码”，然后ioc在需要的时候调用。
 
@@ -30,7 +113,6 @@ IOC设计模式的两个重要支持：
 1. **对象间依赖关系的建立和应用系统的运行状态没有很强的关联性**，因此对象的依赖关系可以在启动时建立好，ioc容器（负责建立对象的依赖关系）不会对应用系统有很强的侵入性。
 2. 面向对象系统中，除了一部分对象是数据对象外，其他很大一部分是用来处理数据的，这些对象并不经常发生变化，在系统中以单件的形式起作用就可以满足应用的需求。
 
-**控制反转 带来的改变：“解耦”**
 
 ## ioc的实现
 

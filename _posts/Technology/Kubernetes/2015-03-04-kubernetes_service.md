@@ -174,48 +174,107 @@ spec:
 |stable virtual ip|Service|apiserver + kube-proxy|
 |externally-reachable URLs|Ingress|apiserver + nginx-ingress|
 
-### Ingress 示例
-
-```yaml
-apiVersion: extensions/v1beta1
-kind: Ingress
-metadata:
-name: cafe-ingress
-spec:
-tls:
-- hosts:
-    - cafe.example.com
-    secretName: cafe-secret
-rules:
-- host: cafe.example.com
-    http:
-    paths:
-    - path: /tea
-        backend:
-        serviceName: tea-svc
-        servicePort: 80
-    - path: /coffee
-        backend:
-        serviceName: coffee-svc
-        servicePort: 80
-```
-
-一个 Ingress 对象的主要内容，实际上就是一个“反向代理”服务（比如：Nginx）的配置文件的描述。而这个代理服务对应的转发规则，就是 IngressRule。
-
-host 字段定义的值，就是这个 Ingress 的入口，当用户访问 cafe.example.com 的时候，实际上访问到的是这个 Ingress 对象。每一个 path 都对应一个后端 Service
-
-
-### Ingress Controller 部署和实现
-
 Ingress和Pod、Servce等等类似，被定义为kubernetes的一种资源。本质上说Ingress只是存储在etcd上面一些数据，我们可以通过kubernetes的apiserver添加删除和修改ingress资源。
 
 有了 Ingress 这样一个统一的抽象，Kubernetes 的用户就无需关心 Ingress 的具体细节了。在实际的使用中，你只需要从社区里选择一个具体的 Ingress Controller，把它部署在 Kubernetes 集群里即可。这个 Ingress Controller 会根据你定义的 Ingress 对象，提供对应的代理能力。目前，业界常用的各种反向代理项目，比如 Nginx、HAProxy、Envoy、Traefik 等，都已经为 Kubernetes 专门维护了对应的 Ingress Controller。
 
-部署 Nginx Ingress Controller`kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/mandatory.yaml` 
+### Ingress Controller 部署和实现
 
-在上述 YAML 文件中，我们定义了一个使用 nginx-ingress-controller 镜像的 Pod，这个 Pod 本身，就是一个监听 Ingress 对象以及它所代理的后端 Service 变化的控制器。
+部署 Nginx Ingress Controller [Installation with Manifests](https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-manifests/#deploy-the-ingress-controller)  简单安装可以使用 helm [Installation with Helm](https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-helm/) 注意处理下google 的镜像源问题。nginx ingress 会安装一个 Deployment：ingress-nginx-controller  在 ingress-nginx namespace 下（helm 安装的好像不是 这个namespace），这个 Pod 本身就是一个监听 Ingress 对象以及它所代理的后端 Service 变化的控制器。
 
 当一个新的 Ingress 对象由用户创建后，nginx-ingress-controller 就会根据Ingress 对象里定义的内容，生成一份对应的 Nginx 配置文件（`/etc/nginx/nginx.conf`），并使用这个配置文件启动一个 Nginx 服务。而一旦 Ingress 对象被更新，nginx-ingress-controller 就会更新这个配置文件。如果这里只是被代理的 Service 对象被更新，nginx-ingress-controller 所管理的 Nginx 服务是不需要重新加载（reload）的，因为其通过Nginx Lua方案实现了 Nginx Upstream 的动态配置。
+
+### Ingress 示例
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: nginx-pod-demo-for-test-ingress
+ labels:
+   app: nginx-pod-demo-for-test-ingress
+spec:
+ containers:
+   - name: nginx-container
+     image: nginx
+     ports:
+       - containerPort: 80
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service-demo-for-test-ingress
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: nginx-pod-demo-for-test-ingress
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: nginx-ingress 
+spec:
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: nginx-service-demo-for-test-ingress
+          servicePort: 80
+```
+
+一个 Ingress 对象的主要内容，实际上就是一个“反向代理”服务（比如：Nginx）的配置文件的描述。而这个代理服务对应的转发规则，就是 IngressRule。
+
+
+```
+root@ubuntu-01:~# kubectl get pod
+NAME                                        READY   STATUS    RESTARTS   AGE
+my-release-nginx-ingress-5c57477464-gssbk   1/1     Running   0          71m
+nginx-pod-demo-for-test-ingress             1/1     Running   0          57m
+root@ubuntu-01:~# kubectl get svc
+NAME                                  TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+my-release-nginx-ingress              LoadBalancer   10.101.164.118   <pending>     80:32000/TCP,443:31723/TCP   64m
+nginx-service-demo-for-test-ingress   ClusterIP      10.103.226.14    <none>        80/TCP                       49m
+```
+
+每个ingress 对象会有一个对应的pod 实际运行nginx ，以及一个LoadBalancer Service 作为这个pod的访问入口。
+
+kubectl 进入my-release-nginx-ingress-5c57477464-gssbk，在`/etc/nginx/conf.d` 下可以看到 ingress 对应一个conf 文件。upstream 指定了 nginx pod对应的ip。 可见 虽然创建了 nginx service，但网络包并没有真正走 service iptables。
+
+```
+# configuration for default/nginx-ingress
+upstream default-nginx-ingress-localhost-nginx-service-demo-for-test-ingress-80 {
+	zone default-nginx-ingress-localhost-nginx-service-demo-for-test-ingress-80 256k;
+	random two least_conn;
+	server 10.244.2.52:80 max_fails=1 fail_timeout=10s max_conns=0;
+}
+server {
+	listen 80;
+	server_tokens on;
+	server_name localhost;
+	location / {
+		proxy_http_version 1.1;
+		proxy_connect_timeout 60s;
+		proxy_read_timeout 60s;
+		proxy_send_timeout 60s;
+		client_max_body_size 1m;
+		proxy_set_header Host $host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Host $host;
+		proxy_set_header X-Forwarded-Port $server_port;
+		proxy_set_header X-Forwarded-Proto $scheme;
+		proxy_buffering on;
+		proxy_pass http://default-nginx-ingress-localhost-nginx-service-demo-for-test-ingress-80;
+	}
+}
+```
 
 
 ## 其它
