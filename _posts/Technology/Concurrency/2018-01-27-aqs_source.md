@@ -161,6 +161,8 @@ AQS实际上通过头尾指针来管理同步队列，实现包括获取锁失�
 
 ## AQS VS synchronized 
 
+![](/public/upload/concurrency/aqs_vs_synchronized.png)
+
 ### synchronized原理
 
 从[Java中synchronized的实现原理与应用](http://blog.csdn.net/u012465296/article/details/53022317) [聊聊并发（二）——Java SE1.6中的Synchronized](http://www.infoq.com/cn/articles/java-se-16-synchronized/) 可以看到:

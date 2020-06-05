@@ -25,7 +25,11 @@ Kubernetes 之所以需要 Service，一方面是因为 Pod 的 IP 不是固定�
 
 K8S 集群的服务，本质上是负载均衡，即反向代理;在实际实现中，这个反向代理，并不是部署在集群某一个节点上（有单点问题），而 是**作为集群节点的边车**，部署在每个节点上的。把服务照进反向代理这个现实的，是 K8S 集群的一个控制器，即 kube-proxy。简单来 说，kube-proxy 通过集群 API Server 监听 着集群状态变化。当有新的服务被创建的时候，kube-proxy 则会把集群服务的状 态、属性，翻译成反向代理的配置。**K8S 集群节点实现服务反向代理的方法，目前主要有三种，即 userspace、 iptables 以及 ipvs**，k8s service 选了iptables。实现反向代理，归根结底，就是做 DNAT，即把发送给集群服务 IP 和端口的数 据包，修改成发给具体容器组的 IP 和端口。
 
+Pod IP 地址是实际存在于某个网卡(可以是虚拟设备)上的，但Service Cluster IP就不一样了，**没有网络设备为这个地址负责**。它是由kube-proxy使用Iptables规则重新定向到其本地端口，再均衡到后端Pod的。
+
 A service provides a stable virtual IP (VIP) address for a set of pods. It’s essential to realize that VIPs do not exist as such in the networking stack. For example, **you can’t ping them.** They are only Kubernetes- internal administrative entities. Also note that the format is IP:PORT, so the IP address along with the port make up the VIP. **Just think of a VIP as a kind of index into a data structure mapping to actual IP addresses.**
+
+
 
 ![](/public/upload/kubernetes/service_communicate.png)
 
