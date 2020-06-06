@@ -51,6 +51,8 @@ Kubernetes requires each pod to have an IP in a flat networking namespace with f
 
 ## 跨主机通信
 
+[CNI 网络方案优缺点及最终选择](https://mp.weixin.qq.com/s/pPrA_5BaYG9AwYNy4n_gKg)
+
 2020.4.18补充：很多文章都是从跨主机容器如何通信 的来阐述网络方案，这或许是一个很不好的理解曲线，从实际来说，一定是先有网络，再为Pod “连上网”。
 
 Network是一组可以相互通信的Endpoints，网络提供connectivity and discoverability.
