@@ -148,8 +148,9 @@ $ docker inspect 472abbce32a5 --format '{{.HostConfig.CpuShares}} {{.HostConfig.
 
 ## 如何避免系统被应用拖垮
 
-1. 监控报警，先感知到再说
-2. 当发现cpu-share 不足以约束应用时，改用 docker 本身的cpus 概念进一步限制
+使用 k8s 的cpu limit 机制，在实际落地过程中，容器平台提供几种固定的规格，单个实例的资源配置 能够支持正常跑即可，项目的服务能力通过横向扩展来解决。
+
+
 
 
 
