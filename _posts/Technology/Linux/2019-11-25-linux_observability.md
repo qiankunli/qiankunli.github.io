@@ -19,6 +19,8 @@ keywords: debug
 
 ![](/public/upload/linux/linux_cpu.png)
 
+[理解Linux系统负荷](http://www.ruanyifeng.com/blog/2011/07/linux_load_average_explained.html)
+
 ### CPU 的物理核与逻辑核
 
 一台机器可能包含多块 CPU 芯片，多个 CPU 之间通过系统总线通信。一块 CPU 芯片可能包含多个物理核，每个物理核都是一个实打实的运算核心（包括运算器、存储器等）。超线程（Hyper-Threading）技术可以让一个物理核在单位时间内同时处理两个线程，变成两个逻辑核。但它不会拥有传统单核 2 倍的处理能力，也不可能提供完整的并行处理能力。
@@ -88,6 +90,34 @@ period. 有几个点
 2. 进程耗费的限制方式：在period（毫秒/微秒） 内该进程只能占用 quota （毫秒/微秒）。PS：内存隔离是 申请内存的时候判断 判断已申请内存有没有超过阈值。cpu 隔离则是 判断period周期内，已耗费时间有没有超过 quota。PS： 频控、限流等很多系统也是类似思想
 3. period 指的是一个判断周期，quota 表示一个周期内可用的多个cpu的时间和。 所以quota 可以超过period ，比如period=100 and  quota=200，表示在100单位时间里，进程要使用cpu 200单位，需要两个cpu 各自执行100单位
 4. 每次拿cpu 说事儿得提两个值（period 和 quota）有点麻烦，可以通过进程消耗的 CPU 时间片quota来统计出进程占用 CPU 的百分比。这也是我们看到的各种工具中都使用百分比来说明 CPU 使用率的原因（下文多出有体现）。
+
+
+## ps
+
+```
+[root@deployer ~]# ps -ef
+UID        PID  PPID  C STIME TTY          TIME CMD
+root         1     0  0  2018 ?        00:00:29 /usr/lib/systemd/systemd --system --deserialize 21
+root         2     0  0  2018 ?        00:00:00 [kthreadd]
+root         3     2  0  2018 ?        00:00:00 [ksoftirqd/0]
+root         5     2  0  2018 ?        00:00:00 [kworker/0:0H]
+root         9     2  0  2018 ?        00:00:40 [rcu_sched]
+......
+root       337     2  0  2018 ?        00:00:01 [kworker/3:1H]
+root       380     1  0  2018 ?        00:00:00 /usr/lib/systemd/systemd-udevd
+root       415     1  0  2018 ?        00:00:01 /sbin/auditd
+root       498     1  0  2018 ?        00:00:03 /usr/lib/systemd/systemd-logind
+......
+root@pts/0
+root     32794 32792  0 Jan10 pts/0    00:00:00 -bash
+root     32901 32794  0 00:01 pts/0    00:00:00 ps -ef
+```
+
+三类进程
+
+1. pid=1 init进程Systemd
+2. pid=2 内核线程kthreadd，用户态不带中括号， 内核态带中括号。在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.
+3. tty 带问号的，说明不是前台启动的，一般都是后台启动的服务
 
 ## perf
 

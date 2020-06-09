@@ -21,8 +21,6 @@ keywords: linux 进程调度
 4. 调用 context_switch 切换运行的上下文，包括寄存器的状态和堆栈；
 5. 重新开启当前 CPU 的抢占功能；
 
-![](/public/upload/basic/scheduler_design.png)
-
 ## 进程数据结构
 
 ![](/public/upload/linux/linux_task_struct_data.png)
@@ -91,7 +89,40 @@ keywords: linux 进程调度
         const struct sched_class *sched_class; // 调度策略的执行逻辑
     }
 
-CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，定义一个vruntime来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的
+CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，定义一个vruntime来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的。PS， vruntime 正是理解 docker --cpu-shares 的钥匙。
+
+```c
+/*
+ * Update the current task's runtime statistics.
+ */
+static void update_curr(struct cfs_rq *cfs_rq)
+{
+  struct sched_entity *curr = cfs_rq->curr;
+  u64 now = rq_clock_task(rq_of(cfs_rq));
+  u64 delta_exec;
+......
+  delta_exec = now - curr->exec_start;
+......
+  curr->exec_start = now;
+......
+  curr->sum_exec_runtime += delta_exec;
+......
+  curr->vruntime += calc_delta_fair(delta_exec, curr);
+  update_min_vruntime(cfs_rq);
+......
+}
+
+/*
+ * delta /= w
+ */
+static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
+{
+  if (unlikely(se->load.weight != NICE_0_LOAD))
+        /* delta_exec * weight / lw.weight */
+    delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
+  return delta;
+}
+```
 
 调度需要一个数据结构来对 vruntime 进行排序，因为任何一个策略做调度的时候，都是要区分谁先运行谁后运行。这个能够排序的数据结构不但需要查询的时候，能够快速找到最小的，更新的时候也需要能够快速的调整排序，毕竟每一个tick vruntime都会增长。能够平衡查询和更新速度的是树，在这里使用的是红黑树。sched_entity 表示红黑树的一个node（数据结构中很少有一个Tree 存在，都是根节点`Node* root`就表示tree了）。
 
@@ -126,7 +157,7 @@ CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的�
     <img src="/public/upload/linux/process_schedule_impl.jpeg"/>
 </div>
 
-基于进程调度第一定律，上图就是一个很完整的循环，cpu的执行一直是方法调方法（process1.func1 ==> process1.schedule ==> process2.func2 ==> process2.schedule ==> process3.func3），只不过是跨了进程
+基于进程调度第一定律，上图就是一个很完整的循环，**cpu的执行一直是方法调方法**（process1.func1 ==> process1.schedule ==> process2.func2 ==> process2.schedule ==> process3.func3），只不过是跨了进程
 
 ### 调度类
 
@@ -195,6 +226,13 @@ sched_class结构体类似面向对象中的基类啊,通过函数指针类型�
 对于普通进程 scheduler_tick ==> fair_sched_class.task_tick_fair ==> entity_tick ==> update_curr 更新当前进程的 vruntime ==> check_preempt_tick 检查是否是时候被抢占了
 
 当发现当前进程应该被抢占，不能直接把它踢下来，而是把它标记为应该被抢占。为什么呢？因为进程调度第一定律呀，一定要等待正在运行的进程调用 __schedule 才行
+
+1. 用户态的抢占时机
+    1. 从系统调用中返回的那个时刻
+    2. 从中断中返回的那个时刻
+2. 内核态的抢占时机
+    1. 一般发生在 preempt_enable()。在内核态的执行中，有的操作是不能被中断的，所以在进行这些操作之前，总是先调用 preempt_disable() 关闭抢占，当再次打开的时候，就是一次内核态代码被抢占的机会。
+    2. 在内核态也会遇到中断的情况，当中断返回的时候，返回的仍然是内核态。这个时候也是一个执行抢占的时机
 
 
 ### Schedule
@@ -268,3 +306,6 @@ linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的�
 所谓的进程切换，就是将某个进程的 thread_struct里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。
 
 
+## 其它
+
+![](/public/upload/basic/scheduler_design.png)
