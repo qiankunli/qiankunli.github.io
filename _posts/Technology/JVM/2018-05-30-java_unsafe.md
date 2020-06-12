@@ -138,26 +138,18 @@ Unsafe 提供 Direct memory access methods.
 2. The only candidates were Thread.suspend and Thread.resume, which are unusable because they encounter an unsolvable race problem: If an unblocking thread invokes resume before the blocking thread has executed suspend, the resume operation will have no effect. Thread.suspend 和 Thread.resume 倒是行，但提前执行 Thread.resume 就比较容易尴尬
 3. **this applies per-thread, not per-synchronizer.** 这或许解释了 很多场景下，synchronized 除了性能依然不够用的原因。
 
-其实Solaris-9/WIN32/Linux NPTL 都有类似的thread library，java 支持的比较晚，总之，java 的synchronized 关键字 不是java并发的全部， java也是在不断发展的。
+其实Solaris-9/WIN32/Linux NPTL 都有类似的thread library，java 支持的比较晚，总之，java 的synchronized 关键字 不是java并发的全部， java也是在不断发展的。PS：线程库不单是 submit 一个task 执行，线程的创建、中断、阻塞、从阻塞中恢复 都是基本的对线程的操作。毕竟底层 都是对task_struct state 的操作。
 
 ### 工作原理
 
 [Understanding Java and native thread details](https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/com.ibm.java.vm.80.doc/docs/javadump_tags_javaandnative_thread_detail.html) A Java thread runs on a native thread, java thread 和native thread 有一个Attach 和Unattach 的过程。native thread 驱动 java thread 代码序列
 
-    ## java(字节码)代码序列
-    java class code1
-    java class code2
-    unsafe.park(xx) ==> 进入native code 执行流程
-    object.wait(xx)
-        java class code1 of wait function
-        java class code2 of wait function
-        native code ==> 进入native code 执行流程
-            ...
-            xx.park(xx)
-
-`unsafe.park(xx)` works directly on the thread, the less work you do, the more efficient. 当然代价是 一些必要的block 线程的准备工作 park 也没做，比如 not synchronizing on anything, you don't pay to have your thread check with main memory for updates from other threads.
-
 [Java的LockSupport.park()实现分析](https://blog.csdn.net/hengyunabc/article/details/28126139)
+
+
+[Java锁的那些事儿](https://mp.weixin.qq.com/s/dwpTgeVXyH9F7-dklk7Iag)park和unpark底层是借助系统层（Linux下）方法 pthread_mutex和 pthread_cond来实现的，通过 pthread_cond_wait函数可以对一个线程进行阻塞操作，在这之前，必须先获取 pthread_mutex，通过 pthread_cond_signal函数对一个线程进行唤醒操作。
+
+Java在语言层面实现了自己的线程管理机制（阻塞、唤醒、排队等），每个Thread实例都有一个独立的 pthread_mutex和 pthread_cond（系统层面的/C语言层面），在Java语言层面上对单个线程进行独立唤醒操作。
 
 ### 其它
 
