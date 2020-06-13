@@ -142,6 +142,8 @@ Unsafe 提供 Direct memory access methods.
 
 ### 工作原理
 
+![](/public/upload/jvm/hospot_thread_object.png)
+
 [Understanding Java and native thread details](https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/com.ibm.java.vm.80.doc/docs/javadump_tags_javaandnative_thread_detail.html) A Java thread runs on a native thread, java thread 和native thread 有一个Attach 和Unattach 的过程。native thread 驱动 java thread 代码序列
 
 [Java的LockSupport.park()实现分析](https://blog.csdn.net/hengyunabc/article/details/28126139)
