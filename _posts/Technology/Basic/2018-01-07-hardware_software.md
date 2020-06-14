@@ -19,41 +19,6 @@ keywords: hardware software
 
 2019.4.12 补充：[进程管理信息数据结构](http://qiankunli.github.io/2017/02/14/linux_art_review.html) 二进制文件分段 ==> 进程分段 ==> 指令操作码/操作数 ==> cpu运算单元/数据单元 ==>  cpu代码段寄存器/数据段寄存器/堆栈段寄存器等，从这个视角看，又有一种软硬件融合的味道。
 
-## 为什么需要反码和补码
-
-### 有界/越界/溢出与取模
-
-在数学的理论中，数字可以有无穷大，也有无穷小。现实中的计算机系统不可能表示无穷大或者无穷小的数字，都有一个上限和下限。加法加越界了就成了 取模运算。 
-
-### 符号位
-
-在实际的硬件系统中，**计算机 CPU 的运算器只实现了加法器88，而没有实现减法器。那么计算机如何做减法呢？我们可以通过加上一个负数来达到这个目的。如何让计算机理解哪些是正数，哪些是负数呢？人们把二进制数分为有符号数（signed）和无符号数（unsigned）。如果是有符号数，那么最高位就是符号位。如果是无符号数，那么最高位就不是符号位，而是二进制数字的一部分。有些编程语言，比如 Java，它所有和数字相关的数据类型都是有符号位的；而有些编程语言，比如 C 语言，它有诸如 unsigned int 这种无符号位的数据类型。
-
-### 比取模更“狠”——有符号数的溢出 
-
-对于 n 位的数字类型，符号位是 1，后面 n-1 位全是 0，我们把这种情形表示为 -2^(n-1)。n 位数字的最大的正值，其符号位为 0，剩下的 n-1 位都1，再增大一个就变为了符号位为 1，剩下的 n-1 位都为0。也就是**n位 有符号最大值 加1 就变成了 n位有符号数界限范围内最小的负数**——上溢出之后，又从下限开始
-
-是不是有点扑克牌的意思， A 可以作为10JQKA 的最大牌，也可以作为A23456 的最小牌。 
-
-||下限|上限|
-|---|---|---|
-|n位无符号数|0|2^n-1|
-|n位有符号数|-2^(n-1)|2^(n-1)-1|
-
-**取模 可以将（最大值+1） 变成下限值**，对于无符号数是0 ，对于有符号数是负数。
-
-### 减法靠补码
-
-原码就是我们看到的二进制的原始表示，是不是可以直接使用负数的原码来进行减法计算呢？答案是否定的，因为负数的原码并不适用于减法操作（加负数操作）
-
-因为取模的特性，我们知道 `i = i + 模数`。 那么 `i-j = i-j + 模数` 也是成立的，进而`i-j = i + (模数 -j)`。`模数 -j` 即补码 可以对应到计算机的 位取反  和 加 1 操作
-
-本质就是
-
-1. 加法器不区分 符号位和数据位
-2. 越界 等于 取模，对于有符号位的取模，可以使得 正数 变成负数
-
-我们经常使用朴素贝叶斯算法 过滤垃圾短信，`P(A|B)=P(A) * P(B/A) / P(B)` 这个公式在数学上平淡无奇，但工程价值在于：实践中右侧数据比 左侧数据更容易获得。 cpu减法器也是类似的道理，`减法器 = CPU 位取反 + 加法器  `
 
 ## 并行计算能力
 
@@ -106,6 +71,13 @@ RAM 是随机访问内存，就是给一个地址就能访问到数据，而磁�
 
 当CPU执行运算的时候，它先去L1查找所需的数据，再去L2，然后是L3，最后如果这些缓存中都没有，所需的数据就要去主内存拿。走得越远，运算耗费的时间就越长。如果你的目标是让端到端的延迟只有 10毫秒，而其中花80纳秒去主存拿一些未命中数据的过程将占很重的一块。**如果你在做一些很频繁的事，你要确保数据在L1缓存中**。
 
+当然，缓存命中率是很笼统的，具体优化时还得一分为二。比如，你在查看 CPU 缓存时会发现有 2 个一级缓存，这是因为，CPU 会区别对待指令与数据。虽然在冯诺依曼计算机体系结构中，代码指令与数据是放在一起的，但执行时却是分开进入指令缓存与数据缓存的，因此我们要分开来看二者的缓存命中率。
+
+1. 提高数据缓存命中率，考虑cache line size
+2. 提高指令缓存命中率，CPU含有分支预测器，如果分支预测器可以预测接下来要在哪段代码执行（比如 if 还是 else 中的指令），就可以提前把这些指令放在缓存中，CPU 执行时就会很快。例如，如果代码中包含if else，不要让每次执行if else 太过于随机。
+
+提升多核 CPU 下的缓存命中率：一、二级缓存是每颗核心独享的，如果一个进程每次都被调度到不同的cpu 核心上执行， 则上一个时间片 在某个核心 上load 的缓存 就完全复用不上了。因此，操作系统提供了将进程或者线程绑定到某一颗 CPU 上运行的能力。
+
 ### 缓存的存取——缓存行
 
 [高性能队列——Disruptor](https://tech.meituan.com/disruptor.html)
@@ -136,18 +108,8 @@ Compiler 和 cpu 经常搞一些 optimizations，这种单线程视角下的优�
 
 [Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)插入内存屏障的指令，会根据指令类型不同有不同的效果，例如在 monitorexit 释放锁后会强制刷新缓存，而 volatile 对应的内存屏障会在每次写入后强制刷新到主存，并且由于 volatile 字段的特性，编译器无法将其分配到寄存器，所以每次都是从主存读取，所以 volatile 适用于读多写少得场景
 
-## 资源的有限性和需求的无限性
-
-
-||计算能力|需求||备注|
-|---|---|---|---|---|
-|软硬件|cpu|创建线程的业务是无限的|用一个数据结构 表示和存放你要执行的任务/线程/进程，任尓干着急，我调度系统按既有的节奏来。|
-|java线程池|线程池管理的线程|要干的活儿是无限的|用一个runnable对象表示一个任务，线程池线程依次从队列中取出任务来执行|线程池管理的线程数可以扩大和缩小|
-|goroutine|goroutine调度器管理的线程|要干的活儿是无限的|用协程表示一个任务，线程从各自的队列里取出任务执行|A线程干完了，还可以偷B线程队列的活儿干|
-
 
 ## 为什么会有人觉得优化没有必要，因为他们不理解有多耗时
-
 
 [Teach Yourself Programming in Ten Years](http://norvig.com/21-days.html)
 
@@ -170,70 +132,6 @@ Approximate timing for various operations on a typical PC:
 |read 1MB sequentially from disk	|20,000,000 nanosec|
 |send packet US to Europe and back	|150 milliseconds = 150,000,000 nanosec|
 |上下文切换|数千个CPU时钟周期，1微秒|
-
-### 线程创建的成本
-
-2018.7.7 补充：[线程池的原理](https://toutiao.io/posts/396080/app_preview)
-我们首先来看，为什么说每次处理任务的时候再创建并销毁线程效率不高？
-
-	Thread t = new Thread();	// 此时只是在java 层面创建了一个对象
-	t.start()	
-
-native 的start 指令做了很多事情
-
-	JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
-	JVMWrapper("JVM_StartThread");
-	JavaThread *native_thread = NULL;
-	{
-		MutexLocker mu(Threads_lock);
-		if (java_lang_Thread::is_stillborn(JNIHandles::resolve_non_null(jthread)) ||
-	java_lang_Thread::thread(JNIHandles::resolve_non_null(jthread)) != NULL) {	
-			throw_illegal_thread_state = true;
-		} else {
-			jlong size =	java_lang_Thread::stackSize(JNIHandles::resolve_non_null(jthread));
-			size_t sz = size > 0 ? (size_t) size : 0;
-			native_thread = new JavaThread(&thread_entry, sz);
-			if (native_thread->osthread() != NULL) {
-				// Note: the current thread is not being used within "prepare".
-				native_thread->prepare(jthread);
-			}
-		} 
-	}
-	Thread::start(native_thread);
-	JVM_END
-	
-这段代码我也不懂，只是想表明， native 做了很多事情。包括但不限于：
-
-1. 创建一个native 线程
-2. 分配线程栈。jvm 参数`-Xss`,每个线程的堆栈大小,JDK5.0以后每个线程堆栈大小为1M,以前每个线程堆栈大小为256K.根据应用的线程所需内存大小进行调整.在相同物理内存下,减小这个值能生成更多的线程.但是操作系统对一个进程内的线程数还是有限制的,不能无限生成,经验值在3000~5000左右.小的应用，如果栈不是很深，128k应该是够用的，大的应用建议使用256k。这个选项对性能影响比较大，需要严格的测试。从这里可以看到两点：
-
-	1. 如果xss不显式设置， 新建线程时 os分配1m的空间绝对不是一个很easy的操作
-	2. 线程数量 不准确的说 是一个内存耗费问题，**在这个角度看，空间和算力有了一个对应关系。**
-3. 将java 线程 关联到 native 线程上
-
-从中可以看到：尽管java 线程和 os 线程具备一对一关系，但java 仍在jvm 层面上 为线程 维持了一些 数据结构。就好像 线程池中的线程 不是单纯的 `new Thread`，java 线程 也不是 单纯的 os 线程。
-
-如果没有这些微观细节，人就很难直观上 感受 线程池的好处。 [线程切换的成本](http://qiankunli.github.io/2018/01/07/hardware_software.html)
-
-2019.5.27补充：[Linux内核基础知识](http://blog.zhifeinan.top/2019/05/01/linux_kernel_basic.html)
-
-### 线程切换的成本
-
-不仅创建线程的代价高，线程切换的开销也很高
-
-1. 线程切换只能在内核态完成，如果当前用户处于用户态，则必然引起用户态与内核态的切换。
-2. 上下文切换，前面说线程信息需要用一个task_struct保存，线程切换时，必然需要将旧线程的task_struct从内核切出，将新线程的切入，带来上下文切换。除此之外，还需要切换寄存器、程序计数器、线程栈（包括操作栈、数据栈）等。2019.03.22补充：《反应式设计模式》尽管CPU已经越来越快，但更多的内部状态已经抵消了纯执行速度上带来的进步，使得上下文切换大约需要耗费1微秒的时间(数千个CPU时钟周期)，这一点在二十年来几乎没有大的改进。
-3. 执行线程调度算法，线程1放弃cpu ==> 线程调度算法找下一个线程 ==> 线程2
-4. 缓存缺失，切换线程，需要执行新逻辑。如果二者的访问的地址空间不相近，则会引起缓存缺失。 PS “进程切换”的代价更大巨大，[linux线程切换和进程切换](https://www.cnblogs.com/kkshaq/p/4547725.html)当你改变虚拟内存空间的时候，处理的页表缓冲（processor’s Translation Lookaside Buffer (TLB)）或者相当的神马东西会被全部刷新，这将导致内存的访问在一段时间内相当的低效。
-
-### 用户态与内核态切换有什么代价呢？
-
-[Understanding User and Kernel Mode](https://blog.codinghorror.com/understanding-user-and-kernel-mode/)
-
-1. 在操作系统中，In Kernel mode, the executing code has complete and unrestricted access to the underlying hardware. It can execute any CPU instruction and reference any memory address. 而用户态可以访问的指令和地址空间是受限的
-2. 用户态和内核态的切换通常涉及到内存的复制，比如内核态read 得到的数据返回给 用户态，因为用户态访问不了内核态的read 返回数据。
-3. jvm 则再插一腿，因为jvm 数据不仅在用户态，jvm 还希望数据是由jvm heap管理，所以对于read 操作来讲，数据从内核态 ==> 用户态  ==> jvm heap 经历了两次复制，netty 中允许使用堆外内存（对于linux来说，jvm heap和堆外内存都在进程的堆内存之内） 减少一次复制
-4. linux 和jvm 都可以使用 mmap来减少用户态和内核态的内存复制，但一是应用场景有限，二是代码复杂度提升了好多。
 
 ## 单核CPU技术瓶颈 ==> CPU 向多核发展 ==> 多台服务器
 

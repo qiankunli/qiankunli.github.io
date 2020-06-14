@@ -259,6 +259,8 @@ gogo 在不同处理器架构上的实现都不相同，但是不同的实现其
 
 这个函数会从 gobuf 中取出 Goroutine 指针、栈指针、返回值、上下文以及程序计数器并将通过 JMP 指令跳转至 Goroutine 应该继续执行代码的位置。PS：就切换几个寄存器，所以协程的切换成本更低
 
+![](/public/upload/go/routine_switch_after.jpg)
+
 ## sysmon 协程
 
 ![](/public/upload/go/go_scheduler_sysmon.jpg)
