@@ -175,6 +175,12 @@ Anatomy of Initialization
 
 [示例](https://github.com/kelseyhightower/kubernetes-initializer-tutorial)
 
+## udpate 机制
+
+[理解 K8s 资源更新机制，从一个 OpenKruise 用户疑问开始](https://mp.weixin.qq.com/s/jWH7jVxj20bmc60_C-w9wQ)
+
+![](/public/upload/kubernetes/update_resource.png)
+
 ## etcd: Kubernetes’ brain
 
 **Every component in Kubernetes (the API server, the scheduler, the kubelet, the controller manager, whatever) is stateless**. All of the state is stored in a key-value store called etcd, and communication between components often happens via etcd.

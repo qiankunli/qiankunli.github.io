@@ -36,9 +36,9 @@ keywords: container network
 
 ## Kubernetes IP-per-pod model
 
-针对docker 跨主机通信时网络中一堆的NAT包，Kubernetes 提出IP-per-pod model ，这个 IP 是真正属于该 Pod 的，对这个 Pod IP 的访问就是真正对它的服务的访问，中间拒绝任何的变造。比如以 10.1.1.1 的 IP 去访问 10.1.2.1 的 Pod，结果到了 10.1.2.1 上发现，它实际上借用的是宿主机的 IP，而不是源 IP，这样是不被允许的。
+针对docker 跨主机通信时网络中一堆的NAT包，Kubernetes 提出IP-per-pod model ，这个 IP 是真正属于该 Pod 的，对这个 Pod IP 的访问就是真正对它的服务的访问，中间拒绝任何的变造。比如以 10.1.1.1 的 IP 去访问 10.1.2.1 的 Pod，结果到了 10.1.2.1 上发现，它实际上借用的是宿主机的 IP，而不是源 IP，这样是不被允许的。**在通信的两端Pod看来，以及整个通信链路中`<source ip,source port,dest ip,dest port>` 是不能改变的**。
 
-Kubernetes 对怎么实现这个模型其实是没有什么限制的，用 underlay 网络来**控制外部路由器进行导流**是可以的；如果希望解耦，用 overlay 网络在底层网络之上再加一层叠加网，这样也是可以的。总之，只要达到模型所要求的目的即可。
+Kubernetes 对怎么实现这个模型其实是没有什么限制的，用 underlay 网络来**控制外部路由器进行导流**是可以的；如果希望解耦，用 overlay 网络在底层网络之上再加一层叠加网，这样也是可以的。总之，只要达到模型所要求的目的即可。**因为`<source ip,source port,dest ip,dest port>`不能变，排除NAT/DAT，其实也就只剩下路由和解封包两个办法了**。
 
 Rather than prescribing a certain networking solution, Kubernetes only states three fundamental requirements:
 
@@ -81,7 +81,7 @@ overlay 网络主要有隧道 和 路由两种方式
 3. 容器内数据包必须先发送目标容器所在的宿主机上，那么容器内原生的数据包便要进行改造（解封包或根据路由更改目标mac）
 4. 数据包到达目标宿主机上之后，目标宿主机要进行一定的操作转发到目标容器。
 
-覆盖网络如何解决connectivity and discoverability？connectivity由物理机之间解决，discoverability由**容器在物理机侧的veth** 与 宿主机eth 之间解决
+覆盖网络如何解决connectivity and discoverability？connectivity由物理机之间解决，discoverability由**容器在物理机侧的veth** 与 宿主机eth 之间解决，一般由主机上网络协议栈具体负责（**一般网络组件除解封包外，不参与通信过程，只是负责向网络协议栈写入routes和iptables**）。
 
 ![](/public/upload/docker/overlay_network_2.png)
 
@@ -163,6 +163,7 @@ There are two main ways they do it:
 ### underlay/physical 网络
 
 [容器网络：盘点，解释与分析](http://www.dockerinfo.net/4289.html)
+
 ||容器的网卡 来自哪里？|真正与外界通信的网卡是哪个？ external connectivity|容器与物理机网卡的关系及数据连通|
 |---|---|---|---|
 |bridge|veth|物理机网卡|veth pair 挂在bridge上，NAT 连通 物理机网卡|
