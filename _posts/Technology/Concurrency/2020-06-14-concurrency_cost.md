@@ -24,7 +24,7 @@ keywords: Concurrency cost
 
 ## 线程
 
-## 线程创建的成本
+### 线程创建的成本
 
 2018.7.7 补充：[线程池的原理](https://toutiao.io/posts/396080/app_preview)
 我们首先来看，为什么说每次处理任务的时候再创建并销毁线程效率不高？
@@ -72,7 +72,7 @@ native 的start 指令做了很多事情
 2019.5.27补充：[Linux内核基础知识](http://blog.zhifeinan.top/2019/05/01/linux_kernel_basic.html)
 
 
-## 线程切换的成本
+### 线程切换的成本
 
 不仅创建线程的代价高，线程切换的开销也很高
 
