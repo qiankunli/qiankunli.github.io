@@ -387,6 +387,9 @@ func ConvertUpdateEndpoints(loadAssignments []*envoy_api_v2.ClusterLoadAssignmen
 ```
 
 ## 服务发现注册
+
+从一个公司的实际来说，不可能一下子所有的服务都在容器环境内运行。容器环境内的rpc 服务启动时需要将自己的服务信息注册到 registry 上，进而可以被容器环境外的服务访问到。
+
 ```
 mosn/pkg/upstream/servicediscovery/dubbod
     init.go
@@ -409,4 +412,6 @@ mosn/pkg/upstream/servicediscovery/dubbod
         }
 ```
 
-sidecar 启动时，通过func init 启动一个webserver组件，和业务容器约定一个pub请求，sidecar web server 收到请求之后，将信息写到 registry（比如zk） 上。 对吧
+sidecar 启动时，通过func init 启动一个webserver组件，和业务容器约定一个pub请求，sidecar web server 收到请求之后，将信息写到 registry（比如zk） 上。 
+
+![](/public/upload/mesh/mosn_pub.png)
