@@ -29,7 +29,7 @@ go1.1 之前都是该模型
 
 ![](/public/upload/go/go_scheduler_gm.jpg)
 
-在这个阶段，**goroutine 调度跟 java 的ThreadPool 是一样一样的**，runnable 表示运行逻辑 提交到queue，ThreadPool 维持多个线程 从queue 中取出runnable 并执行。
+在这个阶段，**goroutine 调度跟 java 的ThreadPool 是一样一样的，除了io操作会阻塞线程外，java Executor也可以视为一个用户态线程调度框架**。runnable 表示运行逻辑 提交到queue，ThreadPool 维持多个线程 从queue 中取出runnable 并执行。
 
 ### GPM模型
 

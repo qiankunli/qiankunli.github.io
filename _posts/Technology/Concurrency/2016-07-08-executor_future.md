@@ -23,7 +23,9 @@ Runnable + Thread 实现了 logic 和 runner 的分离，runner 又进一步扩�
 
 ![](/public/upload/java/various_executor.png)
 
-Executor provides a way of decoupling task submission from the mechanics of how each task will be run, including details of thread use, scheduling, etc. **Executor 是一个如此成功的抽象，就像linux的File 接口一样**。 任务的提交与执行相分离。 PS：有点类似于Spring IOC，Bean的创建与使用相分离
+Executor provides a way of decoupling task submission from the mechanics of how each task will be run, including details of thread use, scheduling, etc. **Executor 是一个如此成功的抽象，就像linux的File 接口一样**。 任务的提交与执行相分离。 PS：有点类似于Spring IOC，Bean的创建与使用相分离。
+
+ Executor 框架为并发编程提供了一个完善的架构体系，不仅包括了线程池的管理，还提供了线程工厂、队列（类似于操作系统中的task_struct 数组）以及拒绝策略等，**将线程的调度和管理设置在了用户态**。
 
 ### 谁来处理task
 

@@ -15,8 +15,6 @@ keywords: mosn detail
 
 ![](/public/upload/mesh/mosn_process.png)
 
-
-
 ## 多协议机制
 
 ![](/public/upload/mesh/mosn_protocol.png)
@@ -388,6 +386,27 @@ func ConvertUpdateEndpoints(loadAssignments []*envoy_api_v2.ClusterLoadAssignmen
 }
 ```
 
+## 服务发现注册
+```
+mosn/pkg/upstream/servicediscovery/dubbod
+    init.go
+        func init() {
+	        Init()
+        }
+    bootstrap.go
+        func Init( /*port string, dubboLogPath string*/ ) {
+	        r := chi.NewRouter()
+            r.Post("/sub", subscribe)
+	        r.Post("/unsub", unsubscribe)
+	        r.Post("/pub", publish)
+	        r.Post("/unpub", unpublish)
+            ...
+        }
+    pub.go
+        func publish(w http.ResponseWriter, r *http.Request) {
+	        err = doPubUnPub(req, true)
+	        return
+        }
+```
 
-
-
+sidecar 启动时，通过func init 启动一个webserver组件，和业务容器约定一个pub请求，sidecar web server 收到请求之后，将信息写到 registry（比如zk） 上。 对吧
