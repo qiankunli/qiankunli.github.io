@@ -66,7 +66,7 @@ keywords: container log collect
 
 [9 个技巧，解决 K8s 中的日志输出问题](https://mp.weixin.qq.com/s/fLNzHS_6V78pSJ_zqTWhZg)
 
-## log-pilot（待补充）
+## log-pilot
 
 ### 启动
 

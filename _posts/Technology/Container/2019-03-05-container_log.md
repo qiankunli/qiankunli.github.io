@@ -8,7 +8,7 @@ keywords: container log
 
 ---
 
-## 简介（待重新整理）
+## 简介
 
 * TOC
 {:toc}
