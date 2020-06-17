@@ -19,7 +19,24 @@ keywords: container log collect
 
 ![](/public/upload/container/collect_log.png)
 
-## 日志输出
+### SideCar 模式 VS Node 模式
+
+[容器日志采集利器Log-Pilot](https://developer.aliyun.com/article/674327)
+
+![](/public/upload/container/log_sidecar_vs_agent.png)
+
+1. sidecar 模式，每个 Pod 中都附带一个 logging 容器来进行本 Pod 内部容器的日志采集，一般采用共享卷的方式
+    1. 在集群规模比较大的情况下，或者说单个节点上容器特别多的情况下，很明显的一个问题就是占用的资源比较多
+    2. 对日志存储后端占用过多的连接数。
+2. node 模式，在每个 Node 节点上仅需布署一个 logging 容器来进行本 Node 所有容器的日志采集。最明显的优势就是占用资源比较少，同样在集群规模比较大的情况下表现出的优势越明显。但对于这种模式来说我们就需要一个更加智能的日志采集工具来配合
+
+### 采集组件
+
+1. fluentd，CNCF社区
+2. filebeat，来自Elastic
+3. flume
+
+## Stdout VS 文件
 
 容器提供标准输出和文件两种方式，
 
@@ -49,7 +66,50 @@ keywords: container log collect
 
 [9 个技巧，解决 K8s 中的日志输出问题](https://mp.weixin.qq.com/s/fLNzHS_6V78pSJ_zqTWhZg)
 
+## log-pilot（待补充）
 
+### 启动
+
+启动命令`/pilot/pilot -template /pilot/filebeat.tpl -base /host -log-level debug`
+
+filebeat.tpl 内容
+
+```
+{{range .configList}}
+- type: log
+  enabled: true
+  paths:
+      - {{ .HostDir }}/{{ .File }}
+  scan_frequency: 10s
+  fields_under_root: true
+  {{if .Stdout}}
+  docker-json: true
+  {{end}}
+  {{if eq .Format "json"}}
+  json.keys_under_root: true
+  {{end}}
+  fields:
+      {{range $key, $value := .Tags}}
+      {{ $key }}: {{ $value }}
+      {{end}}
+      {{range $key, $value := $.container}}
+      {{ $key }}: {{ $value }}
+      {{end}}
+  tail_files: false
+  close_inactive: 2h
+  close_eof: false
+  close_removed: true
+  clean_removed: true
+  close_renamed: false
+{{end}}
+```
+
+![](/public/upload/container/log_pilot_object.png)
+
+![](/public/upload/container/log_pilot_sequence.png)
+
+1. log-pilot 比较喜欢用环境变量，比如采集插件/组件 使用fluentd 还是filebeat 都是由环境变量指定 `PILOT_TYPE=filebeat`
+2. 待确认：fluentd/filebeat 就像nginx 一样，根据配置文件运行，本身不具备动态发现容器日志文件的能力，log-pilot 对其封装了下。就像istio pilot-agent 对envoy 所做的那样。
 
 
 

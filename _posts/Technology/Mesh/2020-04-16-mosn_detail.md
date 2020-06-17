@@ -388,7 +388,11 @@ func ConvertUpdateEndpoints(loadAssignments []*envoy_api_v2.ClusterLoadAssignmen
 
 ## 服务发现注册
 
-从一个公司的实际来说，不可能一下子所有的服务都在容器环境内运行。容器环境内的rpc 服务启动时需要将自己的服务信息注册到 registry 上，进而可以被容器环境外的服务访问到。
+从一个公司的实际来说，不可能一下子所有的服务都在容器环境内运行。容器环境内的rpc 服务启动时需要将自己的服务信息注册到 registry 上，进而可以被容器环境外的服务访问到。有几种方式
+
+1. 从k8s向registry 同步数据
+2. 业务容器的sdk 直接向registry 写入数据
+3. 业务容器的sdk 通过 sidecar 向registry 写入数据
 
 ```
 mosn/pkg/upstream/servicediscovery/dubbod
