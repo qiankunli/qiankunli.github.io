@@ -70,7 +70,72 @@ keywords: container log collect
 
 ### 启动
 
-启动命令`/pilot/pilot -template /pilot/filebeat.tpl -base /host -log-level debug`
+容器（以DaemonSet方式运行）启动时，执行entrypoint `/pilot/entrypoint` entrypoint 是一个可执行脚本，根据ENV_PILOT_TYPE 判断使用哪个采集插件，以filebeat为例，并执行启动命令`/pilot/pilot -template /pilot/filebeat.tpl -base /host -log-level debug`
+
+容器内的一些关键文件
+
+```
+/pilot
+    /entrypoint
+    /pilot
+    /filebeat.tpl 
+/usr/bin/filebeat
+/etc/filebeat
+    /filebeat.yml
+    /prospectors.d  // 容器的配置文件
+    /modules.d // 各种存储后端的配置文件
+```
+
+1. log-pilot 比较喜欢用环境变量，比如采集插件/组件 使用fluentd 还是filebeat 都是由环境变量指定 `PILOT_TYPE=filebeat`
+2. fluentd/filebeat 就像nginx 一样，根据配置文件运行，本身不具备动态发现容器日志文件的能力，log-pilot 对其封装了下（exec.Command 启动`/usr/bin/filebeat -c /etc/filebeat/filebeat.yml`）。就像istio pilot-agent 对envoy 所做的那样。
+3. log-pilot 监听docker 拿到container 数据（比如container的label），如果container 是新的， 并为container 生成一个filebeat yml 文件，reload filebeat（filebeat 本身会动态 发现`/prospectors.d`下的配置文件，reload  fluentd则需要向 fluentd 进程发送syscall.SIGHUP 信号 ），filebeat 便可以搜集容器日志发往后端存储了。
+
+### 源码分析
+
+log-pilot 源码目录 
+```
+log-pilot
+    pilot
+        pilot.go
+        piloter.go
+        filebeat_piloter.go
+        fluentd_piloter.go
+    main.go
+```
+
+![](/public/upload/container/log_pilot_object.png)
+
+启动过程
+
+![](/public/upload/container/log_pilot_sequence.png)
+
+通过docker client 监听event 数据
+
+```go
+func (p *Pilot) watch() error {
+    err := p.piloter.Start()
+    ...
+    msgs, errs := p.client.Events(ctx, options)
+    go func() {
+		log.Info("begin to watch event")
+		for {
+			select {
+			case msg := <-msgs:
+				if err := p.processEvent(msg); err != nil {
+					log.Errorf("fail to process event: %v,  %v", msg, err)
+				}
+			case err := <-errs:
+				...
+			}
+		}
+    }()
+    err := p.processAllContainers()
+    ...
+	<-p.stopChan
+}
+```
+
+### 为每一个容器生成filebeat yml文件
 
 filebeat.tpl 内容
 
@@ -104,17 +169,53 @@ filebeat.tpl 内容
 {{end}}
 ```
 
-![](/public/upload/container/log_pilot_object.png)
+Pilot.processEvent ==> Pilot.newContainer ==> Pilot.render ==> WriteFile
 
-![](/public/upload/container/log_pilot_sequence.png)
+某个容器对应的 filebeat yml 文件示例
 
-1. log-pilot 比较喜欢用环境变量，比如采集插件/组件 使用fluentd 还是filebeat 都是由环境变量指定 `PILOT_TYPE=filebeat`
-2. 待确认：fluentd/filebeat 就像nginx 一样，根据配置文件运行，本身不具备动态发现容器日志文件的能力，log-pilot 对其封装了下。就像istio pilot-agent 对envoy 所做的那样。
+```yaml
+- type: log
+  enabled: true
+  paths:
+      - /host/var/lib/docker/containers/068eef0de2acd07f4b4d20d3e51e173ee02e5c3d9c1e403857f23e45d432cab0/068eef0de2acd07f4b4d20d3e51e173ee02e5c3d9c1e403857f23e45d432cab0-json.log*
+  scan_frequency: 10s
+  fields_under_root: true
+  docker-json: true
+  fields:
+      app_name: business-vip-present-rpc-service
+      index: stdout
+      topic: stdout
+      docker_container: k8s_business-vip-present-rpc-service_business-business-vip-present-rpc-service-stable-5c65b549bw8558_default_3f53634c-7f34-4148-821b-83b0f4b4d154_0
+      k8s_container_name: business-vip-present-rpc-service
+      k8s_node_name: 192.168.60.96
+      k8s_pod: business-business-vip-present-rpc-service-stable-5c65b549bw8558
+      k8s_pod_namespace: default
+  tail_files: false
+  close_inactive: 2h
+  close_eof: false
+  close_removed: true
+  clean_removed: true
+  close_renamed: false
+- type: log
+  enabled: true
+  paths:
+      - /host/var/lib/kubelet/pods/3f53634c-7f34-4148-821b-83b0f4b4d154/volumes/kubernetes.io~empty-dir/tomcat-logs/catalina.*.log
+  scan_frequency: 10s
+  fields_under_root: true
+  fields:
+      app_name: business-vip-present-rpc-service
+      index: tomcat
+      topic: tomcat
+      docker_container: k8s_business-vip-present-rpc-service_business-business-vip-present-rpc-service-stable-5c65b549bw8558_default_3f53634c-7f34-4148-821b-83b0f4b4d154_0
+      k8s_container_name: business-vip-present-rpc-service
+      k8s_node_name: 192.168.60.96
+      k8s_pod: business-business-vip-present-rpc-service-stable-5c65b549bw8558
+      k8s_pod_namespace: default
 
-
-
-
-
-
-
-
+  tail_files: false
+  close_inactive: 2h
+  close_eof: false
+  close_removed: true
+  clean_removed: true
+  close_renamed: false
+```
