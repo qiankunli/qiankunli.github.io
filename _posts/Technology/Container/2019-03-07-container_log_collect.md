@@ -105,6 +105,11 @@ log-pilot
 
 ![](/public/upload/container/log_pilot_object.png)
 
+pilot 和 piloter 有着明确的分工
+
+1. pilot 负责解析解析、监听容器事件、根据piloter 对应的tpl 文件创建 容器实例对应的yml 文件，start/reload piloter
+2. piloter 相对简单一些，就是根据 配置文件采集 log发往存储后端
+
 启动过程
 
 ![](/public/upload/container/log_pilot_sequence.png)
@@ -136,6 +141,19 @@ func (p *Pilot) watch() error {
 ```
 
 ### 为每一个容器生成filebeat yml文件
+
+Log-Pilot 支持声明式日志配置，可以依据容器的 Label 或者 ENV 来动态地生成日志采集配置文件
+
+1. PILOT_LOG_PREFIX  指定了Label和ENV 集合中 跟 log 相关的前缀。假设 PILOT_LOG_PREFIX=log
+2. 标签 log.$name=$path 
+3. 环境变量 log_$name=$path 
+
+name 和 path的含义
+
+1. name：我们自定义的一个字符串，它在不同的场景下指代不同的含义。当我们将日志采集到 ElasticSearch 的时候， name 表示的是 Index；当我们将日志采集到 Kafka 的时候， name 表示的是 Topic；当我们将日志采集到阿里云日志服务的时候，name 表示的是 LogstoreName。
+2. path：它本身支持两种，
+    1. 一种是约定关键字 stdout，表示的是采集容器的标准输出日志，比如我们要采集 tomcat 容器日志，那么我们通过配置标签 `log.catalina=stdout` 来采集 tomcat 标准输出日志
+    2. 第二种是容器内部的具体文件日志路径，可以支持通配符的方式。通过配置标签 `log.access=/usr/local/tomcat/logs/*.log` 来采集 tomcat 容器内部文件日志。
 
 filebeat.tpl 内容
 
@@ -182,13 +200,13 @@ Pilot.processEvent ==> Pilot.newContainer ==> Pilot.render ==> WriteFile
   fields_under_root: true
   docker-json: true
   fields:
-      app_name: business-vip-present-rpc-service
+      app_name: $APP_NAME
       index: stdout
       topic: stdout
-      docker_container: k8s_business-vip-present-rpc-service_business-business-vip-present-rpc-service-stable-5c65b549bw8558_default_3f53634c-7f34-4148-821b-83b0f4b4d154_0
-      k8s_container_name: business-vip-present-rpc-service
+      docker_container: k8s_$APP_NAME_$POD_NAME_default_3f53634c-7f34-4148-821b-83b0f4b4d154_0
+      k8s_container_name: $APP_NAME
       k8s_node_name: 192.168.60.96
-      k8s_pod: business-business-vip-present-rpc-service-stable-5c65b549bw8558
+      k8s_pod: $POD_NAME
       k8s_pod_namespace: default
   tail_files: false
   close_inactive: 2h
@@ -203,13 +221,13 @@ Pilot.processEvent ==> Pilot.newContainer ==> Pilot.render ==> WriteFile
   scan_frequency: 10s
   fields_under_root: true
   fields:
-      app_name: business-vip-present-rpc-service
+      app_name: $APP_NAME
       index: tomcat
       topic: tomcat
-      docker_container: k8s_business-vip-present-rpc-service_business-business-vip-present-rpc-service-stable-5c65b549bw8558_default_3f53634c-7f34-4148-821b-83b0f4b4d154_0
-      k8s_container_name: business-vip-present-rpc-service
+      docker_container: k8s_$APP_NAME_$POD_NAME_default_3f53634c-7f34-4148-821b-83b0f4b4d154_0
+      k8s_container_name: $APP_NAME
       k8s_node_name: 192.168.60.96
-      k8s_pod: business-business-vip-present-rpc-service-stable-5c65b549bw8558
+      k8s_pod: $POD_NAME
       k8s_pod_namespace: default
 
   tail_files: false
