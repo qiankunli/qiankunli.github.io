@@ -13,6 +13,12 @@ keywords: debug
 * TOC
 {:toc}
 
+如何通过监控找到性能瓶颈？
+
+1. 微观上，快速地找出进程内的瓶颈函数，就是从代码层面直接寻找调用次数最频繁、耗时最长的函数，通常它就是性能瓶颈。[火焰图](http://www.brendangregg.com/flamegraphs.html)
+2. 宏观上，找出整个分布式系统中的瓶颈组件。全链路监控
+
+
 ## cpu
 
 [CPU平均负载为多少更合理？](https://mp.weixin.qq.com/s/utbtKusx-gBgemh94f6trg)

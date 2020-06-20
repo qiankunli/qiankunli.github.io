@@ -15,13 +15,19 @@ keywords: Docker Kubernetes Volume
 
 ### ## 从AUFS说起
 
-以下引用自[深入理解Docker Volume（一）](http://dockone.io/article/128)
+[云原生存储详解：容器存储与 K8s 存储卷](https://mp.weixin.qq.com/s/7rGrXhlc4-9jgSoVHqcs4A)容器服务之所以如此流行，一大优势即来自于运行容器时容器镜像的组织形式。容器通过复用容器镜像的技术，实现多个容器共享一个镜像资源（**更细一点说是共享某一个镜像层**），避免了每次启动容器时都拷贝、加载镜像文件，这种方式既节省了主机的存储空间，又提高了容器启动效率。**为了实现多个容器间共享镜像数据，容器镜像每一层都是只读的**。
 
-先谈下Docker的文件系统是如何工作的。Docker镜像是由多个文件系统（只读层）叠加而成。当我们启动一个容器的时候，Docker会加载只读镜像层并在其上添加一个读写层。如果运行中的容器修改了现有的一个已经存在的文件，那该文件将会从读写层下面的只读层复制到读写层，该文件的只读版本仍然存在，只是已经被读写层中该文件的副本所隐藏。当删除Docker容器，并通过该镜像重新启动时，之前的更改将会丢失。在Docker中，只读层及在顶部的读写层的组合被称为Union File System（联合文件系统）。
+以下引用自[深入理解Docker Volume（一）](http://dockone.io/article/128)先谈下Docker的文件系统是如何工作的。Docker镜像是由多个文件系统（只读层）叠加而成。当我们启动一个容器的时候，Docker会加载只读镜像层并在其上添加一个读写层。写时复制：如果运行中的容器修改了现有的一个已经存在的文件，那该文件将会从读写层下面的只读层复制到读写层，该文件的只读版本仍然存在，只是已经被读写层中该文件的副本所隐藏。一旦容器销毁，这个读写层也随之销毁，之前的更改将会丢失。在Docker中，只读层及在顶部的读写层的组合被称为Union File System（联合文件系统）。
 
-那么**容器为什么使用AUFS作为文件系统呢？**
+存储驱动是指如何对容器的各层数据进行管理，已达到上述需要实现共享、可读写的效果。常见的存储驱动：
 
-假设容器不使用AUFS作为文件系统，那么根据image创建container时，便类似于Virtualbox根据box文件生成vm实例，将box中的关于Linux文件系统数据整个复制一套（要是不复制，a容器更改了fs的内容，就会影响到b容器），这个过程的耗时还是比较长的。想要复用image中的文件数据，就得使用类似UFS系统。**这也是docker启动速度快的一个重要因素（**除了实际启动的是一个进程）。
+1. AUFS
+2. OverlayFS
+3. Devicemapper
+4. Btrfs
+5. ZFS
+
+
 ```
 # 假设存在以下目录结构
 root@Standard-PC:/tmp# tree
@@ -46,22 +52,20 @@ hello
 
 ### 为什么要有volumn 
 
+[云原生存储详解：容器存储与 K8s 存储卷](https://mp.weixin.qq.com/s/7rGrXhlc4-9jgSoVHqcs4A)容器中的应用读写数据都是发生在容器的读写层，**镜像层+读写层映射为容器内部文件系统**、负责容器内部存储的底层架构。当我们需要容器内部应用和外部存储进行交互时，**需要一个类似于计算机 U 盘一样的外置存储**，容器数据卷即提供了这样的功能。 ==> `容器存储组成：只读层（容器镜像） + 读写层 + 外置存储（数据卷）`
+
 [DockOne技术分享（五十七）：Docker容器对存储的定义（Volume 与 Volume Plugin）](http://dockone.io/article/1257)提到：Docker容器天生设计就是为了应用的运行环境打包，启动，迁移，弹性拓展，所以Docker容器一个最重要的特性就是disposable，是可以被丢弃处理，稍瞬即逝的。而应用访问的重要数据可不是disposable的，这些重要数据需要持久化的存储保持。Docker提出了Volume数据卷的概念就是来应对数据持久化的。
 
 简单来说，Volume就是目录或者文件，它可以**绕过默认的UFS**，而以正常的文件或者目录的形式存在于宿主机上。换句话说，宿主机和容器建立`/a:/b`的映射，那么对容器`/b`的写入即对宿主机`/a`的写入（反之也可）。
 
  the two main reasons to use Volumes are data persistency and shared resources：
 
-- 将容器以及容器产生的数据分离开来
-
-    人们很容易想到volumn是为了持久化数据，其实容器只要你不删除，它就在那里，停掉的容器也可以重新启动运行，所以容器是持久的。
-    
-    估计也正是因为如此，`docker cp`、`docker commit`和`docker export`还不支持Volume（只是对容器本身的数据做了相应处理）。
-    
-
+- 将容器以及容器产生的数据分离开来。相比通过存储驱动实现的可写层，数据卷读写是直接对外置存储进行读写，效率更高
 - 容器间共享数据
 
 ### docker volume
+
+Volume 挂载方式语法：`-v: src:dst:opts`
 
 ```
 // 创建一个容器，包含两个数据卷
@@ -93,8 +97,6 @@ docker run -v dir:/container/dir imagename command
 ### kubernetes volume
 
 A Volume is a directory, possibly with some data in it, which is accessible to a Container. Kubernetes Volumes are similar to but not the same as Docker Volumes.
-
-A Pod specifies which Volumes its containers need in its ContainerManifest property.
 
 **A process in a Container sees a filesystem view composed from two sources: a single Docker image and zero or more Volumes**（这种表述方式很有意思）. A Docker image is at the root of the file hierarchy. Any Volumes are mounted at points on the Docker image; Volumes do not mount on other Volumes and do not have hard links to other Volumes. Each container in the Pod independently specifies where on its image to mount each Volume. This is specified a VolumeMounts property.
 
@@ -137,6 +139,13 @@ spec:
 
 1. Volume 与pod 声明周期相同，不是 Kubernetes 对象，主要用于跨节点或者容器对数据进行同步和共享。 EmptyDir、HostPath、ConfigMap 和 Secret
 2. PersistentVolume，为集群中资源的一种，它与集群中的节点 Node 有些相似，PV 为 Kubernete 集群提供了一个如何提供并且使用存储的抽象，与它一起被引入的另一个对象就是 PersistentVolumeClaim(PVC)，这两个对象之间的关系与Node和 Pod 之间的关系差不多。**PVC 消耗了持久卷资源**，而 Pod 消耗了节点上的 CPU 和内存等物理资源。PS：当 Kubernetes 创建一个节点时，它其实仅仅创建了一个对象来代表这个节点，并基于 metadata.name 字段执行健康检查，对节点进行验证。如果节点可用，意即所有必要服务都已运行，它就符合了运行一个 pod 的条件；否则它将被所有的集群动作忽略直到变为可用。
+
+[云原生存储详解：容器存储与 K8s 存储卷](https://mp.weixin.qq.com/s/7rGrXhlc4-9jgSoVHqcs4A)另一种划分方式：
+1. 本地存储：如 HostPath、emptyDir，这些存储卷的特点是，数据保存在集群的特定节点上，并且不能随着应用漂移，节点宕机时数据即不再可用；
+2. 网络存储：Ceph、Glusterfs、NFS、Iscsi 等类型，这些存储卷的特点是数据不在集群的某个节点上，而是在远端的存储服务上，使用存储卷时需要将存储服务挂载到本地使用；
+3. Secret/ConfigMap：这些存储卷类型，其数据是集群的一些对象信息，并不属于某个节点，使用时将对象数据以卷的形式挂载到节点上供应用使用；
+4. CSI/Flexvolume：这是两种数据卷扩容方式，可以理解为抽象的数据卷类型。每种扩展方式都可再细化成不同的存储类型；
+5. 一种数据卷定义方式，将数据卷抽象成一个独立于 pod 的对象，这个对象定义（关联）的存储信息即存储卷对应的真正存储信息，供 K8s 负载（也就是pod）挂载使用。
 
 因为 PVC 允许用户消耗抽象的存储资源，所以用户需要不同类型、属性和性能的 PV 就是一个比较常见的需求了，在这时我们可以通过 StorageClass 来提供不同种类的 PV 资源，上层用户就可以直接使用系统管理员提供好的存储类型。
 
@@ -262,6 +271,11 @@ PVC 和 PV 的设计，其实跟“面向对象”的思想完全一致。PVC �
 ||确定Node后，为Node挂载存储设备 ==> <br>Pod 为Node 带了一份“嫁妆”|能调度到Node上，说明Node本身的CPU和内存够用|
 ||完全是 Kubernetes 项目自己负责管理的<br>runtime 只知道mount 本地的一个目录| 容器操作基本委托给runtime|
 
+PVC、PV 的一些属性：
+1. PVC 和 PV 总是成对出现的，PVC 必须与 PV 绑定后才能被应用（Pod）消费；
+2. PVC 和 PV 是一一绑定关系，不存在一个 PV 被多个 PVC 绑定，或者一个 PVC 绑定多个 PV 的情况；
+3. 消费关系上：Pod 消费 PVC，PVC 消费 PV，而 PV 定义了具体的存储介质。
+
 ## K8s 持久化存储流程
 
 [详解 Kubernetes Volume 的实现原理](https://draveness.me/kubernetes-volume/)集群中的每一个卷在被 Pod 使用时都会经历四个操作，也就是附着（Attach）、挂载（Mount）、卸载（Unmount）和分离（Detach）。如果 Pod 中使用的是 EmptyDir、HostPath 这种类型的卷，那么这些卷并不会经历附着和分离的操作，它们只会被挂载和卸载到某一个的 Pod 中。
@@ -288,6 +302,19 @@ Volume 的创建和管理在 Kubernetes 中主要由卷管理器 VolumeManager �
 6. Kubelet 通过 Docker 启动 Pod 的 Containers，用 bind mount 方式将已挂载到本地全局目录的卷映射到容器中。
 
 在 Kubernetes 中，实际上存在着一个专门处理持久化存储的控制器，叫作 Volume Controller。这个Volume Controller 维护着多个控制循环，其中有一个循环，扮演的就是撮合 PV 和 PVC 的“红娘”的角色。它的名字叫作 PersistentVolumeController
+
+[Kubernetes 中 PV 和 PVC 的状态变化](https://mp.weixin.qq.com/s/wOzN26uuiBqEODKT0_QmJg)
+|操作|	PV 状态|	PVC 状态|
+|---|---|---|
+|创建 PV|	Available|	-|
+|创建 PVC|	Available|	Pending|
+||    Bound|	Bound|
+|删除 PV|	-/Terminating|	Lost/Bound|
+|重新创建 PV|	Bound|	Bound|
+|删除 PVC|	Released|	-|
+|后端存储不可用|	Failed|	-|
+|删除 PV 的 claimRef|	Available|	-|
+
 
 ## CSI
 
