@@ -219,7 +219,7 @@ reader.loadBeanDefinitions(res);
 
 ## ioc启动与停止
 
-**一个容器的功能：构建和管理Bean， 分割在启动和getBean 两个部分**，启动时候没有创建Bean 对象。
+**一个容器的功能：构建和管理Bean， 分割在启动和getBean 两个部分**，启动时候没有创建Bean 对象。所以BeanFactoryPostProcessor 工作在ioc 启动阶段，BeanPostProcessor 工作在getBean 阶段。
 
 ### 容器启动
 

@@ -19,15 +19,13 @@ keywords: springboot
 2. 如何自动规范依赖jar？继承 spring-boot-starter-parent
 3. tomcat 是如何内置的
 
-![](/public/upload/spring/spring_boot_class_diagram.png)
-
 建议先阅读下 [回头看Spring IOC](http://qiankunli.github.io/2015/06/15/spring_ioc.html) 对IOC 和 ApplicationContext 等概念有所了解。
 
 ![](/public/upload/spring/ioc_overview.png)
 
 ## 启动过程
 
-![](/public/upload/spring/SpringBootApplication_annotation.png)
+启动过程 就是AnnotationConfigServletWebServerApplicationContext的初始化过程。
 
 ```java
 @SpringBootApplication
@@ -40,7 +38,7 @@ public class SpringbootDemoApplication {
 
 从某种视角看 SpringApplication.run 跟以下代码差不多
 
-``java
+```java
 ApplicationContext applicationContext = new ClassPathXmlApplicationContext("application.xml");
 applicationContext.getBean("xx")
 ```
@@ -136,41 +134,47 @@ public class XXApplicationContextInitializer implements ApplicationContextInitia
 
 通过BeanFactory 对象，便可以将自定义的业务对象 注入到ioc 容器中，为spring 所用。
 
+![](/public/upload/spring/spring_boot_class_diagram.png)
+
 ## tomcat 是如何内置的——ServletWebServerApplicationContext
 
 ![](/public/upload/spring/spring_boot_web_server.png)
 
 ## @EnableAutoConfiguration 如何工作
 
+![](/public/upload/spring/SpringBootApplication_annotation.png)
 
-    @Target(ElementType.TYPE)
-    @Retention(RetentionPolicy.RUNTIME)
-    @Documented
-    @Inherited
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    @ComponentScan(excludeFilters = {
-            @Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
-            @Filter(type = FilterType.CUSTOM,
-                    classes = AutoConfigurationExcludeFilter.class) })
-    public @interface SpringBootApplication {
-        ...
-    }
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Inherited
+@SpringBootConfiguration
+@EnableAutoConfiguration
+@ComponentScan(excludeFilters = {
+        @Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
+        @Filter(type = FilterType.CUSTOM,
+                classes = AutoConfigurationExcludeFilter.class) })
+public @interface SpringBootApplication {
+    ...
+}
+```
 
 如果使用了@SpringBootApplication注解，那么自动就启用了EnableAutoConfiguration
 
-
-    @Target(ElementType.TYPE)
-    @Retention(RetentionPolicy.RUNTIME)
-    @Documented
-    @Inherited
-    @AutoConfigurationPackage
-    @Import(AutoConfigurationImportSelector.class)
-    public @interface EnableAutoConfiguration {
-        String ENABLED_OVERRIDE_PROPERTY ="spring.boot.enableautoconfiguration";
-        Class<?>[] exclude() default {};
-        String[] excludeName() default {};
-    }
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Inherited
+@AutoConfigurationPackage
+@Import(AutoConfigurationImportSelector.class)
+public @interface EnableAutoConfiguration {
+    String ENABLED_OVERRIDE_PROPERTY ="spring.boot.enableautoconfiguration";
+    Class<?>[] exclude() default {};
+    String[] excludeName() default {};
+}
+```
 
 @Import 的作用类似xml 中的`<import>` Provides functionality equivalent to the `<import/>` element in Spring XML.Allows for importing  @Configuration classes,ImportSelector and
 ImportBeanDefinitionRegistrar implementations
