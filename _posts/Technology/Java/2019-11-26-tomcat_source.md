@@ -68,6 +68,8 @@ tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支�
 
 ## 启动过程
 
+Tomcat 独立部署的模式下，我们通过 startup 脚本来启动 Tomcat，Tomcat 中的 Bootstrap 和 Catalina 会负责初始化类加载器，并解析server.xml和启动这些组件。
+
 `/usr/java/jdk1.8.0_191/bin/java -Dxx  -Xxx org.apache.catalina.startup.Bootstrap start`
 
 ![](/public/upload/java/tomcat_start.png)
@@ -191,6 +193,8 @@ tomcat并没有完全遵循类加载的双亲委派机制，考虑几个问题�
 热部署和热加载是类似的，都是在不重启Tomcat的情况下，使得应用的最新代码生效。热部署表示重新部署应用，它的执行主体是Host，表示主机。热加载表示重新加载class，它的执行主体是Context，表示应用。
 
 ## Sprint Boot如何利用Tomcat加载Servlet？
+
+在内嵌式的模式下，Bootstrap 和 Catalina 的工作就由 Spring Boot 来做了，Spring Boot 调用了 Tomcat 的 API 来启动这些组件。
 
 tomcat 源码中直接提供Tomcat类，其java doc中有如下表述：**Tomcat supports multiple styles of configuration and startup** - the most common and stable is server.xml-based,implemented in org.apache.catalina.startup.Bootstrap. Tomcat is for use in apps that embed tomcat. 从Tomcat类的属性可以看到，该有的属性都有了，内部也符合Server ==> Service ==> connector + Engine ==> Host ==> Context ==> Wrapper 的管理关系，下图绿色部分是通用的。
 
