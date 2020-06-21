@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Springboot 入门
+title: Spring 创建Bean的年代变迁
 category: 技术
 tags: Spring
 keywords: springboot
@@ -13,37 +13,11 @@ keywords: springboot
 * TOC
 {:toc}
 
-![](/public/upload/spring/springboot.png)
+![](/public/upload/spring/ioc_overview.png)
 
-[Spring 和 SpringBoot 之间到底有啥区别？](https://mp.weixin.qq.com/s/jWCa8qQv2E2uCrLZMs7vcg)SpringBoot基本上是 Spring框架的扩展
+本文主要讲下图中左侧的内容
 
-1. 创建独立的 Spring应用。
-2. 嵌入式 Tomcat、 Jetty、 Undertow容器（无需部署war文件）。
-3. 提供的 starters 简化构建配置
-4. 尽可能自动配置 spring应用。
-5. 提供生产指标,例如指标、健壮检查和外部化配置
-6. 完全没有代码生成和 XML配置要求
-
-## 起步依赖
-
-Dependency management is a critical aspects of any complex project. And doing this manually is less than ideal;
-
-Spring Boot starters were built to address exactly this problem. Starter POMs are a set of convenient dependency descriptors that you can include in your application. 说的好像 starter 依赖  有一点netty-all 的感觉。项目依赖netty-all，再通过netty-all 传递依赖netty-buffer、netty-codec、netty-codec-http、netty-common等
-
-|中间件本身|融入spring|融入springboot|
-|---|---|---|
-|rabbitmq|spring-rabbit|spring-boot-starter-amqp|
-|...|...|...|
-
-### 将starter jar的bean import 到ioc
-
-![](/public/upload/spring/SpringBootApplication_annotation.png)
-
-**starter 的本质是采用import 方式，在如何引用bean 做了创新，最终实现：只要配置了`META-INF/spring.factories`的jar 在classpath 下即可进入spring ioc的效果**。
-
-## 创建Bean的那些事儿
-
-### 根据xml, annotations or java code创建Bean
+## 根据xml, annotations or java code创建Bean
 
 [History of Spring Framework and Spring Boot](https://www.quickprogrammingtips.com/spring-boot/history-of-spring-framework-and-spring-boot.html)It currently consists of a large number of modules providing a range of services. These include a component container, aspect oriented programming support for building cross cutting concerns, security framework, data access framework, web application framework and support classes for testing components. **All the components of the spring framework are glued together by the dependency injection architecture pattern**. Dependency injection(also known as inversion of control) makes it easy to design and test loosely coupled software components. 依赖注入的关键就是有一个component container/IOC container，它持有所有对象的实例，负责所有对象的创建和销毁问题，在创建对象时可以夹一点自己的私货，比如
 
@@ -67,7 +41,7 @@ spring 迭代过程中，跟配置有关的部分，配置最终也是为了创�
 6. Spring 4.0, provide some updates to Spring 3.x @Profile
 
 
-### 根据@Profile创建Bean ==> 一次打包即可跨环境运行
+## 根据@Profile创建Bean ==> 一次打包即可跨环境运行
 
 [@Profile Annotation Improvements in Spring 4](https://javapapers.com/spring/profile-annotation-improvements-in-spring-4/)
 
@@ -113,7 +87,7 @@ In Spring 3.1, we can use the @Profile annotation only at the class level. We ca
     }
 
 
-### 根据任意条件创建Bean
+## 根据任意条件创建Bean
 
 [Spring @Conditional Annotation](https://javapapers.com/spring/spring-conditional-annotation/)
 

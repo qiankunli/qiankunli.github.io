@@ -202,8 +202,8 @@ tomcat 源码中直接提供Tomcat类，其java doc中有如下表述：**Tomcat
 
 所以 Minimal 情况下 new 一个tomcat 即可启动一个tomcat。
 
-    Tomcat tomcat = new Tomcat
-    tomcat.setXXX
+    Tomcat tomcat = new Tomcat();
+    tomcat.setXXX;
     tomcat.start();
 
 所以spring-boot-starter-web 主要体现在 创建 并配置Tomcat 实例，具体参见[SpringBoot 中内嵌 Tomcat 的实现原理解析](http://www.glmapper.com/2019/10/06/springboot-server-tomcat/)

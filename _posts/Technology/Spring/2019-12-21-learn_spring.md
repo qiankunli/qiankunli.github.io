@@ -13,13 +13,6 @@ keywords: springboot
 * TOC
 {:toc}
 
-
-![](/public/upload/spring/spring_features.png)
-
-## 先有思想后有的支持思想的feature
-
-常规的说法是：AOP的实现用到了动态代理技术。但更准确的说：**动态代理 是java 内嵌的对面向切面编程的支持**
-
 ## 编程模型
 
 面向对象编程
@@ -55,6 +48,8 @@ keywords: springboot
 
 ## Spring是什么？
 
+![](/public/upload/spring/ioc_overview.png)
+
 ### 内在本质——component container
 
 [History of Spring Framework and Spring Boot](https://www.quickprogrammingtips.com/spring-boot/history-of-spring-framework-and-spring-boot.html)It currently consists of a large number of modules providing a range of services. These include a component container, aspect oriented programming support for building cross cutting concerns, security framework, data access framework, web application framework and support classes for testing components. **All the components of the spring framework are glued together by the dependency injection architecture pattern**. Dependency injection(also known as inversion of control) makes it easy to design and test loosely coupled software components. 依赖注入的关键就是有一个component container//bean container/IOC container，它持有所有对象的实例，负责所有对象的创建和销毁问题，在创建对象时可以夹一点自己的私货。
@@ -78,4 +73,12 @@ keywords: springboot
 2017.7.27 更新
 
 面向对象出来之后，一个项目的代码通常由一系列对象组成，而理解一个项目的难点变成了：如何理解对象之间复杂的依赖关系。读过netty源码的都知道，channel、pipeline、eventloop三个组件之间，复杂的依赖关系，简直不忍直视。比如A依赖B，B可以作为A的成员、方法参数等，而Spring统一成了一种：B作为A的成员。c、go之类，即便按照面向对象的思路来编程，因为没有类似spring的组件，业务本身的复杂性 + 对象之间的复杂的依赖关系，增加了理解的难度。
+
+## 其它
+
+先有思想后有的支持思想的feature：常规的说法是：AOP的实现用到了动态代理技术。但更准确的说：**动态代理 是java 内嵌的对面向切面编程的支持**
+
+![](/public/upload/spring/spring_features.png)
+
+
 
