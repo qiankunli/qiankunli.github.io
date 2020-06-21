@@ -13,8 +13,6 @@ keywords: springboot
 * TOC
 {:toc}
 
-![](/public/upload/spring/springboot.png)
-
 几个问题
 
 1. 如何自动加载配置，将依赖bean 注入到spring ioc
@@ -24,6 +22,8 @@ keywords: springboot
 ![](/public/upload/spring/spring_boot_class_diagram.png)
 
 建议先阅读下 [回头看Spring IOC](http://qiankunli.github.io/2015/06/15/spring_ioc.html) 对IOC 和 ApplicationContext 等概念有所了解。
+
+![](/public/upload/spring/ioc_overview.png)
 
 ## 启动过程
 
@@ -36,6 +36,13 @@ public class SpringbootDemoApplication {
 		SpringApplication.run(DockerSpringbootDemoApplication.class, args);
 	}
 }
+```
+
+从某种视角看 SpringApplication.run 跟以下代码差不多
+
+``java
+ApplicationContext applicationContext = new ClassPathXmlApplicationContext("application.xml");
+applicationContext.getBean("xx")
 ```
 
 ![](/public/upload/spring/spring_application_run.png)
@@ -91,7 +98,7 @@ public ConfigurableApplicationContext run(String... args) {
 
 1. 所谓的 SpringApplicationRunListeners 就是在SpringApplication.run 方法执行的不同阶段去执行一些操作， SpringApplicationRunListener 也可在`META-INF/spring.factories` 配置
 2.  Environment代表着程序的运行环境，主要包含了两种信息，一种是profiles，用来描述哪些bean definitions 是可用的；一种是properties，用来描述系统的配置，其来源可能是配置文件、jvm属性文件、操作系统环境变量等。
-3. AnnotationConfigServletWebServerApplicationContext 的默认构造方法中初始化了两个成员变量，类型分别为AnnotatedBeanDefinitionReader 和  ClassPathBeanDefinitionScanner 用来加载Bean 定义。
+3. AnnotationConfigServletWebServerApplicationContext 的默认构造方法中初始化了两个成员变量，类型分别为AnnotatedBeanDefinitionReader 和  ClassPathBeanDefinitionScanner 用来加载BeanDefinition。
 
 其中在 prepareContext 中
 
@@ -199,5 +206,7 @@ spring-boot-autoconfigure `META-INF/spring.factories`内容示例
 总结一下就是，@EnableAutoConfiguration 会push springboot 加载各个依赖jar `META-INF/spring.factories` 中key=org.springframework.boot.autoconfigure.EnableAutoConfiguration 指定的@Configuration 类
 
 ## 其它
+
+![](/public/upload/spring/springboot.png)
 
 [你写的代码是别人的噩梦吗？从领域建模的必要性谈起](https://mp.weixin.qq.com/s/UHrJ-6ruC_HkhUXvWvDX0A)通过Annotation注解的方式对领域能力和扩展点进行标注，然后在系统bootstrap阶段，通过代码扫描的方式，将这些能力点和扩展点收集起来上传到中心服务器。类似的，starter 就有这么点意思。

@@ -13,13 +13,11 @@ keywords: JAVA Spring
 * TOC
 {:toc}
 
-![](/public/upload/spring/spring_ioc.png)
-
-Spring 容器具象化一点就是 从xml、配置类、依赖jar 等处 通过 `BeanDefinitionRegistry.registerBeanDefinition` 向容器注入Bean信息，然后通过`BeanFactory.getBean` 应用在各个位置。 笔者以前习惯于关注 BeanFactory 初始化后的getBean 部分，忽视了其初始化过程的Bean信息加载部分。
+Spring 容器具象化一点就是 从xml、配置类、依赖jar 等处 通过 `BeanDefinitionRegistry.registerBeanDefinition` 向容器注入Bean信息，然后通过`BeanFactory.getBean` 应用在各个位置。 
 
 ![](/public/upload/spring/ioc_overview.png)
 
-从[谈元编程与表达能力](https://mp.weixin.qq.com/s/SUV6vBaqwu19-xYzkG4SxA)中，笔者收获了对运行时的一个理解：当相应的行为在当前对象上没有被找到时，运行时会提供一个改变当前对象行为的入口。**从这个视角看，Spring 也可以认为是 java 的一个runtime，通过ApplicationContext 获取的bean 拥有 bean代码本身看不到的能力**。
+从[谈元编程与表达能力](https://mp.weixin.qq.com/s/SUV6vBaqwu19-xYzkG4SxA)中，笔者收获了对runtime的一个理解：当相应的行为在当前对象上没有被找到时，运行时会提供一个改变当前对象行为的入口（比如synchronized关键字，jvm 会针对性的做一些处理）。**从这个视角看，Spring 也可以认为是 java 的一个runtime，通过标注@Autowire等，ApplicationContext 获取的bean 拥有 bean代码本身看不到的能力**。
 
 ## 容器解决了什么问题？
 
@@ -79,14 +77,14 @@ class ArticlService {
 既然直接构造存在这么多的问题，那么最简单的办法就是把创建的过程拿出去，只留下与字段关联的过程：
 ```java
 class ArticleService {
-  private ArticleRepository repository;
-  public ArticleService(final ArticleRepository repository) {
-    this.repository = repository;
-  }
-  public Article findByTitle(final String title) {
-    // 做参数校验
-    return this.repository.findByTitle(title);
-  }
+    private ArticleRepository repository;
+    public ArticleService(final ArticleRepository repository) {
+        this.repository = repository;
+    }
+    public Article findByTitle(final String title) {
+        // 做参数校验
+        return this.repository.findByTitle(title);
+    }
 }
 ```
 现在，对象的创建已经分离了出去，但还是要要有一个地方完成这个工作，最简单的解决方案自然是，把所有的对象创建和组装在一个地方完成：
@@ -114,22 +112,24 @@ IOC设计模式的两个重要支持：
 2. 面向对象系统中，除了一部分对象是数据对象外，其他很大一部分是用来处理数据的，这些对象并不经常发生变化，在系统中以单件的形式起作用就可以满足应用的需求。
 
 
-## ioc的实现
+## ioc 的接口定义
 
 什么是ioc容器？BeanFactory是最简单的ioc容器，看了BeanFactory接口方法，也许会更直观(主要包括获取bean、查询bean的特性等方法)。
 
-    interface BeanFactory{
-        FACTORY_BEAN_PREFIX
-        object getBean(String)
-        T getBean(String,Class<T>)
-        T getBean(Class<T>)
-        boolean containsBean(String)
-        boolean isSingleton(String)
-        boolean isPrototype(String)  
-        boolean isTypeMatch(String,Class<T>)   
-        class<?> getType(String)
-        String[] getAliases    
-    }
+```java
+interface BeanFactory{
+    FACTORY_BEAN_PREFIX
+    object getBean(String)
+    T getBean(String,Class<T>)
+    T getBean(Class<T>)
+    boolean containsBean(String)
+    boolean isSingleton(String)
+    boolean isPrototype(String)  
+    boolean isTypeMatch(String,Class<T>)   
+    class<?> getType(String)
+    String[] getAliases    
+}
+```
 
 ### BeanFactory
 
@@ -154,49 +154,53 @@ Note that it is generally better to rely on Dependency Injection("push" configur
 
 AbstractRefreshableApplicationContext 虽然实现了BeanFactory接口，但其实是**组合了一个beanFactory**，这是讨论BeanFactory 和 ApplicationContext 差异时最核心的一点。 也正因此，ApplicationContext is a complete superset of the BeanFactory.
 
-    public abstract class AbstractRefreshableApplicationContext extends AbstractApplicationContext {
-        private DefaultListableBeanFactory beanFactory;
-        public final ConfigurableListableBeanFactory getBeanFactory() {
-            synchronized (this.beanFactoryMonitor) {
-                if (this.beanFactory == null) {
-                    throw new IllegalStateException("BeanFactory not initialized or already closed - " +
-                            "call 'refresh' before accessing beans via the ApplicationContext");
-                }
-                return this.beanFactory;
+```java
+public abstract class AbstractRefreshableApplicationContext extends AbstractApplicationContext {
+    private DefaultListableBeanFactory beanFactory;
+    public final ConfigurableListableBeanFactory getBeanFactory() {
+        synchronized (this.beanFactoryMonitor) {
+            if (this.beanFactory == null) {
+                throw new IllegalStateException("BeanFactory not initialized or already closed - " +
+                        "call 'refresh' before accessing beans via the ApplicationContext");
             }
+            return this.beanFactory;
         }
     }
+}
+```
 
 
 In contrast to a **plain BeanFactory**, an ApplicationContext is supposed to detect special beans(BeanFactoryPostProcessor/BeanPostProcessor/ApplicationListener）defined in its internal bean factory
-
-    public abstract class AbstractApplicationContext{
-        public void refresh(){
-            ...
-            prepareBeanFactory(beanFactory);
-            ...
-            registerBeanPostProcessors(beanFactory);
-            ...
-        }
-        protected void prepareBeanFactory(ConfigurableListableBeanFactory beanFactory) {
-            ...
-            beanFactory.addBeanPostProcessor(new ApplicationContextAwareProcessor(this));
-            ...
-        }
+```java
+public abstract class AbstractApplicationContext{
+    public void refresh(){
+        ...
+        prepareBeanFactory(beanFactory);
+        ...
+        registerBeanPostProcessors(beanFactory);
+        ...
     }
+    protected void prepareBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+        ...
+        beanFactory.addBeanPostProcessor(new ApplicationContextAwareProcessor(this));
+        ...
+    }
+}
+```
 
 `beanFactory.addBeanPostProcessor(new ApplicationContextAwareProcessor(this));`ApplicationContextAwareProcessor是一个BeanPostProcessor，其作用就是当发现 一个类实现了ApplicationContextAware等接口时，为该类注入ApplicationContext 成员。
-
-    public static void registerBeanPostProcessors(...){
-        String[] postProcessorNames = beanFactory.getBeanNamesForType(BeanPostProcessor.class, true, false);
-        ...
-        for (String ppName : postProcessorNames) {
-            BeanPostProcessor pp = beanFactory.getBean(ppName, BeanPostProcessor.class);
-            priorityOrderedPostProcessors.add(pp);
-        }
-        ...
-        registerBeanPostProcessors(beanFactory,priorityOrderedPostProcessors);
+```java
+public static void registerBeanPostProcessors(...){
+    String[] postProcessorNames = beanFactory.getBeanNamesForType(BeanPostProcessor.class, true, false);
+    ...
+    for (String ppName : postProcessorNames) {
+        BeanPostProcessor pp = beanFactory.getBean(ppName, BeanPostProcessor.class);
+        priorityOrderedPostProcessors.add(pp);
     }
+    ...
+    registerBeanPostProcessors(beanFactory,priorityOrderedPostProcessors);
+}
+```
 
 ### BeanFactory VS ApplicationContext
 
@@ -204,74 +208,110 @@ ApplicationContexts can autodetect BeanPostProcessor beans in their bean definit
 
 可以说，BeanFactory 基本实现了一个bean container 需要的所有功能，但其一些特性要通过programmatic来支持，ApplicationContext在简单容器BeanFactory的基础上，增加了许多面向框架的特性。《Spring技术内幕》中参照XmlBeanFactory的实现，以编程方式使用DefaultListableBeanFactory，从中我们可以看到Ioc容器使用的一些基本过程。
 
-	ClassPathResource res = new ClassPathResource("beans.xml");
-	DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
-	XmlBeanDefinitionReader reader = new XmlBeanDefinitionReader(factory);
-	reader.loadBeanDefinitions(res);
+```java
+ClassPathResource res = new ClassPathResource("beans.xml");
+DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+XmlBeanDefinitionReader reader = new XmlBeanDefinitionReader(factory);
+reader.loadBeanDefinitions(res);
+```
 	
 **简单来说，`reader.loadBeanDefinitions(res);`将类信息从`beans.xml` 读取到DefaultListableBeanFactory及其父类的各种map中。然后`factory.getBean`时即可做出对应的反应。**
 
-## 容器启动与停止
+## ioc启动与停止
+
+**一个容器的功能：构建和管理Bean， 分割在启动和getBean 两个部分**，启动时候没有创建Bean 对象。
+
+### 容器启动
 
 AbstractApplicationContext.refresh(): Load or refresh the persistent representation of the configuration such as xml. ApplicationContext 支持的很多特性都可以在个启动方法里找到迹象。
 
-	public void refresh() throws BeansException, IllegalStateException {
-		synchronized (this.startupShutdownMonitor) {
-			// Prepare this context for refreshing.
-			prepareRefresh();
-			// Tell the subclass to refresh the internal bean factory.
-			ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
-			// Prepare the bean factory for use in this context. 加入了Bean依赖以及非Bean依赖（比如Environment）
-			prepareBeanFactory(beanFactory);
-			try {
-				// Allows post-processing of the bean factory in context subclasses.
-				postProcessBeanFactory(beanFactory);
-				// Invoke factory processors registered as beans in the context.
-				invokeBeanFactoryPostProcessors(beanFactory);
-				// Register bean processors that intercept bean creation.
-				registerBeanPostProcessors(beanFactory);
-				// Initialize message source for this context.
-				initMessageSource();
-				// Initialize event multicaster for this context.
-				initApplicationEventMulticaster();
-				// Initialize other special beans in specific context subclasses.
-				onRefresh();
-				// Check for listener beans and register them.
-				registerListeners();
-				// Instantiate all remaining (non-lazy-init) singletons.
-				finishBeanFactoryInitialization(beanFactory);
-				// Last step: publish corresponding event.
-				finishRefresh();
-			}catch (BeansException ex) {
-				// Destroy already created singletons to avoid dangling resources.
-				destroyBeans();
-				// Reset 'active' flag.
-				cancelRefresh(ex);
-				// Propagate exception to caller.
-				throw ex;
-			}finally {
-				// Reset common introspection caches in Spring's core, since we
-				// might not ever need metadata for singleton beans anymore...
-				resetCommonCaches();
-			}
-		}
-	}
+```java
+public void refresh() throws BeansException, IllegalStateException {
+    synchronized (this.startupShutdownMonitor) {
+        // Prepare this context for refreshing.
+        prepareRefresh();
+        // Tell the subclass to refresh the internal bean factory.
+        ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+        // Prepare the bean factory for use in this context. 加入了Bean依赖以及非Bean依赖（比如Environment）
+        prepareBeanFactory(beanFactory);
+        try {
+            // Allows post-processing of the bean factory in context subclasses.
+            postProcessBeanFactory(beanFactory);
+            // Invoke factory processors registered as beans in the context.
+            invokeBeanFactoryPostProcessors(beanFactory);
+            // Register bean processors that intercept bean creation.
+            registerBeanPostProcessors(beanFactory);
+            // Initialize message source for this context.
+            initMessageSource();
+            // Initialize event multicaster for this context.
+            initApplicationEventMulticaster();
+            // Initialize other special beans in specific context subclasses.
+            onRefresh();
+            // Check for listener beans and register them.
+            registerListeners();
+            // Instantiate all remaining (non-lazy-init) singletons.
+            finishBeanFactoryInitialization(beanFactory);
+            // Last step: publish corresponding event.
+            finishRefresh();
+        }catch (BeansException ex) {
+            // Destroy already created singletons to avoid dangling resources.
+            destroyBeans();
+            // Reset 'active' flag.
+            cancelRefresh(ex);
+            // Propagate exception to caller.
+            throw ex;
+        }finally {
+            // Reset common introspection caches in Spring's core, since we
+            // might not ever need metadata for singleton beans anymore...
+            resetCommonCaches();
+        }
+    }
+}
+```
 
-停止逻辑
+其中obtainFreshBeanFactory ==> refreshBeanFactory
 
-	public void close() {
-		synchronized (this.startupShutdownMonitor) {
-			doClose();
-			// If we registered a JVM shutdown hook, we don't need it anymore now:We've already explicitly closed the context.
-			if (this.shutdownHook != null) {
-				try {
-					Runtime.getRuntime().removeShutdownHook(this.shutdownHook);
-				}catch (IllegalStateException ex) {
-					// ignore - VM is already shutting down
-				}
-			}
-		}
-	}
+```java
+// AbstractRefreshableApplicationContext.java
+protected final void refreshBeanFactory() throws BeansException {
+    if (hasBeanFactory()) {
+        destroyBeans();
+        closeBeanFactory();
+    }
+    try {
+        DefaultListableBeanFactory beanFactory = createBeanFactory();
+        beanFactory.setSerializationId(getId());
+        customizeBeanFactory(beanFactory);
+        loadBeanDefinitions(beanFactory);
+        synchronized (this.beanFactoryMonitor) {
+            this.beanFactory = beanFactory;
+        }
+    }
+    catch (IOException ex) {
+        throw new ApplicationContextException("I/O error parsing bean definition source for " + getDisplayName(), ex);
+    }
+}
+```
+refreshBeanFactory 中**beanFactory 的refresh 更纯粹一点**：从xml、注解 等处构造BeanDefinitions 信息。ApplicationContext refresh 杂活比较多，还要管 Listeners、MessageSource、Event ，给beanFactory 塞一些特殊的类实例或逻辑。
+
+
+### 停止逻辑
+
+```java
+public void close() {
+    synchronized (this.startupShutdownMonitor) {
+        doClose();
+        // If we registered a JVM shutdown hook, we don't need it anymore now:We've already explicitly closed the context.
+        if (this.shutdownHook != null) {
+            try {
+                Runtime.getRuntime().removeShutdownHook(this.shutdownHook);
+            }catch (IllegalStateException ex) {
+                // ignore - VM is already shutting down
+            }
+        }
+    }
+}
+```
 
 ## ioc 中的对象
 
@@ -281,12 +321,6 @@ AbstractApplicationContext.refresh(): Load or refresh the persistent representat
 |单体对象|是|否|无|依赖查找、依赖注入|
 |Resolvable Dependency|否|否|有|依赖注入|
 
-### Bean工厂的养料——BeanDefinition
-
-在BeanFactory 可以getBean之前，必须要先初始化，**从各种源（比如xml配置文件）中加载bean信息**。
-
-![](/public/upload/spring/bean_definition.png)
-
 bean在不同阶段的表现形式
 
 ||表现形式|与jvm类比|
@@ -295,9 +329,17 @@ bean在不同阶段的表现形式
 |ioc初始化|BeanDefinition|class二进制 ==> 内存中的Class对象|
 |getBean|Object|堆中的对象实例|
 
+### Bean工厂的养料——BeanDefinition
+
+在BeanFactory 可以getBean之前，必须要先初始化，**从各种源（比如xml配置文件）中加载bean信息**。
+
+![](/public/upload/spring/bean_definition.png)
+
 jvm 基于Class 对象将对象实例化，想new 一个对象，得先有Class 对象，或者使用classLoader 加载，或者动态生成。spring 容器类似，想getBean 对象bean 实例， 就是先register 对应的BeanDefinition，任何来源的bean 通过`BeanDefinitionRegistry.registerBeanDefinition` 都可以纳入到IOC 的管理。
 
 ![](/public/upload/spring/bean_definition_xmind.png)
+
+### getBean
 
 [Spring的Bean生命周期，11 张高清流程图及代码，深度解析](https://mp.weixin.qq.com/s/Rilo9hlkwM1OvfqUx_YJ9A)`BeanFactory.getBean("beanid")`得到bean的实例
 
@@ -316,3 +358,7 @@ Interface representing the environment in which the current application is runni
 Properties play an important role in almost all applications,and may originate from a variety of sources: properties files, JVM system properties, system environment variables, JNDI, servlet context parameters, ad-hoc Properties objects,Maps, and so on. The role of the environment object with relation to properties is to provide the user with a convenient service interface for configuring property sources and resolving properties from them.
 
 ![](/public/upload/spring/spring_env.png)
+
+## 其它
+
+![](/public/upload/spring/spring_ioc.png)
