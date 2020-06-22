@@ -58,11 +58,18 @@ keywords: tomcat
 
 ### 整体架构
 
-![](/public/upload/java/tomcat_war.png)
+Tomcat 要实现 2 个核心功能：
+1. 处理 Socket 连接，负责网络字节流与 Request 和 Response 对象的转化。
+2. 加载和管理 Servlet，以及具体处理 Request 请求。
+
+![](/public/upload/java/tomcat_sample.jpg)
+
+从图上可以看到，最顶层是 Server，这里的 Server 指的就是一个 Tomcat 实例。一个 Server 中有一个或者多个 Service，一个 Service 中有多个连接器和一个容器。
 
 tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支持http
 
-![](/public/upload/java/tomcat_sample.png)
+![](/public/upload/java/tomcat_war.png)
+
 
 ![](/public/upload/java/tomcat_overview.png)
 
@@ -106,6 +113,25 @@ Tomcat 独立部署的模式下，我们通过 startup 脚本来启动 Tomcat，
 
 ![](/public/upload/java/tomcat_connector.png)
 
+我们可以把连接器的功能需求进一步细化，比如：
+1. 监听网络端口。
+2. 接受网络连接请求。
+3. 读取网络请求字节流。
+4. 根据具体应用层协议（HTTP/AJP）解析字节流，生成统一的 Tomcat Request 对象。
+5. 将 Tomcat Request 对象转成标准的 ServletRequest。
+6. 调用 Servlet 容器，得到 ServletResponse。
+7. 将 ServletResponse 转成 Tomcat Response 对象。
+8. 将 Tomcat Response 转成网络字节流。将响应字节流写回给浏览器。
+
+优秀的模块化设计应该考虑高内聚、低耦合。通过分析连接器的详细功能列表，我们发现连接器需要完成 3 个高内聚的功能：
+1. 网络通信。
+2. 应用层协议解析。
+3. Tomcat Request/Response 与 ServletRequest/ServletResponse 的转化。
+
+Tomcat 的设计者设计了 3 个组件来实现这 3 个功能，分别是 Endpoint、Processor 和 Adapter。**组件之间通过抽象接口交互**，这样做一个好处是封装变化。这是面向对象设计的精髓，将系统中经常变化的部分和稳定的部分隔离，有助于增加复用性，并降低系统耦合度。网络通信的 I/O 模型是变化的，可能是非阻塞 I/O、异步 I/O 或者 APR。应用层协议也是变化的，可能是 HTTP、HTTPS、AJP。浏览器端发送的请求信息也是变化的。但是整体的处理逻辑是不变的，Endpoint 负责提供字节流给 Processor，Processor 负责提供 Tomcat Request 对象给 Adapter，Adapter 负责提供 ServletRequest 对象给容器。其中 Endpoint 和 Processor 放在一起抽象成了 ProtocolHandler 组件
+
+![](/public/upload/java/tomcat_connector.jpg)
+
 ### io 和线程模型
 
 ![](/public/upload/java/tomcat_connector_object.png)
@@ -121,44 +147,77 @@ Tomcat 独立部署的模式下，我们通过 startup 脚本来启动 Tomcat，
 
 线程数量
 
-    public class NioEndpoint extends AbstractEndpoint<NioChannel> {
+```java
+public class NioEndpoint extends AbstractEndpoint<NioChannel> {
+    private Executor executor = new ThreadPoolExecutor(getMinSpareThreads(), getMaxThreads(), 60, TimeUnit.SECONDS,taskqueue, tf);
+    
+    private int pollerThreadCount = Math.min(2,Runtime.getRuntime().availableProcessors()); // new Thread().start() 的方式
+    protected int acceptorThreadCount = 0;      // new Thread().start() 的方式
 
-        private Executor executor = new ThreadPoolExecutor(getMinSpareThreads(), getMaxThreads(), 60, TimeUnit.SECONDS,taskqueue, tf);
-        
-        private int pollerThreadCount = Math.min(2,Runtime.getRuntime().availableProcessors()); // new Thread().start() 的方式
-        protected int acceptorThreadCount = 0;      // new Thread().start() 的方式
-
-        // poller  内部除了 selector.select() 逻辑外，一般通过executor 异步执行
-        // acceptor 就是简单的 accept 一个socket 并将其 加入到poller 的event 队列中（ 以将socket 注册到selector）所以没有用到executor
-        
-    }
+    // poller  内部除了 selector.select() 逻辑外，一般通过executor 异步执行
+    // acceptor 就是简单的 accept 一个socket 并将其 加入到poller 的event 队列中（ 以将socket 注册到selector）所以没有用到executor
+}
+```
 
 
 ## 业务处理
 
+
 ### container 架构
+
+Tomcat 设计了 4 种容器，分别是 Engine、Host、Context 和 Wrapper。这 4 种容器是父子关系，形成一个树形结构。Tomcat 是用组合模式来管理这些容器的，具体实现方法是，所有容器组件都实现了 Container 接口。
+
+```java
+public interface Container extends Lifecycle {
+    public void setName(String name);
+    public Container getParent();
+    public void setParent(Container container);
+    public void addChild(Container child);
+    public void removeChild(Container child);
+    public Container findChild(String name);
+}
+```
+
+假如有用户访问一个 URL：http://user.shopping.com:8080/order/buy，Tomcat 如何将这个 URL 定位到一个 Servlet 呢？Tomcat 是用 Mapper 组件。
+1. 根据协议和端口号选定 Service 和 Engine。
+2. 根据域名选定 Host。
+3. 根据 URL 路径找到 Context 组件。
+4. 根据 URL 路径找到 Wrapper（Servlet）。
+
 
 ![](/public/upload/java/tomcat_container.png)
 
 为了更清晰一点，上图只画出了Host 类族，Engine、Context、Wrapter 与Host 类似。黄色部分组成了一个pipeline，可以看到Engine、Context、Wrapter 和Host 作为容器，并不亲自“干活”，而是交给对应的pipeline。
 
-    public class CoyoteAdapter implements Adapter {
-        // 有读事件时会触发该操作
-        public boolean event(org.apache.coyote.Request req,
-            org.apache.coyote.Response res, SocketStatus status) {
-            ...
-            // 将读取的数据写入到 request inputbuffer 
-            request.read();
-            ...
-            // 触发filter、servlet的执行
-            connector.getService().getContainer().getPipeline().getFirst().event(request, response, request.getEvent());
-            ...
-        }
+```java
+public class CoyoteAdapter implements Adapter {
+    // 有读事件时会触发该操作
+    public boolean event(org.apache.coyote.Request req,
+        org.apache.coyote.Response res, SocketStatus status) {
+        ...
+        // 将读取的数据写入到 request inputbuffer 
+        request.read();
+        ...
+        // 触发filter、servlet的执行
+        connector.getService().getContainer().getPipeline().getFirst().event(request, response, request.getEvent());
+        ...
     }
+}
+```
 
 pipeline 逐步传递请求直到Servlet
 
 ![](/public/upload/java/tomcat_handle_request_container.png)
+
+Pipeline-Valve 是责任链模式，责任链模式是指在一个请求处理的过程中有很多处理者依次对请求进行处理，每个处理者负责做自己相应的处理，处理完之后将再调用下一个处理者继续处理。Valve 表示一个处理点，比如权限认证和记录日志。
+
+每一个容器都有一个 Pipeline 对象，只要触发这个 Pipeline 的第一个 Valve，这个容器里 Pipeline 中的 Valve 就都会被调用到。不同容器的 Pipeline 是怎么链式触发的呢？Pipeline 中还有个 getBasic 方法。这个 BasicValve 处于 Valve 链表的末端，它是 Pipeline 中必不可少的一个 Valve，负责调用下层容器的 Pipeline 里的第一个 Valve。
+
+Wrapper 容器的最后一个 Valve 会创建一个 Filter 链，并调用 doFilter 方法，最终会调到 Servlet 的 service 方法。
+
+![](/public/upload/java/tomcat_pipeline_value.jpg)
+
+那 Valve 和 Filter 有什么区别吗？Valve 是 Tomcat 的私有机制，与 Tomcat 的基础架构 /API 是紧耦合的。Servlet API 是公有的标准，所有的 Web 容器包括 Jetty 都支持 Filter 机制。
 
 ## tomcat的类加载
 
@@ -171,22 +230,24 @@ tomcat并没有完全遵循类加载的双亲委派机制，考虑几个问题�
 
 ![](/public/upload/java/tomcat_classloader.jpg)
 
-    public final class Bootstrap {
-        ClassLoader commonLoader = null;
-        ClassLoader catalinaLoader = null;
-        public void init() throws Exception {
-            initClassLoaders();
-            Thread.currentThread().setContextClassLoader(catalinaLoader);
-            SecurityClassLoad.securityClassLoad(catalinaLoader);
-            ...
-        }
-        private void initClassLoaders() {
-            ...
-            commonLoader = createClassLoader("common", null);
-            ...
-            catalinaLoader = createClassLoader("server", commonLoader);
-        }
+```java
+public final class Bootstrap {
+    ClassLoader commonLoader = null;
+    ClassLoader catalinaLoader = null;
+    public void init() throws Exception {
+        initClassLoaders();
+        Thread.currentThread().setContextClassLoader(catalinaLoader);
+        SecurityClassLoad.securityClassLoad(catalinaLoader);
+        ...
     }
+    private void initClassLoaders() {
+        ...
+        commonLoader = createClassLoader("common", null);
+        ...
+        catalinaLoader = createClassLoader("server", commonLoader);
+    }
+}
+```
 
 ![](/public/upload/java/tomcat_loader.png)
 
