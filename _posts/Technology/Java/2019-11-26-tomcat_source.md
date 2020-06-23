@@ -111,7 +111,7 @@ Tomcat 独立部署的模式下，我们通过 startup 脚本来启动 Tomcat，
 
 ### connector 架构
 
-![](/public/upload/java/tomcat_connector.png)
+![](/public/upload/java/tomcat_connector.jpg)
 
 我们可以把连接器的功能需求进一步细化，比如：
 1. 监听网络端口。
@@ -129,8 +129,6 @@ Tomcat 独立部署的模式下，我们通过 startup 脚本来启动 Tomcat，
 3. Tomcat Request/Response 与 ServletRequest/ServletResponse 的转化。
 
 Tomcat 的设计者设计了 3 个组件来实现这 3 个功能，分别是 Endpoint、Processor 和 Adapter。**组件之间通过抽象接口交互**，这样做一个好处是封装变化。这是面向对象设计的精髓，将系统中经常变化的部分和稳定的部分隔离，有助于增加复用性，并降低系统耦合度。网络通信的 I/O 模型是变化的，可能是非阻塞 I/O、异步 I/O 或者 APR。应用层协议也是变化的，可能是 HTTP、HTTPS、AJP。浏览器端发送的请求信息也是变化的。但是整体的处理逻辑是不变的，Endpoint 负责提供字节流给 Processor，Processor 负责提供 Tomcat Request 对象给 Adapter，Adapter 负责提供 ServletRequest 对象给容器。其中 Endpoint 和 Processor 放在一起抽象成了 ProtocolHandler 组件
-
-![](/public/upload/java/tomcat_connector.jpg)
 
 ### io 和线程模型
 

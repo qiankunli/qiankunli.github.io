@@ -31,7 +31,7 @@ keywords: Scala  akka
 
 kafka client (producer/consumer) 与kafka server通信时使用自定义的协议，一个线程 一个selector 裸调java NIO 进行网络通信。 
 
-面对高并发、低延迟的需求，kafka 服务端使用了多线程+多selector ，参见[java nio的多线程扩展](http://qiankunli.github.io/2015/06/19/java_nio_2.html)
+面对高并发、低延迟的需求，kafka 服务端使用了多线程+多selector 
 
 ![](/public/upload/netty/kafka_server_nio.jpg)
 
