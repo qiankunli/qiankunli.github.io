@@ -18,6 +18,43 @@ MyBatis is a first class persistence framework with support for custom SQL, stor
 2. 基本隐藏了jdbc 实现，条件查询（包括结果返回）也简化了很多
 3. 使用xml 或 xml 控制java 类和 database record 的映射过程
 
+## 使用手感
+
+原生mybatis 代码
+
+```java
+String resource = "mybatis/mybatis-config.xml";
+InputStream inputStream = Resources.getResourceAsStream(resource);
+SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(inputStream);
+try (SqlSession session = sqlSessionFactory.openSession()) {
+    List<User> users = session.selectList("mybatis.mapper.UserMapper.getAll");
+    System.out.println(String.format("result:%s", users));
+}
+```
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+  <environments default="development">
+    <environment id="development">
+      <transactionManager type="JDBC"/>
+      <dataSource type="POOLED">
+        <property name="driver" value="com.mysql.jdbc.Driver"/>
+        <property name="url" value="jdbc:mysql://localhost:3306/test"/>
+        <property name="username" value="root"/>
+        <property name="password" value="root"/>
+      </dataSource>
+    </environment>
+  </environments>
+  <mappers>
+    <mapper resource="mybatis/mapper/UserMapper.xml"/>
+  </mappers>
+</configuration>
+```
+## 整体架构
+
+![](/public/upload/data/mybatis_work.png)
 
 [Mybatis framework learning](http://www.codeblogbt.com/archives/303221)
 
@@ -34,8 +71,9 @@ MyBatis is a first class persistence framework with support for custom SQL, stor
 5. MappedStatement Mybatis is also a low-level encapsulation object, which encapsulates Mybatis configuration information and SQL mapping information. A SQL in the Mapper.xml file corresponds to a Mapped Statement object, SQL.ID is the ID of the Mapped statement.
 6. Executor The input Java object is mapped to SQL by MappedStatement before the SQL is held, and the meaning of the input parameter mapping is to set the parameters for PreparedStatement in JDBC programming. ExecutOr maps the output results to the Java object after executing SQL through the MappedStatement, and the output result mapping process is equivalent to the resolution process for the results in JDBC programming.
 
+## 源码分析
 
-## 直接感受
+![](/public/upload/java/mybatis_object.png)
 
 mybatis 最重要的接口是 SqlSession，它是应用程序与持久层之间执行交互操作的一个单线程对象，具体的说
 
@@ -43,69 +81,74 @@ mybatis 最重要的接口是 SqlSession，它是应用程序与持久层之间�
 2. SqlSession是线程不安全的，每个线程都应该有它自己的SqlSession实例.
 3. 使用完SqlSeesion之后关闭Session很重要,应该确保使用finally块来关闭它.
 
-	public interface SqlSession extends Closeable {
-  		<T> T selectOne(String statement);
-  		<T> T selectOne(String statement, Object parameter);
-  		int insert(String statement);
-  		int insert(String statement, Object parameter);
-  		int delete(String statement);
-  		int delete(String statement, Object parameter);
-  	}
-  	
-  	
-从操作接口可以看到，基本是符合class persistence framework 的感觉的
+自上而下，逐渐分解
 
-1. 输入是statement（sql 的id），对象参数
-2. 返回值是对象
-3. framework 负责屏蔽sql 的变化，输入数据的序列化，输出数据的反序列化。（一不留神有点io通信框架的感觉了）
+|抽象|参数|方法|备注|
+|---|---|---|---|
+|SqlSession|mapper xml 文件中的statement  id|增删改查|
+|Executor|MappedStatement, 根据parameterObject 可以得到真正待执行的BoundSql|query/update|额外处理缓存、批量等逻辑|
+|StatementHandler|java.sql.Statement|query/update|
 
+![](/public/upload/java/mybatis_select.png)
 
-SqlSession  由 SqlSessionFactory 创建
+```java
+// DefaultSqlSession
+public void select(String statement, Object parameter, RowBounds rowBounds, ResultHandler handler) {
+    try {
+        MappedStatement ms = configuration.getMappedStatement(statement);
+        executor.query(ms, wrapCollection(parameter), rowBounds, handler);
+    } catch (Exception e) {
+        throw ExceptionFactory.wrapException("Error querying database.  Cause: " + e, e);
+    } finally {
+        ErrorContext.instance().reset();
+    }
+}
+// SimpleExecutor
+public <E> List<E> doQuery(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) throws SQLException {
+    Statement stmt = null;
+    try {
+        Configuration configuration = ms.getConfiguration();
+        StatementHandler handler = configuration.newStatementHandler(wrapper, ms, parameter, rowBounds, resultHandler, boundSql);
+        stmt = prepareStatement(handler, ms.getStatementLog());
+        return handler.query(stmt, resultHandler);
+    } finally {
+        closeStatement(stmt);
+    }
+}
+// SimpleStatementHandler
+public <E> List<E> query(Statement statement, ResultHandler resultHandler) throws SQLException {
+    String sql = boundSql.getSql();
+    statement.execute(sql);
+    return resultSetHandler.handleResultSets(statement);
+}
+```
 
-	public interface SqlSessionFactory {
-	  	SqlSession openSession();//这个方法最经常用,用来创建SqlSession对象.
-	  	SqlSession openSession(boolean autoCommit);
-	  	SqlSession openSession(Connection connection);
-	  	SqlSession openSession(TransactionIsolationLevel level);
-	  	SqlSession openSession(ExecutorType execType);
-	  	SqlSession openSession(ExecutorType execType, boolean autoCommit);
-	  	SqlSession openSession(ExecutorType execType, TransactionIsolationLevel level);
-	  	SqlSession openSession(ExecutorType execType, Connection connection);
-	  	Configuration getConfiguration();
-	}
+## 学到的技巧
 
-![](/public/upload/data/mybatis_work.png)
+StatementHandler 包含多个子类，分别对应不同的场景。一般情况下 会使用工厂模式，mybatis 实现了一个RoutingStatementHandler（上层代码无需关心具体实现），根据参数 创建一个delegate 实现 并将请求转发给它。 **是一个用对象 替换if else 的典型实现**。
 
-关于SqlSessionFactory和SqlSession两个对象给一个具体的使用过程: 
-
-	public class TestQuickStart {
-	    @Test
-	    public void testQueryBlogById() throws Exception {
-	        // 1. Load the SqlMapConfig.xml configuration file
-	        InputStream inputStream = Resources.getResourceAsStream("SqlMapConfig.xml");
-	        // 2. Create SqlSessionFactoryBuilder objects
-	        SqlSessionFactoryBuilder sqlSessionFactoryBuilder = new SqlSessionFactoryBuilder();
-	        // 3. Create SqlSessionFactory objects
-	        SqlSessionFactory sqlSessionFactory = sqlSessionFactoryBuilder.build(inputStream);
-	        // 4. Create SqlSession objects
-	        SqlSession sqlSession = sqlSessionFactory.openSession();
-	        // 5. Execute SqlSession object execution query and get result Blog13         // The first parameter is the ID of statement of BlogMapper.xml. The second parameter is the parameter needed to execute SQL.
-	        Blog blog = sqlSession.selectOne("queryBlogById", 1);
-	        // 6. Print results
-	        System.out.println(blog);
-	        // 7. Release resources
-	        sqlSession.close();
-	    }
-	}
-
-从中可以看到：
-
-1. mybatis 最重要的是SqlSessionFactory和SqlSession两个对象， 尤其以SqlSession 最为核心，其interface 定义最体现了class persistence framework 的精髓
-2. 很多框架，在实现其基本逻辑后， 一般会提供给一个xx-spring 封装以与spring 整合。所以在学习mybatis 时，**我们自己要分清楚哪些是框架本身的部分（里儿），哪些是皮儿。**
-3. 很多框架在主体之外，通常会有很多旁路系统，比如获取配置（动态或静态）、监控等，SqlSessionFactoryBuilder、SqlSessionFactory 就是类似的旁路系统，**搞清楚主体和枝节**。
+```java
+public class RoutingStatementHandler implements StatementHandler {
+    private final StatementHandler delegate;
+    public RoutingStatementHandler(Executor executor, MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, BoundSql boundSql) {
+        switch (ms.getStatementType()) {
+        case STATEMENT:
+            delegate = new SimpleStatementHandler(executor, ms, parameter, rowBounds, resultHandler, boundSql);
+            break;
+        case PREPARED:
+            delegate = new PreparedStatementHandler(executor, ms, parameter, rowBounds, resultHandler, boundSql);
+            break;
+        case CALLABLE:
+            delegate = new CallableStatementHandler(executor, ms, parameter, rowBounds, resultHandler, boundSql);
+            break;
+        default:
+            throw new ExecutorException("Unknown statement type: " + ms.getStatementType());
+        }
+    }
+}
+```
 
 ## 再进一步
-
 
 作者在做hibernate 与mybatis 的对比时提到：
 
