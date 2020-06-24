@@ -75,7 +75,7 @@ try (SqlSession session = sqlSessionFactory.openSession()) {
 
 ![](/public/upload/java/mybatis_object.png)
 
-mybatis 最重要的接口是 SqlSession，它是应用程序与持久层之间执行交互操作的一个单线程对象，具体的说
+mybatis 最重要的接口是 SqlSession，它是应用程序与持久层之间执行交互操作的一个单线程对象，SqlSessionTemplate 只是mybatis-spring 对它的封装
 
 1. SqlSession对象完全包含以数据库为背景的所有执行SQL操作的方法,它的底层封装了JDBC连接,可以用SqlSession实例来直接执行被映射的SQL语句.
 2. SqlSession是线程不安全的，每个线程都应该有它自己的SqlSession实例.
@@ -83,11 +83,12 @@ mybatis 最重要的接口是 SqlSession，它是应用程序与持久层之间�
 
 自上而下，逐渐分解
 
-|抽象|参数|方法|备注|
+|抽象|参数 ==> 结果|方法|备注|
 |---|---|---|---|
-|SqlSession|mapper xml 文件中的statement  id|增删改查|
-|Executor|MappedStatement, 根据parameterObject 可以得到真正待执行的BoundSql|query/update|额外处理缓存、批量等逻辑|
-|StatementHandler|java.sql.Statement|query/update|
+|SqlSession|mapper xml 文件中的statement  id ==> (List) obj|增删改查|
+|Executor|MappedStatement ==> (List) obj, 根据parameterObject 可以得到真正待执行的BoundSql|query/update|额外处理缓存、批量等逻辑|
+|StatementHandler|java.sql.Statement ==> (List) obj|query/update|
+|java.sql.Statement|sql ==> ResultSet|query/update|
 
 ![](/public/upload/java/mybatis_select.png)
 
