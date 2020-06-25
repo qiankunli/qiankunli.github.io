@@ -22,7 +22,11 @@ keywords: kubernetes 源码分析
 The Kubernetes controller manager is a daemon that embeds the core control loops shipped with Kubernetes. In applications of robotics and
 automation, a control loop is a non-terminating loop that regulates the state of the system. In Kubernetes, a controller is a control loop that watches the shared state of the cluster through the apiserver and makes changes attempting to move the current state towards the desired state.
 
+![](/public/upload/kubernetes/controller_view.png)
+
 ## ControllerContext
+
+Informer 是 Client-go 中的一个核心工具包。如需要 List/Get Kubernetes 中的 Object（包括pod，service等等），可以直接使用 Informer 实例中的 Lister()方法（包含 Get 和 List 方法）。Informer 最基本的功能就是 List/Get Kubernetes 中的 Object，还可以监听事件并触发回调函数等。
 
 ![](/public/upload/kubernetes/controller_context.png)
 

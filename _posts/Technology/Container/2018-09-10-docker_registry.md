@@ -30,6 +30,38 @@ Harbor做的事情就是说它在原生的一个 Docker registry 的基础上提
 
 ## 镜像仓库
 
+容器镜像包含以下的信息
+1. Manifest：包含特定平台、os的镜像信息、包含layer\config描述和digest信息
+2. Config：容器运行时需要用到的rootfs的变更和执行参数
+3. layer：包含了文件系统的信息，即该image包含了哪些文件/目录，以及它们的属性和数据。
+4. tar+gzip
+
+`docker manifest inspect istio/pilot:1.2.2` 可以看到以下数据
+
+![](/public/upload/container/container_manifest.png)
+
+那镜像是如何下发的呢？
+1. 把tag解析为对应的manifest
+2. 获取manifest，查找本地不存在的层
+3. 下载层（tar.gz文件）
+4. 解压
+通过解析镜像的格式以及下发过程，我们可以总结出影响镜像分发速度因素
+1. 镜像大小
+2. 网络带宽
+3. 并发数
+4. 有改动的层的大小
+
+那如何加速镜像下发呢？
+1. 减少镜像层数，删除非必要文件
+2. 尽量使用相同的base image
+3. base镜像预拉取
+4. 多阶段构建
+5. 使用nginx 缓存
+6. 使用工具（如docker-slim）压缩镜像
+7. 后端使用对象存储
+8. Harbor replication，通过复制多个Harbor的方式，分担下载压力。
+9. 使用P2P协议，Dragonfly p2p；Uber Kraken p2p
+
 ### image在docker registry 存储
 
 [DockOne技术分享（二十六）：Docker Registry V1 to V2](http://dockone.io/article/747)一个重要的视角，你可以观察registry daemon或container 在磁盘上的存储目录

@@ -13,7 +13,6 @@ keywords: kubernetes 源码分析
 * TOC
 {:toc}
 
-
 背景知识
 
 1. GO语言的http包使用
@@ -45,12 +44,15 @@ keywords: kubernetes 源码分析
 
 ## 整体架构
 
+API Server使用了go-restful框架，按照go-restful的原理，包含以下的组件
+1. Container: 一个Container包含多个WebService
+2. WebService: 一个WebService包含多条route
+3. Route: 一条route包含一个method(GET、POST、DELETE，WATCHLIST等)，一条具体的path以及一个响应的handler
+
 ![](/public/upload/kubernetes/apiserver_overview.png)
 
-在[Kubernetes源码分析——从kubectl开始](http://qiankunli.github.io/2018/12/23/kubernetes_source_kubectl.html) [Kubernetes源码分析——kubelet](http://qiankunli.github.io/2018/12/31/kubernetes_source_kubelet.html)系列博客中，笔者都是以创建pod 为主线来学习k8s 源码。 在学习api server 之初，笔者想当然的认为 `kubectl create -f xxpod.yaml` 发出http 请求，apiserver 收到请求，然后有一个PodHandler的东西处理相关逻辑， 比如将信息保存在etcd 上。结果http.server 启动部分都正常，但PodHandler 愣是没找到。k8s apiserver 刷新了笔者对http.server 开发的认知。
+在API Server中会通过InstallAPIs 和 InstallLegacyAPI来注册API接口，**并关联到相应的处理对象RESTStorage**。
 
-1. apiserver 将resource/kubernetes object 数据保存在etcd 上，因为resource 通过etcd 持久化的操作模式比较固定，一个通用http.Handler 根据resource 元数据 即可完成 crud，无需专门的PodHandler/ServiceHandler 等
-2. apiserver 也不单是built-in resource的api server，**是一个通用api server**，这也是为何相关的struct 叫 GenericAPIServer。 就是你定义一个user.yaml，dynamic registry user.yaml 到 apiserver上，然后就可以直接 `http://apiserver/api/users` 返回所有User 数据了。
 
 ## 启动
 
@@ -199,3 +201,13 @@ Similarly, if you want to put a container somewhere but you don’t care where:
 When I understood that basically everything in Kubernetes works by watching etcd for stuff it has to do, doing it, and then writing the new state back into etcd, Kubernetes made a lot more sense to me.
 
 [Reasons Kubernetes is cool](https://jvns.ca/blog/2017/10/05/reasons-kubernetes-is-cool/)Because all the components don’t keep any state in memory(stateless), you can just restart them at any time and that can help mitigate a variety of bugs.The only stateful thing you have to operate is etcd
+
+## create pod
+
+![](/public/upload/kubernetes/apiserver_create_pod.png)
+
+在[Kubernetes源码分析——从kubectl开始](http://qiankunli.github.io/2018/12/23/kubernetes_source_kubectl.html) [Kubernetes源码分析——kubelet](http://qiankunli.github.io/2018/12/31/kubernetes_source_kubelet.html)系列博客中，笔者都是以创建pod 为主线来学习k8s 源码。 在学习api server 之初，笔者想当然的认为 `kubectl create -f xxpod.yaml` 发出http 请求，apiserver 收到请求，然后有一个PodHandler的东西处理相关逻辑， 比如将信息保存在etcd 上。结果http.server 启动部分都正常，但PodHandler 愣是没找到。k8s apiserver 刷新了笔者对http.server 开发的认知。
+
+1. apiserver 将resource/kubernetes object 数据保存在etcd 上，因为resource 通过etcd 持久化的操作模式比较固定，一个通用http.Handler 根据resource 元数据 即可完成 crud，无需专门的PodHandler/ServiceHandler 等
+2. apiserver 也不单是built-in resource的api server，**是一个通用api server**，这也是为何相关的struct 叫 GenericAPIServer。 就是你定义一个user.yaml，dynamic registry user.yaml 到 apiserver上，然后就可以直接 `http://apiserver/api/users` 返回所有User 数据了。
+

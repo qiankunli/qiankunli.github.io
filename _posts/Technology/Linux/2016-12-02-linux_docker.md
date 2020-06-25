@@ -111,6 +111,8 @@ network namespace 倒是没有根， 但docker 创建 veth pair，root namespace
 
 ## cgroups
 
+对于CPU Cgroup的配置会影响一个进程的task_struct作为调度单元的scheduled_entity，并影响在CPU上的调度。对于内存 Cgroup的配置起作用在进程申请内存的时候，也即当出现缺页，调用handle_pte_fault进而调用do_anonymous_page的时候，会查看是否超过了配置，超过了就分配失败，OOM。
+
 [使用cgroups控制进程cpu配额](http://www.pchou.info/linux/2017/06/24/cgroups-cpu-quota.html)
 
 从操作上看：

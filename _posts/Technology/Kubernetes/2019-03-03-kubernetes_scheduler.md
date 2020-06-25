@@ -30,11 +30,14 @@ the scheduler is yet another controller, watching for Pods to show up in the API
 
 在 Kubernetes 里，Pod 是最小的原子调度单位。这也就意味着，所有跟调度和资源管理相关的属性都应该是属于 Pod 对象的字段。而这其中最重要的部分，就是 Pod 的CPU 和内存配置
 
-在 Kubernetes 中，像 CPU 这样的资源被称作“可压缩资源”（compressible resources）。它的典型特点是，当可压缩资源不足时，Pod 只会“饥饿”，但不会退出。
+在 Kubernetes 中，像 CPU 这样的资源被称作“可压缩资源”（compressible resources）。它的典型特点是，当可压缩资源不足时，Pod 只会“饥饿”，但不会退出。而像内存这样的资源，则被称作“不可压缩资源（incompressible resources）。当不可压缩资源不足时，Pod 就会因为 OOM（Out-Of-Memory）被内核杀掉。
 
-而像内存这样的资源，则被称作“不可压缩资源（incompressible resources）。当不可压缩资源不足时，Pod 就会因为 OOM（Out-Of-Memory）被内核杀掉。
+### request and limit
 
 Kubernetes 里 Pod 的 CPU 和内存资源，实际上还要分为 limits 和 requests 两种情况：在调度的时候，kube-scheduler 只会按照 requests 的值进行计算。而在真正设置 Cgroups 限制的时候，kubelet 则会按照 limits 的值来进行设置。这个理念基于一种假设：容器化作业在提交时所设置的资源边界，并不一定是调度系统所必须严格遵守的，这是因为在实际场景中，大多数作业使用到的资源其实远小于它所请求的资源限额。
+
+
+### request limit 关系 ==> QoS ==> 驱逐策略
 
 QoS 划分的主要应用场景，是当宿主机资源（主要是不可压缩资源）紧张的时候，kubelet 对 Pod 进行 Eviction（即资源回收）时需要用到的。“紧张”程度可以作为kubelet 启动参数配置，默认为
 
@@ -178,32 +181,43 @@ type PreFilterPlugin interface {
 
 ![](/public/upload/kubernetes/scheduler_object.png)
 
-![](/public/upload/kubernetes/scheduler_sequence.png)
-
-## 亲和性与调度
-
-1. 对于Pod yaml进行配置，约束一个 Pod 只能在特定的 Node(s) 上运行，或者优先运行在特定的节点上
-    1. nodeSelector
-    2. nodeAffinity，相对nodeSelector 更专业和灵活一点
-    3. podAffinity，根据 POD 之间的关系进行调度
-2. 对Node 进行配置。如果一个节点标记为 Taints ，除非 POD 也被标识为可以容忍污点节点，否则该 Taints 节点不会被调度pod。
-
-[Assigning Pods to Nodes](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity-beta-feature)
-
-Node affinity, described [here](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity-beta-feature), is a property of pods that attracts them to a set of nodes (either as a preference or a hard requirement). Taints are the opposite – they allow a node to repel（击退） a set of pods.
-
-[Taints and Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
-
-给节点加Taints`kubectl taint nodes node1 key=value:NoSchedule`
-
-给pod 加加tolerations
-```yaml
-tolerations:
-- key: "key"
-operator: "Equal"
-value: "value"
-effect: "NoSchedule"
+```go
+sched, err := scheduler.New(cc.Client,
+    cc.InformerFactory,
+    cc.PodInformer,
+    recorderFactory,
+    ctx.Done(),
+    scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
+    scheduler.WithAlgorithmSource(cc.ComponentConfig.AlgorithmSource),
+    scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
+    scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
+    scheduler.WithBindTimeoutSeconds(cc.ComponentConfig.BindTimeoutSeconds),
+    scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
+    scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
+    scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
+    scheduler.WithExtenders(cc.ComponentConfig.Extenders...),
+  )
 ```
-NoSchedule 是一个effect. This means that no pod will be able to schedule onto node1 unless it has a matching toleration.
 
+在创建Scheduler的New函数里面，做了以下几件事情：
+1. 创建SchedulerCache，这里面有podStates保存Pod的状态，有nodes保存节点的状态，整个调度任务是完成两者的匹配。
+2. 创建volumeBinder，因为调度很大程度上和Volume是相关的，有可能因为要求某个Pod需要满足一定大小或者条件的Volume，而这些Volume只能在某些节点上才能被挂载。
+3. 创建调度队列，将来尚未调度的Pod都会放在这个队列里面
+4. 创建调度算法，将来这个对象的Schedule函数会被调用进行调度
+5. 创建调度器，组合上面所有的对象
+6. addAllEventHandlers，添加事件处理器。如果Pod已经调度过，发生变化则更新Cache，如果Node发生变化更新Cache，如果Pod没有调度过，则放入队列中等待调度，PV和PVC发生变化也会做相应的处理。
+
+创建了Scheduler之后，接下来是调用Scheduler的Run函数，运行scheduleOne进行调度。
+1. 从队列中获取下一个要调度的Pod
+2. 根据调度算法，选择出合适的Node，放在scheduleResult中
+3. 在本地缓存中，先绑定Volume，真正的绑定要调用API Server将绑定信息放在ETCD里面，但是因为调度器不能等写入ETCD后再调度下一个，这样太慢了，因而在本地缓存中绑定后，同一个Volume，其他的Pod调度的时候就不会使用了。
+4. 在本地缓存中，绑定Node，原因类似
+5. 通过API Server的客户端做真正的绑定，是异步操作
+
+接下来我们来看调度算法的Schedule函数，Schedule算法做了以下的事情：
+1. findNodesThatFitPod：根据所有预选算法过滤符合的node列表
+2. prioritizeNodes: 对符合的节点进行优选评分，一个排序的列表
+3. selectHost：对优选的 node 列表选择一个最优的节点
+
+![](/public/upload/kubernetes/scheduler_sequence.png)
 
