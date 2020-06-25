@@ -3,7 +3,7 @@
 layout: post
 title: Prometheus 学习
 category: 技术
-tags: Ops
+tags: Go
 keywords: Prometheus
 
 ---
@@ -13,11 +13,7 @@ keywords: Prometheus
 * TOC
 {:toc}
 
-[Prometheus官网](https://prometheus.io/)
-
-[Prometheus官方文档](https://prometheus.io/docs)
-
-Prometheus 是由SoundCloud 开发的开源监控报警系统和时序数据库（TSDB），由Golang编写
+[Prometheus官网](https://prometheus.io/)[Prometheus官方文档](https://prometheus.io/docs)Prometheus 是由SoundCloud 开发的开源监控报警系统和时序数据库（TSDB），由Golang编写。
 
 由于数据采集可能会有丢失，所以 Prometheus 不适用于对采集数据要 100% 准确的情形，例如实时监控
 
