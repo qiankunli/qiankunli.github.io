@@ -10,39 +10,27 @@ keywords: 面向对象
 
 ## 简介
 
-本文最初由[apollo client源码分析](http://qiankunli.github.io/2017/09/23/apollo_client_source.html) 引发，后来加入了 陈皓《左耳听风》教程的相关内容。
-
-我一直有一个比方，如果把程序员写程序比作史官写历史，那么面向过程就是编年体通史，而面向对象更像是纪传体通史。编年体通史以时间（或一段时间）为中心，
-
-    公元xxx年，xxx攻打xxx，克xx城
-    公元xx年，xx卒
-    
-而纪传体通史则以人物为中心，譬如《史记》的《高祖本纪》等。类似的，面向过程多认为程序由一个个函数组成（依照顺序先后调用），譬如历史由一件件大事组成。而面向对象倾向于认为程序由一个个对象组成，譬如历史由一个个人的故事组成。
+我一直有一个比方，如果把程序员写程序比作史官写历史，那么面向过程就是编年体通史，而面向对象更像是纪传体通史。编年体通史以时间（或一段时间）为中心，而纪传体通史则以人物为中心，譬如《史记》的《高祖本纪》等。类似的，面向过程多认为程序由一个个函数组成（依照顺序先后调用），譬如历史由一件件大事组成。而面向对象倾向于认为程序由一个个对象组成，譬如历史由一个个人的故事组成。
 
 ## 喷一喷面向对象
 
-2019.1.2 补充
-
-[如此理解面向对象编程](https://coolshell.cn/articles/8745.html)，有一个需求：代码检查操作系统类型，若是linux 输出：linux很不错；若是windows，输出windows 很差
+2019.1.2 补充[如此理解面向对象编程](https://coolshell.cn/articles/8745.html)，有一个需求：代码检查操作系统类型，若是linux 输出：linux很不错；若是windows，输出windows 很差
 
 1. 过程化的方案
 2. 一般面向对象方案（一个os 抽象class，一个具体os 对应一个子class）
 3. 面向对象进化：不仅弄子类，还弄一map 保存os 和 子类的关系
 4. 大神 Rob Pike 对此的评论是：根本就不需要什么Object，只需要一张小小的配置表格，里面配置了对应的操作系统和你想输出的文本。这不就完了。所谓的代码进化相当疯狂和愚蠢的，这个完全误导了对编程的认知。
 
-
 还有的人喜欢用Object来替换所有的if-else语句，他们甚至还喜欢把函数的行数限制在10行以内 [programming in the
 twenty-first century](https://prog21.dadgum.com/156.html)
 6. **那23个经典的设计模式和OO半毛钱关系没有**，只不过人家用OO来实现罢了。设计模式就三个准则：1）中意于组合而不是继承，2）依赖于接口而不是实现，3）高内聚，低耦合。你看，这完全就是Unix的设计准则。
 
 
-[Don't Distract New Programmers with OOP](https://prog21.dadgum.com/93.html)
-
-The shift from procedural to OO brings with it a shift from thinking about problems and solutions to thinking about architecture. That's easy to see just by comparing a procedural Python program with an object-oriented one. The latter is almost always longer, full of extra interface and indentation and annotations. The temptation（诱惑） is to start moving trivial bits of code into classes and adding all these little methods and anticipating（预料） methods that aren't needed yet but might be someday. 封装对象、类、接口等对很多简单代码来说是不必要的。
+[Don't Distract New Programmers with OOP](https://prog21.dadgum.com/93.html)The shift from procedural to OO brings with it a shift from thinking about problems and solutions to thinking about architecture. That's easy to see just by comparing a procedural Python program with an object-oriented one. The latter is almost always longer, full of extra interface and indentation and annotations. The temptation（诱惑） is to start moving trivial bits of code into classes and adding all these little methods and anticipating（预料） methods that aren't needed yet but might be someday. 封装对象、类、接口等对很多简单代码来说是不必要的。
 
 When you're trying to help someone learn how to go from a problem statement to working code, the last thing you want is to get them sidetracked（转移话题） by faux（人造的）-engineering busywork（作业、额外工作）. Some people are going to run with those scraps（点滴） of OO knowledge and build crazy class hierarchies and end up not as focused on on what they should be learning. Other people are going to lose interest because there's a layer of extra nonsense（无意义的） that makes programming even more cumbersome（笨重的）.
 
-面向对象逼着你除了思考问题本身外，还要思考结构、设计，很多人无此意识或功力不足， 滥用面向对象的特性，整出大量无意义的代码，使得代码复杂度大大超过了问题本身的复杂度。[函数式编程的设计模式](http://qiankunli.github.io/2018/12/15/functional_programming_patterns.html) 面向对象设计模式经常在搞一件事，把动词转换为名词，但很不幸，这个动作很多时候没有必要。
+面向对象逼着你除了思考问题本身外，还要思考结构、设计，很多人无此意识或功力不足， 滥用面向对象的特性，整出大量无意义的代码，使得代码复杂度大大超过了问题本身的复杂度。
 
 ## 继承也是组合
 
@@ -58,7 +46,9 @@ controller-service-dao说白了，跟面向对象没啥关系，说面向过程�
 
 一个类，有几个方法，有几个字段，叫啥名，哪些对外可见的，很重要，绝不是随意的，反应了你的设计理念。尤其是在重逻辑，轻数据处理的项目中。Controller-service-dao 给了很不好的恶习。
 
-一个对象，被多少方法作为参数，就有多少逻辑暴露在外面，对象相关的逻辑操作散乱在各处，一次更改便会涉及到多个类，对更改很不友好。可以推知：一个“丰满”的对象，应该尽量少的被作为参数。
+在一些从结构化编程起步的程序员的视角里，面向对象就是数据加函数。虽然这种理解不算完全错误，但理解的程度远远不够。面向对象是解决更大规模应用开发的一种尝试，它提升了程序员管理程序的尺度。谈到面向对象，你可能会想到面向对象的三个特点：封装、继承和多态。**封装，则是面向对象的根基**。对象之间就是靠方法调用来通信的。但这个方法调用并不是简单地把对象内部的数据通过方法暴露。因为，封装的重点在于对象提供了哪些行为，而不是有哪些数据。也就是说，即便我们把对象理解成数据加函数，**数据和函数也不是对等的地位**。函数是接口，而数据是内部的实现，正如我们一直说的那样，接口是稳定的，实现是易变的。
+
+理解了这一点，我们来看一个很多人都有的日常编程习惯。他们编写一个类的方法是，把这个类有哪些字段写出来，然后，生成一大堆 getter 和 setter，将这些字段的访问暴露出去。**这种做法的错误就在于把数据当成了设计的核心**，这一堆的 getter 和 setter，就等于把实现细节暴露了出去。请注意，方法的命名，体现的是你的意图，而不是具体怎么做。所以，**getXXX 和 setXXX 绝对不是一个好的命名**。不过，在真实的项目中，有时确实需要暴露一些数据，所以，等到你确实需要暴露的时候，再去写 getter 也不迟，你一定要问问自己为什么要加 getter。至于 setter，首先，大概率是你用错了名字，应该用一个表示意图的名字；其次，setter 通常意味着修改，这是我们不鼓励的。
 
 ## 左耳听风
 
