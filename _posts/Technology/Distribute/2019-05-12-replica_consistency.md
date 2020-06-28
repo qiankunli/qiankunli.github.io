@@ -13,11 +13,13 @@ keywords: 一致性协议
 * TOC
 {:toc}
 
-建议先参见 [串一串一致性协议](http://qiankunli.github.io/2018/09/27/consistency_protocol.html) 了解下背景
-
 ![](/public/upload/distribute/consistency.png)
 
-## basic-paxos——不断循环的2PC
+[条分缕析分布式：到底什么是一致性？](https://mp.weixin.qq.com/s/qnvl_msvw0XL7hFezo2F4w)在证明CAP定理的原始论文Brewer’s Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web，C指的是linearizable consistency，也就是「线性一致性」。更精简的英文表达则是linearizability。而很多人在谈到CAP时，则会把这个C看成是强一致性（strong consistency）。这其实也没错，因为线性一致性的另一个名字，就是强一致性。只不过，相比「线性一致性」来说，「强一致性」并不是一个好名字。因为，从这个名字你看不出来它真实的含义（到底「强」在哪？）
+
+那线性一致性是什么意思呢？它精确的形式化定义非常抽象，且难以理解。具体到一个分布式存储系统来说，线性一致性的含义可以用一个具体的描述来取代：对于任何一个数据对象来说，系统**表现得就像它只有一个副本一样**。显然，如果系统对于每个数据对象真的只存一个副本，那么肯定是满足线性一致性的。但是单一副本不具有容错性，所以分布式存储系统一般都会对数据进行复制（replication），也就是保存多个副本。这时，在一个分布式多副本的存储系统中，要提供线性一致性的保证，就需要付出额外的成本了。
+
+## basic-paxos
 
 每个Node 同时充当了两个角色：Proposer和Acceptor，在实现过程中， 两个角色在同一个进程里面。专门提一个Proposer概念（只是一个角色概念）的好处是：对业务代码没有侵入性，也就是说，我们不需要在业务代码中实现算法逻辑，就可以像使用数据库一样访问后端的数据。
 

@@ -62,6 +62,8 @@ My response of old might have been “well, here’s the FLP paper, and here’s
 
 ## 分布式系统不可能三角——CAP
 
+2020.06.28补充：[条分缕析分布式：到底什么是一致性？](https://mp.weixin.qq.com/s/qnvl_msvw0XL7hFezo2F4w)在历史上，CAP定理具有巨大的知名度，但它实际的影响力却没有想象的那么大。随着分布式理论的发展，我们逐渐认识到，CAP并不是一个「大一统」的理论，远不能涵盖分布式系统设计中方方面面的问题。相反，CAP引发了很多误解和理解上的混乱（细节不讨论了）。
+
 下文来自 李运华 极客时间中的付费专栏《从0到1学架构》和韩健的《分布式协议和算法实战》。
 
 Robert Greiner （http://robertgreiner.com/about/） 对CAP 的理解也经历了一个过程，他写了两篇文章来阐述CAP理论，第一篇被标记为outdated
