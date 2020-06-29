@@ -36,3 +36,6 @@ keywords: Prometheus Source
 
 prometheus的启动也可以看作十个不同职能组件的启动。 启动用到了 `github.com/oklog` 的Group struct， Group collects actors (functions) and runs them concurrently. When one actor (function) returns, all actors are interrupted. 实现多个协程”共进退“的效果（实际上Group 自己也没干啥事儿， 就是封装了业务函数 和 interrupt 两个函数）。
 
+## metric scrape 组件
+
+![](/public/upload/go/prometheus_scraper_object.png)

@@ -187,6 +187,8 @@ restartPolicy 和 Pod 里容器的状态，以及Pod 状态的对应关系（最
     kubectl describe pod <pod-name> 查看 Pod 的事件
     kubectl logs <pod-name> [-c <container-name>] 查看容器日志
 
+[Restart policy](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy)A PodSpec has a restartPolicy field with possible values Always, OnFailure, and Never. The default value is Always. restartPolicy applies to all Containers in the Pod. restartPolicy only refers to restarts of the Containers by the kubelet on the same node. Exited Containers that are restarted by the kubelet are restarted with an exponential back-off delay (10s, 20s, 40s ...) capped at five minutes, and is reset after ten minutes of successful execution. **业务容器经常会因为内存不足发生oom，进而导致容器的重启，重启次数可以间接反映业务的健康状态**。
+
 ### 为什么pod中要有一个pause 容器？
 
 [Kubernetes networking 101 – Pods](http://www.dasblinkenlichten.com/kubernetes-networking-101-pods/)
