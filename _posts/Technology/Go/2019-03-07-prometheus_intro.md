@@ -31,26 +31,28 @@ Prometheus is configured via command-line flags and a configuration file. While 
 
 从配置文件来看 prometheus
 
-    $ cat /usr/local/prometheus/prometheus.yml
-    # 全局配置
-    global:
-    	scrape_interval:     15s # 默认抓取间隔, 15秒向目标抓取一次数据。
-    	evaluation_interval: 15s # 执行rules的频率
-    alerting:
-        alertmanagers:  ## 配置alertmanager的地址
-    rule_files:
-    # - "first.rules"
-    # - "second.rules"
-    # controls what resources Prometheus monitors.
-    scrape_configs:
-    # 这里是抓取promethues自身的配置
-    - job_name: 'prometheus'
-        # metrics_path defaults to '/metrics'
-        # scheme defaults to 'http'.
-        # 重写了全局抓取间隔时间，由15秒重写成5秒。
-        scrape_interval: 5s
-        static_configs:
-        - targets: ['localhost:9090']
+```yaml
+$ cat /usr/local/prometheus/prometheus.yml
+# 全局配置
+global:
+    scrape_interval:     15s # 默认抓取间隔, 15秒向目标抓取一次数据。
+    evaluation_interval: 15s # 执行rules的频率
+alerting:
+    alertmanagers:  ## 配置alertmanager的地址
+rule_files:
+# - "first.rules"
+# - "second.rules"
+# controls what resources Prometheus monitors.
+scrape_configs:
+# 这里是抓取promethues自身的配置
+- job_name: 'prometheus'
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+    # 重写了全局抓取间隔时间，由15秒重写成5秒。
+    scrape_interval: 5s
+    static_configs:
+    - targets: ['localhost:9090']
+```
 
 启动prometheus `prometheus --config.file=prometheus.yml`
 

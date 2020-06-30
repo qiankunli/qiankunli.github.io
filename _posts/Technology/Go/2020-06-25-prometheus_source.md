@@ -8,7 +8,7 @@ keywords: Prometheus Source
 
 ---
 
-## 前言(未完成)
+## 前言
 
 * TOC
 {:toc}
@@ -47,4 +47,55 @@ $GOPATH/src/github.com/prometheus/prometheus/scrape
     target.go
 ```
 
+prometheus 示例配置文件
+
+```yaml
+$ cat /usr/local/prometheus/prometheus.yml
+# 全局配置
+global:
+    scrape_interval:     15s # 默认抓取间隔, 15秒向目标抓取一次数据。
+    evaluation_interval: 15s # 执行rules的频率
+alerting:
+    alertmanagers:  ## 配置alertmanager的地址
+rule_files:
+# - "first.rules"
+# - "second.rules"
+# controls what resources Prometheus monitors.
+scrape_configs:
+# 这里是抓取promethues自身的配置
+- job_name: 'prometheus'
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+    # 重写了全局抓取间隔时间，由15秒重写成5秒。
+    scrape_interval: 5s
+    static_configs:
+    - targets: ['localhost:9090']
+```
 ![](/public/upload/go/prometheus_scraper_object.png)
+
+
+指标服务发现组件discovery 通过channel将最新发现的target传递给scrapeManager `err := scrapeManager.Run(discoveryManagerScrape.SyncCh())`，scrapeManager服务启动两个协程，一是完成收集指标、存储指标的主要业务逻辑，二是拿到最新target后更新业务逻辑，两个协程的通信也是通过channel(`triggerReload chan struct{}`)
+
+```go
+func (m *Manager) Run(tsets <-chan map[string][]*targetgroup.Group) error {
+	go m.reloader()
+	for {
+		select {
+		case ts := <-tsets:
+			m.updateTsets(ts)
+
+			select {
+			case m.triggerReload <- struct{}{}:
+			default:
+			}
+		case <-m.graceShut:
+			return nil
+		}
+	}
+}
+```
+
+每一个Target 对应一个 ScrapeLoop，ScrapeLoop获取指标后通过append将指标存储到存储组件中，但在中间添加了一层cache层。首先构造存储器和解析器，对指标进行解析，如果不合法就丢弃，否则查看cache中是否存在，根据结果决定是调用AddFast还是Add，前者是快速添加
+
+![](/public/upload/go/prometheus_scraper_sequence.png)
+

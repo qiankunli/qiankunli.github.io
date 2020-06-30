@@ -47,7 +47,7 @@ k8s 多个组件均会产生 event， 下文以Kubelet 为例
 
 ![](/public/upload/kubernetes/kubernetes_event_sequence.png)
 
-### events 妙用
+### 到哪里去/events 妙用
 
 Events 量非常大，只能存在一个很短的时间，很有必要将它们export 出来持久化（尤其是到时序数据库内） 以便异常状态下的分析，以及日常监控。
 
@@ -56,6 +56,10 @@ Events 量非常大，只能存在一个很短的时间，很有必要将它们e
 工作日开工后飙升的 Schedule 和 pod create event。
 
 ![](/public/upload/kubernetes/kubernetes_event_monitor_2.png)
+
+[Kubernetes可观察性：全方位事件监控](https://yq.aliyun.com/articles/745567)
+
+![](/public/upload/kubernetes/aliyun_k8s_event_center.png)
 
 ## 获取event 数据
 
