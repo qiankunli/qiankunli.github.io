@@ -14,7 +14,7 @@ keywords: concurrency
 
 [并发之痛 Thread，Goroutine，Actor](http://lenix.applinzi.com/archives/2945)中的几个基本要点：
 
-1. 那我们从最开始梳理下程序的抽象。开始我们的程序是面向过程的，数据结构+func。后来有了面向对象，对象组合了数结构和func，我们想用模拟现实世界的方式，抽象出对象，有状态和行为。但无论是面向过程的func还是面向对象的func，**本质上都是代码块的组织单元，本身并没有包含代码块的并发策略的定义。**于是为了解决并发的需求，引入了Thread（线程）的概念。
+1. 那我们从最开始梳理下程序的抽象。开始我们的程序是面向过程的，数据结构+func。后来有了面向对象，对象组合了数结构和func，我们想用模拟现实世界的方式，抽象出对象，有状态和行为。但无论是面向过程的func还是面向对象的func，**本质上都是代码块的组织单元，本身并没有包含代码块的并发策略的定义。**于是为了解决并发的需求，引入了Thread（线程）的概念。PS： **这一点go 使用关键字比使用专门类库要好一些**。
 
 2. We believe that writing correct concurrent, fault-tolerant and scalable applications is too hard. Most of the time it’s because we are using the wrong tools and the wrong level of abstraction. —— Akka。，有论文认为当前的大多数并发程序没出问题只是并发度不够，如果CPU核数继续增加，程序运行的时间更长，很难保证不出问题
 
