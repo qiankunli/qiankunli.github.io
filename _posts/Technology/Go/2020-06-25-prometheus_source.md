@@ -38,4 +38,13 @@ prometheus的启动也可以看作十个不同职能组件的启动。 启动用
 
 ## metric scrape 组件
 
+源代码就3个文件
+
+```
+$GOPATH/src/github.com/prometheus/prometheus/scrape
+    manager.go
+    scrape.go
+    target.go
+```
+
 ![](/public/upload/go/prometheus_scraper_object.png)
