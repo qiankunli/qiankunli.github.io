@@ -47,6 +47,12 @@ keywords: container log collect
     4. 文件的 Dump 方式支持各种策略，例如同步/异步写入、缓存大小、文件轮转策略、压缩策略、清除策略等，相对更加灵活。
 2. 日志打印到文件的方式和虚拟机/物理机基本类似，只是日志可以使用不同的存储方式，例如默认存储、EmptyDir、HostVolume、NFS 等。
 
+[「Allen 谈 Docker 系列」之 docker logs 实现剖析](http://blog.daocloud.io/allen_docker01/)对于应用的标准输出(stdout)日志，Docker Daemon 在运行这个容器时就会创建一个协程(goroutine)，负责标准输出日志。由于此 goroutine 绑定了整个容器内所有进程的标准输出文件描述符，因此容器内应用的所有标准输出日志，都会被 goroutine 接收。goroutine 接收到容器的标准输出内容时，立即将这部分内容，写入与此容器—对应的日志文件中，日志文件位于`/var/lib/docker/containers/<container_id>`，文件名为<container_id>-json.log。
+
+![](/public/upload/docker/docker_log.png)
+
+Docker 则通过 docker logs 命令向用户提供日志接口。`docker logs` 实现原理的本质均基于与容器一一对应的 <container-id>-json.log，`kubectl logs`类似
+
 ## 采集什么
 
 ![](/public/upload/container/collect_what.png)
@@ -237,3 +243,16 @@ Pilot.processEvent ==> Pilot.newContainer ==> Pilot.render ==> WriteFile
   clean_removed: true
   close_renamed: false
 ```
+
+## 本地日志清理
+
+从物理机角度，有一个方案是执行`docker system df -v` 可以列出每个容器占用的 磁盘空间，当期大小超过一定阈值时，可以根据container id 将其删除。
+
+
+    CONTAINER ID        IMAGE                                                                                       COMMAND                  LOCAL VOLUMES       SIZE                CREATED ago             STATUS              NAMES
+    2ba3bb81f4a6        harbor.test.ximalaya.com/test/wws-library-web:20190305-190207                               "/sbin/my_init"          0                   3.76MB              40 minutes ago ago      Up 40 minutes       mesos-8f4307c7-6a44-467e-9a94-56e09182013d
+    98e129663d1c        harbor.test.ximalaya.com/test/anchor-sell-web:20190305-182739                               "/sbin/my_init"          0                   2.47MB              About an hour ago ago   Up About an hour    mesos-60309b8a-27bd-4744-99f9-685f68dca71a
+    cd38d9c7fb71        test/docker-count-service-album-test:6                                                      "/usr/local/tomcat/b…"   0                   49.2MB              2 hours ago ago         Up 2 hours          mesos-33f4264e-77fc-4a4f-84c7-aae78519c0ad
+
+
+使用定时任务每天执行`docker system prune -af`

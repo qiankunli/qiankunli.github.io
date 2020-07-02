@@ -95,7 +95,7 @@ func (m *Manager) Run(tsets <-chan map[string][]*targetgroup.Group) error {
 }
 ```
 
-每一个Target 对应一个 ScrapeLoop，ScrapeLoop获取指标后通过append将指标存储到存储组件中，但在中间添加了一层cache层。首先构造存储器和解析器，对指标进行解析，如果不合法就丢弃，否则查看cache中是否存在，根据结果决定是调用AddFast还是Add，前者是快速添加
+每一个Target 对应一个 ScrapeLoop，ScrapeLoop获取指标后通过append将指标存储到存储组件中，但在中间添加了一层cache层。首先构造存储器和解析器，对指标进行解析，如果不合法就丢弃，否则查看cache中是否存在，根据结果决定是调用AddFast（快速添加）还是Add
 
 ![](/public/upload/go/prometheus_scraper_sequence.png)
 

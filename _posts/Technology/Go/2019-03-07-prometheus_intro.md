@@ -13,17 +13,35 @@ keywords: Prometheus
 * TOC
 {:toc}
 
-[Prometheus官网](https://prometheus.io/)[Prometheus官方文档](https://prometheus.io/docs)Prometheus 是由SoundCloud 开发的开源监控报警系统和时序数据库（TSDB），由Golang编写。
+devops基本理念：
+1. if you can't measure it,you can't improve it
+2. you build it,you run it, you monitor it.  谁开发，谁运维，谁监控，
 
-由于数据采集可能会有丢失，所以 Prometheus 不适用于对采集数据要 100% 准确的情形，例如实时监控
+四种主要的监控方式
+1. Logging
+2. Tracing
+3. Metric
+4. Healthchecks
+
+监控是分层次的， 以metric 为例
+
+1. 系统层，比如cpu、内存监控，面向运维人员
+2. 应用层，应用出错、请求延迟等，业务开发、框架开发人员
+3. 业务层，比如下了多少订单等，业务开发人员
 
 ## 整体结构
 
-![](/public/upload/ops/prometheus.png)
+![](/public/upload/go/monitor_overview.png)
 
 Prometheus is an open-source systems monitoring and alerting toolkit. 数据采集、简单计算、存储、展示、报警都支持，部分能力可以使用其他组件替代，比如存储，Prometheus本来支持存储在磁盘，也可以通过adapter将数据存在influxdb，进而就可以复用influxdb的一系列能力。
 
+![](/public/upload/ops/prometheus.png)
+
 Prometheus is a monitoring platform that collects metrics from monitored targets by scraping metrics HTTP endpoints on these targets. prometheus 通过被抓取对象 暴露出的http 端口抓取metrics，可以看作是一个按配置拉取特定url的“爬虫”
+
+[Prometheus官网](https://prometheus.io/)[Prometheus官方文档](https://prometheus.io/docs)Prometheus 是由SoundCloud 开发的开源监控报警系统和时序数据库（TSDB），由Golang编写。
+
+由于数据采集可能会有丢失，所以 Prometheus 不适用于对采集数据要 100% 准确的情形，例如实时监控
 
 ## 配置文件
 
@@ -110,8 +128,7 @@ scrape_configs:
 
 ### data model
 
-Prometheus fundamentally stores all data as time series: streams of timestamped values belonging to the same metric and the same set of labeled dimensions. 
-
+Prometheus fundamentally stores all data as time series: streams of timestamped values belonging to the same metric and the same set of labeled dimensions. time series 最直观的数据格式是`(t0,v0),(t1,v1),(t2,v2)...` 一个time series 属于一个metric + labels。 我们日常看到的格式是`(metric name, label.., value) `，因为 数据产生的时候是没有时间的，等prometheus 抓取落盘后 会有一个抓取的时间。
 
 我们访问 `http://ip:9090/metrics` 来看一次实际的数据scrape返回结果
 
@@ -173,6 +190,13 @@ Prometheus includes a local on-disk time series database, but also optionally in
 
 ## 高级特性
 
+### metric 种类
+
+1. counter（计数器），始终增加，比如http请求数、下单数
+2. gauge（测量仪），当期值的一次快照测量，可增可减。比如磁盘使用率、当前同时在线用户数
+3. Histogram（直方图），通过分桶方式统计样本分布
+4. Summary（汇总），根据样本统计出百分位，比如客户端计算
+
 ### Prometheus expression language
 
 [QUERYING PROMETHEUS](https://prometheus.io/docs/prometheus/latest/querying/basics/)即便一个表达语言，那也是麻雀虽小五脏俱全，字面量、运算符、语法规则、函数等都有，虽然没有编程语言全面，但也像SQL一样很完备了
@@ -207,5 +231,5 @@ Prometheus uses rules to create new time series and to generate alerts.
 
 单个Prometheus监控方案 毕竟性能有限，Prometheus支持集群联邦。这种分区的方式增加了Prometheus自身的可扩展性，常见分区两种方式：
 
-1. 每一个Prometheus Server实例只负责采集当前数据中心中的一部分任务（Job）。例如可以将不同的监控任务分配到不同的Prometheus实例当中，再由中心Prometheus实例进行聚合。
+1. 每一个Prometheus Server实例只负责采集当前数据中心中的一部分任务（Job）。例如可以将不同的监控任务分配到不同的Prometheus实例当中，再由中心Prometheus实例进行聚合。PS：也就是由一个中心prometheus server 去拉取另一个 prometheus server的数据。
 2. 其二是水平扩展，将同一任务的不同实例的监控数据采集任务划分到不同的Prometheus实例。
