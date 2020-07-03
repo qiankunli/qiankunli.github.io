@@ -12,10 +12,11 @@ keywords: JAVA spi xsd
 
 笔者最近学习几个框架，其共同特征用maven 项目结构来描述的话就是：
 
-	xxx
-		xxx-core/xxx-common
-		xxx-spring
-	
+```
+xxx
+    xxx-core/xxx-common
+    xxx-spring
+```
 我们说面向过程，画流程图，流程图中从start到end的代码我们都看的到。但到java中，大部分时候，我们在写回调函数/生命周期函数。即便是我们用代码描述了开始与结束，但其中注解啊什么的，又为我们夹带了不少私货。经常有人说，大部分程序猿拿着面向对象的语言写面向过程的代码（常写controller-service-dao的程序猿对这点感受尤其明显）。那么理解问题、理解框架、理解框架与业务的边界，有利于我们从面向对象的角度去思考问题。
 
 框架一般有以下几个tips：
@@ -37,30 +38,30 @@ keywords: JAVA spi xsd
 
 java 平台对spi的支持可以参见java.util.ServiceLoader.A simple service-provider loading facility类。比如对一个maven项目结构
 
-
-	src
-		main
-			java
-				org.lqk.spi
-					IUserService
-					UserService
-			resources
-				META-INF
-					services
-						org.lqk.spi.IUserService // 内容是org.lqk.spi. UserService
-						
+```
+src
+    main
+        java
+            org.lqk.spi
+                IUserService
+                UserService
+        resources
+            META-INF
+                services
+                    org.lqk.spi.IUserService // 内容是org.lqk.spi. UserService
+```					
 
 那么在代码中
+```java
+public class ServiceBootstrap {
+    public static void main(String[] args) {
+        ServiceLoader<IUserService> serviceLoader = ServiceLoader.load(IUserService.class);
+        serviceLoader.forEach(IUserService::sayHello);
+    }
+}
+```
 
-	public class ServiceBootstrap {
-		 public static void main(String[] args) {
-        	ServiceLoader<IUserService>
-                serviceLoader = ServiceLoader.load(IUserService.class);
-        	serviceLoader.forEach(IUserService::sayHello);
-    	}
-	}
-
-`ServiceBootstrap.load(IUserService.class)`即可得到IUserService实例。
+`ServiceLoader.load(IUserService.class)`即可得到IUserService实例。
 
 
 ### 与api 对比

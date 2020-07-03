@@ -24,7 +24,7 @@ keywords: dubbo micro service
 
 ## 整体架构
 
-![](/public/upload/practice/micro_service_overview.png)
+![](/public/upload/rpc/micro_service_overview.png)
 
 ## 三大基本套路
 

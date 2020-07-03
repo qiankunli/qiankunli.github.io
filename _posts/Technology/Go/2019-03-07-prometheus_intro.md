@@ -70,6 +70,10 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
     - targets: ['localhost:9090']
+- job_name: 'mysql'
+    scrape_interval: 5s
+    static_configs:
+    - targets: ['localhost:9104','localhost:9105']
 ```
 
 启动prometheus `prometheus --config.file=prometheus.yml`
@@ -132,23 +136,24 @@ Prometheus fundamentally stores all data as time series: streams of timestamped 
 
 我们访问 `http://ip:9090/metrics` 来看一次实际的数据scrape返回结果
 
-    # HELP go_gc_duration_seconds A summary of the GC invocation durations.
-    # TYPE go_gc_duration_seconds summary
-    go_gc_duration_seconds{quantile="0"} 1.3428e-05
-    go_gc_duration_seconds{quantile="0.25"} 3.5274e-05
-    go_gc_duration_seconds{quantile="0.5"} 5.292e-05
-    go_gc_duration_seconds{quantile="0.75"} 6.7349e-05
-    go_gc_duration_seconds{quantile="1"} 0.000192367
-    go_gc_duration_seconds_sum 0.00562896
-    go_gc_duration_seconds_count 101
-    # HELP go_goroutines Number of goroutines that currently exist.
-    # TYPE go_goroutines gauge
-    go_goroutines 175
-    # HELP prometheus_sd_discovered_targets Current number of discovered targets.
-    # TYPE prometheus_sd_discovered_targets gauge
-    prometheus_sd_discovered_targets{config="6577653216d30e75870c4b843dfbafd6",name="notify"} 1
-    prometheus_sd_discovered_targets{config="cadvisor",name="scrape"} 16
-
+```
+# HELP go_gc_duration_seconds A summary of the GC invocation durations.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 1.3428e-05
+go_gc_duration_seconds{quantile="0.25"} 3.5274e-05
+go_gc_duration_seconds{quantile="0.5"} 5.292e-05
+go_gc_duration_seconds{quantile="0.75"} 6.7349e-05
+go_gc_duration_seconds{quantile="1"} 0.000192367
+go_gc_duration_seconds_sum 0.00562896
+go_gc_duration_seconds_count 101
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 175
+# HELP prometheus_sd_discovered_targets Current number of discovered targets.
+# TYPE prometheus_sd_discovered_targets gauge
+prometheus_sd_discovered_targets{config="6577653216d30e75870c4b843dfbafd6",name="notify"} 1
+prometheus_sd_discovered_targets{config="cadvisor",name="scrape"} 16
+```
 
 以`prometheus_sd_discovered_targets{config="6577653216d30e75870c4b843dfbafd6",name="notify"} 1`（称之为sample） 为例
 
@@ -170,8 +175,6 @@ Prometheus Server 对`http://ip:9090/metrics` 返回的数据 不是直接原样
         # duration of the scrape.
         scrape_duration_seconds{job="<job-name>", instance="<instance-id>"}: xx
 
-
-
 ### 和存储结果 对接
 
 Prometheus includes a local on-disk time series database, but also optionally integrates with remote storage systems.
@@ -188,7 +191,25 @@ Prometheus includes a local on-disk time series database, but also optionally in
 
 同样地，Promthues的Remote Read（远程读）也通过了一个适配器实现。在远程读的流程当中，当用户发起查询请求后，Promthues将向remote_read中配置的URL发起查询请求（matchers，time ranges），Adapter根据请求条件从第三方存储服务中获取响应的数据。同时将数据转换为Promthues的原始样本数据返回给Prometheus Server。当获取到样本数据后，Promthues在本地使用PromQL对样本数据进行二次处理。
 
-## 高级特性
+## 其它
+
+## 后台ui
+
+假设prometheus 运行在`localhost:9090`，则访问`localhost:9090` 可以直接打开其后台ui 
+
+![](public/upload/go/prometheus_status.png)
+
+后台ui包括几个菜单，`localhost:9090` 加上菜单名 即可直接打开 对应菜单，比如 `localhost:9090/alerts` 即可打开 Alerts菜单
+
+1. Alerts 当前的报警配置 及报警状态
+2. Graph 对prometheus 抓取的数据进行查询
+3. Status 有几个子菜单
+    1. Runtime & Build Information  当前prometheus 进程的构建和运行时信息
+    2. Command-Line Flags 启动当前prometheus 进程时的命令行参数
+    3. Configuration 启动当前prometheus 进程时的配置
+    4. Rules 报警规则
+    5. Targets 可以看到当前Prometheus 抓取的Target的状态，以UP 和 Down区分
+    6. Service Discovery  基本对应 配置文件中的 job_name
 
 ### metric 种类
 
@@ -201,23 +222,36 @@ Prometheus includes a local on-disk time series database, but also optionally in
 
 [QUERYING PROMETHEUS](https://prometheus.io/docs/prometheus/latest/querying/basics/)即便一个表达语言，那也是麻雀虽小五脏俱全，字面量、运算符、语法规则、函数等都有，虽然没有编程语言全面，但也像SQL一样很完备了
 
+
+
+```
+http_requests_total{code="200",handler="/api/v1/label/:name/values",instance="0.0.0.0:9099",job="prometheus"}	802
+http_requests_total{code="200",handler="/api/v1/query",instance="0.0.0.0:9099",job="prometheus"}	188683
+http_requests_total{code="200",handler="/api/v1/query_range",instance="0.0.0.0:9099",job="prometheus"}	121281
+http_requests_total{code="200",handler="/api/v1/series",instance="0.0.0.0:9099",job="prometheus"}	12512
+http_requests_total{code="200",handler="/config",instance="0.0.0.0:9099",job="prometheus"}	1
+http_requests_total{code="200",handler="/flags",instance="0.0.0.0:9099",job="prometheus"}	2
+http_requests_total{code="200",handler="/graph",instance="0.0.0.0:9099",job="prometheus"}	11
+http_requests_total{code="200",handler="/metrics",instance="0.0.0.0:9099",job="prometheus"}	17605
+http_requests_total{code="200",handler="/rules",instance="0.0.0.0:9099",job="prometheus"}
+```
 Time series Selectors 从time series 中选择需要的数据
 
-1. Instant vector selectors 以下3个实例
-
-        ## 根据metric name 选择
-        http_requests_total
-        ## 根据metric name + label 选择
-        http_requests_total{job="prometheus",group="canary"}
-        ## label 支持多个运算符
-        http_requests_total{environment=~"staging|testing|development",method!="GET"}
-
-2. Range Vector Selectors
-
-        # 使用[]指定一个range duration
-        http_requests_total{job="prometheus"}[5m]
-
-[expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
+1. Instant vector selectors 基于metric name 、label 做选择，以下3个实例
+    ```
+    ## 根据metric name 选择
+    http_requests_total
+    ## 根据metric name + label 选择
+    http_requests_total{job="prometheus",group="canary"}
+    ## label 支持多个运算符
+    http_requests_total{environment=~"staging|testing|development",method!="GET"}
+    ```
+2. Range Vector Selectors  为查询数据指定一个时间范围
+    ```
+    # 使用[]指定一个range duration
+    http_requests_total{job="prometheus"}[5m]
+    ```
+3. 对指标进行 函数计算，比如`sum(http_requests_total)` 支持的函数[expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
 
 ### rules
 

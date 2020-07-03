@@ -70,7 +70,28 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
     - targets: ['localhost:9090']
+- job_name: 'mysql'
+    scrape_interval: 5s
+    static_configs:
+    - targets: ['localhost:9104','localhost:9105']
 ```
+
+这个配置文件对应 prometheus 的Config struct
+
+```go
+type Config struct {
+	GlobalConfig   GlobalConfig    `yaml:"global"`
+	AlertingConfig AlertingConfig  `yaml:"alerting,omitempty"`
+	RuleFiles      []string        `yaml:"rule_files,omitempty"`
+	ScrapeConfigs  []*ScrapeConfig `yaml:"scrape_configs,omitempty"`
+	RemoteWriteConfigs []*RemoteWriteConfig `yaml:"remote_write,omitempty"`
+	RemoteReadConfigs  []*RemoteReadConfig  `yaml:"remote_read,omitempty"`
+	// original is the input from which the config was parsed.
+	original string
+}
+```
+
+
 ![](/public/upload/go/prometheus_scraper_object.png)
 
 
