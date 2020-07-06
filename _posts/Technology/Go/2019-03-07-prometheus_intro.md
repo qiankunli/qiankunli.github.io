@@ -193,11 +193,11 @@ Prometheus includes a local on-disk time series database, but also optionally in
 
 ## 其它
 
-## 后台ui
+### 后台ui
 
 假设prometheus 运行在`localhost:9090`，则访问`localhost:9090` 可以直接打开其后台ui 
 
-![](public/upload/go/prometheus_status.png)
+![](/public/upload/go/prometheus_status.png)
 
 后台ui包括几个菜单，`localhost:9090` 加上菜单名 即可直接打开 对应菜单，比如 `localhost:9090/alerts` 即可打开 Alerts菜单
 
@@ -255,7 +255,7 @@ Time series Selectors 从time series 中选择需要的数据
 
 ## rules
 
-Prometheus uses rules to create new time series and to generate alerts.
+Prometheus uses rules to create new time series and to generate alerts. rule 分为两种类型：RecordingRule 和 AlertingRule
 
 **Recording rules** allow you to precompute frequently needed or computationally expensive expressions and save their result as a new set of time series. Querying the precomputed result will then often be much faster than executing the original expression every time it is needed. This is especially useful for dashboards, which need to query the same expression repeatedly every time they refresh. dashboard每次query，一下子计算上千条time series 肯定会很耗时，因此可以预置一些规则，比如每5分钟汇总一次，即可大大减少计算最终结果时的数据量。
 

@@ -120,3 +120,27 @@ func (m *Manager) Run(tsets <-chan map[string][]*targetgroup.Group) error {
 
 ![](/public/upload/go/prometheus_scraper_sequence.png)
 
+## Rule Manager
+
+报警规则示例：http status=500 的比例超过2% 时报警
+
+```yaml
+groups:
+- name: simulator-alert-rule
+  rules:
+  - alert: ErrorRateHigh
+    expr: sum(rate(http_requests_total{job="http-simulator", status="500"}[5m])) / sum(rate(http_requests_total{job="http-simulator"}[5m])) > 0.02
+    for: 1m
+    labels:
+      severity: major
+    annotations:
+      summary: "High Error Rate detected"
+      description: "Error Rate is above 2% (current value is: {{ $value }}"
+```
+
+![](/public/upload/go/prometheus_rule_object.png)
+
+1. rule 分为两种类型：RecordingRule 和 AlertingRule。 
+2. 无论是源码还是部署层面，prometheus server 都与alertmanager 平级，prometheus 调用/将报警数据**推给**alertmanager
+
+![](/public/upload/go/prometheus_rule_sequence.png)

@@ -13,7 +13,7 @@ keywords: Docker Kubernetes Volume
 
 ## Volume 背景介绍
 
-### ## 从AUFS说起
+### 从AUFS说起
 
 [云原生存储详解：容器存储与 K8s 存储卷](https://mp.weixin.qq.com/s/7rGrXhlc4-9jgSoVHqcs4A)容器服务之所以如此流行，一大优势即来自于运行容器时容器镜像的组织形式。容器通过复用容器镜像的技术，实现多个容器共享一个镜像资源（**更细一点说是共享某一个镜像层**），避免了每次启动容器时都拷贝、加载镜像文件，这种方式既节省了主机的存储空间，又提高了容器启动效率。**为了实现多个容器间共享镜像数据，容器镜像每一层都是只读的**。
 
@@ -50,7 +50,7 @@ hello
 ```
 背景材料 [linux 文件系统](http://qiankunli.github.io/2018/05/19/linux_file_mount.html)
 
-### 为什么要有volumn 
+### 为什么要有volume 
 
 [云原生存储详解：容器存储与 K8s 存储卷](https://mp.weixin.qq.com/s/7rGrXhlc4-9jgSoVHqcs4A)容器中的应用读写数据都是发生在容器的读写层，**镜像层+读写层映射为容器内部文件系统**、负责容器内部存储的底层架构。当我们需要容器内部应用和外部存储进行交互时，**需要一个类似于计算机 U 盘一样的外置存储**，容器数据卷即提供了这样的功能。 ==> `容器存储组成：只读层（容器镜像） + 读写层 + 外置存储（数据卷）`
 
@@ -62,6 +62,12 @@ hello
 
 - 将容器以及容器产生的数据分离开来。相比通过存储驱动实现的可写层，数据卷读写是直接对外置存储进行读写，效率更高
 - 容器间共享数据
+
+## docker 和 Kubernetes volume
+
+云原生存储的两个关键领域：
+1. Docker 存储卷：容器服务在**单节点**的存储组织形式，关注数据存储、容器运行时的相关技术；
+2. K8s 存储卷：关注容器集群的**存储编排**，从应用使用存储的角度关注存储服务。
 
 ### docker volume
 
@@ -111,7 +117,7 @@ spec:
   containers:
   - name: test-container
     image: k8s.gcr.io/busybox
-    volumeMounts:
+    volumeMounts:   ## 这里的volume 配置可以视为单纯的传递给 container runtime的参数
     - name: cache-volume
       mountPath: /cache
     - name: test-volume
@@ -120,7 +126,7 @@ spec:
       mountPath: /data/configmap
     - name: special-volume
       mountPath: /data/secret
-  volumes:
+  volumes:  ## 集群范围内的volume配置，在pod 调度到某个机器上时，k8s 要负责将这些volume 在 Node 上准备好
   - name: cache-volume
     emptyDir: {}
   - name: hostpath-volume
