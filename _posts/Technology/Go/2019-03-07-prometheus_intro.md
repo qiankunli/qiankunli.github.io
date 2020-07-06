@@ -207,7 +207,7 @@ Prometheus includes a local on-disk time series database, but also optionally in
     1. Runtime & Build Information  当前prometheus 进程的构建和运行时信息
     2. Command-Line Flags 启动当前prometheus 进程时的命令行参数
     3. Configuration 启动当前prometheus 进程时的配置
-    4. Rules 报警规则
+    4. Rules, **Prometheus uses rules to create new time series and to generate alerts**.
     5. Targets 可以看到当前Prometheus 抓取的Target的状态，以UP 和 Down区分
     6. Service Discovery  基本对应 配置文件中的 job_name
 
@@ -253,13 +253,35 @@ Time series Selectors 从time series 中选择需要的数据
     ```
 3. 对指标进行 函数计算，比如`sum(http_requests_total)` 支持的函数[expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
 
-### rules
+## rules
 
 Prometheus uses rules to create new time series and to generate alerts.
 
-**Recording rules** allow you to precompute frequently needed or computationally expensive expressions and save their result as a new set of time series. Querying the precomputed result will then often be much faster than executing the original expression every time it is needed. This is especially useful for dashboards, which need to query the same expression repeatedly every time they refresh.
+**Recording rules** allow you to precompute frequently needed or computationally expensive expressions and save their result as a new set of time series. Querying the precomputed result will then often be much faster than executing the original expression every time it is needed. This is especially useful for dashboards, which need to query the same expression repeatedly every time they refresh. dashboard每次query，一下子计算上千条time series 肯定会很耗时，因此可以预置一些规则，比如每5分钟汇总一次，即可大大减少计算最终结果时的数据量。
 
-每次query，一下子计算上千条time series 肯定会很耗时，因此可以预置一些规则，比如每5分钟汇总一次，即可大大减少计算最终结果时的数据量。
+### 4个黄金指标
+
+4个黄金指标可以在服务级别帮助衡量终端用户体验、服务中断、业务影响等层面的问题。
+1. 延迟：服务请求所需时间。
+2. 通讯量：监控当前系统的流量，用于衡量服务的容量需求。例如，在HTTP REST API中, 流量通常是每秒HTTP请求数；
+3. 错误：监控当前系统所有发生的错误请求，衡量当前系统错误发生的速率。
+4. 饱和度：衡量当前服务的饱和度。比如，“磁盘是否可能在4个小时候就满了”。
+
+### 告警
+
+**告警能力在Prometheus的架构中被划分成两个独立的部分**。通过在Prometheus中定义AlertRule（告警规则），Prometheus会周期性的对告警规则进行计算，如果满足告警触发条件就会向Alertmanager发送告警信息。
+
+在Prometheus中一条告警规则主要由以下几部分组成：
+1. 告警名称：用户需要为告警规则命名，当然对于命名而言，需要能够直接表达出该告警的主要内容
+2. 告警规则：**告警规则实际上主要由PromQL进行定义**，其实际意义是当表达式（PromQL）查询结果持续多长时间（During）后出发告警
+
+在Prometheus中，还可以通过Group（告警组）对一组相关的告警进行统一定义。比如 “最大响应时间超过xx”、“4个9影响时间超过xx” 都属于“http 请求超时”的范畴。
+
+Alertmanager作为一个独立的组件，负责接收并处理（去重、分组、路由（基于alert携带的标签将告警发给不同的receiver）、抑制、静默）来自Prometheus Server(也可以是其它的客户端程序)的告警信息。
+
+![](/public/upload/go/prometheus_alertmanager_overview.png)
+
+prometheus 本身的报警机制基本能够满足各种报警需求，唯一的缺憾就是 配置变更要通过 修改配置文件 以及reload prometheus server，国内开源了[Qihoo360/doraemon](https://github.com/Qihoo360/doraemon) 来解决该问题。
 
 ## 集群联邦
 

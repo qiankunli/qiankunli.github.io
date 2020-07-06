@@ -13,23 +13,25 @@ keywords: pilot service mesh
 * TOC
 {:toc}
 
-istio 流量管理支持一下功能
-1. 路由、流量转移（灰度、ab、黑白名单等）
-2. 测试能力：故障注入、流量镜像
-3. 弹性能力：超时重试、熔断等
+## envoy 好在哪里？
 
-本文主要上述功能 在配置和代码上如何体现
+[应用交付老兵眼中的Envoy, 云原生时代下的思考](https://mp.weixin.qq.com/s/cZ8iqRKMX6sOnK5orFwTAQ)
+
+动态性：Envoy 的配置高度依赖接口自动化产生各种配置，这些配置是可以进行 Runtime 修改而无需 reload 文件，在现代应用架构中，**一个服务端点的生命周期都变得更短，其运行的不确定性或弹性都变得更大，所以能够对配置进行 runtime 修改而无需重新 reload 配置文件这个能力在现代应用架构中显得尤其珍贵**，这正是 Istio 选择 Envoy 作为数据平面的一个重要考虑。Envoy 同时还具备热重启能力，这使得在升级或必须进行重启的时候变得更加优雅，已有连接能够得到更多的保护。
+
+扩展性：Envoy 的配置中可以看到大量的 filter，这些都是其扩展性的表现，Envoy 学习了 F5 以及 NGINX 的架构，大量使用插件式，使得开发者可以更加容易的开发。从 listener 开始就支持使用 filter，支持开发者开发 L3,L4,L7 的插件从而实现对协议扩展与更多控制。
+
+可观测性：可观测的三大组件：logs，metrics，tracing 默认都被 Envoy 所支持。Envoy 容许用户以灵活的方式在灵活的位置定义灵活的日志格式，这些变化可以通过动态配置下发从而实现立即生效，并容许定义对日志的采样等。在 Metrics 则提供了能够与 Prometheus 进行集成的诸多指标，值得一提的是 Envoy 容许 filter 本身来扩充这些指标，例如在限流或者验证等 filter 中容许插件本身定义属于自己的指标从而帮助用户更好的使用和量化插件的运行状态。在 Tracing 方面 Envoy 支持向 zipkin，jaeger，datadog，lightStep 等第三方集成，Envoy 能够生产统一的请求 ID 并在整个网络结构中保持传播，同时也支持外部的 x-client-trace-id，从而实现对微服务之间关系拓扑的描述。
 
 ## 流量管理配置
 
-### envoy配置
+### 功能划分
 
 [Envoy 官方文档中文版](https://www.servicemesher.com/envoy/)
 
 ![](/public/upload/mesh/envoy_work.jpg)
 
 Envoy的工作模式如图所示，横向是管理平面/管理流，纵向是数据流。Envoy会暴露admin的API，可以通过API查看Envoy中的路由或者集群的配置。
-
 
 Envoy按照使用 场景可以分三种：
 
@@ -43,7 +45,11 @@ router 和ingress 均属于和应用服务不在一起的纯代理场景，可�
 2. sidecar outbound，从当前节点发往节点外的流量。**根据协议的不同有所不同，待进一步认识**。
 3. gateway
 
+### envoy sidecar 配置 与 xds
+
 Envoy是一个高性能的C++写的proxy转发器，那Envoy如何转发请求呢？需要定一些规则，然后按照这些规则进行转发。规则可以是静态的，放在配置文件中的，启动的时候加载，要想重新加载，一般需要重新启动。当然最好的方式是规则设置为动态的，放在统一的地方维护，这个统一的地方在Envoy眼中看来称为Discovery Service，Envoy过一段时间去这里拿一下配置，就修改了转发策略。无论是静态的，还是动态的，在配置里面往往会配置四个东西。
+
+![](/public/upload/mesh/envoy_cfg.png)
 
 ||xds|备注|
 |---|---|---|
@@ -54,7 +60,14 @@ Envoy是一个高性能的C++写的proxy转发器，那Envoy如何转发请求�
 
 ![](/public/upload/mesh/envoy_config.png)
 
-### 流量管理api 与 xds 配置的映射
+||envoy|nginx|
+|---|---|---|
+|监听入口|listener|listener 以及部分 Server 段落配置|
+|路由控制逻辑|route|各种 Locations 匹配等|
+||clusters|upstream|
+||endpoints| upstream 里的 server|
+
+### envoy ingress 配置 与xds
 
 istio 的流控支持那么多功能，由用户直接 决定 给某个pod 的envoy 发送 xds 数据是不现实的。[Traffic Management](https://istio.io/docs/concepts/traffic-management/)You can do all this and more by adding your own traffic configuration to Istio using Istio’s traffic management API.
 

@@ -55,6 +55,7 @@ src
 ```java
 public class ServiceBootstrap {
     public static void main(String[] args) {
+        // 一般 用于加载不属于当前 jar 的 框架库文件内的 类
         ServiceLoader<IUserService> serviceLoader = ServiceLoader.load(IUserService.class);
         serviceLoader.forEach(IUserService::sayHello);
     }
