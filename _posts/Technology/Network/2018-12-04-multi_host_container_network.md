@@ -105,7 +105,7 @@ Flannel 支持三种后端实现，分别是： VXLAN；host-gw； UDP。而 UDP
 
 ![](/public/upload/network/container_network_route_2.png)
 
-路由方案的关键是谁来路由？路由信息怎么感知？
+**一般配套设计是 一个物理机对应一个网段**，路由方案的关键是谁来路由？路由信息怎么感知？
 
 |overlay network|路由设备|路由更新|要求|
 |---|---|---|---|
