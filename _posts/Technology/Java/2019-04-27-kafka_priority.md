@@ -14,16 +14,21 @@ keywords: kafka
 kafka 官方需求  Kafka Improvement Proposals [KIP-349: Priorities for Source Topics](https://cwiki.apache.org/confluence/display/KAFKA/KIP-349%3A+Priorities+for+Source+Topics)
 
 
-背景，我们希望kafka 可以支持“优先级”特性：即便队列里已经有了很多消息，但是高优先级消息可以“插队”进而立即被消费。自然地，在kafka 的概念里，我们建立多个topic，一个topic代表一个优先级，每个consumer 有一个或多个consumer（下文统一简化为一个consumer），**那么难点就转换为“如何对 不同优先级的consumer 进行封装处理”了**。
+背景，我们希望kafka 可以支持“优先级”特性：即便队列里已经有了很多消息，但是高优先级消息可以“插队”进而立即被消费。自然地，在kafka 的概念里，我们建立多个topic，一个topic代表一个优先级，每个consumer group有一个或多个consumer
 
 ![](/public/upload/java/priority_kafka_subscribe.png)
 
 1. 优先级以数字表示，值越高优先级越高
-2. 一个topic 对应有一个优先级，对应一个consumer
+2. 一个topic 对应有一个优先级，对应一个consumer group
 
-## 内部使用优先级队列重新缓冲
+**那么难点就转换为“如何对 不同优先级的consumer 进行封装处理”了**，大致有两种方案
 
-![](/public/upload/java/priority_kafka_internal_queue.png)
+1. consumer 各自拉取，使用优先级队列重新缓冲
+    ![](/public/upload/java/priority_kafka_internal_queue.png)
+2. 构建一个PriorityConsumer 聚合多个优先级的consumer ，优先级从高到低依次 `consumer-1.poll;cosumer-i.poll;consumer-max.priority.poll` 数据
+    ![](/public/upload/java/priority_kafka_priority.png)
+
+## 使用优先级队列重新缓冲方案
 
 java 自带的PriorityBlockingQueue 无界队列，如果消费者消费速速不够快的话，“波峰”涌入，可能会导致内存OOM，因此要使用有界优先级阻塞队列。
 
@@ -40,7 +45,7 @@ java 自带的PriorityBlockingQueue 无界队列，如果消费者消费速速�
 
 ![](/public/upload/java/priority_kafka_consumer_class_diagram.png)
 
-This client provides abstraction to implement Kafka's Producer<K, V> and Consumer<K, V> with priority support.  PriorityKafkaProducer 和 CapacityBurstPriorityKafkaConsumer 只是聚合了KafkaProducer 和 KafkaConsumer成员 ，其本身仍符合KafkaProducer 和 KafkaConsumer 接口
+This client provides abstraction to implement Kafka's `Producer<K, V>` and `Consumer<K, V>` with priority support.  PriorityKafkaProducer 和 CapacityBurstPriorityKafkaConsumer 只是聚合了KafkaProducer 和 KafkaConsumer成员 ，其本身仍符合KafkaProducer 和 KafkaConsumer 接口
 
 CapacityBurstPriorityKafkaConsumer 的类描述
 
