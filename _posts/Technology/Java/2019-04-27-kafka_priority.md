@@ -24,11 +24,14 @@ kafka 官方需求  Kafka Improvement Proposals [KIP-349: Priorities for Source 
 **那么难点就转换为“如何对 不同优先级的consumer 进行封装处理”了**，大致有两种方案
 
 1. consumer 各自拉取，使用优先级队列重新缓冲
-    ![](/public/upload/java/priority_kafka_internal_queue.png)
-2. 构建一个PriorityConsumer 聚合多个优先级的consumer ，优先级从高到低依次 `consumer-1.poll;cosumer-i.poll;consumer-max.priority.poll` 数据
-    ![](/public/upload/java/priority_kafka_priority.png)
+2. 先拉取高优先级topic的数据，只要有就一直消费，直到没有数据再消费低一级topic。消费低一级topic的过程中，如果发现有高一级topic消息到来，则转向消费高优先级消息。该方案实现较为复杂，且在高峰时段可能会导致低优先级消息完全失去消费机会。
+3. 构建一个PriorityConsumer 聚合多个优先级的consumer ，优先级从高到低依次消费数据，同一批次所有topic 都会被消费，但不同topic一次消费的消息数量（可以视为权重）不同，通过“权重”来变相实现“插队效果”。
+    
+本文主要讲述第一和三方案。
 
 ## 使用优先级队列重新缓冲方案
+
+![](/public/upload/java/priority_kafka_internal_queue.png)
 
 java 自带的PriorityBlockingQueue 无界队列，如果消费者消费速速不够快的话，“波峰”涌入，可能会导致内存OOM，因此要使用有界优先级阻塞队列。
 
@@ -38,6 +41,8 @@ java 自带的PriorityBlockingQueue 无界队列，如果消费者消费速速�
 2. priority queue 可以保证 已经插入的消息 按照priority 排队，但不能保证阻塞的几个插入方按优先级插入。
 
 ## 优先级从高到低依次拉取，优先级越高拉取“配额”越大
+
+![](/public/upload/java/priority_kafka_priority.png)
 
 下文主要来自对[flipkart-incubator/priority-kafka-client](https://github.com/flipkart-incubator/priority-kafka-client)的源码分析
 
@@ -118,6 +123,8 @@ CapacityBurstPriorityKafkaConsumer.poll 一次可以拉取的记录数由`max.po
 2. 一种分配方式是指数分配（Exponential distribution of maxPollRecords across all priorities (upto maxPriority)），即高一个优先级的“配额”是低一个优先级“配额”的2倍。当然，你也可以选择 高一个优先级的“配额”比低一个优先级的多1个。 
 
 ### 根据实际情况调整配额
+
+如果某一个优先级的topic 长期没有消息，比如高中低topic 的配额分别是`29,14,7`，高优先级长期没有消息进来，则中低优先级每次拉取`14,7`有点浪费了，因此借鉴了“滑动窗口”策略来优化某个优先级的topic 长期没有消息时总的消费性能。 
 
 For example say we have:
 
