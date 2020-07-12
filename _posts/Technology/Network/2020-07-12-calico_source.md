@@ -113,7 +113,7 @@ func main() {
     2. CalcGraph, syncer 弄过来的 datastore的数据 通常不能直接使用，需要CalcGraph 做一些计算和归并 再交给dataplane 
     3. dataplane, 负责真正对 node 做出处理， 分为 本地和远程（使用grpc 通信）两种形态，为此定义了一个 proto，`github.com/projectcalico/felix/proto/felixbackend.pb.go` ，如果是本地运行，则通过channel 直接传输 proto model，如果是dataplane 远程独立运行，则执行grpc 调用。InternalDataplane implements an in-process Felix dataplane driver based on **iptables and ipsets**.  It communicates with the datastore-facing part of Felix via the Send/RecvMessage methods, which operate on the protobuf-defined API objects.
 
-dataplane 一方面通过ifaceMonitor 监听网卡，发出 ifaceUpdates, ifaceAddrUpdates 事件；另一方面接收 来自syncer/CalcGraph 的proto model。 dataplane 聚合一系列 Manager(felix 剩下的大部分代码 都是按felix 分包的)， 监听上述两类事件变化并执行。 
+dataplane 一方面通过ifaceMonitor 监听网卡，发出 ifaceUpdates, ifaceAddrUpdates 事件；另一方面接收 来自syncer/CalcGraph 的proto model。 dataplane 聚合一系列 Manager(felix 剩下的大部分代码 都是按manager 分包的)， 监听上述两类事件变化并执行。 
 
 ![](/public/upload/network/calico_felix_object.png)
 
