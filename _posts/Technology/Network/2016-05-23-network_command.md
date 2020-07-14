@@ -43,14 +43,14 @@ iproute2是一个套件，包含的是一套命令，类似于docker，所有的
 较高版本的linux内核支持namespace，因此ip命令还可以设置某个namespace的网卡（实际上，我们通常在root namespace执行ip命令，root namespace可以“看见”所有的子namespace）。
 
 通过`man ip`我们可以看到
-
-    ip link add link DEVICE [ name ] NAME
-                   [ txqueuelen PACKETS ]
-                   [ address LLADDR ] [ broadcast LLADDR ]
-                   [ mtu MTU ]
-                   type TYPE [ ARGS ]
-           TYPE := [ vlan | veth | vcan | dummy | ifb | macvlan | can | bridge]
-           
+```
+ip link add link DEVICE [ name ] NAME
+                [ txqueuelen PACKETS ]
+                [ address LLADDR ] [ broadcast LLADDR ]
+                [ mtu MTU ]
+                type TYPE [ ARGS ]
+        TYPE := [ vlan | veth | vcan | dummy | ifb | macvlan | can | bridge]
+```        
 这说明，ip命令不仅可以添加网卡，还可以添加网桥等网络设备。
 
 ## brctl 
@@ -79,6 +79,40 @@ The command `brctl addif <brname> <ifname>` will make the interface "ifname" a p
 
 ## iptables
 
+[从零认识 iptables](https://mp.weixin.qq.com/s/pdX5z5LL-wHGhkqLavMW5w)iptables 并不是也不依赖于守护进程，它只是利用Linux内核提供的功能。
+
+### netfilter 
+
+netfilter是工作于内核空间当中的一系列网络（TCP/IP）协议栈的钩子（hook），为内核模块在网络协议栈中的不同位置注册回调函数（callback）。也就是说，**在数据包经过网络协议栈的不同位置时做相应的由iptables配置好的处理逻辑**。netfilter中的五个钩子（这里也称为五个关卡）PRE_ROUTING，INPUT，FORWARD，OUTPUT，POST_ROUTING
+
+![](/public/upload/network/netfilter_chain_flow.png)
+
+两次路由选择
+1. 刚刚进入网络层的数据包通过PRE_ROUTING关卡时，要进行一次路由选择
+    1. 当目标地址为本机地址时，数据进入INPUT，
+    2. 非本地的目标地址进入FORWARD（需要本机内核支持IP_FORWARD）
+2. 由本地**用户空间应用进程产生的**数据包，通过一次路由选择由**哪个接口**送往网络中
+
+iptables的四表五链    
+
+1. 链，分别对应上面提到的五个关卡，PRE_ROUTING，INPUT，FORWARD，OUTPUT，POST_ROUTING，这五个关卡分别由netfilter的五个钩子函数来触发。为什么叫做“链”呢？这个关卡上的“规则”不止一条，很多条规则会按照顺序逐条匹配，将在此关卡的所有规则组织称“链”就很适合，
+2. 表，每一条“链”上的一串规则里面有些功能是相似的，比如，A类规则都是对IP或者端口进行过滤，B类规则都是修改报文，我们考虑能否将这些功能相似的规则放到一起，这样管理iptables规则会更方便。iptables把具有相同功能的规则集合叫做“表”，并且定一个四种表：filter;nat;mangle;raw
+
+不是所有的“链”都具有所有类型的“规则”，也就是说，某个特定表中的“规则”注定不能应用到某些“链”中
+
+![](/public/upload/network/iptables.png)
+
+在实际使用iptables配置规则时，我们往往是以“表”为入口制定“规则”;因为数据包经过一个关卡的时候，会将“链”中所有的“规则”都按照顺序逐条匹配，这时候就涉及一个优先级的问题：`raw -> mangle -> nat -> filter`
+
+### 凭啥过滤
+
+iptables规则由两部分组成，报文的匹配条件和匹配到之后的处理动作。
+
+1. 匹配条件：根据协议报文特征指定匹配条件，基本匹配条件和扩展匹配条件
+2. 处理动作：内建处理机制由iptables自身提供的一些处理动作
+
+自定义的链不能直接使用，只能被某个默认的链当作Action去调用。也就是说自定义链为规则的一个处理动作的集合。
+
 《网络是怎样连接的》：网络包的头部包含了用于控制通信操作的控制信息，经常用于设置包过滤规则的字段
 
 |头部类型|规则判断条件|含义|
@@ -102,83 +136,64 @@ The command `brctl addif <brname> <ifname>` will make the interface "ifname" a p
 |-|-|192.0.2.0/24|80|-|允许|
 |-|-|-|-|-|阻止|
 
-### 从tomcat filter说起
+设置iptables规则时需要考量的要点：
 
-[tomcat filter分析](https://zsr.github.io/2017/11/15/tomcat-filter%E5%88%86%E6%9E%90/)
-
-![](/public/upload/network/tomcat_filter_chain.png)
-
-每次请求过来都会创建一个过滤器链(filterChain)，并把待执行的servlet对象存放到过滤器链中。对于每个url，对应的filter个数都是不固定的，filterchain需要保存每个请求所对应的一个filter数组，以及调用到的filter的position，以便继续向下调用filter
-
-### tomcat filter ==> netfilter 
-
-netfilter 是linux内核的一个机制，用于在网络发送和转发的关键节点上加上 hook 函数。netfilter一个著名的实现，就是内核模块 ip_tables。在用户态，还有一个客户端程序 iptables，用命令行来干预内核的规则， iptables只是一个操作 Linux 内核 Netfilter 子系统的“界面”
-
-![](/public/upload/network/linux_netfilter.png)
-
-因为客户端发来的报文可能并不是本机而是其他服务器，当本机的内核支持IP_FORWARD时，我们可以将报文转发给其它服务器。**不考虑这种特殊情况，若将上图的forward chain 移除掉时，会清晰很多**。
-
-![](/public/upload/network/netfilter_chain_flow.png)
-
-1. 链 是指iptables 过滤的时机，类比到 java ee filter，就是你的逻辑是加在 `filterChain.doFilter(req, res);` 之前 还是之后。或者说 类似于 springmvc HandlerInterceptor的preHandle  和 postHandle 方法。
-2. 表是负责 完成某个过滤 功能的模块
-
-    1. filter 表，确定是否放行数据包
-    2. nat表，**修改数据包的源ipport 和 目的ipport**
-
-netfilter 在网络包收发及路由的 管道上，一共切了 5 个口，分别是 PREROUTING，FORWARD，POSTROUT- ING，INPUT 以及 OUTPUT;同时 netfilter 定义了包括 nat、filter 在内的若干个**网络包处理方式**。
-
-![](/public/upload/network/iptables.png)
-
-需要注意的是，routing 和 forwarding 很大程度上增加了以上 netfilter 的复杂 程度，如果我们不考虑 routing 和 forwarding，那么 netfilter 会变得跟一般过 滤器框架一样简单。
+1. 根据要实现哪种功能，判断添加在那张“表”上
+2. 根据报文流经的路径，判断添加在那个“链”上
+    1. 到本主机某进程的报文：PreRouting -> Input -> Process -> Output -> PostRouting
+    2. 由本主机转发的报文：PreRouting -> Forward -> PostRouting
 
 ### 源码上的体现
 
-    // 从tcp层向ip层发送数据包
-    int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb){
-        struct iphdr *iph = ip_hdr(skb);
-        iph->tot_len = htons(skb->len);
-        skb->protocol = htons(ETH_P_IP);
-        // 可以看到第一个hook点NF_INET_LOCAL_OUT
-        return nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT,
-                net, sk, skb, NULL, skb_dst(skb)->dev,
-                dst_output);
-    }
-    // 从ip层向link层发送数据包
-    int ip_output(struct net *net, struct sock *sk, struct sk_buff *skb){
-        struct net_device *dev = skb_dst(skb)->dev;
-        skb->dev = dev;
-        skb->protocol = htons(ETH_P_IP);
-        // 可以看到第一个hook点NF_INET_POST_ROUTING
-        return NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING,
-                    net, sk, skb, NULL, dev,
-                    ip_finish_output,
-                    !(IPCB(skb)->flags & IPSKB_REROUTED));
-    }
-    // 从link到ip层的接收逻辑
-    int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev){
-        const struct iphdr *iph;
-        struct net *net;
-        u32 len;
-        ......
-        net = dev_net(dev);
-        ......
-        iph = ip_hdr(skb);
-        len = ntohs(iph->tot_len);
-        skb->transport_header = skb->network_header + iph->ihl*4;
-        ......
-        // 可以看到第一个hook点是NF_INET_PRE_ROUTING
-        return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,
-                net, NULL, skb, dev, NULL,
-                ip_rcv_finish);
-        ......
-    }
+```c
+// 从tcp层向ip层发送数据包
+int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb){
+    struct iphdr *iph = ip_hdr(skb);
+    iph->tot_len = htons(skb->len);
+    skb->protocol = htons(ETH_P_IP);
+    // 可以看到第一个hook点NF_INET_LOCAL_OUT
+    return nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT,
+            net, sk, skb, NULL, skb_dst(skb)->dev,
+            dst_output);
+}
+// 从ip层向link层发送数据包
+int ip_output(struct net *net, struct sock *sk, struct sk_buff *skb){
+    struct net_device *dev = skb_dst(skb)->dev;
+    skb->dev = dev;
+    skb->protocol = htons(ETH_P_IP);
+    // 可以看到第一个hook点NF_INET_POST_ROUTING
+    return NF_HOOK_COND(NFPROTO_IPV4, NF_INET_POST_ROUTING,
+                net, sk, skb, NULL, dev,
+                ip_finish_output,
+                !(IPCB(skb)->flags & IPSKB_REROUTED));
+}
+// 从link到ip层的接收逻辑
+int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev){
+    const struct iphdr *iph;
+    struct net *net;
+    u32 len;
+    ......
+    net = dev_net(dev);
+    ......
+    iph = ip_hdr(skb);
+    len = ntohs(iph->tot_len);
+    skb->transport_header = skb->network_header + iph->ihl*4;
+    ......
+    // 可以看到第一个hook点是NF_INET_PRE_ROUTING
+    return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,
+            net, NULL, skb, dev, NULL,
+            ip_rcv_finish);
+    ......
+}
+```
 
 ### 操作
 
-    iptbales -L -vn --line-number
-    iptables -D INPUT 7
-    iptables -D FORWARD 4
+```sh
+iptbales -L -vn --line-number
+iptables -D INPUT 7
+iptables -D FORWARD 4
+```
 
 这样按序号删规则很方便
 
@@ -193,15 +208,16 @@ netfilter 在网络包收发及路由的 管道上，一共切了 5 个口，分
 	* 由本机的某进程发出报文 output --> postrouting
 
 4. 自定义链允许我们以自定义名称组织相关的规则，要被默认链引用，才可以生效
+    ```
+    Chain INPUT (policy ACCEPT)
+    target     prot opt source               destination
+    cali-INPUT  all  --  anywhere             anywhere             /* cali:Cz_u1IQiXIMmKD4c */
 
-		Chain INPUT (policy ACCEPT)
-		target     prot opt source               destination
-		cali-INPUT  all  --  anywhere             anywhere             /* cali:Cz_u1IQiXIMmKD4c */
-
-		Chain cali-INPUT (1 references)
-		target     prot opt source               destination
-		ACCEPT     all  --  anywhere             anywhere             /* cali:i7okJZpS8VxaJB3n */ mark match 0x1000000/0x1000000
-		DROP       ipencap--  anywhere             anywhere             /* cali:p8Wwvr6qydjU36AQ */ /* Drop IPIP packets from non-Calico hosts */ ! match-set cali4-all-hosts src
+    Chain cali-INPUT (1 references)
+    target     prot opt source               destination
+    ACCEPT     all  --  anywhere             anywhere             /* cali:i7okJZpS8VxaJB3n */ mark match 0x1000000/0x1000000
+    DROP       ipencap--  anywhere             anywhere             /* cali:p8Wwvr6qydjU36AQ */ /* Drop IPIP packets from non-Calico hosts */ ! match-set cali4-all-hosts src
+    ```
 
 ## 引用
 
