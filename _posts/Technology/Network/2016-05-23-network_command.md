@@ -53,30 +53,6 @@ ip link add link DEVICE [ name ] NAME
 ```        
 这说明，ip命令不仅可以添加网卡，还可以添加网桥等网络设备。
 
-## brctl 
-
-写的挺好，都不忍心翻译
-
-Software defined networking (SDN) is the current wave sweeping the networking industry. And one of the key enablers of SDN is virtual networking. While SDN and virtual networking are in vogue these days, the support for virtual networking is not a recent development. And Linux bridge has been the pioneer in this regard.（简述SDN、virtual networking、Linux Bridge之间的关系）
-
-Virtual networking requires the presence of a virtual switch inside a server/hypervisor. Even though it is called a bridge, the Linux bridge is really a virtual switch and used with KVM/QEMU hypervisor. Linux Bridge is a kernel module, first introduced in 2.2 kernel (circa 2000). And it is administered using brctl command on Linux.
-
-以下来自`man btctl`
-
-The command `brctl addbr <name>` creates a new instance of the ethernet bridge. **The network interface corresponding to the bridge will be called "name"**.
-
-The command `brctl delbr <name>` deletes the instance "name" of the ethernet bridge. **The network interface corresponding to the bridge must be down** before it can be deleted!
-
-Each bridge has a number of ports attached to it. Network traffic coming in on any of these ports will be forwarded to the other ports transparently, so that the bridge is  invisible to the rest of the network.
-
-The command `brctl addif <brname> <ifname>` will make the interface "ifname" a port of the bridge "brname". This means that all frames received on "ifname" will be processed as if destined for the bridge. 
-
-总的来说，就是使用brctl
-
-1. 可以查看所有的linux bridge，增加和删除linux bridge
-2. 针对一个linux bridge，可以将一个interface挂到bridge或移除，可以查看“挂到”上面的所有interface
-3. 每建一个网桥，都会建一个跟网桥同名的interface，并挂在网桥上面。
-
 ## iptables
 
 [从零认识 iptables](https://mp.weixin.qq.com/s/pdX5z5LL-wHGhkqLavMW5w)iptables 并不是也不依赖于守护进程，它只是利用Linux内核提供的功能。
@@ -218,6 +194,30 @@ iptables -D FORWARD 4
     ACCEPT     all  --  anywhere             anywhere             /* cali:i7okJZpS8VxaJB3n */ mark match 0x1000000/0x1000000
     DROP       ipencap--  anywhere             anywhere             /* cali:p8Wwvr6qydjU36AQ */ /* Drop IPIP packets from non-Calico hosts */ ! match-set cali4-all-hosts src
     ```
+
+## brctl 
+
+写的挺好，都不忍心翻译
+
+Software defined networking (SDN) is the current wave sweeping the networking industry. And one of the key enablers of SDN is virtual networking. While SDN and virtual networking are in vogue these days, the support for virtual networking is not a recent development. And Linux bridge has been the pioneer in this regard.（简述SDN、virtual networking、Linux Bridge之间的关系）
+
+Virtual networking requires the presence of a virtual switch inside a server/hypervisor. Even though it is called a bridge, the Linux bridge is really a virtual switch and used with KVM/QEMU hypervisor. Linux Bridge is a kernel module, first introduced in 2.2 kernel (circa 2000). And it is administered using brctl command on Linux.
+
+以下来自`man btctl`
+
+The command `brctl addbr <name>` creates a new instance of the ethernet bridge. **The network interface corresponding to the bridge will be called "name"**.
+
+The command `brctl delbr <name>` deletes the instance "name" of the ethernet bridge. **The network interface corresponding to the bridge must be down** before it can be deleted!
+
+Each bridge has a number of ports attached to it. Network traffic coming in on any of these ports will be forwarded to the other ports transparently, so that the bridge is  invisible to the rest of the network.
+
+The command `brctl addif <brname> <ifname>` will make the interface "ifname" a port of the bridge "brname". This means that all frames received on "ifname" will be processed as if destined for the bridge. 
+
+总的来说，就是使用brctl
+
+1. 可以查看所有的linux bridge，增加和删除linux bridge
+2. 针对一个linux bridge，可以将一个interface挂到bridge或移除，可以查看“挂到”上面的所有interface
+3. 每建一个网桥，都会建一个跟网桥同名的interface，并挂在网桥上面。
 
 ## 引用
 
