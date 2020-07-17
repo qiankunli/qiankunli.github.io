@@ -13,13 +13,11 @@ keywords: container entrypoint
 * TOC
 {:toc}
 
-容器内多进程 ==> 多进程转换为Pod内多容器 ==>  容器内只运行业务进程 ==> 业务进程可能会启动失败，所以不适合作为entrypoint ==> 选择一个合适的进程管理工具作为entrypoint
-
 ## 背景
 
 在容器化早期，因为需要ssh访问容器等原因（尽量为开发提供与物理机一致的体验），需要一个容器内运行业务进程与ssh等进程。随着k8s pod 多容器的推进， 一个容器内多进程的需求减弱，但业务进程直接作为 entrypoint 仍有很多问题，因此会寻求一些进程管理工具作为pid=1进程。
 
-对于springboot项目，一开始是用`java -jar `方式容器中启动，并作为容器的主进程。但测试环境，经常代码逻辑可能有问题，导致主进程失败，容器启动失败，进而触发marathon/k8s健康检查失败，进而不断重启容器。开发呢也一直抱怨看不到“事故现场”。所以针对这种情况，直观的想法是 不让`java -jar` 作为容器的主进程。
+对于springboot项目，一开始是用`java -jar `方式容器中启动，并作为容器的主进程。但在测试环境，经常代码逻辑可能有问题，java启动失败，进而触发k8s健康检查失败，进而不断重启容器。开发呢也一直抱怨看不到“事故现场”。所以针对这种情况，直观的想法是 不让`java -jar` 作为容器的主进程。
 
 
 ## 一个容器一个进程？
@@ -33,6 +31,11 @@ stack exchange [Why it is recommended to run only one process in a container?](h
 理由要找的话有很多，比较喜欢一个回答：As in most cases, it's not all-or-nothing. The guidance of "one process per container" stems from the idea that containers should serve a distinct purpose. For example, a container should not be both a web application and a Redis server.
 
 There are cases where it makes sense to run multiple processes in a single container, as long as both processes support a single, modular function.
+
+从笔者的实践感受来说
+
+1. 除了业务进程，**你有没有比较刚的需求运行其他进程？**比如ssh 等。笔者在实践中，每个容器内还跑了一个监控进程，用来跟踪容器内的进程数据、以及执行一些异常诊断指令。
+2. entrypoint 启动失败的可能性有多高，entrypoint 挂了会不停地重启，对集群带来的不良影响是否可控？
 
 ## 以进程管理工具作为entrypoint
 
@@ -74,45 +77,7 @@ docker stop  对PID1进程 的要求
 
 官方 [Run multiple services in a container](https://docs.docker.com/config/containers/multi-service_container/)
 
-### systemd
 
-[CHAPTER 3. USING SYSTEMD WITH CONTAINERS](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/managing_containers/using_systemd_with_containers)
-
-[Running Docker Containers with Systemd](https://container-solutions.com/running-docker-containers-with-systemd/)
-
-[Do you need to execute more than one process per container?](https://gomex.me/2018/07/21/do-you-need-to-execute-more-than-one-process-per-container/)
-
-### supervisor
-
-官方 [Run multiple services in a container](https://docs.docker.com/config/containers/multi-service_container/)
-
-[Admatic Tech Blog: Starting Multiple Services inside a Container with Supervisord](https://medium.com/@SaravSun/admatic-tech-blog-starting-multiple-services-inside-a-container-with-supervisord-16e3beb55916)
-
-使用 
-
-supervisord.conf
-
-	[supervisord]
-	nodaemon=true
-	logfile=/dev/stdout
-	loglevel=debug
-	logfile_maxbytes=0
-	
-	[program:pinggoogle]
-	command=ping admatic.in
-	autostart=true
-	autorestart=true
-	startsecs=5
-	stdout_logfile=NONE
-	stderr_logfile=NONE
-	
-Dockerfile
-	
-	FROM ubuntu
-	...
-	COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-	...
-	CMD ["/usr/bin/supervisord"]
 
 ### runit
 
@@ -166,7 +131,45 @@ runit 工作原理
 
 ![](/public/upload/docker/runit.png)
 
+### systemd
 
+[CHAPTER 3. USING SYSTEMD WITH CONTAINERS](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux_atomic_host/7/html/managing_containers/using_systemd_with_containers)
+
+[Running Docker Containers with Systemd](https://container-solutions.com/running-docker-containers-with-systemd/)
+
+[Do you need to execute more than one process per container?](https://gomex.me/2018/07/21/do-you-need-to-execute-more-than-one-process-per-container/)
+
+### supervisor
+
+官方 [Run multiple services in a container](https://docs.docker.com/config/containers/multi-service_container/)
+
+[Admatic Tech Blog: Starting Multiple Services inside a Container with Supervisord](https://medium.com/@SaravSun/admatic-tech-blog-starting-multiple-services-inside-a-container-with-supervisord-16e3beb55916)
+
+使用 
+
+supervisord.conf
+
+	[supervisord]
+	nodaemon=true
+	logfile=/dev/stdout
+	loglevel=debug
+	logfile_maxbytes=0
+	
+	[program:pinggoogle]
+	command=ping admatic.in
+	autostart=true
+	autorestart=true
+	startsecs=5
+	stdout_logfile=NONE
+	stderr_logfile=NONE
+	
+Dockerfile
+	
+	FROM ubuntu
+	...
+	COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+	...
+	CMD ["/usr/bin/supervisord"]
 ## 其它
 
 ### Docker-friendliness image
@@ -188,19 +191,11 @@ github 有一个 [phusion/baseimage-docker](https://github.com/phusion/baseimage
 1. multi-user
 2. multi-process
 
-### 优雅的管理springboot 项目
-
-回到文开始提到的问题：
-
-[phusion/baseimage-docker](https://github.com/phusion/baseimage-docker)  的image 是基于ubuntu，笔者试着用alpine + runit + sshd 实现了一个简洁的base image，具体情况待实践一段时间再交流。
-
-1. 多进程方式，使得不管springboot 是否启动成功，容器都会启动成功
-2. 另外采取 措施监控 springboot 的健康状态，以决定是否 向该容器打入流量
-3. runit 正常会尝试不断重启，实际上往往因为代码的原因，启动一次就行了。因此启动springboot 的时候，先检查下 有没有`/etc/service/springboot/supervise`（runsv将服务的状态保存服务对应在supervise目录中） 文件，若没有则是第一次启动。有则是第二次启动，写入`/etc/service/springboot/down`（down 告知runsv 停止该服务）
-
 ### 和ssh的是是非非
 
-2018.12.01 补充 [ssh连接远程主机执行脚本的环境变量问题](http://feihu.me/blog/2014/env-problem-when-ssh-executing-command-on-remote/)
+2020.07.17 补充：随着web console 工具（底层由kubectl exec支持）不及，ssh 渐渐没有必要了。
+
+2018.12.01 补充： [ssh连接远程主机执行脚本的环境变量问题](http://feihu.me/blog/2014/env-problem-when-ssh-executing-command-on-remote/)
 
 背景：
 
