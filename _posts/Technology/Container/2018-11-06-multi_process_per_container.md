@@ -166,9 +166,6 @@ runit 工作原理
 
 ![](/public/upload/docker/runit.png)
 
-### s6
-
-[Managing multiple processes in Docker containers](https://medium.com/@beld_pro/managing-multiple-processes-in-docker-containers-455480f959cc) 
 
 ## 其它
 
