@@ -15,15 +15,17 @@ keywords: kubernetes 源码分析
 
 go 程序中大量使用channel
 1. 一个是消灭了观察者模式
-2. 很多功能组件得以独立。以前对外提供接口，等着上游组件函数调用。现在改成了消息传递，主流程/入口直接go start启动组件，然后在for 循环里 等着channel 来消息就行。
+2. 很多功能组件得以独立。以前对外提供接口，等着上游组件函数调用。现在改成了消息传递，主流程/入口直接go start启动组件，然后在for 循环里 等着channel 来消息就行。channel 作为独立组件的输入，输出则为io操作 或向另一个channel 发出事件。
 
 反应在源码分析上
-1. 之前，类图 有很多接口、实现类（因为要用接口界定组件间的关系）。序列图有较深的 函数调用（从左到右很长）。
-2. 现在，一个组件一个协程，大家都是main函数/入口对象的“亲儿子”，各干各的活儿，通过channel 协同
+1. 之前，功能分解由接口/类体现，类图有很多接口、实现类（因为要用接口界定组件间的关系）。序列图有较深的 函数调用（从左到右很长）。
+2. 现在，功能分解由协程体现，一个组件一个协程，大家都是main函数/入口对象的“亲儿子”，各干各的活儿，通过channel 协同
+
+kubelet 源码虽然庞大，但并不复杂，基本适用于上述规律，在1.13 版本中，kubelet 大约有13个mannager 保证pod 正常运行。
 
 ## 整体结构
 
-Kubelet 作为 Kubernetes 集群中的 node agent，一方面，kubelet 扮演的是集群控制器的角色，它定期从 API Server 获取 Pod 等相关资源的信息，并依照这些信息，控制运行在节点上 Pod 的执行;另外一方面， kubelet 作为节点状况的监视器，它获取节点信息，并以集群客户端的角色，把这些 状况同步到 API Server。
+**Kubelet 作为 Kubernetes 集群中的 node agent**，一方面，kubelet 扮演的是集群控制器的角色，它定期从 API Server 获取 Pod 等相关资源的信息，并依照这些信息，控制运行在节点上 Pod 的执行;另外一方面， kubelet 作为节点状况的监视器，它获取节点信息，并以集群客户端的角色，把这些 状况同步到 API Server。
 
 ### 节点状况的监视器
 
@@ -84,10 +86,10 @@ kubelet 源码包结构
 
 ```
 k8s.io/kubernetes
-    /cmd
+    /cmd/kubelet
         /app
         /kubelet.go
-    /pkg
+    /pkg/kubelet
         /cadvisor
         /configmap
         /prober
@@ -258,90 +260,6 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 ![](/public/upload/kubernetes/kubelet_create_pod_sequence.png)
 
 从图中可以看到，蓝色区域 grpc 调用 dockershim等cri shim 完成。
-
-## 上下游组件
-
-### pleg
-
-整体蛮简单的，源码就几个文件
-
-```
-k8s.io/kubernetes
-    /cmd
-        /app
-        /kubelet.go
-    /pkg
-        /pleg
-            /doc.go
-            /generic.go
-            /pleg.go
-        ...
-        /kubelet.go 
-```
-
-![](/public/upload/kubernetes/kubelet_pleg_object.png)
-
-GenericPLEG 通过 runtime/cri 获取pod 信息，与本地存储的上一次pod 数据作对比，通过eventChannel 对外发出 PodLifecycleEvent 事件
-
-```go
-func (g *GenericPLEG) Start() {
-	go wait.Until(g.relist, g.relistPeriod, wait.NeverStop)
-}
-// relist queries the container runtime for list of pods/containers, compare
-// with the internal pods/containers, and generates events accordingly.
-func (g *GenericPLEG) relist() {
-	...
-	// Get all the pods.
-	podList, err := g.runtime.GetPods(true)
-	pods := kubecontainer.Pods(podList)
-	g.podRecords.setCurrent(pods)
-	// Compare the old and the current pods, and generate events. eventsByPodID 存储了可能的新事件
-	eventsByPodID := map[types.UID][]*PodLifecycleEvent{}
-	for pid := range g.podRecords {
-		oldPod := g.podRecords.getOld(pid)
-		pod := g.podRecords.getCurrent(pid)
-		// Get all containers in the old and the new pod.
-		allContainers := getContainersFromPods(oldPod, pod)
-		for _, container := range allContainers {
-			events := computeEvents(oldPod, pod, &container.ID)
-			for _, e := range events {
-				updateEvents(eventsByPodID, e)
-			}
-		}
-	}	
-	// If there are events associated with a pod, we should update the podCache.
-	for pid, events := range eventsByPodID {
-		pod := g.podRecords.getCurrent(pid)
-		if g.cacheEnabled() {...}
-		// Update the internal storage and send out the events.
-		g.podRecords.update(pid)
-		for i := range events {
-			// Filter out events that are not reliable and no other components use yet.
-			if events[i].Type == ContainerChanged {
-				continue
-			}
-			select {
-			case g.eventChannel <- events[i]:
-			default:...
-			}
-		}
-	}
-	...
-}
-```
-
-pleg 本地 对pod 数据的缓存结构 `type podRecords map[types.UID]*podRecord`
-
-```go
-type podRecord struct {
-	old     *kubecontainer.Pod
-	current *kubecontainer.Pod
-}
-```
-
-### PodManager
-
-**The kubelet discovers pod updates from 3 sources: file, http, and apiserver**. Pods from non-apiserver sources are called static pods, and API server is not aware of the existence of static pods. In order to monitor the status of such pods, the kubelet creates a mirror pod for each static pod via the API server.
 
 
 ## 其它 
