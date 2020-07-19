@@ -4,7 +4,7 @@ layout: post
 title: kubernetes operator
 category: 技术
 tags: Kubernetes
-keywords: kubernetes yaml
+keywords: kubernetes operator
 
 ---
 

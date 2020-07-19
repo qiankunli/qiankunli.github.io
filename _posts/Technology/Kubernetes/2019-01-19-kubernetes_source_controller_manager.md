@@ -4,7 +4,7 @@ layout: post
 title: Kubernetes源码分析——controller mananger
 category: 技术
 tags: Kubernetes
-keywords: kubernetes 源码分析
+keywords: kubernetes 源码分析 controller mananger
 
 ---
 

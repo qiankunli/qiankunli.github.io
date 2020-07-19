@@ -4,7 +4,7 @@ layout: post
 title: Kubernetes 其它特性
 category: 技术
 tags: Kubernetes
-keywords: CoreOS Docker Kubernetes
+keywords: Docker Kubernetes
 
 ---
 

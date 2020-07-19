@@ -4,7 +4,7 @@ layout: post
 title: knative入门
 category: 技术
 tags: Kubernetes
-keywords: kubernetes cni
+keywords: kubernetes knative
 
 ---
 

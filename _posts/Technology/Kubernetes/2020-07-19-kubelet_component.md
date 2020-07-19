@@ -280,3 +280,37 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 	return spaceFreed, nil
 }
 ```
+
+## cadvisor
+
+[google/cadvisor](https://github.com/google/cadvisor)由谷歌开源，使用Go开发，cadvisor不仅可以搜集一台机器上所有运行的容器信息，包括CPU使用情况、内存使用情况、网络吞吐量及文件系统使用情况，还提供基础查询界面和http接口，方便其他组件进行数据抓取。在K8S中集成在Kubelet里作为默认启动项，k8s官方标配。
+
+![](/public/upload/kubernetes/kubernetes_cadvisor.png)
+
+资源使用情况的监控可以通过 Metrics API的形式获取，具体的组件为Metrics Server（以Deployment 形式存在）。Metrics server复用了api-server的库来实现自己的功能，比如鉴权、版本等，为了实现将数据存放在内存中吗，去掉了默认的etcd存储，引入了内存存储。因为存放在内存中，因此监控数据是没有持久化的，可以通过第三方存储来拓展
+
+
+```sh
+$ k get deployment -n kube-system | grep metric
+kube-state-metrics        1/1     1            1           61d
+metrics-server            1/1     1            1           30d
+```
+
+启动链路：Kubelet.Run ==> Kubelet.updateRuntimeUp ==> Kubelet.initializeRuntimeDependentModules ==> Kubelet.cadvisor.Start
+
+```
+k8s.io/kubernetes
+    /cmd/kubelet
+        /app
+        /kubelet.go
+    /pkg/kubelet
+        /cadvisor
+            /cadvisor_linux.go   // 定义cadvisorClient struct
+            /types.go
+        ...
+        /kubelet.go 
+```
+
+几乎cadvisorClient/Interface 所有的方法调用都转给了 cadvisor 包的manger struct
+
+![](/public/upload/kubernetes/kubelet_cadvisor_object.png)

@@ -3,7 +3,7 @@ layout: post
 title: 访问Kubernetes上的Service
 category: 技术
 tags: Kubernetes
-keywords: Docker Kubernetes
+keywords: Kubernetes Service
 ---
 
 

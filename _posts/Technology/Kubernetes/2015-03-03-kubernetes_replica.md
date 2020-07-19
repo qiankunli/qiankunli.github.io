@@ -3,7 +3,7 @@ layout: post
 title: Kubernetes副本管理
 category: 技术
 tags: Kubernetes
-keywords: CoreOS Docker Kubernetes
+keywords:  Kubernetes replica
 ---
 
 
