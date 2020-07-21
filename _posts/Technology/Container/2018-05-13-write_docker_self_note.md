@@ -26,36 +26,43 @@ initComand 启动后挂载文件系统，从管道中读取用户输入的comman
 
 从图中可以看到，能在父进程的干的，就在父进程干了（不准确的说，runCommand 是“父进程”的父进程，父进程是initCommand的父进程）。比如提前预备好子进程的root目录，子进程只是change root 一下。比如配置父进程的namespace 和 cgroup，因为子进程会自动继承。 父进程 还负责 在子进程 退出时 进行子进程相关资源的清理工作。 go语言中
 
-	{
-		cmd:=NewProcess(xx)	// 创建进程对象
-		if err:= cmd.Start();err != nil {	 // 启动子进程
-			log.Error(err)		
-		}
-		...  // 这里cmd.Process.pid 拿到子进程的pid 能干很多事，比如设置cgroup
-		cmd.Wait() // 该函数阻塞知道子进程退出,比如子进程命令敲入exit
-		...	 // 这里可以做一些 清理工作
-	}
+```go
+{
+    cmd:=NewProcess(xx)	// 创建进程对象
+    if err:= cmd.Start();err != nil {	 // 启动子进程
+        log.Error(err)		
+    }
+    ...  // 这里cmd.Process.pid 拿到子进程的pid 能干很多事，比如设置cgroup
+    cmd.Wait() // 该函数阻塞知道子进程退出,比如子进程命令敲入exit
+    ...	 // 这里可以做一些 清理工作
+}
+```
 
 ## 镜像的来龙去脉
+
+1. 虚拟机启动时，是完全的全新启动内核，挂载rootfs及特定发行版对应的文件系统（比如ubuntu的ext4）； 
+2. 容器启动时，只是运行了一个进程
+    1. mount namespace/changeroot 使得进程将某个目录作为其根目录
+    2. UFS 使得多个容器可以共用镜像文件但不改变其内容，也不会相互影响
 
 ### 镜像是一个压缩后的文件夹
 
 1. 通过namespace，可以让容器工作在一个隔离的环境中。但用户输入的command 比如`/bin/sh` 仍然是宿主机上的可执行文件。（注意，此时只是新的mnt namespace，还没有change root）
 2. 下载busybox 镜像，将其解压至目录`/root/busybox`，会看到内容为
-
-		bin
-		dev
-		etc
-		home
-		lib
-		mnt
-		opt
-		proc
-		bin
-		sbin
-		tmp
-		...
-		
+    ```
+    bin
+    dev
+    etc
+    home
+    lib
+    mnt
+    opt
+    proc
+    bin
+    sbin
+    tmp
+    ...
+	```
 ### changeroot
 
 2019.3.13 补充：Mount Namespace 修改的，是容器进程对文件系统“挂载点”的认知。但是，这也就意味着，只有在“挂载”这个操作发生之后，进程的视图才会被改变。而在此之前，新创建的容器会直接继承宿主机的各个挂载点。
@@ -85,12 +92,14 @@ initComand 启动后挂载文件系统，从管道中读取用户输入的comman
 
 d 表示 mydocker/父进程退出时，子进程仍然可以运行。此时，父进程代码中，只能
 
-	{
-		... 
-		if tty{
-			cmd.Wait()
-		}
-	}
+```json
+{
+    ... 
+    if tty{
+        cmd.Wait()
+    }
+}
+```
 
 即 父子进程 支持detach 之后，父进程 启动 子进程后会立即退出，自然也就不存在 通过 父进程的stdin 给 子进程 传命令的 可能了。
 
@@ -128,40 +137,42 @@ eth0 在linux中 就是一个 struct device , 每一个struct device 都有一�
 此处有几个基本抽象
 
 1. 网络
-
-		type Network struct{
-			Name string		// 网络名
-			IpRange *net.IPNet	// 地址段
-			Driver string		// 网络驱动名
-		}
+    ```go
+    type Network struct{
+        Name string		// 网络名
+        IpRange *net.IPNet	// 地址段
+        Driver string		// 网络驱动名
+    }
+    ```
 2. 网络端点
-	
-		type Endpoint struct{
-			ID string,
-			Device netlink.Veth
-			IPAddress net.IP
-			MacAddress net.HardwareAddr
-			PortMapping []string
-			Network *Network
-		}
-
+	```go
+    type Endpoint struct{
+        ID string,
+        Device netlink.Veth
+        IPAddress net.IP
+        MacAddress net.HardwareAddr
+        PortMapping []string
+        Network *Network
+    }
+    ```
 3. 网络驱动
-
-		type NetworkDriver interface{
-			Name() string
-			Create(subnet string,name string)(*Network,error)
-			Delete(network Network) error
-			Connect(network *Network,endpoint * Endpoint) error
-			Disconnect(network *Network,endpoint * Endpoint) error
-		}
+    ```go
+    type NetworkDriver interface{
+        Name() string
+        Create(subnet string,name string)(*Network,error)
+        Delete(network Network) error
+        Connect(network *Network,endpoint * Endpoint) error
+        Disconnect(network *Network,endpoint * Endpoint) error
+    }
+    ```
 4. ipam
-
-		type IPAM struct{
-			...
-		}
-		func (ipam *IPAM)Allocate(subnet *net.IPNet)(ip net.IP,err error)
-		func (ipam *IPAm)Release(subnet *net.IPNet,ipaddr *net.IP) error
-		
+    ```go
+    type IPAM struct{
+        ...
+    }
+    func (ipam *IPAM)Allocate(subnet *net.IPNet)(ip net.IP,err error)
+    func (ipam *IPAm)Release(subnet *net.IPNet,ipaddr *net.IP) error
+	```
 从中可以看到
 		
 1. 网络信息的dump，就是将 Network json化并写入文件中

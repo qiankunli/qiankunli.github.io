@@ -120,19 +120,20 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 优先级和抢占机制，解决的是 （高优先级的）Pod 调度失败时该怎么办的问题
 
-	apiVersion: v1
-	kind: Pod
-	metadata:
-	name: nginx
-	labels:
-		env: test
-	spec:
-	containers:
-	- name: nginx
-		image: nginx
-		imagePullPolicy: IfNotPresent
-	priorityClassName: high-priority
-
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+name: nginx
+labels:
+    env: test
+spec:
+containers:
+- name: nginx
+    image: nginx
+    imagePullPolicy: IfNotPresent
+priorityClassName: high-priority
+```
 
 Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的 PriorityClass。当这个 Pod 被提交给 Kubernetes 之后，Kubernetes 的 PriorityAdmissionController 就会自动将这个 Pod 的 spec.priority 字段设置为 PriorityClass 对应的value 值。
 
@@ -146,7 +147,7 @@ Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的
 	3. 调度器会开启一个 Goroutine，同步地删除牺牲者。
 3. 调度器就会通过正常的调度流程把抢占者调度成功
 
-## 基于调度框架
+## 基于Scheduling Framework
 
 明确了 Kubernetes 中的各个调度阶段，提供了设计良好的基于插件的接口。调度框架认为 Kubernetes 中目前存在调度（Scheduling）和绑定（Binding）两个循环：
 
@@ -156,6 +157,24 @@ Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的
 除了两个大循环之外，调度框架中还包含 QueueSort、PreFilter、Filter、PostFilter、Score、Reserve、Permit、PreBind、Bind、PostBind 和 Unreserve 11 个扩展点（Extension Point），这些扩展点会在调度的过程中触发，它们的运行顺序如下：
 
 ![](/public/upload/kubernetes/framework_schedule.png)
+
+[Scheduling Framework](https://github.com/kubernetes/enhancements/blob/master/keps/sig-scheduling/20180409-scheduling-framework.md)scheduling cycle
+1. QueueSort, These plugins are used to sort pods in the scheduling queue. A queue sort plugin essentially will provide a "less(pod1, pod2)" function. Only one queue sort plugin may be enabled at a time.
+2. PreFilter, PreFilter 类似于调度流程启动之前的预处理，可以对 Pod 的信息进行加工。同时 PreFilter 也可以进行一些预置条件的检查，去检查一些集群维度的条件，判断否满足 pod 的要求。
+3. Filter, **是 scheduler v1 版本中的 Predicate 的逻辑**，用来过滤掉不满足 Pod 调度要求的节点
+4. PostFilter, 主要是用于处理当 Pod 在 Filter 阶段失败后的操作，例如抢占，Autoscale 触发等行为。
+5. PreScore, 主要用于在 Score 之前进行一些信息生成。此处会获取到通过 Filter 阶段的节点列表，我们也可以在此处进行一些信息预处理或者生成一些日志或者监控信息。
+6. Scoring, **是 scheduler v1 版本中 Priority 的逻辑**，目的是为了基于 Filter 过滤后的剩余节点，根据 Scoring 扩展点定义的策略挑选出最优的节点。分为两个阶段：
+
+    1. 打分：打分阶段会对 Filter 后的节点进行打分，scheduler 会调用所配置的打分策略
+    2. 归一化: 对打分之后的结构在 0-100 之间进行归一化处理
+7. Reserve, 是 scheduler v1 版本的 assume 的操作，此处会对调度结果进行缓存，如果在后边的阶段发生了错误或者失败的情况，会直接进入 Unreserve 阶段，进行数据回滚。
+8. Permit, ，当 Pod 在 Reserve 阶段完成资源预留之后，Bind 操作之前，开发者可以定义自己的策略在 Permit 节点进行拦截，根据条件对经过此阶段的 Pod 进行 allow、reject 和 wait 的 3 种操作。
+
+ binding cycle, 需要调用 apiserver 的接口，耗时较长，为了提高调度的效率，需要异步执行，所以此阶段线程不安全。
+ 1. Bind, 是 scheduler v1 版本中的 Bind 操作，会调用 apiserver 提供的接口，将 pod 绑定到对应的节点上。
+ 2. PreBind 和 PostBind, 在 PreBind 和 PostBind 分别在 Bind 操作前后执行，这两个阶段可以进行一些数据信息的获取和更新。
+ 3. UnReserve, 用于清理到 Reserve 阶段的的缓存，回滚到初始的状态。当前版本 UnReserve 与 Reserve 是分开定义的，未来会将 UnReserve 与 Reserve 统一到一起，即要求开发者在实现 Reserve 同时需要定义 UnReserve，保证数据能够有效的清理，避免留下脏数据。
 
 插件规范定义在 `$GOPATH/src/k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/interface.go` 中，各类插件继承 Plugin
 
@@ -170,6 +189,35 @@ type PreFilterPlugin interface {
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,or nil if it does not. A Pre-filter plugin can provide extensions to incrementally modify its pre-processed info. The framework guarantees that the extensions
 	// AddPod/RemovePod will only be called after PreFilter, possibly on a cloned CycleState, and may call those functions more than once before calling Filter again on a specific node.
 	PreFilterExtensions() PreFilterExtensions
+}
+```
+
+[Kubernetes scheduling framework](https://mp.weixin.qq.com/s/UkVXuZU0E0LT3LaDdZG4Xg)Kubernetes 负责 Kube-scheduler 的小组 sig-scheduling 为了更好的管理调度相关的 Plugin，新建了项目 scheduler-plugins 来方便用户管理不同的插件。
+```
+github.com/kubernetes-sigs/scheduler-plugins
+    /pkg
+        /qos
+            /queue_sort.go  // 插件实现
+k8s.io/kubernetes
+    /cmd
+        /kube-scheduler
+            /scheduler.go   // 插件注册   
+```
+以其中的 Qos 的插件来为例，Qos 的插件主要基于 Pod 的 QoS(Quality of Service) class 来实现的，目的是为了实现调度过程中如果 Pod 的优先级相同时，根据 Pod 的 Qos 来决定调度顺序。 注册逻辑如下
+
+```go
+// scheduler.go
+func main() {
+	rand.Seed(time.Now().UnixNano())
+	command := app.NewSchedulerCommand(
+        app.WithPlugin(qos.Name, qos.New),  // 这一行为新增的注册代码
+    )
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
+	logs.InitLogs()
+	defer logs.FlushLogs()
+	if err := command.Execute(); err != nil {
+		os.Exit(1)
+	}
 }
 ```
 
