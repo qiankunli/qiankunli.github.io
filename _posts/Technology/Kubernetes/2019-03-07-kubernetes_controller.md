@@ -43,11 +43,13 @@ controller是一系列控制器的集合，不单指RC。
 
 这些控制器之所以被统一放在 pkg/controller 目录下，就是因为它们都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。  [Writing Controllers](https://github.com/kubernetes/community/blob/8decfe4/contributors/devel/controllers.md)
 
-    for {
-        desired := getDesiredState()
-        current := getCurrentState()
-        makeChanges(desired, current)
-    }
+```go
+for {
+    desired := getDesiredState()
+    current := getCurrentState()
+    makeChanges(desired, current)
+}
+```
 
 实际状态往往来自于 Kubernetes 集群本身。 比如，**kubelet 通过心跳汇报的容器状态和节点状态**，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。而期望状态，一般来自于用户提交的 YAML 文件。 比如，Deployment 对象中 Replicas 字段的值，这些信息往往都保存在 Etcd 中。
 
@@ -121,14 +123,7 @@ controller 与上下游的边界/接口如下图
 
 ### 数据结构
 
-Controller Mananger 的主要逻辑便是 先初始化 资源（重点就是Informer） 并启动Controller。可以将Controller 和 Informer 视为两个组件，也可以认为只有Controller 一个，比如[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)将 Deployment 记录存储到 etcd 并初始化后，就可以通过 kube-apiserver 使其可见，DeploymentController工作就是负责监听 Deployment 记录的更改——控制器通过 Informer 注册cud事件的回调函数。
-
-[Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)Kubernetes offers these powerful structures to get a local representation of the API server's resources.
-
-![](/public/upload/kubernetes/controller_object.png)
-
-The Informer just a convenient wrapper to  automagically syncs the upstream data to a downstream store and even offers you some handy event hooks.
-
+Controller Mananger 的主要逻辑便是 先初始化 资源（重点就是Informer） 并启动Controller。[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)将 Deployment 记录存储到 etcd 并初始化后，就可以通过 kube-apiserver 使其可见，DeploymentController工作就是负责监听 Deployment 记录的更改——控制器通过 Informer 注册cud事件的回调函数。
 
 ### 外围——循环及数据获取
 
