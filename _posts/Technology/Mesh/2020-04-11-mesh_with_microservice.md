@@ -8,7 +8,7 @@ keywords: mesh microservice
 
 ---
 
-## 前言（未完成）
+## 前言
 
 * TOC
 {:toc}
@@ -45,6 +45,7 @@ keywords: mesh microservice
 
 在 Istio 控制面中，Pilot 组件负责管理服务网格内部的服务和流量策略。Pilot 将服务信息和路由策略转换为 xDS 接口的标准数据结构，下发到数据面的 Envoy。Pilot 自身并不负责网格中的服务注册，而是通过集成其他服务注册表来获取网格中管理的服务。除此以外，Istio 还支持通过 API 向网格中添加注册表之外的独立服务。
 
+[如何将第三方服务注册集成到 Istio ？](https://mp.weixin.qq.com/s/EJMk0tcJ457iKNMFbmi3jQ)
 ### 支持自定义RPC 协议
 
 

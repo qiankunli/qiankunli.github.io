@@ -13,7 +13,6 @@ keywords: pilot service mesh
 * TOC
 {:toc}
 
-![](/public/upload/mesh/pilot_package.png)
 
 ## pilot-discovery宏观设计
 
@@ -27,7 +26,7 @@ keywords: pilot service mesh
     2. 配置规则（人为的）： 各种配置规则，包括路由规则及流量管理规则等，通过Kubernetes CRD(Custom Resources Definition)形式定义并存储在Kubernetes中。PS：本质就是一些配置，只是pilot 没有提供直接的crud API，通过k8s中转一下：人 ==> k8s ==> pilot 
 2. Pilot的输出为符合xDS接口的数据面配置数据，并通过gRPC Streaming接口将配置数据推送到数据面的Envoy中。
 
-![](/public/upload/mesh/pilot_input_output.svg)
+![](/public/upload/mesh/pilot_input_output.png)
 
 代码、配置、架构一体化视角 [深入解读Service Mesh背后的技术细节](https://mp.weixin.qq.com/s/hq9KTc9fm8Nou8hXmqdKuw)
 
@@ -378,5 +377,8 @@ DiscoveryServer 启动时 触发sendPushes ，负责消费PushQueue ==> doSendPu
 3. 抢救envoy
 4. 优雅关闭envoy
 
+## 其它
+
+![](/public/upload/mesh/pilot_package.png)
 
 

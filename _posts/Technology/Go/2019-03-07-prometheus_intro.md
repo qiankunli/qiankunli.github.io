@@ -253,6 +253,8 @@ Time series Selectors 从time series 中选择需要的数据
     ```
 3. 对指标进行 函数计算，比如`sum(http_requests_total)` 支持的函数[expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
 
+[Prometheus 常用 PromQL 语句](https://mp.weixin.qq.com/s/vr1C6S_jAnMMu_5sUmYPMQ)
+
 ## rules
 
 Prometheus uses rules to create new time series and to generate alerts. rule 分为两种类型：RecordingRule 和 AlertingRule
