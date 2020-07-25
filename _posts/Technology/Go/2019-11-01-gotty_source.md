@@ -111,7 +111,7 @@ func (server *Server) setupHandlers(ctx context.Context, cancel context.CancelFu
     return siteHandler
 }
 ```
-本机启动 `gotty -w bash`，然后浏览器访问 `localhost:8080`，浏览器发出请求下载一系列js文件， 其中的关键是 发出了`ws://localhost:8080/ws`，然后浏览器进行了协议升级。
+本机启动 `gotty -w bash`，然后浏览器访问 `localhost:8080`，浏览器发出请求下载一系列js文件， 其中的关键是 发出了`ws://localhost:8080/ws`，然后服务端返回http status=101（Switching Protocols 服务器将遵从客户的请求转换到另外一种协议）进行了协议升级。
 
 ![](/public/upload/go/gotty_ws_upgrade.png)
 
