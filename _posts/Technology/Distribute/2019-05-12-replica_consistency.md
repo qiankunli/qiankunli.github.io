@@ -19,16 +19,18 @@ keywords: 一致性协议
 
 那线性一致性是什么意思呢？它精确的形式化定义非常抽象，且难以理解。具体到一个分布式存储系统来说，线性一致性的含义可以用一个具体的描述来取代：对于任何一个数据对象来说，系统**表现得就像它只有一个副本一样**。显然，如果系统对于每个数据对象真的只存一个副本，那么肯定是满足线性一致性的。但是单一副本不具有容错性，所以分布式存储系统一般都会对数据进行复制（replication），也就是保存多个副本。这时，在一个分布式多副本的存储系统中，要提供线性一致性的保证，就需要付出额外的成本了。
 
+[分布式一致性技术是如何演进的？](https://mp.weixin.qq.com/s/KSpsa1viYz9K_-DYYQkmKA)分布式一致性，简单的说就是在一个或多个进程提议了一个值后，使系统中所有进程对这个值达成一致。
+
 ## basic-paxos
 
 每个Node 同时充当了两个角色：Proposer和Acceptor，在实现过程中， 两个角色在同一个进程里面。专门提一个Proposer概念（只是一个角色概念）的好处是：对业务代码没有侵入性，也就是说，我们不需要在业务代码中实现算法逻辑，就可以像使用数据库一样访问后端的数据。
 
 ![](/public/upload/distribute/paxos_role.jpg)
 
-||proposer|acceptor||
+||proposer|acceptor|作用|
 |---|---|---|---|
-|prepare阶段|proposer 生成全局唯一且自增的proposal id，广播propose<br>只广播proposal id即可，无需value|Acceptor 收到 propose 后，做出“两个承诺，一个应答”<br>1. 不再应答 proposal id **小于等于**当前请求的propose<br>2. 不再应答 proposal id **小于** 当前请求的 accept<br>3. 若是符合应答条件，返回已经accept 过的提案中proposal id最大的那个 propose 的value 和 proposal id， 没有则返回空值|proposer 通过prepare请求来发现之前被大多数节点通过的提案|
-|accept阶段|提案生成规则<br>1. 从acceptor 应答中选择proposalid 最大的value 作为本次的提案<br>2. 如果所有的应答的天value为空，则可以自己决定value|在不违背“两个承诺”的情况下，持久化当前的proposal id和value|
+|prepare阶段|proposer 生成全局唯一且自增的proposal id，广播propose<br>只广播proposal id即可，无需value|Acceptor 收到 propose 后，做出“两个承诺，一个应答”<br>1. 不再应答 proposal id **小于等于**当前请求的propose<br>2. 不再应答 proposal id **小于** 当前请求的 accept<br>3. 若是符合应答条件，返回已经accept 过的提案中proposal id最大的那个 propose 的value 和 proposal id， 没有则返回空值|争取提议权，争取到了提议权才能在Accept阶段发起提议，否则需要重新争取<br>学习之前已经提议的值|
+|accept阶段|提案生成规则<br>1. 从acceptor 应答中选择proposalid 最大的value 作为本次的提案<br>2. 如果所有的应答的天value为空，则可以自己决定value|在不违背“两个承诺”的情况下，持久化当前的proposal id和value|使提议形成多数派，提议一旦形成多数派则决议达成，可以开始学习达成的决议|
 
 
 **Proposer 之间并不直接交互**，Acceptor除了一个“存储”的作用外，还有一个信息转发的作用。**从Acceptor的视角看**，basic-paxos 及 multi-paxos 选举过程是协商一个值，每个Proposer提出的value 都可能不一样。所以第一阶段，先经由Acceptor将**已提交的**ProposerId 最大的value 尽可能扩散到Proposer（即决定哪个Proposer 是“意见领袖”）。第二阶段，再将“多数意见”形成“决议”（Acceptor持久化value）
@@ -40,7 +42,9 @@ keywords: 一致性协议
 
 《分布式协议与算法实战》Multi-Paxos 是一种思想，不是算法，缺失实现算法的必须编程细节。而 Multi-Paxos 算法是一个统称，它是指基于 Multi-Paxos 思想，通过多个 Basic Paxos 实例实现一系列值的共识的算法（比如 Chubby 的 Multi-Paxos 实现、Raft 算法等）。
 
-当存在一批提案时，用Basic-Paxos一个一个决议当然也可以，但是每个提案都经历两阶段提交，显然效率不高。Basic-Paxos协议的执行流程针对每个提案（每条redo log）都至少存在三次网络交互：1. 产生log ID；2. prepare阶段；3. accept阶段。所以，Mulit-Paxos基于Basic-Paxos做了优化，引入领导者节点作为唯一提议者，以 Chubby 的 Multi-Paxos 实现为例
+Basic Paxos达成一次决议至少需要两次网络来回，并发情况下可能需要更多，极端情况下甚至可能形成活锁，效率低下。Multi-Paxos选举一个Leader，提议由Leader发起，没有竞争，解决了活锁问题。提议都由Leader发起的情况下，Prepare阶段可以跳过，将两阶段变为一阶段，提高效率。Multi-Paxos并不假设唯一Leader，它允许多Leader并发提议，不影响安全性，极端情况下退化为Basic Paxos。Multi-Paxos与Basic Paxos的区别并不在于Multi（Basic Paxos也可以Multi），只是在同一Proposer**连续提议时**可以优化跳过Prepare直接进入Accept阶段，仅此而已。
+
+以 Chubby 的 Multi-Paxos 实现为例
 
 1. 主节点作为唯一提议者，这样就不存在多个提议者同时提交提案的情况，也就不存在提案冲突的情况
 2. 在 Chubby 中，主节点是通过执行 Basic Paxos 算法，进行投票选举产生的，并且在运行过程中，主节点会通过不断续租的方式来延长租期（Lease）。
@@ -51,19 +55,13 @@ keywords: 一致性协议
 
 强烈推荐细读 [《In Search of an Understandable Consensus Algorithm》](https://raft.github.io/raft.pdf) 论文，说清楚好多事情。 
 
+不同于Paxos直接从分布式一致性问题出发推导出来，Raft则是从多副本状态机的角度提出，使用更强的假设来减少需要考虑的状态，使之变的易于理解和实现。
+
 通过选出leader，<font color="red">Raft 将一致性问题分解成为三个相对独立的子问题</font>：
 
 1. leader选取， 在一个leader宕机之后必须要选取一个新的leader
 2. 日志复制，leader必须从client接收日志然后复制到集群中的其他服务器，并且强制要求其他服务器的日志保持和自己相同
 3. 安全性（Safety），一系列的规则约束
-
-针对 正场情况 和 leader 崩溃后的恢复场景 定义了一系列规则，最终达到一致性的要求。
-
-||正常情况|leader崩溃后的恢复|
-|---|---|---|
-|Leader 选举|参见论文|参见论文|
-|日志复制|参见论文|参见论文|
-|安全性||选举限制<br>提交之前任期的日志条目|
 
 ### Raft 和 Paxos
 
@@ -75,7 +73,33 @@ Raft 算法属于 Multi-Paxos 算法，它是在兰伯特 Multi-Paxos 思想的�
 
 [《In Search of an Understandable Consensus Algorithm》](https://raft.github.io/raft.pdf)单决策（Single-decree）Paxos 是晦涩且微妙的：它被划分为两个没有简单直观解释的阶段，并且难以独立理解。正因为如此，它不能很直观的让我们知道为什么单一决策协议能够工作。为多决策 Paxos 设计的规则又添加了额外的复杂性和精巧性。我们相信多决策问题能够分解为其它更直观的方式。PS： 现实问题是多决策的，paxos 单决策出现在 多决策之前，彼时是以单决策的视角来考虑问题（在单决策场景下，选主不是很重要），又简单的以为将单决策 组合起来就可以支持 多决策。 
 
+Raft与Multi-Paxos中相似的概念：
+
+|raft|Multi-Paxos|
+|---|---|
+|leader|proposer|
+|term|proposal id|
+|log entry|proposal|
+|log index|instance id|
+|Leader选举|prepare 阶段|
+|日志复制|Accept阶段|
+
+Raft与Multi-Paxos的不同：
+
+||raft|Multi-Paxos|
+|---|---|---|
+|领导者|强leader|弱leader|
+|领导者选举权| 具有已连续提交日志的副本|任意副本|
+|日志复制|保证复制|允许空洞|
+|日志提交|推进commit index|异步的commit 消息|
+
 Raft 和 Paxos 最大的不同之处就在于 Raft 的**强领导特性**：Raft 使用leader选举作为一致性协议里必不可少的部分，**并且将尽可能多的功能集中到了leader身上**。这样就可以使得算法更加容易理解。例如，在 Paxos 中，leader选举和基本的一致性协议是正交的：leader选举仅仅是性能优化的手段，而且不是一致性所必须要求的。但是，这样就增加了多余的机制：Paxos 同时包含了针对基本一致性要求的两阶段提交协议和针对leader选举的独立的机制。相比较而言，Raft 就直接将leader选举纳入到一致性算法中，并作为两阶段一致性的第一步。这样就减少了很多机制。
+
+强Leader在工程中一般使用Leader Lease和Leader Stickiness来保证：
+ 
+1. Leader Lease：上一任Leader的Lease过期后，随机等待一段时间再发起Leader选举，保证新旧Leader的Lease不重叠。
+2. Leader Stickiness：Leader Lease未过期的Follower拒绝新的Leader选举请求。
+
 
 ### Leader 选举
 
@@ -133,6 +157,7 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 2. 领导者强制跟随者更新覆盖的不一致日志项，实现日志的一致。
 
 跟随者中的不一致日志项会被领导者的日志覆盖，而且领导者从来不会覆盖或者删除自己的日志。
+
 
 ## 补充
 

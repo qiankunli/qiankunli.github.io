@@ -210,9 +210,9 @@ func GetSingletonObj() *SingletonObj{
 
 ### 为什么有 context？
 
-部分像java 中的`future.cancel()`。
-
 在 Go 的 server 里，通常每来一个请求都会启动若干个 goroutine 同时工作：有些去数据库拿数据，有些调用下游接口获取相关数据……这些 goroutine 需要共享这个请求的基本数据，例如登陆的 token，处理请求的最大超时时间（如果超过此值再返回数据，请求方因为超时接收不到）等等。当请求被取消或超时，所有正在为这个请求工作的 goroutine 需要快速退出，因为它们的“工作成果”不再被需要了。context 包就是为了解决上面所说的这些问题而开发的：在 一组 goroutine 之间传递共享的值、取消信号、deadline……
+
+goroutine **主动**检查 Context 的状态并作出正确的响应。PS： **从这个视角看，context 跟 惯用的stopChannel 差不多**
 
 ### 为什么是context 树
 
@@ -247,6 +247,7 @@ context 取消和传值示例
 
 ```go
 func main() {
+    // cancel 是一个方法
 	ctx, cancel := context.WithCancel(context.Background())
 	valueCtx := context.WithValue(ctx, key, "add value")
 	go watch(valueCtx)
