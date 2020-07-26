@@ -131,3 +131,21 @@ Alertmanager包含由HashiCorp Memberlist库提供的集群功能。Memberlist�
 2. 其二是水平扩展，将同一任务的不同实例的监控数据采集任务划分到不同的Prometheus实例。
 
 如果需要对某些区域或功能进行整体视图查看，那么可以使用federat ion功能将时间序列提取到集中的Prometheus服务器。
+
+### 存储扩展
+
+Prometheus includes a local on-disk time series database, but also optionally integrates with remote storage systems.
+
+```yaml
+# prometheus.yml
+remote_write:
+- url: "http://localhost:1234/receive"
+remote_read
+- url: xx
+```
+
+可以这么理解， Prometheus 定义了一套协议规范，可以和Adapter (及其背后的remote storage) 进行数据交互
+
+可以在Prometheus配置文件中指定Remote Write（远程写）的URL地址，一旦设置了该配置项，Prometheus将采集到的样本数据通过HTTP的形式发送给适配器（Adapter）。而用户则可以在适配器中对接外部任意的服务。外部服务可以是真正的存储系统，公有云的存储服务，也可以是消息队列等任意形式。
+
+同样地，Promthues的Remote Read（远程读）也通过了一个适配器实现。在远程读的流程当中，当用户发起查询请求后，Promthues将向remote_read中配置的URL发起查询请求（matchers，time ranges），Adapter根据请求条件从第三方存储服务中获取响应的数据。同时将数据转换为Promthues的原始样本数据返回给Prometheus Server。当获取到样本数据后，Promthues在本地使用PromQL对样本数据进行二次处理。

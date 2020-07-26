@@ -112,11 +112,9 @@ scrape_configs:
 
 [服务发现与Relabel](https://yunlzheng.gitbook.io/prometheus-book/part-ii-prometheus-jin-jie/sd/service-discovery-with-relabel)
 
-## 存储
+## data model
 
-### data model
-
-Prometheus 采用**多维**时间序列数据模型。这个时间序列数据模型结合了时间序列名称和称为标签(label)的键/值对，这些**标签提供了维度**（为特定时间序列添加上下文）。每个时间序列由名称和标签的组合唯一标识（从技术上讲，名称本身也是名为__name__的标签）。时间序列的真实值是采样(samp le)的结果，它包括两部分：一个float 64类型的数值；一个毫秒精度的时间戳。
+Prometheus 采用**多维**时间序列数据模型。这个时间序列数据模型结合了时间序列名称和称为标签(label)的键/值对，这些**标签提供了维度**（为特定时间序列添加上下文）。每个时间序列由名称和标签的组合唯一标识（从技术上讲，名称本身也是名为__name__的标签）。时间序列的真实值是采样(sample)的结果，它包括两部分：一个float 64类型的数值；一个毫秒精度的时间戳。
 
 Prometheus fundamentally stores all data as time series: streams of timestamped values belonging to the same metric and the same set of labeled dimensions. time series 最直观的数据格式是`(t0,v0),(t1,v1),(t2,v2)...` 一个time series 属于一个metric + labels。 我们日常看到的格式是`(metric name, label.., value) `，因为 数据产生的时候是没有时间的，等prometheus 抓取落盘后 会有一个抓取的时间。
 
@@ -162,21 +160,7 @@ Prometheus Server 对`http://ip:9090/metrics` 返回的数据 不是直接原样
 
 带有__前缀的标签名称保留给Prometheus内部使用
 
-### 和存储结果 对接
 
-Prometheus includes a local on-disk time series database, but also optionally integrates with remote storage systems.
-
-    # prometheus.yml
-    remote_write:
-    - url: "http://localhost:1234/receive"
-    remote_read
-    - url: xx
-
-可以这么理解， Prometheus 定义了一套协议规范，可以和Adapter (及其背后的remote storage) 进行数据交互
-
-可以在Prometheus配置文件中指定Remote Write（远程写）的URL地址，一旦设置了该配置项，Prometheus将采集到的样本数据通过HTTP的形式发送给适配器（Adapter）。而用户则可以在适配器中对接外部任意的服务。外部服务可以是真正的存储系统，公有云的存储服务，也可以是消息队列等任意形式。
-
-同样地，Promthues的Remote Read（远程读）也通过了一个适配器实现。在远程读的流程当中，当用户发起查询请求后，Promthues将向remote_read中配置的URL发起查询请求（matchers，time ranges），Adapter根据请求条件从第三方存储服务中获取响应的数据。同时将数据转换为Promthues的原始样本数据返回给Prometheus Server。当获取到样本数据后，Promthues在本地使用PromQL对样本数据进行二次处理。
 
 ## 其它
 
