@@ -44,6 +44,7 @@ metric 种类
 3. 错误：监控当前系统所有发生的错误请求，衡量当前系统错误发生的速率。
 4. 饱和度：衡量当前服务的饱和度。比如，“磁盘是否可能在4个小时候就满了”。
 
+**在Prometheus 提供的许多exporter 中都支持上述metric**，只有想不到，没有不支持的。
 
 ## 监控的几个反模式
 
@@ -112,6 +113,72 @@ systemd 收集器的数据，比如node_systemd_unit_state， 包括标签name �
 
 元数据风格的 指标，许多现有的exporter 使用“元数据”模式来提供额外的状态信息，比如cadvisor_version_info，包含标签 cadvisorRevision/dockerVersion/instance/job/kernelVersion/osVersion
 
+不只是node-exporter，mysql-exporter 等也有很多的收集器可选
+
+## 监控Kubernetes
+
+![](/public/upload/go/prometheus_k8s.png)
+
+### node-exporter
+
+```yaml
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: node-exporter
+  namespace: monitoring
+  ...
+  spec:
+    tolerations:
+    - key: node-role.kubernetes.io/master
+      effect: NoSchedule
+    hostNetwork: true
+    hostPID: true
+    hostIPC: true
+    securityContext:
+      runAsUser: 0
+```
+
+利用Kubernetes DaemonSet控制器在集群中的每个节点上自动node-exporter pod。
+1. 启用systemd收 集器，并指定要监控的特定服务的正则表达式，而不是主机上的所有服务。
+2. 使用toleration来确保 node-exporter pod也会被调度到Kubernetes主节点，而不仅是工作节点。
+3. 以用户0或root运行pod(这允许访问systemd)，并 且还启用了hostNetwork、hostPID和hostIPC，以指定实例的网络、进程和IPC命名空间在容器中可用。
+
+```yaml
+containers:
+- images: prom/node-exporter:latest
+  name: node-exporter
+  volumeMounts:
+    - mountPath: /run/systemd/private
+      name: systemd-socket
+      readOnly: true
+  args:
+    - "--collector.systemd"
+    - "--collector.systemd.unit-whitelist=(docker|ssh|rsyslog|kubelet).service"
+  ports:
+    - containerPort: 9100
+      hostPort: 9100
+      name: scrape
+```
+
+配置一个Prometheus scrape job，结合Kubernetes daemonset, 只需要定义一次，未来所有Kubernetes服务端点都将被自动发现 和监控。
+
+### 业务Pod监控
+
+大部分业务监控 非常依赖边车模式。
+
+**在Pod 或Service 中定义注解，可以让Prometheus 自动发现当前metric endpoint 并抓取数据**
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: tornado-db
+  annotations:
+    prometheus.io/scrape: 'true'  # 告诉Prometheus抓取这个服务
+    prometheus.io/port: '9104'    # 告诉 Prometheus要抓取的端口，将被放入__address__标签中
+```
+
 ## 可靠性与可扩展性
 
 Prometheus 本身自带了监控自己的许多指标，比如收集的指标数量（`sum(count by(__name__)({__name__=\~"\.\+"}))`），进而估算Prometheus 需要的内存和磁盘空间。可以用来辅助做Prometheus 的运维决策
@@ -149,3 +216,11 @@ remote_read
 可以在Prometheus配置文件中指定Remote Write（远程写）的URL地址，一旦设置了该配置项，Prometheus将采集到的样本数据通过HTTP的形式发送给适配器（Adapter）。而用户则可以在适配器中对接外部任意的服务。外部服务可以是真正的存储系统，公有云的存储服务，也可以是消息队列等任意形式。
 
 同样地，Promthues的Remote Read（远程读）也通过了一个适配器实现。在远程读的流程当中，当用户发起查询请求后，Promthues将向remote_read中配置的URL发起查询请求（matchers，time ranges），Adapter根据请求条件从第三方存储服务中获取响应的数据。同时将数据转换为Promthues的原始样本数据返回给Prometheus Server。当获取到样本数据后，Promthues在本地使用PromQL对样本数据进行二次处理。
+
+## 其它
+
+一些比较有意思的exporter
+1. mtail，专门用于从应用程序日志中提取要导出到时间序列数据库中的metric。从无法导出自己内部状态的应用程序中解析日志数据。
+2. Blackbox exporter，探针监控，exporter通过 HTTP、HTTPS、DNS、TCP和ICMP来探测端点，执行检查并将生成的指标返回给Prometheus
+
+Pushgateway位于发送指标的应用程序和Prometheus服务器之间。Pushgateway接收指标，然后作为目标 被抓取，以将指标提供给Prometheus服务器。
