@@ -154,7 +154,28 @@ metadata:
 
 [kubernetes/kube-state-metrics](https://github.com/kubernetes/kube-state-metrics)
 
-kube-state-metrics is a simple service that listens to the Kubernetes API server and generates metrics about the state of the objects. It is not focused on the health of the individual Kubernetes components, but rather on the health of the various objects inside, such as deployments, nodes and pods.  上文关注的是 k8s组件是否健康， kube-state-metrics 关注的Kubernetes 的object 是否健康。
+1. kube-state-metrics is a simple service that listens to the Kubernetes API server and generates metrics about the state of the objects. It is not focused on the health of the individual Kubernetes components, but rather on the health of the various objects inside, such as deployments, nodes and pods.  上文关注的是 k8s组件是否健康， kube-state-metrics 关注的Kubernetes 的object 是否健康。
+2. kube-state-metrics uses client-go to talk with Kubernetes clusters
+3. k8s custom resource 比如 verticalpodautoscalers 默认不采集， 需要额外配置
+4. 以Deployment 方式运行，以Service 对外服务
+
+所有metric 以 `kube_*` 为前缀，每一个k8s resource 对应一批metric ，以`kube_资源名_*` 为前缀，以`kube_deployment_*`为例
+
+```
+kube_deployment_status_replicas
+kube_deployment_status_replicas_available
+kube_deployment_spec_replicas
+...
+```
+
+Kube-state-metrics self metrics，描述自身的工作状态，比如 
+
+```
+kube_state_metrics_list_total{resource="*v1.Node",result="success"} 1
+kube_state_metrics_list_total{resource="*v1.Node",result="error"} 52
+kube_state_metrics_watch_total{resource="*v1beta1.Ingress",result="success"} 1
+```
+
 
 ## 需要哪些 alert rule
 
