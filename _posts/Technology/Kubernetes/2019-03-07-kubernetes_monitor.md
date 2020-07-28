@@ -30,7 +30,7 @@ keywords: Kubernetes monitor
 
 ![](/public/upload/kubernetes/kubernetes_monitor.png)
 
-### Metrics Server（抓取cadvisor 数据）
+### Metrics Server/cadvisor
 
 Metrics server复用了api-server的库来实现自己的功能，比如鉴权、版本等，为了实现将数据存放在内存中吗，去掉了默认的etcd存储，引入了内存存储。因为存放在内存中，因此监控数据是没有持久化的，可以通过第三方存储来拓展
 
@@ -43,6 +43,29 @@ Metrics server复用了api-server的库来实现自己的功能，比如鉴权�
 从cadvisor 视角看
 
 ![](/public/upload/kubernetes/kubernetes_cadvisor.png)
+
+cadvisor 指标分析
+
+cadvisor 是监控容器的，容器像物理机一样为业务提供运算资源，因此按照 USE 对容器的指标进行分析。[监控的黄金指标](https://zhuanlan.zhihu.com/p/75875469)
+
+cadvisor 指标以`container_` 为前缀，包括container_cpu_*,container_memory_*, container_fs_*, container_network_* 等，还有 container_spec_* 获取了 container 配置相关的内容。部分指标如下
+
+cpu
+1. container_cpu_user_seconds_total —“用户”时间的总数（即不在内核中花费的时间）
+2. container_cpu_system_seconds_total —“系统”时间的总数（即在内核中花费的时间）
+3. container_cpu_usage_seconds_total—以上总和
+4. container_cpu_cfs_throttled_seconds_total  当容器超出其CPU限制时，Linux运行时将“限制”该容器并在container_cpu_cfs_throttled_seconds_total指标中记录其被限制的时间
+
+cAdvisor中提供的内存指标是从node_exporter公开的43个内存指标的子集。以下是容器内存指标：
+
+1. container_memory_cache-页面缓存的字节数。
+2. container_memory_rss -RSS的大小（以字节为单位）。
+3. container_memory_swap-容器交换使用量（以字节为单位）。
+4. container_memory_usage_bytes-当前内存使用情况（以字节为单位,包括所有内存，无论何时访问。) 包括了文件系统缓存
+5. container_memory_max_usage_bytes- 以字节为单位记录的最大内存使用量。
+6. container_memory_working_set_bytes-当前工作集（以字节为单位）。
+7. container_memory_failcnt-内存使用次数达到限制。
+8. container_memory_failures_total-内存 分配失败的累积计数。
 
 ### node-exporter
 
@@ -90,29 +113,6 @@ containers:
 
 配置一个Prometheus scrape job，结合Kubernetes daemonset, 只需要定义一次，未来所有Kubernetes服务端点都将被自动发现 和监控。
 
-### cadvisor 指标分析
-
-cadvisor 是监控容器的，容器像物理机一样为业务提供运算资源，因此按照 USE 对容器的指标进行分析。[监控的黄金指标](https://zhuanlan.zhihu.com/p/75875469)
-
-cadvisor 指标以`container_` 为前缀，包括container_cpu_*,container_memory_*, container_fs_*, container_network_* 等，还有 container_spec_* 获取了 container 配置相关的内容。部分指标如下
-
-cpu
-1. container_cpu_user_seconds_total —“用户”时间的总数（即不在内核中花费的时间）
-2. container_cpu_system_seconds_total —“系统”时间的总数（即在内核中花费的时间）
-3. container_cpu_usage_seconds_total—以上总和
-4. container_cpu_cfs_throttled_seconds_total  当容器超出其CPU限制时，Linux运行时将“限制”该容器并在container_cpu_cfs_throttled_seconds_total指标中记录其被限制的时间
-
-cAdvisor中提供的内存指标是从node_exporter公开的43个内存指标的子集。以下是容器内存指标：
-
-1. container_memory_cache-页面缓存的字节数。
-2. container_memory_rss -RSS的大小（以字节为单位）。
-3. container_memory_swap-容器交换使用量（以字节为单位）。
-4. container_memory_usage_bytes-当前内存使用情况（以字节为单位,包括所有内存，无论何时访问。) 包括了文件系统缓存
-5. container_memory_max_usage_bytes- 以字节为单位记录的最大内存使用量。
-6. container_memory_working_set_bytes-当前工作集（以字节为单位）。
-7. container_memory_failcnt-内存使用次数达到限制。
-8. container_memory_failures_total-内存 分配失败的累积计数。
-
 ### Apiserver 指标分析
 
 kube-apiserver 是集群所有请求的入口，指标的分析可以反应集群的健康状态。Apiserver 的指标可以分为以下几大类：
@@ -149,6 +149,12 @@ metadata:
     prometheus.io/scrape: 'true'  # 告诉Prometheus抓取这个服务
     prometheus.io/port: '9104'    # 告诉 Prometheus要抓取的端口，将被放入__address__标签中
 ```
+
+### kube-state-metrics
+
+[kubernetes/kube-state-metrics](https://github.com/kubernetes/kube-state-metrics)
+
+kube-state-metrics is a simple service that listens to the Kubernetes API server and generates metrics about the state of the objects. It is not focused on the health of the individual Kubernetes components, but rather on the health of the various objects inside, such as deployments, nodes and pods.  上文关注的是 k8s组件是否健康， kube-state-metrics 关注的Kubernetes 的object 是否健康。
 
 ## 需要哪些 alert rule
 
