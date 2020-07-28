@@ -31,20 +31,6 @@ devops基本理念：
 2. 应用层，应用出错、请求延迟等，业务开发、框架开发人员
 3. 业务层，比如下了多少订单等，业务开发人员
 
-metric 种类
-
-1. counter（计数器），始终增加，比如http请求数、下单数
-2. gauge（测量仪），当期值的一次快照测量，可增可减。比如磁盘使用率、当前同时在线用户数
-3. Histogram（直方图），通过分桶方式统计样本分布
-4. Summary（汇总），根据样本统计出百分位，比如客户端计算
-
-4个黄金指标可以在服务级别帮助衡量终端用户体验、服务中断、业务影响等层面的问题。
-1. 延迟：服务请求所需时间。
-2. 通讯量：监控当前系统的流量，用于衡量服务的容量需求。例如，在HTTP REST API中, 流量通常是每秒HTTP请求数；
-3. 错误：监控当前系统所有发生的错误请求，衡量当前系统错误发生的速率。
-4. 饱和度：衡量当前服务的饱和度。比如，“磁盘是否可能在4个小时候就满了”。
-
-**在Prometheus 提供的许多exporter 中都支持上述metric**，只有想不到，没有不支持的。
 
 ## 监控的几个反模式
 
@@ -59,7 +45,37 @@ metric 种类
 
 很多团队都是按部就班的搭建监控系统：一个常见的例子是监控每台主机上的 CPU、内存和磁盘，但不监控可以指示主机上应用程序是否正常运行的关键服务。如果应用程序在你 没有注意到的情况下发生故障，那么即使进行了监控，你也需要重新考虑正在监控的内容是否合理。**根据服务价值设计自上而下（业务逻辑 ==> 应用程序 ==> 操作系统）**的监控系统是一个很好的方式，这会帮助明确应用程 序中更有价值的部分，并优先监控这些内容，再从技术堆栈中依次向下推进。从业务逻辑和业务输出开始，向下到应用程序逻辑，最后到基础设施。这并不意味着你不需要收集基础设施或操作系统指标——它们在诊断和容量规划中很有帮助——但你不太可能使用这些来报告应用程序的价值。如果无法从业务指标开始，则可试着从靠近用户侧的地方开始监控。因为他们才是最终的客 户，他们的体验是推动业务发展的动力。PS：只要业务没事，底层os一定没事， 底层os没事，业务逻辑不一定没事，监控要尽量能够反应用户的体验。
 
+
+## metric 种类
+
+1. counter（计数器），始终增加，比如http请求数、下单数
+2. gauge（测量仪），当期值的一次快照测量，可增可减。比如磁盘使用率、当前同时在线用户数
+3. Histogram（直方图），通过分桶方式统计样本分布
+4. Summary（汇总），根据样本统计出百分位，比如客户端计算
+
+4个黄金指标可以在服务级别帮助衡量终端用户体验、服务中断、业务影响等层面的问题。
+1. 延迟：服务请求所需时间。
+2. 通讯量：监控当前系统的流量，用于衡量服务的容量需求。例如，在HTTP REST API中, 流量通常是每秒HTTP请求数；
+3. 错误：监控当前系统所有发生的错误请求，衡量当前系统错误发生的速率。
+4. 饱和度：衡量当前服务的饱和度。比如，“磁盘是否可能在4个小时候就满了”。
+
+这四个指标并不是唯一的系统性能或状况的衡量标准，系统可以简单分为两类
+
+1. 资源提供系统 - 对外提供简单的资源，比如CPU（计算资源），存储，网络带宽。 针对资源提供型系统，有一个更简单直观的USE标准
+    1. Utilization - 往往体现为资源使用的百分比
+    2. Saturation - 资源使用的饱和度或过载程度，**过载的系统往往意味着系统需要辅助的排队系统完成相关任务**。这个和上面的Utilization指标有一定的关系但衡量的是不同的状况，以CPU为例，Utilization往往是CPU的使用百分比而Saturation则是当前等待调度CPU的县城或进程队列长度
+    3. Errors - 这个可能是使用资源的出错率或出错数量，比如网络的丢包率或误码率等等
+2. 服务提供系统 - 对外提供更高层次与业务相关的任务处理能力，比如订票，购物等等。针对服务型系统，则往往用RED方式进行衡量
+    1. Rate - 单位时间内完成服务请求的能力
+    2. Errors - 错误率或错误数量：单位时间内服务出错的比列或数量
+    3. Duration - 平均单次服务的持续时长（或用户得到服务响应的时延）
+
+
+**Prometheus 提供的许多exporter 或者直接提供上述metric，或者通过计算可以得到上述metric**。或者反过来说，这些原则指导了exporter 去暴露哪些metric。
+
 ## node-exporter
+
+node-exporter提供了近1000个指标，以`node_` 为前缀，包括node_cpu_*,node_memory_*, node_filesystem_*/node_disk_*, node_network_* 等。
 
 node-exporter 控制启用哪些[收集器](https://github.com/prometheus/node_exporter#collectors)，许多收集器默认都是启用的。它们的状态要么是启用要 么是禁用，你可以通过使用no-前缀来修改状态。
 
@@ -115,80 +131,36 @@ systemd 收集器的数据，比如node_systemd_unit_state， 包括标签name �
 
 不只是node-exporter，mysql-exporter 等也有很多的收集器可选
 
-## 监控Kubernetes
-
-![](/public/upload/go/prometheus_k8s.png)
-
-### node-exporter
-
-```yaml
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  name: node-exporter
-  namespace: monitoring
-  ...
-  spec:
-    tolerations:
-    - key: node-role.kubernetes.io/master
-      effect: NoSchedule
-    hostNetwork: true
-    hostPID: true
-    hostIPC: true
-    securityContext:
-      runAsUser: 0
-```
-
-利用Kubernetes DaemonSet控制器在集群中的每个节点上自动node-exporter pod。
-1. 启用systemd收 集器，并指定要监控的特定服务的正则表达式，而不是主机上的所有服务。
-2. 使用toleration来确保 node-exporter pod也会被调度到Kubernetes主节点，而不仅是工作节点。
-3. 以用户0或root运行pod(这允许访问systemd)，并 且还启用了hostNetwork、hostPID和hostIPC，以指定实例的网络、进程和IPC命名空间在容器中可用。
-
-```yaml
-containers:
-- images: prom/node-exporter:latest
-  name: node-exporter
-  volumeMounts:
-    - mountPath: /run/systemd/private
-      name: systemd-socket
-      readOnly: true
-  args:
-    - "--collector.systemd"
-    - "--collector.systemd.unit-whitelist=(docker|ssh|rsyslog|kubelet).service"
-  ports:
-    - containerPort: 9100
-      hostPort: 9100
-      name: scrape
-```
-
-配置一个Prometheus scrape job，结合Kubernetes daemonset, 只需要定义一次，未来所有Kubernetes服务端点都将被自动发现 和监控。
-
-### 业务Pod监控
-
-大部分业务监控 非常依赖边车模式。
-
-**在Pod 或Service 中定义注解，可以让Prometheus 自动发现当前metric endpoint 并抓取数据**
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: tornado-db
-  annotations:
-    prometheus.io/scrape: 'true'  # 告诉Prometheus抓取这个服务
-    prometheus.io/port: '9104'    # 告诉 Prometheus要抓取的端口，将被放入__address__标签中
-```
-
 ## 可靠性与可扩展性
 
-Prometheus 本身自带了监控自己的许多指标，比如收集的指标数量（`sum(count by(__name__)({__name__=\~"\.\+"}))`），进而估算Prometheus 需要的内存和磁盘空间。可以用来辅助做Prometheus 的运维决策
+Prometheus 本身自带了监控自己的许多指标，比如
+1. 收集的指标数量（`sum(count by(__name__)({__name__=\~"\.\+"}))`），进而估算Prometheus 需要的内存和磁盘空间。可以用来辅助做Prometheus 的运维决策
+2. top10的 metric 数量： 按 metric 名字分 `topk(10, count by (__name__)({__name__=~".+"}))`
+3. top10的 metric 数量： 按 job 名字分 `topk(10, count by (__name__, job)({__name__=~".+"}))`
 
 ### 可靠性
 
-**Prometheus推荐的容错解决方案**是并 行运行两个配置相同的Prometheus服务器，并且这两个服务器同时处于活动状态。该配置生成的重复警报可以交由上游 Alertmanager 使用其分组 (及抑制)功能进行处 理 。一个推荐的方法是尽可能使上游Alertmanager高度容错 ，而不是关注Prometheus服务器的容错能力。
-
-Alertmanager包含由HashiCorp Memberlist库提供的集群功能。Memberlist是一个Go语言库，使
+1. **Prometheus推荐的容错解决方案**是并 行运行两个配置相同的Prometheus服务器，并且这两个服务器同时处于活动状态。该配置生成的重复警报可以交由上游 Alertmanager 使用其分组 (及抑制)功能进行处 理 。一个推荐的方法是尽可能使上游Alertmanager高度容错 ，而不是关注Prometheus服务器的容错能力。Alertmanager包含由HashiCorp Memberlist库提供的集群功能。Memberlist是一个Go语言库，使
 用基于gossip的协议来管理集群成员和成员故障检测。**Alertmanager集群本身负责与集群的其他活动成员共享所有收到的警报**，并处理数据去重(如果需要的话)。
+2. HA + 远程存储
+3. 联邦集群
+4. 使用thanos 或者victoriametrics，来解决全局查询、多副本数据 join 问题。 [高可用prometheus：thanos 实践](https://yasongxu.gitbook.io/container-monitor/yi-.-kai-yuan-fang-an/di-2-zhang-prometheus/thanos)
+
+### 大内存问题
+
+[高可用prometheus：常见问题](https://yasongxu.gitbook.io/container-monitor/yi-.-kai-yuan-fang-an/di-2-zhang-prometheus/prometheus-use)随着规模变大，prometheus需要的cpu和内存都会升高，内存一般先达到瓶颈，这个时候要么加内存，要么集群分片减少单机指标。这里我们先讨论单机版prometheus的内存问题
+
+1. prometheus 的内存消耗主要是因为每隔2小时做一个 block 数据落盘，落盘之前所有数据都在内存里面，因此和采集量有关。
+2. 加载历史数据时，是从磁盘到内存的，查询范围越大，内存越大。这里面有一定的优化空间
+3. 一些不合理的查询条件也会加大内存，如 group、大范围rate
+
+作者给了一个计算器，设置指标量、采集间隔之类的，计算 prometheus 需要的理论内存值：https://www.robustperception.io/how-much-ram-does-prometheus-2-x-need-for-cardinality-and-ingestion
+
+优化方案：
+1. sample 数量超过了 200 万，就不要单实例了，做下分片，然后通过victoriametrics，thanos，trickster等方案合并数据
+2. 评估哪些metric 和 label占用较多，去掉没用的指标。
+3. 查询时尽量避免大范围查询，注意时间范围和 step 的比例，慎用 group
+4. 如果需要关联查询，先想想能不能通过 relabel 的方式给原始数据多加个 label，一条sql 能查出来的何必用join，时序数据库不是关系数据库。
 
 ### 可扩展性
 
