@@ -26,6 +26,8 @@ keywords: Kubernetes monitor
 3. 监控指标随着容器规模爆炸式增长，如何处理及展示大量监控数据。
 4. 随着集群动态增长，监控系统必须具备动态扩缩的能力。
 
+k8s 社区对k8s 监控的表述 [Kubernetes monitoring architecture](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/monitoring_architecture.md)
+
 ## 能搞到哪些metric
 
 ![](/public/upload/kubernetes/kubernetes_monitor.png)
@@ -159,7 +161,7 @@ metadata:
 3. k8s custom resource 比如 verticalpodautoscalers 默认不采集， 需要额外配置
 4. 以Deployment 方式运行，以Service 对外服务
 
-所有metric 以 `kube_*` 为前缀，每一个k8s resource 对应一批metric ，以`kube_资源名_*` 为前缀，以`kube_deployment_*`为例
+所有metric 以 `kube_*` 为前缀，每一个k8s resource 对应一批metric [Exposed Metrics](https://github.com/kubernetes/kube-state-metrics/tree/master/docs) ，以`kube_资源名_*` 为前缀，以`kube_deployment_*`为例
 
 ```
 kube_deployment_status_replicas
