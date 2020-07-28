@@ -48,7 +48,7 @@ cadvisor 指标分析
 
 cadvisor 是监控容器的，容器像物理机一样为业务提供运算资源，因此按照 USE 对容器的指标进行分析。[监控的黄金指标](https://zhuanlan.zhihu.com/p/75875469)
 
-cadvisor 指标以`container_` 为前缀，包括container_cpu_*,container_memory_*, container_fs_*, container_network_* 等，还有 container_spec_* 获取了 container 配置相关的内容。部分指标如下
+cadvisor 指标以`container_` 为前缀，包括`container_cpu_*`,`container_memory_*`, `container_fs_*`, `container_network_*` 等，还有 `container_spec_*` 获取了 container 配置相关的内容。部分指标如下
 
 cpu
 1. container_cpu_user_seconds_total —“用户”时间的总数（即不在内核中花费的时间）
@@ -69,7 +69,7 @@ cAdvisor中提供的内存指标是从node_exporter公开的43个内存指标的
 
 ### node-exporter
 
-node-exporter提供了近1000个指标，以`node_` 为前缀，包括node_cpu_*,node_memory_*, node_filesystem_*/node_disk_*, node_network_* 等。
+node-exporter提供了近1000个指标，以`node_` 为前缀，包括`node_cpu_*`,`node_memory_*`, `node_filesystem_*/node_disk_*`, `node_network_*` 等。
 
 ```yaml
 apiVersion: extensions/v1beta1
@@ -117,22 +117,22 @@ containers:
 
 kube-apiserver 是集群所有请求的入口，指标的分析可以反应集群的健康状态。Apiserver 的指标可以分为以下几大类：
 
-1. 请求速率和延迟,  apiserver_request_*/apiserver_response_*
-2. 控制器队列的性能, apiserver_admission_*
-3. etcd 的性能, etcd_*
-4. 进程状态：文件系统、内存、CPU, 
-5. golang 程序的状态：GC、进程、线程, go_gc_*/go_info
+1. 请求速率和延迟,  `apiserver_request_*/apiserver_response_*`
+2. 控制器队列的性能, `apiserver_admission_*`
+3. etcd 的性能, `etcd_*`
+4. 进程状态：文件系统、内存、CPU
+5. golang 程序的状态：GC、进程、线程, `go_gc_*/go_info`
 
 ### ETCD 指标分析
 
 Kubernetes使用etcd来存储集群中组件的所有状态，是 Kubernetes数据库，监视etcd的性能和行为应该是整个Kubernetes监控计划的一部分。
 
-etcd服务器指标以 etcd_* 为前缀，分为几个主要类别：
+etcd服务器指标以 `etcd_*` 为前缀，分为几个主要类别：
 
-1. Leader的存在和Leader变动率, etcd_server_leader_*
-2. 请求已提交/已应用/正在等待/失败, etcd_server_proposals_*
-3. 磁盘写入性能 , etcd_disk_*
-4. 入站gRPC统计信息，集群内gRPC统计信息, etcd_grpc_*
+1. Leader的存在和Leader变动率, `etcd_server_leader_*`
+2. 请求已提交/已应用/正在等待/失败, `etcd_server_proposals_*`
+3. 磁盘写入性能 , `etcd_disk_*`
+4. 入站gRPC统计信息，集群内gRPC统计信息, `etcd_grpc_*`
 
 ### 业务Pod监控
 
