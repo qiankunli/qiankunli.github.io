@@ -328,7 +328,25 @@ k8s.io/kubernetes
 
 ## 其它
 
-1. PodManager, **The kubelet discovers pod updates from 3 sources: file, http, and apiserver**. Pods from non-apiserver sources are called static pods, and API server is not aware of the existence of static pods. In order to monitor the status of such pods, the kubelet creates a mirror pod for each static pod via the API server.
+1. PodManager, Pod 在内存中的管理结构，crud 访问kubelet 内存中的Pod 都通过它（线程安全），包括mirror Pod 和static Pod
+    ```go
+    type Manager interface {
+        // GetPods returns the regular pods bound to the kubelet and their spec.
+        GetPods() []*v1.Pod
+        GetPodByFullName(podFullName string) (*v1.Pod, bool)
+        GetPodByName(namespace, name string) (*v1.Pod, bool)
+        GetPodByUID(types.UID) (*v1.Pod, bool)
+        ...
+        // AddPod adds the given pod to the manager.
+        AddPod(pod *v1.Pod)
+        // UpdatePod updates the given pod in the manager.
+        UpdatePod(pod *v1.Pod)
+        // DeletePod deletes the given pod from the manager. 
+        DeletePod(pod *v1.Pod)
+        MirrorClient
+    }
+    ```
+
 2. OOM killer
     1. 输入：监听 `/dev/kmsg` 文件，捕获 `Killed process` 日志记录，从中拿到进程id（及contaienrName）。`github.com/euank/go-kmsg-parse` 监听文件输出日志channel，`github.com/google/cadvisor/utils/oomparser` 消费channel 过滤 oom 信息
     2. 输出：kubelet 记录event
