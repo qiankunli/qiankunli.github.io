@@ -350,3 +350,6 @@ k8s.io/kubernetes
 2. OOM killer
     1. 输入：监听 `/dev/kmsg` 文件，捕获 `Killed process` 日志记录，从中拿到进程id（及contaienrName）。`github.com/euank/go-kmsg-parse` 监听文件输出日志channel，`github.com/google/cadvisor/utils/oomparser` 消费channel 过滤 oom 信息
     2. 输出：kubelet 记录event
+3. eviction manager, 磁盘/内存/cpu 变化时触发 `managerImpl.synchronize` 的拿到 需要被驱逐的pod（对当期那所有规则排序，找最前面那个，不同的资源紧张时 使用的排序规则不同） 数据并使用`Kubelet.podResourcesAreReclaimed `处理一下。
+
+    ![](/public/upload/kubernetes/kubelet_eviction_object.png)
