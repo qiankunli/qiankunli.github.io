@@ -21,6 +21,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
     ...
     // Start the cloud provider sync manager
     go kl.cloudResourceSyncManager.Run(wait.NeverStop)
+    if err := kl.initializeModules(); err != nil {...}
     // Start volume manager
     go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
     // Start syncing node status immediately, this may set up things the runtime needs to run.
@@ -41,6 +42,21 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
     // Start the pod lifecycle event generator.
     kl.pleg.Start()
     kl.syncLoop(updates, kl)
+}
+// initializeModules will initialize internal modules that do not require the container runtime to be up. 启动不需要container runtime 的组件
+func (kl *Kubelet) initializeModules() error {
+    // Prometheus metrics.
+    metrics.Register(...)
+    // Setup filesystem directories.
+    if err := kl.setupDataDirs(); err != nil {...}
+    // Start the image manager.
+    kl.imageManager.Start()
+    // Start the certificate manager if it was enabled.
+    kl.serverCertificateManager.Start()
+    // Start out of memory watcher.
+    if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {...}
+    // Start resource analyzer
+	kl.resourceAnalyzer.Start()
 }
 ```
 
@@ -198,11 +214,6 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 func (m *manager) syncBatch() {...}
 func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {...}
 ```
-
-## PodManager
-
-**The kubelet discovers pod updates from 3 sources: file, http, and apiserver**. Pods from non-apiserver sources are called static pods, and API server is not aware of the existence of static pods. In order to monitor the status of such pods, the kubelet creates a mirror pod for each static pod via the API server.
-
 ## kubelet 垃圾收集
 
 ```go
@@ -314,3 +325,10 @@ k8s.io/kubernetes
 几乎cadvisorClient/Interface 所有的方法调用都转给了 cadvisor 包的manger struct
 
 ![](/public/upload/kubernetes/kubelet_cadvisor_object.png)
+
+## 其它
+
+1. PodManager, **The kubelet discovers pod updates from 3 sources: file, http, and apiserver**. Pods from non-apiserver sources are called static pods, and API server is not aware of the existence of static pods. In order to monitor the status of such pods, the kubelet creates a mirror pod for each static pod via the API server.
+2. OOM killer
+    1. 输入：监听 `/dev/kmsg` 文件，捕获 `Killed process` 日志记录，从中拿到进程id（及contaienrName）。`github.com/euank/go-kmsg-parse` 监听文件输出日志channel，`github.com/google/cadvisor/utils/oomparser` 消费channel 过滤 oom 信息
+    2. 输出：kubelet 记录event

@@ -11,6 +11,10 @@ keywords: Docker Kubernetes Volume
 * TOC
 {:toc}
 
+云原生存储的两个关键领域：
+1. Docker 存储卷：容器服务在**单节点**的存储组织形式，关注数据存储、容器运行时的相关技术；
+2. K8s 存储卷：关注容器集群的**存储编排**，从应用使用存储的角度关注存储服务。
+
 ## Volume 背景介绍
 
 ### 从AUFS说起
@@ -63,13 +67,8 @@ hello
 - 将容器以及容器产生的数据分离开来。相比通过存储驱动实现的可写层，数据卷读写是直接对外置存储进行读写，效率更高
 - 容器间共享数据
 
-## docker 和 Kubernetes volume
 
-云原生存储的两个关键领域：
-1. Docker 存储卷：容器服务在**单节点**的存储组织形式，关注数据存储、容器运行时的相关技术；
-2. K8s 存储卷：关注容器集群的**存储编排**，从应用使用存储的角度关注存储服务。
-
-### docker volume
+## docker volume
 
 Volume 挂载方式语法：`-v: src:dst:opts`
 
@@ -100,7 +99,7 @@ docker run -v dir:/container/dir imagename command
 
 即使用以上两种命令，也只能删除没有容器连接的Volume。连接到用户指定主机目录的Volume永远不会被docker删除。bypasses the Union File System, independent of the container’s life cycle.Docker therefore never automatically deletes volumes when you remove a container, nor will it “garbage collect” volumes that are no longer referenced by a container. **Docker 有 Volume 的概念，但对它只有少量且松散的管理（没有生命周期的概念），Docker 较新版本才支持对基于本地磁盘的 Volume 的生存期进行管理**。
 
-### kubernetes volume
+## kubernetes volume
 
 A Volume is a directory, possibly with some data in it, which is accessible to a Container. Kubernetes Volumes are similar to but not the same as Docker Volumes.
 
@@ -155,192 +154,12 @@ spec:
 
 因为 PVC 允许用户消耗抽象的存储资源，所以用户需要不同类型、属性和性能的 PV 就是一个比较常见的需求了，在这时我们可以通过 StorageClass 来提供不同种类的 PV 资源，上层用户就可以直接使用系统管理员提供好的存储类型。
 
-## PV 和 PVC
-
-与CPU 和 Mem 这些资源相比，“存储”对k8s 来说更像是“外设”，k8s 提供统一的“总线”接入。[Kata Containers 创始人带你入门安全容器技术](https://mp.weixin.qq.com/s/w2SkC6TuSBqurvAae0RAUA)OCI规范规定了容器之中应用被放到什么样的环境下、如何运行，比如说容器的根文件系统上哪个可执行文件会被执行，是用什么用户执行，需要什么样的 CPU，有什么样的内存资源、**外置存储**，还有什么样的共享需求等等。
-
-### 为何引入PV、PVC以及StorageClass？
-
-[Kubernetes云原生开源分布式存储介绍](https://mp.weixin.qq.com/s/lHY6cvaag1TdIist-Xg0Bg)早期Pod使用Volume的写法
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-labels:
-    role: web-frontend
-spec:
-containers:
-- name: web
-    image: nginx
-    ports:
-    - name: web
-        containerPort: 80
-    volumeMounts:
-        - name: ceph
-        mountPath: "/usr/share/nginx/html"
-volumes:
-- name: ceph
-	capacity:
-	  storage: 10Gi
-    cephfs:
-      monitors:
-	  - 172.16.0.1:6789
-	  - 172.16.0.2:6789
-	  - 172.16.0.3:6789
-	  path: /ceph
-      user: admin
-	  secretRef:
-	    name: ceph-secret
-```
-
-这种方式至少存在两个问题：
-
-1. Pod声明与底层存储耦合在一起，每次声明Volume都需要配置存储类型以及该存储插件的一堆配置，如果是第三方存储，配置会非常复杂。
-2. 开发人员的需求可能只是需要一个20GB的卷，这种方式却不得不强制要求开发人员了解底层存储类型和配置。
-
-于是引入了PV（Persistent Volume），PV其实就是把Volume的配置声明部分从Pod中分离出来，PV的spec部分几乎和前面Pod的Volume定义部分是一样的由运维人员事先创建在 Kubernetes 集群里待用
-
-```yaml
-apiVersion: v1
-kind: PersistentVolume
-metadata: 
-  name: cephfs-pv
-spec:
-  capacity:
-  	storage: 10Gi
-  cephfs:
-  	monitors:
-  	- 172.16.0.1:6789
-  	- 172.16.0.2:6789
-  	- 172.16.0.3:6789
-  	path: /ceph_storage
-  	user: admin
-  	secretRef:
-  	  name: ceph-secret
-```
-
-有了PV，在Pod中就可以不用再定义Volume的配置了，**直接引用**即可。但是这没有解决Volume定义的第二个问题，存储系统通常由运维人员管理，开发人员并不知道底层存储配置，也就很难去定义好PV。为了解决这个问题，引入了PVC（Persistent Volume Claim），声明与消费分离，开发与运维责任分离。
-
-```yaml
-kind:PersistentVolumeClaim
-apiVersion:v1
-metadata:
-  name: cephfs-pvc
-spec:
-  accessModes:
-  - ReadWriteMany
-  resources:
-    requests:
-	  storage: 8Gi
-```
-通过 `kubectl get pv` 命令可看到 PV 和 PVC 的绑定情况
-
-```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-labels:
-    role: web-frontend
-spec:
-containers:
-- name: web
-    image: nginx
-    ports:
-    - name: web
-        containerPort: 80
-    volumeMounts:
-       - name: cephfs-volume
-       mountPath: "/usr/share/nginx/html"
-volumes:
-- name: cephfs-volume
-    persistentVolumeClaim:
-        claimName: cephfs-pvc
-```
-
-运维人员负责存储管理，可以事先根据存储配置定义好PV，而开发人员无需了解底层存储配置，只需要通过PVC声明需要的存储类型、大小、访问模式等需求即可，然后就可以在Pod中引用PVC，完全不用关心底层存储细节。
-
-PS：感觉上，在Pod的早期，以Pod 为核心，Pod 运行所需的资源都定义在Pod yaml 中，导致Pod 越来越臃肿。后来，Kubernetes 集群中出现了一些 与Pod 生命周期不一致的资源，并单独管理。 Pod 与他们 更多是引用关系， 而不是共生 关系了。 
-
-### Persistent Volume（PV）和 Persistent Volume Claim（PVC）
-
-![](/public/upload/kubernetes/k8s_pvc.jpg)
-
-[一文读懂 K8s 持久化存储流程](https://mp.weixin.qq.com/s/jpopq16BOA_vrnLmejwEdQ)
-
-PVC 和 PV 的设计，其实跟“面向对象”的思想完全一致。PVC 可以理解为持久化存储的“接口”，它提供了对某种持久化存储的描述，但不提供具体的实现；而这个持久化存储的实现部分则由 PV 负责完成。这样做的好处是，作为应用开发者，我们只需要跟 PVC 这个“接口”打交道，而不必关心具体的实现是 NFS 还是 Ceph
-
-||PVC|Pod|
-|---|---|---|
-|资源|消耗 PV 资源，**PV资源是集群的**|消耗 Node 资源|
-||可以请求特定存储卷的大小及访问模式|Pod 可以请求特定级别的资源（CPU 和内存）|
-||确定Node后，为Node挂载存储设备 ==> <br>Pod 为Node 带了一份“嫁妆”|能调度到Node上，说明Node本身的CPU和内存够用|
-||完全是 Kubernetes 项目自己负责管理的<br>runtime 只知道mount 本地的一个目录| 容器操作基本委托给runtime|
-
-PVC、PV 的一些属性：
-1. PVC 和 PV 总是成对出现的，PVC 必须与 PV 绑定后才能被应用（Pod）消费；
-2. PVC 和 PV 是一一绑定关系，不存在一个 PV 被多个 PVC 绑定，或者一个 PVC 绑定多个 PV 的情况；
-3. 消费关系上：Pod 消费 PVC，PVC 消费 PV，而 PV 定义了具体的存储介质。
-
-## K8s 持久化存储流程
-
-[详解 Kubernetes Volume 的实现原理](https://draveness.me/kubernetes-volume/)集群中的每一个卷在被 Pod 使用时都会经历四个操作，也就是附着（Attach）、挂载（Mount）、卸载（Unmount）和分离（Detach）。如果 Pod 中使用的是 EmptyDir、HostPath 这种类型的卷，那么这些卷并不会经历附着和分离的操作，它们只会被挂载和卸载到某一个的 Pod 中。
-
-Volume 的创建和管理在 Kubernetes 中主要由卷管理器 VolumeManager 和 AttachDetachController 和 PVController 三个组件负责。
-1. VolumeManager 在 Kubernetes 集群中的每一个节点（Node）上的 kubelet 启动时都会运行一个 VolumeManager Goroutine，它会负责在当前节点上的 Pod 和 Volume 发生变动时对 Volume 进行挂载和卸载等操作。
-2. AttachDetachController 主要负责对集群中的卷进行 Attach 和 Detach
-    1. 让卷的挂载和卸载能够与节点的可用性脱离；一旦节点或者 kubelet 宕机，附着（Attach）在当前节点上的卷应该能够被分离（Detach），分离之后的卷就能够再次附着到其他节点上；
-    2. 保证云服务商秘钥的安全；如果每一个 kubelet 都需要触发卷的附着和分离逻辑，那么每一个节点都应该有操作卷的权限，但是这些权限应该只由主节点掌握，这样能够降低秘钥泄露的风险；
-    3. 提高卷附着和分离部分代码的稳定性；
-3. PVController 负责处理持久卷的变更
-
-[一文读懂 K8s 持久化存储流程](https://mp.weixin.qq.com/s/jpopq16BOA_vrnLmejwEdQ)
-
-![](/public/upload/kubernetes/persistent_process.png)
-
-流程如下：
-
-1. 用户创建了一个包含 PVC 的 Pod，该 PVC 要求使用动态存储卷；
-2. Scheduler 根据 Pod 配置、节点状态、PV 配置等信息，把 Pod 调度到一个合适的 Worker 节点上；
-3. PV 控制器 watch 到该 Pod 使用的 PVC 处于 Pending 状态，于是调用 Volume Plugin（in-tree）创建存储卷，并创建 PV 对象（out-of-tree 由 External Provisioner 来处理）；
-4. AD 控制器发现 Pod 和 PVC 处于待挂接状态，于是调用 Volume Plugin 挂接存储设备到目标 Worker 节点上
-5. 在 Worker 节点上，Kubelet 中的 Volume Manager 等待存储设备挂接完成，并通过 Volume Plugin 将设备挂载到全局目录：`/var/lib/kubelet/pods/[pod uid]/volumes/kubernetes.io~iscsi/[PV name]`（以 iscsi 为例）；
-6. Kubelet 通过 Docker 启动 Pod 的 Containers，用 bind mount 方式将已挂载到本地全局目录的卷映射到容器中。
-
-在 Kubernetes 中，实际上存在着一个专门处理持久化存储的控制器，叫作 Volume Controller。这个Volume Controller 维护着多个控制循环，其中有一个循环，扮演的就是撮合 PV 和 PVC 的“红娘”的角色。它的名字叫作 PersistentVolumeController
-
-[Kubernetes 中 PV 和 PVC 的状态变化](https://mp.weixin.qq.com/s/wOzN26uuiBqEODKT0_QmJg)
-|操作|	PV 状态|	PVC 状态|
-|---|---|---|
-|创建 PV|	Available|	-|
-|创建 PVC|	Available|	Pending|
-||    Bound|	Bound|
-|删除 PV|	-/Terminating|	Lost/Bound|
-|重新创建 PV|	Bound|	Bound|
-|删除 PVC|	Released|	-|
-|后端存储不可用|	Failed|	-|
-|删除 PV 的 claimRef|	Available|	-|
 
 
-## CSI
-
-Kubernetes存储方案发展过程概述
-
-1. 最开始是通过Volume Plugin实现集成外部存储系统，即不同的存储系统对应不同的Volume Plugin。Volume Plugin实现代码全都放在了Kubernetes主干代码中（in-tree)，也就是说这些插件与核心Kubernetes二进制文件一起链接、编译、构建和发布。
-2. 从1.8开始，Kubernetes停止往Kubernetes代码中增加新的存储支持。从1.2开始，推出了一种新的插件形式支持外部存储系统，即FlexVolume。FlexVolume类似于CNI插件，通过外部脚本集成外部存储接口，这些脚本默认放在`/usr/libexec/kubernetes/kubelet-plugins/volume/exec/`，需要安装到所有Node节点上。
-3. 从1.9开始又引入了Container Storage Interface（CSI）容器存储接口
-
-![](/public/upload/kubernetes/k8s_csi.png)
-
-CSI 插件体系的设计思想，就是把Dynamic Provision 阶段以及 Kubernetes 里的一部分存储管理功能（比如“Attach 阶段”和“Mount 阶段”，实际上是通过调用 CSI 插件来完成的），从主干代码里剥离出来，做成了几个单独的组件。这些组件会通过 Watch API 监听 Kubernetes 里与存储相关的事件变化，比如 PVC 的创建，来执行具体的存储管理动作。
-
-CSI 的设计思想，把插件的职责从“两阶段处理”，扩展成了Provision、Attach 和 Mount 三个阶段。其中，Provision 等价于“创建磁盘”，Attach 等价于“挂载磁盘到虚拟机”，Mount 等价于“将该磁盘格式化后，挂载在 Volume 的宿主机目录上”。
-
-一个 CSI 插件只有一个二进制文件，但它会以 gRPC 的方式对外提供三个服务（gRPC Service），分别叫作：CSI Identity、CSI Controller 和 CSI Node。
 
 
-1. Identity Service用于返回一些插件信息；
-2. Controller Service实现Volume的CURD操作；
-3. Node Service运行在所有的Node节点，用于实现把Volume挂载在当前Node节点的指定目录，该服务会监听一个Socket，controller通过这个Socket进行通信，可以参考官方提供的样例CSI Hostpath driver Sample[2]。
+
+
+
 
 
