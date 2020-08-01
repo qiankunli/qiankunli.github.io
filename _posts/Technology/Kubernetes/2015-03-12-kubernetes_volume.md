@@ -154,7 +154,231 @@ spec:
 
 因为 PVC 允许用户消耗抽象的存储资源，所以用户需要不同类型、属性和性能的 PV 就是一个比较常见的需求了，在这时我们可以通过 StorageClass 来提供不同种类的 PV 资源，上层用户就可以直接使用系统管理员提供好的存储类型。
 
+## kubelet 相关代码实现
 
+源码包
+```
+k8s.io/
+    /utils
+        /mount
+            /mount_linux.go // 定义了Mounter
+    /kubernetes
+        /pkg
+            /kubelet
+                /kubelet.go
+                    /volumemanager
+                        /populator
+                            /desired_state_of_world_populator.go
+                        /reconciler
+                            /reconciler.go
+                    /volume_manager.go
+            /volume
+                /volume.go   // 定义了 Mounter
+                /plugins.go  // 定义了 VolumePluginMgr VolumePlugin
+                /util
+                    /operationexecutor
+                        /operation_generator.go  //定义了OperationGenerator 
+                /local
+                    /local.go   // 定义了localVolumeMounter
+                /nfs
+                /cephfs
+```
+
+
+![](/public/upload/kubernetes/kubelet_volume_manager.png)
+
+kubelet volume 相关代码主要分为两个部分
+
+1. 定义了VolumePlugin 插件体系，每个volume 方案相机实现Mounter/Unmounter/Attacher/Detacher 等逻辑。对外提供 operationexecutor 作为统一的volume 操作入口。
+2. volumePluginManager，根据pod spec 定义的desire state 与 actual state 比对 pod 与volume 的绑定情况，调用operationexecutor 该挂载挂载，该卸载卸载
+
+
+```go
+// Run starts the kubelet reacting to config updates
+func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
+    ...   
+    // Start volume manager
+    go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
+    ...
+}
+func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
+	go vm.desiredStateOfWorldPopulator.Run(sourcesReady, stopCh)
+	go vm.reconciler.Run(stopCh)
+	// start informer for CSIDriver
+	vm.volumePluginMgr.Run(stopCh)
+	<-stopCh
+	klog.Infof("Shutting down Kubelet Volume Manager")
+}
+```
+
+desiredStateOfWorldPopulator.Run ==> 每隔一段时间执行 populatorLoop ，从PodManager中获取pod spec数据，更新DesiredStateOfWorld
+```go
+func (dswp *desiredStateOfWorldPopulator) populatorLoop() {
+	dswp.findAndAddNewPods()
+    ...
+	dswp.findAndRemoveDeletedPods()
+}
+func (dswp *desiredStateOfWorldPopulator) findAndAddNewPods() {
+	// Map unique pod name to outer volume name to MountedVolume.
+    mountedVolumesForPod := make(map[volumetypes.UniquePodName]map[string]cache.MountedVolume)
+    ...
+    processedVolumesForFSResize := sets.NewString()
+	for _, pod := range dswp.podManager.GetPods() {
+		if dswp.isPodTerminated(pod) {continue}
+		dswp.processPodVolumes(pod, mountedVolumesForPod, processedVolumesForFSResize)
+	}
+}
+// processPodVolumes processes the volumes in the given pod and adds them to the
+// desired state of the world.
+func (dswp *desiredStateOfWorldPopulator) processPodVolumes(pod *v1.Pod,mountedVolumesForPod ..., ...) {
+	uniquePodName := util.GetUniquePodName(pod)
+	mounts, devices := util.GetPodVolumeNames(pod)  // 即抓取 container.VolumeMounts 配置
+	// Process volume spec for each volume defined in pod
+	for _, podVolume := range pod.Spec.Volumes {
+		pvc, volumeSpec, volumeGidValue, err :=
+			dswp.createVolumeSpec(podVolume, pod.Name, pod.Namespace, mounts, devices)
+		// Add volume to desired state of world
+		_, err = dswp.desiredStateOfWorld.AddPodToVolume(
+			uniquePodName, pod, volumeSpec, podVolume.Name, volumeGidValue)
+    }
+}
+```
+
+预期状态和实际状态的协调者，负责调整实际状态至预期状态。reconciler.Run ==> reconciliationLoopFunc ==> 每隔一段时间执行 reconcile，根据desire state 对比actual state，该卸载卸载，该挂载挂载。
+
+```go
+func (rc *reconciler) reconcile() {
+	rc.unmountVolumes() // 对于实际已经挂载的与预期不一样的需要unmount
+	rc.mountAttachVolumes() // 从desiredStateOfWorld中获取需要mount的volomes
+	rc.unmountDetachDevices()
+}
+func (rc *reconciler) mountAttachVolumes() {
+	// Ensure volumes that should be attached/mounted are attached/mounted.
+	for _, volumeToMount := range rc.desiredStateOfWorld.GetVolumesToMount() {
+		volMounted, devicePath, err := rc.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		volumeToMount.DevicePath = devicePath
+		if cache.IsVolumeNotAttachedError(err) {
+			if rc.controllerAttachDetachEnabled || !volumeToMount.PluginIsAttachable {
+                // Volume is not attached (or doesn't implement attacher), kubelet attach is disabled, wait for controller to finish attaching volume.
+			} else {
+				// Volume is not attached to node, kubelet attach is enabled, volume implements an attacher, so attach it
+				volumeToAttach := operationexecutor.VolumeToAttach{
+					VolumeName: volumeToMount.VolumeName,
+					VolumeSpec: volumeToMount.VolumeSpec,
+					NodeName:   rc.nodeName,
+				}
+				err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
+			}
+		} else if !volMounted || cache.IsRemountRequiredError(err) {
+			// Volume is not mounted, or is already mounted, but requires remounting
+			err := rc.operationExecutor.MountVolume(
+				rc.waitForAttachTimeout,
+				volumeToMount.VolumeToMount,
+				rc.actualStateOfWorld,
+				isRemount)
+		}
+	}
+}
+```
+挂载操作主要由 OperationGenerator  负责，MountVolume 时，先根据volumeSpec找到匹配的volumePlugin，每一个volumePlugin 都有一个对应的Mounter/Unmounter。 如果volumePlugin 是AttachableVolumePlugin类型，还有对应的Attacher/Detacher
+
+![](/public/upload/kubernetes/volume_plugin_object.png)
+
+```go
+func (og *operationGenerator) GenerateMountVolumeFunc(
+	waitForAttachTimeout,volumeToMount,ActualStateOfWorldMounterUpdater,isRemount bool) volumetypes.GeneratedOperations {
+	volumePluginName := unknownVolumePlugin
+    // FindPluginBySpec函数遍历所有的plugin判断volumeSpec符合哪种plugin
+	volumePlugin, err :=
+		og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
+	mountVolumeFunc := func() (error, error) {
+		// Get mounter plugin
+		volumePlugin, err := og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
+		affinityErr := checkNodeAffinity(og, volumeToMount)
+		volumeMounter, newMounterErr := volumePlugin.NewMounter(volumeToMount.VolumeSpec,volumeToMount.Pod,volume.VolumeOptions{})
+		mountCheckError := checkMountOptionSupport(og, volumeToMount, volumePlugin)
+		// Get attacher, if possible
+		attachableVolumePlugin, _ :=
+			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+		volumeAttacher, _ = attachableVolumePlugin.NewAttacher()
+		// get deviceMounter, if possible
+		deviceMountableVolumePlugin, _ := og.volumePluginMgr.FindDeviceMountablePluginBySpec(volumeToMount.VolumeSpec)
+		volumeDeviceMounter, _ = deviceMountableVolumePlugin.NewDeviceMounter()
+		devicePath := volumeToMount.DevicePath
+		// Wait for attachable volumes to finish attaching
+		devicePath, err = volumeAttacher.WaitForAttach(
+				volumeToMount.VolumeSpec, devicePath, volumeToMount.Pod, waitForAttachTimeout)
+		if volumeDeviceMounter != nil {
+			deviceMountPath, err :=
+				volumeDeviceMounter.GetDeviceMountPath(volumeToMount.VolumeSpec)
+			// Mount device to global mount path
+			err = volumeDeviceMounter.MountDevice(volumeToMount.VolumeSpec,devicePath,deviceMountPath)
+			// Update actual state of world to reflect volume is globally mounted
+			markDeviceMountedErr := actualStateOfWorld.MarkDeviceAsMounted(
+				volumeToMount.VolumeName, devicePath, deviceMountPath)
+		}
+		// Execute mount
+		mountErr := volumeMounter.SetUp(volume.MounterArgs{
+			FsGroup:             fsGroup,
+			DesiredSize:         volumeToMount.DesiredSizeLimit,
+			FSGroupChangePolicy: fsGroupChangePolicy,
+		})
+		// Update actual state of world
+		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(markOpts)
+		return nil, nil
+	}
+	return volumetypes.GeneratedOperations{
+		OperationName:     "volume_mount",
+		OperationFunc:     mountVolumeFunc,
+		EventRecorderFunc: eventRecorderFunc,
+		CompleteFunc:      util.OperationCompleteHook(util.GetFullQualifiedPluginNameForVolume(volumePluginName, volumeToMount.VolumeSpec), "volume_mount"),
+	}
+}
+```
+以 localVolumeMounter 的SetUp 为例，其实就是构造mount 命令并执行mount 命令的过程
+
+```go
+func (m *localVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return m.SetUpAt(m.GetPath(), mounterArgs)
+}
+
+// SetUpAt bind mounts the directory to the volume path and sets up volume ownership
+func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+	notMnt, err := mount.IsNotMountPoint(m.mounter, dir)
+	if err != nil && !os.IsNotExist(err) {...}
+	if !notMnt {return nil}
+	refs, err := m.mounter.GetMountRefs(m.globalPath)
+	if runtime.GOOS != "windows" {...}
+	// Perform a bind mount to the full path to allow duplicate mounts of the same volume.
+	options := []string{"bind"}
+	if m.readOnly {options = append(options, "ro")}
+	mountOptions := util.JoinMountOptions(options, m.mountOptions)
+	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
+	err = m.mounter.Mount(globalPath, dir, "", mountOptions)
+	return nil
+}
+// k8s.io/utils/mount/mount_linux.go
+func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	return mounter.MountSensitive(source, target, fstype, options, nil)
+}
+func (mounter *Mounter) MountSensitive(source,target,fstype string, options,sensitiveOptions []string) error {
+	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
+	// All Linux distros are expected to be shipped with a mount utility that a support bind mounts.
+	bind, bindOpts, bindRemountOpts, bindRemountOptsSensitive := MakeBindOptsSensitive(options, sensitiveOptions)
+	if bind {
+		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts, bindRemountOptsSensitive)
+		return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindRemountOpts, bindRemountOptsSensitive)
+	}
+	...
+	return mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, options, sensitiveOptions)
+}
+func (mounter *Mounter) doMount(mounterPath, mountCmd, source, target, fstype string, options, sensitiveOptions []string) error {
+	mountArgs, mountArgsLogStr := MakeMountArgsSensitive(source, target, fstype, options, sensitiveOptions)
+	command := exec.Command(mountCmd, mountArgs...)
+	output, err := command.CombinedOutput()
+	return err
+}
+```
 
 
 
