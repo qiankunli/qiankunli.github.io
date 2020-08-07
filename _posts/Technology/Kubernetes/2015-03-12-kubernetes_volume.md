@@ -380,7 +380,12 @@ func (mounter *Mounter) doMount(mounterPath, mountCmd, source, target, fstype st
 }
 ```
 
+整体来说，kubelet volume reconcile 过程和k8s controller 类似，只是“实际状态”的数据来源有些不同。
 
+||理想状态|实际状态|
+|---|---|---|
+|k8s controller|resource yaml 文件|kubelet 上报的status 数据|
+|kubelet volume manager|resource yaml 文件|本地实际的 数据目录等|
 
 
 
