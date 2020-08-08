@@ -12,7 +12,21 @@ keywords: Docker image
 * TOC
 {:toc}
 
+代码分发：在物理机时代， springboot项目普遍都带了一个run.sh文件，不论项目本身的特点如何，开发和运维约定`run.sh start/stop`来启停应用
+1. 这说明只有一个jar是运行不起来的
+2. 如果我们不是一个java系为主的公司，这么做够么？
+到后面，你就发现，run.sh 里可能什么都有，包括依赖库（比如转码程序会安装ffmpeg）、下载文件等，run.sh做到极致：一个应用一个操作系统环境（依赖库、env等），但整个文件岂不是很大？**Docker最大的贡献就是提出了分层镜像的概念**。
+
 ## 制作镜像
+
+```sh
+cid=$(docker run -v /foo/bar debian:jessie) 
+image_id=$(docker commit $cid) 
+cid=$(docker run $image_id touch /foo/bar/baz) 
+docker commit $(cid) my_debian
+```
+
+image的build过程，粗略的说，就是以容器执行命令（`docker run`）和提交更改（`docker commit`）的过程
 
 ### build 时使用http代理
 
@@ -57,34 +71,6 @@ RUN \
 	COPY app .
 	CMD ["./app"]  
 
-### build 过程
-
-    cid=$(docker run -v /foo/bar debian:jessie) 
-    image_id=$(docker commit $cid) 
-    cid=$(docker run $image_id touch /foo/bar/baz) 
-    docker commit $(cid) my_debian
-
-image的build过程，粗略的说，就是以容器执行命令（`docker run`）和提交更改（`docker commit`）的过程
-
-## Dockerfile
-
-### COPY VS ADD
-
-将文件添加到镜像中有以下两种方式：
-
-- COPY 方式
-     
-        COPY resources/jdk-7u79-linux-x64.tar.gz /tmp/
-        RUN tar -zxvf /tmp/jdk-7u79-linux-x64.tar.gz -C /usr/local
-        RUN rm /tmp/jdk-7u79-linux-x64.tar.gz
- 
-- ADD 方式 
-  
-        ADD resources/jdk-7u79-linux-x64.tar.gz /usr/local/
-        
-
-两者效果一样，但COPY方式将占用三个layer，并大大增加image的size。一开始用ADD时，我还在奇怪，为什么docker自动将添加到其中的`xxx.tar.gz`解压，现在看来，能省空间喔。
-
 ## 镜像规范
 
 ### 基础镜像选型的教训
@@ -108,6 +94,8 @@ image的build过程，粗略的说，就是以容器执行命令（`docker run`�
 
 ## 镜像下载
 
+镜像一般会包括两部分内容，一个是 manifests 文件，这个文件定义了镜像的 元数据，另一个是镜像层，是实际的镜像分层文件。
+
 ### docker login
 
 我们在拉取私有镜像之前，要使用 docker login 命令来登录镜像仓库。登录主要就做了三件 事情:
@@ -116,24 +104,6 @@ image的build过程，粗略的说，就是以容器执行命令（`docker run`�
 3. docker 使用用户提供的账户密码，访问 Www-Authenticate 头字段返回的鉴权服务器的地址 Bearer realm。如果这个访问成功，则鉴权服务器会返回 jwt 格式的 token 给 docker，然后 docker 会把账户密码编码并保存在用户目录的 .docker/docker.json 文件里。这个文件作为 docker 登录仓库的 唯一证据，在后续镜像仓库操作中，会被不断的读取并使用。
 
 ![](/public/upload/container/pull_image_security.png)
-
-### docker pull
-
-镜像一般会包括两部分内容，一个是 manifests 文件，这个文件定义了镜像的 元数据，另一个是镜像层，是实际的镜像分层文件。
-
-### 拉取镜像问题
-
-docker pull 时出现 Unexpected EOF 
-
-[docker pull on a pull through cache fails: Unexpected EOF after some image blobs are expired ](https://github.com/docker/distribution/issues/2367) 文中分析这个现象的原因是：
-
-1. docker distribution（也就是docker registry）的Repository 都有一个TTL，默认是7天
-2. 假设你第一天 `docker pull localhost:5000/library/python`，第三天 `docker pull localhost:5000/library/node`，node 镜像依赖 python 镜像
-3. 7天后，python镜像过期， node 镜像还没有，再执行 `docker pull localhost:5000/library/node` 便会出现 Unexpected EOF 
-
-另外一种类似的原因是，layer已经被 delete，但仍然可以从harbor 上拉到layer的数据，当真正去下载layer时，出现  Unexpected EOF 。
-
-其它资料 [HTTP Cache Headers](https://github.com/docker/distribution/issues/459)
 
 ### docker 镜像下载加速
 

@@ -49,3 +49,7 @@ keywords: docker
 
 
 很有能力，很有想法，所有的技术都会，但就是没有办法输出成为一个平台（或者系统），发生的所有新的事情，都是在这个平台上找到或落地。平台是可以承接你理念、经验的东西。
+
+[灵魂拷问，上 Kubernetes 有什么业务价值？](https://mp.weixin.qq.com/s/a3NE5fSpZIM9qlOofGTMWQ)
+
+![](/public/upload/kubernetes/k8s_application_platform.png)
