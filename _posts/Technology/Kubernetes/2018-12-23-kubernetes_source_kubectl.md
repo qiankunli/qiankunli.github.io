@@ -13,6 +13,8 @@ keywords: kubernetes 源码分析 kubectl
 * TOC
 {:toc}
 
+从API Server看，kubectl 其实是高级定制版的 curl 工具
+
 ![](/public/upload/kubernetes/kubectl_overview.png)
 
 ## 从kubectl 开始

@@ -41,6 +41,19 @@ keywords: kubernetes 源码分析 apiserver
 
 [火得一塌糊涂的kubernetes有哪些值得初学者学习的？](https://mp.weixin.qq.com/s/iI5vpK5bVkKmdbf9sbAGWw)在分布式系统中，任何组件都可能随时出现故障。当组件恢复时，需要弄清楚要做什么，使用命令式 API 时，处理起来就很棘手。但是使用声明式 API ，组件只需查看 API 服务器的当前状态，即可确定它需要执行的操作。《阿里巴巴云原生实践15讲》 称之为：**面向终态**自动化。
 
+k8s api 术语
+
+1. Kind, 表示实体的类型。每个对象都有一个字段 Kind（JSON 中的小写 kind，Golang 中的首字母大写 Kind），该字段告诉如 kubectl 之类的客户端它表示什么类型。
+2. API group, 在逻辑上相关的一组 Kind 集合。如 Job 和 ScheduledJob 都在 batch API group 里。
+3. Version, 标示 API group 的版本更新， API group 会有多个版本 (version)。
+
+    1. v1alpha1: 初次引入
+    2. v1beta1: 升级改进
+    3. v1: 开发完成毕业
+4. Resource, 通常是小写的复数词（例如，pod），用于标识一组 HTTP 端点（路径），来对外暴露 CURD 操作。
+
+![](/public/upload/kubernetes/k8s_rest_api.png)
+
 
 ## 整体架构
 
