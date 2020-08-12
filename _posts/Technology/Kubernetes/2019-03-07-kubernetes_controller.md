@@ -45,9 +45,13 @@ controller是一系列控制器的集合，不单指RC。
 
 ```go
 for {
-    desired := getDesiredState()
-    current := getCurrentState()
-    makeChanges(desired, current)
+    actualState := GetResourceActualState(rsvc)
+    expectState := GetResourceExpectState(rsvc) // 来自yaml 文件
+    if actualState == expectState {
+        // do nothing
+    } else {
+        Reconcile(rsvc) // 编排逻辑，调谐的最终结果一般是对被控制对象的某种写操作，比如增/删/改 Pod
+    }
 }
 ```
 
@@ -67,8 +71,8 @@ for {
 
 控制器与api server的关系——从拉取到监听：In order to retrieve an object's information, the controller sends a request to Kubernetes API server.However, repeatedly retrieving information from the API server can become expensive. Thus, in order to get and list objects multiple times in code, Kubernetes developers end up using cache which has already been provided by the client-go library. Additionally, the controller doesn't really want to send requests continuously. It only cares about events when the object has been created, modified or deleted. 
 
-[从 Kubernetes 资源控制到开放应用模型，控制器的进化之旅](https://mp.weixin.qq.com/s/AZhyux2PMYpNmWGhZnmI1g)
-
+**informer 在client-go 库中，k8s 多个组件用informer 来减少对api-server的访问压力**。
+[从 Kubernetes 资源控制到开放应用模型，控制器的进化之旅](https://mp.weixin.qq.com/s/AZhyux2PMYpNmWGhZnmI1g) 
 1. Controller 一直访问API Server 导致API Server 压力太大，于是有了Informer
 2. 由 Informer 代替Controller去访问 API Server，而Controller不管是查状态还是对资源进行伸缩都和 Informer 进行交接。而且 Informer 不需要每次都去访问 API Server，它只要在初始化的时候通过 LIST API 获取所有资源的最新状态，然后再通过 WATCH API 去监听这些资源状态的变化，整个过程被称作 ListAndWatch。
 3. Informer 也有一个助手叫 Reflector，上面所说的 ListAndWatch 事实上是由 Reflector 一手操办的。这使 API Server 的压力大大减少。
@@ -77,31 +81,7 @@ for {
 6. 但这又引来了新的问题，SharedInformer 无法同时给多个控制器提供信息，这就需要每个控制器自己排队和重试。为了配合控制器更好地实现排队和重试，SharedInformer  搞了一个 Delta FIFO Queue（增量先进先出队列），每当资源被修改时，它的助手 Reflector 就会收到事件通知，并将对应的事件放入 Delta FIFO Queue 中。与此同时，SharedInformer 会不断从 Delta FIFO Queue 中读取事件，然后更新本地缓存的状态。
 7. 这还不行，SharedInformer 除了更新本地缓存之外，还要想办法将数据同步给各个控制器，为了解决这个问题，它又搞了个工作队列（Workqueue），一旦有资源被添加、修改或删除，就会将相应的事件加入到工作队列中。所有的控制器排队进行读取，一旦某个控制器发现这个事件与自己相关，就执行相应的操作。如果操作失败，就将该事件放回队列，等下次排到自己再试一次。如果操作成功，就将该事件从队列中删除。
 
-**Informer 约等于apiserver client sdk**：Informer其实就是一个带有本地缓存和索引机制的、可以注册EventHandler( AddFunc、UpdateFunc 和 DeleteFunc)的 数据+事件总线(event bus)。通过监听etcd数据变化，Informer 可以实时地更新本地缓存，并且调用这些事件对应的 EventHandler。在istio pilot 以及 各种配置中心client sdk 中都有类似逻辑，与远程数据保持同步 并在数据变化时触发业务代码注册的回调函数。 **从这个视角看，Informer 直接使用go etcd client 监听etcd的话就不用这么费事了，当然可能在安全机制上或许有漏洞**。
-
-![](/public/upload/kubernetes/control_loop.png)
-
-从代码上看 informer 由两个部分组成
-
-1. Listwatcher is a combination of a list function and a watch function for a specific resource in a specific namespace. 
-2. Resource Event Handler is where the controller handles notifications for changes on a particular resource
-
-		type ResourceEventHandlerFuncs struct {
-			AddFunc    func(obj interface{})
-			UpdateFunc func(oldObj, newObj interface{})
-			DeleteFunc func(obj interface{})
-		}
-
-
 ## 单个Controller的工作原理
-
-controller 与上下游的边界/接口如下图
-
-![](/public/upload/kubernetes/controller_overview.png)
-
-事实上，一个controller 通常依赖多个Informer
-
-![](/public/upload/kubernetes/controller_context.png)
 
 从DeploymentController 及 ReplicaSetController 观察到的共同点
 
@@ -127,41 +107,44 @@ Controller Mananger 的主要逻辑便是 先初始化 资源（重点就是Info
 
 ### 外围——循环及数据获取
 
-	// Run begins watching and syncing.
-	func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
-		defer utilruntime.HandleCrash()
-		defer dc.queue.ShutDown()
-		if !controller.WaitForCacheSync("deployment", stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
-			return
-		}
-		for i := 0; i < workers; i++ {
-			go wait.Until(dc.worker, time.Second, stopCh)
-		}
-		<-stopCh
-	}
+```go
+// Run begins watching and syncing.
+func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
+    defer utilruntime.HandleCrash()
+    defer dc.queue.ShutDown()
+    if !controller.WaitForCacheSync("deployment", stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
+        return
+    }
+    for i := 0; i < workers; i++ {
+        go wait.Until(dc.worker, time.Second, stopCh)
+    }
+    <-stopCh
+}
+```
 
 重点就是 `go wait.Until(dc.worker, time.Second, stopCh)`。for 循环隐藏在 `k8s.io/apimachinery/pkg/util/wait/wait.go` 工具方法中，`func Until(f func(), period time.Duration, stopCh <-chan struct{}) {...}` 方法的作用是  Until loops until stop channel is closed, running f every period. 即在stopCh 标记停止之前，每隔 period 执行 一个func，对应到DeploymentController 就是 worker 方法
 
-	// worker runs a worker thread that just dequeues items, processes them, and marks them done.
-	// It enforces that the syncHandler is never invoked concurrently with the same key.
-	func (dc *DeploymentController) worker() {
-		for dc.processNextWorkItem() {
-		}
-	}
-	
-	func (dc *DeploymentController) processNextWorkItem() bool {
-		// 取元素
-		key, quit := dc.queue.Get()
-		if quit {
-			return false
-		}
-		// 结束前标记元素被处理过
-		defer dc.queue.Done(key)
-		// 处理元素
-		err := dc.syncHandler(key.(string))
-		dc.handleErr(err, key)
-		return true
-	}
+```go
+// worker runs a worker thread that just dequeues items, processes them, and marks them done.
+// It enforces that the syncHandler is never invoked concurrently with the same key.
+func (dc *DeploymentController) worker() {
+    for dc.processNextWorkItem() {
+    }
+}
+func (dc *DeploymentController) processNextWorkItem() bool {
+    // 取元素
+    key, quit := dc.queue.Get()
+    if quit {
+        return false
+    }
+    // 结束前标记元素被处理过
+    defer dc.queue.Done(key)
+    // 处理元素
+    err := dc.syncHandler(key.(string))
+    dc.handleErr(err, key)
+    return true
+}
+```
 
 `dc.syncHandler` 实际为 DeploymentController  的syncDeployment方法
 
