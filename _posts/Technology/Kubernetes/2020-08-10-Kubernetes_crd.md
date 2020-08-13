@@ -200,6 +200,8 @@ func New(name string, mgr manager.Manager, options Options) (Controller, error) 
 }
 ```
 **Informer 触发eventHandler  ==> 变更resource 加入队列**：通过 Cache 我们创建了所有 Scheme 里面 GVKs 的 Informers，然后对应 GVK 的 Controller 注册了 Watch Handler 到对应的 Informer，这样一来对应的 GVK 里面的资源有变更都会触发 Handler，将变更事件写到 Controller 的事件队列中
+
+![](/public/upload/kubernetes/kubebuilder_logic.png)
 ```go
 func (blder *Builder) doWatch() error {
 	// watch 本 Controller 负责的 CRD 
@@ -254,10 +256,11 @@ func (cm *controllerManager) SetFields(i interface{}) error {
 
 ### Manager 启动
 
-
 ```go
 func (cm *controllerManager) Start(stop <-chan struct{}) error {
-	go cm.serveMetrics(cm.internalStop)
+    // 启动metric 组件供Prometheus 拉取数据
+    go cm.serveMetrics(cm.internalStop)
+    // 启动健康检查探针
 	go cm.serveHealthProbes(cm.internalStop)
 	go cm.startNonLeaderElectionRunnables()
 	if cm.resourceLock != nil {
@@ -273,6 +276,7 @@ type controllerManager struct {
 	// These Runnables are managed by lead election.
 	leaderElectionRunnables []Runnable
 }
+// 启动cache/informer 及 Controller
 func (cm *controllerManager) startLeaderElectionRunnables() {
     // 核心是启动Informer, waitForCache ==> cm.startCache = cm.cache.Start ==> InformersMap.Start ==> 
     // InformersMap.structured/unstructured.Start ==> Informer.Run
@@ -304,6 +308,7 @@ func (c *Controller) worker() {
 	for c.processNextWorkItem() {
 	}
 }
+// 从队列中取出 变更的对象（也就是需要处理的对象），包括队列操作相关的线速、重试等，并触发Reconcile 逻辑
 func (c *Controller) processNextWorkItem() bool {
 	obj, shutdown := c.Queue.Get()
 	if shutdown {
@@ -331,4 +336,3 @@ func (c *Controller) reconcileHandler(obj interface{}) bool {
 }
 ```
 
-![](/public/upload/kubernetes/kubebuilder_logic.png)
