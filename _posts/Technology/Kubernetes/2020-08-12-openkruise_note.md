@@ -34,7 +34,7 @@ github.com/openkruise/kruise
 
 ## CloneSet
 
-CloneSet 控制器提供了高效管理无状态应用的能力，一个简单的 CloneSet yaml 文件如下：
+[CloneSet](http://openkruise.io/zh-cn/docs/cloneset.html) 控制器提供了高效管理无状态应用的能力，一个简单的 CloneSet yaml 文件如下：
 
 ```yaml
 apiVersion: apps.kruise.io/v1alpha1
