@@ -32,52 +32,63 @@ keywords: Scala
 
 ## case 和 锅炉板模式
 
+[Java正在“Kotlin化”](https://mp.weixin.qq.com/s/ut6l7ipdkN3O-9rIELuEcQ)Java record 是我们长期以来一直要求的一项特性，我相信你早就多次遇到这样的场景了，那就是极不情愿地实现 toString、hashCode、equals 方法以及每个字段的 getter。Kotlin 提供了数据类（data class）来解决这个问题，Java 也通过发布 record 类来解决了这个问题，同样的问题，Scala 是通过 case 类来解决的。这些类的主要目的是在对象中保存不可变的数据。PS：**有点类似DDD中的值对象。或者说，语言设计正在想业务模型的需要靠拢**。
+
 [Boilerplate code](https://en.wikipedia.org/wiki/Boilerplate_code)
 
 In computer programming, boilerplate code or boilerplate refers to sections of code that have to be included in many places with little or no alteration. It is often used when referring to languages that are considered verbose, i.e. the programmer must write a lot of code to do minimal jobs.
 
 比如，setter/getter 就是典型的锅炉板代码，尽管每个类的setter/getter 细节不一样，但setter/getter 代码 占了Pet 类代码量的一半。
 
-	public class Pet {
-	    private String name;
-	    private Person owner;
-	
-	    public Pet(String name, Person owner) {
-	        this.name = name;
-	        this.owner = owner;
-	    }
-	
-	    public String getName() {
-	        return name;
-	    }
-	
-	    public void setName(String name) {
-	        this.name = name;
-	    }
-	
-	    public Person getOwner() {
-	        return owner;
-	    }
-	
-	    public void setOwner(Person owner) {
-	        this.owner = owner;
-	    }
-	}
+```java
+public class Pet {
+    private String name;
+    private Person owner;
+    public Pet(String name, Person owner) {
+        this.name = name;
+        this.owner = owner;
+    }
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public Person getOwner() {
+        return owner;
+    }
+    public void setOwner(Person owner) {
+        this.owner = owner;
+    }
+}
+```
 
 To reduce the amount of boilerplate, many frameworks have been developed, e.g. Lombok for Java.
-	
-	@AllArgsConstructor
-	@Getter
-	@Setter
-	public class Pet {
-	    private String name;
-	    private Person owner;
-	}
+
+```java	
+@AllArgsConstructor
+@Getter
+@Setter
+public class Pet {
+    private String name;
+    private Person owner;
+}
+```
 	
 scala 就更简洁了
 
-	case class Pet(var name: String, var owner: Person)
-	
+```scala
+case class Pet(var name: String, var owner: Person)
+```
+
+从jdk14 开始支持 java record 也有类似效果
+
+```java
+public record EmployeeRecord(String firstName, String surname,
+ int age, AddressRecord address, double salary) {  
+}
+```
+
 boilerplate code 理念扩展下层次 就成了 boilerplate pattern， 比如配置中心、服务发现等。单纯配置中心或服务发现功能需要大量的代码，但对于不同业务方来说，不同之处可能就是几个参数，这也是spring cloud的重要理念。 
 
 ## 其它

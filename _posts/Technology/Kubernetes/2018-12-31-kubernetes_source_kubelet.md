@@ -39,17 +39,52 @@ PLEG 是 Pod Lifecycle Events Generator 的缩写，基本上它的执行逻辑�
 
 [kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)从kubectl 命令开始，kubectl ==> apiserver ==> controller ==> scheduler 所有的状态变化仅仅只是针对保存在 etcd 中的资源记录。到Kubelet 才开始来真的。如果换一种思维模式，可以把 Kubelet 当成一种特殊的 Controller，它每隔 20 秒（可以自定义）向 kube-apiserver 通过 NodeName 获取自身 Node 上所要运行的 Pod 清单。一旦获取到了这个清单，它就会通过与自己的内部缓存进行比较来检测新增加的 Pod，如果有差异，就开始同步 Pod 列表。
 
-![](/public/upload/kubernetes/kubelet_overview.png)
+### 分层实现
+
+kubelet 源码包结构
+
+```
+k8s.io/kubernetes
+    /cmd/kubelet
+        /app
+        /kubelet.go
+    /pkg/kubelet
+        /cadvisor
+        /configmap
+        /prober
+        /status
+        /dockershim
+        /container          // 定义了 Runtime interface 
+        /kuberuntime        // 定义了 kubeGenericRuntimeManager struct，实现了Runtime interface
+        /remote             // 定义了 RemoteRuntimeService
+        ...
+        /kubelet.go  定义了kubelet struct
+k8s.io/cri-api
+    /pkg/apis
+        /runtime/v1alpha2
+            /api.pb.go
+        /service.go     // 定义了RuntimeService/ImageManagerService interface
+```
+
+pkg 下几乎每一个文件夹对应了 kubelet 的一个功能组件，定义了一个manager 协程，负责具体的功能实现，启动时只需 `go manager.start`。此外有一个syncLoop 负责kubelet 主功能的实现。
+
+![](/public/upload/kubernetes/kubelet_cri.png)
 
 kubelet 从PodManager 中拿到 Pod数据，判断是否需要操作，SyncPod 到 kubeGenericRuntimeManager 中。除了取Pod操作Pod外，还做一些eviction 逻辑的处理。
 
 ![](/public/upload/kubernetes/kubelet_object.png)
 
+kubelet像极了spring mvc的controller-service-rpc，一层一层的 将高层概念/动作 分解为 cri 提供的基本概念/底层操作。
+
+|spring mvc|kubelet|kubelet 所在包|概念|
+|----|---|---|---|
+|controller|kubelet struct|`pkg/kubelet/kubelet.go`||
+|service|Runtime interface|`pkg/kubelet/container`|Pod/PodStatus/Container/ContainerStatus/Image<br/>Mount/PortMapping/VolumeInfo/RunContainerOptions|
+|service.impl|kubeGenericRuntimeManager struct|`pkg/kubelet/kuberuntime`|
+|rpc|RuntimeService interface/ImageManagerService interface|`pkg/kubelet/apis/cri`|Container/PodSandbox/Image/AuthConfig|
+|rpc.impl|RemoteRuntimeService struct|`pkg/kubelet/apis/remote`||
+
 ## 启动流程
-
-[Kubelet 源码剖析](https://toutiao.io/posts/z2e88b/preview) 有一个启动的序列图
-
-![](/public/upload/kubernetes/kubelet_init_sequence.png)
 
 比较有意思的是 Bootstap interface 的描述：Bootstrap is a bootstrapping interface for kubelet, targets the initialization protocol. 也就是 `cmd/kubelet` 和 `pkg/kubelet` 的边界是 Bootstap interface
 
@@ -82,29 +117,10 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 }
 ```
 
-kubelet 源码包结构
-
-```
-k8s.io/kubernetes
-    /cmd/kubelet
-        /app
-        /kubelet.go
-    /pkg/kubelet
-        /cadvisor
-        /configmap
-        /prober
-        /status
-        ...
-        /kubelet.go  定义了kubelet struct
-```
-
-pkg 下几乎每一个文件夹对应了 kubelet 的一个功能组件，定义了一个manager 协程，负责具体的功能实现，启动时只需 `go manager.start`。此外有一个syncLoop 负责kubelet 主功能的实现。
-
-
 ## syncLoop
 
 syncLoop is the main loop for processing changes. It watches for changes from three channels (**file, apiserver, and http***) and creates a union of them. For any new change seen, will run a sync against desired state and running state. If no changes are seen to the configuration, will synchronize the last known desired
-state every sync-frequency seconds. **Never returns**.
+state every sync-frequency seconds. **Never returns**. Kubelet启动后通过syncLoop进入到主循环处理Node上Pod Changes事件，监听来自file,apiserver,http三类的事件并汇聚到kubetypes.PodUpdate Channel（Config Channel）中，由syncLoopIteration不断从kubetypes.PodUpdate Channel中消费。
 
 ```go
 func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHandler) {
@@ -164,6 +180,8 @@ case kubetypes.RESTORE:
 最终的立足点还是 syncHandler（还是Kubelet 自己实现的），下面分析下 HandlePodAdditions
 	
 ### 新建 pod
+
+![](/public/upload/kubernetes/kubelet_overview.png)
 
 代码中去掉了跟创建 无关的部分，删减了日志、错误校验等
 
@@ -262,21 +280,9 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 从图中可以看到，蓝色区域 grpc 调用 dockershim等cri shim 完成。
 
 
-## 其它 
-
-![](/public/upload/kubernetes/kubelet_intro.png)
-
-[kubelet 源码分析：Garbage Collect](https://cizixs.com/2017/06/09/kubelet-source-code-analysis-part-3/) gc 机制后面由  eviction 代替
-
-[kubelet 源码分析：statusManager 和 probeManager](https://cizixs.com/2017/06/12/kubelet-source-code-analysis-part4-status-manager/)
 
 
-kubelet像极了spring mvc的controller-service-rpc，一层一层的 将高层概念/动作 分解为 cri 提供的基本概念/底层操作。
 
-|spring mvc|kubelet|kubelet 所在包|概念|
-|----|---|---|---|
-|controller|kubelet struct|`pkg/kubelet/kubelet.go`||
-|service|Runtime interface|`pkg/kubelet/container`|Pod/PodStatus/Container/ContainerStatus/Image<br/>Mount/PortMapping/VolumeInfo/RunContainerOptions|
-|service.impl|kubeGenericRuntimeManager struct|`pkg/kubelet/kuberuntime`|
-|rpc|RuntimeService interface/ImageManagerService interface|`pkg/kubelet/apis/cri`|Container/PodSandbox/Image/AuthConfig|
-|rpc.impl|RemoteRuntimeService struct|`pkg/kubelet/apis/remote`||
+
+
+
