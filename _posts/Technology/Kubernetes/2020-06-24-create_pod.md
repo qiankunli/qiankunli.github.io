@@ -38,3 +38,6 @@ keywords:  create pod
 17. CRI调用Docker运行容器
 18. Kubelet告知Volume Manager，将盘挂在到Node上，然后mount到Pod中
 19. CRI调用CNI给容器配置网络
+
+
+![](/public/upload/kubernetes/kubelet_create_pod.png)
