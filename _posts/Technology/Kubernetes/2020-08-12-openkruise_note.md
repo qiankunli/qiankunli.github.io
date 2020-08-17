@@ -254,7 +254,22 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 	return 0, nil
 }
 ```
-计算待更新pod 的spec ,condition,container status 等数据， 加上revision label, inplace-update-grace annotation ，最终使用k8s api 更新pod 到k8s cluster
+
+原地升级pod 的status 示例 
+
+```
+Readiness Gates:
+  Type                 Status
+  InPlaceUpdateReady   True        // 原地升级添加的自定义Readiness Gates
+Conditions:
+  Type                 Status
+  InPlaceUpdateReady   True
+  Initialized          True
+  Ready                False
+  ContainersReady      False
+  PodScheduled         True
+```
+
 
 ```go
 // kruise/pkg/util/inplaceupdate/inplace_utils.go
@@ -310,3 +325,4 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 	})
 }
 ```
+计算待更新pod 的spec ,condition,container status 等数据， 加上revision label, inplace-update-grace annotation ，最终使用k8s api 更新pod 到k8s cluster
