@@ -299,7 +299,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
         ...
         return ...
     }
-    // 如果不是原地升级，则本次Reconcile 删除pod，待下次Reconcile 自动重建相关pod ？
+    // 如果不是原地升级，则本次Reconcile 删除pod，待下次Reconcile 重建相关pod ？
     if err := c.Delete(context.TODO(), pod); err != nil {
 		return 0, err
 	}
@@ -308,7 +308,20 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 }
 ```
 
-虽然  spec.updateStrategy.partition 指定了旧版的数量。但 update 逻辑的主要目的是  更新 （replicas - partition） 个 updateRevision 实例。如果连续多次灰度发布，则旧版 可能存在多个 revision（也就是说不是最新的revision 都是旧版，旧版不是某一个revision），整个cloneset 可能存在2个以上 revision的 pod。
+虽然  `spec.updateStrategy.partition` 指定了旧版的数量。但 update 逻辑的主要目的是  更新 （replicas - partition） 个 updateRevision 实例。如果连续多次灰度发布，则旧版 可能存在多个 revision（也就是说不是最新的revision 都是旧版，旧版不是某一个revision），整个cloneset 可能存在2个以上 revision的 pod。 这与直觉上的 多版本pod管理 还是不一样的
+
+```yaml
+## 直觉上的多版本管理
+spec
+  - template:
+    name: ...
+    image: nginx:1.18.0
+    replicas: 2
+  - template:
+    name: ...
+    image: nginx:1.17.0
+    replicas: 3
+```
 
 ## 原地升级
 
