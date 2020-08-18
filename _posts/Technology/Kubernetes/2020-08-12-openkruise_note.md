@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: openkruise 学习
+title: openkruise cloneset学习
 category: 架构
 tags: Kubernetes
 keywords: openkruise
@@ -57,7 +57,57 @@ spec:
       - name: nginx
         image: nginx:alpine
 ```
-`spec.template` 中定义了当前 CloneSet 中最新的 Pod 模板。 控制器会为每次更新过的 `spec.template` 计算一个 revision hash 值。在运行过程中，还会额外 为cloneset 管理的pod 加上 label=controller-revision-hash  标记pod 所属的revision。
+`spec.template` 中定义了当前 CloneSet 中最新的 Pod 模板。 控制器会为每次更新过的 `spec.template` 计算一个 revision hash 值。在运行过程中，还会额外 为cloneset 管理的**pod** 加上 label=controller-revision-hash  标记pod 所属的revision。
+
+运行后，describe cloneset 示例：
+
+```yaml
+Name:         sample
+Namespace:    default
+Labels:       app=sample
+Annotations:  API Version:  apps.kruise.io/v1alpha1
+Kind:         CloneSet
+Metadata:
+  Creation Timestamp:  2020-08-17T09:39:08Z
+  Generation:          1
+  Resource Version:    307518
+  Self Link:           /apis/apps.kruise.io/v1alpha1/namespaces/default/clonesets/sample
+  UID:                 65534592-a998-4374-a2c7-56eeb1dd273b
+Spec:
+  ...
+Status:
+  Available Replicas:      5
+  Collision Count:         0
+  Label Selector:          app=sample
+  Observed Generation:     1
+  Ready Replicas:          5
+  Replicas:                5
+  Update Revision:         sample-5cdbb7d879
+  Updated Ready Replicas:  5
+  Updated Replicas:        5
+```
+
+原地升级nginx pod 的status 示例 
+
+```
+Labels:         app=sample
+                apps.kruise.io/cloneset-instance-id=75v7q
+                controller-revision-hash=sample-549647c4b4
+Annotations:    inplace-update-state:
+                  {"revision":"sample-549647c4b4","updateTimestamp":"2020-08-14T11:04:25Z","lastContainerStatuses":...}
+Controlled By:  CloneSet/sample
+Status:       Running               // Pending/Running/Succeeded/Failed/Unknown
+Readiness Gates:
+  Type                 Status
+  InPlaceUpdateReady   True         // 原地升级添加的自定义Readiness Gates
+Conditions:
+  Type                 Status
+  InPlaceUpdateReady   True
+  Initialized          True         // 所有的 Init 容器 都已成功启动
+  Ready                False        // Pod 可以为请求提供服务，并且应该被添加到对应服务的负载均衡池中
+  ContainersReady      False        // Pod 中所有容器都已就绪
+  PodScheduled         True         // Pod 已经被调度到某节点
+```
 
 CloneSet可以对标原生的 Deployment，但 CloneSet 提供了很多增强功能，比如扩缩容时删除特定pod，**尤其提供了丰富的升级策略**。
 
@@ -81,6 +131,15 @@ spec:
         podsToDelete:       // 允许用户在缩小 replicas 数量的同时，指定想要删除的 Pod 名字
 ```
 
+CloneSet status 中的字段说明：
+
+1. status.replicas: Pod 总数
+2. status.readyReplicas: ready Pod 数量
+3. status.availableReplicas: ready and available Pod 数量 (满足 minReadySeconds)
+4. status.updateRevision: 最新版本的 revision hash 值
+5. status.updatedReplicas: 最新版本的 Pod 数量
+6. status.updatedReadyReplicas: 最新版本的 ready Pod 数量
+
 ### Reconcile 逻辑
 
 在kubebuilder 把Controller  控制器模型 的代码 都自动生成之后，不同Controller 之间的逻辑差异便只剩下 Reconcile 了
@@ -99,10 +158,12 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	selector, err := metav1.LabelSelectorAsSelector(instance.Spec.Selector)
 	// list all active Pods and PVCs belongs to cs
 	filteredPods, filteredPVCs, err := r.getOwnedResource(instance)
-	// list all revisions and sort them
-	revisions, err := r.controllerHistory.ListControllerRevisions(instance, selector)
+	// list all revisions and sort them 
+    revisions, err := r.controllerHistory.ListControllerRevisions(instance, selector)
+    // 排序规则 byRevision.Less 优先根据 CreationTimestamp排序 其次根据Name
 	history.SortControllerRevisions(revisions)
-	// get the current, and update revisions
+    // get the current, and update revisions, filteredPods 中 CreationTimestamp 最小的revision 会被作为currentRevision
+    // 计算 currentRevision 的原因是，扩容时可能要创建一定的 老版本. 在升级时，只需要用到updateRevision
     currentRevision, updateRevision, collisionCount, err := r.getActiveRevisions(instance, revisions, clonesetutils.GetPodsRevisions(filteredPods))
 	newStatus := appsv1alpha1.CloneSetStatus{
         ObservedGeneration: instance.Generation,
@@ -123,17 +184,6 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	if err = r.truncateHistory(instance, filteredPods, revisions, currentRevision, updateRevision); err != nil {...}
 	return reconcile.Result{RequeueAfter: delayDuration}, syncErr
 }
-```
-CloneSet status 中的字段说明：
-
-1. status.replicas: Pod 总数
-2. status.readyReplicas: ready Pod 数量
-3. status.availableReplicas: ready and available Pod 数量 (满足 minReadySeconds)
-4. status.updateRevision: 最新版本的 revision hash 值
-5. status.updatedReplicas: 最新版本的 Pod 数量
-6. status.updatedReadyReplicas: 最新版本的 ready Pod 数量
-
-```go
 // kruise/pkg/controller/cloneset/cloneset_controller.go
 func (r *ReconcileCloneSet) syncCloneSet(
 	instance *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus,
@@ -151,14 +201,17 @@ func (r *ReconcileCloneSet) syncCloneSet(
 	return delayDuration, err
 }
 ```
-syncCloneSet  根据 cloneSet 期望状态（ 由replicas 以及updateStrategy描述 ）以及pod的真实状态，**scale  负责 新旧Revision pod 的数量符合replicas/partition/MaxSurge/maxUnavailable 要求（删除或创建特定Revision的pod），update方法 负责需要原地升级的pod（如果有的话）**。在运行过程中，经常updatePod 或者 update crd 自身的数据，将一些状态数据持久化 以供下次 Reconcile 使用。graceful period  等策略的存在也决定了 Reconcile 工作不会一次就完成。
+syncCloneSet  根据 cloneSet 期望状态（ 由replicas 以及updateStrategy描述 ）以及pod的真实状态， 执行scale **或** update 逻辑（两个逻辑的主体部分不同时执行）
+1. scale逻辑：
+    1. 需要做扩容或缩容的时候（**也就是pod 实际数量不等于 replicas时**），scale  通过 删除或创建特定Revision的pod 使得 新旧Revision pod 的数量符合replicas/partition/MaxSurge/maxUnavailable 要求
+    2. 如果 pod 实际数量等于 replicas，scale 并不会进行处理，本次syncCloneSet 主要执行 update 逻辑。
+2. update逻辑：找到不符合 updateRevision 的pod，根据 partition/MaxSurge/maxUnavailable 以及pod 的ready 情况，计算需要更新的pod 的数量needToUpdateCount，从排序好的 pod 中选取 needToUpdateCount 个pod 执行更新逻辑。
+    1. 如果配置了原地升级策略， 原地升级pod 
+    2. 如果是默认ReCreate 策略，按序删除pod
+
+在运行过程中，经常updatePod 或者 update crd 自身的数据，将一些状态数据持久化 以供下次 Reconcile 使用。graceful period  等策略的存在也决定了 Reconcile 工作不会一次就完成。
 
 ![](/public/upload/kubernetes/cloneset_reconcile.png)
-
-
-### scale：确保新旧Revision pod 的数量符合要求
-
-如果发布的时候设置了 maxSurge，控制器会先多扩出来 maxSurge 数量的 Pod（此时 Pod 总数为 (replicas+maxSurge))，然后再开始发布存量的 Pod。 然后，当新版本 Pod 数量已经满足 partition 要求之后，控制器会再把多余的 maxSurge 数量的 Pod 删除掉，保证最终的 Pod 数量符合 replicas。此外，maxSurge 还受 升级方式（type）的影响：maxSurge 不允许配合 InPlaceOnly 更新模式使用（可以认为此时maxSurge=0？）。 另外，如果是与 InPlaceIfPossible 策略配合使用，控制器会先扩出来 maxSurge 数量的 Pod，再对存量 Pod 做原地升级。
 
 ```go
 // kruise/pkg/controller/cloneset/scale/cloneset_scale.go
@@ -197,11 +250,7 @@ func (r *realControl) Manage(
 	return false, nil
 }
 ```
-
-### 原地升级pod
-
-当一个 Pod 被原地升级时，控制器会先利用 readinessGates 把 Pod status 中修改为 not-ready 状态，然后再更新 Pod spec 中的 image 字段来触发 Kubelet 重建对应的容器。 不过这样可能存在的一个风险：有时候 Kubelet 重建容器太快，还没等到其他控制器如 endpoints-controller 感知到 Pod not-ready，可能会导致流量受损。因此又在原地升级中提供了 graceful period 选项，作为优雅原地升级的策略。用户如果配置了 gracePeriodSeconds 这个字段，控制器在原地升级的过程中会先把 Pod status 改为 not-ready，然后等一段时间（gracePeriodSeconds），最后再去修改 Pod spec 中的镜像版本。 这样，就为 endpoints-controller 这些控制器留出了充足的时间来将 Pod 从 endpoints 端点列表中去除。
-
+如果发布的时候设置了 maxSurge，控制器会先多扩出来 maxSurge 数量的 Pod（此时 Pod 总数为 (replicas+maxSurge))，然后再开始发布存量的 Pod。 然后，当新版本 Pod 数量已经满足 partition 要求之后，控制器会再把多余的 maxSurge 数量的 Pod 删除掉，保证最终的 Pod 数量符合 replicas。此外，maxSurge 还受 升级方式（type）的影响：maxSurge 不允许配合 InPlaceOnly 更新模式使用（可以认为此时maxSurge=0？）。 另外，如果是与 InPlaceIfPossible 策略配合使用，控制器会先扩出来 maxSurge 数量的 Pod，再对存量 Pod 做原地升级。
 ```go
 // 处理 升级间隔，计算真正需要 更新的pod
 // kruise/pkg/controller/cloneset/update/cloneset_update.go
@@ -218,7 +267,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 			waitUpdateIndexes = append(waitUpdateIndexes, i)
 		}
 	}
-	// 2. sort all pods waiting to update
+	// 2. sort all pods waiting to update  排序规则ActivePods.Less , 越新的 pod 越靠前
 	// 3. 根据 replicas/partition/MaxSurge/maxUnavailable 以及pod Status（比如not ready）等 calculate max count of pods can update
 	needToUpdateCount := calculateUpdateCount(coreControl, cs.Spec.UpdateStrategy, cs.Spec.MinReadySeconds, int(*cs.Spec.Replicas), waitUpdateIndexes, pods)
 	if needToUpdateCount < len(waitUpdateIndexes) {
@@ -231,7 +280,7 @@ func (c *realControl) Manage(cs *appsv1alpha1.CloneSet,
 	}
 	return requeueDuration.Get(), nil
 }
-// 根据CloneSet 升级策略，执行原地升级逻辑
+// 根据CloneSet 升级策略，执行升级逻辑
 func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetcore.Control,
 	updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	pod *v1.Pod, pvcs []*v1.PersistentVolumeClaim,
@@ -250,26 +299,26 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
         ...
         return ...
     }
+    // 如果不是原地升级，则本次Reconcile 删除pod，待下次Reconcile 自动重建相关pod ？
+    if err := c.Delete(context.TODO(), pod); err != nil {
+		return 0, err
+	}
 	// handle pvc
 	return 0, nil
 }
 ```
 
-原地升级pod 的status 示例 
+虽然  spec.updateStrategy.partition 指定了旧版的数量。但 update 逻辑的主要目的是  更新 （replicas - partition） 个 updateRevision 实例。如果连续多次灰度发布，则旧版 可能存在多个 revision（也就是说不是最新的revision 都是旧版，旧版不是某一个revision），整个cloneset 可能存在2个以上 revision的 pod。
 
-```
-Readiness Gates:
-  Type                 Status
-  InPlaceUpdateReady   True        // 原地升级添加的自定义Readiness Gates
-Conditions:
-  Type                 Status
-  InPlaceUpdateReady   True
-  Initialized          True
-  Ready                False
-  ContainersReady      False
-  PodScheduled         True
-```
+## 原地升级
 
+[如何在Kubernetes中实现容器原地升级](https://cloud.tencent.com/developer/article/1413743)一个Pod中可能包含了主业务容器，还有不可剥离的依赖业务容器，以及SideCar组件容器等，如果因为要更新其中一个SideCar Container而继续按照ReCreate Pod的方式进行整个Pod的重建，那负担还是很大的。更新一个轻量的SideCar却导致了分钟级的单个Pod的重建过程，因此，我们迫切希望能实现，只升级Pod中的某个Container，而不用重建整个Pod。
+
+Kubernetes把容器原地升级的能力只做在Kubelet这一层，并没有暴露在Deployment、StatefulSet等Controller中直接提供给用户，原因很简单，还是建议大家把Pod作为完整的部署单元。为了实现容器原地升级，我们更改Pod.Spec中对应容器的Image，就会生成kubetypes.UPDATE类型的事件，kubelet 将容器优雅终止。旧的容器被杀死之后，kubelet启动新的容器，如此即完成Pod不重建的前提下实现容器的原地升级。
+
+ 不过这样可能存在的几个风险：
+ 1. 容器 升级时 有一段时间服务不可用，但k8s 组件 无法感知，这用到了 [readinessGates](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)Your application can inject extra feedback or signals into PodStatus: Pod readiness. To use this, set readinessGates in the Pod's spec to specify a list of additional conditions that the kubelet evaluates for Pod readiness.Readiness gates are determined by the current state of status.condition fields for the Pod. If Kubernetes cannot find such a condition in the status.conditions field of a Pod, the status of the condition is defaulted to "False". 当一个 Pod 被原地升级时，控制器会先利用 readinessGates 把 Pod status 中修改为 not-ready 状态，然后再更新 Pod spec 中的 image 字段来触发 Kubelet 重建对应的容器。
+ 1. 有时候 Kubelet 重建容器太快，还没等到其他控制器如 endpoints-controller 感知到 Pod not-ready，可能会导致流量受损。因此又在原地升级中提供了 graceful period 选项，作为优雅原地升级的策略。用户如果配置了 gracePeriodSeconds 这个字段，控制器在原地升级的过程中会先把 Pod status 改为 not-ready，然后等一段时间（gracePeriodSeconds），最后再去修改 Pod spec 中的镜像版本。 这样，就为 endpoints-controller 这些控制器留出了充足的时间来将 Pod 从 endpoints 端点列表中去除。
 
 ```go
 // kruise/pkg/util/inplaceupdate/inplace_utils.go
@@ -325,4 +374,8 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 	})
 }
 ```
+
 计算待更新pod 的spec ,condition,container status 等数据， 加上revision label, inplace-update-grace annotation ，最终使用k8s api 更新pod 到k8s cluster
+
+
+

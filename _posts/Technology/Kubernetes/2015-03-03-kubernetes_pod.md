@@ -71,21 +71,22 @@ Pod，而不是容器，才是 Kubernetes 项目中的最小编排单位。将�
 Pod 扮演的是传统部署环境里“虚拟机”的角色。这样的设计，是为了使用户从传统环境（虚拟机环境）向 Kubernetes（容器环境）的迁移，更加平滑。而如果你能把 Pod 看成传统环境里的“机器”、把容器看作是运行在这个“机器”里的“用户程序”，那么很多关于 Pod 对象的设计就非常容易理解了。 比如，**凡是调度、网络、存储，以及安全相关的属性，基本上是 Pod 级别的**。这些属性的共同特征是，它们描述的是“机器”这个整体，而不是“机器”里的“用户程序”。
 
 
-	apiVersion: v1
-	kind: Pod...
-	spec: 
-		nodeSelector:
-		hostAliases:
-		containers:
-			- name:
-			  image:
-			  lifecycle: 
-			  	postStart: 
-			  		exec: 
-			  			command: ["/bin/sh","-c","echo hello world"]
-			  	preStop:
-			  		...
-
+```yaml
+apiVersion: v1
+kind: Pod...
+spec: 
+    nodeSelector:
+    hostAliases:
+    containers:
+        - name:
+            image:
+            lifecycle: 
+            postStart: 
+                exec: 
+                    command: ["/bin/sh","-c","echo hello world"]
+            preStop:
+                ...
+```
 		
 可以观察这些配置的位置，Pod的归Pod，容器的归容器。	
 #### Pod configuration file
@@ -188,6 +189,25 @@ restartPolicy 和 Pod 里容器的状态，以及Pod 状态的对应关系（最
     kubectl logs <pod-name> [-c <container-name>] 查看容器日志
 
 [Restart policy](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy)A PodSpec has a restartPolicy field with possible values Always, OnFailure, and Never. The default value is Always. restartPolicy applies to all Containers in the Pod. restartPolicy only refers to restarts of the Containers by the kubelet on the same node. Exited Containers that are restarted by the kubelet are restarted with an exponential back-off delay (10s, 20s, 40s ...) capped at five minutes, and is reset after ten minutes of successful execution. **业务容器经常会因为内存不足发生oom，进而导致容器的重启，重启次数可以间接反映业务的健康状态**。
+
+
+```go
+// k8s.io/kubernetes/pkg/apis/core/types.go
+type PodStatus struct {
+	Phase PodPhase
+	Conditions []PodCondition
+	Message string
+	Reason string
+	NominatedNodeName string
+	HostIP string
+	PodIPs []PodIP
+	StartTime *metav1.Time
+	QOSClass PodQOSClass
+	InitContainerStatuses []ContainerStatus
+	ContainerStatuses []ContainerStatus
+	EphemeralContainerStatuses []ContainerStatus
+}
+```
 
 ### 为什么pod中要有一个pause 容器？
 
