@@ -13,11 +13,55 @@ keywords: java dynamic proxy
 * TOC
 {:toc}
 
+动态代理到底是解决什么问题？首先，它是一个代理机制。代理可以看作是对调用目标的一个包装，这样我们**对目标代码的调用不是直接发生的**，而是通过代理完成。**通过代理可以让调用者与实现者之间解耦**。比如进行 RPC 调用，框架内部的寻址、序列化、反序列化等，对于调用者往往是没有太大意义的，通过代理，可以提供更加友善的“界面”。代理的发展经历了静态到动态的过程，源于静态代理引入的额外工作。类似早期的 RMI 之类古董技术，还需要 rmic 之类工具生成静态 stub 等各种文件，增加了很多繁琐的准备工作，而这又和我们的业务逻辑没有关系。**利用动态代理机制，相应的 stub 等类，可以在运行时生成，对应的调用操作也是动态完成**，极大地提高了我们的生产力。
+
 部分来自极客时间 《RPC实战与核心原理》
 
-动态代理 就是在执行代码的过程中，动态生成了 代理类 Class 的字节码`byte[]`，然后通过defineClass0 加载到jvm 中。
+## 从示例代码开始说起
 
+
+```java
+public class MyDynamicProxy {
+    public static  void main (String[] args) {
+        HelloImpl hello = new HelloImpl();
+        MyInvocationHandler handler = new MyInvocationHandler(hello);
+        // 构造代码实例，底层实现是 generateProxyClass byte[] 并进行了类加载
+        Hello proxyHello = (Hello) Proxy.newProxyInstance(HelloImpl.class.getClassLoader(), HelloImpl.class.getInterfaces(), handler);
+        // 调用代理方法
+        proxyHello.sayHello();
+    }
+}
+interface Hello {
+    void sayHello();
+}
+class HelloImpl implements  Hello {
+    @Override
+    public void sayHello() {
+        System.out.println("Hello World");
+    }
+}
+ class MyInvocationHandler implements InvocationHandler {
+    private Object target;
+    public MyInvocationHandler(Object target) {
+        this.target = target;
+    }
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args)
+            throws Throwable {
+        // 在生产系统中，我们可以轻松扩展类似逻辑进行诊断、限流等。
+        System.out.println("Invoking sayHello");
+        Object result = method.invoke(target, args);
+        return result;
+    }
+}
 ```
+
+首先，实现对应的 InvocationHandler；然后，以Hello interface为纽带，为被调用目标HelloImpl构建代理对象proxyHello，进而应用程序就可以使用代理对象间接运行调用目标的逻辑，代理为应用插入额外逻辑（这里是 println）提供了便利的入口。
+
+## Proxy.newProxyInstance 里面究竟发生了什么？
+
+
+```java
 Proxy.newProxyInstance
     ProxyClassFactory.apply
         byte[] proxyClassFile = ProxyGenerator.generateProxyClass(
@@ -26,55 +70,7 @@ Proxy.newProxyInstance
                                 proxyClassFile, 0, proxyClassFile.length);
 ```
 
-
-
-## 从示例代码开始说起
-
-给 Hello 接口生成一个动态代理类，并调用接口 say() 方法，但真实返回的值居然是来自 Other 里面的 speak() 方法返回值。
-
-
-```java
-// 要代理的接口
-public interface Hello {
-    String say();
-}
-// 真实调用对象
-public class Other {
-    public String speak(){
-        return "i'm proxy";
-    }
-}
-// JDK代理类生成
-public class HelloInvocationHandler implements InvocationHandler {
-    private Object target;
-    HelloInvocationHandler(Object target) {
-        this.target = target;
-    }
-    @Override
-    public Object invoke(Object proxy, Method method, Object[] paramValues) {
-        return ((Other)target).speak();
-    }
-}
-// 测试例子
-public class TestProxy {
-    public static void main(String[] args){
-        // 构建代理器
-        HelloInvocationHandler proxy = new HelloInvocationHandler(new Other());
-        ClassLoader classLoader = ClassLoaderUtils.getCurrentClassLoader();
-        // 把生成的代理类保存到文件
-        System.setProperty("sun.misc.ProxyGenerator.saveGeneratedFiles","true");
-        // 生成代理类
-        Hello test = (Hello) Proxy.newProxyInstance(classLoader, new Class[]{Hello.class}, proxy);
-        // 方法调用
-        System.out.println(test.say());
-    }
-}
-```
-
-1. `Hello.say` 的执行会通过 `InvocationHandler.invoke` 被转到 `Other.speak`。用AOP 里的术语 就是`Other.speak` 是pointcut， `InvocationHandler.invoke` 除`Other.speak`  之外的其它部分是advise。
-2. 在一般的 动态代理 示例中，Other 会实现 Hello interface，`InvocationHandler.invoke`最后会执行 `method.invoke(target,args)`。但此处实例表明，**`InvocationHandler.invoke` 可以执行任意逻辑，可以自己实现所有逻辑，也可以是完全不相关的类的 不相关的方法**， invoke 方法参数 更多是提供被代理 方法的信息。
-
-## Proxy.newProxyInstance 里面究竟发生了什么？
+动态代理 就是在执行代码的过程中，动态生成了 代理类 Class 的字节码`byte[]`，然后通过defineClass0 加载到jvm 中。
 
 ```java
 public class Proxy implements java.io.Serializable {

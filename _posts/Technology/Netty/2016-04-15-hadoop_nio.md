@@ -4,7 +4,7 @@ layout: post
 title: 向Hadoop学习NIO的使用
 category: 技术
 tags: Netty
-keywords: JAVA
+keywords: netty hadoop nio
 
 ---
 

@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: netty（七）netty在框架中的使用套路
+title: netty在框架中的使用套路
 category: 技术
 tags: Netty
-keywords: JAVA netty pool
+keywords: JAVA in framework
 
 ---
 

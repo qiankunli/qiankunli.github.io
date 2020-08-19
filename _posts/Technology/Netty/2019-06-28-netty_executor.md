@@ -13,6 +13,8 @@ keywords: JAVA netty
 * TOC
 {:toc}
 
+Java 的标准类库，由于其基础性、通用性的定位，往往过于关注技术模型上的抽象，而不是从一线应用开发者的角度去思考。java引入concurrent 包的一个重要原因就是，应用开发者使用 Thread API 比较痛苦，需要操心的不仅仅是业务逻辑，而且还要自己负责将其映射到 Thread 模型上。Java NIO 的设计也有类似的特点，开发者需要深入掌握线程、IO、网络等相关概念，学习路径很长，很容易导致代码复杂、晦涩，即使是有经验的工程师，也难以快速地写出高可靠性的实现。Netty 的设计强调了 “Separation Of Concerns”，通过精巧设计的事件机制，将业务逻辑和无关技术逻辑进行隔离，并通过各种方便的抽象，一定程度上填补了了基础平台和业务开发之间的鸿沟，更有利于在应用开发中普及业界的最佳实践。PS： 也就是说，**netty 的api 都提供异步接口，你只需要构造入口对象时传入Executor，怎么用Executor 就不用管了**。
+
 ## Executor 家族
 
 ![](/public/upload/netty/netty_executor.png)
@@ -24,7 +26,7 @@ keywords: JAVA netty
 1. 规范 作业线程的管理，比如ExecutorService
 2. 提供 更丰富的 异步处理返回值 ，比如guava 的ListeningExecutorService
 3. 优化特定场景，比如netty的SingleThreadEventExecutor，只有一个作业线程
-3. 针对特定业务场景，更改作业线程的处理逻辑。比如netty的EventLoopGroup，其作业线程逻辑为 io + task ，并可以根据ioRatio 调整io 与task的cpu 占比。
+4. 针对特定业务场景，更改作业线程的处理逻辑。比如netty的EventLoopGroup，其作业线程逻辑为 io + task ，并可以根据ioRatio 调整io 与task的cpu 占比。
 
 ## SingleThreadEventExecutor
 
@@ -57,39 +59,43 @@ Runnable + Thread 实现了 logic 和 runner 的分离，runner 又进一步扩�
 
 ThreadPoolExecutor 的作业逻辑 由Worker 定义
 
-    private final class Worker implements Runnable{
-        public void run() {
-            try {
-                Runnable task = firstTask;
-                // 循环从线程池的任务队列获取任务 
-                while (task != null || (task = getTask()!= null) {
-                    // 执行任务 
-                    runTask(task);
-                    task = null;
-                }
-            } finally {
-                workerDone(this);
+```java
+private final class Worker implements Runnable{
+    public void run() {
+        try {
+            Runnable task = firstTask;
+            // 循环从线程池的任务队列获取任务 
+            while (task != null || (task = getTask()!= null) {
+                // 执行任务 
+                runTask(task);
+                task = null;
             }
-        }
-        private void runTask(Runnable task) {         
-                task.run();
+        } finally {
+            workerDone(this);
         }
     }
+    private void runTask(Runnable task) {         
+            task.run();
+    }
+}
+```
 
 SingleThreadEventExecutor的作业逻辑在 自己的run 方法中，是一个抽象方法，`DefaultEventExecutor.run` 是一个具体的实现
 
-    protected void run() {
-        for (;;) {
-            Runnable task = takeTask();
-            if (task != null) {
-                task.run();
-                updateLastExecutionTime();
-            }
-            if (confirmShutdown()) {
-                break;
-            }
+```java
+protected void run() {
+    for (;;) {
+        Runnable task = takeTask();
+        if (task != null) {
+            task.run();
+            updateLastExecutionTime();
+        }
+        if (confirmShutdown()) {
+            break;
         }
     }
+}
+```
 
 ### 作业线程的管理
 
@@ -100,26 +106,28 @@ ThreadPoolExecutor 作业线程 由一个HashSet 成员专门持有， 管理/cr
 
 SingleThreadEventExecutor 顾名思义，只有一个线程，还是“租来的”。
 
-    private void doStartThread() {
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                thread = Thread.currentThread();
-                try {
-                    SingleThreadEventExecutor.this.run();
-                } catch (Throwable t) {
-                    logger.warn("Unexpected exception from an event executor: ", t);
-                } finally {
-                    // Run all remaining tasks and shutdown hooks.
-                    for (;;) {
-                        if (confirmShutdown()) {
-                            break;
-                        }
+```java
+private void doStartThread() {
+    executor.execute(new Runnable() {
+        @Override
+        public void run() {
+            thread = Thread.currentThread();
+            try {
+                SingleThreadEventExecutor.this.run();
+            } catch (Throwable t) {
+                logger.warn("Unexpected exception from an event executor: ", t);
+            } finally {
+                // Run all remaining tasks and shutdown hooks.
+                for (;;) {
+                    if (confirmShutdown()) {
+                        break;
                     }
                 }
             }
-        });
-    }
+        }
+    });
+}
+```
 
 SingleThreadEventExecutor 通过thread成员 持有了对当前线程的引用
 
@@ -144,23 +152,27 @@ SingleThreadEventExecutor 通过thread成员 持有了对当前线程的引用
 
 channel.write 根据inEventLoop 来判断 caller 线程的性质，以判断是否 可以安全写入outboundBuffer
 
-    public abstract class AbstractChannel{
-        private volatile EventLoop eventLoop;
-        private final Unsafe unsafe;
-        protected abstract class AbstractUnsafe implements Unsafe {
-            private volatile ChannelOutboundBuffer outboundBuffer
-        }
+```java
+public abstract class AbstractChannel{
+    private volatile EventLoop eventLoop;
+    private final Unsafe unsafe;
+    protected abstract class AbstractUnsafe implements Unsafe {
+        private volatile ChannelOutboundBuffer outboundBuffer
     }
+}
+```
 
 类似于
 
-    function write(msg){
-        if(Thread.currentThread() == eventLoop.getThread()){
-            write buffer
-        }else{
-            eventLoop.execute(task(msg));
-        }
+```java
+function write(msg){
+    if(Thread.currentThread() == eventLoop.getThread()){
+        write buffer
+    }else{
+        eventLoop.execute(task(msg));
     }
+}
+```
 
 ![](/public/upload/java/use_executor.png)
 
