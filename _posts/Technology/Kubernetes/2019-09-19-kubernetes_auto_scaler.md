@@ -163,6 +163,18 @@ updatePolicy
 2. Auto(默认)：VPA 在 Pod 创建时分配资源，并且能够在 Pod 的其他生命周期更新它们，包括淘汰和重新调度 Pod。
 3. Off：VPA 从不改变Pod资源。Recommender 而依旧会在VPA对象中生成推荐信息，他们可以被用在演习中。
 
+## 解决响应速度问题
+
+官方的这个HPA Controller在实现的时候用的是一个Gorountine来处理整个集群的所有HPA的计算和同步问题，在集群配置的HPA比较多的时候可能会导致业务扩容不及时的问题，其次官方HPA Controller不支持为每个HPA进行单独的个性化配置。
+
+为了优化HPA Controller的性能和个性化配置问题，我们把HPA Controller单独抽离出来单独部署。同时为每一个HPA单独配置一个Gorountine，并且每一个HPA多可以根据业务的需要进行单独的配置。
+
+![](/public/upload/kubernetes/tke_hpa.png)
+
+其实仅仅优化HPA Controller还是不能满足一些业务在业务高峰时候的一些需求，比如在业务做活动的时候，希望在流量高峰期之前就能够把业务扩容好。这个时候我们就需要一个定时HPA的功能，为此我们定义了一个CronHPA的CRD和CronHPA Operator。CronHPA会在业务定义的时间进行扩容和缩容，同时还能和HPA一起配合工作。
+
+![](/public/upload/kubernetes/tke_cron_hpa.png)
+
 ## 其它
 
 
