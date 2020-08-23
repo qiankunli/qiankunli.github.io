@@ -1,71 +1,17 @@
 ---
 
 layout: post
-title: kubernetes实践
-category: 技术
+title: controller 组件介绍
+category: 架构
 tags: Kubernetes
-keywords: kubernetes practice
-
+keywords: openkruise
 ---
 
-## 简介（持续更新）
+## 简介
 
 * TOC
 {:toc}
 
-[容器化在一下科技的落地实践](http://www.10tiao.com/html/217/201811/2649699541/1.html)
-
-[荔枝运维平台容器化实践](https://mp.weixin.qq.com/s/Q4t5IptqQmQZ6z4vOIhcjQ) 从打包、监控、日志、网络、存储各方面阐述了一下，还比较全面
-
-## 总纲
-
-两个基本工作
-
-1. 应用容器化
-
-    1. 
-    2. 
-    3. 
-    4. 
-2. 编排自动化
-
-    1. 
-    2. 
-    3. 
-    4. 
-
-## 美团实践
-
-[美团点评Kubernetes集群管理实践](https://mp.weixin.qq.com/s/lYDYzEUlvXQhCO1xCJ7HAg) 笔者从中得到一个启发就是，整个kubernetes 的实践是分层次的。
-
-![](/public/upload/kubernetes/meituan_kubernetes_practice.png)
-
-## helm
-
-[Helm安装使用](https://www.qikqiak.com/k8s-book/docs/42.Helm%E5%AE%89%E8%A3%85.html)
-
-## 另类“Service”——给服务一个稳定的主机名
-
-容器的ip 总是经常变，针对这个问题， k8s早已有一系列解决方案。
-
-1. k8s 套件内
-
-    1. k8s集群内，Service等
-    2. k8s集群外，Nodeport，ingress等
-2. 提供一个dns服务器，维护`<容器名,ip>` 映射。 实现： codedns + etcd，ip 的变化写入etcd 即可
-3. 改写ipam插件，支持静态ip
-
-## 内存突然爆满了
-
-项目日志写满磁盘，k8s 会将pod 从该机器上驱逐出去。k8s驱逐机制（未学习）
-
-
-## web界面管理
-
-[Qihoo360/wayne](https://github.com/Qihoo360/wayne) Wayne 是一个通用的、基于 Web 的 Kubernetes 多集群管理平台。通过可视化 Kubernetes 对象模板编辑的方式，降低业务接入成本， 拥有完整的权限管理系统，适应多租户场景，是一款适合企业级集群使用的发布平台。
-
-
-[Kubernetic](https://kubernetic.com/)一款kubenretes桌面客户端, Kubernetic uses `~/.kube/config` file to find existing cluster contexts and handle authentication. This means that as soon as you have a kubectl client configured to your machine Kubernetic will be able to login to your configured clusters.
 
 ## Garbage Collection
 
@@ -100,12 +46,3 @@ keywords: kubernetes practice
     1. minimum-container-ttl-duration, 容器dead 之后多久可以被删除
     2. maximum-dead-containers-per-container, 每个pod 最多允许的dead 容器数量，超过的容器会被删掉
     3. maximum-dead-containers, 主机上最多允许的dead 容器数量，超过的容器会被删掉
-
-## 工作流
-
-线上环境上线的镜像是已经上线到测试环境的相同镜像。
-
-笔者个人微信订阅号
-
-![](/public/upload/qrcode_for_gh.jpg)
-

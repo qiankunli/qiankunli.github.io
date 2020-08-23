@@ -116,11 +116,41 @@ metadata 与 spec 分别代表了 共性与个性，数据表设计也可以参�
 但对运维来说，在实际环境中还需添加大量的配置，此时，运维可以事先定义一个PodPreset.yaml，并创建一个PodPreset`kubectl create -f preset.yaml`。 之后开发创建的pod（有一个规则匹配） 都会自动加上 preset.yaml 指定的配置。
 
 
-## kubectl 
 
-在命令行中，所有 key-value 格式的参数，都使用“=”而非“:”表示。
+## 访问多个kubernetes 集群
 
+1. 一般情况，kubernetes 单独搭建在一个集群上，开发者通过开发机 或某一个跳板机上 通过kubectl 操作kubernetes，kubectl 会读取`~/.kube/config` 文件读取集群信息
+2. kubernetes 一般会有多个集群：测试环境（运行公司测试环境的服务），开发环境（用来验证新功能）==> developer 需要在本机 上使用kubectl 访问多个k8s集群
 
-笔者个人微信订阅号
+[配置对多集群的访问](https://kubernetes.io/zh/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
 
-![](/public/upload/qrcode_for_gh.jpg)
+`~/.kube/config` 是一个yaml 文件，可以配置多个集群的信息
+
+    apiVersion: v1
+    kind: Config
+    clusters:
+    users:
+    contexts:
+
+可以看到 几个核心配置都是数组
+
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - cluster:
+    name: development
+    - cluster:
+    name: scratch
+    users:
+    - name: developer
+    - name: experimenter
+    contexts:
+    - context:
+        cluster: development
+        user: developer
+      name: dev-frontend
+    name: dev-frontend
+    - context:
+        cluster: scratch
+        user: experimenter
+      name: exp-scratch

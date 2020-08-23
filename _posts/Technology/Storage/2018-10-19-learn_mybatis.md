@@ -12,13 +12,16 @@ keywords: mysql mybatis
 
 What is MyBatis?
 
-MyBatis is a first class persistence framework with support for custom SQL, stored procedures and advanced mappings. MyBatis eliminates almost all of the JDBC code and manual setting of parameters and retrieval of results. MyBatis can use simple XML or Annotations for configuration and map primitives, Map interfaces and Java POJOs (Plain Old Java Objects) to database records.
+MyBatis is a first **class persistence framework** with support for custom SQL, stored procedures and advanced mappings. MyBatis eliminates almost all of the JDBC code and manual setting of parameters and retrieval of results. MyBatis can use simple XML or Annotations for configuration and map primitives, Map interfaces and Java POJOs (Plain Old Java Objects) to database records.
 
-1. 一般业务模型直接体现在数据库表设计，表设计好了，页面设计确认了，剩下的code就是一个匹配的过程。我以前用持久化框架，都是先创建数据库表，一直忽视从class persistence framework 的角度来看问题，这才是实际的数据流动的视角。
-2. 基本隐藏了jdbc 实现，条件查询（包括结果返回）也简化了很多
-3. 使用xml 或 xml 控制java 类和 database record 的映射过程
+[Mybatis framework learning](http://www.codeblogbt.com/archives/303221)
+
+1. Mybatis It is characterized by the use of Xml files to configure SQL statements. Programmers write their own SQL statements. When the requirements change, we only need to modify the configuration files, which is more flexible. 在这一类orm 框架出现之前，sql是写死在代码中的。有了mybatis 之后，sql 可以与 代码分离。 
+2. In addition, Mybatis transfer to the SQL statement can be passed directly into the Java object without the need for a parameter to correspond with the placeholder; the query result set is mapped to a Java object.  sql 的输入输出 都可以是对象，而不是java.sql 默认支持的ResultSet 等。 PS： mybatis 之于java.sql 有点类似于 netty 之于java.nio
 
 ## 使用手感
+
+![](/public/upload/data/mybatis_work.png)
 
 原生mybatis 代码
 
@@ -31,6 +34,9 @@ try (SqlSession session = sqlSessionFactory.openSession()) {
     System.out.println(String.format("result:%s", users));
 }
 ```
+
+MyBatis框架要做的事情，就是在运行`session.selectList("mybatis.mapper.UserMapper.getAll")`的时候，将 `mybatis.mapper.UserMapper.getAll`进行替换，使SQL语句变成`SELECT id,name FROM user`。
+
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE configuration
@@ -54,13 +60,24 @@ try (SqlSession session = sqlSessionFactory.openSession()) {
 ```
 ## 整体架构
 
-![](/public/upload/data/mybatis_work.png)
+[MyBatis版本升级引发的线上告警回顾及原理分析](https://mp.weixin.qq.com/s/sk0Kou9V727tRe5wddmDig)MyBatis要将SQL语句完整替换成带参数值的版本，需要经历框架初始化以及实际运行时动态替换这两个部分。
 
-[Mybatis framework learning](http://www.codeblogbt.com/archives/303221)
+在框架初始化阶段，有一些组件会被构建：
 
-1. Mybatis It is characterized by the use of Xml files to configure SQL statements. Programmers write their own SQL statements. When the requirements change, we only need to modify the configuration files, which is more flexible. 提取 xml  来隔离sql 的变化
+1. SqlSession：作为MyBatis工作的主要顶层API，表示和数据库交互的会话，完成必要的数据库增删改查功能。
+2. SqlSource：负责根据用户传递的parameterObject，动态地生成SQL语句，将信息封装到BoundSql对象中，并返回。
+3. Configuration：MyBatis所有的配置信息都维持在Configuration对象之中。**在构建Configuration的过程中，会涉及到构建对应每一条SQL语句对应的MappedStatement**
 
-2. In addition, Mybatis transfer to the SQL statement can be passed directly into the Java object without the need for a parameter to correspond with the placeholder; the query result set is mapped to a Java object.  sql 的输入输出 都可以是对象
+在具体执行阶段
+
+![](/public/upload/storage/mybatis_run.png)
+
+1. SqlSession：作为MyBatis工作的主要顶层API，表示和数据库交互的会话，完成必要数据库增删改查功能。
+2. Executor：MyBatis执行器，这是MyBatis调度的核心，负责SQL语句的生成和查询缓存的维护。
+3. BoundSql：表示动态生成的SQL语句以及相应的参数信息。
+4. StatementHandler：封装了JDBC Statement操作，负责对JDBC statement的操作，如设置参数、将Statement结果集转换成List集合等等。
+5. ParameterHandler：负责对用户传递的参数转换成JDBC Statement 所需要的参数。
+6. TypeHandler：负责Java数据类型和JDBC数据类型之间的映射和转换。
 
 ![](/public/upload/data/mybatis_framework.jpg)
 
@@ -69,7 +86,9 @@ try (SqlSession session = sqlSessionFactory.openSession()) {
 3. SqlSession is created by a conversational factory, and the operation database needs to be done through SqlSession.
 4. Mybatis The bottom layer customize the Executor actuator interface to operate the database, and the Executor executor calls the specific MappedStatement object to perform the database operation.
 5. MappedStatement Mybatis is also a low-level encapsulation object, which encapsulates Mybatis configuration information and SQL mapping information. A SQL in the Mapper.xml file corresponds to a Mapped Statement object, SQL.ID is the ID of the Mapped statement.
-6. Executor The input Java object is mapped to SQL by MappedStatement before the SQL is held, and the meaning of the input parameter mapping is to set the parameters for PreparedStatement in JDBC programming. ExecutOr maps the output results to the Java object after executing SQL through the MappedStatement, and the output result mapping process is equivalent to the resolution process for the results in JDBC programming.
+6. Executor The input Java object is mapped to SQL by MappedStatement before the SQL is held, and the meaning of the input parameter mapping is to set the parameters for PreparedStatement in JDBC programming. Executor maps the output results to the Java object after executing SQL through the MappedStatement, and the output result mapping process is equivalent to the resolution process for the results in JDBC programming.
+
+
 
 ## 源码分析
 
@@ -118,6 +137,7 @@ public <E> List<E> doQuery(MappedStatement ms, Object parameter, RowBounds rowBo
 }
 // SimpleStatementHandler
 public <E> List<E> query(Statement statement, ResultHandler resultHandler) throws SQLException {
+    // BoundSql boundSql = ms.getBoundSql(parameter);  来自BaseExecutor.query
     String sql = boundSql.getSql();
     statement.execute(sql);
     return resultSetHandler.handleResultSets(statement);

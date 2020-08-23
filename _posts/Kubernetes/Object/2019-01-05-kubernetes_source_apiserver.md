@@ -224,3 +224,39 @@ When I understood that basically everything in Kubernetes works by watching etcd
 1. apiserver 将resource/kubernetes object 数据保存在etcd 上，因为resource 通过etcd 持久化的操作模式比较固定，一个通用http.Handler 根据resource 元数据 即可完成 crud，无需专门的PodHandler/ServiceHandler 等
 2. apiserver 也不单是built-in resource的api server，**是一个通用api server**，这也是为何相关的struct 叫 GenericAPIServer。 就是你定义一个user.yaml，dynamic registry user.yaml 到 apiserver上，然后就可以直接 `http://apiserver/api/users` 返回所有User 数据了。
 
+## k8s 在 etcd中的存在
+
+    /registry/minions
+    /registry/minions/192.168.56.102    # 列出该节点的信息，包括其cpu和memory能力
+    /registry/minions/192.168.56.103
+    /registry/controllers
+    /registry/controllers/default
+    /registry/controllers/default/apache2-controller	# 跟创建该controller时信息大致相同，分为desireState和currentState
+    /registry/controllers/default/heapster-controller
+    /registry/pods
+    /registry/pods/default
+    /registry/pods/default/128e1719-c726-11e4-91cd-08002782f91d   	# 跟创建该pod时信息大致相同，分为desireState和currentState
+    /registry/pods/default/128e7391-c726-11e4-91cd-08002782f91d
+    /registry/pods/default/f111c8f7-c726-11e4-91cd-08002782f91d
+    /registry/nodes
+    /registry/nodes/192.168.56.102
+    /registry/nodes/192.168.56.102/boundpods	# 列出在该主机上运行pod的信息，镜像名，可以使用的环境变量之类，这个可能随着pod的迁移而改变
+    /registry/nodes/192.168.56.103
+    /registry/nodes/192.168.56.103/boundpods
+    /registry/events
+    /registry/events/default
+    /registry/events/default/704d54bf-c707-11e4-91cd-08002782f91d.13ca18d9af8857a8		# 记录操作，比如将某个pod部署到了某个node上
+    /registry/events/default/f1ff6226-c6db-11e4-91cd-08002782f91d.13ca07dc57711845
+    /registry/services
+    /registry/services/specs
+    /registry/services/specs/default
+    /registry/services/specs/default/monitoring-grafana		#  基本跟创建信息大致一致，但包含serviceip
+    /registry/services/specs/default/kubernetes
+    /registry/services/specs/default/kubernetes-ro
+    /registry/services/specs/default/monitoring-influxdb
+    /registry/services/endpoints
+    /registry/services/endpoints/default
+    /registry/services/endpoints/default/monitoring-grafana	  	# 终端（traffic在这里被处理），和某一个serviceId相同，包含了service对应的几个pod的ip，这个可能经常变。
+    /registry/services/endpoints/default/kubernetes
+    /registry/services/endpoints/default/kubernetes-ro
+    /registry/services/endpoints/default/monitoring-influxdb
