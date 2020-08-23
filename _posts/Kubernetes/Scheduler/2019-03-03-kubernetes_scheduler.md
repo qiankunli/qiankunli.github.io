@@ -26,6 +26,17 @@ the scheduler is yet another controller, watching for Pods to show up in the API
 
 **scheduler is not responsible for actually running the pod – that’s the kubelet’s job. So it basically just needs to make sure every pod has a node assigned to it.**
 
+## 工作流程
+
+[Create a custom Kubernetes scheduler](https://developer.ibm.com/technologies/containers/articles/creating-a-custom-kube-scheduler/#)
+
+1. The default scheduler starts up according to the parameters given.
+2. It watches on apiserver, and puts pods where its spec.nodeName is empty into its internal scheduling queue.
+It pops out a pod from the scheduling queue and starts a standard scheduling cycle.
+3. It retrieves “hard requirements” (like cpu/memory requests, nodeSelector/nodeAffinity) from the pod’s API spec. Then the predicates phase occurs where it calculates to give a node candidates list which satisfies those requirements.
+4. It retrieves “soft requirements” from the pod’s API spec and also applies some default soft “policies” (like the pods prefer to be more packed or scattered across the nodes). It finally gives a score for each candidate node, and picks up the final winner with the highest score.
+5. It talks to the apiserver (by issuing a bind call) and sets
+
 ## Kubernetes 资源模型与资源管理
 
 在 Kubernetes 里，Pod 是最小的原子调度单位。这也就意味着，所有跟调度和资源管理相关的属性都应该是属于 Pod 对象的字段。而这其中最重要的部分，就是 Pod 的CPU 和内存配置
@@ -34,7 +45,7 @@ the scheduler is yet another controller, watching for Pods to show up in the API
 
 ### request and limit
 
-Kubernetes 里 Pod 的 CPU 和内存资源，实际上还要分为 limits 和 requests 两种情况：在调度的时候，kube-scheduler 只会按照 requests 的值进行计算。而在真正设置 Cgroups 限制的时候，kubelet 则会按照 limits 的值来进行设置。这个理念基于一种假设：容器化作业在提交时所设置的资源边界，并不一定是调度系统所必须严格遵守的，这是因为在实际场景中，大多数作业使用到的资源其实远小于它所请求的资源限额。
+Kubernetes 里 Pod 的 CPU 和内存资源，实际上还要分为 limits 和 requests 两种情况：**在调度的时候，kube-scheduler 只会按照 requests 的值进行计算**。而在真正设置 Cgroups 限制的时候，kubelet 则会按照 limits 的值来进行设置。这个理念基于一种假设：容器化作业在提交时所设置的资源边界，并不一定是调度系统所必须严格遵守的，这是因为在实际场景中，大多数作业使用到的资源其实远小于它所请求的资源限额。
 
 
 ### request limit 关系 ==> QoS ==> 驱逐策略
