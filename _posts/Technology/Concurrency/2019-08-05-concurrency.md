@@ -30,6 +30,13 @@ keywords: concurrency
 
 ![](/public/upload/architecture/high_concurrency.png)
 
+并发竞争的几种处理
+
+1. 靠锁把并发搞成顺序的
+1. 发现有人在操作数据，就先去干点别的，比如自旋、sleep 一会儿
+2. 发现有人在操作数据，找个老版本数据先用着，比如mvcc
+2. 相办法不共享数据
+
 ## 异步
 
 [异步执行抽象——Executor与Future](http://qiankunli.github.io/2016/07/08/executor_future.html)
