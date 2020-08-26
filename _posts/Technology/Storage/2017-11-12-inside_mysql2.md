@@ -13,53 +13,6 @@ keywords: mysql innodb
 * TOC
 {:toc}
 
-## 事务
-
-《软件架构设计》通俗的讲，事务就是一个“代码块”，这个代码块要么不执行，要么全部执行。事务要操作数据（数据库里面的表），事务与事务之间会存在并发冲突，就好比在多线程编程中，多个线程操作同一份儿数据，存在线程间的并发冲突是一个道理。 
-
-[理解事务 - MySQL 事务处理机制](https://juejin.im/entry/58f08b4cda2f60005d225a8e)基本要点（太经典，要低水平的复制粘贴了）：
-
-重新理解一致性：在事务T开始时，此时数据库有一种状态，这个状态是所有的MySQL对象处于一致的状态，例如数据库完整性约束正确，日志状态一致等，当事务T提交后，这时数据库又有了一个新的状态，不同的数据，不同的索引，不同的日志等，但此时，**约束，数据，索引，日志（binlog/redo/undo log）等MySQL各种对象还是要保持一致性（正确性）。** 这就是 从一个一致性的状态，变到另一个一致性的状态。也就是事务执行后，并没有破坏数据库的完整性约束。有分布式一致性，其实一致性问题分布式和单机都有。
-
-## 事务的原子性和持久性——redo/undo log
-
-一次事务实际执行的伪代码
-
-```
-start transaction
-    写undo log1: 备份该行数据（update）
-    update 表1某行记录
-    写redo log1
-    写undo log2：备份该行数据（insert）
-    delete 表1某行记录
-    写redo log2
-    写undo log3：该行的主键id（delete）
-    insert 表2某行记录
-    写redo log3
-commit
-```
-
-![](/public/upload/data/mysql_commit_transaction.jpg)
-
-InnoDB将Undo Log看作数据，因此记录Undo Log的操作也会记录到redo log中，包含Undo Log操作的Redo Log，看起来是这样的：
-
-```
-记录1: <trx1, Undo log insert <undo_insert …>>
-记录2: <trx1, insert …>
-记录3: <trx2, Undo log insert <undo_update …>>
-记录4: <trx2, update …>
-记录5: <trx3, Undo log insert <undo_delete …>>
-记录6: <trx3, delete …>
-```
-
-宕机恢复后（redo log undo log 貌似都是从宕机恢复的视角来说的）
-
-1. 会把redo log 全部重放一遍，并不关心事务性，提交的事务和未提交的事务都被重放了，从而**让数据库”原封不动“的回到宕机前的状态**。
-2. 重放完成后，再把未完成的事务找出来，逐一利用undo log进行逻辑上的“回滚”。 undo log 记录了sql 的反操作，所谓回滚即 执行反操作sql
-
-可以看出，redo log 不保证事务原子性， 只是保证了持久性， 不管提交未提交的事务都会进入redo log。
-
-**redo log和undo log所做的一切都是为了提高 数据本身的IO效率**，已提交事务和未提交事务的数据 可以随意立即/延迟写入磁盘。代价是，事务提交时，redo log必须写入到磁盘，**数据随机写转换为日志数据顺序写**。PS，随机写优化为顺序写，也是一种重要的架构优化方法。 
 
 ## redo log
 
@@ -147,7 +100,56 @@ undo log 不是log，而是数据，每个事务在修改记录之前，都会�
 
 ![](/public/upload/data/mysql_sql_lock.png)
 
-## 事务的隔离性与一致性——MVCC与锁
+
+## 事务
+
+《软件架构设计》通俗的讲，事务就是一个“代码块”，这个代码块要么不执行，要么全部执行。事务要操作数据（数据库里面的表），事务与事务之间会存在并发冲突，就好比在多线程编程中，多个线程操作同一份儿数据，存在线程间的并发冲突是一个道理。 
+
+[理解事务 - MySQL 事务处理机制](https://juejin.im/entry/58f08b4cda2f60005d225a8e)基本要点（太经典，要低水平的复制粘贴了）：
+
+重新理解一致性：在事务T开始时，此时数据库有一种状态，这个状态是所有的MySQL对象处于一致的状态，例如数据库完整性约束正确，日志状态一致等，当事务T提交后，这时数据库又有了一个新的状态，不同的数据，不同的索引，不同的日志等，但此时，**约束，数据，索引，日志（binlog/redo/undo log）等MySQL各种对象还是要保持一致性（正确性）。** 这就是 从一个一致性的状态，变到另一个一致性的状态。也就是事务执行后，并没有破坏数据库的完整性约束。有分布式一致性，其实一致性问题分布式和单机都有。
+
+### 事务的原子性和持久性——redo/undo log
+
+一次事务实际执行的伪代码
+
+```
+start transaction
+    写undo log1: 备份该行数据（update）
+    update 表1某行记录
+    写redo log1
+    写undo log2：备份该行数据（insert）
+    delete 表1某行记录
+    写redo log2
+    写undo log3：该行的主键id（delete）
+    insert 表2某行记录
+    写redo log3
+commit
+```
+
+![](/public/upload/data/mysql_commit_transaction.jpg)
+
+InnoDB将Undo Log看作数据，因此记录Undo Log的操作也会记录到redo log中，包含Undo Log操作的Redo Log，看起来是这样的：
+
+```
+记录1: <trx1, Undo log insert <undo_insert …>>
+记录2: <trx1, insert …>
+记录3: <trx2, Undo log insert <undo_update …>>
+记录4: <trx2, update …>
+记录5: <trx3, Undo log insert <undo_delete …>>
+记录6: <trx3, delete …>
+```
+
+宕机恢复后（redo log undo log 貌似都是从宕机恢复的视角来说的）
+
+1. 会把redo log 全部重放一遍，并不关心事务性，提交的事务和未提交的事务都被重放了，从而**让数据库”原封不动“的回到宕机前的状态**。
+2. 重放完成后，再把未完成的事务找出来，逐一利用undo log进行逻辑上的“回滚”。 undo log 记录了sql 的反操作，所谓回滚即 执行反操作sql
+
+可以看出，redo log 不保证事务原子性， 只是保证了持久性， 不管提交未提交的事务都会进入redo log。
+
+**redo log和undo log所做的一切都是为了提高 数据本身的IO效率**，已提交事务和未提交事务的数据 可以随意立即/延迟写入磁盘。代价是，事务提交时，redo log必须写入到磁盘，**数据随机写转换为日志数据顺序写**。PS，随机写优化为顺序写，也是一种重要的架构优化方法。 
+
+### 事务的隔离性与一致性——MVCC与锁
 	
 **mysql 作为一个数据库，其实就是sql的 解释执行器，这一点和jvm 作为字节码的解释执行器是一样一样的。**但跟java语言层面的并发安全又有所不同，java语言层面就两个安全级别：安全，不安全。目的是为了保证一致性，但绝对的一致性要损失性能，因此允许某些异常便产生一致性强弱的区别。主要体现在 如果数据正在更新（感知到有事务正在处理，并发冲突），可以先返回老版本数据，数据更新则始终基于最新数据（也就是要等其它事务结束）。PS：**就像主从同步一样，读可以读从库（很多业务可以接受一点不一致）**，写则必须去主库写。 
 
