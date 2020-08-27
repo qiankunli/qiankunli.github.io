@@ -25,6 +25,8 @@ keywords: pilot service mesh
 
 ## 流量管理配置
 
+[Envoy 基于文件的动态配置](https://mp.weixin.qq.com/s/cJniDmmTh-h-sHwPV-LTeQ) [Envoy 基于 API 的动态配置](https://mp.weixin.qq.com/s/Upcb1XBaQMUx2Y-Xo0g3ZA) 未读
+
 ### 功能划分
 
 [Envoy 官方文档中文版](https://www.servicemesher.com/envoy/)

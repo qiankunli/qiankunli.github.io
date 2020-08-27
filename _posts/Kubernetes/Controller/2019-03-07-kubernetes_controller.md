@@ -61,6 +61,8 @@ for {
 
 **Reconcile 的是什么？**在Kubernetes中，Pod是调度的基本单元，也是所有内置Workload管理的基本单元，无论是Deployment还是StatefulSet，它们在对管理的应用进行更新时，都是以Pod为单位。**所谓编排，最终落地就是 更新pod 的spec ,condition,container status 等数据**（原地更新或重建符合这些配置的pod）。非基本单位的 Deployment/StatefulSet 的变更更多是 数据的持久化。
 
+《programming kubernetes》 Kubernetes **控制平面**大量使用事件和松散耦合的组件。其它分布式系统使用rpc 来触发行为。但Kubernetes 并没有这么做（**纯粹依赖事件来进行多组件协同，许多独立的控制循环只通过 api server 上对象的变化进行通信**）。Kubernetes controller 监听api server 中的Kubernetes 对象操作：添加、删除、更新。当发生此类事件时，controller 将执行其业务逻辑。监听事件 是通过api server 和controller 之间的http 长连接发送，从而驱动informer
+
 ## 整体架构
 
 [通过自定义资源扩展Kubernetes](https://blog.gmem.cc/extend-kubernetes-with-custom-resources)
@@ -81,7 +83,7 @@ for {
 4. 后来，WATCH 数据的太多了，Informer/Reflector去 API Server 那里 WATCH 状态的时候，只 WATCH 特定资源的状态，不要一股脑儿全 WATCH。
 5. 一个controller 一个informer 还是压力大，于是针对每个（受多个控制器管理的）资源弄一个 Informer。比如 Pod 同时受 Deployment 和 StatefulSet 管理。这样当多个控制器同时想查 Pod 的状态时，只需要访问一个 Informer 就行了。
 6. 但这又引来了新的问题，SharedInformer 无法同时给多个控制器提供信息，这就需要每个控制器自己排队和重试。为了配合控制器更好地实现排队和重试，SharedInformer  搞了一个 Delta FIFO Queue（增量先进先出队列），每当资源被修改时，它的助手 Reflector 就会收到事件通知，并将对应的事件放入 Delta FIFO Queue 中。与此同时，SharedInformer 会不断从 Delta FIFO Queue 中读取事件，然后更新本地缓存的状态。
-7. 这还不行，SharedInformer 除了更新本地缓存之外，还要想办法将数据同步给各个控制器，为了解决这个问题，它又搞了个工作队列（Workqueue），一旦有资源被添加、修改或删除，就会将相应的事件加入到工作队列中。所有的控制器排队进行读取，一旦某个控制器发现这个事件与自己相关，就执行相应的操作。如果操作失败，就将该事件放回队列，等下次排到自己再试一次。如果操作成功，就将该事件从队列中删除。
+7. 这还不行，SharedInformer 除了更新本地缓存之外，还要想办法将数据同步给各个控制器，为了解决这个问题，它又搞了个工作队列（Workqueue），一旦有资源被添加、修改或删除，就会将相应的事件加入到工作队列中。所有的控制器排队进行读取，一旦某个控制器发现这个事件与自己相关，就执行相应的操作。如果操作失败，就将该事件放回队列，等下次排到自己再试一次。如果操作成功，就将该事件从队列中删除。PS：**工作队列用于状态更新事件的有序处理并协助实现重试**。 
 
 ![](/public/upload/kubernetes/k8s_controller_model.png)
 
