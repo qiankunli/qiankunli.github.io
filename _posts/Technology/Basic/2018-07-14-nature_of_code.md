@@ -101,3 +101,7 @@ You must be aware of who you are on your team. When hiring new people, you must 
 "Programmers waste enormous amounts of time thinking about, or worrying about, the speed of noncritical parts of their programs, and these attempts at efficiency actually have a strong negative impact when debugging and maintenance are considered. We should forget about small efficiencies, say about 97% of the time: **premature optimization is the root of all evil**. Yet we should not pass up our opportunities in that critical 3%." — Donald E. Knuth 
 
 Data-Oriented Design："Data dominates. If you've chosen the right data structures and organized things well, the algorithms will almost always be self-evident. Data structures, not algorthims, are central to programming." - Rob Pike
+
+## 其它
+
+[程序员如何把控自己的职业](https://coolshell.cn/articles/20977.html)只有学会总结和归纳，才能形成自己的思维框架、自己的套路、自己的方法论，以后学这个东西应该怎么学。就像学一门新的语言，不管GO语言，还是Rust语言，第一件事情就是了解内存是怎么管理的，数据类型什么样，第二是泛型怎么搞，第三是并发怎么弄。还有一些抽象怎么弄，比如说怎么解耦，怎么实现多态？套路这种东西只有学的多了以后才能形成套路，如果**你只学会一门语言不会有套路**，你要每年学门语言，不用学多精，你思考这个语言有什么不一样，为什么这个这种有玩法，那个有那种玩法，这些东西思考多了套路方法论就出来了。

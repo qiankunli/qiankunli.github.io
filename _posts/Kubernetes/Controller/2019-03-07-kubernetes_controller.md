@@ -19,29 +19,9 @@ keywords: kubernetes controller
 
 [Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)
 
-**We really like the Kubernetes ideology of seeing the entire system as a control system. That is, the system constantly tries to move its current state to a desired state**.The worker units that guarantee the desired state are called controllers. 控制器就是保证系统按 desired state运行。
+[kube-controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/) **In applications of robotics and automation, a control loop is a non-terminating loop that regulates the state of the system**（在自动化行业是常见方式）. **We really like the Kubernetes ideology of seeing the entire system as a control system. That is, the system constantly tries to move its current state to a desired state**.The worker units that guarantee the desired state are called controllers. 控制器就是保证系统按 desired state运行。
 
-[kube-controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/) **In applications of robotics and automation, a control loop is a non-terminating loop that regulates the state of the system**（在自动化行业是常见方式）. In Kubernetes, a controller is a control loop that watches the shared state of the cluster through the API server and makes changes attempting to move the current state towards the desired state. Examples of controllers that ship with Kubernetes today are the replication controller, endpoints controller, namespace controller, and serviceaccounts controller.
-
-docker是单机版的，当我们接触k8s时，天然的认为这是一个集群版的docker，再具体的说，就是在集群里给镜像找一个主机来运行容器。但实际上比调度更重要的是编排，那么编排如何实现呢？控制器
-
-声明式API对象与控制器模型相辅相成，声明式API对象定义出期望的资源状态，控制器模型则通过控制循环（Control Loop）将Kubernetes内部的资源调整为声明式API对象期望的样子。因此可以认为声明式API对象和控制器模型，才是Kubernetes项目编排能力“赖以生存”的核心所在。
-
-### 有什么
-
-controller是一系列控制器的集合，不单指RC。
-
-	$ cd kubernetes/pkg/controller/
-	$ ls -d */              
-	deployment/             job/                    podautoscaler/          
-	cloud/                  disruption/             namespace/              
-	replicaset/             serviceaccount/         volume/
-	cronjob/                garbagecollector/       nodelifecycle/          replication/            statefulset/            daemon/
-	...
-
-### 整体架构
-
-这些控制器之所以被统一放在 pkg/controller 目录下，就是因为它们都遵循 Kubernetes 项目中的一个通用编排模式，即：控制循环（control loop）。  [Writing Controllers](https://github.com/kubernetes/community/blob/8decfe4/contributors/devel/controllers.md)
+声明式API对象与控制器模型相辅相成，声明式API对象定义出期望的资源状态，实际状态往往来自于 Kubernetes 集群本身，比如**kubelet 通过心跳汇报的容器状态和节点状态**，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。控制器模型则通过控制循环（Control Loop）将Kubernetes内部的资源调整为声明式API对象期望的样子。因此可以认为声明式API对象和控制器模型，才是Kubernetes项目编排能力“赖以生存”的核心所在。
 
 ```go
 for {
@@ -55,37 +35,41 @@ for {
 }
 ```
 
-实际状态往往来自于 Kubernetes 集群本身。 比如，**kubelet 通过心跳汇报的容器状态和节点状态**，或者监控系统中保存的应用监控数据，或者控制器主动收集的它自己感兴趣的信息。而期望状态，一般来自于用户提交的 YAML 文件。 比如，Deployment 对象中 Replicas 字段的值，这些信息往往都保存在 Etcd 中。
-
 ![](/public/upload/kubernetes/k8s_controller_definition.PNG)
 
 **Reconcile 的是什么？**在Kubernetes中，Pod是调度的基本单元，也是所有内置Workload管理的基本单元，无论是Deployment还是StatefulSet，它们在对管理的应用进行更新时，都是以Pod为单位。**所谓编排，最终落地就是 更新pod 的spec ,condition,container status 等数据**（原地更新或重建符合这些配置的pod）。非基本单位的 Deployment/StatefulSet 的变更更多是 数据的持久化。
 
-《programming kubernetes》 Kubernetes **控制平面**大量使用事件和松散耦合的组件。其它分布式系统使用rpc 来触发行为。但Kubernetes 并没有这么做（**纯粹依赖事件来进行多组件协同，许多独立的控制循环只通过 api server 上对象的变化进行通信**）。Kubernetes controller 监听api server 中的Kubernetes 对象操作：添加、删除、更新。当发生此类事件时，controller 将执行其业务逻辑。监听事件 是通过api server 和controller 之间的http 长连接发送，从而驱动informer
-
 ## 整体架构
 
-[通过自定义资源扩展Kubernetes](https://blog.gmem.cc/extend-kubernetes-with-custom-resources)
-
-[A Deep Dive Into Kubernetes Controllers](https://engineering.bitnami.com/articles/a-deep-dive-into-kubernetes-controllers.html) 
+《programming kubernetes》 Kubernetes **控制平面**大量使用事件和松散耦合的组件。其它分布式系统使用rpc 来触发行为。但Kubernetes 并没有这么做（**纯粹依赖事件来进行多组件协同，许多独立的控制循环只通过 api server 上对象的变化进行通信**）。Kubernetes controller 监听api server 中的Kubernetes 对象操作：添加、删除、更新。当发生此类事件时，controller 将执行其业务逻辑。监听事件 是通过api server 和controller 之间的http 长连接发送，从而驱动informer
 
 ![](/public/upload/kubernetes/k8s_custom_controller.png)
 
 ### 控制器与Informer——如何高效监听一个http server
 
-控制器与api server的关系——从拉取到监听：In order to retrieve an object's information, the controller sends a request to Kubernetes API server.However, repeatedly retrieving information from the API server can become expensive. Thus, in order to get and list objects multiple times in code, Kubernetes developers end up using cache which has already been provided by the client-go library. Additionally, the controller doesn't really want to send requests continuously. It only cares about events when the object has been created, modified or deleted. 
-
-**informer 在client-go 库中，k8s 多个组件用informer 来减少对api-server的访问压力**。
-[从 Kubernetes 资源控制到开放应用模型，控制器的进化之旅](https://mp.weixin.qq.com/s/AZhyux2PMYpNmWGhZnmI1g) 
-1. Controller 一直访问API Server 导致API Server 压力太大，于是有了Informer
-2. 由 Informer 代替Controller去访问 API Server，而Controller不管是查状态还是对资源进行伸缩都和 Informer 进行交接。而且 Informer 不需要每次都去访问 API Server，它只要在初始化的时候通过 LIST API 获取所有资源的最新状态，然后再通过 WATCH API 去监听这些资源状态的变化，整个过程被称作 ListAndWatch。
-3. Informer 也有一个助手叫 Reflector，上面所说的 ListAndWatch 事实上是由 Reflector 一手操办的。这使 API Server 的压力大大减少。
-4. 后来，WATCH 数据的太多了，Informer/Reflector去 API Server 那里 WATCH 状态的时候，只 WATCH 特定资源的状态，不要一股脑儿全 WATCH。
-5. 一个controller 一个informer 还是压力大，于是针对每个（受多个控制器管理的）资源弄一个 Informer。比如 Pod 同时受 Deployment 和 StatefulSet 管理。这样当多个控制器同时想查 Pod 的状态时，只需要访问一个 Informer 就行了。
-6. 但这又引来了新的问题，SharedInformer 无法同时给多个控制器提供信息，这就需要每个控制器自己排队和重试。为了配合控制器更好地实现排队和重试，SharedInformer  搞了一个 Delta FIFO Queue（增量先进先出队列），每当资源被修改时，它的助手 Reflector 就会收到事件通知，并将对应的事件放入 Delta FIFO Queue 中。与此同时，SharedInformer 会不断从 Delta FIFO Queue 中读取事件，然后更新本地缓存的状态。
-7. 这还不行，SharedInformer 除了更新本地缓存之外，还要想办法将数据同步给各个控制器，为了解决这个问题，它又搞了个工作队列（Workqueue），一旦有资源被添加、修改或删除，就会将相应的事件加入到工作队列中。所有的控制器排队进行读取，一旦某个控制器发现这个事件与自己相关，就执行相应的操作。如果操作失败，就将该事件放回队列，等下次排到自己再试一次。如果操作成功，就将该事件从队列中删除。PS：**工作队列用于状态更新事件的有序处理并协助实现重试**。 
+控制器与api server的关系——从拉取到监听：In order to retrieve an object's information, the controller sends a request to Kubernetes API server.However, repeatedly retrieving information from the API server can become expensive. Thus, in order to get and list objects multiple times in code, Kubernetes developers end up using cache which has already been provided by the **client-go** library. Additionally, the controller doesn't really want to send requests continuously. It only cares about events when the object has been created, modified or deleted. 
 
 ![](/public/upload/kubernetes/k8s_controller_model.png)
+
+上图上半部分为client-go 原理，下半部分是informer 与controller 的交互。Informer  间接通过工作队列（Workqueue）与controller 通信
+1. Informer  可以添加自定义回调函数，但controller 并不直接 注册业务 逻辑到 informer 回调上。一旦有资源被添加、修改或删除，就会将相应的事件加入到工作队列中。
+2. 工作队列用于状态更新事件的有序处理并协助实现重试。所有的控制器排队进行读取，一旦某个控制器发现这个事件与自己相关，就执行相应的操作。如果操作失败，就将该事件放回队列，等下次排到自己再试一次。如果操作成功，就将该事件从队列中删除。 
+
+### 事件驱动
+
+在Kubernetes 控制平面中，许多组件会更改apiserver 上的对象，每次更改都会导致事件的发生。另一方面，很多组件对这些事件有兴趣。如果组件消费事件时 出现错误，就很容易丢失事件。k8s 由事件驱动，但总是基于最新状态执行逻辑，以replicaset controller 为例，假设其收到 pod 更新事件，它不会管当前pod 如何，而是将`pod.spec.repliacas` 与正在运行的pod做比较。当它丢失事件时，下次收到pod 更新事件 会再次执行。
+
+### 更改集群内后集群外对象
+
+controller 消费事件，处理结果是更改其管理资源、对象的状态，具体逻辑特定于领域或任务。此外，资源本身不一定必须是Kubernetes 集群的一部分，即controller 可以更改位于Kubernetes外部的资源（例如云存储服务） 的状态。
+
+并发写入可能因为写冲突而失败：为了进行无锁的并发操作，Kubernetes api server 使用乐观锁 进行并发控制。言而言之，如果api server 检测到有并发写，它将拒绝两个写操作中的后者，然后由客户端（controller、scheduler、kubectl）来处理写冲突并充实写操作。 
+
+从`client.Get` 调用返回的对象 foo 包含一个资源版本号（ObjectMeta struct的一部分），实际上是 etcd 键值对的版本号，etcd 维护着一个计数器，每次修改键的值时，计数器都会增加。
+
+[理解 K8s 资源更新机制，从一个 OpenKruise 用户疑问开始](https://mp.weixin.qq.com/s/jWH7jVxj20bmc60_C-w9wQ)
+
+![](/public/upload/kubernetes/update_resource.png)
 
 ## 单个Controller的工作原理
 
@@ -158,89 +142,93 @@ func (dc *DeploymentController) processNextWorkItem() bool {
 
 syncDeployment 包含 扩容、rollback、rolloutRecreate、rolloutRolling 我们裁剪部分代码，以最简单的 扩容为例
 
-	// syncDeployment will sync the deployment with the given key.
-	func (dc *DeploymentController) syncDeployment(key string) error {
-		namespace, name, err := cache.SplitMetaNamespaceKey(key)
-		deployment, err := dc.dLister.Deployments(namespace).Get(name)
-		// List ReplicaSets owned by this Deployment, while reconciling ControllerRef through adoption/orphaning.
-		rsList, err := dc.getReplicaSetsForDeployment(d)
-		scalingEvent, err := dc.isScalingEvent(d, rsList)
-		if scalingEvent {
-			return dc.sync(d, rsList)
-		}
-		...
-	}
-
-	// sync is responsible for reconciling deployments on scaling events or when they are paused.
-	func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
-		newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
-		...
-		dc.scale(d, newRS, oldRSs);
-		...
-		allRSs := append(oldRSs, newRS)
-		return dc.syncDeploymentStatus(allRSs, newRS, d)
-	}
+```go
+// syncDeployment will sync the deployment with the given key.
+func (dc *DeploymentController) syncDeployment(key string) error {
+    namespace, name, err := cache.SplitMetaNamespaceKey(key)
+    deployment, err := dc.dLister.Deployments(namespace).Get(name)
+    // List ReplicaSets owned by this Deployment, while reconciling ControllerRef through adoption/orphaning.
+    rsList, err := dc.getReplicaSetsForDeployment(d)
+    scalingEvent, err := dc.isScalingEvent(d, rsList)
+    if scalingEvent {
+        return dc.sync(d, rsList)
+    }
+    ...
+}
+// sync is responsible for reconciling deployments on scaling events or when they are paused.
+func (dc *DeploymentController) sync(d *apps.Deployment, rsList []*apps.ReplicaSet) error {
+    newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
+    ...
+    dc.scale(d, newRS, oldRSs);
+    ...
+    allRSs := append(oldRSs, newRS)
+    return dc.syncDeploymentStatus(allRSs, newRS, d)
+}
+```
 
 scale要处理 扩容或 RollingUpdate  各种情况，此处只保留扩容逻辑。 
 
-	func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet) error {
-		// If there is only one active replica set then we should scale that up to the full count of the
-		// deployment. If there is no active replica set, then we should scale up the newest replica set.
-		if activeOrLatest := deploymentutil.FindActiveOrLatest(newRS, oldRSs); activeOrLatest != nil {
-			if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) {
-				return nil
-			}
-			_, _, err := dc.scaleReplicaSetAndRecordEvent(activeOrLatest, *(deployment.Spec.Replicas), deployment)
-			return err
-		}
-		...
-	}
+```go
+func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet) error {
+    // If there is only one active replica set then we should scale that up to the full count of the
+    // deployment. If there is no active replica set, then we should scale up the newest replica set.
+    if activeOrLatest := deploymentutil.FindActiveOrLatest(newRS, oldRSs); activeOrLatest != nil {
+        if *(activeOrLatest.Spec.Replicas) == *(deployment.Spec.Replicas) {
+            return nil
+        }
+        _, _, err := dc.scaleReplicaSetAndRecordEvent(activeOrLatest, *(deployment.Spec.Replicas), deployment)
+        return err
+    }
+    ...
+}
 
-	func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
-		// No need to scale
-		if *(rs.Spec.Replicas) == newScale {
-			return false, rs, nil
-		}
-		var scalingOperation string
-		if *(rs.Spec.Replicas) < newScale {
-			scalingOperation = "up"
-		} else {
-			scalingOperation = "down"
-		}
-		scaled, newRS, err := dc.scaleReplicaSet(rs, newScale, deployment, scalingOperation)
-		return scaled, newRS, err
-	}
+func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment) (bool, *apps.ReplicaSet, error) {
+    // No need to scale
+    if *(rs.Spec.Replicas) == newScale {
+        return false, rs, nil
+    }
+    var scalingOperation string
+    if *(rs.Spec.Replicas) < newScale {
+        scalingOperation = "up"
+    } else {
+        scalingOperation = "down"
+    }
+    scaled, newRS, err := dc.scaleReplicaSet(rs, newScale, deployment, scalingOperation)
+    return scaled, newRS, err
+}
 
-	func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment, scalingOperation string) (bool, *apps.ReplicaSet, error) {
-		sizeNeedsUpdate := *(rs.Spec.Replicas) != newScale
-		annotationsNeedUpdate := ...
-		scaled := false
-		var err error
-		if sizeNeedsUpdate || annotationsNeedUpdate {
-			rsCopy := rs.DeepCopy()
-			*(rsCopy.Spec.Replicas) = newScale
-			deploymentutil.SetReplicasAnnotations...
-			// 调用api 接口更新 对应ReplicaSet 的数据
-			rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(rsCopy)
-			...
-		}
-		return scaled, rs, err
-	}
+func (dc *DeploymentController) scaleReplicaSet(rs *apps.ReplicaSet, newScale int32, deployment *apps.Deployment, scalingOperation string) (bool, *apps.ReplicaSet, error) {
+    sizeNeedsUpdate := *(rs.Spec.Replicas) != newScale
+    annotationsNeedUpdate := ...
+    scaled := false
+    var err error
+    if sizeNeedsUpdate || annotationsNeedUpdate {
+        rsCopy := rs.DeepCopy()
+        *(rsCopy.Spec.Replicas) = newScale
+        deploymentutil.SetReplicasAnnotations...
+        // 调用api 接口更新 对应ReplicaSet 的数据
+        rs, err = dc.client.AppsV1().ReplicaSets(rsCopy.Namespace).Update(rsCopy)
+        ...
+    }
+    return scaled, rs, err
+}
+```
 
 调用api 接口更新Deployment 对象本身的数据
 
-	// syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
-	func (dc *DeploymentController) syncDeploymentStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
-		newStatus := calculateStatus(allRSs, newRS, d)
-		if reflect.DeepEqual(d.Status, newStatus) {
-			return nil
-		}
-		newDeployment := d
-		newDeployment.Status = newStatus
-		_, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(newDeployment)
-		return err
-	}
-
+```go
+// syncDeploymentStatus checks if the status is up-to-date and sync it if necessary
+func (dc *DeploymentController) syncDeploymentStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, d *apps.Deployment) error {
+    newStatus := calculateStatus(allRSs, newRS, d)
+    if reflect.DeepEqual(d.Status, newStatus) {
+        return nil
+    }
+    newDeployment := d
+    newDeployment.Status = newStatus
+    _, err := dc.client.AppsV1().Deployments(newDeployment.Namespace).UpdateStatus(newDeployment)
+    return err
+}
+```
 
 
 
