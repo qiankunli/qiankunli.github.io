@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes objects之编排对象 
+title: Kubernetes objects 
 category: 技术
 tags: Kubernetes
 keywords: kubernetes stateset
@@ -19,20 +19,110 @@ Kubernetes 对象是系统中的持久实体，描述集群的期望状态
 
 你一定有方法在不使用 Kubernetes、甚至不使用容器的情况下，自己 DIY 一个类似的方案出来。但是，一旦涉及到升级、版本管理等更工程化的能力，Kubernetes 的好处，才会更加凸现。
 
-
 **Kubernetes 的各种object，就是常规的各个项目组件在 kubernetes 上的表示** [深入理解StatefulSet（三）：有状态应用实践](https://time.geekbang.org/column/article/41217) 充分体现了在我们把服务 迁移到Kubernetes 的过程中，要做多少概念上的映射。
 
-## Spec 和 Status
+## Kubernetes 基础类型系统
 
-每一个对象都包含两个嵌套对象来描述规格（Spec）和状态（Status），对象的规格其实就是我们期望的目标状态。而Status描述了对象的当前状态，这部分一般由 Kubernetes 系统本身提供和管理，是我们观察集群本身的一个接口。
+k8s.io/client-go, k8s.io/api, k8s.io/apimachinery 是基于Golang的 Kubernetes 编程的核心。api machinery 代码库实现了 Kubernetes 基础类型系统（实际指的是kinds）
 
-    type Deployment struct { 
-        metav1.TypeMeta `json:",inline"` 
-        metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"` 
-    
-        Spec DeploymentSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"` 
-        Status DeploymentStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"` 
-    } 
+![](/public/upload/kubernetes/kubernetes_type.png)
+kinds被分为 group 和verison，因此api machinery 代码中的核心术语是 GroupVersionKind，简称GVK。 与kinds 同级概念的是 resource，也按group 和version 划分，因此有术语GroupVersionResource 简称GVR，每个GVR 对应一个http 路径（kind 不会），用于标识 Kubernetes API的REST 接口
+
+scheme struct 将golang object 映射为可能的GVK。一个GVK 到一个GVR 的映射被称为 REST mapping,  RESTMapper interface/ RESTMapping struct 来完成转换。
+
+```go
+// k8s.io/apimachinery/pkg/api/meta/interface.go
+type RESTMapper interface {
+	KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
+    ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error)
+    ...
+}
+// k8s.io/apimachinery/pkg/runtime/scheme.go
+type Scheme struct {
+	gvkToType map[schema.GroupVersionKind]reflect.Type
+    typeToGVK map[reflect.Type][]schema.GroupVersionKind
+}
+func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error) {...}
+```
+为了使 scheme正常工作，必须将golang 类型注册到 scheme 中。对于Kubernetes 核心类型，在`k8s.io/client-go/kubernetes/scheme` 包中 均已预先注册
+
+```go
+// k8s.io/client-go/kubernetes/scheme/register.go
+var Scheme = runtime.NewScheme()
+var AddToScheme = localSchemeBuilder.AddToScheme
+func init(){
+    v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
+    utilruntime.Must(AddToScheme(Scheme))
+}
+var localSchemeBuilder = runtime.SchemeBuilder{
+    corev1.AddToScheme,
+    appsv1.AddToScheme,
+}
+// k8s.io/api/core/v1/register.go
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&Pod{},
+        &PodList{},
+        &Service{},
+    )
+    ...
+}
+```
+kubernetes object 在go 中是struct（`k8s.io/api/core/v1/types.go`），struct 的filed 当然不同， 但也共用一些结构 runtime.Object。用来约定：可以set/get GroupVersionKind 和 deepCopy，即**k8s object 存储其类型并允许克隆**。
+
+```go
+// k8s.io/apimachinery/pkg/runtime/interface.go
+type Object interface{
+    GetObjectKind() schema.ObjectKind
+    DeepCopyObject() Object
+}
+type ObjectKind interface{
+    SetGroupVersionKind(kind GroupVersionKind)
+    GroupVersionKind() GroupVersionKind
+}
+// k8s.io/apimachinery/pkg/apis/meta/v1/types.go
+// 实现 ObjectKind
+type TypeMeta struct{
+    Kind string             `json:"kind"`
+    APIVersion string       `json:"apiVersion"`
+}
+type ObjectMeta struct{
+    Name string
+    Namespace string
+    UID types.UID
+    ResourceVersion string
+    CreationTimestamp Time
+    DeletionTimestamp Time
+    Labels map[string]string
+    Annotations map[string]string
+}
+```
+go 中的pod 声明 如下所示
+
+```go
+// k8s.io/api/core/v1/types.go
+type Pod struct{
+    metav1.TypeMeta 
+    metav1.ObjectMeta   `json:"metadata"`
+    Spec PodSpec        `json:"spec"`
+    Status PodStatus    `json:"status"`
+}
+```
+
+每一个对象都包含两个嵌套对象来描述规格（Spec）和状态（Status），对象的规格其实就是我们期望的目标状态。而Status描述了对象的当前状态（或者说愿望的结果），是我们观察集群本身的一个接口。
+
+```go
+type Deployment struct { 
+    metav1.TypeMeta `json:",inline"` 
+    metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"` 
+    Spec DeploymentSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"` 
+    Status DeploymentStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"` 
+} 
+```
 
 ## 集大成者——StatefulSet
 

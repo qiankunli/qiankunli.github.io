@@ -81,8 +81,8 @@ for {
 2.  创建 API `kubebuilder create api --group apps --version v1alpha1 --kind Application`
     ```
     GOPATH/src/app
-        /api 
-            /application_types.go       // 新增 Application/ApplicationSpec/ApplicationStatus struct
+        /api/v1alpha1
+            /application_types.go      // 新增 Application/ApplicationSpec/ApplicationStatus struct; 将类型注册到 scheme 辅助接口 
             /zz_generated.deepcopy.go
         /config
             /crd                        // 新增Application CustomResourceDefinition
@@ -92,6 +92,11 @@ for {
         main.go                         // ApplicationReconciler 添加到 Manager
         go.mod                          
     ```
+
+Kubernetes 有类型系统，cr 要符合相关的规范（一部分由开发人员手动编写，另一些由代码生成器生成），包括
+
+1. struct 定义放在 项目 `pkg/apis/$group/$version` 包下
+2. struct 嵌入 TypeMeta struct  ObjectMeta，定义spec 和 status
 
 ## 启动流程
 
@@ -335,4 +340,57 @@ func (c *Controller) reconcileHandler(obj interface{}) bool {
 	return true
 }
 ```
+
+## kubectl 感知 crd
+
+《programming Kubernetes》 假设存在 一个CR
+
+```yaml
+apiVersion: cnat.programming-kubernetes.info/v1alpha1
+kind: At
+metadata:
+  name: example-at
+spec:
+  schedule: ...
+status:
+  phase: "pending"
+```
+
+整个感知过程由 RESTMapper实现，kubectl 在`~/.kubectl` 中缓存了资源类型，由此它不必每次访问重新检索感知信息，缓存每隔10分钟失效。
+
+1. 最初，kubectl 并不知道 ats 是什么？
+2. kubectl 使用`/apis` 感知endpoint 的方式，向api server 查询所有的api groups  
+    ```sh
+    $ http://localhost:8080/apis
+    {
+        "groups":[
+            {
+                "name":"at.cnat.programming-kubernetes.info/v1alpha1",
+                "versions":[{
+                    "groupVersion":"cnat.programming-kubernetes.info/v1alpha1",
+                    "version":"v1alpha1"
+                }]
+            },
+            ...
+        ]
+    }
+    ```
+3. 接着，kubectl 使用`/apis/$groupVersion` 感知endpoint 的方式，向apiserver 查询所有API groups 中的资源
+    ```sh
+    $ http://localhost:8080/apis/cnat.programming-kubernetes.info/v1alpha1
+    {
+        "apiVersion":"v1",
+        "groupVersion":"cnat.programming-kubernetes.info/v1alpha1",
+        "kind": "APIResourceList",
+        "resource":[{
+            "kind": "At",
+            "name": "ats",
+            "namespaced": true,
+            "verbs":["create","delete","get","list","update","watch",...]
+        },...]
+
+    }
+    ```
+4. 然后kubectl 将 给定的类型ats 转换为一下3 种类型：Group(cnat.programming-kubernetes.info) Version (v1alpha1)  Resource (ats)
+
 
