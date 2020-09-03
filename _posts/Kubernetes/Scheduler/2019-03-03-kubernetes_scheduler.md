@@ -83,7 +83,7 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 除了Pod，Scheduler 需要调度其它对象么？不需要。因为Kubernetes 对象虽多，**但只有Pod 是调度对象**，其它对象包括数据对象（比如PVC等）、编排对象（Deployment）、Pod辅助对象（NetworkPolicy等） 都只是影响Pod的调度，本身不直接消耗计算和内存资源。
 
-**调度器对一个 Pod 调度成功，实际上就是将它的 spec.nodeName 字段填上调度结果的节点名字**。 这在k8s 的很多地方都要体现，k8s 不仅将对容器的操作“标准化” ==> “配置化”，一些配置是用户决定的，另一个些是系统决定的
+**Scheduler对一个 Pod 调度成功，是通过设置Pod的.Spec.NodeName为节点的名称**，将一个Pod绑定到一个节点。然而，Scheduler是间接地设置.Spec.NodeName而不是直接设置。Kubernetes Scheduler不被允许更新Pod的Spec。因此，KubernetesScheduler创建了一个Kubernetes绑定对象, 而不是更新Pod。在创建绑定对象后，Kubernetes API将负责更新Pod的.Spec.NodeName。
 
 调度主要包括两个部分
 

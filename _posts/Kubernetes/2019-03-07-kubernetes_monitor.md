@@ -120,7 +120,19 @@ containers:
 
 配置一个Prometheus scrape job，结合Kubernetes daemonset, 只需要定义一次，未来所有Kubernetes服务端点都将被自动发现 和监控。
 
-### Apiserver 指标分析
+### k8s 组件 指标分析
+
+
+Kubernetes 各组件的 Healthz 和 Metrics API 
+
+|Components|	Healthz API|	Metrics API|
+|---|---|---|
+|Apiserver|	`:6443/healthz`|	`:6443/metrics`|
+|Controller Manager|	`:10252/healthz`|	`:10252/metrics`|
+|Scheduler|	`:10251/healthz`|	`:10251/metrics`|
+|Kube-proxy|	`:10249/healthz`|	`:10249/metrics`|
+|Kubelet|	`:10248/healthz`|	`:10250/metrics`|
+|ETCD|	`:2379/healthz`|	`:2379/metrics`|
 
 kube-apiserver 是集群所有请求的入口，指标的分析可以反应集群的健康状态。Apiserver 的指标可以分为以下几大类：
 
