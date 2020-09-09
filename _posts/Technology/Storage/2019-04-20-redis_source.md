@@ -477,9 +477,14 @@ object.c
 4. 到db.c 时，`setKey(robj *key,robj *val)`
 5. dict.c `dictAdd(void *key, void *val)` key 已被转换为 sds。 
 
-## Sentinel/哨兵模式
+## 定义新的数据类型
 
-sentinel是redis高可用的解决方案，sentinel系统可以监视一个或者多个redis master服务，以及这些master服务的所有从服务；当某个master服务下线时，自动将该master下的某个从服务升级为master服务替代已下线的master服务继续处理请求。
+来自 《Redis核心技术与实现》
+
+1. 定义新数据类型的底层结构，可以自己创建和命名`.h` 和 `.c` 文件
+2. 在 RedisObject 的 type 属性中，增加这个新类型的定义。在 Redis 的 server.h 文件中
+3. 开发新类型的创建和释放函数。主要是用 zmalloc 做底层结构分配空间。
+4. 开发新类型的命令操作。在 server.c 文件中的 redisCommandTable 里面，把新增命令和实现函数关联起来。
 
 ## 小结
 

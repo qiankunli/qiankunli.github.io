@@ -44,6 +44,18 @@ keywords: Redis
 1. 当保存的是 Long 类型整数时，RedisObject 中的指针就直接赋值为整数数据了，这样就不用额外的指针再指向整数了，节省了指针的空间开销。
 2. 当保存的是字符串数据，并且字符串小于等于 44 字节时，RedisObject 中的元数据、指针和 SDS 是一块连续的内存区域，这样就可以避免内存碎片。
 
+```c++
+#define REDIS_LRU_BITS 24
+typedef struct redisObject {
+    unsigned type:4;        // 类型
+    unsigned encoding:4;    // 编码
+    unsigned lru:REDIS_LRU_BITS; // 对象最后一次被访问的时间
+    int refcount;   // 引用计数
+    void *ptr;  // 指向实际值的指针，可以指向不同的数据类型
+
+} robj;
+```
+
 ### 底层数据结构
 
 Redis 为什么性能突出呢？一方面因为它是内存数据库，另一方面要归功于它的数据结构。这是因为，键值对是按一定的数据结构来组织的，操作键值对最终就是对数据结构进行增删改查操作，所以高效的数据结构是 Redis 快速处理数据的基础。String/List/Hash/Set/SortedSet 是Redis 中value的数据类型，这里说的数据结构 是底层实现，底层数据结构一共有 6 种。可以看到，String 类型的底层实现只有一种数据结构，也就是简单动态字符串。而 List、Hash、Set 和 Sorted Set 这四种数据类型，都有两种底层实现结构。

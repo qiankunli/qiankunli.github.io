@@ -70,10 +70,7 @@ Prometheus 官网有个专门的对比 [Prometheus COMPARISON TO ALTERNATIVES](h
 3. Cardinality 基数过大，会引起influxdb 查询缓慢。PS：还有待确认
 
 
-## 纯粹的监控系统 与 数据采集存储反馈报警系统的异同
+## 其它
 
-纯粹的监控系统，比如zabbix
-
-数据采集监控报警等，比如阿里的鹰眼、美团点评的cat等
-
+RedisTimeSeries 是 Redis 的一个扩展模块。它专门面向时间序列数据提供了数据类型和访问接口，并且支持在 Redis 实例上直接对数据进行按时间范围的聚合计算。
 
