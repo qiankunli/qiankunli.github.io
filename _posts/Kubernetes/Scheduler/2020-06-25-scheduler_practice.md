@@ -92,3 +92,30 @@ NoSchedule 是一个effect. This means that no pod will be able to schedule onto
 ![](/public/upload/kubernetes/descheduler.png)
 
 [Kubernetes如何改变美团的云基础设施？](https://mp.weixin.qq.com/s/Df9fjmfTSD8MKg69LaySkQ)
+
+[zhangshunping/dynamicScheduler](https://github.com/zhangshunping/dynamicScheduler)通过监控获取到各个k8s节点的使用率（cpu，mem等），当超过人为设定的阈值后，给对应节点打上status=presure，根据k8s软亲和性策略（nodeAffinity + preferredDuringSchedulingIgnoredDuringExecution），让pod尽量不调度到打上的presure标签的节点。
+
+[kubernetes-sigs/descheduler](https://github.com/kubernetes-sigs/descheduler) 会监控Node的高负载情况，将一些配置了高负载迁移的Pod迁移到负载比较低的Node上。 PS：未细读
+
+## 资源预留
+
+[Kubernetes 资源预留配置](https://mp.weixin.qq.com/s/tirMYoC_o9ahRjiErc99AQ)考虑一个场景，由于某个应用无限制的使用节点的 CPU 资源，导致节点上 CPU 使用持续100%运行，而且压榨到了 kubelet 组件的 CPU 使用，这样就会导致 kubelet 和 apiserver 的心跳出问题，节点就会出现 Not Ready 状况了。默认情况下节点 Not Ready 过后，5分钟后会驱逐应用到其他节点，当这个应用跑到其他节点上的时候同样100%的使用 CPU，是不是也会把这个节点搞挂掉，同样的情况继续下去，也就导致了整个集群的雪崩。
+
+```
+$ kubectl describe node ydzs-node4
+......
+Capacity:
+  cpu:                4
+  ephemeral-storage:  17921Mi
+  hugepages-2Mi:      0
+  memory:             8008820Ki
+  pods:               110
+Allocatable:
+  cpu:                4
+  ephemeral-storage:  16912377419
+  hugepages-2Mi:      0
+  memory:             7906420Ki
+  pods:               110
+......
+```
+

@@ -8,10 +8,12 @@ keywords: project evolution
 
 ---
 
-## 简介（持续更新）
+## 简介
 
 * TOC
 {:toc}
+
+![](/public/upload/architecture/project_evolution.png)
 
 最开始，只是一个简单的需求，然后基于简单的需求实现了一个系统。然后不停的开始加小功能，尤其是需求方来自不同的人员的时候，无目的的扩充，会让系统逐步变得很臃肿、零散，中间还往往伴随着 项目负责人的变动，代码风格的不一致等。
 
