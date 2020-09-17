@@ -53,3 +53,6 @@ keywords: docker
 [灵魂拷问，上 Kubernetes 有什么业务价值？](https://mp.weixin.qq.com/s/a3NE5fSpZIM9qlOofGTMWQ)
 
 ![](/public/upload/kubernetes/k8s_application_platform.png)
+
+
+[逃离职业倦怠期，我是这样做的](https://mp.weixin.qq.com/s/7DgrTYUOV55o3E6nSEejwQ)如果你只是把自动化理解成实现一些几百行代码量的脚本，那么说明你并没有理解什么是真正的自动化，真正的自动化是给出一整套可以提升效率的平台，**这个平台可以集成各式各样的改善效率的工具集合**，而并非单独零散的脚本。当然这些工具也并非几天或几周就可以做完的，而是通过日常的工作中不断地发现问题、解决问题并总结而来的。以我们团队举例，将一些流程化比较固定的工作通过 RPA 来实现自动化，在出现故障时，为了能够第一时间快速响应故障，我们实现了故障自动拉群功能，这样可以减少故障过程中到处找人的问题。
