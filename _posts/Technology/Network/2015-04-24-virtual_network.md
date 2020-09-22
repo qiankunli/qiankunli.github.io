@@ -18,8 +18,10 @@ keywords: Docker
 
 相对于物理网络，虚拟化有两个方面：
 
-1. 虚拟设备  一般伴随网络驱动
+1. 虚拟设备，一般伴随网络驱动
 2. 虚拟网路
+
+不仅数据协议上要有相关字段的体现，操作系统（具体说是网络驱动）和交换机也都要一定的配合。
 
 ## vlan
 
@@ -31,11 +33,14 @@ keywords: Docker
 
 ![](/public/upload/network/vlan_vlanId.png)
 
+**vlan 与目前互联网公司测试环境中流行的隔离组机制是非常相似的，vlan ID 类似isolation Name，交换机之于vlan id 就好像很多中间件框架对 isolation Name的处理**。微服务主要靠自己注册，网络通信的节点发现主要靠广播。微服务路由靠客户端库（mesh 靠sidecar），网络通信的路由则有专门的路由设备。
+
+对于支持 VLAN 的交换机，当这个交换机把二层的头取下来的时候，就能够识别这个 VLAN ID。这样只有相同 VLAN 的包，才会互相转发，不同 VLAN 的包，是看不到的。有一种口叫作 Trunk 口，它可以转发属于任何 VLAN 的口。交换机之间可以通过这种口相互连接。
+
 ### vlan 划分
 
 1. 常用的 VLAN 划分方式是通过端口进行划分，虽然这种划分 VLAN 的方式设置比较很简单， 但仅适用于终端设备物理位置比较固定的组网环境。随着移动办公的普及，终端设备可能不 再通过固定端口接入交换机，这就会增加网络管理的工作量。比如，一个用户可能本次接入 交换机的端口 1，而下一次接入交换机的端口 2，由于端口 1 和端口 2 属于不同的 VLAN，若 用户想要接入原来的 VLAN 中，网管就必须重新对交换机进行配置。显然，这种划分方式不 适合那些需要频繁改变拓扑结构的网络。
 2. 而 MAC VLAN 则可以有效解决这个问题，它根据 终端设备的 MAC 地址来划分 VLAN。这样，即使用户改变了接入端口，也仍然处在原 VLAN 中。**注意，这种称为mac based vlan，跟macvlan还不是一个意思**
-
 
 在交换机上配置了IMP(ip-mac-port映射)功能以后，交换机会检查每个数据包的源IP地址和MAC，对于没有在交换机内记录的IP和MAC地址的计算机所发出的数据包都会被交换机所阻止。ip-mac-port映射静态设置比较麻烦，可以开启交换机上面的DHCP SNOOPING功能， DHCP Snooping可以自动的学习IP和MAC以及端口的配对，并将学习到的对应关系保存到交换机的本地数据库中。
 
@@ -62,8 +67,57 @@ keywords: Docker
 2. vlan是实现在二层交换机上的，二层交换机没有网段的概念，只有路由器/三层交换机才有网段的概念。
 3. vlan网段的配置是配置在路由器的子接口上，每个子接口<b>（Sub-Interface）</b>采用<b>802.1Q VLAN ID</b>封装，这样就把网段和对应的VLAN联系了起来，子接口通常作为此网段的缺省网关。如果采用三层交换机来替代路由器，则使用 <b>Interface VLAN ID </b>来将VLAN与网段联系起来，和使用路由器类似。
 
+### 为啥vlan 要有个sub interface？
+
+基于IEEE 802.1Q附加的VLAN信息，就像在传递物品时附加的标签。因此，它也被称作“标签型VLAN（Tagging VLAN）”。 [IEEE 802.1Q](https://en.wikipedia.org/wiki/IEEE_802.1Q)IEEE 802.1Q, often referred to as Dot1q, is the networking standard that supports virtual LANs (VLANs) on an IEEE 802.3 Ethernet network. The standard defines a system of VLAN tagging for Ethernet frames and the accompanying procedures to be used by bridges and switches in handling such frames. 一种说法是vlan 的划分方式太多（基于交换机port、基于mac地址、基于ip地址等），各家交换机各搞各的也不统一，不能互通，干脆弄一个802.1Q 协议统一下，让数据包带标签吧。交换机发现数据帧里有vlan tag（物理机接口 要能给 数据帧打tag，所以需要sub-interface）就按vlan tag 来，没有vlan tag 就按自家支持的 vlan 划分方法来。
+
+## macvlan 和 ipvlan
+
+[Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)Macvlan and ipvlan are Linux network drivers that exposes underlay or host interfaces directly to VMs or Containers running in the host. 
+
+要跟mac based vlan 有所区分，参见[虚拟网络](http://qiankunli.github.io/2015/04/24/virtual_network.html)。
+
+Macvlan, MACVLAN or MAC-VLAN allows you to configure multiple Layer 2 (i.e. Ethernet MAC) addresses **on a single physical interface**. Macvlan allows you to configure sub-interfaces (also termed slave devices) of a parent, physical Ethernet interface (also termed upper device), each with its own unique (randomly generated) MAC address, and consequently its own IP address. Applications, VMs and containers can then bind to a specific sub-interface to connect directly to the physical network, using their own MAC and IP address. 基于物理机网卡 physical interface 创建多个 sub-interface，拥有自己的MAC and IP ，直接接入physical network。
+
+[Kubernetes在信也科技的落地实战](https://mp.weixin.qq.com/s/OBxnAitZaoI0lbP219Fvwg)Macvlan是一种直连网络，数据包通过宿主机网卡传输到硬件链路上，通过交换机路由器等设备最终到达目的地。Macvlan网络是Linux内核原生支持，不需要部署额外的组件。本身包含VLAN特性，一台宿主机上面可以虚拟出多块VLAN网卡，支持多个C类地址的IP分配。此时宿主机和交换机的链路必须是trunk模式，同一链路根据不同报文内的vlanID如（10、20、30）组成逻辑信道，互不干扰。
+
+![](/public/upload/network/macvlan_network.png)
+
+采用Macvlan网络模式之后，容器里面的网络协议栈和宿主机是完全独立。这就导致容器不能使用宿主机的iptables规则从而容器里面无法通过ClusterIP去访问Service。可以 采用Multus-CNI网络插件在Pod里面使用Bridge模式添加了第二块网卡，并设置路由如果访问ClusterIP就走Bridge模式的网卡。
+
+### sub-interface
+
+[Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/) 讲清了macvlan sub-interface 和 vlan-sub-interface 的异同
+
+||物理网卡|vlan sub-interface|macvlan sub-interface|
+|---|---|---|---|
+|mac/ip||all sub-interfaces have same mac address（ip 手动/自动配）|each sub-interface will get unique mac and ip address|
+|||each sub-interface belongs to a different L2 domain using vlan（发的包自带vlan id，是数据帧的一部分）| exposed directly in underlay network|
+|配置文件|独立的网络接口配置文件|保存在临时文件`/proc/net/vlan/config`，重启会丢失|独立的网络接口配置文件|
+|一般格式|eth0|eth0.1|eth0:1|
+
+vlan sub-interface他们没有自己的配置文件，他们只是通过将物理网加入不同的VLAN而生成的VLAN虚拟网卡。如果将一个物理网卡添加到多个VLAN当中去的话，就会有多个VLAN虚拟网卡出现。vlan sub-interface 的mac 地址都一样
+
+macvlan 本身跟vlan 没啥关系，如果不考虑虚拟化的概念，甚至可以理解为一个物理机插了多个网卡。但在容器里面通常跟vlan 结合使用（因为一个宿主机的上百个容器可能属于不同的vlan）。 Following picture shows an example where macvlan sub-interface works together with vlan sub-interface. Containers c1, c2 are connected to underlay interface ethx.1 and Containers c3, c4 are connected to underlay interface ethx.2.
+
+![](/public/upload/network/macvlan_and_vlan.png)
+
+[Docker Networking: macvlans with VLANs](https://hicu.be/docker-networking-macvlan-vlan-configuration) 
+
+One macvlan, one Layer 2 domain and one subnet per physical interface, however, is a rather serious limitation in a modern virtualization solution. 这个说的是物理机时代，一个host 两个网卡，每个网卡属于不同的vlan（属于同一个vlan的话还整两个网卡干啥），而两个vlan 不可以是同一个网段。
+
+a Docker host sub-interface can serve as a parent interface for the macvlan network. This aligns perfectly with the Linux implementation of VLANs, where each VLAN on a 802.1Q trunk connection is terminated on a sub-interface of the physical interface. You can map each Docker host interface to a macvlan network, thus extending the Layer 2 domain from the VLAN into the macvlan network.
+
+Docker macvlan driver automagically creates host sub interfaces when you create a new macvlan network with sub interface as a parent。vlan sub interface 创建完毕后，以其为parent 创建macvlan sub interface 由 macvlan driver 自动完成。
 
 ## vxlan
+
+对于云平台中的**隔离**问题，前面咱们用的策略一直都是 VLAN，但是我们也说过这种策略的问题，VLAN 只有 12 位，共 4096 个。当时设计的时候，看起来是够了，但是现在绝对不够用，怎么办呢？
+
+1. 一种方式是修改这个协议。这种方法往往不可行
+2. 另一种方式就是扩展，在原来包的格式的基础上扩展出一个头，里面包含足够用于区分租户的 ID。一旦遇到需要区分用户的地方，我们就用**一个特殊的程序**，来处理这个特殊的包的格式。
+
+![](/public/upload/network/vxlan_frame.jpg)
 
 [知乎：VXLAN vs VLAN](https://zhuanlan.zhihu.com/p/36165475)
 
@@ -84,12 +138,6 @@ keywords: Docker
 ![](/public/upload/network/vxlan_vtep.png)
 
 [为什么集群需要 Overlay 网络](https://mp.weixin.qq.com/s/x7jLgThS2uwoPJcqsJE29w)Overlay 网络其实与软件定义网络（Software-defined networking、SDN）密切相关，而 SDN 引入了数据平面和控制平面，其中**数据平面负责转发数据，而控制平面负责计算并分发转发表**。VxLAN 的 RFC7348 中只定义了数据平面的内容，由该技术组成的网络可以通过传统的自学习模式学习网络中的 MAC 与 ARP 表项，但是在大规模的集群中，我们仍然需要引入控制平面分发路由转发表。
-
-## macvlan 和 ipvlan
-
-[Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)
-
-Macvlan and ipvlan are Linux network drivers that exposes underlay or host interfaces directly to VMs or Containers running in the host. 
 
 ## 虚拟设备
 
@@ -130,6 +178,99 @@ Macvlan and ipvlan are Linux network drivers that exposes underlay or host inter
 
 Linux 用户想要使用网络功能，不能通过直接操作硬件完成，而需要直接或间接的操作一个Linux 为我们抽象出来的设备，即通用的 Linux 网络设备来完成。“eth0”并不是网卡，而是Linux为我们抽象（或模拟）出来的“网卡”。除了网卡，现实世界中存在的网络元素Linux都可以模拟出来，包括但不限于：电脑终端、二层交换机、路由器、网关、支持 802.1Q VLAN 的交换机、三层交换机、物理网卡、支持 Hairpin 模式的交换机。同时，既然linux可以模拟网络设备，自然提供了操作这些虚拟的网络设备的命令或interface。
 
+什么是network driver?
+
+A network device driver is a device driver that enables a network device to communicate between the computer and operating system as well as with other network computers and network devices.
+
+[Device driver](https://en.wikipedia.org/wiki/Device_driver)In computing, a device driver is a computer program that operates or controls a particular type of device that is attached to a computer. **A driver provides a software interface to hardware devices**, enabling operating systems and other computer programs to access hardware functions without needing to know precise details about the hardware being used. 驱动就是对硬件提供软件接口，屏蔽硬件细节。
+
+A driver communicates with the device through the computer bus or communications subsystem to which the hardware connects. When a calling program invokes a routine in the driver, the driver issues commands to the device. Once the device sends data back to the driver, the driver may invoke routines in the original calling program. Drivers are hardware dependent and operating-system-specific. They usually provide the interrupt handling required for any necessary asynchronous time-dependent hardware interface.
+
+
+网卡 ==> computer bus ==> network driver ==> Subroutine/子程序 ==> calling program。也就是network driver 在网卡 与操作系统之间，从这个角度看，跟磁盘驱动、鼠标驱动类似了。
+
+
+## macvlan 实操
+
+以下实现基于docker1.13，物理机使用`192.168.0.0/16`网段，容器使用`172.31.0.0/16`网段。
+
+1. docker host，自定义ipam plugin负责ip地址管理，每个docker host运行一个ipam plugin，并根据ipam plugin创建local scope的macvlan network。
+2. 创建容器时使用macvlan网络
+3. 外置交换机负责容器之间、host之间、容器与host之间的连通性。
+
+MACVLAN可以从一个主机接口虚拟出多个macvtap，且每个macvtap设备都拥有不同的mac地址（对应不同的linux字符设备）。
+
+docker macvlan 用802.1q模式，对于一个交换机端口来说：
+
+1. 物理机和容器的数据包属于不同的vlan，so， 交换机端口设置为trunk；
+2. 物理机和容器的数据包属于不同的网段，so，在交换机的三层加一层路由，打通物理机和容器的两个网段。
+
+### 设置路由器或交换机
+
+[Docker Networking: macvlans with VLANs](https://hicu.be/docker-networking-macvlan-vlan-configuration) 
+
+本小节是2018.12.17补充，所以网段部分对不上
+
+if you happen to have a Cisco IOS router
+
+```
+router(config)# interface fastEthernet 0/0
+router(config-if)# no shutdown
+
+router(config)# interface fastEthernet 0/0.10
+router(config-subif)# encapsulation dot1Q 10
+router(config-subif)# ip address 10.0.10.1 255.255.255.0
+router(config-subif)# ipv6 address 2001:db8:babe:10::1/64
+
+router(config)# interface fastEthernet 0/0.20
+router(config-subif)# encapsulation dot1Q 20
+router(config-subif)# ip address 10.0.20.1 255.255.255.0
+router(config-subif)# ipv6 address 2001:db8:babe:20::1/64
+
+…or Cisco Layer 3 Switch…
+
+switch# configure terminal
+switch(config)# vlan 10
+switch(config)# vlan 20
+
+switch(config)# interface fastEthernet0/0
+switch(config-if)# switchport mode trunk
+switch(config-if)# switchport trunk native vlan 1
+
+switch(config)# interface vlan 10
+switch(config-if)# ip address 10.0.10.1 255.255.255.0
+switch(config-if)# ipv6 address 2001:db8:babe:10::1/64
+
+switch(config)# interface vlan 20
+switch(config-if)# ip address 10.0.20.1 255.255.255.0
+switch(config-if)# ipv6 address 2001:db8:babe:20::1/64
+```
+	
+可以看到，从交换机的角度看，也是与linux 类似的ip命令，配置ip、网段等。
+
+### 物理机创建vlan的sub interface
+
+使用802.1q vlan时，我们发出去的数据包，要有802.1q中的vlan tag。为了不影响物理网卡的正常使用，就是只有基于sub interface（eth1.10）来发送802.1q package。
+
+1. Load the 802.1q module into the kernel.`sudo modprobe 8021q`
+2. **Create a new interface that is a member of a specific VLAN**, 
+VLAN id 10 is used in this example. Keep in mind you can only use physical interfaces as a base, creating VLAN's on virtual interfaces (i.e. eth0:1) will not work. We use the physical interface eth1 in this example. This command will add an additional interface next to the interfaces which have been configured already, so your existing configuration of eth1 will not be affected. `sudo vconfig add eth1 10`
+3. Assign an address to the new interface. `sudo ip addr add 10.0.0.1/24 dev eth0.10`
+4. Starting the new interface. `sudo ip link set up eth0.10`
+	
+基于sub interface创建docker macvlan 网络
+
+```sh
+docker network  create  -d macvlan \
+    --subnet=172.31.0.0/16 \
+    --gateway=172.31.0.1 \
+    -o parent=eth0.10 macvlan10
+```
+创建容器，指定使用macvlan网络
+
+```sh
+docker run --net=macvlan10 -it --name macvlan_test5 --rm alpine /bin/sh
+```	
 ## 小结
 
 ||特点|ip/mac address|从交换机的视角看vlan方案|
