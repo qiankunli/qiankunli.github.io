@@ -13,11 +13,22 @@ keywords: mesh source
 * TOC
 {:toc}
 
+## 先聊聊七层负载均衡
+
+[现代网络负载均衡与代理（上）](https://mp.weixin.qq.com/s/FwuEUAKU245tCa-UNtVYLw) 客户端建立一个到负载均衡 器的 TCP 连接。负载均衡器**终结该连接**(即直接响应 SYN)，然后选择一个后端，并与该后端建立一个新的 TCP 连接(即发送一个新的 SYN)。四层负载均衡器通常只在四层 TCP/UDP 连接/会话级别上运行。因此， 负载均衡器通过转发数据，并确保来自同一会话的字节在同一后端结束。四层负载均衡器 不知道它正在转发数据的任何应用程序细节。数据内容可以是 HTTP, Redis, MongoDB，或任 何应用协议。
+
+四层负载均衡有哪些缺点是七层(应用)负载均衡来解决的呢? 假如两个 gRPC/HTTP2 客户端通过四层负载均衡器连接想要与一个后端通信。四层负载均衡器为每个入站 TCP 连接创建一个出站的 TCP 连接，从而产生两个入站和两个出站的连接（CA ==> loadbalancer ==> SA, CB ==> loadbalancer ==> SB）。假设，客户端 A 每分钟发送 1 个请求，而客户端 B 每秒发送 50 个请求，则SA 的负载是 SB的 50倍。所以四层负载均衡器问题随着时 间的推移变得越来越不均衡。
+
+![](/public/upload/network/seven_layer_load_balance.jpeg)
+
+上图 显示了一个七层 HTTP/2 负载均衡器。在本例中，客户端创建一个到负载均衡器的HTTP/2 TCP 连接。负载均衡器创建连接到两个后端。当客户端向负载均衡器发送两个HTTP/2 流时，流 1 被发送到后端 1，流 2 被发送到后端 2。因此，即使请求负载有很大差 异的客户端也会在后端之间实现高效地分发。这就是为什么七层负载均衡对现代协议如此 重要的原因。对于mosn来说，还支持协议转换，比如client mosn 之间是http，mosn 与server 之间是 grpc 协议。
+
 ## 初始化和启动
 
 [MOSN 源码解析 - 启动流程](https://mosn.io/zh/blog/code/mosn-startup/)`Mosn := NewMosn(c)` 实例化了一个 Mosn 实例。`Mosn.Start()` 开始运行。我们先看 MOSN 的结构：
 
 ```go
+// mosn.io/mosn/pkg/mosn/starter.go
 type Mosn struct {
 	servers        []server.Server
 	clustermanager types.ClusterManager
@@ -72,25 +83,21 @@ type Mosn struct {
 
 ![](/public/upload/go/mosn_start.png)
 
-## 数据转发
+## 协议无关L4 数据接收
 
-[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md) 
+activeListener.Start ==> listener.Start ==> listener.acceptEventLoop ==> listener.accept ==> activeListener.OnAccept ==> activeRawConn.ContinueFilterChain ==> activeListener.newConnection ==> activeListener.OnNewConnection ==> connection.Start ==> connection.startRWLoop ==> connection.startReadLoop and startWriteLoop 以read 为例 ==> connection.doRead ==> connection.onRead ==> filterManager.OnRead ==> filterManager.onContinueReading ==> proxy.OnData 
 
-![](/public/upload/go/mosn_io_process.png)
+上述链路与源码位置结合且省略一下
 
-1. MOSN 在 IO 层读取数据，通过 read filter 将数据发送到 Protocol 层进行 Decode
-2. Decode 出来的数据，根据不同的协议，**回调到 stream 层**，进行 stream 的创建和封装
-3. stream 创建完毕后，会回调到 Proxy 层做路由和转发，Proxy 层会关联上下游（upstream,downstream）间的转发关系
-4. Proxy 挑选到后端后，会根据后端使用的协议，将数据发送到对应协议的 Protocol 层，对数据重新做 Encode
-5. Encode 后的数据会发经过 write filter 并最终使用 IO 的 write 发送出去
+```
+mosn.io/mosn/pkg/
+    server/handler.go           // activeListener.Start ==> activeListener.OnAccept ==> activeListener.OnNewConnection
+    network/connection.go       // connection.Start ==> connection.onRead
+           /filterManager.go    // filterManager.OnRead
+    proxy/proxy.go              // proxy.OnData 
+```
 
-[MOSN 源码解析 - 协程模型](https://mosn.io/zh/blog/code/mosn-eventloop/)
-
-![](/public/upload/mesh/mosn_process.png)
-
-### 数据接收
-
-network 层 读取
+如果mosn 只支持四层负载均衡的话，到proxy.OnData  就可以可以通过 负载均衡 选择一个下游 节点发送数据了。mosn 支持七层负载均衡，L7就涉及到 协议处理了。
 
 ```go
 func (c *connection) startReadLoop() {
@@ -141,7 +148,65 @@ func (p *proxy) OnData(buf buffer.IoBuffer) api.FilterStatus {
 	p.serverStreamConn.Dispatch(buf)
 }
 ```
-**之后streamConnection/stream 等逻辑就是 根据协议的不同而不同了**（初次看代码时踩了很大的坑），下面代码以xprotocol 协议为例
+
+## L7 基于多路复用的转发 
+
+```
+mosn.io/mosn/pkg
+    /types/stream.go        // Stream is a generic protocol stream  定义了stream 层的很多接口
+    /stream
+        /http/stream.go
+        /http2/stream.go
+        /xprotocol
+            /stream.go
+            /conn.go
+    /stream.go      // 通用/父类实现
+    /proxy
+        /downstream.go
+```
+
+
+[MOSN 多协议机制解析](https://mosn.io/zh/blog/posts/multi-protocol-deep-dive/) MOSN 的底层机制与 Envoy、Nginx 并没有核心差异，同样支持基于 I/O 多路复用的 L4 读写过滤器扩展，并在此基础之上再封装 L7 的处理。但是与前两者不同的是，**MOSN 针对典型的微服务通信场景**，抽象出了一套适用于基于**多路复用** RPC 协议的扩展框架。
+
+![](/public/upload/mesh/mosn_protocol.png)
+
+多路复用的定义：允许在单条链接上，并发处理多个请求/响应。 对于http2 来说，在connection 之上专门提了一个stream 概念 以表达多路复用，一般rpc 框架则 只是通过`<requestId,Request> ` 将请求暂存起来，当收到 响应时，从Response 中提取requestId 就可以与 Request建立关联。这样rpc 框架不用 发一个Request 收到Response 之后再发下一个 Request。像http2 一样，**mosn 也专门显式化了 Stream 的概念**（以及一个stream 包含header/data/trailer 3个Frame），dubbo 实现中，mosn 的Steam.streamId 就是 dubbo Frame.Header.Id 
+
+![](/public/upload/mesh/mosn_multiplexing.png)
+
+1. MOSN 从 downstream(conn=2) 接收了一个请求 request，依据报文扩展多路复用接口 GetRequestId 获取到请求在这条连接上的身份标识(requestId=1)，并记录到关联映射中待用；
+2. 请求经过 MOSN 的路由、负载均衡处理，选择了一个 upstream(conn=5)，同时在这条链接上新建了一个请求流(requestId=30)，并调用文扩展多路复用接口 SetRequestId 封装新的身份标识，并记录到关联映射中与 downstream 信息组合；
+3. MOSN 从 upstream(conn=5) 接收了一个响应 response，依据报文扩展多路复用接口 GetRequestId 获取到请求在这条连接上的身份标识(requestId=30)。此时可以从上下游关联映射表中，根据 upstream 信息(connId=5, requestId=30) 找到对应的 downstream 信息(connId=2, requestId=1)；
+4. 依据 downstream request 的信息，调用文扩展多路复用接口 SetRequestId 设置响应的 requestId，并回复给 downstream；
+
+L7 层多用复用转发逻辑：proxy.onData ==> xprotocol.serverStreamConnection.Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleRequest/handleResponse ==> proxy.NewStreamDetect 创建了 downStream ==> downStream.OnReceive ==> downStream.receive ==> downStream.matchRoute ==> downStream.chooseHost 确定下游主机 ==> downStream.receiveHeaders/receiveData/receiveTrailers ==> upstreamRequest.receiveHeaders/receiveData/receiveTrailers 转发结束
+
+省略一下
+```
+proxy.onData ==> proxy.NewStreamDetect
+downStream.OnReceive 执行filter route 及 choose 下游节点
+upstreamRequest 发送到下游
+```
+**mosn 作为一个七层代理，其核心工作就是转发，但mosn 不是每一个协议 都实现了一套自己的L7 转发，针对微服务场景，架设了基于多路复用/Stream机制的转发**，哪怕http 不是多路复用也 迁就了这一套约定。**各个协议不需要自己发现下游主机节点，不需要维护连接池，只需要向 mosn 的Stream 机制靠拢即可**（实现暴露的编解码等接口 并注册）。
+
+L4及L7合并后的 转发逻辑如下
+
+```
+activeListener.Start ==> activeListener.OnAccept ==> activeListener.OnNewConnection
+connection.Start ==> connection.onRead
+filterManager.OnRead
+proxy.onData ==> proxy.NewStreamDetect   L4 层引出 Stream 多路复用机制
+downStream.OnReceive 执行filter route 及 choose 下游节点
+upstreamRequest 发送到下游
+```
+
+## 转发代码分析
+
+[MOSN 源码解析 - 协程模型](https://mosn.io/zh/blog/code/mosn-eventloop/)
+
+![](/public/upload/mesh/mosn_process.png)
+
+mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应协议的`serverStreamConnection.Dispatch` 经过协议解析， **字节流转成了协议的数据包**，转给了`StreamReceiveListener.OnReceive`。proxy.downStream 实现了 StreamReceiveListener。
 
 ```go
 func (sc *streamConn) Dispatch(buf types.IoBuffer) {
@@ -182,17 +247,7 @@ func (sc *streamConn) handleRequest(ctx context.Context, frame xprotocol.XFrame,
 }
 ```
 
-mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应协议的`serverStreamConnection.Dispatch` 经过协议解析， **字节流转成了协议的数据包**，转给了`StreamReceiveListener.OnReceive`。proxy.downStream 实现了 StreamReceiveListener。
-
-[MOSN 多协议机制解析](https://mosn.io/zh/blog/posts/multi-protocol-deep-dive/)  协议解析过程比较复杂，涉及到多路复用等机制，具体细节参见[mosn细节](http://qiankunli.github.io/2020/04/16/mosn_detail.html)。 
-
-![](/public/upload/mesh/mosn_protocol.png)
-
-
-### 转发流程
-
 在http/http2/xprotocol 对应的ServerStreamConnection 中，**每次收到一个新的Stream，`sc.serverCallbacks.NewStreamDetect` ==> newActiveStream 生成一个新的downStream struct 对应**， sc.serverCallbacks 其实就是proxy struct。downStream 代码注释中提到： Downstream stream, as a controller to handle downstream and upstream proxy flow。 downStream  同时持有responseSender 成员指向Stream，用于upstream收到响应数据时 回传给client。
-
 
 `downStream.OnReceive` 逻辑
 
@@ -226,7 +281,7 @@ func (s *downStream) OnReceive(ctx context.Context,..., data types.IoBuffer, ...
     ]
     ```
 2. MatchRoute，一个请求所属的domains  绑定了许多路由规则，目的将一个请求 路由到一个cluster 上
-3. ChooseHost，每一个cluster 对应一个连接池
+3. ChooseHost，每一个cluster 对应一个连接池。  从池中 选出一个连接 赋给 downStream.upstreamRequest  
 3. WaitNofity则是转发成功以后，等待被响应数据唤醒。
 
 ```go
@@ -306,9 +361,6 @@ func (s *downStream) receive(ctx context.Context, id uint32, phase types.Phase) 
     return types.End
 }
 ```
-
-### 数据发送
-
 真正的发送数据逻辑是在receiveHeaders、receiveData、receiveTrailers这三个方法里，当然每次请求不一定都需要有这三部分的数据，这里我们以receiveHeaders方法为例来进行说明：
 
 ```go
@@ -363,7 +415,7 @@ func (p *connPool) NewStream(ctx context.Context, responseDecoder types.StreamRe
 ```
 从 xprotocol.connPool 取出一个client ，创建了一个协议对应的 Stream(变量名为 streamEncoder)，对xprotocol 就是xStream，最终执行了AppendHeaders
 
-```
+```go
 func (r *upstreamRequest) OnReady(sender types.StreamSender, host types.Host) {
 	r.requestSender = sender
 	r.host = host
@@ -449,6 +501,9 @@ func (s *downStream) waitNotify(id uint32) (phase types.Phase, err error) {
 
 ## 与envoy 对比
 
+Envoy 支持四层的读写过滤器扩展、基于 HTTP 的七层读写过滤器扩展以及对应的 Router/Upstream 实现。如果想要基于 Envoy 的扩展框架实现 L7 协议接入，目前的普遍做法是基于 L4 filter 封装相应的 L7 codec，在此基础之上再实现对应的协议路由等能力，无法复用 HTTP L7 的扩展框架。
+
+
 envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)
 
 ![](/public/upload/mesh/envoy_new_connection.jpg)
@@ -461,7 +516,11 @@ envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun
 
 ![](/public/upload/mesh/envoy_data_parse.jpg)
 
-## 补充细节
+## 补充细节（之前没懂的时候画了很多图）
+
+[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md) 
+
+![](/public/upload/go/mosn_io_process.png)
 
 不同颜色 表示所处的 package 不同
 

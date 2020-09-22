@@ -17,6 +17,8 @@ keywords: functional programming
 
 ## 编程范式异同
 
+### 声明式与命令式
+
 [声明式编程范式初探](http://www.nowamagic.net/academy/detail/1220525)
 
 ![](/public/upload/architecture/programming_paradigm.jpg)
@@ -33,6 +35,14 @@ keywords: functional programming
 总的说来，在命令式语言中融入声明式的元素应当是一种趋势。尤其是函数式，它的一些特征已经在许多命令式语言中得到了支持。
 
 既然声明式编程有这么多好处，为什么命令式语言不仅占大多数，而且流行程度也不减呢？编程语言的流行程度与其擅长的领域关系密切。声明式语言——尤其是函数式语言和逻辑式语言——擅长基于数理逻辑的应用，如人工智能、符号处理、数据库、编译器等，对基于业务逻辑的、尤其是交互式或事件驱动型的应用就不那么得心应手了。而大多数软件是面向用户的，交互性强、多为事件驱动、业务逻辑千差万别，显然命令式语言在此更有用武之地。
+
+### 与其它编程范式对比
+
+[Java如何支持函数式编程？](https://mp.weixin.qq.com/s/Ko41OG9yFAZZMEi6-C9kBQ)每个编程范式都有自己独特的地方，这就是它们会被抽象出来作为一种范式的原因。面向对象编程最大的特点是：以类、对象作为组织代码的单元以及它的四大特性。面向过程编程最大的特点是：以函数作为组织代码的单元，数据与方法相分离。那函数式编程最独特的地方又在哪里呢？实际上，**函数式编程最独特的地方在于它的编程思想**。函数式编程认为程序可以用一系列数学函数或表达式的组合来表示。函数式编程是程序面向数学的更底层的抽象，将计算过程描述为表达式。不过，这样说你肯定会有疑问，真的可以把任何程序都表示成一组数学表达式吗？理论上讲是可以的。但是，并不是所有的程序都适合这么做。函数式编程有它自己适合的应用场景，比如科学计算、数据处理、统计分析等。对于强业务相关的大型业务系统开发来说，费劲吧啦地将它抽象成数学表达式，硬要用函数式编程来实现，显然是自讨苦吃。相反，在这种应用场景下，面向对象编程更加合适，写出来的代码更加可读、可维护。
+
+具体到编程实现，函数式编程跟面向过程编程一样，也是以函数作为组织代码的单元。不过，它跟面向过程编程的区别在于，**它的函数是无状态的**。何为无状态？简单点讲就是，函数内部涉及的变量都是局部变量，不会像面向对象编程那样，共享类成员变量，也不会像面向过程编程那样，共享全局变量。函数的执行结果只与入参有关，跟其他任何外部变量无关。同样的入参，不管怎么执行，得到的结果都是一样的。这实际上就是数学函数或数学表达式的基本要求。
+
+不同的编程范式之间并不是截然不同的，总是有一些相同的编程规则。比如不管是面向过程、面向对象还是函数式编程，它们都有变量、函数的概念，最顶层都要有main函数执行入口，来组装编程单元（类、函数等）。只不过，面向对象的编程单元是类或对象，面向过程的编程单元是函数，**函数式编程的编程单元是无状态函数**。
 
 ## 基本特性
 
@@ -89,17 +99,19 @@ keywords: functional programming
 
 ### 柯里化
 
-	def inc(x):
-		def incx(y):
-			return x+y
-		return incx
-	
-	incc = inc(2)
-	inc5 = inc(5)
-	
-	print inc2(5)	// output 7
-	print inc5(5) // output 10
-	
+```
+def inc(x):
+    def incx(y):
+        return x+y
+    return incx
+
+incc = inc(2)
+inc5 = inc(5)
+
+print inc2(5)	// output 7
+print inc5(5) // output 10
+```
+
 大牛 **从参数分解的角度** 对柯里化 的描述是：将一个函数的多个参数 分解成多个函数，然后将函数多层封装起来，每层函数都返回一个函数去接收下一个参数，这样可以简化函数的多个参数。 
 
 ### 装饰器
@@ -131,19 +143,23 @@ shell 命令
 |函数式编程||一种东西和另一种东西之间的对应关系。|至于什么柯里化、什么数据不可变，都只是外延体现而已。|
 |命令式编程|面向过程、面向对象等|一个步骤||
 
-	object HelloWorld  {  
-	  def main(args: Array[String]): unit = {  
-	    args.filter( (arg:String) => arg.startsWith("G") )  
-	        .foreach( (arg:String) => Console.println("Found " + arg) )  
-	  }  
-	} 
+```scala
+object HelloWorld  {  
+    def main(args: Array[String]): unit = {  
+    args.filter( (arg:String) => arg.startsWith("G") )  
+        .foreach( (arg:String) => Console.println("Found " + arg) )  
+    }  
+}
+``` 
 	
 函数式的代码是“对映射的描述”，查看scala中filter函数的源码，或许更能体会对映射的描述的感觉。
 
-	class Array[A]{  
-	    // ...  
-	   def filter  (p : (A) => Boolean) : Array[A] = ... // not shown  
-	} 
+```scala
+class Array[A]{  
+    // ...  
+    def filter  (p : (A) => Boolean) : Array[A] = ... // not shown  
+} 
+```
 
 
 [什么是函数式编程思维？](https://www.zhihu.com/question/28292740/answer/100284611)
@@ -210,34 +226,36 @@ application of a curried function, such as f(3).
 
 ## 一些代码技巧
 
-在java8 的List 接口中，存在一个default method 
-
-	void sort(Comparator<? super E> c)
+在java8 的List 接口中，存在一个default method `void sort(Comparator<? super E> c)`
 	
 对应`java.util.Collections` 中的sort 方法
 
 
-	 public static <T> void sort(List<T> list, Comparator<? super T> c) {
-        list.sort(c);
-    }
+```java
+public static <T> void sort(List<T> list, Comparator<? super T> c) {
+    list.sort(c);
+}
+```
     
 从[编程的本质](http://qiankunli.github.io/2018/07/14/nature_of_code.html) 中 可以知道 程序 = 控制 + 逻辑（这与函数式编程理念是非常契合的）。在这里的sort方法中，排序是用冒泡还是插入是控制 ，与业务无关。而Comparator 描述的是逻辑，与业务紧密相关。 
 
 在 [异步编程——Promise](https://github.com/hprose/hprose-java/wiki/%E5%BC%82%E6%AD%A5%E7%BC%96%E7%A8%8B%E2%80%94%E2%80%94Promise) 中作者提了三个接口
 
-	interface Callback<R, V> {}
-	// 对输入采取一定的动作，没有返回
-	public interface Action<V> extends Callback<Void, V> {
-	    void call(V value) throws Throwable;
-	}
-	// 将输入转换为输出
-	public interface Func<R, V> extends Callback<R, V> {
-    	R call(V value) throws Throwable;
-	}
-	// 将输入转换为输出，异步
-	public interface AsyncFunc<R, V> extends Callback<R, V> {
-    	Promise<R> call(V value) throws Throwable;
-	}
+```java
+interface Callback<R, V> {}
+// 对输入采取一定的动作，没有返回
+public interface Action<V> extends Callback<Void, V> {
+    void call(V value) throws Throwable;
+}
+// 将输入转换为输出
+public interface Func<R, V> extends Callback<R, V> {
+    R call(V value) throws Throwable;
+}
+// 将输入转换为输出，异步
+public interface AsyncFunc<R, V> extends Callback<R, V> {
+    Promise<R> call(V value) throws Throwable;
+}
+```
 	
 实现一个完全符合函数式编程理念的项目很难，通常也很少有这样的机会。但在我们日常的代码中，多用用Action、Func、AsyncFunc 这类接口，却可以做到，可以在很大程度上提高代码的可读性。
 
