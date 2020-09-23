@@ -163,6 +163,7 @@ mosn.io/mosn/pkg
     /stream.go      // 通用/父类实现
     /proxy
         /downstream.go
+        /upstream.go
 ```
 
 
@@ -187,7 +188,6 @@ proxy.onData ==> proxy.NewStreamDetect
 downStream.OnReceive 执行filter route 及 choose 下游节点
 upstreamRequest 发送到下游
 ```
-**mosn 作为一个七层代理，其核心工作就是转发，但mosn 不是每一个协议 都实现了一套自己的L7 转发，针对微服务场景，架设了基于多路复用/Stream机制的转发**，哪怕http 不是多路复用也 迁就了这一套约定。**各个协议不需要自己发现下游主机节点，不需要维护连接池，只需要向 mosn 的Stream 机制靠拢即可**（实现暴露的编解码等接口 并注册）。
 
 L4及L7合并后的 转发逻辑如下
 
@@ -199,6 +199,61 @@ proxy.onData ==> proxy.NewStreamDetect   L4 层引出 Stream 多路复用机制
 downStream.OnReceive 执行filter route 及 choose 下游节点
 upstreamRequest 发送到下游
 ```
+
+以官方 dubbo example 运行为例： dubbo consumer  ==> client mosn `localhost:2045` ==> server mosn `localhost:2046` ==> dubbo provider `0.0.0.0:20880`
+
+```
+[DEBUG] new idlechecker: maxIdleCount:6, conn:2
+[DEBUG] [server] [listener] accept connection from 0.0.0.0:2045, condId= 2, remote addr:192.168.104.18:60625
+[DEBUG] [2,-] [stream] [xprotocol] new stream detect, requestId = 0
+[DEBUG] [2,] [proxy] [downstream] new stream, proxyId = 1 , requestId =0, oneway=false
+[DEBUG] [2,] [proxy] [downstream] 0 stream filters in config
+[DEBUG] [2,] [proxy] [downstream] OnReceive headers   跟上header 的具体内容
+[DEBUG] [2,] [proxy] [downstream] enter phase DownFilter[1], proxyId = 1
+[DEBUG] [2,] [proxy] [downstream] enter phase MatchRoute[2], proxyId = 1
+[DEBUG] [router] [routers] [MatchRoute]
+[DEBUG] [router] [routers] [findVirtualHost] found default virtual host only
+[DEBUG] [2,] [router] [DefaultHandklerChain] [MatchRoute] matched a route: &{0xc00023d900 .*}
+[DEBUG] [2,] [proxy] [downstream] enter phase DownFilterAfterRoute[3], proxyId = 1
+[DEBUG] [2,] [proxy] [downstream] enter phase ChooseHost[4], proxyId = 1
+[DEBUG] [2,] [proxy] [downstream] route match result:&{RouteRuleImplBase:0xc00023d900 matchValue:.*}, clusterName=clientCluster
+[DEBUG] [upstream] [cluster manager] clusterSnapshot.loadbalancer.ChooseHost result is 127.0.0.1:2046, cluster name = clientCluster
+[DEBUG] [stream] [sofarpc] [connpool] init host 127.0.0.1:2046
+[INFO] remote addr: 127.0.0.1:2046, network: tcp
+[DEBUG] [network] [check use writeloop] Connection = 3, Local Address = 127.0.0.1:60626, Remote Address = 127.0.0.1:2046
+[DEBUG] [network] [client connection connect] connect raw tcp, remote address = 127.0.0.1:2046 ,event = ConnectedFlag, error = <nil>
+[DEBUG] client OnEvent ConnectedFlag, connected false
+[DEBUG] [2,] [proxy] [downstream] timeout info: {GlobalTimeout:1m0s TryTimeout:0s}
+[DEBUG] [2,] [proxy] [downstream] enter phase DownFilterAfterChooseHost[5], proxyId = 1
+[DEBUG] [2,] [proxy] [downstream] enter phase DownRecvHeader[6], proxyId = 1
+[DEBUG] [2,] [proxy] [upstream] append headers: xx  跟上header 的具体内容
+[DEBUG] [2,] [proxy] [upstream] connPool ready, proxyId = 1, host = 127.0.0.1:2046
+[DEBUG] [2,] [stream] [xprotocol] appendHeaders, direction = 0, requestId = 1
+[DEBUG] [2,] [proxy] [downstream] enter phase DownRecvData[7], proxyId = 1
+[DEBUG] [2,] [proxy] [downstream] receive data = 2.0.2mosn.io.dubbo.DemoService0.0.sayHelloLjava/lang/String;MOSNHpathmosn.io.dubbo.DemoService	interfacemosn.io.dubbo.DemoServiceversion0.0.0Z
+[DEBUG] [2,] [proxy] [downstream] start a request timeout timer
+[DEBUG] [2,] [proxy] [upstream] append data:2.0.2mosn.io.dubbo.DemoService0.0.sayHelloLjava/lang/String;MOSNHpathmosn.io.dubbo.DemoService	interfacemosn.io.dubbo.DemoServiceversion0.0.0Z
+[DEBUG] [2,] [stream] [xprotocol] appendData, direction = 0, requestId = 1
+[DEBUG] [2,] [stream] [xprotocol] connection 3 endStream, direction = 0, requestId = 1
+[DEBUG] [2,] [proxy] [downstream] enter phase WaitNotify[11], proxyId = 1
+[DEBUG] [2,] [proxy] [downstream] waitNotify begin 0xc00046c000, proxyId = 1
+[DEBUG] [2,] [stream] [xprotocol] connection 3 receive response, requestId = 1
+[DEBUG] [2,] [proxy] [upstream] OnReceive headers: xx跟上响应header 的具体内容
+[DEBUG] [2,] [proxy] [downstream] OnReceive send downstream response xx
+[DEBUG] [2,] [proxy] [downstream] enter phase UpFilter[12], proxyId = 1
+[DEBUG] [2,] [proxy] [downstream] enter phase UpRecvHeader[13], proxyId = 1
+[DEBUG] [2,] [stream] [xprotocol] appendHeaders, direction = 1, requestId = 0
+[DEBUG] [2,] [proxy] [downstream] enter phase UpRecvData[14], proxyId = 1
+[DEBUG] [2,] [stream] [xprotocol] appendData, direction = 1, requestId = 0
+[DEBUG] [2,] [stream] [xprotocol] connection 2 endStream, direction = 1, requestId = 0
+[DEBUG] update listener write bytes: 89
+```
+
+client mosn 处理过程 ： 收到client connection=2；收到 client stream；receive header frame；route & chooseHost；client mosn 建立与上游mosn 的connection =3；向上游发送 header frame； receive data frame； 向上游发送 data frame；endStream；从上游 接收 header frame 发往下游；从上游接收 data frame 发往下游；endstream。
+
+mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持http、http2  和针对微服务场景xprotocol。 
+1. mosn proxy **架设了基于多路复用/Stream机制的转发**：多路复用由Stream 概念表示，一个 请求/响应 对应多个frame（至少包含header 和 data 2个frame）。哪怕http 不是多路复用也 迁就了这一套约定。在proxy包中，转发逻辑由 downstream.go 和 upstream.go 完成，**各个协议不需要自己实现转发逻辑，只需要向 mosn 的Stream 机制靠拢即可**：实现ServerStreamConnection 和 ClientStreamConnection interface
+2. 对于微服务框架，xprotocol 进一步的封装了功能代码，各rpc 协议只需实现xprotocol.XProtocol interface。
 
 ## 转发代码分析
 
@@ -544,6 +599,6 @@ envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun
 不要硬看代码，尤其对于多协程程序
 
 1. 打印日志
-2. `debug.printStack` 来查看某一个方法之前的调用栈
+2. `debug.PrintStack()` 来查看某一个方法之前的调用栈
 3. `fmt.Printf("==> %T\n",xx)`  如果一个interface 有多个“实现类” 可以通过`%T` 查看struct 的类型
 

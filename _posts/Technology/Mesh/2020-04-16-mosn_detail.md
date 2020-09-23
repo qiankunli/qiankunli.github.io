@@ -15,15 +15,13 @@ keywords: mosn detail
 
 ![](/public/upload/mesh/mosn_process.png)
 
-## 多协议机制
+## 多协议机制的实现——多路复用 
 
 ![](/public/upload/mesh/mosn_protocol.png)
 
 [MOSN 多协议机制解析](https://mosn.io/zh/blog/posts/multi-protocol-deep-dive/)
 
 ![](/public/upload/mesh/mosn_stream_layer.png)
-
-### 多路复用
 
 借鉴了http2 的stream 的理念（所以Stream interface 上有一个方法是`ID()`），Stream 是虚拟的，**在“连接”的层面上看，消息却是乱序收发的“帧”（http2 frame）**，通过StreamId关联，用来实现在一个Connection 之上的“多路复用”。tcp 数据包在网络上流转，os 维护了socket 对象，随着连接创建、关闭而新建和销毁。 frame 数据包在 连接中传输，网络 应用层维护了 stream 对象，随着 request-response 产生、结束而新建和销毁。 
 
@@ -51,9 +49,134 @@ mosn http2 和 xprotocol 的StreamConnection 中都保存有 requestId 与 Strea
 2. 请求和 响应 一般共用一个统一的数据格式，因此可以用一个 frame struct 表示
 3. 一般会支持 心跳机制，即心跳frame
 
-### StreamConnection
+## 多路复用的代码实现 StreamConnection
 
 StreamConnection is a connection runs multiple streams
+
+一个dubbo 协议的config.json 例子
+
+```json
+{
+    "servers":[
+        {
+            "listeners":[
+                {
+                    "filter_chains":[
+                        {
+                            "filters":[
+                                {
+                                    "downstream_protocol": "X",
+                                    "upstream_protocol": "X",
+                                    "extend_config": {
+                                        "sub_protocol": "dubbo"
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
+```
+
+### StreamConnection 的初始化
+
+初始化相关链路：activeListener.OnAccept ==> activeRawConn.ContinueFilterChain ==> activeListener.newConnection ==> activeListener.OnNewConnection ==> genericProxyFilterConfigFactory.CreateFilterChain ==> filterManager.AddReadFilter ==> proxy.InitializeReadFilterCallbacks ==> stream.CreateServerStreamConnection
+
+```go
+// mosn.io/mosn/pkg/proxy/proxy.go
+func (p *proxy) InitializeReadFilterCallbacks(cb api.ReadFilterCallbacks) {
+    p.readCallbacks = cb
+    ...
+	p.readCallbacks.Connection().AddConnectionEventListener(p.downstreamListener)
+	if p.config.DownstreamProtocol != string(protocol.Auto) {
+        // 创建好的ServerStreamConnection 赋给proxy  
+        // proxy.config.DownstreamProtocol = X 即 Xprotocol
+		p.serverStreamConn = stream.CreateServerStreamConnection(p.context, types.ProtocolName(p.config.DownstreamProtocol), p.readCallbacks.Connection(), p)
+	}
+}
+// mosn.io/mosn/pkg/stream/factory.go
+var streamFactories map[types.ProtocolName]ProtocolStreamFactory
+func init() {
+	streamFactories = make(map[types.ProtocolName]ProtocolStreamFactory)
+}
+func Register(prot types.ProtocolName, factory ProtocolStreamFactory) {
+	streamFactories[prot] = factory
+}
+func CreateServerStreamConnection(context context.Context, prot api.Protocol, connection api.Connection,
+	callbacks types.ServerStreamConnectionEventListener) types.ServerStreamConnection {
+	if ssc, ok := streamFactories[prot]; ok {
+		return ssc.CreateServerStream(context, connection, callbacks)
+	}
+	return nil
+}
+```
+在新的Connection 被创建时，会创建一个ServerStreamConnection 赋给proxy。所有L7 层协议要实现 stream.ProtocolStreamFactory interface 用于构建 StreamConnection。示例中 `proxy.config.DownstreamProtocol` = X 即 Xprotocol ，即L7 层 数据读取 及转发采用 Xprotocol 多用复用机制（而不是http或http2）
+
+```go
+// mosn.io/mosn/pkg/stream/xprotocol/factory.go
+func (f *streamConnFactory) CreateServerStream(context context.Context, connection api.Connection,
+	serverCallbacks types.ServerStreamConnectionEventListener) types.ServerStreamConnection {
+	return newStreamConnection(context, connection, nil, serverCallbacks)
+}
+// mosn.io/mosn/pkg/stream/xprotocol/conn.go
+func newStreamConnection(ctx context.Context, conn api.Connection, clientCallbacks types.StreamConnectionEventListener,
+	serverCallbacks types.ServerStreamConnectionEventListener) types.ClientStreamConnection {
+	// 1. init first context
+	// 2. prepare protocols
+	subProtocol := mosnctx.Get(ctx, types.ContextSubProtocol).(string)
+	subProtocols := strings.Split(subProtocol, ",")
+	// 2.1 exact protocol, get directly
+	// 2.2 multi protocol, setup engine for further match 
+	if len(subProtocols) == 1 {
+		proto := xprotocol.GetProtocol(types.ProtocolName(subProtocol))
+		if proto == nil {
+			log.Proxy.Errorf(ctx, "[stream] [xprotocol] no such protocol: %s", subProtocol)
+			return nil
+		}
+		sc.protocol = proto
+	} else {   // mosn 支持多个subProtocol ，估计是可以根据 连接中的信息自动匹配
+		engine, err := xprotocol.NewXEngine(subProtocols)
+		if err != nil {
+			log.Proxy.Errorf(ctx, "[stream] [xprotocol] create XEngine failed: %s", err)
+			return nil
+		}
+		sc.engine = engine
+	}
+	// client
+	if sc.clientCallbacks != nil {
+		// default client concurrency capacity: 8
+		sc.clientStreams = make(map[uint64]*xStream, 8) // Stream 抽象了一般rpc 框架维护的 <requestId,Request>
+	}
+	// set support transfer connection
+	return sc
+}
+// mosn.io/mosn/pkg/protocol/xprotocol/factory.go
+var (
+	protocolMap = make(map[types.ProtocolName]XProtocol)
+	matcherMap  = make(map[types.ProtocolName]types.ProtocolMatch)
+)
+// RegisterProtocol register the protocol to factory
+func RegisterProtocol(name types.ProtocolName, protocol XProtocol) error {
+	// check name conflict
+	_, ok := protocolMap[name]
+	if ok {
+		return errors.New("duplicate protocol register:" + string(name))
+	}
+	protocolMap[name] = protocol
+	return nil
+}
+func GetProtocol(name types.ProtocolName) XProtocol {
+	return protocolMap[name]
+}
+```
+
+Xprotocol 支持多个 subProtocol，按照示例 配置 创建 dubbo 对应的 Xprotocol ServerStreamConnection。所有的 subProtocol 要实现 xprotocol.Xprotocol interface
+
+
+L7 及 Xprotocol subProtocol 对应的包在启动 时会将 自己的实现 register 到相关数据结构
 
 ```
 mosn/pkg/stream
@@ -93,29 +216,16 @@ mosn/pkg/stream
     types.go
 ```
 
-stream 包最外层 定义了ProtocolStreamFactory interface
-，针对每个协议 都有一个对应的 streamConnFactory 实现（维护在`var streamFactories map[types.ProtocolName]ProtocolStreamFactory`），协议对应的pkg 内启动时自动执行 init 方法，注册到map。最终 实现根据 Protocol 得到 streamConnFactory 进而得到 ServerStreamConnection 实例
+### 基于多路复用的数据转发
 
-```go
-// mosn/pkg/stream/factory.go
-func CreateServerStreamConnection(context context.Context, prot api.Protocol, connection api.Connection,
-	callbacks types.ServerStreamConnectionEventListener) types.ServerStreamConnection {
+mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持http、http2  和针对微服务场景xprotocol。 
+1. mosn proxy **架设了基于多路复用/Stream机制的转发**：多路复用由Stream 概念表示，一个 请求/响应 对应多个frame（至少包含header 和 data 2个frame）。哪怕http 不是多路复用也 迁就了这一套约定。在proxy包中，转发逻辑由 downstream.go 和 upstream.go 完成，**各个协议不需要自己实现转发逻辑，只需要向 mosn 的Stream 机制靠拢即可**：实现ServerStreamConnection 和 ClientStreamConnection interface
+2. 对于微服务框架，xprotocol 进一步的封装了功能代码，各rpc 协议只需实现xprotocol.XProtocol interface。
 
-	if ssc, ok := streamFactories[prot]; ok {
-		return ssc.CreateServerStream(context, connection, callbacks)
-	}
+proxy.onData ==> xprotocol.serverStreamConnection.Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleRequest/handleResponse ==> proxy.NewStreamDetect 创建了 downStream ==> downStream.OnReceive ==> downStream.receive ==> downStream.matchRoute ==> downStream.chooseHost 确定下游主机 ==> downStream.receiveHeaders/receiveData/receiveTrailers ==> upstreamRequest.receiveHeaders/receiveData/receiveTrailers 转发结束
 
-	return nil
-}
-```
 
-![](/public/upload/mesh/mosn_StreamConnection.png)
-
-mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应协议的`serverStreamConnection.Dispatch` ==> 根据协议解析数据 ，经过协议解析，收到一个完整的请求时`serverStreamConnection.handleFrame` 会创建一个 Stream，然后逻辑 转给了`StreamReceiveListener.OnReceive`。proxy.downStream 实现了 StreamReceiveListener
-
-![](/public/upload/mesh/mosn_Stream.png)
-
-### 连接池管理
+## 连接池管理
 
 同样应用了工厂模式
 
@@ -167,7 +277,7 @@ mosn/pkg/stream
 
 ![](/public/upload/mesh/mosn_ConnectionPool.png)
 
-### 协议的编解码
+## 协议的编解码
 
 工厂模式，各个协议的包在启动时，将自己注册到protocolMap 和 matcherMap 中。
 
@@ -197,33 +307,7 @@ mosn/pkg/protocol/xprotocol
 
 ![](/public/upload/mesh/mosn_xprotocol.png)
 
-一个dubbo 协议的config.json 为例
 
-```json
-{
-    "servers":[
-        {
-            "listeners":[
-                {
-                    "filter_chains":[
-                        {
-                            "filters":[
-                                {
-                                    "downstream_protocol": "X",
-                                    "upstream_protocol": "X",
-                                    "extend_config": {
-                                        "sub_protocol": "dubbo"
-                                    }
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        }
-    ]
-}
-```
 
 bolt、dubbo 都属于 xprotocol ，它们的区别在于 协议格式的不同（“语义”不同），但数据的通信流程 是相同的（“语法”相同）
 
