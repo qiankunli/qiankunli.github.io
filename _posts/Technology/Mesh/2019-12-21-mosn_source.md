@@ -255,6 +255,15 @@ mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持
 1. mosn proxy **架设了基于多路复用/Stream机制的转发**：多路复用由Stream 概念表示，一个 请求/响应 对应多个frame（至少包含header 和 data 2个frame）。哪怕http 不是多路复用也 迁就了这一套约定。在proxy包中，转发逻辑由 downstream.go 和 upstream.go 完成，**各个协议不需要自己实现转发逻辑，只需要向 mosn 的Stream 机制靠拢即可**：实现ServerStreamConnection 和 ClientStreamConnection interface
 2. 对于微服务框架，xprotocol 进一步的封装了功能代码，各rpc 协议只需实现xprotocol.XProtocol interface。
 
+![](/public/upload/mesh/mosn_overview.png)
+
+基于上述认识，[云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)我们再来看 mosn 的分层结构设计。其中，**每一层通过工厂设计模式向外暴露其接口**，方便用户灵活地注册自身的需求。
+
+1. NET/IO 作为网络层，监测连接和数据包的到来，同时作为 listener filter 和 network filter 的挂载点;
+2. Protocol 作为多协议引擎层，对数据包进行检测，并使用对应协议做 decode/encode 处理; 
+3. Stream **对 decode 的数据包做二次封装为 stream**，作为 stream filter 的挂载点; PS：Protocol 为什么在Stream 的下面，因为协议数据 要decode 为Stream
+4. Proxy 作为 MOSN 的转发框架，对封装的 stream 做 proxy 处理;
+
 ## 转发代码分析
 
 [MOSN 源码解析 - 协程模型](https://mosn.io/zh/blog/code/mosn-eventloop/)
@@ -553,46 +562,6 @@ func (s *downStream) waitNotify(id uint32) (phase types.Phase, err error) {
 	return s.processError(id)
 }
 ```
-
-## 与envoy 对比
-
-Envoy 支持四层的读写过滤器扩展、基于 HTTP 的七层读写过滤器扩展以及对应的 Router/Upstream 实现。如果想要基于 Envoy 的扩展框架实现 L7 协议接入，目前的普遍做法是基于 L4 filter 封装相应的 L7 codec，在此基础之上再实现对应的协议路由等能力，无法复用 HTTP L7 的扩展框架。
-
-
-envoy 对应逻辑 [深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)
-
-![](/public/upload/mesh/envoy_new_connection.jpg)
-
-[深入解读Service Mesh的数据面Envoy](https://sq.163yun.com/blog/article/213361303062011904)下文以envoy 实现做一下类比 用来辅助理解mosn 相关代码的理念：
-
-![](/public/upload/mesh/envoy_on_data.jpg)
-
-对于每一个Filter，都调用onData函数，咱们上面解析过，其中HTTP对应的ReadFilter是ConnectionManagerImpl，因而调用ConnectionManagerImpl::onData函数。ConnectionManager 是协议插件的处理入口，**同时也负责对整个处理过程的流程编排**。
-
-![](/public/upload/mesh/envoy_data_parse.jpg)
-
-## 补充细节（之前没懂的时候画了很多图）
-
-[SOFAMosn Introduction](https://github.com/sofastack/sofastack-doc/blob/master/sofa-mosn/zh_CN/docs/Introduction.md) 
-
-![](/public/upload/go/mosn_io_process.png)
-
-不同颜色 表示所处的 package 不同
-
-![](/public/upload/go/mosn_object.png)
-
-一次http1协议请求的处理过程（绿色部分表示另起一个协程）
-
-![](/public/upload/go/mosn_http_read.png)
-
-代码的组织（pkg/stream,pkg/protocol,pkg/proxy）  跟架构是一致的
-
-![](/public/upload/go/mosn_layer.png)
-
-1. `pkg/types/connection.go` Connection
-2. `pkg/types/stream.go` StreamConnection is a connection runs multiple streams
-3. `pkg/types/stream.go` Stream is a generic protocol stream
-4. 一堆listener 和filter 比较好理解：Method in listener will be called on event occur, but not effect the control flow.Filters are called on event occurs, it also returns a status to effect control flow. Currently 2 states are used: Continue to let it go, Stop to stop the control flow.
 
 ## 学到的
 

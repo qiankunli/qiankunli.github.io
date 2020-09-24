@@ -173,9 +173,6 @@ func GetProtocol(name types.ProtocolName) XProtocol {
 }
 ```
 
-Xprotocol 支持多个 subProtocol，按照示例 配置 创建 dubbo 对应的 Xprotocol ServerStreamConnection。所有的 subProtocol 要实现 xprotocol.Xprotocol interface
-
-
 L7 及 Xprotocol subProtocol 对应的包在启动 时会将 自己的实现 register 到相关数据结构
 
 ```
@@ -216,6 +213,32 @@ mosn/pkg/stream
     types.go
 ```
 
+Xprotocol 支持多个 subProtocol，按照示例 配置 创建 dubbo 对应的 Xprotocol ServerStreamConnection。所有的 subProtocol 要实现 xprotocol.Xprotocol interface。 
+
+```
+mosn/pkg/protocol/xprotocol
+    bolt
+        protocol.go
+            func init() {
+	            xprotocol.RegisterProtocol(ProtocolName, &boltProtocol{})
+            }
+    dubbo
+        protocol.go
+            func init() {
+                xprotocol.RegisterProtocol(ProtocolName, &dubboProtocol{})
+            }
+    factory.go
+        var ( // 工厂模式，各个协议的包在启动时，将自己注册到protocolMap 和 matcherMap 中。
+            protocolMap = make(map[types.ProtocolName]XProtocol)
+            matcherMap  = make(map[types.ProtocolName]types.ProtocolMatch)
+        )
+        func RegisterProtocol(name types.ProtocolName, protocol XProtocol) error {
+            ...
+            protocolMap[name] = protocol
+            ...
+        }
+```
+
 ### 基于多路复用的数据转发
 
 mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持http、http2  和针对微服务场景xprotocol。 
@@ -226,6 +249,10 @@ proxy.onData ==> xprotocol.serverStreamConnection.Dispatch ==> xprotocol.streamC
 
 
 ## 连接池管理
+
+[云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)为了提升服务网格之间的建连性能还设计了多种协议的连接池从而方便地实现连接复用及管理。在连接管理方面，MOSN 设计了多协议连接池， 当 Proxy 模块在 Downstream 收到 Request 的时候，在经过路由、负载均衡等模块处理获取到 Upstream Host 以及对应的转发协议时，通过 Cluster Manager 获取对应协议的连接池 ，如果连接池不存在则创建并加入缓存中，之后在长连接上创建 Stream，并发送数据
+
+![](/public/upload/mesh/mosn_conn_pool.png)
 
 同样应用了工厂模式
 
@@ -277,41 +304,11 @@ mosn/pkg/stream
 
 ![](/public/upload/mesh/mosn_ConnectionPool.png)
 
-## 协议的编解码
+## 内存管理（未仔细学习）
 
-工厂模式，各个协议的包在启动时，将自己注册到protocolMap 和 matcherMap 中。
+[云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)MOSN 为了降低 Runtime GC 带来的卡顿，MOSN 在 sync.Pool 之上封装了一层资源对的注册管理模块，可以方便的扩展各种类型的对象进行复用和管理。其中 bpool 是用来存储各类对象的构建方法，vpool 用来存放 bpool 中各个实例对象具体的值。运行时通过 bpool 里保存的构建方法来创建对应的对象通过 index 关联记录到 vpool 中，使用完后通过 sync.Pool 进行空闲对象的管理达到复用。
 
-```
-mosn/pkg/protocol/xprotocol
-    bolt
-        protocol.go
-            func init() {
-	            xprotocol.RegisterProtocol(ProtocolName, &boltProtocol{})
-            }
-    dubbo
-        protocol.go
-            func init() {
-                xprotocol.RegisterProtocol(ProtocolName, &dubboProtocol{})
-            }
-    factory.go
-        var (
-            protocolMap = make(map[types.ProtocolName]XProtocol)
-            matcherMap  = make(map[types.ProtocolName]types.ProtocolMatch)
-        )
-        func RegisterProtocol(name types.ProtocolName, protocol XProtocol) error {
-            ...
-            protocolMap[name] = protocol
-            ...
-        }
-```
-
-![](/public/upload/mesh/mosn_xprotocol.png)
-
-
-
-bolt、dubbo 都属于 xprotocol ，它们的区别在于 协议格式的不同（“语义”不同），但数据的通信流程 是相同的（“语法”相同）
-
-![](/public/upload/mesh/mosn_frame.png)
+![](/public/upload/mesh/mosn_mm.png)
 
 
 ## filter扩展机制
