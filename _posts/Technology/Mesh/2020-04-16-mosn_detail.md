@@ -13,8 +13,6 @@ keywords: mosn detail
 * TOC
 {:toc}
 
-![](/public/upload/mesh/mosn_process.png)
-
 在某种程度上，除了代理组件的业务逻辑=转发外，代理组件和web/rpc服务非常像，代理组件接收请求转发到另一个服务跟web/rpc接收请求调用依赖服务是一样一样的。与rpc 框架（比如netty）做类比的话，就会发现在多协议支持/内存池管理/连接池管理/扩展机制等方面非常相似。
 
 ## 多协议机制的实现——多路复用 
