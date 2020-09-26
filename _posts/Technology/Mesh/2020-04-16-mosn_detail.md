@@ -15,6 +15,8 @@ keywords: mosn detail
 
 ![](/public/upload/mesh/mosn_process.png)
 
+在某种程度上，除了代理组件的业务逻辑=转发外，代理组件和web/rpc服务非常像，代理组件接收请求转发到另一个服务跟web/rpc接收请求调用依赖服务是一样一样的。与rpc 框架（比如netty）做类比的话，就会发现在多协议支持/内存池管理/连接池管理/扩展机制等方面非常相似。
+
 ## 多协议机制的实现——多路复用 
 
 ![](/public/upload/mesh/mosn_protocol.png)
@@ -247,7 +249,6 @@ mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持
 
 proxy.onData ==> xprotocol.serverStreamConnection.Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleRequest/handleResponse ==> proxy.NewStreamDetect 创建了 downStream ==> downStream.OnReceive ==> downStream.receive ==> downStream.matchRoute ==> downStream.chooseHost 确定下游主机 ==> downStream.receiveHeaders/receiveData/receiveTrailers ==> upstreamRequest.receiveHeaders/receiveData/receiveTrailers 转发结束
 
-
 ## 连接池管理
 
 [云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)为了提升服务网格之间的建连性能还设计了多种协议的连接池从而方便地实现连接复用及管理。在连接管理方面，MOSN 设计了多协议连接池， 当 Proxy 模块在 Downstream 收到 Request 的时候，在经过路由、负载均衡等模块处理获取到 Upstream Host 以及对应的转发协议时，通过 Cluster Manager 获取对应协议的连接池 ，如果连接池不存在则创建并加入缓存中，之后在长连接上创建 Stream，并发送数据
@@ -304,12 +305,246 @@ mosn/pkg/stream
 
 ![](/public/upload/mesh/mosn_ConnectionPool.png)
 
-## 内存管理（未仔细学习）
+## 内存管理
 
-[云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)MOSN 为了降低 Runtime GC 带来的卡顿，MOSN 在 sync.Pool 之上封装了一层资源对的注册管理模块，可以方便的扩展各种类型的对象进行复用和管理。其中 bpool 是用来存储各类对象的构建方法，vpool 用来存放 bpool 中各个实例对象具体的值。运行时通过 bpool 里保存的构建方法来创建对应的对象通过 index 关联记录到 vpool 中，使用完后通过 sync.Pool 进行空闲对象的管理达到复用。
+在池管理的术语上，mosn的习惯是 take 是申请元素，give 是回收元素。此外，池管理对象/变量 不直接对外使用，仅通过`包名.方法` 进行操作。
 
-![](/public/upload/mesh/mosn_mm.png)
+### 对象池管理
 
+[云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)MOSN 为了降低 Runtime GC 带来的卡顿，MOSN 在 `sync.Pool` 之上封装了一层资源对的注册管理模块，可以方便的扩展各种类型的对象进行复用和管理。
+
+java 中使用commons-pool 初始化一个 ObjectPool `ObjectPool<Demo> objectPool = new GenericObjectPool(PooledObjectFactory,GenericObjectPoolConfig)`，其中PooledObjectFactory 告知如何创建 Demo 对象，config 配置了池大小等，之后就可以 `objectPool.borrowObject/returnObject` 来管理和回收对象了。
+
+在mosn 对象池管理机制中，与ObjectPool 比较对应的 是bufferPool，BufferPoolCtx 对应PooledObjectFactory， `bufferPool.take/give` 分别对应`objectPool.borrowObject/returnObject`。
+```go
+// mosn.io/mosn/pkg/types/buffer.go
+type BufferPoolCtx interface {
+	// Index returns the bufferpool's Index
+	Index() int
+	New() interface{}           // new 一个元素
+	Reset(interface{})          // reset 一个元素  放回到buffer 中的元素要 reset 到一种clean 的状态
+}
+// mosn.io/mosn/pkg/buffer/buffer.go
+// bufferPool is buffer pool
+type bufferPool struct {
+	ctx types.BufferPoolCtx
+	sync.Pool
+}
+// 取出一个元素，有则取出，无则new 一个
+func (p *bufferPool) take() (value interface{}) {
+	value = p.Get()
+	if value == nil {
+		value = p.ctx.New()
+	}
+	return
+}
+// 放回元素 到buffer 中
+func (p *bufferPool) give(value interface{}) {
+	p.ctx.Reset(value)
+	p.Put(value)
+}
+```
+
+到这按说就够用了，mosn 又进一步提出一个 bufferValue struct，`bufferValue.Take(BufferPoolCtx)` 根据 BufferPoolCtx 参数便可以返回池化对象。此时bufferValue 很像一个通用对象池，根据传入的BufferPoolCtx 缓存任何对象（最大16个对象类型），底层实际上是一个 bufferPool 的数组bPool在支持。
+
+![](/public/upload/mesh/mosn_buffer_pool.png)
+
+```go
+type bufferValue struct {
+	value    [maxBufferPool]interface{}
+	transmit [maxBufferPool]interface{}
+}
+func (bv *bufferValue) Take(poolCtx types.BufferPoolCtx) (value interface{}) {
+	i := poolCtx.Index()
+	value = bPool[i].take()
+	bv.value[i] = value
+	return
+}
+// 返回poolCtx 对应的上一次take 的对象，如果没有，则新生成一个
+func (bv *bufferValue) Find(poolCtx types.BufferPoolCtx, ...) interface{} {
+	i := poolCtx.Index()
+	if i <= 0 || i > int(index) {
+		panic("buffer should call buffer.RegisterBuffer()")
+	}
+	if bv.value[i] != nil {
+		return bv.value[i]
+	}
+	return bv.Take(poolCtx)
+}
+```
+
+bufferValue 本身也受 对象次vPool/valuePool 管理，bufferValue 的申请（newBufferValue） 和 回收(bufferValue.Give） 都经过了 vPool
+
+```go
+const maxBufferPool = 16
+var (
+	index int32
+	bPool = bufferPoolArray[:]
+    bufferPoolArray [maxBufferPool]bufferPool
+    
+    vPool = new(valuePool)
+)
+type valuePool struct {
+	sync.Pool
+}
+```
+
+### buffer 管理
+
+通信中的编解码涉及到 大量小字节数组的 分配和释放，类似netty 中的ByteBuf，在mosn 中是IoBuffer。
+
+```go
+// mosn.io/pkg/buffer/types.go
+type IoBuffer interface {
+	Read(p []byte) (n int, err error)
+	ReadOnce(r io.Reader) (n int64, err error)
+	Write(p []byte) (n int, err error)
+	WriteString(s string) (n int, err error)
+	WriteByte(p byte) error
+	WriteUint32(p uint32) error
+	WriteUint64(p uint64) error
+	WriteTo(w io.Writer) (n int64, err error)
+	Len() int
+	Cap() int
+	Reset()
+	// String returns the contents of the unread portion of the buffer as a string. If the Buffer is a nil pointer, it returns "<nil>".
+	String() string
+	// Alloc alloc bytes from BytePoolBuffer
+	Alloc(int)
+	// Free free bytes to BytePoolBuffer
+	Free()
+	Append(data []byte) error
+	CloseWithError(err error)
+}
+// mosn.io/pkg/buffer/iobuffer.go
+type ioBuffer struct {
+	buf     []byte // contents: buf[off : len(buf)]
+	off     int    // read from &buf[off], write to &buf[len(buf)]
+	offMark int
+	count   int32
+	eof     bool
+	b *[]byte
+}
+func newIoBuffer(capacity int) IoBuffer {
+	buffer := &ioBuffer{
+		offMark: ResetOffMark,
+		count:   1,
+	}
+	if capacity <= 0 {
+		capacity = DefaultSize
+	}
+	buffer.b = GetBytes(capacity)
+	buffer.buf = (*buffer.b)[:0]
+	return buffer
+}
+```
+在netty 中ByteBuf 是“门脸”，封装了 基本数据类型（Int/Long/String等）的 读写操作，真正管 内存/字节数组分配的是Arena，mosn 中 IoBuffer 也是如此， 只是IoBuffer 本身有一个池管理变量 ibPool，对外提供 `buffer.GetIoBuffer/PutIoBuffer` 进行IoBuffer的分配和回收。
+
+```go
+// mosn.io/pkg/buffer/iobuffer_pool.go
+var ibPool IoBufferPool
+// IoBufferPool is Iobuffer Pool
+type IoBufferPool struct {
+	pool sync.Pool
+}
+var ibPool IoBufferPool
+func GetIoBuffer(size int) IoBuffer {
+	return ibPool.take(size)
+}
+func PutIoBuffer(buf IoBuffer) error {
+	count := buf.Count(-1)
+	if count > 0 {
+		return nil
+	} else if count < 0 {
+		return errors.New("PutIoBuffer duplicate")
+	}
+	if p, _ := buf.(*pipe); p != nil {
+		buf = p.IoBuffer
+	}
+	ibPool.give(buf)
+	return nil
+}
+```
+真正管内存/字节数组分配的是 byteBufferPool，byteBufferPool 包含一个 bufferSlot 数组，每个 bufferSlot 是一个字节数组的对象池（字节数组大小为 defaultSize）
+
+![](/public/upload/mesh/mosn_byte_buffer_pool.png)
+
+```go
+var bbPool *byteBufferPool
+func init() {
+	bbPool = newByteBufferPool()
+}
+func GetBytes(size int) *[]byte {
+	return bbPool.take(size)
+}
+// mosn.io/pkg/buffer/bytebuffer_pool.go
+// byteBufferPool is []byte pools
+type byteBufferPool struct {
+	minShift int
+	minSize  int
+	maxSize  int
+	pool []*bufferSlot
+}
+type bufferSlot struct {
+	defaultSize int
+	pool        sync.Pool
+}
+func (p *byteBufferPool) take(size int) *[]byte {
+	slot := p.slot(size)
+	if slot == errSlot {
+		b := newBytes(size)
+		return &b
+	}
+	v := p.pool[slot].pool.Get()
+	if v == nil {
+		b := newBytes(p.pool[slot].defaultSize)
+		b = b[0:size]
+		return &b
+	}
+	b := v.(*[]byte)
+	*b = (*b)[0:size]
+	return b
+}
+func (p *byteBufferPool) give(buf *[]byte) {
+	if buf == nil {
+		return
+	}
+	size := cap(*buf)
+	slot := p.slot(size)
+	if slot == errSlot {
+		return
+	}
+	if size != int(p.pool[slot].defaultSize) {
+		return
+	}
+	p.pool[slot].pool.Put(buf)
+}
+```
+
+在Protocol 层的编解码中，便可以直接使用 IoBuffer 作为Request/Response.Header/Data 使用。
+
+```go
+// mosn.io/mosn/pkg/protocol/buffer.go
+type ProtocolBuffers struct {
+	reqData     buffer.IoBuffer
+	reqHeader   buffer.IoBuffer
+	reqHeaders  map[string]string
+	reqTrailers map[string]string
+
+	rspData     buffer.IoBuffer
+	rspHeader   buffer.IoBuffer
+	rspHeaders  map[string]string
+	rspTrailers map[string]string
+}
+// GetReqData returns IoBuffer for request data
+func (p *ProtocolBuffers) GetReqData(size int) buffer.IoBuffer {
+	if size <= 0 {
+		size = defaultDataSize
+	}
+	p.reqData = buffer.GetIoBuffer(size)
+	return p.reqData
+}
+```
 
 ## filter扩展机制
 
