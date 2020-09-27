@@ -196,7 +196,15 @@ hotspot 内部c++对java 对象的表示
 
 ![](/public/upload/java/oop_kclass_model.png)
 
-​**java中的反射，设计思路是，先类型后值**。意思是，无论如何，都是先找到属性和方法的描述，然后根据描述来获取属性的值、调用方法的执行。要进行这样的操作，入口都是由类的描述开始。golang设计思路为，值和类型划分的非常清晰，两条腿走路。
+​**java中的反射，设计思路是，先类型后值**。意思是，无论如何，都是先找到属性和方法的描述，然后根据描述来获取属性的值、调用方法的执行。要进行这样的操作，入口都是由类的描述开始。
+
+```java
+Class cls = obj.getClass(); 
+Constructor constructor = cls.getConstructor(); 
+Method[] methods = cls.getDeclaredFields();
+```
+
+golang设计思路为，值和类型划分的非常清晰，两条腿走路。Go 没有类的概念，并且结构体只包含了已声明的字段。因此，我们需要借助“reflection”包来获得所需的信息
 
 ||java|go|
 |---|---|---|
@@ -208,6 +216,7 @@ hotspot 内部c++对java 对象的表示
 |方法调用|`method.invoke(obj, args)`|`objValue.Method(index).Call(args)`|
 
 在java中，通过类的描述，来获得method，由于该method是属于类级别的，所以，调用时，需要传入参数obj和args；而golang中，method是对象级别的，所以，调用时，不需要参数obj，只需要args。
+
 
 
 

@@ -76,6 +76,10 @@ keywords: software mechanism
 
 加入线程的因素：**每个线程有独立的栈**（栈一般作为线程独占的内存空间，使用时也就无需担心并发安全），而栈既保留了变量的值，也保留了函数的调用关系、参数和返回值。
 
+[Go 垃圾回收（二）——垃圾回收是什么？](https://zhuanlan.zhihu.com/p/104623357)GC 不负责回收栈中的内存，为什么呢？主要原因是**栈是一块专用内存，专门为了函数执行而准备的**，存储着函数中的局部变量以及调用栈。除此以外，栈中的数据都有一个特点——简单。比如局部变量就不能被函数外访问，所以**这块内存用完就可以直接释放**。正是因为这个特点，栈中的数据可以通过简单的编译器指令自动清理，也就不需要通过 GC 来回收了。
+
+栈空间可以被重复利用，新增和删除栈的数据只需要移动栈顶指针即可，节约了重复申请和释放内存的操作。基于栈被重复利用的特性，这块内存很大概率能被 CPU 的缓存命中，从而可以极大地提升访问的速度。
+
 ### 为什么需要堆？
 
 光有栈，对于面向过程的程序设计还远远不够，因为栈上的数据在函数返回的时候就会被释放掉，所以**无法将数据传递至函数外部**。而全局变量没有办法动态地产生，只能在编译的时候定义，有很多情况下缺乏表现力，在这种情况下，堆（Heap）是一种唯一的选择。The heap is an area of dynamically-allocated memory that is **managed automatically by the operating system or the memory manager library**. Memory on the heap is allocated, deallocated, and resized regularly during program execution, and this can lead to a problem called fragmentation. 堆适合管理生存期较长的一些数据，这些数据在退出作用域以后也不会消失。

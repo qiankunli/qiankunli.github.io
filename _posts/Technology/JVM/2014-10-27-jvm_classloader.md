@@ -120,9 +120,20 @@ JVM在运行时，需要一种用来标识Java内部类型的机制。在HotSpot
 
 ### 内存布局
 
+```c++
+class oopDesc {
+ private:
+  volatile markWord _mark;
+  union _metadata {
+    Klass*      _klass;
+    narrowKlass _compressed_klass;
+  } _metadata;
+}
+```
+
 ![](/public/upload/java/java_object_memory_layout.png)
 
-每个 Java 对象都有一个对象头 （object header） ，由标记字段和类型指针构成
+每个 Java 对象都有一个对象头 （object header） ，由标记字段和类型指针构成。java对象头信息是跟对象自身定义的数据结构无关的，**这些信息所记录的状态是用于JVM对对象的管理的**（比如并发访问与gc）。
 
 1. 标记字段用来存储对象的哈希码， GC 信息， 持有的锁信息。
 2. 类型指针指向该对象的类 Class。
