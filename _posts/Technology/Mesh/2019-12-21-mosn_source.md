@@ -180,7 +180,7 @@ mosn.io/mosn/pkg
 3. MOSN 从 upstream(conn=5) 接收了一个响应 response，依据报文扩展多路复用接口 GetRequestId 获取到请求在这条连接上的身份标识(requestId=30)。此时可以从上下游关联映射表中，根据 upstream 信息(connId=5, requestId=30) 找到对应的 downstream 信息(connId=2, requestId=1)；
 4. 依据 downstream request 的信息，调用文扩展多路复用接口 SetRequestId 设置响应的 requestId，并回复给 downstream；
 
-L7 层多用复用转发逻辑：proxy.onData ==> xprotocol.serverStreamConnection.Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleRequest/handleResponse ==> proxy.NewStreamDetect 创建了 downStream ==> downStream.OnReceive ==> downStream.receive ==> downStream.matchRoute ==> downStream.chooseHost 确定下游主机 ==> downStream.receiveHeaders/receiveData/receiveTrailers ==> upstreamRequest.receiveHeaders/receiveData/receiveTrailers 转发结束
+L7 层多用复用转发逻辑：proxy.onData ==> xprotocol.serverStreamConnection.Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleRequest/handleResponse ==> proxy.NewStreamDetect 创建了 downStream ==> downStream.OnReceive ==> downStream.receive ==> downStream.matchRoute ==> downStream.chooseHost 确定下游主机 ==> downStream.receiveHeaders/receiveData/receiveTrailers ==> upstreamRequest.receiveHeaders/receiveData/receiveTrailers 转发结束。 **网络数据 从字节数组都frame 再到协议对象 都是实际存在的，Connection/StreamConnection/Stream 则都是 通信两端 为维护数据状态 而产生的**。
 
 省略一下
 ```
@@ -204,10 +204,12 @@ upstreamRequest 发送到下游
 
 ```
 [DEBUG] new idlechecker: maxIdleCount:6, conn:2
+// 收到client connection=2；
 [DEBUG] [server] [listener] accept connection from 0.0.0.0:2045, condId= 2, remote addr:192.168.104.18:60625
 [DEBUG] [2,-] [stream] [xprotocol] new stream detect, requestId = 0
 [DEBUG] [2,] [proxy] [downstream] new stream, proxyId = 1 , requestId =0, oneway=false
 [DEBUG] [2,] [proxy] [downstream] 0 stream filters in config
+// receive header frame；
 [DEBUG] [2,] [proxy] [downstream] OnReceive headers   跟上header 的具体内容
 [DEBUG] [2,] [proxy] [downstream] enter phase DownFilter[1], proxyId = 1
 [DEBUG] [2,] [proxy] [downstream] enter phase MatchRoute[2], proxyId = 1
@@ -220,36 +222,40 @@ upstreamRequest 发送到下游
 [DEBUG] [upstream] [cluster manager] clusterSnapshot.loadbalancer.ChooseHost result is 127.0.0.1:2046, cluster name = clientCluster
 [DEBUG] [stream] [sofarpc] [connpool] init host 127.0.0.1:2046
 [INFO] remote addr: 127.0.0.1:2046, network: tcp
+// client mosn 建立与上游mosn 的connection =3；
 [DEBUG] [network] [check use writeloop] Connection = 3, Local Address = 127.0.0.1:60626, Remote Address = 127.0.0.1:2046
 [DEBUG] [network] [client connection connect] connect raw tcp, remote address = 127.0.0.1:2046 ,event = ConnectedFlag, error = <nil>
 [DEBUG] client OnEvent ConnectedFlag, connected false
 [DEBUG] [2,] [proxy] [downstream] timeout info: {GlobalTimeout:1m0s TryTimeout:0s}
 [DEBUG] [2,] [proxy] [downstream] enter phase DownFilterAfterChooseHost[5], proxyId = 1
 [DEBUG] [2,] [proxy] [downstream] enter phase DownRecvHeader[6], proxyId = 1
+// 向上游发送 header frame； 
 [DEBUG] [2,] [proxy] [upstream] append headers: xx  跟上header 的具体内容
 [DEBUG] [2,] [proxy] [upstream] connPool ready, proxyId = 1, host = 127.0.0.1:2046
 [DEBUG] [2,] [stream] [xprotocol] appendHeaders, direction = 0, requestId = 1
+// receive data frame；
 [DEBUG] [2,] [proxy] [downstream] enter phase DownRecvData[7], proxyId = 1
 [DEBUG] [2,] [proxy] [downstream] receive data = 2.0.2mosn.io.dubbo.DemoService0.0.sayHelloLjava/lang/String;MOSNHpathmosn.io.dubbo.DemoService	interfacemosn.io.dubbo.DemoServiceversion0.0.0Z
 [DEBUG] [2,] [proxy] [downstream] start a request timeout timer
+// 向上游发送 data frame；
 [DEBUG] [2,] [proxy] [upstream] append data:2.0.2mosn.io.dubbo.DemoService0.0.sayHelloLjava/lang/String;MOSNHpathmosn.io.dubbo.DemoService	interfacemosn.io.dubbo.DemoServiceversion0.0.0Z
 [DEBUG] [2,] [stream] [xprotocol] appendData, direction = 0, requestId = 1
 [DEBUG] [2,] [stream] [xprotocol] connection 3 endStream, direction = 0, requestId = 1
 [DEBUG] [2,] [proxy] [downstream] enter phase WaitNotify[11], proxyId = 1
 [DEBUG] [2,] [proxy] [downstream] waitNotify begin 0xc00046c000, proxyId = 1
 [DEBUG] [2,] [stream] [xprotocol] connection 3 receive response, requestId = 1
+// 从上游 接收 header frame 发往下游；
 [DEBUG] [2,] [proxy] [upstream] OnReceive headers: xx跟上响应header 的具体内容
 [DEBUG] [2,] [proxy] [downstream] OnReceive send downstream response xx
 [DEBUG] [2,] [proxy] [downstream] enter phase UpFilter[12], proxyId = 1
 [DEBUG] [2,] [proxy] [downstream] enter phase UpRecvHeader[13], proxyId = 1
 [DEBUG] [2,] [stream] [xprotocol] appendHeaders, direction = 1, requestId = 0
+从上游接收 data frame 发往下游；
 [DEBUG] [2,] [proxy] [downstream] enter phase UpRecvData[14], proxyId = 1
 [DEBUG] [2,] [stream] [xprotocol] appendData, direction = 1, requestId = 0
 [DEBUG] [2,] [stream] [xprotocol] connection 2 endStream, direction = 1, requestId = 0
 [DEBUG] update listener write bytes: 89
 ```
-
-client mosn 处理过程 ： 收到client connection=2；收到 client stream；receive header frame；route & chooseHost；client mosn 建立与上游mosn 的connection =3；向上游发送 header frame； receive data frame； 向上游发送 data frame；endStream；从上游 接收 header frame 发往下游；从上游接收 data frame 发往下游；endstream。
 
 mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持http、http2  和针对微服务场景xprotocol。 
 1. mosn proxy **架设了基于多路复用/Stream机制的转发**：多路复用由Stream 概念表示，一个 请求/响应 对应多个frame（至少包含header 和 data 2个frame）。哪怕http 不是多路复用也 迁就了这一套约定。在proxy包中，转发逻辑由 downstream.go 和 upstream.go 完成，**各个协议不需要自己实现转发逻辑，只需要向 mosn 的Stream 机制靠拢即可**：实现ServerStreamConnection 和 ClientStreamConnection interface
@@ -260,8 +266,8 @@ mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持
 基于上述认识，[云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)我们再来看 mosn 的分层结构设计。其中，**每一层通过工厂设计模式向外暴露其接口**，方便用户灵活地注册自身的需求。
 
 1. NET/IO 作为网络层，监测连接和数据包的到来，同时作为 listener filter 和 network filter 的挂载点;
-2. Protocol 作为多协议引擎层，对数据包进行检测，并使用对应协议做 decode/encode 处理; 
-3. Stream **对 decode 的数据包做二次封装为 stream**，作为 stream filter 的挂载点; PS：Protocol 为什么在Stream 的下面，因为协议数据 要decode 为Stream
+2. Protocol 作为多协议引擎层，对数据包进行检测，并使用对应协议做 decode/encode 处理。**Protocol 层对应了代码中的 StreamConnection struct，将各个协议映射为 stream 处理机制：**`Dispatch(buf)` 将字节数组 decode 为frame，并 ，非常重要，这也与 代码中的package 包 单纯负责 编解码是 不一样的。
+3. Stream **对 decode 的数据包做二次封装为 stream**，作为 stream filter 的挂载点; 
 4. Proxy 作为 MOSN 的转发框架，对封装的 stream 做 proxy 处理;
 
 ## 转发代码分析
@@ -311,7 +317,7 @@ func (sc *streamConn) handleRequest(ctx context.Context, frame xprotocol.XFrame,
 }
 ```
 
-在http/http2/xprotocol 对应的ServerStreamConnection 中，**每次收到一个新的Stream，`sc.serverCallbacks.NewStreamDetect` ==> newActiveStream 生成一个新的downStream struct 对应**， sc.serverCallbacks 其实就是proxy struct。downStream 代码注释中提到： Downstream stream, as a controller to handle downstream and upstream proxy flow。 downStream  同时持有responseSender 成员指向Stream，用于upstream收到响应数据时 回传给client。
+在xprotocol 对应的ServerStreamConnection 中，每次收到一个新的xprotocol.xStream，xStream.receiver 即downStream ，downStream代码注释中提到： Downstream stream, as a controller to handle downstream and upstream proxy flow。 downStream  同时持有responseSender 成员指向Stream，用于upstream收到响应数据时 回传给client。
 
 `downStream.OnReceive` 逻辑
 
