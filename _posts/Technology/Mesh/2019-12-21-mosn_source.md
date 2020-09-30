@@ -192,7 +192,10 @@ mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持
 
 从上游接收响应 handleResponse：client.onData ==> xprotocol.streamConn(clientStreamConnection).Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleResponse ==> clientStream = `xprotocol.streamConn.clientStreams[requestId]` ==> clientStreamReceiverWrapper.onReceive ==>  upstreamRequest.OnReceive ==> downStream.sendNotify ==>  接收协程从先前中断的地方继续 downStream.receive  ==> upstreamRequest.receiveHeaders/downStream.appendHeaders/xprotocol.xStream.AppendHeaders ==> upstreamRequest.receiveData/downStream.appendData/xprotocol.xStream.AppendData ==>  upstreamRequest.receiveTrailers/downStream.appendTrailers/xprotocol.xStream.AppendTrailers ==> xprotocol.xStream.endStream ==> buf = xprotocol.xStream.streamConn.protocol.Encode(frame) ==> xprotocol.xStream.streamConn.netConn.Write(buf)  
 
-**网络数据 从字节数组都frame 再到协议对象 都是实际存在的，Connection/StreamConnection/Stream 则都是 通信两端 为维护数据状态 而产生的**。
+两个体会：
+
+1. 可以看到 基于io事件 如何实现了转发逻辑
+2. **网络数据 从字节数组都frame 再到协议对象 都是实际存在的，Connection/StreamConnection/Stream 则都是 通信两端 为维护数据状态 而产生的**。
 
 以官方 dubbo example 运行为例： dubbo consumer  ==> client mosn `localhost:2045` ==> server mosn `localhost:2046` ==> dubbo provider `0.0.0.0:20880`
 
