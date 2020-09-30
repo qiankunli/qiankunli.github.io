@@ -263,7 +263,7 @@ mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持
 3. Stream **对 decode 的数据包做二次封装为 stream**，作为 stream filter 的挂载点; 
 4. Proxy 作为 MOSN 的转发框架，对封装的 stream 做 proxy 处理;
 
-## 转发代码分析
+## 转发代码分析（从下游接收请求部分）
 
 mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应协议的`serverStreamConnection.Dispatch` 经过协议解析， **字节流转成了协议的数据包**，转给了`StreamReceiveListener.OnReceive`。proxy.downStream 实现了 StreamReceiveListener。
 
