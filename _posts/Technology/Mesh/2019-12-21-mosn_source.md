@@ -180,25 +180,19 @@ mosn.io/mosn/pkg
 3. MOSN 从 upstream(conn=5) 接收了一个响应 response，依据报文扩展多路复用接口 GetRequestId 获取到请求在这条连接上的身份标识(requestId=30)。此时可以从上下游关联映射表中，根据 upstream 信息(connId=5, requestId=30) 找到对应的 downstream 信息(connId=2, requestId=1)；
 4. 依据 downstream request 的信息，调用文扩展多路复用接口 SetRequestId 设置响应的 requestId，并回复给 downstream；
 
-L7 层多用复用转发逻辑：proxy.onData ==> xprotocol.serverStreamConnection.Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleRequest/handleResponse ==> proxy.NewStreamDetect 创建了 downStream ==> downStream.OnReceive ==> downStream.receive ==> downStream.matchRoute ==> downStream.chooseHost 确定下游主机 ==> downStream.receiveHeaders/receiveData/receiveTrailers ==> upstreamRequest.receiveHeaders/receiveData/receiveTrailers 转发结束。 **网络数据 从字节数组都frame 再到协议对象 都是实际存在的，Connection/StreamConnection/Stream 则都是 通信两端 为维护数据状态 而产生的**。
+[MOSN 源码解析 - 协程模型](https://mosn.io/zh/blog/code/mosn-eventloop/)
 
-省略一下
-```
-proxy.onData ==> proxy.NewStreamDetect
-downStream.OnReceive 执行filter route 及 choose 下游节点
-upstreamRequest 发送到下游
-```
+mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持http、http2  和针对微服务场景xprotocol。 
+1. mosn proxy **架设了基于多路复用/Stream机制的转发**：多路复用由Stream 概念表示，一个 请求/响应 对应多个frame（至少包含header 和 data 2个frame）。哪怕http 不是多路复用也 迁就了这一套约定。在proxy包中，转发逻辑由 downstream.go 和 upstream.go 完成，**各个协议不需要自己实现转发逻辑，只需要向 mosn 的Stream 机制靠拢即可**：实现ServerStreamConnection 和 ClientStreamConnection interface
+2. 对于微服务框架，xprotocol 进一步的封装了功能代码，各rpc 协议只需实现xprotocol.XProtocol interface。
 
-L4及L7合并后的 转发逻辑如下
+![](/public/upload/mesh/mosn_process.png)
 
-```
-activeListener.Start ==> activeListener.OnAccept ==> activeListener.OnNewConnection
-connection.Start ==> connection.onRead
-filterManager.OnRead
-proxy.onData ==> proxy.NewStreamDetect   L4 层引出 Stream 多路复用机制
-downStream.OnReceive 执行filter route 及 choose 下游节点
-upstreamRequest 发送到下游
-```
+从下游接收请求 handleRequest：proxy.onData ==> xprotocol.streamConn(serverStreamConnection).Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleRequest ==> create serverStream(xStream) 并关联 downStream ==> downStream.OnReceive ==> downStream.receive ==> downStream.matchRoute ==> downStream.chooseHost 确定下游主机 ==> downStream.receiveHeaders/upstreamRequest.appendHeaders/xprotocol.xStream.AppendHeaders ==> downStream.receiveData/upstreamRequest.appendData/xprotocol.xStream.AppendData ==>  downStream.receiveTrailers/upstreamRequest.appendTrailers/xprotocol.xStream.AppendTrailers ==> xprotocol.xStream.endStream ==> buf = xprotocol.xStream.streamConn.protocol.Encode(frame) ==> xprotocol.xStream.streamConn.netConn.Write(buf)  转发暂停
+
+从上游接收响应 handleResponse：client.onData ==> xprotocol.streamConn(clientStreamConnection).Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleResponse ==> clientStream = `xprotocol.streamConn.clientStreams[requestId]` ==> clientStreamReceiverWrapper.onReceive ==>  upstreamRequest.OnReceive ==> downStream.sendNotify ==>  接收协程从先前中断的地方继续 downStream.receive  ==> upstreamRequest.receiveHeaders/downStream.appendHeaders/xprotocol.xStream.AppendHeaders ==> upstreamRequest.receiveData/downStream.appendData/xprotocol.xStream.AppendData ==>  upstreamRequest.receiveTrailers/downStream.appendTrailers/xprotocol.xStream.AppendTrailers ==> xprotocol.xStream.endStream ==> buf = xprotocol.xStream.streamConn.protocol.Encode(frame) ==> xprotocol.xStream.streamConn.netConn.Write(buf)  
+
+**网络数据 从字节数组都frame 再到协议对象 都是实际存在的，Connection/StreamConnection/Stream 则都是 通信两端 为维护数据状态 而产生的**。
 
 以官方 dubbo example 运行为例： dubbo consumer  ==> client mosn `localhost:2045` ==> server mosn `localhost:2046` ==> dubbo provider `0.0.0.0:20880`
 
@@ -257,10 +251,6 @@ upstreamRequest 发送到下游
 [DEBUG] update listener write bytes: 89
 ```
 
-mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持http、http2  和针对微服务场景xprotocol。 
-1. mosn proxy **架设了基于多路复用/Stream机制的转发**：多路复用由Stream 概念表示，一个 请求/响应 对应多个frame（至少包含header 和 data 2个frame）。哪怕http 不是多路复用也 迁就了这一套约定。在proxy包中，转发逻辑由 downstream.go 和 upstream.go 完成，**各个协议不需要自己实现转发逻辑，只需要向 mosn 的Stream 机制靠拢即可**：实现ServerStreamConnection 和 ClientStreamConnection interface
-2. 对于微服务框架，xprotocol 进一步的封装了功能代码，各rpc 协议只需实现xprotocol.XProtocol interface。
-
 ![](/public/upload/mesh/mosn_overview.png)
 
 基于上述认识，[云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)我们再来看 mosn 的分层结构设计。其中，**每一层通过工厂设计模式向外暴露其接口**，方便用户灵活地注册自身的需求。
@@ -271,10 +261,6 @@ mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持
 4. Proxy 作为 MOSN 的转发框架，对封装的 stream 做 proxy 处理;
 
 ## 转发代码分析
-
-[MOSN 源码解析 - 协程模型](https://mosn.io/zh/blog/code/mosn-eventloop/)
-
-![](/public/upload/mesh/mosn_process.png)
 
 mosn 数据接收时，从`proxy.onData` 收到传上来的数据，执行对应协议的`serverStreamConnection.Dispatch` 经过协议解析， **字节流转成了协议的数据包**，转给了`StreamReceiveListener.OnReceive`。proxy.downStream 实现了 StreamReceiveListener。
 
@@ -518,7 +504,7 @@ func (s *xStream) endStream() {
 }
 ```
 
-网络层的write
+xStream.endStream 真正触发 网络数据的发送，网络层的write
 
 ```go
 func (c *connection) Write(buffers ...buffer.IoBuffer) (err error) {

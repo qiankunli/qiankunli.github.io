@@ -79,8 +79,6 @@ StreamConnection is a connection runs multiple streams
 }
 ```
 
-### StreamConnection 的初始化
-
 初始化相关链路：activeListener.OnAccept ==> activeRawConn.ContinueFilterChain ==> activeListener.newConnection ==> activeListener.OnNewConnection ==> genericProxyFilterConfigFactory.CreateFilterChain ==> filterManager.AddReadFilter ==> proxy.InitializeReadFilterCallbacks ==> stream.CreateServerStreamConnection
 
 ```go
@@ -237,14 +235,28 @@ mosn/pkg/protocol/xprotocol
         }
 ```
 
-### 基于多路复用的数据转发
+streamConn 承上启下，分为client 和 server两侧，持有协议、连接对象，可以创建clientSteam（且暂存） 和 serverStream
+1. server 侧，从Dispatch 接收数据，解码，创建 serverStream 关联downStream ，downStream 处理，创建针对上游的clientStream， 操作Connection 写数据到上游
+1. client 侧，从Dispatch 接收数据，解码，寻找 clientStream ，downStream 恢复处理，找到关联的serverStream， 操作Connection 写数据到下游
 
-mosn 作为一个七层代理，其核心工作就是转发，L7 层转发支持http、http2  和针对微服务场景xprotocol。 
-1. mosn proxy **架设了基于多路复用/Stream机制的转发**：多路复用由Stream 概念表示，一个 请求/响应 对应多个frame（至少包含header 和 data 2个frame）。哪怕http 不是多路复用也 迁就了这一套约定。在proxy包中，转发逻辑由 downstream.go 和 upstream.go 完成，**各个协议不需要自己实现转发逻辑，只需要向 mosn 的Stream 机制靠拢即可**：实现ServerStreamConnection 和 ClientStreamConnection interface
-2. 对于微服务框架，xprotocol 进一步的封装了功能代码，各rpc 协议只需实现xprotocol.XProtocol interface。
+```go
+// mosn.io/mosn/pkg/stream/xprotocol/conn.go
+type streamConn struct {
+    ctx        context.Context
+    ctxManager *stream.ContextManager
 
-proxy.onData ==> xprotocol.serverStreamConnection.Dispatch ==> xprotocol.streamConn.handleFrame ==> xprotocol.streamConn.handleRequest/handleResponse ==> proxy.NewStreamDetect 创建了 downStream ==> downStream.OnReceive ==> downStream.receive ==> downStream.matchRoute ==> downStream.chooseHost 确定下游主机 ==> downStream.receiveHeaders/receiveData/receiveTrailers ==> upstreamRequest.receiveHeaders/receiveData/receiveTrailers 转发结束
-
+	netConn    api.Connection               // 底层连接
+	engine   *xprotocol.XEngine             // xprotocol fields
+	protocol xprotocol.XProtocol
+    // server side fields
+	serverCallbacks types.ServerStreamConnectionEventListener 
+    // client side fields
+	clientMutex        sync.RWMutex                           
+	clientStreamIDBase uint64
+	clientStreams      map[uint64]*xStream
+	clientCallbacks    types.StreamConnectionEventListener
+}
+```
 ## 连接池管理
 
 [云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)为了提升服务网格之间的建连性能还设计了多种协议的连接池从而方便地实现连接复用及管理。在连接管理方面，MOSN 设计了多协议连接池， 当 Proxy 模块在 Downstream 收到 Request 的时候，在经过路由、负载均衡等模块处理获取到 Upstream Host 以及对应的转发协议时，通过 Cluster Manager 获取对应协议的连接池 ，如果连接池不存在则创建并加入缓存中，之后在长连接上创建 Stream，并发送数据
