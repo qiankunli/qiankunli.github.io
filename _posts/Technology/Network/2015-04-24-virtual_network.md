@@ -73,6 +73,8 @@ keywords: Docker
 
 ## macvlan 和 ipvlan
 
+[一文读懂容器网络发展](https://mp.weixin.qq.com/s/fAThT7hKxDYXvFGJvqO42g)Macvlan 是 linux kernel 比较新的特性，允许在主机的一个网络接口上配置多个虚拟的网络接口，这些网络 interface 有自己独立的 mac 地址，也可以配置上 ip 地址进行通信。macvlan 下的虚拟机或者容器网络和主机在同一个网段中，共享同一个广播域。除此之外，macvlan 自身也完美支持 VLAN。
+
 [Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)Macvlan and ipvlan are Linux network drivers that exposes underlay or host interfaces directly to VMs or Containers running in the host. 
 
 要跟mac based vlan 有所区分，参见[虚拟网络](http://qiankunli.github.io/2015/04/24/virtual_network.html)。
