@@ -331,3 +331,28 @@ k8s 在 etcd中的存在
 
 ![](/public/upload/kubernetes/apiserver_create_pod.png)
 
+## 扩展apiserver
+
+The aggregation layer runs in-process with the kube-apiserver. Until an extension resource is registered, the aggregation layer will do nothing. To register an API, you add an APIService object, which "claims" the URL path in the Kubernetes API. At that point, the aggregation layer will proxy anything sent to that API path (e.g. /apis/myextension.mycompany.io/v1/…) to the registered APIService. 聚合层在 kube-apiserver 进程内运行。在扩展资源注册之前，聚合层不做任何事情。 要注册 API，用户必须添加一个 APIService 对象，用它来“申领” Kubernetes API 中的 URL 路径。 自此以后，聚合层将会把发给该 API 路径的所有内容转发到已注册的 APIService。
+
+
+```yaml
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1alpha1.wardle.k8s.io
+spec:
+  insecureSkipTLSVerify: true
+  group: wardle.k8s.io
+  groupPriorityMinimum: 1000
+  versionPriority: 15
+  service:
+    name: api
+    namespace: wardle
+  version: v1alpha1
+```
+
+上述配置 会让 apiserver 收到 v1alpha1.wardle.k8s.io  请求时 转给 namespace=wardle 下名为 api 的服务。PS：估计是
+`http://apiserver/apis/v1alpha1.wardle.k8s.io/v1alpha1/abc` 转给 `http://serviceIp:servicePort/abc`
+
+
