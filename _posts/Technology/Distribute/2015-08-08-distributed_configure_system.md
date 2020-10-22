@@ -31,7 +31,7 @@ You can use these to implement different **recipes** that are required for clust
 
 ## 现有产品
 
-分布式配置系统一般有zookeeper,etcd,Consul等
+分布式配置系统一般有zookeeper,etcd,Consul,Eureka(AP)等
 
 分布式配置中心一般有以下特点：
 
@@ -102,7 +102,7 @@ etcd启动时，有三种模式`static`,`etcd Discovery`和`DNS Discovery`三种
     /network/docker/nodes/192.168.56.101:2375
     /network/docker/nodes/192.168.56.102:2375
 
-### zookeeper
+### CP/zookeeper
 
 针对每个主机
 

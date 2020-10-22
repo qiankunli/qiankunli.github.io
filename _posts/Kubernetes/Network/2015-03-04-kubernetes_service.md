@@ -12,8 +12,9 @@ keywords: Kubernetes Service
 * TOC
 {:toc}
 
-本文均在“访问Pod 必须通过 Service的范畴”
+[服务发现技术选型那点事儿](https://mp.weixin.qq.com/s/boh5smQ6ApTwScKYyhuD-Q)常规的“服务发现”是“客户端的服务发现（client-side service discovery）”，假设订单系统运行在四个节点上，每个节点有不同的 IP 地址，那我们的调用者在发起 RPC 或者 HTTP 请求前，是必须要清楚到底要调用个节点的。在微服务世界，我们很希望每个服务都是独立且完整的，就像面向对象编程一样，细节应该被隐藏到模块内部。比如对于一个订单服务，在外来看它就应该是“一个服务”，它内部的几个节点是否可用并不是调用者需要关心的，这些细节我们并不想关心。按照这种想法，服务端的服务发现（server-side serivce discovery）会更具有优势，其实我们对这种模式并不陌生，在使用 NGINX 进行负载均衡的代理时，我们就在实践这种模式，一旦流量到了 proxy，由 proxy 决定下发至哪个节点，而 proxy 可以通过 healthcheck 来判断哪个节点是否健康。
 
+本文均在“访问Pod 必须通过 Service的范畴”
 
 ![](/public/upload/kubernetes/kubernetes_service_access.png)
 
