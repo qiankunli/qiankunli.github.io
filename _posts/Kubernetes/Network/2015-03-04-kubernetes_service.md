@@ -14,6 +14,8 @@ keywords: Kubernetes Service
 
 [服务发现技术选型那点事儿](https://mp.weixin.qq.com/s/boh5smQ6ApTwScKYyhuD-Q)常规的“服务发现”是“客户端的服务发现（client-side service discovery）”，假设订单系统运行在四个节点上，每个节点有不同的 IP 地址，那我们的调用者在发起 RPC 或者 HTTP 请求前，是必须要清楚到底要调用个节点的。在微服务世界，我们很希望每个服务都是独立且完整的，就像面向对象编程一样，细节应该被隐藏到模块内部。比如对于一个订单服务，在外来看它就应该是“一个服务”，它内部的几个节点是否可用并不是调用者需要关心的，这些细节我们并不想关心。按照这种想法，服务端的服务发现（server-side serivce discovery）会更具有优势，其实我们对这种模式并不陌生，在使用 NGINX 进行负载均衡的代理时，我们就在实践这种模式，一旦流量到了 proxy，由 proxy 决定下发至哪个节点，而 proxy 可以通过 healthcheck 来判断哪个节点是否健康。
 
+[深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)在 kubernetes 中，您可以将应用程序定义为 Service。Service 是一种抽象，它定义了一组 Pods 的逻辑集和访问它们的策略。
+
 本文均在“访问Pod 必须通过 Service的范畴”
 
 ![](/public/upload/kubernetes/kubernetes_service_access.png)
@@ -111,6 +113,11 @@ KUBE-SVC-NWV5X2332I4OT4T3 规则实际上是一组随机模式（–mode random�
 
 在yaml 配置层面 LoadBalancer/NodePort/ExternalName 的kind 都是 Service
 
+K8S 中定义了 4种 Service 类型:
+1. ClusterIP: 通过 VIP 访问 Service，但该 VIP 只能在此集群内访问
+2. NodePort: 通过 NodeIP:NodePort 访问 Service，这意味着该端口将保留在集群内的所有节点上
+3. ExternalIP: 与 ClusterIP 相同，但是这个 VIP 可以从这个集群之外访问
+4. LoadBalancer
 
 
 ### LoadBalancer

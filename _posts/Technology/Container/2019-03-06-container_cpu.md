@@ -72,6 +72,8 @@ NICE_0_LOAD = 1024
 
 ## 容器 与 CFS
 
+[Kubernetes中的CPU节流：事后分析](https://mp.weixin.qq.com/s/2lcX3-QBYFP5UnPw-b-Rvg)几乎所有的容器编排器都依赖于内核控制组（cgroup）机制来管理资源约束。在容器编排器中设置硬CPU限制后，内核将使用完全公平调度器（CFS）Cgroup带宽控制来实施这些限制。CFS-Cgroup带宽控制机制使用两个设置来管理CPU分配：配额（quota）和周期（period）。当应用程序在给定时间段内使用完其分配的CPU配额时，此时它将受到CPU节流，直到下一个周期才能被调度。
+
 [docker CPU文档](https://docs.docker.com/config/containers/resource_constraints/)By default, each container’s access to the host machine’s CPU cycles is unlimited. You can set various constraints to limit a given container’s access to the host machine’s CPU cycles. Most users use and configure the default CFS scheduler. In Docker 1.13 and higher, you can also configure the realtime scheduler.The CFS is the Linux kernel CPU scheduler for normal Linux processes. **Several runtime flags allow you to configure the amount of access to CPU resources your container has**. When you use these settings, Docker modifies the settings for the container’s cgroup on the host machine.  默认情况，容器可以任意使用 host 上的cpu cycles，**配的不是容器，配的是 CFS**，dockers仅仅是帮你设置了下参数而已。
 
 ||示例|默认值|

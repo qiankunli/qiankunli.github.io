@@ -18,8 +18,6 @@ keywords:  Kubernetes replica
 
 2018.11.18 补充，内容来自极客时间 《深入剖析Kubernetes》
 
-
-
 ## What is Kubernetes replication for?
 
 [Kubernetes Replication Controller, Replica Set and Deployments: Understanding replication options](https://www.mirantis.com/blog/kubernetes-replication-controller-replica-set-and-deployments-understanding-replication-options/)
@@ -105,6 +103,8 @@ Replication controllers make it easy to scale the number of replicas up or down,
 （很轻松的改变pod的个数）
 
 #### Rolling updates
+
+[Kubernetes deployment strategies](https://blog.container-solutions.com/kubernetes-deployment-strategies)
 
 Replication controllers are designed to facilitate（促进，帮助，使容易） rolling updates to a service by replacing pods one by one.
 

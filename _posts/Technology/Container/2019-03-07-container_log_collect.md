@@ -53,6 +53,8 @@ keywords: container log collect
 
 Docker 则通过 docker logs 命令向用户提供日志接口。`docker logs` 实现原理的本质均基于与容器一一对应的 <container-id>-json.log，`kubectl logs`类似
 
+[腾讯云容器服务日志采集最佳实践](https://mp.weixin.qq.com/s/CE5D23unxy4cSCGLEwtacw) 从公有云或私有云来说，不应对实现加以限制，采集什么（stdout/容器文件/host文件）；文件吐到哪里；如何解析日志格式；日志过滤/时间戳自定义；日志查询等 等都可以支持可配。
+
 ## 采集什么
 
 ![](/public/upload/container/collect_what.png)

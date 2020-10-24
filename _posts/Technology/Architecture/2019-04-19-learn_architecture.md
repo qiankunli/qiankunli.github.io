@@ -44,6 +44,8 @@ keywords: learn architecture
 
 ## 架构
 
+[应用架构之道：分离业务逻辑和技术细节](https://mp.weixin.qq.com/s/F5BWyALjJxryZXfb8WcH9g)任何事物都是规则性和随机性的组合。规范的意义就在于我们可以将规则性的东西固化下来，尽量减少随心所欲带来的复杂度，一致性可以降低系统复杂度。从命名到架构皆是如此，而架构本身就是一种规范和约束，破坏这个约束，也就破坏了架构。
+
 ### 架构是什么
 
 [从方法到思维：什么是应用逻辑架构的正确姿势？](https://mp.weixin.qq.com/s/6bYQK305VcqHruT1nmuO7w) 作者一直尝试对“架构是什么”进行有一定高度的提炼。发现了一句话：The fundamental organization of a system, embodied in its components, their relationships to each other and the environment, and the principles governing its design and evolution.　　根据这个定义，Architecture = Structure of Components + Relationships + Principles&Guidelines，我们在架构中需要：

@@ -65,3 +65,31 @@ keywords: Docker, calico
 2. 边缘代理，实际上只是中间代理拓扑的一种变体
 3. 嵌入式客户端库，为了避免中间代理拓扑固有的单点故障和扩展问题，更成熟的基础架构已朝着 通过将负载均衡嵌入到客户端库的方式来实现。
 4. Sidecar 代理，嵌入式客户端库负载均衡的一种变体。Sidecar 代理背后的思路是，以各进程间通信而导致的轻微延迟损失 为代价，无需任何编程语言锁定即可获得嵌入式库方法的各种优点。
+
+## 代理的其它实现方式
+
+### 通过 iptables实现proxy
+
+[深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)用户空间代理程序的主要瓶颈来自内核-用户空间切换和数据复制。如果我们可以完全在内核空间中实现代理，它将在性能上大大提高，从而击败用户空间的代理。iptables 可用于实现这一目标。
+
+### 通过ipvs 实现proxy
+
+虽然基于 iptables 的代理在性能上优于基于用户空间的代理，但在集群服务过多的情况下也会导致性能严重下降。本质上，这是因为 iptables 判决是基于链的，它是一个复杂度为 O(n) 的线性算法。iptables 的一个好的替代方案是 IPVS——内核中的L4负载均衡器，它在底层使用 ipset(哈希实现)，因此复杂度为 O(1)。
+
+```sh
+$ yum install -y ipvsadm
+$ ipvsadm -ln
+# 增加service
+$ ipvsadm -A -t $CLUSTER_IP:$PORT -s rr
+$ ipvsadm -a -t $CLUSTER_IP:$PORT -r $POD1_IP -m
+$ ipvsadm -a -t $CLUSTER_IP:$PORT -r $POD2_IP -m
+```
+
+### 通过 bpf 实现 proxy  
+
+这也是一个 O(1) 代理，但是与IPVS相比具有更高的性能。如果你有足够的时间和兴趣来阅读eBPF/BPF，可以考虑阅读 Cilium: BPF and XDP Reference Guide
+
+需要实现一段代码，编译并加载到内核中
+
+
+

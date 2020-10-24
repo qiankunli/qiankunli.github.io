@@ -13,6 +13,8 @@ keywords: linux 进程调度
 * TOC
 {:toc}
 
+调度器就好比教练，线程就好比球员，给线程调度cpu就好比安排哪个球员上球场。
+
 [调度系统设计精要](https://mp.weixin.qq.com/s/R3BZpYJrBPBI0DwbJYB0YA)CFS 的调度过程还是由 schedule 函数完成的，该函数的执行过程可以分成以下几个步骤：
 
 1. 关闭当前 CPU 的抢占功能；

@@ -59,7 +59,11 @@ ip link add link DEVICE [ name ] NAME
 
 ### netfilter 
 
-netfilter是工作于内核空间当中的一系列网络（TCP/IP）协议栈的钩子（hook），为内核模块在网络协议栈中的不同位置注册回调函数（callback）。也就是说，**在数据包经过网络协议栈的不同位置时做相应的由iptables配置好的处理逻辑**。netfilter中的五个钩子（这里也称为五个关卡）PRE_ROUTING，INPUT，FORWARD，OUTPUT，POST_ROUTING
+[深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)Netfilter 是 Linux 内核内部的包过滤和处理框架。一些要点:
+1. 主机上的所有数据包都将通过 netfilter 框架
+2. 在 netfilter 框架中有5个钩子点: PRE_ROUTING, INPUT, FORWARD, OUTPUT, POST_ROUTING
+3. 命令行工具 iptables 可用于动态地将规则插入到钩子点中
+4. 可以通过组合各种 iptables 规则来操作数据包(接受/重定向/删除/修改，等等)
 
 ![](/public/upload/network/netfilter_chain_flow.png)
 
@@ -69,9 +73,9 @@ netfilter是工作于内核空间当中的一系列网络（TCP/IP）协议栈�
     2. 非本地的目标地址进入FORWARD（需要本机内核支持IP_FORWARD）
 2. 由本地**用户空间应用进程产生的**数据包，通过一次路由选择由**哪个接口**送往网络中
 
-iptables的四表五链    
+iptables的四表五链：**在每个钩子点中**，规则被组织到具有预定义优先级的不同链中。为了按目的管理链，链被进一步组织到表中。
 
-1. 链，分别对应上面提到的五个关卡，PRE_ROUTING，INPUT，FORWARD，OUTPUT，POST_ROUTING，这五个关卡分别由netfilter的五个钩子函数来触发。为什么叫做“链”呢？这个关卡上的“规则”不止一条，很多条规则会按照顺序逐条匹配，将在此关卡的所有规则组织称“链”就很适合，
+1. 链，**分别对应**上面提到的五个关卡，PRE_ROUTING，INPUT，FORWARD，OUTPUT，POST_ROUTING，这五个关卡分别由netfilter的五个钩子函数来触发。为什么叫做“链”呢？这个关卡上的“规则”不止一条，很多条规则会按照顺序逐条匹配，将在此关卡的所有规则组织称“链”就很适合，
 2. 表，每一条“链”上的一串规则里面有些功能是相似的，比如，A类规则都是对IP或者端口进行过滤，B类规则都是修改报文，我们考虑能否将这些功能相似的规则放到一起，这样管理iptables规则会更方便。iptables把具有相同功能的规则集合叫做“表”，并且定一个四种表：filter;nat;mangle;raw
 
 不是所有的“链”都具有所有类型的“规则”，也就是说，某个特定表中的“规则”注定不能应用到某些“链”中

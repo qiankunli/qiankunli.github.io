@@ -104,6 +104,14 @@ Linux有两种IO：Direct IO和Buffered IO。Direct IO直接写磁盘，Duffered
 
 很多方面，**容器内应用无法感知容器的存在**，此外，容器间也在不常见的地方相互影响着。此时需要更改glibc、更深入点比如内核等。
 
+## 监控jvm
+
+[手把手教你使用 Prometheus 监控 JVM](https://mp.weixin.qq.com/s/ZnQqtImbh81L-HBBvI686g)JMX-Exporter 提供了两种用法:
+
+1. 启动独立进程。JVM 启动时指定参数，暴露 JMX 的 RMI 接口，JMX-Exporter 调用 RMI 获取 JVM 运行时状态数据，转换为 Prometheus metrics 格式，并暴露端口让 Prometheus 采集。
+2. JVM 进程内启动(in-process)。JVM 启动时指定参数，通过 javaagent 的形式运行 JMX-Exporter 的 jar 包，进程内读取 JVM 运行时状态数据，转换为 Prometheus metrics 格式，并暴露端口让 Prometheus 采集。
+官方不推荐使用第一种方式，一方面配置复杂，另一方面因为它需要一个单独的进程，而这个进程本身的监控又成了新的问题
+
 ## jar冲突
 
 [tomcat启动遇到NoSuchMethodError错误的排查思路](http://hongjiang.info/tag/classloader/)
