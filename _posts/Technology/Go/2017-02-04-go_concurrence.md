@@ -55,7 +55,7 @@ PS,routine is a set sequence of steps, part of larger computer program.
 
 共享内存
 
-1. sync.Mutex,           类似lock
+1. sync.Mutex,           实现Locker interface，类似lock
 2. sync.WaitGroup,       类似CountDown       
 
 CSP channel

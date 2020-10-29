@@ -23,7 +23,7 @@ J2SE-1.5 introduces package java.util.concurrent, **a collection of medium-level
  
 Among these components are a set of synchronizers – abstract data type (ADT) classes that maintain an internal synchronization state (for example, representing whether a lock is locked or unlocked), operations to update and inspect that state, and at least one method that will cause a calling thread to block if the state requires it, resuming when some other thread changes the synchronization state to permit it. Examples include various forms of mutual exclusion locks, read-write locks, semaphores, barriers, futures, event indicators, and handoff queues.
 
-abstract data type (ADT) classes 作者将同步器 描述为一个抽象的数据类型，包含几个要素
+abstract data type (ADT) classes 作者**将同步器 描述为一个抽象的数据类型，包含几个要素**
 
 1. an internal synchronization state
 2. operations to update and inspect that state 
@@ -42,7 +42,7 @@ any synchronizer can be used to implement nearly any other.可以用一个同步
 
 [Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)
 
-**线程同步出现的根本原因是访问公共资源需要多个操作，而这多个操作的执行过程不具备原子性，被任务调度器分开了**，而其他线程会破坏共享资源，所以需要在临界区做线程的同步，这里我们先明确一个概念，就是临界区，他**是指多个任务访问共享资源如内存或文件时候的指令，他是指令并不是受访问的资源**。POSIX 定义了五种同步对象：互斥锁，条件变量，自旋锁，读写锁，信号量，这些对象在 JVM 中也都有对应的实现
+**线程同步出现的根本原因是访问公共资源需要多个操作，而这多个操作的执行过程不具备原子性，被任务调度器分开了**，而其他线程会破坏共享资源，所以需要在临界区做线程的同步，这里我们先明确一个概念，就是临界区，它**是指多个任务访问共享资源如内存或文件时候的指令，它是指令并不是受访问的资源**。POSIX 定义了五种同步对象：互斥锁，条件变量，自旋锁，读写锁，信号量，这些对象在 JVM 中也都有对应的实现
 
 ### 实现什么
 
@@ -102,24 +102,26 @@ Concrete classes based on AbstractQueuedSynchronizer must define methods tryAcqu
 
 [The j.u.c Synchronizer Framework翻译(二)设计与实现](http://ifeve.com/aqs-2/)
 
-CLH队列实际上并不那么像队列，因为它的入队和出队操作都与它的用途（即用作锁）紧密相关。PS： 以至于一些文章 直接称之为锁 [并发编程——详解 AQS CLH 锁](https://juejin.im/post/5ae755606fb9a07ab97942a4)  CLH队列实际上并不那么像队列，因为它的入队和出队操作都与它的用途（即用作锁）紧密相关。它是一个链表队列，通过两个字段head和tail来存取，这两个字段是可原子更新的，两者在初始化时都指向了一个空节点。
+CLH队列实际上并不那么像队列，因为它的入队和出队操作都与它的用途（即用作锁）紧密相关。它是一个链表队列，通过两个字段head和tail来存取，这两个字段是可原子更新的，两者在初始化时都指向了一个空节点。
 
 ![](/public/upload/java/aqs_clh.png)
 
 一个新的节点，node，通过一个原子操作入队：
 
-	do {
-		pred = tail;
-	} while(!tail.compareAndSet(pred, node));
+```
+do {
+    pred = tail;
+} while(!tail.compareAndSet(pred, node));
+```
 
 每一个节点的“释放”状态都保存在其前驱节点中。因此，自旋锁的“自旋”操作就如下：
-
-	while (pred.status != RELEASED); // spin
-
+```
+while (pred.status != RELEASED); // spin
+```
 自旋后的出队操作只需将head字段指向刚刚得到锁的节点：
-
-	head = node;
-
+```
+head = node;
+```
 ### AQS 对 CLH 的变动
 
 为了将CLH队列用于阻塞式同步器，需要做些额外的修改以提供一种高效的方式定位某个节点的后继节点，因为一个节点需要显式地唤醒（unpark）其后继节点。AQS队列的节点包含一个next链接到它的后继节点
@@ -142,6 +144,20 @@ CLH队列实际上并不那么像队列，因为它的入队和出队操作都�
 2. head 表示当前持有锁的节点，release操作 upark head 之后的线程
 
 ![](/public/upload/java/aqs_clh_modify.png)
+
+## 演化
+
+晁岳攀：go Mutex 庖丁解牛看实现
+
+![](/public/upload/concurrency/concurrency_develop.png)
+
+“初版”的 Mutex 使用一个 flag 来表示锁是否被持有，实现比较简单；后来照顾到新来的 goroutine，所以会让新的 goroutine 也尽可能地先获取到锁，这是第二个阶段，我把它叫作“给新人机会”；那么，接下来就是第三阶段“多给些机会”，照顾新来的和被唤醒的 goroutine；但是这样会带来饥饿问题，所以目前又加入了饥饿的解决方案，也就是第四阶段“解决饥饿”。
+
+Mutex 绝不容忍一个 goroutine 被落下，永远没有机会获取锁。不抛弃不放弃是它的宗旨，而且它也尽可能地让等待较长的 goroutine 更有机会获取到锁。
+
+Mutex 可能处于两种操作模式下：正常模式和饥饿模式
+1. 正常模式下，waiter 都是进入先入先出队列，被唤醒的 waiter 并不会直接持有锁，而是要和新来的 goroutine 进行竞争。新来的 goroutine 有先天的优势，它们正在 CPU 中运行，可能它们的数量还不少，所以，在高并发情况下，被唤醒的 waiter 可能比较悲剧地获取不到锁，这时，它会被插入到队列的前面。如果 waiter 获取不到锁的时间超过阈值 1 毫秒，那么，这个 Mutex 就进入到了饥饿模式。
+2. 在饥饿模式下，Mutex 的拥有者将直接把锁交给队列最前面的 waiter。新来的 goroutine 不会尝试获取锁，即使看起来锁没有被持有，它也不会去抢，也不会 spin，它会乖乖地加入到等待队列的尾部。
 
 ## 小结一下
 
