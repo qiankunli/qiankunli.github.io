@@ -207,6 +207,7 @@ kube_state_metrics_list_total{resource="*v1.Node",result="error"} 52
 kube_state_metrics_watch_total{resource="*v1beta1.Ingress",result="success"} 1
 ```
 
+**Kubernetes object 的很多数据都可以从 kube-state-metrics 拿到（比如pod的重启次数，deploymnet 副本数有没有更新完毕）**，在不知道之前，使用client-go 监听k8s 用代码获取pod /deployment 等数据，方法比较笨。
 
 ## 需要哪些 alert rule
 

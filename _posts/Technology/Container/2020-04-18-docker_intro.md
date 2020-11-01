@@ -13,6 +13,16 @@ keywords: docker
 * TOC
 {:toc}
 
+
+## 容器运行时
+
+Linux 提供了cgroup 和 namespace 两大系统功能，是容器的基础，但是要把进程运行在容器中，还需要有便捷的SDK 或命令来调用Linux 的系统功能，从而创建出容器，容器运行时 就是容器进程运行和管理的工具。 
+
+![](/public/upload/container/container_runtime.png)
+
+1. runC是最常用的 容器低层运行时，不包含镜像管理，它假定容器的文件包已经从镜像里解压出来并存放于文件系统中。runC 创建的容器需要手动配置网络才能与其他容器或者网络节点连通。 
+2. containerd是最常用的 容器高层运行时，提供镜像下载、解压等功能， 不包含镜像构建、上传等功能
+
 ## Docker Daemon 调用栈分析
 
 docker在 1.11 之 后，被拆分成了多个组件以适应 OCI 标准。拆分之后，其包括 docker daemon， containerd，containerd-shim 以及 runC。组件 containerd 负责集群节点上容器 的生命周期管理，并向上为 docker daemon 提供 gRPC 接口。
@@ -39,6 +49,11 @@ docker-containerd-shim $containerId /var/run/docker/libcontainerd/  $containerId
 3. 向 kubelet 进程发送 SIGABRT 信号，golang 运行时就会帮我们输出 kubelet 进程的所有调 用栈。需要注意的是，这个操作会杀死 kubelet 进程。
 
 ## 命令行方式创建一个传统虚拟机
+
+虚拟化技术的发展
+1. 主机虚拟化，一台物理机可以被划分为若干个小的机器，每个机器的硬件互不共享，各自安装操作系统
+2. 硬件虚拟化，同一个物理机上隔离多个操作系统实例
+3. 操作系统虚拟化，由操作系统创建虚拟的系统环境，使应用感知不到其他应用的存在
 
 qemu 创建传统虚拟机流程（virtualbox是一个图形化的壳儿）
 

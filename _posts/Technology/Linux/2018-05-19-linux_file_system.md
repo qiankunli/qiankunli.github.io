@@ -208,6 +208,8 @@ ln分为软链接和硬链接
 
 ### union mount
 
+联合文件系统是一种 堆叠文件系统，通过不停地叠加文件实现对文件的修改。其中，增加操作通过在读写层增加新文件实现，删除操作一般通过添加额外的删除属性文件实现，比如删除a.file时读写层增加一个a.file.delete文件。修改只读层文件时，需要先复制一份儿文件到读写层，然后修改复制的文件。
+
 参见[Union mount](https://en.wikipedia.org/wiki/Union_mount)，In computer operating systems, union mounting is a way of combining multiple directories into one that appears to contain their combined contents.
 
 union mount的使用场景——读写只读文件系统，As an example application of union mounting, consider the need to update the information contained on a CD-ROM or DVD. While a CD-ROM is not writable, one can overlay the CD's mount point with a writable directory in a union mount. Then, updating files in the union directory will cause them to end up in the writable directory, giving the illusion that the CD-ROM's contents have been updated. 

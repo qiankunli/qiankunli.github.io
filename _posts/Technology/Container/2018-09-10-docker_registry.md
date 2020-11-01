@@ -13,8 +13,12 @@ keywords: docker registry
 * TOC
 {:toc}
 
-[最新进展 才云基于 Harbor 的企业级镜像仓库高可用实践](http://www.10tiao.com/html/562/201803/2650094752/1.html)
 
+镜像存储分为本地存储和Registry 存储，都是分层存储
+1. 本地存储，镜像下载到本地后，是如何在本地文件系统中存储的。**以快速加载和启动容器为核心**，容器在启动时需要将 镜像层按照顺序堆叠作为容器的运行环境，都是源文件（非压缩的）
+2. Registry 存储是指以什么方式存储在远端的 镜像仓库中。**以方便镜像快速上传和拉取为核心**，使用了压缩格式，按照layer 独立压缩和存储，使用镜像清单 manifest 包含所有的层，通过镜像摘要 digest 与tag 关联起来
+
+[最新进展 才云基于 Harbor 的企业级镜像仓库高可用实践](http://www.10tiao.com/html/562/201803/2650094752/1.html)
 
 Docker registry，目前它更名为 Distribution。它做的主要事情就是把这些 images 按照 blob 一层一层地存到文件系统里面，每一个 blob 的 name 都是一长串的数字，这数字是根据文件的内容算出来的；甚至它一些描述信息，也是通过 blob 的方式存起来的。然后它提供了一套比较完备的 API 供你去调用，你可以知道这里面有哪些 image 是你可以 pull 或者 push
 
@@ -30,9 +34,63 @@ Harbor做的事情就是说它在原生的一个 Docker registry 的基础上提
 
 ## 镜像仓库
 
-容器镜像包含以下的信息
+联合文件系统是一种 堆叠文件系统，通过不停地叠加文件实现对文件的修改。其中，增加操作通过在读写层增加新文件实现，删除操作一般通过添加额外的删除属性文件实现，比如删除a.file时读写层增加一个a.file.delete文件。修改只读层文件时，需要先复制一份儿文件到读写层，然后修改复制的文件。PS：所以我们说镜像是一层层的，每个layer是什么呢？ 一堆文件，比如a.file 和 b.file.delete 文件。
+
+容器的rootfs 由多个layer 文件叠加而成，每个layer 文件在分发时都必须被打包成一个tar 文件（即a.file 和b.file.delete/或whiteout标记 弄成一个文件），可选择压缩或非压缩的方式。打成一个文件的好处 除了发布方便，还可以生成摘要，便于校验和按内容寻址。
+
+容器镜像包含以下的信息，镜像的4个部分之间通过digest 相互引用（内容寻址）
 1. Manifest：包含特定平台、os的镜像信息、包含layer\config描述和digest信息
-2. Config：容器运行时需要用到的rootfs的变更和执行参数
+
+    ```json
+    {
+        "schemaVersion":2,
+        "config":{
+            "mediaType":"application/vnd.oci.image.config.v1+json",
+            "size":6883,
+            "digest": xx
+        }
+        "layers":[
+            {
+                "mediaType":"application/vnd.oci.image.config.v1+json",
+                "size":168654,
+                "digest":xx
+            },
+            {
+                "mediaType":"application/vnd.oci.image.config.v1+json",
+                "size":645724,
+                "digest":xx
+            },
+        ]
+    }
+    ```
+2. Config：容器运行时需要用到的rootfs和执行参数
+    ```json
+    {
+        "author":xx,
+        "os":"linux",
+        "config":{
+            "ExposedPorts": {
+                "8888/tcp":{}
+            },
+            "Env":[],
+            "Entrypoint":["/bin/myApp"],
+            "Cmd":[
+                "-f",
+                "/etc/harbor.cfg"
+            ],
+            "Volumes":{},
+            "Labels":{}
+        },
+        "rootfs":{
+            "diff_ids":[    // 未压缩层文件的digest
+                "sha256:xx",
+                "sha256:xx"
+            ],
+            "type":"layers"
+        },
+        "history":[] // 可选项
+    }
+    ```
 3. layer：包含了文件系统的信息，即该image包含了哪些文件/目录，以及它们的属性和数据。
 4. tar+gzip
 

@@ -34,6 +34,8 @@ There are cases where it makes sense to run multiple processes in a single conta
 1. 除了业务进程，**你有没有比较刚的需求运行其他进程？**比如ssh 等。笔者在实践中，每个容器内还跑了一个监控进程，用来跟踪容器内的进程数据、以及执行一些异常诊断指令。
 2. entrypoint 启动失败的可能性有多高，entrypoint 挂了会不停地重启，对集群带来的不良影响是否可控？
 
+2020.11.1补充： [并非每个容器内部都能包含一个操作系统](https://mp.weixin.qq.com/s/ALTxkwAXBdKdQLMYJIMrLw)容器单进程并不是指容器里只能运行"一个"进程而是指容器没有管理多进程的能力。这是因为容器里PID=1的进程就是应用本身，其他的进程都是PID=1进程的子进程。
+
 ## 以进程管理工具作为entrypoint
 
 [理解Docker容器的进程管理](https://yq.aliyun.com/articles/5545)
@@ -73,8 +75,6 @@ docker stop  对PID1进程 的要求
 ### 自定义脚本
 
 官方 [Run multiple services in a container](https://docs.docker.com/config/containers/multi-service_container/)
-
-
 
 ### runit
 

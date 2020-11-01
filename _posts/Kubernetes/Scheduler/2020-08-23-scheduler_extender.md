@@ -20,6 +20,8 @@ keywords: Scheduler Extender
 
 This approach is needed for use cases where scheduling decisions need to be made on resources not directly managed by the standard Kubernetes scheduler. The extender helps make scheduling decisions based on such resources. (Note that the three approaches are not mutually exclusive.) 第三种方案一般用在 调度决策依赖于 非默认支持的资源的场景
 
+[一篇读懂Kubernetes Scheduler扩展功能](https://mp.weixin.qq.com/s/e4VfnUpEOmVxx_zwXOMCPg)
+
 ## scheduler 调用 SchedulerExtender 
 
 ### 调用过程

@@ -16,12 +16,15 @@ keywords: Docker
 
 建议看下前文 [程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)
 
-相对于物理网络，虚拟化有两个方面：
-
-1. 虚拟设备，一般伴随网络驱动
-2. 虚拟网路
-
 不仅数据协议上要有相关字段的体现，操作系统（具体说是网络驱动）和交换机也都要一定的配合。
+
+[Linux虚拟网络技术学习](https://mp.weixin.qq.com/s/2PYds2LDie7W5sXYi1qwew)在Linux虚拟化技术中，网络层面，通常重要的三个技术分别是Network Namespace、veth pair、以及网桥或虚拟交换机技术。
+
+1. 对于每个 Network Namespace 来说，它会有自己独立的网卡、路由表、ARP 表、iptables 等和网络相关的资源。ip命令提供了`ip netns exec`子命令可以在对应的 Network Namespace 中执行命令。PS： 也就是`ip netns exec` 操作网卡、路由表、ARP表、iptables 等。也可以打开一个shell ，后面所有的命令都在这个Network Namespace中执行，好处是不用每次执行命令时都要带上ip netns exec ，缺点是我们无法清楚知道自己当前所在的shell，容易混淆。
+2. 默认情况下，network namespace 是不能和主机网络，或者其他 network namespace 通信的。可以使用 Linux 提供的veth pair来完成通信，veth pair你可以理解为使用网线连接好的两个接口，把两个端口放到两个namespace中，那么这两个namespace就能打通。
+3. 虽然veth pair可以实现两个 Network Namespace 之间的通信，但 veth pair 有一个明显的缺陷，就是只能实现两个网络接口之间的通信。如果多个network namespace需要进行通信，则需要借助bridge。
+
+将vlan 理解为网络协议的多路复用，vxlan 理解为mesh，网络路由、交换设备理解为支持某种协议的进程，feel 会很不一样。
 
 ## vlan
 
@@ -33,9 +36,7 @@ keywords: Docker
 
 ![](/public/upload/network/vlan_vlanId.png)
 
-**vlan 与目前互联网公司测试环境中流行的隔离组机制是非常相似的，vlan ID 类似isolation Name，交换机之于vlan id 就好像很多中间件框架对 isolation Name的处理**。微服务主要靠自己注册，网络通信的节点发现主要靠广播。微服务路由靠客户端库（mesh 靠sidecar），网络通信的路由则有专门的路由设备。
-
-对于支持 VLAN 的交换机，当这个交换机把二层的头取下来的时候，就能够识别这个 VLAN ID。这样只有相同 VLAN 的包，才会互相转发，不同 VLAN 的包，是看不到的。有一种口叫作 Trunk 口，它可以转发属于任何 VLAN 的口。交换机之间可以通过这种口相互连接。
+对于支持 VLAN 的交换机，当这个交换机把二层的头取下来的时候，就能够识别这个 VLAN ID。这样只有相同 VLAN 的包，才会互相转发，不同 VLAN 的包，是看不到的。有一种口叫作 Trunk 口，它可以转发属于任何 VLAN 的口。交换机之间可以通过这种口相互连接。PS：说白了就是 在**网络层支持了 “多路复用”**，类似于http2 的StreamId，rpc 框架中的requestId
 
 ### vlan 划分
 

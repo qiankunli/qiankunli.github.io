@@ -27,6 +27,9 @@ keywords: Kubernetes crd kubebuilder
 
 [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) 是一个用来帮助用户快速实现 Kubernetes CRD Operator 的 SDK。当然，kubebuilder 也不是从0 生成所有controller 代码，k8s 提供给一个 [Kubernetes controller-runtime Project](https://github.com/kubernetes-sigs/controller-runtime)  a set of go libraries for building Controllers. controller-runtime 在Operator SDK中也有被用到。
 
+[controller-runtime 之控制器实现](https://mp.weixin.qq.com/s/m-eNII-h-Gq74bMZ3fQLKg)
+[controller-runtime 之 manager 实现](https://mp.weixin.qq.com/s/3i3t-PBP3UN8W9quEhAQDQ)
+
 ### 整体设计
 
 Kubebuilder 包含以下核心组件
@@ -53,7 +56,12 @@ for {
     }
 }
 ```
-**而Kubebuilder 真的做到了 实现 控制器模型，只留下Reconcile 给业务开发 去扩展**。 本篇讲的 就是kubebuilder 如何实现Reconcile 之外的部分。
+
+[Kubernetes之controller-runtime事件再处理](https://mp.weixin.qq.com/s/NTRog9zrSv3en9MV5_nJuQ)在controller-runtime中，Event的处理逻辑是Reconciler对象，Reconciler被controller引用，这里的controller便是控制器。在controller之上，还有一个更高层的管理者manager。manager中可以设置多个controller，但是一个controller中只有一个Reconciler。
+
+![](/public/upload/kubernetes/controller_runtime_overview.png)
+
+
 
 ### 目录结构
 
