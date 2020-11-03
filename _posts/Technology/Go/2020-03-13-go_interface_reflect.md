@@ -30,13 +30,14 @@ You must do your best to understand what could change and use interfaces to deco
 方法带不带指针：`(p *Person)` refers to a pointer to the created instance of the Person struct. it is like using the keyword `this` in Java or `self` in Python when referring to the pointing object.
 `(p Person)` is a copy of the value of Person ia passed to the function. any change that you make in  p if you pass it by value won't be reflected in source `p`.
 
-
-    func (p *Person)GetFullName() string{
-        return fmt.Println("%s %s",p.Name,p.Surname)
-    }
-    func (p Person)GetFullName() string{
-        return fmt.Println("%s %s",p.Name,p.Surname)
-    }
+```go
+func (p *Person)GetFullName() string{
+    return fmt.Println("%s %s",p.Name,p.Surname)
+}
+func (p Person)GetFullName() string{
+    return fmt.Println("%s %s",p.Name,p.Surname)
+}
+```
 
 [深度解密Go语言之关于 interface 的 10 个问题](https://mp.weixin.qq.com/s/EbxkBokYBajkCR-MazL0ZA)如果实现了接收者是值类型的方法，会隐含地也实现了接收者是指针类型的方法。
 
@@ -55,9 +56,29 @@ func (this *Person)GetFullName() string{
 
 ## interface 底层实现
 
+Go 使用 iface 结构体表示包含方法的接口；使用 eface 结构体表示不包含任何方法的 interface{} 类型
+
 ![](/public/upload/go/go_interface_object.png)
 
 [Go Data Structures: Interfaces](https://research.swtch.com/interfaces)Languages with methods typically fall into one of two camps: prepare tables for all the method calls statically (as in C++ and Java), or do a method lookup at each call (as in Smalltalk and its many imitators, JavaScript and Python included) and add fancy caching to make that call efficient. Go sits halfway between the two: it has method tables but computes them at run time. I don't know whether Go is the first language to use this technique, but it's certainly not a common one.
+
+### interface{} 不是任意类型
+
+[Go 语言设计与实现-接口](https://draveness.me/golang/docs/part2-foundation/ch04-basic/golang-interface/)
+
+```go
+package main
+type TestStruct struct{}
+func NilOrNot(v interface{}) bool {
+	return v == nil
+}
+func main() {
+	var s *TestStruct
+	fmt.Println(s == nil)      // #=> true
+	fmt.Println(NilOrNot(s))   // #=> false
+}
+```
+出现上述现象的原因是 —— 调用 NilOrNot 函数时发生了隐式的类型转换，除了向方法传入参数之外，变量的赋值也会触发隐式类型转换。在类型转换时，*TestStruct 类型会转换成 interface{} 类型，转换后的变量不仅包含转换前的变量，还包含变量的类型信息 TestStruct，所以转换后的变量与 nil 不相等。
 
 ### eface 内部结构
 
@@ -110,13 +131,14 @@ C++ 和 Go 在定义接口方式上的不同，也导致了底层实现上的不
 
 ## 类型转换和类型断言
 
-类型断言貌似是，一个大类型，比如`interface{}`，我怀疑它可能是字符串，则可以`xxx.(string)`
-
 类型转换的情况比较多：
 
 1. 同一类型的转换，比如int64与int
 2. 某类型与字符串的转换，这个有专门的包
 3. 字符串与字符/short数组的转换，比如string与`[]uint8`等
+4. 具体类型转换成接口类型。go 中是鸭子类型，`type Child struct` 和 `type Parent interface` 以及 `interface {}`在编译层面有专门的 struct 表示（分别是 Child struct/iface struct/eface struct），存在一个struct 间字段赋值的过程。
+
+类型断言是，一个大类型，比如`interface{}`，我怀疑它可能是字符串，则可以`xxx.(string)`
 
 ## 反射
 

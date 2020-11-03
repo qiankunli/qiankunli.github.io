@@ -174,7 +174,7 @@ metadata:
 [kubernetes/kube-state-metrics](https://github.com/kubernetes/kube-state-metrics)
 
 1. kube-state-metrics is a simple service that listens to the Kubernetes API server and generates metrics about the state of the objects. It is not focused on the health of the individual Kubernetes components, but rather on the health of the various objects inside, such as deployments, nodes and pods.  上文关注的是 k8s组件是否健康， kube-state-metrics 关注的Kubernetes 的object 是否健康。
-2. kube-state-metrics uses client-go to talk with Kubernetes clusters，**将Kubernetes的结构化信息转换为metrics**
+2. kube-state-metrics uses client-go to talk with Kubernetes clusters，**将Kubernetes的结构化信息转换为metrics**，很多metric 都来自 Kubernetes object 的Status 或 Conditions 等字段，`kubectl describe xx` 一样可以看到。
 3. k8s custom resource 比如 verticalpodautoscalers 默认不采集， 需要额外配置
 4. 以Deployment 方式运行，以Service 对外服务
 
@@ -207,7 +207,6 @@ kube_state_metrics_list_total{resource="*v1.Node",result="error"} 52
 kube_state_metrics_watch_total{resource="*v1beta1.Ingress",result="success"} 1
 ```
 
-**Kubernetes object 的很多数据都可以从 kube-state-metrics 拿到（比如pod的重启次数，deploymnet 副本数有没有更新完毕）**，在不知道之前，使用client-go 监听k8s 用代码获取pod /deployment 等数据，方法比较笨。
 
 ## 需要哪些 alert rule
 
