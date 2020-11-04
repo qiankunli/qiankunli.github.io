@@ -78,7 +78,16 @@ func main() {
 	fmt.Println(NilOrNot(s))   // #=> false
 }
 ```
-出现上述现象的原因是 —— 调用 NilOrNot 函数时发生了隐式的类型转换，除了向方法传入参数之外，变量的赋值也会触发隐式类型转换。在类型转换时，*TestStruct 类型会转换成 interface{} 类型，转换后的变量不仅包含转换前的变量，还包含变量的类型信息 TestStruct，所以转换后的变量与 nil 不相等。
+出现上述现象的原因是 —— 调用 NilOrNot 函数时发生了隐式的类型转换，除了向方法传入参数之外，变量的赋值也会触发隐式类型转换。在类型转换时，`*TestStruct` 类型会转换成 `interface{}` 类型，转换后的变量（eface struct）不仅包含转换前的变量，还包含变量的类型信息 TestStruct，所以转换后的变量与 nil 不相等。
+
+变量的赋值、向方法传入参数会触发隐式类型转换，类型转换的情况比较多：
+
+1. 同一类型的转换，比如int64与int
+2. 某类型与字符串的转换，这个有专门的包
+3. 字符串与字符/short数组的转换，比如string与`[]uint8`等
+4. 具体类型转换成接口类型。
+
+类型断言是，一个大类型，比如`interface{}`，怀疑它可能是字符串，则可以`xxx.(string)`
 
 ### eface 内部结构
 
@@ -129,16 +138,6 @@ Note that the itable corresponds to the interface type, not the dynamic type. In
 
 C++ 和 Go 在定义接口方式上的不同，也导致了底层实现上的不同。C++ 通过虚函数表来实现基类调用派生类的函数；而 Go 通过 itab 中的 fun 字段来**实现接口**变量调用实体类型的函数。C++ 中的虚函数表是在编译期生成的；而 Go 的 itab 中的 fun 字段是在运行期间动态生成的。
 
-## 类型转换和类型断言
-
-类型转换的情况比较多：
-
-1. 同一类型的转换，比如int64与int
-2. 某类型与字符串的转换，这个有专门的包
-3. 字符串与字符/short数组的转换，比如string与`[]uint8`等
-4. 具体类型转换成接口类型。go 中是鸭子类型，`type Child struct` 和 `type Parent interface` 以及 `interface {}`在编译层面有专门的 struct 表示（分别是 Child struct/iface struct/eface struct），存在一个struct 间字段赋值的过程。
-
-类型断言是，一个大类型，比如`interface{}`，我怀疑它可能是字符串，则可以`xxx.(string)`
 
 ## 反射
 
@@ -146,7 +145,7 @@ C++ 和 Go 在定义接口方式上的不同，也导致了底层实现上的不
 
 ![](/public/upload/go/go_reflect.jpeg)
 
-reflect 包里定义了一个接口`reflect.Type`和一个结构体`reflect.Value`，它们提供很多函数来获取存储在接口里的类型信息。`reflect.Type` 主要提供关于类型相关的信息，所以它和 _type 关联比较紧密； `reflect.Value` 则结合 `_type` 和 data 两者，因此程序员可以获取甚至改变类型的值。
+reflect 包里定义了一个接口`reflect.Type`和一个结构体`reflect.Value`，它们提供很多函数来获取存储在接口里的类型信息，反射包中的所有方法基本都是围绕着 Type 和 Value 这两个类型设计的。`reflect.Type` 主要提供关于类型相关的信息，所以它和 _type 关联比较紧密； `reflect.Value` 则结合 `_type` 和 data 两者，因此程序员可以获取甚至改变类型的值。
 
 ![](/public/upload/go/reflect_object.png)
 
@@ -201,16 +200,14 @@ func unpackEface(i interface{}) Value {
 
 ### 三大定律
 
-**反射建立在类型系统之上**，下列struct 基本是一个东西，只是所在包有区别。
+**反射建立在类型系统之上**，以java 视角来表述的话，反射为程序提供了部分操作 jvm 数据的能力。
 
-|类型系统相关struct|反射相关struct|
-|---|---|
-|eface|emptyInterface|
-|_type|type|
+![](/public/upload/go/go_reflect.png)
 
-1. Reflection goes from interface value to reflection object. 反射是一种检测存储在 interface 中的类型和值机制。这可以通过 TypeOf 函数和 ValueOf 函数得到。
-2. Reflection goes from reflection object to interface value. 将 ValueOf 的返回值通过 Interface() 函数反向转变成 interface 变量。前两条就是说 **接口型变量（runtime中指向一个struct） 和 反射类型对象 可以相互转化**。
-3. To modify a reflection object, the value must be settable.如果需要操作一个反射变量，那么它必须是可设置的。翻译一下就是：**如果想要操作原变量，反射变量 Value 必须要 hold 住原变量的地址才行**。
+1. Reflection goes from interface value to reflection object. 我们能将 Go 语言的 `interface{}` 变量转换成反射对象。为什么是从 `interface{}` 变量到反射对象？当我们执行 `reflect.ValueOf(1)` 时，虽然看起来是获取了基本类型 int 对应的反射类型，但是由于 `reflect.TypeOf`、`reflect.ValueOf` 两个方法的入参都是 `interface{}` 类型，所以在方法执行的过程中发生了类型转换。
+2. Reflection goes from reflection object to interface value. 我们可以从反射对象可以获取 `interface{}` 变量(`Interface()` 方法)。
+3. To modify a reflection object, the value must be settable.如果需要操作一个反射变量，那么它必须是可设置的。PS: 可设置 ==> 可以找到原变量地址 ==> go 是值传递 ==> `reflect.ValueOf(引用)` 反射变量 Value 必须要 hold 住原变量的地址才行
+
 
 ### 与java 对比
 
