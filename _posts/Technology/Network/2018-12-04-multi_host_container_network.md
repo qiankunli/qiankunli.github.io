@@ -113,7 +113,7 @@ Flannel 支持三种后端实现，分别是： VXLAN；host-gw； UDP。而 UDP
 
 ![](/public/upload/network/container_network_route_2.png)
 
-**一般配套设计是 一个物理机对应一个网段**，路由方案的关键是谁来路由？路由信息怎么感知？
+容器互通主要基于路由表打通，**一般配套设计是 一个物理机对应一个网段**，路由方案的关键是谁来路由？路由信息怎么感知？路由信息存哪？Kubernetes/etcd/每个主机bgp分发都来一份。calico 容器在**主机内外**都通过 路由规则连通（主机内不会创建网桥设备）；flannel host-gw 主机外靠路由连通，主机内靠网桥连通。
 
 |overlay network|路由设备|路由更新|要求|
 |---|---|---|---|
