@@ -46,50 +46,78 @@ keywords: Go Concurrence
 |线程|共享内存|1. 互斥量+条件变量 支持同步；2. 程序层面通过模拟signal弄出的futrue模式支持异步|只支持共享内存，高层抽象支持通信，比如java的blockingQueue|
 |goroutine|channel|1. channel支持同步；2. 程序层面提供异步|只支持通信，高层抽象支持共享内存，比如go的sync包|
 
-
 PS,routine is a set sequence of steps, part of larger computer program.
 
 
+## 同步原语
 
-## Mechanics
+[Go 语言设计与实现-同步原语与锁](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-sync-primitives/)Go 语言在 sync 包中提供了用于同步的一些基本原语，包括常见的 sync.Mutex、sync.RWMutex、sync.WaitGroup、sync.Once 和 sync.Cond。这些基本原语提高了较为基础的同步功能，但是它们是一种相对原始的同步机制，在多数情况下，我们都应该使用**抽象层级的更高的** Channel 实现同步。
 
-共享内存
-
-1. sync.Mutex,           实现Locker interface，类似lock
-2. sync.WaitGroup,       类似CountDown       
-
-CSP channel
+### Mutex
 
 ```go
-func AsyncService() chan string {
-	retCh := make(chan string, 1)
-	//retCh := make(chan string, 1)
-	go func() {
-		ret := service()
-		fmt.Println("returned result.")
-		retCh <- ret
-		fmt.Println("service exited.")
-	}()
-	return retCh
+type Mutex struct {
+	state int32     // 表示当前互斥锁的状态，最低三位分别表示 mutexLocked、mutexWoken 和 mutexStarving，剩下的位置用来表示当前有多少个 Goroutine 等待互斥锁的释放
+	sema  uint32
 }
-func TestAsynService(t *testing.T) {
-	retCh := AsyncService()
-	fmt.Println(<-retCh)
-	time.Sleep(time.Second * 1)
+func (m *Mutex) Lock() {
+	if atomic.CompareAndSwapInt32(&m.state, 0, mutexLocked) {
+		return
+    }
+	m.lockSlow()
+}
+// src/runtime/sema.go
+func semacquire1(addr *uint32, lifo bool, profile semaProfileFlags, skipframes int) {
+    gp := getg()
+    s := acquireSudog()
+    ...
+	for {
+		// Add ourselves to nwait to disable "easy case" in semrelease.
+		atomic.Xadd(&root.nwait, 1)
+		...
+		root.queue(addr, s, lifo)       // 加入等待队列
+		goparkunlock(&root.lock, waitReasonSemacquire, traceEvGoBlockSync, 4+skipframes)    
+		if s.ticket != 0 || cansemacquire(addr) {
+			break
+		}
+	}
+	...
+	releaseSudog(s)
+}
+// src/runtime/proc.go
+func park_m(gp *g) {
+	_g_ := getg()
+	casgstatus(gp, _Grunning, _Gwaiting)
+	dropg()
+	if fn := _g_.m.waitunlockf; fn != nil {
+		ok := fn(gp, _g_.m.waitlock)
+		...
+		if !ok {
+			casgstatus(gp, _Gwaiting, _Grunnable)       // 改变goroutine 状态
+			execute(gp, true) 
+		}
+	}
+	schedule()  // 触发调度器 调度
 }
 ```
 
-从上述代码的感觉看，`channel string`像极了`Future<String>`
+Mutex.Lock 有一个类似jvm 锁膨胀的过程（go 调度器运行在 用户态，因此实现比java synchronized 关键字更简单），Goroutine 会自旋、休眠自己，也会修改 mutex 的state
+
+Goroutine修改自己的行为/状态
+
+1. 锁空闲则加锁；
+2. 锁占用  + 普通模式则执行 `sync.runtime_doSpin`进入自旋，执行30次PAUSE 指令消耗CPU时间；
+3. 锁占用  + 饥饿模式则执行 `sync.runtime_SemacquireMutex`进入休眠状态
+
+Goroutine修改 mutex 的状态
+
+1. 如果当前 Goroutine 等待锁的时间超过了 1ms，当前 Goroutine 会将互斥锁切换到饥饿模式
+2. 如果当前 Goroutine 是互斥锁上的最后一个等待的协程或者等待的时间小于 1ms，当前 Goroutine 会将互斥锁切换回正常模式；
+
 
 ### 读写锁
 
 ```go
-package main
-import (
-    "errors"
-    "fmt"
-    "sync"
-)
 var (
     pcodes         = make(map[string]string)
     mutex          sync.RWMutex
@@ -122,16 +150,6 @@ func main() {
 
 ### 超时
 
-```java
-public Future<String> AsyncService(){
-    Future<String> future = Executer.submit(new Callable<String>(){
-        public String call(){
-            return xx.service();
-        }
-    });
-    return future;
-}
-```
 java 的`future.get(timeout)` 体现在channel 上是
 
 ```go
@@ -154,78 +172,79 @@ select {
 }
 ```
 
-从上述视角看，与Future 相比，channel 也更像一个“受体”。
+## 取消/中断goroutine 执行的工具——context
 
-### 取消
-
-所有的channel 接收者（通常是一个goroutine） 都会在channel关闭时，立刻从阻塞等待中返回且 `v,ok <- ch` ok值为false。这个广播机制常被利用， 进行向多个订阅者同时发送信号，如：退出信号。PS：有点类似`Thread.interrupt()` 的感觉。
-
-```go
-func isCancelled(cancelChan chan struct{}) bool {
-	select {
-	case <-cancelChan:
-		return true
-	default:
-		return false
-	}
-}
-func TestCancel(t testing.T){
-    cancelChan := make(chan struct{},0)
-    go func(cancelChan chan struct{}){
-        for{
-            if isCancelled(cancelChan){
-                break
-            }
-            time.Sleep(time.Millisecond * 5)
-        }
-        fmt.Println("Cancelled")
-    }(cancelChan)
-    // 类似java future.cancel()
-    close(cancelChan)
-    time.Sleep(time.Second * 1)
-}
-```
-
-### 只执行一次
-
-GetSingletonObj 可以被多次并发调用， 但只执行一次（可比java 的单例模式清爽多了）
-```go
-var once sync.Once
-func GetSingletonObj() *SingletonObj{
-    once.Do(func(){
-        fmt.Println("Create Singleton obj.")
-        obj = &SingletonObj{}
-    })
-    return obj
-}
-```
-
-**通过buffered channel 可以变相实现对象池的效果**。
-
-## context
-
-[深度解密Go语言之context](https://mp.weixin.qq.com/s/GpVy1eB5Cz_t-dhVC6BJNw)Go 1.7 标准库引入 context，中文译作“上下文”，准确说它是 goroutine 的上下文，包含 goroutine 的运行状态、环境、现场等信息。
-
-![](/public/upload/go/context_object.png)
-
-### 为什么有 context？
+[深度解密Go语言之context](https://mp.weixin.qq.com/s/GpVy1eB5Cz_t-dhVC6BJNw)Go 1.7 标准库引入 context，中文译作“上下文”（其实这名字叫的不好）
 
 在 Go 的 server 里，通常每来一个请求都会启动若干个 goroutine 同时工作：有些去数据库拿数据，有些调用下游接口获取相关数据……这些 goroutine 需要共享这个请求的基本数据，例如登陆的 token，处理请求的最大超时时间（如果超过此值再返回数据，请求方因为超时接收不到）等等。当请求被取消或超时，所有正在为这个请求工作的 goroutine 需要快速退出，因为它们的“工作成果”不再被需要了。context 包就是为了解决上面所说的这些问题而开发的：在 一组 goroutine 之间传递共享的值、取消信号、deadline……
 
-goroutine **主动**检查 Context 的状态并作出正确的响应。PS： **从这个视角看，context 跟 惯用的stopChannel 差不多**
 
-### 为什么是context 树
 
-1. 根Context，通过`context.Background()` 创建
-2. 子Context，`context.WithCancel(parentContext)` 创建
+[Go 语言设计与实现——上下文 Context](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-context/)主要作用还是在多个 Goroutine 组成的树中同步取消信号以减少对资源的消耗和占用，**虽然它也有传值的功能，但是这个功能我们还是很少用到**。在真正使用传值的功能时我们也应该非常谨慎，使用 context.Context 进行传递参数请求的所有参数一种非常差的设计，比较常见的使用场景是传递请求对应用户的认证令牌以及用于进行分布式追踪的请求 ID。
+
+
+### 为什么有 context？
+
+一个goroutine启动后是无法控制它的，大部分情况是等待它自己结束，如何主动通知它结束呢？
+
+```go
+func main() {
+	stop := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-stop:    // 有点类似Thread.interrupt() 的感觉
+				fmt.Println("监控退出，停止了...")
+				return
+			default:
+				fmt.Println("goroutine监控中...")
+				time.Sleep(2 * time.Second)
+			}
+		}
+	}()
+	time.Sleep(10 * time.Second)
+	fmt.Println("可以了，通知监控停止")
+	stop<- true
+}
+```
+
+`chan+select`是比较优雅的结束goroutine的方式，不过这种方式也有局限性，如果有很多goroutine都需要控制结束？如果这些goroutine又衍生了其他更多的goroutine怎么办呢？goroutine的关系链导致了这些场景非常复杂
+
+```go
+func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Println("监控退出，停止了...")
+				return
+			default:
+				fmt.Println("goroutine监控中...")
+				time.Sleep(2 * time.Second)
+			}
+		}
+	}(ctx)
+	time.Sleep(10 * time.Second)
+	fmt.Println("可以了，通知监控停止")
+	cancel()    // context.WithCancel 返回的cancel 方法
+}
+```
+
+### 父 goroutine 创建context
+
+1. 根Context，通过`context.Background()/context.TODO()` 创建
+2. 子Context
     ```go
     func WithCancel(parent Context) (ctx Context, cancel CancelFunc)
-    func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc)
-    func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc)
-    func WithValue(parent Context, key interface{}, val interface{}) Context
+    // 和WithCancel差不多，会多传递一个截止时间参数，即到了这个时间点会自动取消Context，也可以通过cancel函数提前取消。
+    func WithDeadline(parent Context, deadline time.Time) (Context, CancelFunc)    
+    // 和WithDeadline基本上一样，多少时间后自动取消Context
+    func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc)   
+    // 和取消Context无关，绑定了一个kv数据的Context，kv可以通过Context.Value方法访问到
+    func WithValue(parent Context, key interface{}, val interface{}) Context    
     ```
 3. 当前Context 被取消时，基于他的子context 都会被取消
-4. 接收取消通知 `<-ctx.Done()`
 
 Goroutine的创建和调用关系总是像层层调用进行的，就像人的辈分一样，而更靠顶部的Goroutine应有办法主动关闭其下属的Goroutine的执行但不会影响 其上层Goroutine的执行（不然程序可能就失控了）。为了实现这种关系，**Context结构也应该像一棵树**，叶子节点须总是由根节点衍生出来的。
 
@@ -233,6 +252,47 @@ Goroutine的创建和调用关系总是像层层调用进行的，就像人的�
 
 如上左图，代表一棵 context 树。当调用左图中标红 context 的 cancel 方法后，该 context 从它的父 context 中去除掉了：实线箭头变成了虚线。且虚线圈框出来的 context 都被取消了，圈内的 context 间的父子关系都荡然无存了。
 
+### 子 goroutine  使用context
+
+```go
+type Context interface {
+	Deadline() (deadline time.Time, ok bool)    // 获取设置的截止时间
+	Done() <-chan struct{}      // 如果该方法返回的chan可以读取，则意味着parent context已经发起了取消请求
+	Err() error                 // 返回取消的原因，在 Done 返回的 Channel 被关闭时返回非空的值；如果 context.Context 被取消，会返回 Canceled 错误；如果 context.Context 超时，会返回 DeadlineExceeded 错误；
+	Value(key interface{}) interface{}
+}
+```
+
+![](/public/upload/go/context_object.png)
+
+```go
+// golang.org/x/net/context/pre_go17.go
+type cancelCtx struct {
+	Context
+	done chan struct{}          // closed by the first cancel call.
+	mu       sync.Mutex
+	children map[canceler]bool  // child 会被加入 parent 的 children 列表中，等待 parent 释放取消信号；
+	err      error             
+}
+func (c *cancelCtx) cancel(removeFromParent bool, err error) {
+	c.mu.Lock()
+	if c.err != nil {c.mu.Unlock() return}
+	c.err = err
+	if c.done == nil {
+		c.done = closedchan
+	} else {
+		close(c.done)
+	}
+	for child := range c.children {
+		child.cancel(false, err)
+	}
+	c.children = nil
+	c.mu.Unlock()
+	if removeFromParent {
+		removeChild(c.Context, c)
+	}
+}
+```
 
 ### 使用建议
 
