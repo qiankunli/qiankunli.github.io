@@ -25,7 +25,33 @@ keywords: Go goroutine scheduler
 
 ### GM模型
 
-go1.1 之前都是该模型
+go1.1 之前都是该模型， 单线程调度器（0.x）  和多线程调度器(1.0)，单线程调度器（0.x） 核心逻辑如下
+
+```go
+static void scheduler(void) {
+	G* gp;
+    lock(&sched);
+	if(gosave(&m->sched)){       // 保存栈寄存器和程序计数器
+		lock(&sched);
+		gp = m->curg;
+		switch(gp->status){
+		case Grunnable:
+		case Grunning:
+			gp->status = Grunnable;
+			gput(gp);
+			break;
+		...
+		}
+		notewakeup(&gp->stopped);
+	}
+	gp = nextgandunlock();      // 获取下一个需要运行的 Goroutine 并解锁调度器
+	noteclear(&gp->stopped);
+	gp->status = Grunning;
+	m->curg = gp;               // 修改全局线程 m 上要执行的 Goroutine；
+	g = gp;
+	gogo(&gp->sched);           // 运行最新的 Goroutine
+}
+```
 
 ![](/public/upload/go/go_scheduler_gm.jpg)
 
@@ -33,39 +59,127 @@ go1.1 之前都是该模型
 
 ### GPM模型
 
+```go
+static void schedule(void) {
+    G *gp;
+ top:
+    if(runtime·gcwaiting) { // 如果当前运行时在等待垃圾回收，调用 runtime.gcstopm 函数；
+        gcstopm();
+        goto top;
+    }
+    gp = runqget(m->p); // 从本地运行队列中获取待执行的 Goroutine；
+    if(gp == nil)
+        gp = findrunnable();    // 从全局的运行队列中获取待执行的 Goroutine；
+    ...
+    execute(gp);    // 在当前线程 M 上运行 Goroutine
+}
+```
+
 几个问题
 
-1. **为什么引入Processor 的概念？为什么把全局队列打散？**对该队列的操作均需要竞争同一把锁, 导致伸缩性不好. 一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。 ==> 为每一个 M 维护一个运行队列 runq ==> 如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行 ==> 将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行 ==> 对runq 及相关信息进行抽象 得到P
+1. **为什么引入Processor 的概念？为什么把全局队列打散？**对该队列的操作均需要竞争同一把锁, 导致伸缩性不好. 一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。 ==> 为每一个 M 维护一个运行队列 runq ==> 如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行 ==> 将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行 ==> 对runq 及相关信息进行抽象 得到P。 go1.1 以P 为基础实现了基于工作窃取的调度器
 2. mcache 为什么跟随 P。 参见[内存管理](http://qiankunli.github.io/2020/01/28/memory_management.html) 了解mcache
 3. 为什么 P 的个数默认是 CPU 核数: Go 尽量提升性能, 那么在一个 n 核机器上, 如何能够最大利用 CPU 性能呢? 当然是同时有 n 个线程在并行运行中, 把 CPU 喂饱, 即所有核上一直都有代码在运行.
 
 ![](/public/upload/go/go_scheduler_gpm.jpg)
 
+当有了一个P 存在后，一些数据结构（跨协程的） 就顺势放在了P 中，包括与性能追踪、垃圾回收和计时器相关的字段。
+
+go java 都有runtime，runtime 不只是一对一辅助执行代码，本身也会运行很多协程/线程，以提高io、定时器、gc等的执行效率，为上层高级特性提供支持。在目前的runtime中，线程、处理器、网络轮询器、运行队列、全局内存分配器状态、内存分配缓存和垃圾收集器都是全局资源。
 
 ## goroutine调度模型的四个抽象及其数据结构
 
-goroutine调度模型4个重要结构，分别是M、G、P、Sched，前三个定义在runtime.h中，Sched定义在proc.c中。
+[Go 语言设计与实现-调度器](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)goroutine调度模型4个重要结构，分别是M、G、P、Sched，前三个定义在runtime.h中，Sched定义在proc.c中。
 
-- G就是goroutine实现的核心结构了，G维护了goroutine需要的栈、程序计数器以及它所在的M等信息。一个协程代表了一个执行流，执行流有需要执行的函数(startpc)，有函数的入参，有当前执行流的状态和进度(对应 CPU 的 PC 寄存器和 SP 寄存器)，当然也需要有保存状态的地方，用于执行流恢复。PS： java runnable 没有 状态字段 是因为其与 linux 内核线程一一对应。
-- M代表内核级线程，一个M就是一个线程，goroutine就是跑在M之上 ；M是一个很大的结构，里面维护小对象内存cache（mcache）、当前执行的goroutine、随机数发生器等等非常多的信息。
-- P全称是Processor，处理器，表示调度的上下文，它可以被看做一个运行于线程 M 上的本地调度器，所以它维护了一个goroutine队列（环形链表），里面存储了所有需要它来执行的goroutine。
-- Sched结构就是调度器，它维护有存储M和G的队列（全局的）以及调度器的一些状态信息等。
+Sched结构就是调度器，它维护有存储M和G的队列（全局的）以及调度器的一些状态信息等。
 
-`$GOROOT/src/runtime/runtime2.go`
+### G
 
-![](/public/upload/go/go_scheduler_object.png)
+G是goroutine实现的核心结构，G维护了goroutine需要的栈、程序计数器以及它所在的M等信息。一个协程代表了一个执行流，执行流有需要执行的函数(startpc)，有函数的入参，有当前执行流的状态和进度(对应 CPU 的 PC 寄存器和 SP 寄存器)，当然也需要有保存状态的地方，用于执行流恢复。PS： java runnable 没有 状态字段 是因为其与 linux 内核线程一一对应。
+```go
+type g struct {
+    m              *m           //  当前 Goroutine 占用的线程，可能为空；
+    sched          gobuf        //  存储 Goroutine 的调度相关的数据
+    atomicstatus   uint32       // Goroutine 的状态
+    goid           int64        // Goroutine 的 ID，该字段对开发者不可见
+    // 与栈相关
+    stack       stack           // 描述了当前 Goroutine 的栈内存范围 [stack.lo, stack.hi)
+    stackguard0 uintptr         // 用于调度器抢占式调度
+    // 与抢占相关
+    preempt       bool // 抢占信号
+    preemptStop   bool // 抢占时将状态修改成 `_Gpreempted`
+    preemptShrink bool // 在同步安全点收缩栈
+    // defer 和 panic 相关
+    _panic       *_panic // 最内侧的 panic 结构体
+    _defer       *_defer // 最内侧的延迟函数结构体
+}
+type gobuf struct {     // 调度器保存或者恢复上下文的时候用到
+    sp   uintptr        // 栈指针（Stack Pointer）
+    pc   uintptr        // 程序计数器（Program Counter）
+    g    guintptr       // 持有 runtime.gobuf 的 Goroutine
+    ret  sys.Uintreg    // 系统调用的返回值
+    ...
+}
+```
 
-1. 结构体 g 的字段 atomicstatus 就存储了当前 Goroutine 的状态，可选值为
-    ![](/public/upload/go/go_scheduler_goroutine_status.jpg) 
-    虽然 Goroutine 在运行时中定义的状态非常多而且复杂，但是我们可以将这些不同的状态聚合成最终的三种：等待中(比如正在执行系统调用或同步操作)、可运行、运行中（占用M），在运行期间我们会在这三种不同的状态来回切换。
-3. runhead、runqtail、runq 以及 runnext 等字段表示P持有的运行队列，该运行队列是一个使用数组构成的环形链表，其中最多能够存储 256 个指向Goroutine 的指针，除了 runq 中能够存储待执行的 Goroutine 之外，runnext 指向的 Goroutine 会成为下一个被运行的 Goroutine
-4. p 结构体中的状态 status 可选值
+结构体 g 的字段 atomicstatus 就存储了当前 Goroutine 的状态，可选值为
 
-    1. _Pidle	处理器没有运行用户代码或者调度器，运行队列为空
-    2. _Prunning	被线程 M 持有，并且正在执行用户代码或者调度器
-    3. _Psyscall	没有执行用户代码，当前线程陷入系统调用
-    4. _Pgcstop	被线程 M 持有，当前处理器由于垃圾回收被停止
-    5. _Pdead	当前处理器已经不被使用
+![](/public/upload/go/go_scheduler_goroutine_status.jpg) 
+
+虽然 Goroutine 在运行时中定义的状态非常多而且复杂，但是我们可以将这些不同的状态聚合成最终的三种：等待中(比如正在执行系统调用或同步操作)、可运行、运行中（占用M），在运行期间我们会在这三种不同的状态来回切换。
+
+### M
+
+调度器最多可以创建 10000 个线程，但是其中大多数的线程都不会执行用户代码（可能陷入系统调用），最多只会有 GOMAXPROCS 个活跃线程能够正常运行。在默认情况下，运行时会将 GOMAXPROCS 设置成当前机器的核数。
+
+M代表内核级线程，一个M就是一个线程，goroutine就是跑在M之上 ；
+
+```go
+type m struct {
+	g0   *g         // 持有调度栈的 Goroutine
+    curg *g         // 在当前线程上运行的用户 Goroutine
+    p             puintptr  // 正在运行代码的处理器 p
+	nextp         puintptr  // 暂存的处理器 nextp
+	oldp          puintptr  // 执行系统调用之前的使用线程的处理器 oldp
+	...
+}
+```
+
+g0 是一个运行时中比较特殊的 Goroutine，它会深度参与运行时的调度过程，包括 Goroutine 的创建、大内存分配和 CGO 函数的执行。
+
+![](/public/upload/go/goroutine_m.png)
+
+
+### P
+
+P全称是Processor，处理器，表示调度的上下文，它可以被看做一个运行于线程 M 上的本地调度器，所以它维护了一个goroutine队列（环形链表），里面存储了所有需要它来执行的goroutine。通过处理器 P 的调度，每一个内核线程都能够执行多个 Goroutine，它能在 Goroutine 进行一些 I/O 操作时及时切换，提高线程的利用率。
+
+```go
+struct P {
+    Lock;
+    uint32	status;
+    P*	link;
+    uint32	tick;
+    M*	m;              // 执行runq 的M
+    MCache*	mcache;
+    G**	runq;           // 运行的 Goroutine 组成的环形的运行队列
+    int32	runqhead;
+    int32	runqtail;
+    int32	runqsize;
+    G*	gfree;
+    int32	gfreecnt;
+};
+```
+
+runhead、runqtail、runq 以及 runnext 等字段表示P持有的运行队列，该运行队列是一个使用数组构成的环形链表，其中最多能够存储 256 个指向Goroutine 的指针，除了 runq 中能够存储待执行的 Goroutine 之外，runnext 指向的 Goroutine 会成为下一个被运行的 Goroutine
+
+p 结构体中的状态 status 可选值
+
+1. _Pidle	处理器没有运行用户代码或者调度器，运行队列为空
+2. _Prunning	被线程 M 持有，并且正在执行用户代码或者调度器
+3. _Psyscall	没有执行用户代码，当前线程陷入系统调用
+4. _Pgcstop	被线程 M 持有，当前处理器由于垃圾回收被停止
+5. _Pdead	当前处理器已经不被使用
 
 ## 函数运行
 
@@ -154,108 +268,111 @@ func newproc1(fn *funcval, argp *uint8, narg int32, callergp *g, callerpc uintpt
 **所有触发 Goroutine 调度的方式最终都会调用 gopark 函数让出当前处理器 P 的控制权**。就好像linux 进程会主动调用schedule() 触发调度让出cpu 控制权，只是linux 多了时间片中断主动触发调度而已。
 
 
-    func gopark(unlockf func(*g, unsafe.Pointer) bool, lock unsafe.Pointer, reason waitReason, traceEv byte, traceskip int) {
-        mp := acquirem()
-        gp := mp.curg
-        mp.waitlock = lock
-        mp.waitunlockf = unlockf
-        gp.waitreason = reason
-        mp.waittraceev = traceEv
-        mp.waittraceskip = traceskip
-        releasem(mp)
-        mcall(park_m)
-    }
+```go
+func gopark(unlockf func(*g, unsafe.Pointer) bool, lock unsafe.Pointer, reason waitReason, traceEv byte, traceskip int) {
+    mp := acquirem()
+    gp := mp.curg
+    mp.waitlock = lock
+    mp.waitunlockf = unlockf
+    gp.waitreason = reason
+    mp.waittraceev = traceEv
+    mp.waittraceskip = traceskip
+    releasem(mp)
+    mcall(park_m)
+}
+```
 
 
 gopark 函数中会更新当前处理器(mp)的状态并在处理器上设置该 Goroutine 的等待原因。gopark中调用的 park_m 函数会将当前 Goroutine 的状态从 _Grunning 切换至 _Gwaiting 并调用 waitunlockf 函数进行解锁
 
-    func park_m(gp *g) {
-        _g_ := getg()
-
-        casgstatus(gp, _Grunning, _Gwaiting)
-        dropg()
-
-        if fn := _g_.m.waitunlockf; fn != nil {
-            ok := fn(gp, _g_.m.waitlock)
-            _g_.m.waitunlockf = nil
-            _g_.m.waitlock = nil
-            if !ok {
-                casgstatus(gp, _Gwaiting, _Grunnable)
-                execute(gp, true) // Schedule it back, never returns.
-            }
+```go
+func park_m(gp *g) {
+    _g_ := getg()
+    casgstatus(gp, _Grunning, _Gwaiting)
+    dropg()
+    if fn := _g_.m.waitunlockf; fn != nil {
+        ok := fn(gp, _g_.m.waitlock)
+        _g_.m.waitunlockf = nil
+        _g_.m.waitlock = nil
+        if !ok {
+            casgstatus(gp, _Gwaiting, _Grunnable)
+            execute(gp, true) // Schedule it back, never returns.
         }
-        schedule()
     }
+    schedule()
+}
+```
 
 在大多数情况下都会调用 schedule 触发一次 Goroutine 调度，这个函数的主要作用就是从不同的地方查找待执行的 Goroutine：
 
-    func schedule() {
-        _g_ := getg()
-
-    top:
-        var gp *g
-        var inheritTime bool
-
-        // 有一定几率会从全局的运行队列中选择一个 Goroutine；
-        if gp == nil {
-            if _g_.m.p.ptr().schedtick%61 == 0 && sched.runqsize > 0 {
-                lock(&sched.lock)
-                gp = globrunqget(_g_.m.p.ptr(), 1)
-                unlock(&sched.lock)
-            }
+```go
+func schedule() {
+    _g_ := getg()
+top:
+    var gp *g
+    var inheritTime bool
+    // 有一定几率会从全局的运行队列中选择一个 Goroutine；
+    if gp == nil {
+        if _g_.m.p.ptr().schedtick%61 == 0 && sched.runqsize > 0 {
+            lock(&sched.lock)
+            gp = globrunqget(_g_.m.p.ptr(), 1)
+            unlock(&sched.lock)
         }
-        // 从当前处理器本地的运行队列中查找待执行的 Goroutine；
-        if gp == nil {
-            gp, inheritTime = runqget(_g_.m.p.ptr())
-            if gp != nil && _g_.m.spinning {
-                throw("schedule: spinning with local work")
-            }
-        }
-        // 尝试从其他处理器上取出一部分 Goroutine，如果没有可执行的任务就会阻塞直到条件满足；
-        if gp == nil {
-            gp, inheritTime = findrunnable() // blocks until work is available
-        }
-
-        execute(gp, inheritTime)
     }
+    // 从当前处理器本地的运行队列中查找待执行的 Goroutine；
+    if gp == nil {
+        gp, inheritTime = runqget(_g_.m.p.ptr())
+        if gp != nil && _g_.m.spinning {
+            throw("schedule: spinning with local work")
+        }
+    }
+    // 尝试从其他处理器上取出一部分 Goroutine，如果没有可执行的任务就会阻塞直到条件满足；
+    if gp == nil {
+        gp, inheritTime = findrunnable() // blocks until work is available
+    }
+    execute(gp, inheritTime)
+}
+```
 
 findrunnable 函数会再次从本地运行队列、全局运行队列、网络轮询器和其他的处理器中获取待执行的任务，该方法一定会返回待执行的 Goroutine，否则就会一直阻塞。
 
 获取可以执行的任务之后就会调用 execute 函数执行该 Goroutine，执行的过程中会先将其状态修改成 _Grunning、与线程 M 建立起双向的关系并调用 gogo 触发调度。
 
-    func execute(gp *g, inheritTime bool) {
-        _g_ := getg()
-
-        casgstatus(gp, _Grunnable, _Grunning)
-        gp.waitsince = 0
-        gp.preempt = false
-        gp.stackguard0 = gp.stack.lo + _StackGuard
-        if !inheritTime {
-            _g_.m.p.ptr().schedtick++
-        }
-        // 与线程 M 建立起双向的关系
-        _g_.m.curg = gp
-        gp.m = _g_.m
-
-        gogo(&gp.sched)
+```go
+func execute(gp *g, inheritTime bool) {
+    _g_ := getg()
+    casgstatus(gp, _Grunnable, _Grunning)
+    gp.waitsince = 0
+    gp.preempt = false
+    gp.stackguard0 = gp.stack.lo + _StackGuard
+    if !inheritTime {
+        _g_.m.p.ptr().schedtick++
     }
+    // 与线程 M 建立起双向的关系
+    _g_.m.curg = gp
+    gp.m = _g_.m
+    gogo(&gp.sched)
+}
+```
 
 gogo 在不同处理器架构上的实现都不相同，但是不同的实现其实也大同小异，下面是该函数在 386 架构上的实现：
 
-    TEXT runtime·gogo(SB), NOSPLIT, $8-4
-        MOVL	buf+0(FP), BX		// gobuf
-        MOVL	gobuf_g(BX), DX
-        MOVL	0(DX), CX		// make sure g != nil
-        get_tls(CX)
-        MOVL	DX, g(CX)
-        MOVL	gobuf_sp(BX), SP	// restore SP
-        MOVL	gobuf_ret(BX), AX
-        MOVL	gobuf_ctxt(BX), DX
-        MOVL	$0, gobuf_sp(BX)	// clear to help garbage collector
-        MOVL	$0, gobuf_ret(BX)
-        MOVL	$0, gobuf_ctxt(BX)
-        MOVL	gobuf_pc(BX), BX
-        JMP	BX
+```
+TEXT runtime·gogo(SB), NOSPLIT, $8-4
+    MOVL	buf+0(FP), BX		// gobuf
+    MOVL	gobuf_g(BX), DX
+    MOVL	0(DX), CX		// make sure g != nil
+    get_tls(CX)
+    MOVL	DX, g(CX)
+    MOVL	gobuf_sp(BX), SP	// restore SP
+    MOVL	gobuf_ret(BX), AX
+    MOVL	gobuf_ctxt(BX), DX
+    MOVL	$0, gobuf_sp(BX)	// clear to help garbage collector
+    MOVL	$0, gobuf_ret(BX)
+    MOVL	$0, gobuf_ctxt(BX)
+    MOVL	gobuf_pc(BX), BX
+    JMP	BX
+```
 
 这个函数会从 gobuf 中取出 Goroutine 指针、栈指针、返回值、上下文以及程序计数器并将通过 JMP 指令跳转至 Goroutine 应该继续执行代码的位置。PS：就切换几个寄存器，所以协程的切换成本更低
 

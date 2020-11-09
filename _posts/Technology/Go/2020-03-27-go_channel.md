@@ -16,7 +16,7 @@ keywords: Go defer
 
 ## channel
 
-[Go 语言设计与实现-Channel](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-channel/)Channel 在运行时的内部表示是 runtime.hchan，该结构体中包含了一个用于保护成员变量的互斥锁，从某种程度上说，**Channel 是一个用于同步和通信的有锁队列**。社区有一些无锁Channel 的提案，但还在不停的优化中。
+[Go 语言设计与实现-Channel](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-channel/)Channel 在运行时的内部表示是 runtime.hchan，该结构体中包含了一个用于保护成员变量的互斥锁，从某种程度上说，**Channel 是一个用于同步和通信的有锁队列**。社区有一些无锁Channel 的提案，但还在不停的优化中。PS：**本质上还是共享内存**
 
 ```go
 type hchan struct {
