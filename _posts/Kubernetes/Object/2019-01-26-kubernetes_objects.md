@@ -146,6 +146,57 @@ Persistent Volume Claim 和 PV 的关系。运维人员创建PV，告知有多�
 
 ## ConfigMap
 
+1. ConfigMap 资源用来保存key-value配置数据，这个数据可以在pods里使用，或者被用来为像controller一样的系统组件存储配置数据。
+2. yaml data 包括了配置数据，ConfigMap中的每个data项都会成为一个新文件。每个data 项可以用来保存单个属性，也可以用来保存一个配置文件。
+
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: special-config
+  namespace: default
+data:
+  SPECIAL_LEVEL: very
+  SPECIAL_TYPE: charm
+  demo.yaml: |
+    abc: 123
+    edf: 456
+---
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  ...
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        ...
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+      volumes:
+      - name: config-volume
+        configMap:
+          name: special-config
+```
+查看执行结果
+```
+root@nginx-deployment-6576c57d87-4vmk4:/etc/config# ls -al
+total 12
+drwxrwxrwx 3 root root 4096 Nov  9 06:06 .
+drwxr-xr-x 1 root root 4096 Nov  9 04:00 ..
+drwxr-xr-x 2 root root 4096 Nov  9 06:06 ..2020_11_09_06_06_22.828693221
+lrwxrwxrwx 1 root root   31 Nov  9 06:06 ..data -> ..2020_11_09_06_06_22.828693221
+lrwxrwxrwx 1 root root   20 Nov  9 03:56 SPECIAL_LEVEL -> ..data/SPECIAL_LEVEL
+lrwxrwxrwx 1 root root   19 Nov  9 03:56 SPECIAL_TYPE -> ..data/SPECIAL_TYPE
+lrwxrwxrwx 1 root root   16 Nov  9 06:06 demo.yaml -> ..data/demo.yaml
+```
+
 ## DaemonSet
 
 ## Job/CronJob

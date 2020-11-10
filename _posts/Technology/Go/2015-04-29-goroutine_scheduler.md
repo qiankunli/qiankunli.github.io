@@ -23,6 +23,28 @@ keywords: Go goroutine scheduler
 
 ## 调度模型的演化
 
+[Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)
+
+```go
+// 程序启动时的初始化代码
+......
+for i := 0; i < N; i++{ // 创建N个操作系统线程执行schedule函数
+    create_os_thread(schedule) // 创建一个操作系统线程执行schedule函数
+}
+
+//schedule函数实现调度逻辑
+func schedule() {
+   for { // 调度循环
+         // 根据某种算法从M个goroutine中找出一个需要运行的goroutine
+         g = find_a_runnable_goroutine_from_M_goroutines()
+         run_g(g) // CPU运行该goroutine，直到需要调度其它goroutine才返回
+         save_status_of_g(g) // 保存goroutine的状态，主要是寄存器的值
+    }
+}
+```
+
+**创建一个操作系统线程执行schedule函数**。
+
 ### GM模型
 
 go1.1 之前都是该模型， 单线程调度器（0.x）  和多线程调度器(1.0)，单线程调度器（0.x） 核心逻辑如下
@@ -55,6 +77,8 @@ static void scheduler(void) {
 
 ![](/public/upload/go/go_scheduler_gm.jpg)
 
+
+
 在这个阶段，**goroutine 调度跟 java 的ThreadPool 是一样一样的，除了io操作会阻塞线程外，java Executor也可以视为一个用户态线程调度框架**。runnable 表示运行逻辑 提交到queue，ThreadPool 维持多个线程 从queue 中取出runnable 并执行。
 
 ### GPM模型
@@ -75,12 +99,6 @@ static void schedule(void) {
 }
 ```
 
-几个问题
-
-1. **为什么引入Processor 的概念？为什么把全局队列打散？**对该队列的操作均需要竞争同一把锁, 导致伸缩性不好. 一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。 ==> 为每一个 M 维护一个运行队列 runq ==> 如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行 ==> 将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行 ==> 对runq 及相关信息进行抽象 得到P。 go1.1 以P 为基础实现了基于工作窃取的调度器
-2. mcache 为什么跟随 P。 参见[内存管理](http://qiankunli.github.io/2020/01/28/memory_management.html) 了解mcache
-3. 为什么 P 的个数默认是 CPU 核数: Go 尽量提升性能, 那么在一个 n 核机器上, 如何能够最大利用 CPU 性能呢? 当然是同时有 n 个线程在并行运行中, 把 CPU 喂饱, 即所有核上一直都有代码在运行.
-
 ![](/public/upload/go/go_scheduler_gpm.jpg)
 
 当有了一个P 存在后，一些数据结构（跨协程的） 就顺势放在了P 中，包括与性能追踪、垃圾回收和计时器相关的字段。
@@ -91,11 +109,12 @@ go java 都有runtime，runtime 不只是一对一辅助执行代码，本身也
 
 [Go 语言设计与实现-调度器](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)goroutine调度模型4个重要结构，分别是M、G、P、Sched，前三个定义在runtime.h中，Sched定义在proc.c中。
 
-Sched结构就是调度器，它维护有存储M和G的队列（全局的）以及调度器的一些状态信息等。
-
 ### G
 
-G是goroutine实现的核心结构，G维护了goroutine需要的栈、程序计数器以及它所在的M等信息。一个协程代表了一个执行流，执行流有需要执行的函数(startpc)，有函数的入参，有当前执行流的状态和进度(对应 CPU 的 PC 寄存器和 SP 寄存器)，当然也需要有保存状态的地方，用于执行流恢复。PS： java runnable 没有 状态字段 是因为其与 linux 内核线程一一对应。
+[Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)系统线程对goroutine的调度与内核对系统线程的调度原理是一样的，实质都是通过**保存和修改CPU寄存器的值**来达到切换线程/goroutine的目的。为了实现对goroutine的调度，需要引入一个数据结构来保存CPU寄存器的值（具体的说就是栈指针、pc指针，题外话：有栈指针之后，栈数据也要实现准备好）以及goroutine的其它一些状态信息。调度器代码可以通过g对象来对goroutine进行调度，当goroutine被调离CPU时，调度器代码负责把CPU寄存器的值保存在g对象的成员变量之中，当goroutine被调度起来运行时，调度器代码又负责把g对象的成员变量所保存的寄存器的值恢复到CPU的寄存器。PS：函数不是并发执行体，所以函数切换只需要保留栈指针就可以了。
+
+G是goroutine实现的核心结构，G维护了goroutine需要的栈、程序计数器以及它所在的M等信息。一个协程代表了一个执行流，执行流有需要执行的函数(startpc)，有函数的入参，有当前执行流的状态和进度(对应 CPU 的 PC 寄存器和 SP 寄存器)，当然也需要有保存状态的地方，用于执行流恢复。
+
 ```go
 type g struct {
     m              *m           //  当前 Goroutine 占用的线程，可能为空；
@@ -113,7 +132,7 @@ type g struct {
     _panic       *_panic // 最内侧的 panic 结构体
     _defer       *_defer // 最内侧的延迟函数结构体
 }
-type gobuf struct {     // 调度器保存或者恢复上下文的时候用到
+type gobuf struct {     // 让出cpu 时，将寄存器信息保留在这里。即将获得cpu时，将这里的信息加载到寄存器
     sp   uintptr        // 栈指针（Stack Pointer）
     pc   uintptr        // 程序计数器（Program Counter）
     g    guintptr       // 持有 runtime.gobuf 的 Goroutine
@@ -128,29 +147,33 @@ type gobuf struct {     // 调度器保存或者恢复上下文的时候用到
 
 虽然 Goroutine 在运行时中定义的状态非常多而且复杂，但是我们可以将这些不同的状态聚合成最终的三种：等待中(比如正在执行系统调用或同步操作)、可运行、运行中（占用M），在运行期间我们会在这三种不同的状态来回切换。
 
-### M
+### Sched
 
-调度器最多可以创建 10000 个线程，但是其中大多数的线程都不会执行用户代码（可能陷入系统调用），最多只会有 GOMAXPROCS 个活跃线程能够正常运行。在默认情况下，运行时会将 GOMAXPROCS 设置成当前机器的核数。
+[Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)要实现对goroutine的调度，仅仅有g结构体对象是不够的，至少还需要一个存放所有（可运行）goroutine的容器，便于工作线程寻找需要被调度起来运行的goroutine，于是Go调度器又引入了schedt结构体，一方面用来保存调度器自身的状态信息，另一方面它还拥有一个用来保存goroutine的运行队列。因为每个Go程序只有一个调度器，所以在每个Go程序中schedt结构体只有一个实例对象，该实例对象在源代码中被定义成了一个共享的全局变量，这样每个工作线程都可以访问它以及它所拥有的goroutine运行队列，我们称这个运行队列为全局运行队列。
 
-M代表内核级线程，一个M就是一个线程，goroutine就是跑在M之上 ；
 
 ```go
-type m struct {
-	g0   *g         // 持有调度栈的 Goroutine
-    curg *g         // 在当前线程上运行的用户 Goroutine
-    p             puintptr  // 正在运行代码的处理器 p
-	nextp         puintptr  // 暂存的处理器 nextp
-	oldp          puintptr  // 执行系统调用之前的使用线程的处理器 oldp
-	...
+// src/runtime/runtime2.go
+type schedt struct {
+	// Global runnable queue.
+	runq     gQueue
+	runqsize int32
+	// Global cache of dead G's.
+	gFree struct {
+		lock    mutex
+		stack   gList // Gs with stacks
+		noStack gList // Gs without stacks
+		n       int32
+	}
+	gcwaiting  uint32 // gc is waiting to run
 }
 ```
 
-g0 是一个运行时中比较特殊的 Goroutine，它会深度参与运行时的调度过程，包括 Goroutine 的创建、大内存分配和 CGO 函数的执行。
-
-![](/public/upload/go/goroutine_m.png)
-
 
 ### P
+
+
+**为什么引入Processor 的概念？为什么把全局队列打散？**对该队列的操作均需要竞争同一把锁, 导致伸缩性不好. 一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。 ==> 为每一个 M 维护一个运行队列 runq ==> 如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行 ==> 将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行 ==> 对runq 及相关信息进行抽象 得到P。 go1.1 以P 为基础实现了基于工作窃取的调度器。
 
 P全称是Processor，处理器，表示调度的上下文，它可以被看做一个运行于线程 M 上的本地调度器，所以它维护了一个goroutine队列（环形链表），里面存储了所有需要它来执行的goroutine。通过处理器 P 的调度，每一个内核线程都能够执行多个 Goroutine，它能在 Goroutine 进行一些 I/O 操作时及时切换，提高线程的利用率。
 
@@ -181,6 +204,41 @@ p 结构体中的状态 status 可选值
 4. _Pgcstop	被线程 M 持有，当前处理器由于垃圾回收被停止
 5. _Pdead	当前处理器已经不被使用
 
+### M
+
+调度器最多可以创建 10000 个线程，但是其中大多数的线程都不会执行用户代码（可能陷入系统调用），最多只会有 GOMAXPROCS 个活跃线程能够正常运行。在默认情况下，运行时会将 GOMAXPROCS 设置成当前机器的核数。
+
+M代表内核级线程，一个M就是一个线程，goroutine就是跑在M之上 ；
+
+```go
+type m struct {
+	g0   *g         // 持有调度栈的 Goroutine
+    curg *g         // 在当前线程上运行的用户 Goroutine
+    p             puintptr  // 正在运行代码的处理器 p
+	nextp         puintptr  // 暂存的处理器 nextp
+	oldp          puintptr  // 执行系统调用之前的使用线程的处理器 oldp
+	...
+}
+```
+
+g0 是一个运行时中比较特殊的 Goroutine，它会深度参与运行时的调度过程，包括 Goroutine 的创建、大内存分配和 CGO 函数的执行。
+
+![](/public/upload/go/goroutine_m.png)
+
+如果只有一个工作线程，那么就只会有一个m结构体对象，问题就很简单，定义一个全局的m结构体变量就行了。可是我们有多个工作线程和多个m需要一一对应，怎么办呢？线程本地存储其实就是线程私有的全局变量，每个工作线程在刚刚被创建出来进入调度循环之前就利用线程本地存储机制为该工作线程实现了一个指向m结构体实例对象的私有全局变量，这样在之后的代码中就使用该全局变量来访问自己的m结构体对象，进而访问与m相关联的p和g对象。
+
+### 重要的全局变量
+
+```go
+allgs    []*g           // 保存所有的g
+allm      *m            // 所有的m构成的一个链表，包括下面的m0
+allp      []*p          // 保存所有的p，len(allp) == gomaxprocs
+ncpu             int32  // 系统中cpu核的数量，程序启动时由runtime代码初始化
+gomaxprocs  int32       // p的最大值，默认等于ncpu，但可以通过GOMAXPROCS修改
+sched     schedt        // 调度器结构体对象，记录了调度器的工作状态
+m0 m                    // 代表进程的主线程
+g0  g                   // m0的g0，也就是m0.g0 = &g0
+```
 ## 函数运行
 
 [Go 语言设计与实现 Goroutine](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)
@@ -251,21 +309,18 @@ func newproc1(fn *funcval, argp *uint8, narg int32, callergp *g, callerpc uintpt
 }
 ```
 
-### 协程切换入口——gopark
-
-[从源码角度看 Golang 的调度](https://studygolang.com/articles/20651)
-
-![](/public/upload/go/go_scheduler_sequence.png)
+### 协程切换/当前协程保留现场，退出执行
 
 协程切换的原因一般有以下几种情况：
-
 
 1. 系统调用；Go 语言通过 Syscall 和 Rawsyscall 等使用汇编语言编写的方法封装了操作系统提供的所有系统调用
 2. 同步和编配；如果原子、互斥量或通道操作调用将导致 Goroutine 阻塞，调度器可以将之切换到一个新的 Goroutine 去运行。一旦 Goroutine 可以再次运行，它就可以重新排队，并最终在M上切换回来。
 3. 抢占式调度时间片结束；
 4. 垃圾回收
 
-**所有触发 Goroutine 调度的方式最终都会调用 gopark 函数让出当前处理器 P 的控制权**。就好像linux 进程会主动调用schedule() 触发调度让出cpu 控制权，只是linux 多了时间片中断主动触发调度而已。
+![](/public/upload/go/goroutine_schedule.png)
+
+就好像linux 进程会主动调用schedule() 触发调度让出cpu 控制权，只是linux 多了时间片中断主动触发调度而已。
 
 
 ```go
@@ -303,6 +358,12 @@ func park_m(gp *g) {
 }
 ```
 
+### 协程调度
+
+[从源码角度看 Golang 的调度](https://studygolang.com/articles/20651)
+
+![](/public/upload/go/go_scheduler_sequence.png)
+
 在大多数情况下都会调用 schedule 触发一次 Goroutine 调度，这个函数的主要作用就是从不同的地方查找待执行的 Goroutine：
 
 ```go
@@ -335,6 +396,8 @@ top:
 ```
 
 findrunnable 函数会再次从本地运行队列、全局运行队列、网络轮询器和其他的处理器中获取待执行的任务，该方法一定会返回待执行的 Goroutine，否则就会一直阻塞。
+
+![](/public/upload/go/goroutine_runq.png)
 
 获取可以执行的任务之后就会调用 execute 函数执行该 Goroutine，执行的过程中会先将其状态修改成 _Grunning、与线程 M 建立起双向的关系并调用 gogo 触发调度。
 
@@ -377,6 +440,8 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
 这个函数会从 gobuf 中取出 Goroutine 指针、栈指针、返回值、上下文以及程序计数器并将通过 JMP 指令跳转至 Goroutine 应该继续执行代码的位置。PS：就切换几个寄存器，所以协程的切换成本更低
 
 ![](/public/upload/go/routine_switch_after.jpg)
+
+
 
 ## sysmon 协程
 
