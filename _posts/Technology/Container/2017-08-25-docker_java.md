@@ -90,7 +90,7 @@ public class App {
 ```
 运行一个java 容器，限制内存为512m，`docker run -m=512m java bash`，执行`javac App.java;java App` 输出 `max memory: 123`, 即123m，说明jvm 知道自己在容器中。
 
-2020.7.11补充： 之前一直尝试为java项目设置“最佳内存”，副作用就是项目负载飙升时容易OOM，后来发现，其实多给点内存也没关系。测试环境很多项目生存周期也不长，并且jvm也没有想象的那样，会贪婪地吃掉 配置的xmx所有的内存。对java 项目，prometheus 专门提供了相关的jmx exporter，可以对jvm 进行监控，进而对jvm的工作状态有一个深入的了解。
+2020.7.11补充： 之前一直尝试为java项目设置“最佳内存”，副作用就是项目负载飙升时容易OOM，后来发现，其实多给点内存也没关系。测试环境很多项目生存周期也不长，并且jvm也没有想象的那样，会贪婪地吃掉 配置的xmx所有的内存。对java 项目，prometheus 专门提供了相关的jmx exporter，可以对jvm 进行监控，进而对jvm的工作状态有一个深入的了解。 有越来越多的面向容器使用的os 开始支持 进程获取容器的cpu 和内存数据 [容器场景选择什么 Linux 版本？](https://mp.weixin.qq.com/s/oGGzeZGUSUNgTjK2hE_AgQ)
 
 ## cpu
 

@@ -15,6 +15,12 @@ keywords: Go goroutine scheduler
 
 本文内容来自 张万波大佬 [go语言调度器源代码情景分析](https://link.zhihu.com/?target=https%3A//mp.weixin.qq.com/mp/homepage%3F__biz%3DMzU1OTg5NDkzOA%3D%3D%26hid%3D1%26sn%3D8fc2b63f53559bc0cee292ce629c4788%26scene%3D25%23wechat_redirect)。在此再次表达 对大佬的膜拜。
 
+## 预备知识
+
+## 初始化和调度循环
+
+
+
 在主线程第一次被调度起来执行第一条指令之前，主线程的函数栈如下图所示：
 
 ![](/public/upload/go/go_scheduler_thread_init.jpg)
@@ -77,7 +83,7 @@ schedule()->execute()->gogo()->g2()->goexit()->goexit1()->mcall()->goexit0()->sc
 
 ![](/public/upload/go/go_scheduler_cycle.jpg)
 
-
+## 调度策略
 
 所谓的goroutine调度，是指程序代码按照一定的算法在适当的时候挑选出合适的goroutine并放到CPU上去运行的过程。这句话揭示了调度系统需要解决的三大核心问题：
 
@@ -86,3 +92,7 @@ schedule()->execute()->gogo()->g2()->goexit()->goexit1()->mcall()->goexit0()->sc
 3. 切换机制：如何把挑选出来的goroutine放到CPU上运行？
 
 对这三大问题的解决构成了调度器的所有工作，因而我们对调度器的分析也必将围绕着它们所展开。
+
+### 被动调度
+### 主动调度
+### 抢占调度
