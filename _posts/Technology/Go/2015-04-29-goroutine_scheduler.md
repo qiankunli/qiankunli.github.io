@@ -372,7 +372,7 @@ func schedule() {
 top:
     var gp *g
     var inheritTime bool
-    // 有一定几率会从全局的运行队列中选择一个 Goroutine；
+    // 有一定几率会从全局的运行队列中选择一个 Goroutine；为了保证调度的公平性，每个工作线程每进行61次调度就需要优先从全局运行队列中获取goroutine出来运行，因为如果只调度本地运行队列中的goroutine，则全局运行队列中的goroutine有可能得不到运行
     if gp == nil {
         if _g_.m.p.ptr().schedtick%61 == 0 && sched.runqsize > 0 {
             lock(&sched.lock)
@@ -395,7 +395,7 @@ top:
 }
 ```
 
-findrunnable 函数会再次从本地运行队列、全局运行队列、网络轮询器和其他的处理器中获取待执行的任务，该方法一定会返回待执行的 Goroutine，否则就会一直阻塞。
+findrunnable 函数会再次从本地运行队列、全局运行队列、网络轮询器和其他的处理器中偷取/获取待执行的任务，该方法一定会返回待执行的 Goroutine，否则就会一直阻塞。
 
 ![](/public/upload/go/goroutine_runq.png)
 
