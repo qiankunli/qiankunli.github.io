@@ -23,6 +23,8 @@ keywords: kubernetes security
 
 ![](/public/upload/kubernetes/container_security.png)
 
+[Docker 和 Kubernetes 中的 root 与 privileged](https://mp.weixin.qq.com/s/aCLGh-UiTsJgmV9HUryb6Q)`--privileged` 标志可以将我们前面看到的0的用户 ID 直接映射到主机的用户 ID 0上，使其可以不受限制地访问任何自己的系统调用。在正常的操作中，即使容器内有 root，Docker 也会限制容器的 Linux Capabilities 的，这种限制包括像 CAP_AUDIT_WRITE 这样的东西，
+
 ### docker 多用户
 
 [理解 docker 容器中的 uid 和 gid](https://www.cnblogs.com/sparkdev/p/9614164.html)默认情况下，容器中的进程以 root 用户权限运行，并且这个 root 用户和宿主机中的 root 是同一个用户。这就意味着一旦容器中的进程有了适当的机会，它就可以控制宿主机上的一切！

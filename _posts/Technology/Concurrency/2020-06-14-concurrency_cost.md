@@ -29,31 +29,35 @@ keywords: Concurrency cost
 2018.7.7 补充：[线程池的原理](https://toutiao.io/posts/396080/app_preview)
 我们首先来看，为什么说每次处理任务的时候再创建并销毁线程效率不高？
 
-	Thread t = new Thread();	// 此时只是在java 层面创建了一个对象
-	t.start()	
+```java
+Thread t = new Thread();	// 此时只是在java 层面创建了一个对象
+t.start()	
+```
 
 native 的start 指令做了很多事情
 
-	JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
-	JVMWrapper("JVM_StartThread");
-	JavaThread *native_thread = NULL;
-	{
-		MutexLocker mu(Threads_lock);
-		if (java_lang_Thread::is_stillborn(JNIHandles::resolve_non_null(jthread)) ||
-	java_lang_Thread::thread(JNIHandles::resolve_non_null(jthread)) != NULL) {	
-			throw_illegal_thread_state = true;
-		} else {
-			jlong size =	java_lang_Thread::stackSize(JNIHandles::resolve_non_null(jthread));
-			size_t sz = size > 0 ? (size_t) size : 0;
-			native_thread = new JavaThread(&thread_entry, sz);
-			if (native_thread->osthread() != NULL) {
-				// Note: the current thread is not being used within "prepare".
-				native_thread->prepare(jthread);
-			}
-		} 
-	}
-	Thread::start(native_thread);
-	JVM_END
+```c++
+JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
+JVMWrapper("JVM_StartThread");
+JavaThread *native_thread = NULL;
+{
+    MutexLocker mu(Threads_lock);
+    if (java_lang_Thread::is_stillborn(JNIHandles::resolve_non_null(jthread)) ||
+java_lang_Thread::thread(JNIHandles::resolve_non_null(jthread)) != NULL) {	
+        throw_illegal_thread_state = true;
+    } else {
+        jlong size =	java_lang_Thread::stackSize(JNIHandles::resolve_non_null(jthread));
+        size_t sz = size > 0 ? (size_t) size : 0;
+        native_thread = new JavaThread(&thread_entry, sz);
+        if (native_thread->osthread() != NULL) {
+            // Note: the current thread is not being used within "prepare".
+            native_thread->prepare(jthread);
+        }
+    } 
+}
+Thread::start(native_thread);
+JVM_END
+```
 	
 这段代码我也不懂，只是想表明， native 做了很多事情。包括但不限于：
 
@@ -67,6 +71,8 @@ native 的start 指令做了很多事情
 
 从中可以看到：尽管java 线程和 os 线程具备一对一关系，但java 仍在jvm 层面上 为线程 维持了一些 数据结构。就好像 线程池中的线程 不是单纯的 `new Thread`，java 线程 也不是 单纯的 os 线程。
 
+[The Go scheduler](https://morsmachine.dk/go-scheduler)POSIX线程API在很大程度上可以看做是对现有Unix进程模型的逻辑延伸，线程和进程有很多相似处。线程有自己的信号掩码（signal mask），可以分配与CPU关联，可以被放入cgroups，可以被查询使用了哪些资源。所有这些控制的特性都增加了开销。
+
 如果没有这些微观细节，人就很难直观上 感受 线程池的好处。 
 
 2019.5.27补充：[Linux内核基础知识](http://blog.zhifeinan.top/2019/05/01/linux_kernel_basic.html)
@@ -76,10 +82,12 @@ native 的start 指令做了很多事情
 
 不仅创建线程的代价高，线程切换的开销也很高
 
-1. 线程切换只能在内核态完成，如果当前用户处于用户态，则必然引起用户态与内核态的切换。
+1. 线程切换只能在内核态完成，如果当前用户处于用户态，则必然引起**用户态与内核态的切换**。
+2. 涉及 16 个寄存器 PC、SP…等寄存器的刷新；
 2. 上下文切换，前面说线程信息需要用一个task_struct保存，线程切换时，必然需要将旧线程的task_struct从内核切出，将新线程的切入，带来上下文切换。除此之外，还需要切换寄存器、程序计数器、线程栈（包括操作栈、数据栈）等。2019.03.22补充：《反应式设计模式》尽管CPU已经越来越快，但更多的内部状态已经抵消了纯执行速度上带来的进步，使得上下文切换大约需要耗费1微秒的时间(数千个CPU时钟周期)，这一点在二十年来几乎没有大的改进。
 3. 执行线程调度算法，线程1放弃cpu ==> 线程调度算法找下一个线程 ==> 线程2
 4. 缓存缺失，切换线程，需要执行新逻辑。如果二者的访问的地址空间不相近，则会引起缓存缺失。 PS “进程切换”的代价更大巨大，[linux线程切换和进程切换](https://www.cnblogs.com/kkshaq/p/4547725.html)当你改变虚拟内存空间的时候，处理的页表缓冲（processor’s Translation Lookaside Buffer (TLB)）或者相当的神马东西会被全部刷新，这将导致内存的访问在一段时间内相当的低效。
+
 
 ## 协程
 
@@ -90,7 +98,7 @@ native 的start 指令做了很多事情
 为什么协程的开销比线程的开销小？
 
 1. Java Thread 和 kernel Thread 是1:1，Goroutine 是M:N ==> 执行体创建、切换过程不用“陷入”内核态。
-2. 仅需切换栈寄存器和程序计数器（待确认）
+2. 只涉及到三个寄存器（PC / SP / DX）的值修改；
 3. JDK5以后Java Thread Stack默认为1M，Goroutine 的Stack初始化大小为2k
 4. kernel 线程 对寄存器中的内容进行恢复还需要向操作系统申请或者销毁对应的资源
 5. 创建协程时，会从进程的堆中分配一段内存作为协程的栈。线程的栈有 8MB，而协程栈的大小通常只有几十 KB。而且，C 库内存池也不会为协程预分配内存，它感知不到协程的存在。

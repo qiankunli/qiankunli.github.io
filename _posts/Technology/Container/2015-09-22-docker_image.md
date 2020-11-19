@@ -28,7 +28,9 @@ keywords: Docker image
 3. Linux发行版是Linux操作系统的特定版本，例如Debian，CentOS或Alpine。
 
 其实linux操作系统中代码包含两部分，一部分是文件目录和配置，另外一部分是内核，这两部分是分开存放的，**系统只有在宿主机开机启动时才会加载内核模块**。说白了，即使镜像中包含了内核也不会被加载。说到最后，原来镜像只是包含了操作系统的躯干（文件系统），并没有包含操作系统的灵魂（内核）。
+**容器中的根文件系统**，其实就是我们做的镜像。
 
+![](/public/upload/container/container_image_overview.png)
 
 ## 制作镜像
 

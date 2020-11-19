@@ -21,6 +21,11 @@ keywords: Go goroutine scheduler
 
 [万字长文深入浅出 Golang Runtime](https://zhuanlan.zhihu.com/p/95056679)调度在计算机中是分配工作所需资源的方法，linux的调度为CPU找到可运行的线程，而Go的调度是为M（线程）找到P（内存、执行票据）和可运行的G。
 
+
+[The Go scheduler](https://morsmachine.dk/go-scheduler)为什么Go 运行时需要一个用户态的调度器？
+1. 线程调度成本高，比如context switch比如陷入内核执行
+2. 操作系统在Go模型下不能做出好的调度决策。os 只能根据时间片做一些简单的调度。
+
 ## 调度模型的演化
 
 [Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)
@@ -109,6 +114,8 @@ go java 都有runtime，runtime 不只是一对一辅助执行代码，本身也
 
 [Go 语言设计与实现-调度器](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)goroutine调度模型4个重要结构，分别是M、G、P、Sched，前三个定义在runtime.h中，Sched定义在proc.c中。
 
+P 的数量决定了系统内最大可并行的 G 的数量（前提：物理 CPU 核数  >= P 的数量）。P 的数量由用户设置的 GoMAXPROCS 决定，但是不论 GoMAXPROCS 设置为多大，P 的数量最大为 256。M 的数量是不定的，由 Go Runtime 调整，为了防止创建过多 OS 线程导致系统调度不过来，目前默认最大限制为 10000 个。
+
 ### G
 
 [Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)系统线程对goroutine的调度与内核对系统线程的调度原理是一样的，实质都是通过**保存和修改CPU寄存器的值**来达到切换线程/goroutine的目的。为了实现对goroutine的调度，需要引入一个数据结构来保存CPU寄存器的值（具体的说就是栈指针、pc指针，题外话：有栈指针之后，栈数据也要实现准备好）以及goroutine的其它一些状态信息。调度器代码可以通过g对象来对goroutine进行调度，当goroutine被调离CPU时，调度器代码负责把CPU寄存器的值保存在g对象的成员变量之中，当goroutine被调度起来运行时，调度器代码又负责把g对象的成员变量所保存的寄存器的值恢复到CPU的寄存器。PS：函数不是并发执行体，所以函数切换只需要保留栈指针就可以了。
@@ -174,6 +181,8 @@ type schedt struct {
 
 
 **为什么引入Processor 的概念？为什么把全局队列打散？**对该队列的操作均需要竞争同一把锁, 导致伸缩性不好. 一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。 ==> 为每一个 M 维护一个运行队列 runq ==> 如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行 ==> 将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行 ==> 对runq 及相关信息进行抽象 得到P。 go1.1 以P 为基础实现了基于工作窃取的调度器。
+
+[The Go scheduler](https://morsmachine.dk/go-scheduler)为什么我们需要P，**我们不能把任务队列直接挂载到M上而去掉P吗？**答案是不行。原因是当运行着的线程由于某些原因需要阻塞时，我们需要通过P把任务队列挂载到其它线程中。**M 并不保留 G 状态，这是 G 可以跨 M 调度的基础**。
 
 P全称是Processor，处理器，表示调度的上下文，它可以被看做一个运行于线程 M 上的本地调度器，所以它维护了一个goroutine队列（环形链表），里面存储了所有需要它来执行的goroutine。通过处理器 P 的调度，每一个内核线程都能够执行多个 Goroutine，它能在 Goroutine 进行一些 I/O 操作时及时切换，提高线程的利用率。
 

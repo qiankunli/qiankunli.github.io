@@ -17,6 +17,8 @@ keywords: container cpu
 
 [Docker: 限制容器可用的 CPU](https://www.cnblogs.com/sparkdev/p/8052522.html)
 
+[为什么不建议把数据库部署在Docker容器内](https://mp.weixin.qq.com/s/WetiMHwBEHmGzvXY6Pb-jQ)资源隔离方面，Docker确实不如虚拟机KVM，Docker是利用Cgroup实现资源限制的，**只能限制资源消耗的最大值，而不能隔绝其他程序占用自己的资源**。如果其他应用过渡占用物理机资源，将会影响容器里MySQL的读写效率。
+
 ## 如何感知某个项目占用了过多的cpu
 
 [docker stats](https://docs.docker.com/engine/reference/commandline/stats/) returns a live data stream for running containers.

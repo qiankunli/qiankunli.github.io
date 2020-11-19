@@ -97,7 +97,7 @@ schedule()->execute()->gogo()->g2()->goexit()->goexit1()->mcall()->goexit0()->sc
 1. 调度时机：什么时候会发生调度？
     1. 被动调度，goroutine执行某个操作因条件不满足需要等待而发生的调度，比如读取channel
     2. 主动调度，正在运行的goroutine通过直接调用runtime.Gosched()函数暂时放弃运行而发生的调度。是用户代码自己控制的
-    3. 抢占调度。
+    3. 抢占调度。见下文
 2. 调度策略：使用什么策略来挑选下一个进入运行的goroutine？
 3. 切换机制：如何把挑选出来的goroutine放到CPU上运行？
 

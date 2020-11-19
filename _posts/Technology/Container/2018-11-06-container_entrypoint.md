@@ -36,16 +36,48 @@ There are cases where it makes sense to run multiple processes in a single conta
 
 2020.11.1补充： [并非每个容器内部都能包含一个操作系统](https://mp.weixin.qq.com/s/ALTxkwAXBdKdQLMYJIMrLw)容器单进程并不是指容器里只能运行"一个"进程而是指容器没有管理多进程的能力。这是因为容器里PID=1的进程就是应用本身，其他的进程都是PID=1进程的子进程。
 
+## init 进程
+
+Linux 内核执行文件一般会放在 /boot 目录下，文件名类似 vmlinuz*。在内核完成了操作系统的各种初始化之后，这个程序需要执行的第一个**用户态**进程就是 init 进程。它直接或者间接创建了 Namespace 中的其他进程。
+
+管理孤儿进程。当一个子进程终止后，它首先会变成一个“失效(defunct)”的进程，也称为“僵尸（zombie）”进程，等待父进程或系统收回（reap）。如果父进程已经结束了，那些依然在运行中的子进程会成为“孤儿（orphaned）”进程。在Linux中Init进程(PID1)作为所有进程的父进程，会维护进程树的状态，一旦有某个子进程成为了“孤儿”进程后，init就会负责接管这个子进程。当一个子进程成为“僵尸”进程之后，如果其父进程已经结束，init会收割这些“僵尸”，释放PID资源。
+
+```c
+init/main.c
+/*
+* We try each of these until one succeeds.
+*
+* The Bourne shell can be used instead of init if we are
+* trying to recover a really broken machine.
+*/
+if (execute_command) {
+        ret = run_init_process(execute_command);
+        if (!ret)
+                return 0;
+        panic("Requested init %s failed (error %d).",
+                execute_command, ret);
+}
+if (!try_to_run_init_process("/sbin/init") ||
+    !try_to_run_init_process("/etc/init") ||
+    !try_to_run_init_process("/bin/init") ||
+    !try_to_run_init_process("/bin/sh"))
+        return 0;
+panic("No working init found.  Try passing init= option to kernel. "
+        "See Linux Documentation/admin-guide/init.rst for guidance.");
+```
+
+linux 信号机制
+
+1. 进程在收到信号后，可以选择
+    1. 忽略，对这个信号不做任何处理，但对特权信号 SIGKILL 和 SIGSTOP 例外，不能忽略和捕获，只能采取默认行为——终止。
+    2. 捕获，用户进程可以注册自己针对这个信号的 handler
+    3. Default，，Linux 为每个信号都定义了一个默认的行为，包含终止、忽略等，SIGKILL 和 SIGSTOP 的默认行为都是终止。
+2. SIGTERM 是kill 默认发出的  `kill pid` = `kill -SIGTERM pid`
+3. 在每个 Namespace 的 init 进程建立的时候，就会打上 SIGNAL_UNKILLABLE 这个标签，1 号进程永远不会响应 SIGKILL 和 SIGSTOP 这两个特权信号，对于其他的信号，如果用户自己注册了 handler，1 号进程可以响应。即如果init 注册了SIGTERM handler， 可以被 SIGTERM 杀死。
+
 ## 以进程管理工具作为entrypoint
 
-[理解Docker容器的进程管理](https://yq.aliyun.com/articles/5545)
-
-linux 对pid=1进程的要求
-
-* 管理孤儿进程。当一个子进程终止后，它首先会变成一个“失效(defunct)”的进程，也称为“僵尸（zombie）”进程，等待父进程或系统收回（reap）。如果父进程已经结束了，那些依然在运行中的子进程会成为“孤儿（orphaned）”进程。在Linux中Init进程(PID1)作为所有进程的父进程，会维护进程树的状态，一旦有某个子进程成为了“孤儿”进程后，init就会负责接管这个子进程。当一个子进程成为“僵尸”进程之后，如果其父进程已经结束，init会收割这些“僵尸”，释放PID资源。
-* 如果它没有提供某个信号的处理逻辑，那么发送给它的该信号都会被屏蔽。init 进程一般不处理 SIGTERM 信号，they're built for hardware shutdowns instead. 原本是防止init进程被误杀。  
-	
-docker stop  对PID1进程 的要求
+[理解Docker容器的进程管理](https://yq.aliyun.com/articles/5545)docker stop  对PID1进程 的要求
 
 1. 支持管理运行过程中可能产生的僵尸/孤儿进程
 2. 容器的PID1进程需要能够正确的处理SIGTERM信号来支持优雅退出，如果容器中包含多个进程，需要PID1进程能够正确的传播SIGTERM信号来结束所有的子进程之后再退出。
@@ -90,9 +122,7 @@ Dockerfile
 
 ```Dockerfile
 FROM phusion/passenger-­ruby22
-
 ...
-
 #install custom bootstrap script as runit service
 COPY myapp/start.sh /etc/service/myapp/run
 ```
