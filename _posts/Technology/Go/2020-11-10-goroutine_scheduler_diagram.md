@@ -105,4 +105,3 @@ schedule()->execute()->gogo()->g2()->goexit()->goexit1()->mcall()->goexit0()->sc
 
 1. 因运行时间过长而导致的抢占调度。监控线程负责给被抢占的goroutine设置抢占标记，被抢占的goroutine再在函数的的入口处检查g的stackguard0成员决定是否需要调用morestack_noctxt函数，从而最终调用到newstack函数处理抢占请求；
 2. 因进入系统调用时间过长而发生的抢占调度。而对于系统调用执行时间过长的goroutine，调度器并没有暂停其执行，只是剥夺了正在执行系统调用的工作线程所绑定的p，要等到工作线程从系统调用返回之后绑定p失败的情况下该goroutine才会真正被暂停运行。
-

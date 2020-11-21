@@ -110,6 +110,8 @@ static void schedule(void) {
 
 go java 都有runtime，runtime 不只是一对一辅助执行代码，本身也会运行很多协程/线程，以提高io、定时器、gc等的执行效率，为上层高级特性提供支持。在目前的runtime中，线程、处理器、网络轮询器、运行队列、全局内存分配器状态、内存分配缓存和垃圾收集器都是全局资源。
 
+[Go: Goroutine, OS Thread and CPU Management](https://medium.com/a-journey-with-go/go-goroutine-os-thread-and-cpu-management-2f5a5eaf518a) 来讲述GPM时，用到了 orchestration 这个词,   Go has its own scheduler to **distribute goroutines over the threads**. This scheduler defines three main concepts
+
 ## goroutine调度模型的四个抽象及其数据结构
 
 [Go 语言设计与实现-调度器](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)goroutine调度模型4个重要结构，分别是M、G、P、Sched，前三个定义在runtime.h中，Sched定义在proc.c中。
@@ -452,14 +454,6 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
 
 ![](/public/upload/go/routine_switch_after.jpg)
 
-## 阻塞
-
-在 Go 里面阻塞主要分为一下 4 种场景：
-1. 由于原子、互斥量或通道操作调用导致  Goroutine  阻塞，调度器将把当前阻塞的 Goroutine 切换出去，重新调度 LRQ 上的其他 Goroutine；
-2. 由于网络请求和 IO 操作导致  Goroutine  阻塞。Go 程序提供了网络轮询器（NetPoller）来处理网络请求和 IO 操作的问题，其后台通过 kqueue（MacOS），epoll（Linux）或  iocp（Windows）来实现 IO 多路复用。通过使用 NetPoller 进行网络系统调用，调度器可以防止  Goroutine  在进行这些系统调用时阻塞 M。这可以让 M 执行 P 的  LRQ  中其他的  Goroutines，而不需要创建新的 M。执行网络系统调用不需要额外的 M，网络轮询器使用系统线程，它时刻处理一个有效的事件循环，有助于减少操作系统上的调度负载。用户层眼中看到的 Goroutine 中的“block socket”，实现了 goroutine-per-connection 简单的网络编程模式。实际上是通过 Go runtime 中的 netpoller 通过 Non-block socket + I/O 多路复用机制“模拟”出来的。
-3. 当调用一些系统方法的时候（如文件 I/O），如果系统方法调用的时候发生阻塞，这种情况下，网络轮询器（NetPoller）无法使用，而进行系统调用的  G1  将阻塞当前 M1。调度器引入 其它M 来服务 M1 的P。
-4. 如果在 Goroutine 去执行一个 sleep 操作，导致 M 被阻塞了。Go 程序后台有一个监控线程 sysmon，它监控那些长时间运行的 G 任务然后设置可以强占的标识符，别的 Goroutine 就可以抢先进来执行。
-
 
 
 ## sysmon 协程
@@ -470,79 +464,20 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
 
 协作式抢占：基本流程是 sysmon 协程标记某个协程运行过久, 需要切换出去, 该协程在运行函数时会检查栈标记, 然后进行切换. PS： 有点类似linux 的时间片中断。
 
-## 系统调用
-
-Go 语言通过 Syscall 和 Rawsyscall 等使用汇编语言编写的方法封装了操作系统提供的所有系统调用，其中 Syscall 在 Linux 386 上的实现如下：
-
-```
-TEXT ·Syscall(SB),NOSPLIT,$0-28
-    CALL	runtime·entersyscall(SB)
-    MOVL	trap+0(FP), AX	// syscall entry
-    MOVL	a1+4(FP), BX
-    MOVL	a2+8(FP), CX
-    MOVL	a3+12(FP), DX
-    MOVL	$0, SI
-    MOVL	$0, DI
-    INVOKE_SYSCALL
-    CMPL	AX, $0xfffff001
-    JLS	ok
-    MOVL	$-1, r1+16(FP)
-    MOVL	$0, r2+20(FP)
-    NEGL	AX
-    MOVL	AX, err+24(FP)
-    CALL	runtime·exitsyscall(SB)
-    RET
-ok:
-    MOVL	AX, r1+16(FP)
-    MOVL	DX, r2+20(FP)
-    MOVL	$0, err+24(FP)
-    CALL	runtime·exitsyscall(SB)
-    RET
-```
-
-[Golang - 调度剖析](https://segmentfault.com/a/1190000016611742)
-
-### 异步系统调用
-
-通过使用网络轮询器进行网络系统调用，调度器可以防止 Goroutine 在进行这些系统调用时阻塞M。这可以让M执行P的 LRQ 中其他的 Goroutines，而**不需要创建新的M**。有助于减少操作系统上的调度负载。
-
-G1正在M上执行，还有 3 个 Goroutine 在 LRQ 上等待执行
-
-![](/public/upload/go/go_scheduler_async_systemcall_1.png)
-
-接下来，G1想要进行网络系统调用，因此它被移动到网络轮询器并且处理异步网络系统调用。然后，M可以从 LRQ 执行另外的 Goroutine。
-
-![](/public/upload/go/go_scheduler_async_systemcall_2.png)
-
-最后：异步网络系统调用由网络轮询器完成，G1被移回到P的 LRQ 中。一旦G1可以在M上进行上下文切换，它负责的 Go 相关代码就可以再次执行。
-
-![](/public/upload/go/go_scheduler_async_systemcall_3.png)
-
-### 同步系统调用
-
-G1将进行同步系统调用以阻塞M1
-
-![](/public/upload/go/go_scheduler_sync_systemcall_1.png)
-
-调度器介入后：识别出G1已导致M1阻塞，此时，调度器将M1与P分离，同时也将G1带走。然后调度器引入新的M2来服务P。
-
-![](/public/upload/go/go_scheduler_sync_systemcall_2.png)
-
-阻塞的系统调用完成后：G1可以移回 LRQ 并再次由P执行。如果这种情况需要再次发生，M1将被放在旁边以备将来使用。
-
-![](/public/upload/go/go_scheduler_sync_systemcall_3.png)
 
 ## G0
 
-[聊聊 g0](https://mp.weixin.qq.com/s/Ie8niOb_0C9z2kACNvWCtg)未理解
+[聊聊 g0](https://mp.weixin.qq.com/s/Ie8niOb_0C9z2kACNvWCtg)linux 执行调度任务：cpu 发生时间片中断，正在执行的线程 被剥离cpu，cpu 执行调度 程度寻找下一个线程并执行。 调度程度 的运行依托 栈、寄存器等上下文环境。对于go 来说，每一个线程 一直在执行一个 调度循环`schedule()->execute()->gogo()->g2()->goexit()->goexit1()->mcall()->goexit0()->schedule()` ，每个被调度的协程 有自己的栈 等 空间，那么先后执行的 两个协程之间 运行 schedule 这些逻辑时，也需要一些栈空间，这些都归属于g0。
+
+[Go: g0, Goroutine for Scheduling](https://medium.com/a-journey-with-go/go-g0-special-goroutine-8c778c6704d8)Go has to schedule and manage goroutines on each of the running threads. This role is delegated to a special goroutine, called g0, that is the first goroutine created for each OS thread. 以下图为例，在g7 被挂起后，运行g0，选择g2 来执行。
+
+![](/public/upload/go/go_g0.png)
+
+此外 g0 has a fix and larger stack. This allows Go to perform operations where a bigger stack is needed. 比如 Goroutine creation, Defer functions allocations, Garbage collector operations
 
 ## 补充
 
 笔者今日学习Joe Armstrong的博士论文《面对软件错误构建可靠的分布式系统》，文中提到“在构建可容错软件系统的过程中要解决的本质问题就是故障隔离。”操作系统进程本身就是一种天然的故障隔离机制，当然从另一个层面，进程间还是因为共享cpu和内存等原因相互影响。进程要想达到容错性，就不能与其他进程有共享状态；它与其他进程的唯一联系就是由内核消息系统传递的消息。 
-
-## 参考文献
-
-![](/public/upload/basic/scheduler_design.png)
 
 
 [goroutine与调度器](http://blog.csdn.net/chanshimudingxi/article/details/40855467)
