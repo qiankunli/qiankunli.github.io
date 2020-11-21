@@ -84,3 +84,21 @@ G1将进行同步系统调用以阻塞M1
 阻塞的系统调用完成后：G1可以移回 LRQ 并再次由P执行。如果这种情况需要再次发生，M1将被放在旁边以备将来使用。
 
 ![](/public/upload/go/go_scheduler_sync_systemcall_3.png)
+
+
+## sysmon 协程
+
+![](/public/upload/go/go_scheduler_sysmon.jpg)
+
+在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.在 go 运行时中也有类似的协程 sysmon. 它会每隔一段时间**检查 Go 语言runtime**，确保程序没有进入异常状态。
+
+
+系统监控的触发时间就会稳定在 10ms，功能比较多: 
+
+1. 检查死锁runtime.checkdead 
+2. 运行计时器 — 获取下一个需要被触发的计时器；
+3. 定时从 netpoll 中获取 ready 的协程
+4. 抢占运行时间较长的或者处于系统调用的 Goroutine；基本流程是 sysmon 协程标记某个协程运行过久, 需要切换出去, 该协程在运行函数时会检查栈标记, 然后进行切换.
+5. 在满足条件时触发垃圾收集回收内存；
+6. 打印调度信息,归还内存等定时任务.
+

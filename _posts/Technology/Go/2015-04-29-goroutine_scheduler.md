@@ -455,16 +455,6 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
 ![](/public/upload/go/routine_switch_after.jpg)
 
 
-
-## sysmon 协程
-
-![](/public/upload/go/go_scheduler_sysmon.jpg)
-
-在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.在 go 运行时中也有类似的协程, sysmon.功能比较多: 定时从 netpoll 中获取 ready 的协程, 进行抢占, 定时 GC,打印调度信息,归还内存等定时任务.
-
-协作式抢占：基本流程是 sysmon 协程标记某个协程运行过久, 需要切换出去, 该协程在运行函数时会检查栈标记, 然后进行切换. PS： 有点类似linux 的时间片中断。
-
-
 ## G0
 
 [聊聊 g0](https://mp.weixin.qq.com/s/Ie8niOb_0C9z2kACNvWCtg)linux 执行调度任务：cpu 发生时间片中断，正在执行的线程 被剥离cpu，cpu 执行调度 程度寻找下一个线程并执行。 调度程度 的运行依托 栈、寄存器等上下文环境。对于go 来说，每一个线程 一直在执行一个 调度循环`schedule()->execute()->gogo()->g2()->goexit()->goexit1()->mcall()->goexit0()->schedule()` ，每个被调度的协程 有自己的栈 等 空间，那么先后执行的 两个协程之间 运行 schedule 这些逻辑时，也需要一些栈空间，这些都归属于g0。
