@@ -95,6 +95,10 @@ At any given time, the Kubernetes Control Plane actively manages an object’s a
 
 metadata 与 spec 分别代表了 共性与个性，数据表设计也可以参照这个思路
 
+metadata 中包含Label 和 Annotation，作用差不多，但有两个区别
+1. k8s 支持根据 label 对object 进行检索， Annotation 不行
+2. 因为label 需要支持检索，所以label 只能是kv 结构，Annotation value 可以是复杂一点，比如json 字符串
+
 ## PodPreset
 
 开发人员习惯的写的，是最简单的pod

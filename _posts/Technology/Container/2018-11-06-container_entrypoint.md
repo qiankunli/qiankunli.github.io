@@ -40,7 +40,6 @@ There are cases where it makes sense to run multiple processes in a single conta
 
 Linux 内核执行文件一般会放在 /boot 目录下，文件名类似 vmlinuz*。在内核完成了操作系统的各种初始化之后，这个程序需要执行的第一个**用户态**进程就是 init 进程。它直接或者间接创建了 Namespace 中的其他进程。
 
-管理孤儿进程。当一个子进程终止后，它首先会变成一个“失效(defunct)”的进程，也称为“僵尸（zombie）”进程，等待父进程或系统收回（reap）。如果父进程已经结束了，那些依然在运行中的子进程会成为“孤儿（orphaned）”进程。在Linux中Init进程(PID1)作为所有进程的父进程，会维护进程树的状态，一旦有某个子进程成为了“孤儿”进程后，init就会负责接管这个子进程。当一个子进程成为“僵尸”进程之后，如果其父进程已经结束，init会收割这些“僵尸”，释放PID资源。
 
 ```c
 init/main.c
@@ -64,6 +63,29 @@ if (!try_to_run_init_process("/sbin/init") ||
         return 0;
 panic("No working init found.  Try passing init= option to kernel. "
         "See Linux Documentation/admin-guide/init.rst for guidance.");
+```
+
+管理孤儿进程。当一个子进程终止后，它首先会变成一个“失效(defunct)”的进程，也称为“僵尸（zombie）”进程，等待父进程或系统收回（通过wait/waitpid 函数）。如果父进程已经结束了，那些依然在运行中的子进程会成为“孤儿（orphaned）”进程。在Linux中Init进程(PID1)作为所有进程的父进程，会维护进程树的状态，一旦有某个子进程成为了“孤儿”进程后，init就会负责接管这个子进程。当一个子进程成为“僵尸”进程之后，如果其父进程已经结束，init会收割这些“僵尸”，释放PID资源。
+
+僵尸进程（内存文件等都已释放，只留了一个stask_struct instance）如果不清理，就会消耗系统中的进程号资源，最坏会导致创建新进程。
+
+社区 有一个容器init 项目tini
+
+```c
+int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
+        pid_t current_pid;
+        int current_status;
+        while (1) {
+                current_pid = waitpid(-1, &current_status, WNOHANG);
+
+                switch (current_pid) {
+                        case -1:
+                                if (errno == ECHILD) {
+                                        PRINT_TRACE("No child to wait");
+                                        break;
+                                }
+
+…
 ```
 
 linux 信号机制

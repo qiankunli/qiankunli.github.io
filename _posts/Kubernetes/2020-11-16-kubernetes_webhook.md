@@ -13,10 +13,12 @@ keywords:  Kubernetes event
 * TOC
 {:toc}
 
-分类
+Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个设计和各类 Web 框架中的 Filter  很像，就是一个插件化的责任链，责任链中的每个插件针对 apiserver 收到的请求做一些操作或校验。分类
 
-1. ValidatingWebhookConfiguration 
-2. MutatingWebhookConfiguration 
+1. ValidatingWebhookConfiguration，校验 api 对象的
+2. MutatingWebhookConfiguration，操作 api 对象的
+
+apiserver 就能保证在校验（Validating）之前先做完所有的修改（Mutating）
 
 ## 配置apiserver 发起webhook
 
@@ -112,3 +114,8 @@ Webhook 禁止请求的最简单响应示例：
   }
 }
 ```
+
+## ValidatingWebhookConfiguration 妙用
+
+[Kubernetes 中如何保证优雅地停止 Pod](https://mp.weixin.qq.com/s/NwJbBLhomaHBhCkIDR1KWA)利用 ValidatingAdmissionWebhook，在重要的 Pod 收到删除请求时，先在 webhook server 上请求集群进行下线前的清理和准备工作，并直接返回拒绝。这时候重点来了，Control Loop 为了达到目标状态（比如说升级到新版本），会不断地进行 reconcile，尝试删除 Pod，而我们的 webhook 则会不断拒绝，除非集群已经完成了所有的清理和准备工作。
+

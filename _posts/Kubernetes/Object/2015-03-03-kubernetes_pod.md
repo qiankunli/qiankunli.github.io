@@ -89,79 +89,15 @@ spec:
 ```
 		
 可以观察这些配置的位置，Pod的归Pod，容器的归容器。	
-#### Pod configuration file
 
-A pod configuration file specifies required information about the pod/ It can be formatted as YAML or as JSON, and supports the following fields:
 
-    {
-      "id": string,
-      "kind": "Pod",
-      "apiVersion": "v1beta1",
-      "desiredState": {
-        "manifest": {
-          manifest object
-        }
-      },
-      "labels": { string: string }
-    }
-    
-Required fields are:
-
-- id: The name of this pod. It must be an RFC1035 compatible value and be unique on this container cluster.
-- kind: Always Pod.
-- apiVersion: Currently v1beta1.
-- desiredState: The configuration for this pod. It must contain a child manifest object.
-
-Optional fields are:
-
-- labels are arbitrary key:value pairs that **can be used by replication controllers and services for grouping and targeting pods**.
-
-#### Manifest
-
-Manifest部分的内容不再赘述（所包含字段，是否必须，以及其意义），可以参见文档
-
-#### Sample file
-
-    {
-      "id": "redis-controller",
-      "kind": "Pod",
-      "apiVersion": "v1beta1",
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "containers": [{
-            "name": "redis",
-            "image": "dockerfile/redis",
-            "ports": [{
-              "containerPort": 6379,
-              "hostPort": 6379
-            }]
-          }]
-        }
-      },
-      "labels": {
-        "name": "redis-controller"
-      }
-    }
-
-### Viewing a pod
-
-    kubectl get pod xxx
-    ## list pod
-    kubectl get pods
-
-### Deleting a pod
-
-    kubectl delete pod xxx
-    
 ## Pod 的运行
 
 ![](/public/upload/kubernetes/pod_status.png)
 
-
 ### pod生命周期
 
-pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/) 
+pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)  [event.go](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/events/event.go) 
 
 ![](/public/upload/kubernetes/pod_lifecycle.png)
 
@@ -171,8 +107,6 @@ pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads
 4. Failed
 5. Unknown  For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod. 用户可以执行 `kubectl delete pods <pod> --grace-period=0 --force` 强制删除 Pod
 
-其实观察pod 状态最全面的是kubernetes 源码中的[event.go](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/events/event.go) For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod.
-
 ### 容器状态及其它状态
 
 restartPolicy 和 Pod 里容器的状态，以及Pod 状态的对应关系（最终体现在`kube get pod pod_name` 时 status 的状态） [有一系列复杂的情况](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#example-states) ，可以概括为两条基本原则：
@@ -181,12 +115,6 @@ restartPolicy 和 Pod 里容器的状态，以及Pod 状态的对应关系（最
 2. 对于包含多个容器的 Pod，只有它里面所有的容器都进入异常状态后，Pod 才会进入 Failed 状态。在此之前，Pod都是 Running 状态。此时，Pod 的 READY 字段会显示正常容器的个数
 
 [Kubernetes 排错之 Pod 异常](https://zhuanlan.zhihu.com/p/34332367)
-
-一般来说，无论 Pod 处于什么异常状态，都可以执行以下命令来查看 Pod 的状态
-
-    kubectl get pod <pod-name> -o yaml 查看 Pod 的配置是否正确
-    kubectl describe pod <pod-name> 查看 Pod 的事件
-    kubectl logs <pod-name> [-c <container-name>] 查看容器日志
 
 [Restart policy](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy)A PodSpec has a restartPolicy field with possible values Always, OnFailure, and Never. The default value is Always. restartPolicy applies to all Containers in the Pod. restartPolicy only refers to restarts of the Containers by the kubelet on the same node. Exited Containers that are restarted by the kubelet are restarted with an exponential back-off delay (10s, 20s, 40s ...) capped at five minutes, and is reset after ten minutes of successful execution. **业务容器经常会因为内存不足发生oom，进而导致容器的重启，重启次数可以间接反映业务的健康状态**。
 
@@ -209,7 +137,20 @@ type PodStatus struct {
 }
 ```
 
-### 为什么pod中要有一个pause 容器？
+## kubectl drain 发生了什么
+
+kubectl drain 将以某种方式驱逐 Pod。drain 将向控制平面发出删除目标节点上的 Pod 的请求。通过 API 将 Pod 从集群中删除后，所有发生的事情就是该 Pod 在元数据服务器中被标记为要删除。这会向所有相关子系统发送一个 Pod 删除通知
+
+1. 目标节点上的 kubelet 开始关闭 Pod。
+    1. 节点上的 kubelet 将调用 Pod 中的 preStop 勾子。
+    2. 一旦 preStop 勾子完成，节点上的 kubelet 将向 Pod 容器中正在运行的应用程序发出 TERM 信号。
+    3. 节点上的 kubelet 将等待最多宽限期（在 Pod 上指定，或从命令行传递；默认为 30 秒）以关闭容器，然后强行终止进程（使用 SIGKILL）。请注意，此宽限期包括执行 preStop 勾子的时间。
+2. 所有节点上运行的 kube-proxy 守护程序将从 iptables 中删除 pod 的 ip 地址。
+3. endpoint 控制器将从有效 endpoint 列表中删除该 Pod，然后从 Service 中删除该 Pod。
+
+这里的重点涉及多个系统，这些系统可能在不同的节点上运行，并且这些序列**并行发生**。因此，将 Pod 从所有活动列表中删除之前，Pod 很有可能运行 preStop 钩子并接收到 TERM 信号。
+
+## 为什么pod中要有一个pause 容器？
 
 [Kubernetes networking 101 – Pods](http://www.dasblinkenlichten.com/kubernetes-networking-101-pods/)
 
