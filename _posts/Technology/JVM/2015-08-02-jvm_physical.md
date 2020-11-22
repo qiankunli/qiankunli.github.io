@@ -18,6 +18,8 @@ jvm 作为 a model of a whole computer，便与os 有许多相似的地方，包
 
 这三者是三个不同的部分，又相互关联，比如jvm基于栈的解释器与jvm 内存模型 相互依存。
 
+![](/public/upload/jvm/jvm_mm.png)
+
 ## 进程内存布局
 
 [Linux内核基础知识](http://qiankunli.github.io/2019/05/01/linux_kernel_basic.html)进程内存布局
@@ -26,15 +28,9 @@ jvm 作为 a model of a whole computer，便与os 有许多相似的地方，包
 
 左右两侧均表示虚拟地址空间，左侧以描述内核空间为主，右侧以描述用户空间为主。右侧底部有一块区域“read from binary image on disk by execve(2)”，即来自可执行文件加载，jvm的方法区来自class文件加载，那么 方法区、堆、栈 便可以一一对上号了。
 
-![](/public/upload/java/jvm_process.png)
-
 ## JVM内存区域新画法 
 
 ![](/public/upload/java/jvm_memory_layout.jpg)
-
-我们以线程的视角重新画一下
-
-![](/public/upload/java/jvm_memory.png)
 
 一个cpu对应一个线程，一个线程一个栈，或者反过来说，一个栈对应一个线程，所有栈组成栈区。我们从cpu的根据pc指向的指令的一次执行开始：
 

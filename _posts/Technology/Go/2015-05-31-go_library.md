@@ -17,6 +17,8 @@ keywords: Go library
 
 ## go runtime
 
+Go does not need a VM and Go application binaries include a small runtime embedded in them to take care of language features like Garbage collection, scheduling & concurrency.
+
 提到 runtime, 大家可能会想起 java, python 的 runtime. 不过 go 和这两者不太一样, java, python 的 runtime 是虚拟机, 而 go 的 runtime 和用户代码一起编译到一个可执行文件中.用户代码和 runtime 代码除了代码组织上有界限外, 运行的时候并没有明显的界限. 一些常用的关键字被编译成 runtime 包下的一些函数调用.
 
 
