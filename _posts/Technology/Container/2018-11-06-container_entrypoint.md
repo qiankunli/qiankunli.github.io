@@ -91,7 +91,7 @@ int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
 linux 信号机制
 
 1. 进程在收到信号后，可以选择
-    1. 忽略，对这个信号不做任何处理，但对特权信号 SIGKILL 和 SIGSTOP 例外，不能忽略和捕获，只能采取默认行为——终止。
+    1. 忽略，对这个信号不做任何处理，但对特权信号 SIGKILL 和 SIGSTOP 例外，不能忽略和捕获（注册signal handler 也会报错），只能采取默认行为——终止。
     2. 捕获，用户进程可以注册自己针对这个信号的 handler
     3. Default，，Linux 为每个信号都定义了一个默认的行为，包含终止、忽略等，SIGKILL 和 SIGSTOP 的默认行为都是终止。
 2. SIGTERM 是kill 默认发出的  `kill pid` = `kill -SIGTERM pid`
