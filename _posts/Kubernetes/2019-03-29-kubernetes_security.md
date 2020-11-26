@@ -86,7 +86,7 @@ docker 启用user namesapce（此处只是普及，不推荐使用）
 
 ## 安全相关的 kubernetes objects
 
-### Secrets
+### Secrets——非明文的configmap
 
 1. 为什么弄一个Secrets？
 2. 其它组件（主要是Pod）如何获取Secrets数据？
@@ -95,26 +95,30 @@ docker 启用user namesapce（此处只是普及，不推荐使用）
 
 为什么要弄一个Secrets？ **回答为什么的一般方法是：对比前后差异**。 
 
-Kubernetes secret objects let you store and manage sensitive information, such as passwords, OAuth tokens, and ssh keys. Putting this information in a secret is safer and more flexible than putting it verbatim in a Pod Lifecycle definition or in a container image . 管理敏感信息，如果没有Secrets，这些信息可能被保存在 pod 定义或者 docker 镜像中，有信息泄露的风险（PS：笔者曾把密码写在代码测试类里提交到公司仓库， 结果被几个看源码的小哥发现并使用了）
+Kubernetes secret objects let you store and manage sensitive information, such as passwords, OAuth tokens, and ssh keys. Putting this information in a secret is safer and more flexible than putting it verbatim(原样的) in a Pod Lifecycle definition or in a container image . 管理敏感信息，如果没有Secrets，这些信息可能被保存在 pod 定义或者 docker 镜像中，有信息泄露的风险（PS：笔者曾把密码写在代码测试类里提交到公司仓库， 结果被几个看源码的小哥发现并使用了）
 
 K8s Secrets 中保存的数据都必须经过 base64加密
 
-	apiVersion: v1
-	kind: Secret
-	metadata:
-		name: db-secret
-		type: Opaque
-		data:
-			# base64
-			carrot-db-username: Y2Fycm90
-			carrot-db-password: Y2Fycm90
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+    name: db-secret
+    type: Opaque
+    data:
+        # base64
+        carrot-db-username: Y2Fycm90
+        carrot-db-password: Y2Fycm90
+```
 
 Secrets can be mounted as data volumes or be exposed as environment variables to be used by a container in a pod
 
 1. volume 方式， Each key in the secret data map becomes the filename under mountPath. 每一个secret key 会变成 container mountPath 下的一个文件。When a secret being already consumed in a volume is updated, projected keys are eventually updated as well. Kubelet is checking whether the mounted secret is fresh on every periodic sync. 当你改了secret 数据，则容器内的文件内容也能自动同步
 2. Environment Variables
 
-### Service Accounts
+### Service Accounts——让pod 可以访问apiserver
+
+[配置 Pod 的 Service Account](https://jimmysong.io/kubernetes-handbook/guide/configure-pod-service-account.html)
 
 A service account provides an identity for processes that run in a Pod. When you (a human) access the cluster (for example, using kubectl), you are authenticated by the apiserver as a particular User Account (currently this is usually admin, unless your cluster administrator has customized your cluster). Processes in containers inside pods can also contact the apiserver. When they do, they are authenticated as a particular Service Account (for example, default).
 
