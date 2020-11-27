@@ -34,7 +34,7 @@ keywords:  Fundamentals Compiling
 os 提供systemcall malloc 内存，但没有提供 systemcall  malloc 一个heap 或 stack 出来。
 
 
-### 汇编语言基础
+### 与机器对话——汇编语言基础
 
 计算机的处理器有很多不同的架构，比如 x86-64、ARM、Power 等，每种处理器的指令集都不相同，那也就意味着汇编语言不同。本文以x86-64 架构为例
 
