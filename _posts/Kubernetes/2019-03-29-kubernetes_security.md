@@ -50,10 +50,12 @@ docker 启用user namesapce（此处只是普及，不推荐使用）
 
 我们可以在 Dockerfile 中添加一个用户 dev，并使用 USER 命令指定以该用户的身份运行程序，Dockerfile 的内容如下：
 
-    FROM ubuntu
-    RUN groupadd -r dev && useradd -r -g dev dev
-    USER dev
-    ENTRYPOINT ["sleep", "infinity"]
+```sh
+FROM ubuntu
+RUN groupadd -r dev && useradd -r -g dev dev
+USER dev
+ENTRYPOINT ["sleep", "infinity"]
+```
 
 则限定了 项目不能在随意位置 写日志，强制项目在 一个特定目录比如 `/logs` 下写日志（为dev 开放`/logs`目录写权限），并将`/logs` 映射到物理机的某个目录，定期整理`/logs` 目录即可。
 
@@ -65,7 +67,7 @@ docker 启用user namesapce（此处只是普及，不推荐使用）
 
 [Managing Service Accounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/)
 
-1. User accounts are for humans. Service accounts are for processes, which run in pods.
+1. **User accounts are for humans. Service accounts are for processes, which run in pods**.
 2. User accounts are intended to be global. Names must be unique across all namespaces of a cluster, future user resource will not be namespaced. Service accounts are namespaced.
 
 ### access the API 
@@ -118,60 +120,78 @@ Secrets can be mounted as data volumes or be exposed as environment variables to
 
 ### Service Accounts——让pod 可以访问apiserver
 
-[配置 Pod 的 Service Account](https://jimmysong.io/kubernetes-handbook/guide/configure-pod-service-account.html)
+[配置 Pod 的 Service Account](https://jimmysong.io/kubernetes-handbook/guide/configure-pod-service-account.html) service account 只是提供了一个类似用户名的标识，真正ServiceAccount 有哪些权限要 通过 ClusterRoleBinding 绑定 ClusterRole。
 
-A service account provides an identity for processes that run in a Pod. When you (a human) access the cluster (for example, using kubectl), you are authenticated by the apiserver as a particular User Account (currently this is usually admin, unless your cluster administrator has customized your cluster). Processes in containers inside pods can also contact the apiserver. When they do, they are authenticated as a particular Service Account (for example, default).
+A service account provides an identity for processes that **run in a Pod**. When you (a human) access the cluster (for example, using kubectl), you are authenticated by the apiserver as a particular User Account (currently this is usually admin, unless your cluster administrator has customized your cluster). Processes in containers inside pods can also contact the apiserver. When they do, they are authenticated as a particular Service Account (for example, default).
 
 为什么弄一个Service Accounts？为processes (that run in a Pod) 提供必要的身份认证
 
 
-	apiVersion: v1
-	kind: ServiceAccount
-	metadata:
-	namespace: mynamespace
-	name: example-sa
+```yml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+namespace: mynamespace
+name: example-sa
+```
 
+Kubernetes 会为一个 ServiceAccount**自动创建并分配一个 Secret 对象**，secret `{data.token}` 就是用户 token 的 base64 编码，可以用来配置kubeconfig
 
-Kubernetes 会为一个 ServiceAccount自动创建并分配一个 Secret 对象
+```sh
+$ kubectl get sa -n mynamespace -o yaml
+- apiVersion: v1
+kind: ServiceAccount
+metadata:
+    creationTimestamp: 2018-09-08T12:59:17Z
+    name: example-sa
+    namespace: mynamespace
+    resourceVersion: "409327"
+    ...
+secrets:
+- name: example-sa-token-vmfg6
+$ k describe secret  example-sa-token-vmfg6
+Name:         example-sa-token-vmfg6
+Namespace:    mynamespace
+Labels:       <none>
+Annotations:  kubernetes.io/service-account.name: example-sa
+              kubernetes.io/service-account.uid: 0fc75075-41b9-48e5-af75-c1b31d64955b
 
-	$ kubectl get sa -n mynamespace -o yaml
-	- apiVersion: v1
-	kind: ServiceAccount
-	metadata:
-		creationTimestamp: 2018-09-08T12:59:17Z
-		name: example-sa
-		namespace: mynamespace
-		resourceVersion: "409327"
-		...
-	secrets:
-	- name: example-sa-token-vmfg6
-
+Type:  kubernetes.io/service-account-token
+Data
+====
+ca.crt:     1346 bytes
+namespace:  11 bytes
+token:      xx      # base64 编码，反解析后是一个json 
+```
 
 用户的 Pod可以声明使用这个 ServiceAccount
 
-
-	apiVersion: v1
-	kind: Pod
-	metadata:
-	namespace: mynamespace
-	name: sa-token-test
-	spec:
-	containers:
-	- name: nginx
-		image: nginx:1.7.9
-	serviceAccountName: example-sa
+```yml
+apiVersion: v1
+kind: Pod
+metadata:
+namespace: mynamespace
+name: sa-token-test
+spec:
+containers:
+- name: nginx
+    image: nginx:1.7.9
+serviceAccountName: example-sa
+```
 
 等这个 Pod 运行起来之后，我们就可以看到，该 ServiceAccount 的 token，也就是一个 Secret 对象，被 Kubernetes 自动挂载到了容器的 `/var/run/secrets/kubernetes.io/serviceaccount` 目录下
 
-	$ kubectl describe pod sa-token-test -n mynamespace
-	Name:               sa-token-test
-	Namespace:          mynamespace
-	...
-	Containers:
-	nginx:
-		...
-		Mounts:
-		/var/run/secrets/kubernetes.io/serviceaccount from example-sa-token-vmfg6 (ro)
+```bash
+$ kubectl describe pod sa-token-test -n mynamespace
+Name:               sa-token-test
+Namespace:          mynamespace
+...
+Containers:
+nginx:
+    ...
+    Mounts:
+    /var/run/secrets/kubernetes.io/serviceaccount from example-sa-token-vmfg6 (ro)
+```
 
 小结一下
 

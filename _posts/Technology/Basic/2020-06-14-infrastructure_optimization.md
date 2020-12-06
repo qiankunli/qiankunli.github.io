@@ -29,6 +29,8 @@ keywords: infrastructure optimization
 
 ## 用户态与内核态切换有什么代价呢？
 
+我们的应用程序运行在 Ring 3（我们通常叫用户态），而操作系统内核运行在 Ring 0（我们通常叫内核态）。所以一次中断调用，不只是“函数调用”，更重要的是改变了执行权限，从用户态跃迁到了内核态。
+
 [Understanding User and Kernel Mode](https://blog.codinghorror.com/understanding-user-and-kernel-mode/)
 
 1. 在操作系统中，In Kernel mode, the executing code has complete and unrestricted access to the underlying hardware. It can execute any CPU instruction and reference any memory address. 而用户态可以访问的指令和地址空间是受限的
