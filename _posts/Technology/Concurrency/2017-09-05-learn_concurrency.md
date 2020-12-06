@@ -10,7 +10,13 @@ keywords: concurrency
 
 ## 前言
 
+
+
 ## 理念变化
+
+![](/public/upload/concurrency/virtual_thread.png)
+
+[云原生时代，Java危矣？](https://mp.weixin.qq.com/s/fVz2A-AmgfhF0sTkz8ADNw)Java语言抽象出来隐藏了各种操作系统线程差异性的统一线程接口，这曾经是它区别于其他编程语言（C/C++表示有被冒犯到）的一大优势，不过，统一的线程模型不见得永远都是正确的。 Java目前主流的线程模型是直接映射到操作系统内核上的1:1模型，**这对于计算密集型任务这很合适**，既不用自己去做调度，也利于一条线程跑满整个处理器核心。**但对于I/O密集型任务，譬如访问磁盘、访问数据库占主要时间的任务，这种模型就显得成本高昂**，主要在于内存消耗和上下文切换上：64位Linux上HotSpot的线程栈容量默认是1MB，线程的内核元数据（Kernel Metadata）还要额外消耗2-16KB内存，所以单个虚拟机的最大线程数量一般只会设置到200至400条，当程序员把数以百万计的请求往线程池里面灌时，系统即便能处理得过来，其中的切换损耗也相当可观。
 
 [并发之痛 Thread，Goroutine，Actor](http://lenix.applinzi.com/archives/2945)中的几个基本要点：
 

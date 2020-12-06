@@ -19,6 +19,8 @@ goroutine一些重要设计：
 3. 提供了同步、互斥和其他常规执行体间的通讯手段，包括大家非常喜欢的 channel；
 4. 提供了几乎所有重要的系统调用（尤其是 IO 请求）的包装。
 
+[调度系统设计精要](https://mp.weixin.qq.com/s/Ge9YgIi9jwrTEOrz3cnvdg)
+
 本文内容来自 张万波大佬 [go语言调度器源代码情景分析](https://mp.weixin.qq.com/mp/homepage?__biz=MzU1OTg5NDkzOA==&hid=1&sn=8fc2b63f53559bc0cee292ce629c4788&scene=25#wechat_redirect)。在此再次表达 对大佬的膜拜。
 
 ## 预备知识
