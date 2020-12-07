@@ -10,6 +10,9 @@ keywords: jvm
 
 ## 前言
 
+* TOC
+{:toc}
+
 jvm 作为 a model of a whole computer，便与os 有许多相似的地方，包括并不限于：
 
 1. 针对os 编程的可执行文件，主要指其背后代表的文件格式、编译、链接、加载 等机制
