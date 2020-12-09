@@ -257,6 +257,44 @@ type streamConn struct {
 	clientCallbacks    types.StreamConnectionEventListener
 }
 ```
+
+## 路由
+
+1. mosn 启动时会初始化 cluster_manager 管理所有的cluster_manager 并通过xds 同步cluster 数据。
+2. proxy.routersWrapper 持有了 所有的routers 数据
+3. 转发流程中 downStream.matchRoute 逻辑 负责从 virtual_hosts 中获取匹配的 router(对http 是域名:path；对rpc 是serviceName:methodName等)，进而拿到对应的 cluster_name ==> cluster。之后是下文针对具体host建立连接池的事儿。
+
+```json
+// servers.listeners
+"filter_chains": [ {
+    "type": "connection_manager",
+    "config": {
+        "router_config_name": "client_router",
+        "virtual_hosts": [{
+            "name": "clientHost",
+            "domains": ["*"],
+            "routers": [{
+                "match": {...},
+                "route": {
+                    "cluster_name": "clientCluster"
+                }
+            }]
+        }]
+    }
+}]
+...
+"cluster_manager": {
+    "clusters": [{
+        "Name": "clientCluster",
+        "type": "SIMPLE",
+        "lb_type": "LB_RANDOM",
+        "hosts": [{
+            "address": "127.0.0.1:2046"
+        }]
+    }]
+},
+```
+
 ## 连接池管理
 
 [云原生网络代理 MOSN 的进化之路](https://mp.weixin.qq.com/s/5X8ZCO9a9nZE1oAMCNKVzw)为了提升服务网格之间的建连性能还设计了多种协议的连接池从而方便地实现连接复用及管理。在连接管理方面，MOSN 设计了多协议连接池， 当 Proxy 模块在 Downstream 收到 Request 的时候，在经过路由、负载均衡等模块处理获取到 Upstream Host 以及对应的转发协议时，通过 Cluster Manager 获取对应协议的连接池 ，如果连接池不存在则创建并加入缓存中，之后在长连接上创建 Stream，并发送数据
