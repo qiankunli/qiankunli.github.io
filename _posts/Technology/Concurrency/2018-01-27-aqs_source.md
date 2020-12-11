@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: AQS2——粗略的代码分析
+title: AQS——粗略的代码分析
 category: 技术
 tags: Concurrency
 keywords: AQS
@@ -169,20 +169,18 @@ AQS实际上通过头尾指针来管理同步队列，实现包括获取锁失�
 
 1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
 * JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走操作系统。
-* 每一个线程都有一个可用monitor record列表，JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor/lock record 的地址。
+* Monitor是线程私有的数据结构，每一个线程都有一个可用monitor record列表，同时还有一个全局的可用列表。JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor/lock record 的地址。
 
     ![](/public/upload/concurrency/biased_lock.png)
-* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了——重量级锁，会导致线程的状态切换，让出cpu。
+* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了——重量级锁，会导致线程的状态切换，让出cpu。**偏向锁通过对比Mark Word解决加锁问题，避免执行CAS操作。而轻量级锁是通过用CAS操作和自旋来解决加锁问题，避免线程阻塞和唤醒而影响性能。重量级锁是将除了拥有锁的线程以外的线程都阻塞**。
 
 [Java synchronized原理总结](https://zhuanlan.zhihu.com/p/29866981)
 
 ![](/public/upload/concurrency/synchronized.png)
 
-所谓悲观锁，就是认为如果我不做充分的同步的手段（包括执行重量级的操作）就肯定会出现问题；所谓乐观锁，就是会乐观地预估系统当前的状态，认为状态是符合预期的，因此不用重量级的同步也可以完成同步，如果不巧发生了竞态，就退避，然后再按照一定的策略重试。
-
 ### DK1.6 之后性能优势不大了，只剩下功能优势
 
-**由于Java的线程是映射到操作系统的原生线程之上的，如果要阻塞或唤醒一条线程，都需要操作系统来帮忙完成**，这就需要从用户态转换到核心态中，因此状态转换需要耗费很多的处理器时间。所以synchronized是Java语言中的一个重量级操作。在JDK1.6中，虚拟机进行了一些优化，譬如在通知操作系统阻塞线程之前加入一段自旋等待过程，避免频繁地切入到核心态中：
+**由于Java的线程是映射到操作系统的原生线程之上的，如果要阻塞或唤醒一条线程，都需要操作系统来帮忙完成**，这就需要从用户态转换到核心态中，因此状态转换需要耗费很多的处理器时间。所以synchronized是Java语言中的一个重量级操作。在JDK1.6中，虚拟机进行了一些优化，譬如在通知操作系统阻塞线程之前加入一段自旋等待过程，避免频繁地切入到核心态中。
 
 synchronized与java.util.concurrent包中的ReentrantLock相比，由于JDK1.6中加入了针对锁的优化措施（见后面），使得synchronized与ReentrantLock的性能基本持平。ReentrantLock只是提供了synchronized更丰富的功能，而不一定有更优的性能，所以在synchronized能实现需求的情况下，优先考虑使用synchronized来进行同步。
 

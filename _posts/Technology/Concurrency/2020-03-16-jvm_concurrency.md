@@ -130,6 +130,12 @@ https://www.zhihu.com/question/27654579/answer/128050125)
 |||可能用到了 semaphore struct|
 |||线程加入等待队列 + 修改自己的状态 + 触发调度|
 
+## 锁
+
+Java中往往是按照是否含有某一特性来定义锁
+
+![](/public/upload/concurrency/java_lock.png)
+
 ## 其它
 
 ### 设置多少线程数
