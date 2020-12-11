@@ -110,13 +110,11 @@ Tomcat 独立部署的模式下，我们通过 startup 脚本来启动 Tomcat，
         <!--可以另外创建一个host，使用不同的appBase-->
         <Host name="localhost"  appBase="webapps"
             unpackWARs="true" autoDeploy="true">
-            <!--可以配置 Context>
+            <!--可以配置 Context-->
         </Host>
     </Engine>
 </Server>
 ```
-
-
 ## io处理
 
 ### connector 架构
@@ -140,11 +138,27 @@ Tomcat 独立部署的模式下，我们通过 startup 脚本来启动 Tomcat，
 
 Tomcat 的设计者设计了 3 个组件来实现这 3 个功能，分别是 Endpoint、Processor 和 Adapter。**组件之间通过抽象接口交互**，这样做一个好处是封装变化。这是面向对象设计的精髓，将系统中经常变化的部分和稳定的部分隔离，有助于增加复用性，并降低系统耦合度。网络通信的 I/O 模型是变化的，可能是非阻塞 I/O、异步 I/O 或者 APR。应用层协议也是变化的，可能是 HTTP、HTTPS、AJP。浏览器端发送的请求信息也是变化的。但是整体的处理逻辑是不变的，Endpoint 负责提供字节流给 Processor，Processor 负责提供 Tomcat Request 对象给 Adapter，Adapter 负责提供 ServletRequest 对象给容器。其中 Endpoint 和 Processor 放在一起抽象成了 ProtocolHandler 组件。
 
+### io 和线程模型
+
+![](/public/upload/java/tomcat_nio.png)
+
+1. Http11NioProtocol start 时会分别启动poller 和 acceptor 线程
+2. acceptor 持有ServerSocket/ServerSocketChannel， 负责监听新的连接，并将得到的Socket 注册到Poller 上
+3. Poller 持有Selector， 负责`selector.select()` 监听读写事件，将新的socket 注册到selector上，以及其它通过addEvent 加入到Poller中的event
+4. Http11NioProcessor 封装了 http 1.1 的协议处理部分，比如parseRequestLine，连接出问题时response设置状态码为503 或400 等。以读事件为例， 最终会将数据读取到 Request 对象的inputBuffer 中
+
+![](/public/upload/java/tomcat_nio_process.png)
+
 ```java
 // NioEndpoint.Poller.run ==> 循环 selector.selectedKeys;processKey ==> processSocket ==> 异步执行 SocketProcessor.run ==>
 //  AbstractConnectionHandler.process ==>  AbstractHttp11Processor.process
 public class NioEndpoint extends AbstractEndpoint<NioChannel> {
-	Executor executor; // AbstractEndpoint
+    private Executor executor = new ThreadPoolExecutor(getMinSpareThreads(), getMaxThreads(), 60, TimeUnit.SECONDS,taskqueue, tf);
+    private int pollerThreadCount = Math.min(2,Runtime.getRuntime().availableProcessors()); // new Thread().start() 的方式
+    protected int acceptorThreadCount = 0;      
+    public class Acceptor implements Runnable{
+        // acceptor 就是简单的 accept 一个socket 并将其 加入到poller 的event 队列中（ 以将socket 注册到selector）所以没有用到executor
+    }
     public class Poller implements Runnable {
         private Selector selector;
         public void run() {
@@ -152,6 +166,7 @@ public class NioEndpoint extends AbstractEndpoint<NioChannel> {
                 keyCount = selector.selectNow();
                 Iterator<SelectionKey> iterator =
                         keyCount > 0 ? selector.selectedKeys().iterator() : null;
+                // poller  内部除了 selector.select() 逻辑外，一般通过executor 异步执行
                 while (iterator != null && iterator.hasNext()) {
                     processKey(sk, attachment);
                 }
@@ -176,33 +191,9 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
 	}
 }
 ```
-一个不太成熟的理解：在io 层面上，io 组件与业务组件约定了request/response 对象。io 组件监听socket，将socket 数据读入request.inputBuffer（并触发上层协议解析及业务处理），将response.outputBuffer 写回到socket。对于同步Servlet 来说，Servlet.service 处理完毕后，request和response 可以释放（`request.recycle();response.recycle();`）。而对于异步Servlet来说，Servlet.service结束后request/response 只能先释放一部分资源，并等待AsyncContext.complete() 收尾。
 
-### io 和线程模型
 
-![](/public/upload/java/tomcat_connector_object.png)
-
-同样一个颜色的是内部类的关系
-
-![](/public/upload/java/tomcat_handle_request_io.png)
-
-1. Http11NioProtocol start 时会分别启动poller 和 acceptor 线程
-2. acceptor 持有ServerSocket/ServerSocketChannel， 负责监听新的连接，并将得到的Socket 注册到Poller 上
-3. Poller 持有Selector， 负责`selector.select()` 监听读写事件，将新的socket 注册到selector上，以及其它通过addEvent 加入到Poller中的event
-4. Http11NioProcessor 封装了 http 1.1 的协议处理部分，比如parseRequestLine，连接出问题时response设置状态码为503 或400 等。以读事件为例， 最终会将 数据读取到 Request 对象的inputBuffer 中
-
-线程数量
-
-```java
-public class NioEndpoint extends AbstractEndpoint<NioChannel> {
-    private Executor executor = new ThreadPoolExecutor(getMinSpareThreads(), getMaxThreads(), 60, TimeUnit.SECONDS,taskqueue, tf);
-    private int pollerThreadCount = Math.min(2,Runtime.getRuntime().availableProcessors()); // new Thread().start() 的方式
-    protected int acceptorThreadCount = 0;      // new Thread().start() 的方式
-    // poller  内部除了 selector.select() 逻辑外，一般通过executor 异步执行
-    // acceptor 就是简单的 accept 一个socket 并将其 加入到poller 的event 队列中（ 以将socket 注册到selector）所以没有用到executor
-}
-```
-
+一个不太成熟的理解：在io 层面上，io 组件与业务组件约定了request/response 对象。io 组件监听socket，将socket 数据读入request.inputBuffer（并触发上层协议解析及业务处理），将response.outputBuffer 写回到socket（伴随向selector注册`SelectionKey.OP_WRITE`）。对于同步Servlet 来说，Servlet.service 处理完毕后，request和response 可以释放（`request.recycle();response.recycle();`）。而对于异步Servlet来说，Servlet.service结束后request/response 只能先释放一部分资源，并等待AsyncContext.complete() 收尾。
 
 ## 业务处理
 
@@ -393,3 +384,11 @@ public class XXServlet extends HttpServlet {
     }
 }
 ```
+
+### 类图补充
+
+![](/public/upload/java/tomcat_connector_object.png)
+
+同样一个颜色的是内部类的关系
+
+![](/public/upload/java/tomcat_handle_request_io.png)
