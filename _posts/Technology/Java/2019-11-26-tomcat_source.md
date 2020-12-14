@@ -72,10 +72,6 @@ Tomcat 要实现 2 个核心功能：
 
 从图上可以看到，最顶层是 Server，这里的 Server 指的就是一个 Tomcat 实例。一个 Server 中有一个或者多个 Service，一个 Service 中有多个连接器和一个容器。
 
-tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支持http
-
-![](/public/upload/java/tomcat_war.png)
-
 **下图红线即为请求处理路径**PS：画流程架构图时又学到一招
 
 ![](/public/upload/java/tomcat_overview.png)
@@ -193,7 +189,7 @@ public abstract class AbstractHttp11Processor<S> extends AbstractProcessor<S> {
 ```
 
 
-一个不太成熟的理解：在io 层面上，io 组件与业务组件约定了request/response 对象。io 组件监听socket，将socket 数据读入request.inputBuffer（并触发上层协议解析及业务处理），将response.outputBuffer 写回到socket（伴随向selector注册`SelectionKey.OP_WRITE`）。对于同步Servlet 来说，Servlet.service 处理完毕后，request和response 可以释放（`request.recycle();response.recycle();`）。而对于异步Servlet来说，Servlet.service结束后request/response 只能先释放一部分资源，并等待AsyncContext.complete() 收尾。
+一个不太成熟的理解：在io 层面上，io 组件与业务组件约定了request/response 对象 （具体的说是inputBuffer 和 outputBuffer 作为中介）。io 组件监听socket，将socket 数据读入request.inputBuffer（并触发上层协议解析及业务处理），将response.outputBuffer 写回到socket（伴随向selector注册`SelectionKey.OP_WRITE`）。对于同步Servlet 来说，Servlet.service 处理完毕后，request和response 可以释放（`request.recycle();response.recycle();`）。而对于异步Servlet来说，Servlet.service结束后request/response 只能先释放一部分资源，并等待AsyncContext.complete() 收尾。
 
 ## 业务处理
 
@@ -334,6 +330,10 @@ tomcat.start();
 ## 其它
 
 ### tomcat为什么运行war 而不是jar
+
+tomcat 的功能简单说 就是让 一堆class文件+web.xml  可以对外支持http
+
+![](/public/upload/java/tomcat_war.png)
 
 如果一个项目打成jar包，那么tomcat 在启动时 就要去分析下 这个jar 是一个web项目还是一个 普通二方库。 
 

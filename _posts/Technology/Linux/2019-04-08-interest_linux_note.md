@@ -192,6 +192,8 @@ POSIX表示可移植操作系统接口（Portable Operating System Interface of 
 
 ![](/public/upload/linux/linux_syscall.png)
 
+软中断是执行中断指令产生的，而硬中断是由外设引发的。硬中断的中断号是由中断控制器提供的，软中断的中断号由指令直接指出，无需使用中断控制器。硬中断是可屏蔽的，软中断不可屏蔽。如果硬件需要CPU去做一些事情，那么这个硬件会使CPU中断当前正在运行的代码。而后CPU会将当前正在运行进程的当前状态放到堆栈（stack）中，以至于之后可以返回继续运行。**硬中断可以停止一个正在运行的进程；可以停止正处理另一个中断的内核代码；或者可以停止空闲进程。产生软中断的进程一定是当前正在运行的进程，因此它们不会中断CPU**。
+
 ## 从glibc 到系统调用
 
 [The GNU C Library (glibc)](https://www.gnu.org/software/libc/started.html)
