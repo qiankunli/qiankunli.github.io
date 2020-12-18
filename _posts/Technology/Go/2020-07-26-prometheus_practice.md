@@ -171,6 +171,8 @@ Prometheus 本身自带了监控自己的许多指标，比如
 
 如果需要对某些区域或功能进行整体视图查看，那么可以使用federat ion功能将时间序列提取到集中的Prometheus服务器。
 
+
+
 ### 存储扩展
 
 Prometheus includes a local on-disk time series database, but also optionally integrates with remote storage systems.
