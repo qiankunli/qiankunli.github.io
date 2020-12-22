@@ -21,14 +21,14 @@ keywords: Kubernetes monitor
 
 ## 容器监控与常规监控的差异
 
+[基于Prometheus的云原生监控系统架构演进](https://mp.weixin.qq.com/s/SBqYGeWDMQwmente8JBaHA)
+
 [Kubernetes监控在小米的落地](https://mp.weixin.qq.com/s/ewwD6A3-ClbotdfFmYY3KA) 为了更方便的管理容器，Kubernetes对Container进行了封装，拥有了Pod、Deployment、Namespace、Service等众多概念。与传统集群相比，Kubernetes集群监控更加复杂：
 
 1. 监控维度更多，除了传统物理集群的监控，还包括核心服务监控（apiserver，etcd等）、容器监控、Pod监控、Namespace监控等。
 2. 监控对象动态可变，在集群中容器的销毁创建十分频繁，无法提前预置。
 3. 监控指标随着容器规模爆炸式增长，如何处理及展示大量监控数据。
 4. 随着集群动态增长，监控系统必须具备动态扩缩的能力。
-
-
 
 ## 能搞到哪些metric
 
@@ -209,6 +209,7 @@ kube_state_metrics_list_total{resource="*v1.Node",result="error"} 52
 kube_state_metrics_watch_total{resource="*v1beta1.Ingress",result="success"} 1
 ```
 
+**kube-state-metrics 可以采集到的 自定义的k8s label（比如deployment等），基于此经常将kube-state-metrics metric 与其它metric 聚合后 制作报警规则**。
 
 ## 需要哪些 alert rule
 
