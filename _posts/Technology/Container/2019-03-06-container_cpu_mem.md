@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 容器狂占cpu怎么办？
+title: 容器狂占cpu和内存怎么办？
 category: 技术
 tags: Container
 keywords: container cpu
@@ -19,18 +19,35 @@ keywords: container cpu
 
 [为什么不建议把数据库部署在Docker容器内](https://mp.weixin.qq.com/s/WetiMHwBEHmGzvXY6Pb-jQ)资源隔离方面，Docker确实不如虚拟机KVM，Docker是利用Cgroup实现资源限制的，**只能限制资源消耗的最大值，而不能隔绝其他程序占用自己的资源**。如果其他应用过渡占用物理机资源，将会影响容器里MySQL的读写效率。
 
-## 如何感知某个项目占用了过多的cpu
+## 观察cpu 使用
+
+### linux 视角
+
+![](/public/upload/container/process_top.png)
+
+![](/public/upload/container/process_cpu.jpeg)
+
+假设只有一个 CPU
+1. 一个用户程序开始运行了，就对应着第一个"us"框，"us"是"user"的缩写，代表 Linux 的用户态 CPU Usage。普通用户程序代码中，只要不是调用系统调用（System Call），这些代码的指令消耗的 CPU 就都属于"us"。
+2. 当用户程序代码中调用了系统调用，比如 read() 去读取一个文件，用户进程就会从用户态切换到内核态。内核态 read() 系统调用在读到真正 disk 上的文件前，会进行一些文件系统层的操作，这些代码指令的消耗就属于"sy"。"sy"是 "system"的缩写，代表内核态 CPU 使用。
+3. 接下来，这个 read() 系统调用会向 Linux 的 Block Layer 发出一个 I/O Request，触发一个真正的磁盘读取操作。这时进程一般会被置为 TASK_UNINTERRUPTIBLE。而 Linux 会把这段时间标示成"wa"，"wa"是"iowait"的缩写，代表等待 I/O 的时间，这里的 I/O 是指 Disk I/O。
+4. 当磁盘返回数据时，进程在内核态拿到数据，这里仍旧是内核态的 CPU 使用中的"sy"，然后，进程再从内核态切换回用户态，在用户态得到文件数据，"us"。进程在读取数据之后，没事可做就休眠了，"id"是"idle"的缩写，代表系统处于空闲状态。
+5. 如果这时这台机器在网络收到一个网络数据包，网卡就会发出一个中断（interrupt）。相应地，CPU 会响应中断，然后进入中断服务程序。CPU 就会进入"hi"，"hi"是"hardware irq"的缩写，代表 CPU 处理硬中断的开销。由于我们的中断服务处理需要关闭中断，所以这个硬中断的时间不能太长。
+6. 但是，发生中断后的工作是必须要完成的，如果这些工作比较耗时那怎么办呢？Linux 中有一个软中断的概念（softirq），它可以完成这些耗时比较长的工作。从网卡收到数据包的大部分工作，都是通过软中断来处理的。那么，CPU 就会进入到第八个框，"si"。这里"si"是"softirq"的缩写，代表 CPU 处理软中断的开销。**无论是"hi"还是"si"，它们的 CPU 时间都不会计入进程的 CPU 时间。这是因为本身它们在处理的时候就不属于任何一个进程**。wa、hi、si，这些 I/O 或者中断相关的 CPU 使用，CPU Cgroup 不会去做限制
+
+### docker 视角
 
 [docker stats](https://docs.docker.com/engine/reference/commandline/stats/) returns a live data stream for running containers.
 
 `docker stats` 命令输出
 
-    CONTAINER ID        NAME                                         CPU %               MEM USAGE / LIMIT     MEM %               NET I/O             BLOCK I/O           PIDS
-    4aeb15578094        mesos-19ba2ecd-7a98-4e92-beed-c132b063578d   0.21%               376.4MiB / 1GiB       36.75%              3.65MB / 1.68MB     119kB / 90.1kB      174
-    77747f26dff4        mesos-e3d34892-8af6-4ab7-a649-0a4b424ccd04   0.31%               752.5MiB / 800MiB     94.06%              11.9MB / 3.06MB     86.1MB / 47MB       132
-    d64e482d2843        mesos-705b5dc6-7169-42e8-a143-6a7dc2e32600   0.18%               680.5MiB / 800MiB     85.06%              43.1MB / 17.1MB     194MB / 228MB       196
-    808a4bd888fb        mesos-65c9d5a6-3967-4a4a-9834-b83ae8c033be   1.81%               1.45GiB / 2GiB        72.50%              1.32GB / 1.83GB     8.36MB / 19.8MB     2392
-
+```
+CONTAINER ID        NAME                                         CPU %               MEM USAGE / LIMIT     MEM %               NET I/O             BLOCK I/O           PIDS
+4aeb15578094        mesos-19ba2ecd-7a98-4e92-beed-c132b063578d   0.21%               376.4MiB / 1GiB       36.75%              3.65MB / 1.68MB     119kB / 90.1kB      174
+77747f26dff4        mesos-e3d34892-8af6-4ab7-a649-0a4b424ccd04   0.31%               752.5MiB / 800MiB     94.06%              11.9MB / 3.06MB     86.1MB / 47MB       132
+d64e482d2843        mesos-705b5dc6-7169-42e8-a143-6a7dc2e32600   0.18%               680.5MiB / 800MiB     85.06%              43.1MB / 17.1MB     194MB / 228MB       196
+808a4bd888fb        mesos-65c9d5a6-3967-4a4a-9834-b83ae8c033be   1.81%               1.45GiB / 2GiB        72.50%              1.32GB / 1.83GB     8.36MB / 19.8MB     2392
+```
 
 1. CPU % 体现了 quota/period 值
 2. MEM USAGE / LIMIT 反映了内存占用
@@ -69,6 +86,10 @@ NICE_0_LOAD = 1024
 ### CFS hard limits
 
 对一个进程配置 cpu-shares 并不能绝对限制 进程对cpu 的使用（如果机器很闲，进程的vruntime 虽然很大，但依然可以一直调度执行），也不能预估 进程使用了多少cpu 资源。这对于 桌面用户无所谓，但对于企业用户或者云厂商来说就很关键了。所以CFS 后续加入了 bandwith control。 将 进程的 cpu-period,cpu-quota 数据纳入到调度逻辑中。
+
+1. 在操作系统里，cpu.cfs_period_us 的值一般是个固定值， Kubernetes 不会去修改它
+1. `cpu.cfs_quota_us/cpu.cfs_period_us` 的值与 top 命令看到的 进程 `%CPU` 是一致的。 PS： 这就把原理与实践串起来了。
+2. 即使 cpu.cfs_quota_us 已经限制了进程 CPU 使用的绝对值，如果两个进程的 `cpu.cfs_quota_us/cpu.cfs_period_us` 和仍然大于了cpu 个数，则 `cpu.shares` 可以限定两个进程使用cpu 时间的比例，**当系统上 CPU 完全被占满的时候是有用的**。
 
 具体逻辑比较复杂，有兴趣可以看[CPU bandwidth control for CFS](https://storage.googleapis.com/pub-tools-public-publication-data/pdf/36669.pdf)
 
@@ -134,7 +155,6 @@ f2321226620e
 $ docker inspect f2321226620e --format '{{.HostConfig.CpuShares}}'
 51
 ```
-
 Why 51, and not 50? The cpu control group and docker both divide a core into 1024 shares, whereas kubernetes divides it into 1000.
 
 ### limit
@@ -154,8 +174,40 @@ $ docker inspect 472abbce32a5 --format '{{.HostConfig.CpuShares}} {{.HostConfig.
 
 使用 k8s 的cpu limit 机制，在实际落地过程中，容器平台提供几种固定的规格，单个实例的资源配置 能够支持正常跑即可，项目的服务能力通过横向扩展来解决。
 
+## 内存 
 
+### OOM Killer
 
+1. OOM Killer 在 Linux 系统里如果内存不足时，会杀死一个正在运行的进程来释放一些内存。如果进程 是容器的entrypoint ，则容器退出。`docker inspect` 命令查看容器， 容器处于"exited"状态，并且"OOMKilled"是 true。
+2. Linux 里的程序都是调用 malloc() 来申请内存，如果内存不足，直接 malloc() 返回失败就可以，为什么还要去杀死正在运行的进程呢？Linux允许进程申请超过实际物理内存上限的内存。因为 malloc() 申请的是内存的虚拟地址，系统只是给了程序一个地址范围，由于没有写入数据，所以程序并没有得到真正的物理内存。物理内存只有程序真的往这个地址写入数据的时候，才会分配给程序。PS： 虚拟内存通过 `ps aux`VSZ 查看；物理内存 `ps aux`RES（也成为RSS） 查看
+3. 在发生 OOM 的时候，Linux 到底是根据什么标准来选择被杀的进程呢？这就要提到一个在 Linux 内核里有一个 oom_badness() 函数，就是它定义了选择进程的标准。
+4. 我们怎样才能快速确定容器发生了 OOM 呢？这个可以通过查看内核日志及时地发现。使用用 `journalctl -k` 命令，或者直接查看日志文件 `/var/log/message`
 
+### Memory Cgroup
 
+`/sys/fs/cgroup/memory`
+
+1. memory.limit_in_bytes，一个控制组里所有进程可使用内存的最大值
+2. memory.oom_control，当控制组中的进程内存使用达到上限值时，这个参数能够决定会不会触发 OOM Killer（默认是），当然只能杀死控制组内的进程。`echo 1 > memory.oom_control` 即使控制组里所有进程使用的内存达到 memory.limit_in_bytes 设置的上限值，控制组也不会杀掉里面的进程，但会影响到控制组中正在申请物理内存页面的进程。这些进程会处于一个停止状态，不能往下运行了。
+3. memory.usage_in_bytes，只读，是当前控制组里所有进程实际使用的内存总和。
+
+Linux **内存类型**
+
+1. 内核需要分配内存给页表，内核栈，还有 slab，也就是内核各种数据结构的 Cache Pool；
+2. 用户态进程内存
+    1. RSS 内存包含了进程的代码段内存，栈内存，堆内存，共享库的内存 
+    2. 文件读写的 Page Cache。是一种为了提高磁盘文件读写性能而**利用空闲物理内存**的机制，因为系统调用 read() 和 write() 的缺省行为都会把读过或者写过的页面存放在 Page Cache 里。
+3. Linux 的内存管理有一种内存页面回收机制（page frame reclaim），会根据系统里空闲物理内存是否低于某个阈值（wartermark），来决定是否启动内存的回收。内存回收的算法会根据不同类型的内存以及内存的最近最少用原则，就是 LRU（Least Recently Used）算法决定哪些内存页面先被释放。因为 Page Cache 的内存页面只是起到 Cache 作用，自然是会被优先释放的。
+
+Memory Cgroup 里都不会对内核的内存做限制（比如页表，slab 等）。只限制用户态相关的两个内存类型，RSS（Resident Set Size） 和 Page Cache。当控制组里的进程需要申请新的物理内存，而且 memory.usage_in_bytes 里的值超过控制组里的内存上限值 memory.limit_in_bytes，这时我们前面说的 Linux 的内存回收（page frame reclaim）就会被调用起来。那么在这个控制组里的 page cache 的内存会根据新申请的内存大小释放一部分，这样我们还是能成功申请到新的物理内存，整个控制组里总的物理内存开销 memory.usage_in_bytes 还是不会超过上限值 memory.limit_in_bytes。PS：所以会出现 容器内存使用量总是在临界点 的现象。
+
+在 Memory Cgroup 中有一个参数 memory.stat，可以显示在当前控制组里各种内存类型的实际的开销。我们不能用 Memory Cgroup 里的 memory.usage_in_bytes，而需要用 memory.stat 里的 rss 值。这个很像我们用 free 命令查看节点的可用内存，不能看"free"字段下的值，而要看除去 Page Cache 之后的"available"字段下的值。
+
+Swap 是一块磁盘空间，当内存写满的时候，就可以把内存中不常用的数据暂时写到这个 Swap 空间上。这样一来，内存空间就可以释放出来，用来满足新的内存申请的需求。
+
+1. 在宿主机节点上打开 Swap 空间，在容器中就是可以用到 Swap 的。
+    1. 因为有了 Swap 空间，本来会被 OOM Kill 的容器，可以好好地运行了（RSS 没有超出）。如果一个容器中的程序发生了内存泄漏（Memory leak），那么本来 Memory Cgroup 可以及时杀死这个进程，让它不影响整个节点中的其他应用程序。结果现在这个内存泄漏的进程没被杀死，还会不断地读写 Swap 磁盘，反而影响了整个节点的性能。
+    2. 在内存紧张的时候，Linux 系统怎么决定是先释放 Page Cache，还是先把匿名内存释放并写入到 Swap 空间里呢？如果系统先把 Page Cache 都释放了，那么一旦节点里有频繁的文件读写操作，系统的性能就会下降。如果 Linux 系统先把匿名内存都释放并写入到 Swap，那么一旦这些被释放的匿名内存马上需要使用，又需要从 Swap 空间读回到内存中，这样又会让 Swap（其实也是磁盘）的读写频繁，导致系统性能下降。
+2. 显然，我们**在释放内存的时候，需要平衡 Page Cache 的释放和匿名内存的释放**。Linux swappiness 参数值的作用是，在系统里有 Swap 空间之后，当系统需要回收内存的时候，是优先释放 Page Cache 中的内存，还是优先释放匿名内存（也就是写入 Swap）。
+3. 在每个 Memory Cgroup 控制组里也有一个 memory.swappiness。 不同就是每个 Memory Cgroup 控制组里的 swappiness 参数值为 0 的时候，就可以让控制组里的内存停止写入 Swap。
 
