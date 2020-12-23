@@ -201,6 +201,11 @@ github 案例项目
 
 综上，GTS 创新地基于 SQL 解析实现对**业务无侵入的**自动补偿回滚机制。说人话就是：由GTS 本身负责 事务过程中间数据的产生（比如undo log table）和处理（比如callback）
 
+
+## 微服务事务一致性
+
+[聊聊微服务架构中的事务处理](https://mp.weixin.qq.com/s/HkIhyrDwRVhqO8wGzmz7OA)未掌握
+
 ## 小结
 
 [谈谈对分布式事务的一点理解和解决方案](https://mp.weixin.qq.com/s/MOvO1JXSa1xFZwS7vNV4ig)解决分布式事务的最佳实践就是：

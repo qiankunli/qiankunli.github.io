@@ -120,6 +120,8 @@ AMD64 Linux平台下，栈是从高地址向低地址方向生长的，为什么
 
 所以操作系统对线程的调度可以简单的理解为内核调度器对不同线程所使用的寄存器和栈的切换。最后，我们对操作系统线程下一个简单且不准确的定义：操作系统线程是由内核负责调度且**拥有自己私有的一组寄存器值和栈的执行流**。
 
+[函数运行时在内存中是什么样子？](https://mp.weixin.qq.com/s/fyrnqiK8ucGjmUxuHeakNQ)进程和线程的运行体现在函数执行上，函数的执行除了函数内部执行的顺序执行还有子函数调用的控制转移以及子函数执行完毕的返回。函数调用是一个First In Last Out 的顺序，天然适用于栈这种数据结构来处理。当函数在运行时每个函数也要有自己的一个“小盒子”，这个小盒子中保存了函数运行时的各种信息，这些小盒子通过栈这种结构组织起来，这个小盒子就被称为栈帧，stack frames，也有的称之为call stack。当函数A调用函数B的时候，控制从A转移到了B，所谓控制其实就是指CPU执行属于哪个函数的机器指令。当函数A调用函数B时，我们只要知道：函数A对于的机器指令执行到了哪里 (我从哪里来，返回 ret)；函数B第一条机器指令所在的地址 (要到哪里去，跳转 call)。
+
 ### 为什么需要堆？
 
 Heap is used for dynamic memory allocation(data with dynamic size ) and unlike stack, the program needs to look up the data in heap using pointers.  

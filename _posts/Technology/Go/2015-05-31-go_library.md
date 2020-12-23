@@ -148,4 +148,30 @@ The pattern to follow is `APPNAME VERB NOUN --ADJECTIVE`. or `APPNAME COMMAND AR
 
 A flag is a way to modify the behavior of a command 这句说的很有感觉
 
+## 其它
+
+组合一个struct 以方便我们给它加方法。比如 net.IP 是go 库的struct，想对ip 做一些扩充。就可以提供两个ip 的转换方法，以及扩充方法。
+
+```go
+// Sub class net.IPNet so that we can add JSON marshalling and unmarshalling.
+type IPNet struct {
+	net.IPNet
+}
+// MarshalJSON interface for an IPNet
+func (i IPNet) MarshalJSON() ([]byte, error) {
+	return json.Marshal(i.String())
+}
+func (i *IPNet) UnmarshalJSON(b []byte) error {...}
+// Version returns the IP version for an IPNet, or 0 if not a valid IP net.
+func (i *IPNet) Version() int {
+	if i.IP.To4() != nil {
+		return 4
+	} else if len(i.IP) == net.IPv6len {
+		return 6
+	}
+	return 0
+}
+func ParseCIDR(c string) (*IP, *IPNet, error) {...}
+```
+
 
