@@ -19,42 +19,23 @@ keywords: Docker Kubernetes Volume
 
 Docker容器的文件系统分层机制主要靠联合文件系统（UnionFS）来实现。联合文件系统保证了文件的堆叠特性，即上层通过增加文件来修改依赖层文件，在保证镜像的只读特性时还能实现容器文件的读写特性。
 
-### 从AUFS说起
+### 从UnionFS说起
+
+每个容器都需要一个镜像，这个镜像就把容器中程序需要运行的二进制文件，库文件，配置文件，其他的依赖文件等全部都打包成一个镜像文件。如果容器使用普通的 Ext4 或者 XFS 文件系统，那么每次启动一个容器，就需要把一个镜像文件下载并且存储在宿主机上。假设一个镜像文件的大小是 500MB，那么 100 个容器的话，就需要下载 500MB*100= 50GB 的文件，并且占用 50GB 的磁盘空间。在绝大部分的操作系统里，库文件都是差不多的。而且，在容器运行的时候，这类文件也不会被改动，基本上都是只读的。
+
+假如这 100 个容器镜像都是基于"ubuntu:18.04"，你不难推测出理想的情况应该是什么样的？当然是在一个宿主机上只要下载并且存储存一份"ubuntu:18.04"，所有基于"ubuntu:18.04"镜像的容器都可以共享这一份通用的部分，不同容器启动的时候，只需要下载自己独特的程序部分就可以。正是为了有效地减少磁盘上冗余的镜像数据，同时减少冗余的镜像数据在网络上的传输，选择一种针对于容器的文件系统是很有必要的，而这类的文件系统被称为 UnionFS。
+
+UnionFS 这类文件系统实现的主要功能是把多个目录一起挂载（mount）在一个目录下。
+
+![](/public/upload/container/container_mount.jpg)
 
 [云原生存储详解：容器存储与 K8s 存储卷](https://mp.weixin.qq.com/s/7rGrXhlc4-9jgSoVHqcs4A)容器服务之所以如此流行，一大优势即来自于运行容器时容器镜像的组织形式。容器通过复用容器镜像的技术，实现多个容器共享一个镜像资源（**更细一点说是共享某一个镜像层**），避免了每次启动容器时都拷贝、加载镜像文件，这种方式既节省了主机的存储空间，又提高了容器启动效率。**为了实现多个容器间共享镜像数据，容器镜像每一层都是只读的**。
 
 以下引用自[深入理解Docker Volume（一）](http://dockone.io/article/128)先谈下Docker的文件系统是如何工作的。Docker镜像是由多个文件系统（只读层）叠加而成。当我们启动一个容器的时候，Docker会加载只读镜像层并在其上添加一个读写层。写时复制：如果运行中的容器修改了现有的一个已经存在的文件，那该文件将会从读写层下面的只读层复制到读写层，该文件的只读版本仍然存在，只是已经被读写层中该文件的副本所隐藏。一旦容器销毁，这个读写层也随之销毁，之前的更改将会丢失。在Docker中，只读层及在顶部的读写层的组合被称为Union File System（联合文件系统）。
 
-存储驱动是指如何对容器的各层数据进行管理，已达到上述需要实现共享、可读写的效果。常见的存储驱动：
+![](/public/upload/container/unionfs_mount.jpg)
 
-1. AUFS
-2. OverlayFS
-3. Devicemapper
-4. Btrfs
-5. ZFS
-
-
-```
-# 假设存在以下目录结构
-root@Standard-PC:/tmp# tree
-.
-├── aufs
-├── dir1
-│   └── file1
-└── dir2
-    └── file2
-# 将dir1和dir2挂载到aufs目录下，这样aufs目录就包含了dir1和dir2包含的文件总和
-root@Standard-PC:/tmp# sudo mount -t aufs -o br=/tmp/dir1=ro:/tmp/dir2=rw none /tmp/aufs
-mount: warning: /tmp/aufs seems to be mounted read-only.
-# 向file1写入文件
-root@Standard-PC:/tmp/aufs# echo hello > file1
-bash: file1: Read-only file system
-# 向file2写入文件
-root@Standard-PC:/tmp/aufs# echo hello > file2
-root@Standard-PC:/tmp/dir2# cat file2 
-hello
-```
-背景材料 [linux 文件系统](http://qiankunli.github.io/2018/05/19/linux_file_mount.html)
+merged/upper/lower 也是linux UnionFS 官方的说法，可以在`/proc/mounts` 查看所有mount 信息。
 
 ### 为什么要有volume 
 
