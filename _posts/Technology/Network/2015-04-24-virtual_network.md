@@ -74,6 +74,8 @@ keywords: Docker
 
 ## macvlan 和 ipvlan
 
+无论是 macvlan 还是 ipvlan，它们都是在一个物理的网络接口上再配置几个虚拟的网络接口。在这些虚拟的网络接口上，都可以配置独立的 IP，并且这些 IP 可以属于不同的 Namespace。对于 macvlan，每个虚拟网络接口都有自己独立的 mac 地址；而 ipvlan 的虚拟网络接口是和物理网络接口共享同一个 mac 地址。而且它们都有自己的 L2/L3 的配置方式.
+
 [一文读懂容器网络发展](https://mp.weixin.qq.com/s/fAThT7hKxDYXvFGJvqO42g)Macvlan 是 linux kernel 比较新的特性，允许在主机的一个网络接口上配置多个虚拟的网络接口，这些网络 interface 有自己独立的 mac 地址，也可以配置上 ip 地址进行通信。macvlan 下的虚拟机或者容器网络和主机在同一个网段中，共享同一个广播域。除此之外，macvlan 自身也完美支持 VLAN。
 
 [Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)Macvlan and ipvlan are Linux network drivers that exposes underlay or host interfaces directly to VMs or Containers running in the host. 
@@ -113,6 +115,23 @@ a Docker host sub-interface can serve as a parent interface for the macvlan netw
 
 Docker macvlan driver automagically creates host sub interfaces when you create a new macvlan network with sub interface as a parent。vlan sub interface 创建完毕后，以其为parent 创建macvlan sub interface 由 macvlan driver 自动完成。
 
+### ipvlan
+
+为容器手动配置上 ipvlan 的网络接口
+```
+docker run --init --name lat-test-1 --network none -d registry/latency-test:v1 sleep 36000
+pid1=$(docker inspect lat-test-1 | grep -i Pid | head -n 1 | awk '{print $2}' | awk -F "," '{print $1}')
+echo $pid1
+ln -s /proc/$pid1/ns/net /var/run/netns/$pid1
+ip link add link eth0 ipvt1 type ipvlan mode l2
+ip link set dev ipvt1 netns $pid1
+ip netns exec $pid1 ip link set ipvt1 name eth0
+ip netns exec $pid1 ip addr add 172.17.3.2/16 dev eth0
+ip netns exec $pid1 ip link set eth0 up
+```
+
+容器的虚拟网络接口，直接连接在了宿主机的物理网络接口上了，直接形成了一个网络二层的连接。
+
 ## vxlan
 
 对于云平台中的**隔离**问题，前面咱们用的策略一直都是 VLAN，但是我们也说过这种策略的问题，VLAN 只有 12 位，共 4096 个。当时设计的时候，看起来是够了，但是现在绝对不够用，怎么办呢？
@@ -143,6 +162,25 @@ Docker macvlan driver automagically creates host sub interfaces when you create 
 [为什么集群需要 Overlay 网络](https://mp.weixin.qq.com/s/x7jLgThS2uwoPJcqsJE29w)Overlay 网络其实与软件定义网络（Software-defined networking、SDN）密切相关，而 SDN 引入了数据平面和控制平面，其中**数据平面负责转发数据，而控制平面负责计算并分发转发表**。VxLAN 的 RFC7348 中只定义了数据平面的内容，由该技术组成的网络可以通过传统的自学习模式学习网络中的 MAC 与 ARP 表项，但是在大规模的集群中，我们仍然需要引入控制平面分发路由转发表。
 
 ## 虚拟设备
+
+### veth
+
+veth 发送数据的函数是 veth_xmit()，它里面的主要操作就是找到 veth peer 设备，然后触发 peer 设备去接收数据包。
+```c
+static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev){
+    ...
+    rcv = rcu_dereference(priv->peer);
+    ...
+    if (likely(veth_forward_skb(rcv, skb, rq, rcv_xdp) == NET_RX_SUCCESS)) {
+        ...
+}
+static int veth_forward_skb(struct net_device *dev, struct sk_buff *skb,
+                            struct veth_rq *rq, bool xdp){
+    return __dev_forward_skb(dev, skb) ?: xdp ?
+        veth_xdp_rx(rq, skb) :
+        netif_rx(skb);
+}
+```
 
 ### 网桥
 

@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 容器狂占cpu和内存怎么办？
+title: 容器狂占资源怎么办？
 category: 技术
 tags: Container
 keywords: container cpu
@@ -95,6 +95,8 @@ NICE_0_LOAD = 1024
 
 ## 容器 与 CFS
 
+`/sys/fs/cgroup/cpu`
+
 [Kubernetes中的CPU节流：事后分析](https://mp.weixin.qq.com/s/2lcX3-QBYFP5UnPw-b-Rvg)几乎所有的容器编排器都依赖于内核控制组（cgroup）机制来管理资源约束。在容器编排器中设置硬CPU限制后，内核将使用完全公平调度器（CFS）Cgroup带宽控制来实施这些限制。CFS-Cgroup带宽控制机制使用两个设置来管理CPU分配：配额（quota）和周期（period）。当应用程序在给定时间段内使用完其分配的CPU配额时，此时它将受到CPU节流，直到下一个周期才能被调度。
 
 [docker CPU文档](https://docs.docker.com/config/containers/resource_constraints/)By default, each container’s access to the host machine’s CPU cycles is unlimited. You can set various constraints to limit a given container’s access to the host machine’s CPU cycles. Most users use and configure the default CFS scheduler. In Docker 1.13 and higher, you can also configure the realtime scheduler.The CFS is the Linux kernel CPU scheduler for normal Linux processes. **Several runtime flags allow you to configure the amount of access to CPU resources your container has**. When you use these settings, Docker modifies the settings for the container’s cgroup on the host machine.  默认情况，容器可以任意使用 host 上的cpu cycles，**配的不是容器，配的是 CFS**，dockers仅仅是帮你设置了下参数而已。
@@ -170,10 +172,6 @@ $ docker inspect 472abbce32a5 --format '{{.HostConfig.CpuShares}} {{.HostConfig.
 51 10000 100000
 ```
 
-## 如何避免系统被应用拖垮
-
-使用 k8s 的cpu limit 机制，在实际落地过程中，容器平台提供几种固定的规格，单个实例的资源配置 能够支持正常跑即可，项目的服务能力通过横向扩展来解决。
-
 ## 内存 
 
 ### OOM Killer
@@ -211,3 +209,41 @@ Swap 是一块磁盘空间，当内存写满的时候，就可以把内存中不
 2. 显然，我们**在释放内存的时候，需要平衡 Page Cache 的释放和匿名内存的释放**。Linux swappiness 参数值的作用是，在系统里有 Swap 空间之后，当系统需要回收内存的时候，是优先释放 Page Cache 中的内存，还是优先释放匿名内存（也就是写入 Swap）。
 3. 在每个 Memory Cgroup 控制组里也有一个 memory.swappiness。 不同就是每个 Memory Cgroup 控制组里的 swappiness 参数值为 0 的时候，就可以让控制组里的内存停止写入 Swap。
 
+## 磁盘
+
+`/sys/fs/cgroup/blkio/`
+1. blkio.throttle.read_iops_device, 磁盘读取 IOPS 限制
+2. blkio.throttle.read_bps_device, 磁盘读取吞吐量限制
+3. blkio.throttle.write_iops_device, 磁盘写入 IOPS 限制
+4. blkio.throttle.write_bps_device, 磁盘写入吞吐量限制
+
+OverlayFS 自己没有专门的特性，可以限制文件数据写入量。可以依靠底层文件系统的 Quota 特性（XFS Quota 的 Project 模式）来限制 OverlayFS 的 upperdir 目录的大小，这样就能实现限制容器写磁盘的目的。
+
+在 Cgroup v1 中有 blkio 子系统，它可以来限制磁盘的 I/O。
+1. 衡量磁盘性能的两个常见的指标 IOPS 和吞吐量（Throughput）。IOPS 是 Input/Output Operations Per Second 的简称，也就是每秒钟磁盘读写的次数，这个数值越大表示性能越好。吞吐量（Throughput）是指每秒钟磁盘中数据的读取量，一般以 MB/s 为单位。这个读取量可以叫作吞吐量，有时候也被称为带宽（Bandwidth）。它们的关系大概是：吞吐量 = 数据块大小 *IOPS。
+2. Linux 文件 I/O 模式
+    1. Direct I/O 
+    2. Buffered I/O, blkio 在 Cgroups v1 里不能限制 Buffered I/O
+
+Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的限制只能在子系统中发生。比如pid可以分别属于 memory Cgroup 和 blkio Cgroup。但是在 blkio Cgroup 对进程 pid 做磁盘 I/O 做限制的时候，blkio 子系统是不会去关心 pid 用了哪些内存，这些内存是不是属于 Page Cache，而这些 Page Cache 的页面在刷入磁盘的时候，产生的 I/O 也不会被计算到进程 pid 上面。**Cgroup v2 相比 Cgroup v1 做的最大的变动就是一个进程属于一个控制组，而每个控制组里可以定义自己需要的多个子系统**。Cgroup v2 对进程 pid 的磁盘 I/O 做限制的时候，就可以考虑到进程 pid 写入到 Page Cache 内存的页面了，这样 buffered I/O 的磁盘限速就实现了。但带来的问题是：在对容器做 Memory Cgroup 限制内存大小的时候，如果仅考虑容器中进程实际使用的内存量，未考虑容器中程序 I/O 的量，则写数据到 Page Cache 的时候，需要不断地去释放原有的页面，造成容器中 Buffered I/O write() 不稳定。
+
+## 网络
+
+Network Namespace 隔离了哪些资源
+
+1. 网络设备，比如 lo，eth0 等网络设备。
+2. IPv4 和 IPv6 协议栈。IP 层以及上面的 TCP 和 UPD 协议栈也是每个 Namespace 独立工作的。它们的相关参数也是每个 Namespace 独立的，这些参数大多数都在 `/proc/sys/net/` 目录下面，同时也包括了 TCP 和 UPD 的 port 资源。
+3. IP 路由表
+4. iptables 规则
+
+发现容器网络不通怎么办？容器中继续 ping 外网的 IP ，然后在容器的 eth0 ，容器外的 veth，docker0，宿主机的 eth0 这一条数据包的路径上运行 tcpdump。这样就可以查到，到底在哪个设备接口上没有收到 ping 的 icmp 包。
+
+容器网络延时要比宿主机上的高吗?veth 发送数据的函数是 veth_xmit()，它里面的主要操作就是找到 veth peer 设备，然后触发 peer 设备去接收数据包。虽然 veth 是一个虚拟的网络接口，但是在接收数据包的操作上，除了没有硬件中断的处理，虚拟接口和真实的网路接口并没有太大的区别，特别是软中断（softirq）的处理部分和真实的网络接口是一样的。即使 softirq 的执行速度很快，还是会带来额外的开销。如果要减小容器网络延时，可以给容器配置 ipvlan/macvlan 的网络接口来替代 veth 网络接口。Ipvlan/macvlan 直接在物理网络接口上虚拟出接口，在发送对外数据包的时候可以直接通过物理接口完成，可以非常接近物理网络接口的延时。不过，由于 ipvlan/macvlan 网络接口直接挂载在物理网络接口上，对于需要使用 iptables 规则的容器，比如 Kubernetes 里使用 service 的容器，就不能工作了。
+
+## 如何避免系统被应用拖垮
+
+使用 k8s 的cpu limit 机制，在实际落地过程中，容器平台提供几种固定的规格，单个实例的资源配置 能够支持正常跑即可，项目的服务能力通过横向扩展来解决。
+
+以上内容来自对《容器实战高手课》的整理
+
+![](/public/upload/container/container_practice.jpg)

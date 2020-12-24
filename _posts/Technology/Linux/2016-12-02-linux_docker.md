@@ -111,6 +111,16 @@ network namespace 倒是没有根， 但docker 创建 veth pair，root namespace
 
 ## cgroups
 
+### V1 和 V2
+
+![](/public/upload/container/cgroup_v1.jpeg)
+
+Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的限制只能在子系统中发生。比如pid可以分别属于 memory Cgroup 和 blkio Cgroup。但是在 blkio Cgroup 对进程 pid 做磁盘 I/O 做限制的时候，blkio 子系统是不会去关心 pid 用了哪些内存，这些内存是不是属于 Page Cache，而这些 Page Cache 的页面在刷入磁盘的时候，产生的 I/O 也不会被计算到进程 pid 上面。**Cgroup v2 相比 Cgroup v1 做的最大的变动就是一个进程属于一个控制组，而每个控制组里可以定义自己需要的多个子系统**。Cgroup v2 对进程 pid 的磁盘 I/O 做限制的时候，就可以考虑到进程 pid 写入到 Page Cache 内存的页面了，这样 buffered I/O 的磁盘限速就实现了。
+
+![](/public/upload/container/cgroup_v2.jpeg)
+
+### 整体实现（可能过时了）
+
 对于CPU Cgroup的配置会影响一个进程的task_struct作为调度单元的scheduled_entity，并影响在CPU上的调度。对于内存 Cgroup的配置起作用在进程申请内存的时候，也即当出现缺页，调用handle_pte_fault进而调用do_anonymous_page的时候，会查看是否超过了配置，超过了就分配失败，OOM。
 
 [使用cgroups控制进程cpu配额](http://www.pchou.info/linux/2017/06/24/cgroups-cpu-quota.html)
