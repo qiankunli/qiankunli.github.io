@@ -211,6 +211,8 @@ rpc 就好像函数调用一样，有数据有状态的往来。也就是需要�
 
 20200527 补充：一些比较好的解决方法 [如何提升微服务的幸福感](https://mp.weixin.qq.com/s/y0tsSbigbRe2AyqaAIzeSQ)
 
+[微服务治理平台化探索](https://mp.weixin.qq.com/s/7DlmcIh9ShKdOdpnWe33VA)
+
 ### 带来的问题
 
 单体服务 ==> 通过 rpc 分割为微服务  ==> 带来以下问题：

@@ -130,3 +130,5 @@ Kubernetes 本身就是微服务的架构，虽然看起来复杂，但是容易
 |Ingress Controller|pod 部署在 Kubernetes 集群里，根据api server 中Ingress 数据做出处理即可|
 |metric server|以Deployment 方式运行|
 |cadvisor|以源码包方式被集成在 kubelet里|
+
+[假如重新设计Kubernetes](https://mp.weixin.qq.com/s/QgROwPVRgpE-jF7vMtjJcQ)
