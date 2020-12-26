@@ -115,3 +115,5 @@ Serverless 架构和之前的架构相比，最大的差异是：业务服务不
 3. 函数的路由和伸缩管理
 
 [无服务器已死？这项技术为什么变得人人嫌弃](https://mp.weixin.qq.com/s/dyCrv-fjN9cGcQXlcl3q1A)一个良好运行的单体应用或许不应变成一个连接到八个网关、四十个队列和数十个数据库实例的一系列”函数“。因此，无服务器适用于那些尚未开发的领域。几乎没有将现有应用（架构）移植过来的案例。
+
+[距离 Java 开发者玩转 Serverless，到底还有多远？](https://mp.weixin.qq.com/s/rhJQfnb1g3AS84ahKZr4vQ)
