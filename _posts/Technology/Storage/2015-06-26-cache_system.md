@@ -13,6 +13,8 @@ keywords: 缓存 redis
 * TOC
 {:toc}
 
+[缓存那些事](https://tech.meituan.com/2017/03/17/cache-about.html)
+
 在计算机和网络领域，缓存无处不在。可以这么说，只要硬件性能不对等的地方都会有缓存的身影。最快的 CPU 缓存与最慢的网络传输，有 1 亿倍的速度差距！因此，我们会使用高速的存储介质创建缓冲区，通过预处理、批处理以及缓冲数据的反复命中，提升系统的整体性能。
 
 ![](/public/upload/data/cache_xmind.png)

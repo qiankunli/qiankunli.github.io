@@ -144,3 +144,30 @@ groups:
 2. 无论是源码还是部署层面，prometheus server 都与alertmanager 平级，prometheus 调用/将报警数据**推给**alertmanager
 
 ![](/public/upload/go/prometheus_rule_sequence.png)
+
+
+prometheus server 提供api 通过PromSQL 获取数据。prometheus Rule Interface 封装了http api的请求与响应。rule.Manager 在此基础上 负责根据rule 发出alert。
+
+```go
+// github.com/prometheus/rules/manager.go
+type Manager struct {
+	opts     *ManagerOptions
+    groups   map[string]*Group
+    ...
+}
+type Group struct {
+	name                 string
+	file                 string
+	interval             time.Duration
+    rules                []Rule
+    ...
+}
+type Rule interface {
+	Name() string
+    Labels() labels.Labels
+    // 通过http 请求传入 rule，获取符合rule 的metric 数据
+	Eval(context.Context, time.Time, QueryFunc, *url.URL) (promql.Vector, error)
+}
+type AlertingRule struct {...}
+type RecordingRule struct {...}
+```
