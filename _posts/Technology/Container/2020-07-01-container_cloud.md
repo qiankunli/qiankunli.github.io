@@ -60,3 +60,9 @@ keywords: docker
 
 [云原生时代，应用架构将如何演进？](https://mp.weixin.qq.com/s/Vu6jxpb_LU6dH3wS4eNtdw)对于业务而言，最关心的往往是交付速度。如果你和业务总监或者CTO去聊，他们就会问你，拥有这么多的技术对于业务有什么好处？可能会谈到成本的优势、管理的优势，但是对于几乎所有业务而言，最核心的是研发效率的提升。所以我们应该思考云原生技术如何才能帮助实现更快的交付。
 
+[京东如何建设基于云原生架构的监控-日志系统？](https://mp.weixin.qq.com/s/bgn4jzIx7cRb_IBnkwBlNQ)京东监控 - 日志系统本质上都是标准的 K8s 组件，与京东容器平台 JDOS 关系密切。
+1. 在 K8s 的视角，监控 - 日志系统是 DaemonSet、RS 的各个 Pod，并非改了系统。
+2. 在 JDOS 容器平台的视角，监控 - 日志系统可以视为 JDOS 容器平台的一个**“插件“**，并非强耦合。
+3. 从应用的视角来，监控 - 日志系统是一个“无需感知“的机制，例如上线无依赖。
+
+![](/public/upload/container/cloud_native_monitor.png)
