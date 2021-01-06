@@ -162,6 +162,8 @@ The userspace perf command present a simple to use interface with commands like:
 
 [干货携程容器偶发性超时问题案例分析（一）](https://mp.weixin.qq.com/s/bSNWPnFZ3g_gciOv_qNhIQ)[干货携程容器偶发性超时问题案例分析（二）](https://mp.weixin.qq.com/s/7ZZqWPE1XNf9Mn_wj1HjUw) 这两篇文章中，使用perf sched 发现了物理上存在的调度延迟问题。
 
+[容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)通过 `perf top` 命令可以查看 哪些函数占用了最多的cpu 时间
+
 ### perf stat
 
  perf stat 针对程序 t1 的输出

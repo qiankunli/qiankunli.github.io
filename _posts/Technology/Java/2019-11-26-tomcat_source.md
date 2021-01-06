@@ -76,6 +76,7 @@ Tomcat 要实现 2 个核心功能：
 
 ![](/public/upload/java/tomcat_overview.png)
 
+2021.1.5补充：如果代码中出现较多阻塞逻辑（比如获取db/redis/rpc连接池慢）、业务处理逻辑慢，则会很快耗尽上图的Executor，导致 Acceptor 还在收连接，但是Executor 处理不了，tomcat 像“假死”一样。
 
 ## 启动过程
 
@@ -132,15 +133,15 @@ Tomcat 独立部署的模式下，我们通过 startup 脚本来启动 Tomcat，
 2. 应用层协议解析。
 3. Tomcat Request/Response 与 ServletRequest/ServletResponse 的转化。
 
-Tomcat 的设计者设计了 3 个组件来实现这 3 个功能，分别是 Endpoint、Processor 和 Adapter。**组件之间通过抽象接口交互**，这样做一个好处是封装变化。这是面向对象设计的精髓，将系统中经常变化的部分和稳定的部分隔离，有助于增加复用性，并降低系统耦合度。网络通信的 I/O 模型是变化的，可能是非阻塞 I/O、异步 I/O 或者 APR。应用层协议也是变化的，可能是 HTTP、HTTPS、AJP。浏览器端发送的请求信息也是变化的。但是整体的处理逻辑是不变的，Endpoint 负责提供字节流给 Processor，Processor 负责提供 Tomcat Request 对象给 Adapter，Adapter 负责提供 ServletRequest 对象给容器。其中 Endpoint 和 Processor 放在一起抽象成了 ProtocolHandler 组件。
+Tomcat 的设计者设计了 3 个组件来实现这 3 个功能，分别是 Endpoint、Processor 和 Adapter。**组件之间通过抽象接口交互**，这样做一个好处是封装变化。这是面向对象设计的精髓，将系统中经常变化的部分和稳定的部分隔离，有助于增加复用性，并降低系统耦合度。网络通信的 I/O 模型是变化的，可能是非阻塞 I/O、异步 I/O 或者 APR。应用层协议也是变化的，可能是 HTTP、HTTPS、AJP。浏览器端发送的请求信息也是变化的。但是整体的处理逻辑是不变的，Endpoint 负责提供**字节流**给 Processor，Processor 负责提供 Tomcat Request 对象给 Adapter，Adapter 负责提供 ServletRequest 对象给容器。其中 Endpoint 和 Processor 放在一起抽象成了 ProtocolHandler 组件。
 
 ### io 和线程模型
 
 ![](/public/upload/java/tomcat_nio.png)
 
 1. Http11NioProtocol start 时会分别启动poller 和 acceptor 线程
-2. acceptor 持有ServerSocket/ServerSocketChannel， 负责监听新的连接，并将得到的Socket 注册到Poller 上
-3. Poller 持有Selector， 负责`selector.select()` 监听读写事件，将新的socket 注册到selector上，以及其它通过addEvent 加入到Poller中的event
+2. acceptor （一个Runnable）持有ServerSocket/ServerSocketChannel， 负责监听新的连接，并将得到的Socket 注册到Poller 上
+3. Poller （一个Runnable）持有Selector， 负责`selector.select()` 监听读写事件，将新的socket 注册到selector上，以及其它通过addEvent 加入到Poller中的event
 4. Http11NioProcessor 封装了 http 1.1 的协议处理部分，比如parseRequestLine，连接出问题时response设置状态码为503 或400 等。以读事件为例， 最终会将数据读取到 Request 对象的inputBuffer 中
 
 ![](/public/upload/java/tomcat_nio_process.png)

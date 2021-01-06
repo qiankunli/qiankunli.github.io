@@ -21,87 +21,25 @@ linux网络编程中，各层有各层的struct，但有一个struct是各层通
 
 TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的网络包，就会将网络包缓存起来，等待应用层的读取。应用层通过 Socket 监听某个端口，因而读取的时候，内核会根据 TCP 头中的端口号，将网络包发给相应的Socket。
 
-![](/public/upload/network/tcp.png)
-
-
-## sk_buff结构
-
-sk_buff部分字段如下，
-
-
-	struct sk_buff {  
-	    /* These two members must be first. */  
-	    struct sk_buff      *next;  
-	    struct sk_buff      *prev;  
-	  
-	    struct sk_buff_head *list;  
-	    struct sock     *sk;  
-	    struct timeval      stamp;  
-	    struct net_device   *dev;  
-	    struct net_device   *real_dev;  
-	  
-	    union {  
-	        struct tcphdr   *th;  
-	        struct udphdr   *uh;  
-	        struct icmphdr  *icmph;  
-	        struct igmphdr  *igmph;  
-	        struct iphdr    *ipiph;  
-	        unsigned char   *raw;  
-	    } h;  // Transport layer header 
-	  
-	    union {  
-	        struct iphdr    *iph;  
-	        struct ipv6hdr  *ipv6h;  
-	        struct arphdr   *arph;  
-	        unsigned char   *raw;  
-	    } nh;  // Network layer header 
-	  
-	    union {  
-	        struct ethhdr   *ethernet;  
-	        unsigned char   *raw;  
-	    } mac;  // Link layer header 
-	  
-	    struct  dst_entry   *dst;  
-	    struct  sec_path    *sp;  
-	    
-	    void            (*destructor)(struct sk_buff *skb);  
-	
-	    /* These elements must be at the end, see alloc_skb() for details.  */  
-	    unsigned int        truesize;  
-	    atomic_t        users;  
-	    unsigned char       *head,  
-	                *data,  
-	                *tail,  
-	                *end;  
-	}; 
-	
-head和end字段指向了buf的起始位置和终止位置。然后使用header指针指像各种协议填值。然后data就是实际数据。tail记录了数据的偏移值。
-
-sk_buff 是各层通用的，在应用层数据包叫 data，在 TCP 层我们称为 segment，在 IP 层我们叫 packet，在数据链路层称为 frame。下层协议将上层协议数据作为data部分，并加上自己的header。这也是为什么代码注释中说，哪些字段必须在最前，哪些必须在最后， 这个其中的妙处可以自己体会。
-
-sk_buff由sk_buff_head组织
-
-```c
-struct sk_buff_head {
-    struct sk_buff		* volatile next;
-    struct sk_buff		* volatile prev;
-    #if CONFIG_SKB_CHECK
-    int				magic_debug_cookie;
-    #endif
-};
-```
-
-![](/public/upload/network/sk_buff.png)
 
 ## 宏观
 
 ### 数据接收过程
 
-	struct sock {
-		...
-		struct sk_buff_head	write_queue,	receive_queue;
-		...	
-	}
+[容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)在内核中，网络设备驱动是通过中断的方式来接受和处理数据包。当网卡设备上有数据到达的时候，会触发一个硬件中断来通知 CPU 来处理数据，此类处理中断的程序一般称作 ISR (Interrupt Service Routines)。ISR 程序不宜处理过多逻辑，否则会让设备的中断处理无法及时响应。因此 Linux 中将中断处理函数分为上半部和下半部。上半部是只进行最简单的工作，快速处理然后释放 CPU。剩下将绝大部分的工作都放到下半部中，下半部中逻辑由内核线程选择合适时机进行处理。
+Linux 2.4 以后内核版本采用的下半部实现方式是软中断，由 ksoftirqd 内核线程全权处理， 正常情况下每个 CPU 核上都有自己的软中断处理数队列和 ksoftirqd 内核线程。
+
+![](/public/upload/network/linux_network_package_receive.png)
+
+网络相关的中断程序在网络子系统初始化的时候进行注册， NET_RX_SOFTIRQ 的对应函数为 `net_rx_action()` ，在 `net_rx_action()` 函数中会调用网卡设备设置的 poll 函数，批量收取网络数据包并调用上层注册的协议函数进行处理，如果是为 ip 协议，则会调用 ip_rcv，上层协议为 icmp 的话，继续调用 icmp_rcv 函数进行后续的处理。
+
+```c
+struct sock {
+    ...
+    struct sk_buff_head	write_queue,	receive_queue;
+    ...	
+}
+```
 	
 硬件监听物理介质，进行数据的接收，当接收的数据填满了缓冲区，硬件就会产生中断，中断产生后，系统会转向中断服务子程序。在中断服务子程序中，数据会从硬件的缓冲区复制到内核的空间缓冲区，并包装成一个数据结构（sk_buff），然后调用对驱动层的接口函数netif_rx()将数据包发送给链路层。从链路层向网络层传递时将调用ip_rcv函数。该函数完成本层的处理后会根据IP首部中使用的传输层协议来调用相应协议的处理函数（比如UDP对应udp_rcv、TCP对应tcp_rcv）。
 
@@ -109,10 +47,12 @@ struct sk_buff_head {
 
 所有使用TCP 协议的套接字对应sock 结构都被挂入tcp_prot（proto 结构）之sock_array 数组中，采用以本地端口号为索引的插入方式，所以当tcp_rcv 函数接收到一个数据包，在完成必要的检查和处理后，其将以TCP 协议首部中目的端口号（对于一个接收的数据包而言，其目的端口号就是本地所使用的端口号）为索引，在tcp_prot 对应sock 结构之sock_array 数组中得到正确的sock 结构队列，再辅之以其他条件遍历该队列进行对应sock 结构的查询，在得到匹配的sock 结构后，将数据包挂入该sock 结构中的缓存队列中（由sock 结构中receive_queue 字段指向），从而完成数据包的最终接收。
 
-	struct prot{
-		...
-		struct sock *	sock_array[SOCK_ARRAY_SIZE]; // 注意是一个数组指针，一个主机有多个端口，一个端口可以建立多个连接，因而有多个struct sock
-	}
+```c
+struct prot{
+    ...
+    struct sock *	sock_array[SOCK_ARRAY_SIZE]; // 注意是一个数组指针，一个主机有多个端口，一个端口可以建立多个连接，因而有多个struct sock
+}
+```
 
 总结来看，数据接收的流程是  sk_buff ==> prot 某个端口的sock_array中的某个sock 的sk_buff 队列。
 
@@ -137,96 +77,95 @@ struct sk_buff_head {
 首先，我们从device struct开始。struct反映了很多东西，比如看一下linux的进程struct，就很容易理解进程为什么能干那么多事情。
 
 linux会维护一个device struct list，通过它能找到所有的网络设备。device struct 和设备不是一对一关系。
-	
-	include/linux/netdevice.h
-	struct device{
-		/*
-		* This is the first field of the "visible" part of this structure
-		* (i.e. as seen by users in the "Space.c" file). It is the name
-		* the interface.
-		*/
-		char *name;
-		/* I/O specific fields - FIXME: Merge these and struct ifmap into one */
-		unsigned long rmem_end; /* shmem "recv" end */
-		unsigned long rmem_start; /* shmem "recv" start */
-		unsigned long mem_end; /* shared mem end */
-		unsigned long mem_start; /* shared mem start */
-		// device 只是一个struct，可能几个struct共用一个物理网卡
-		unsigned long base_addr; /* device I/O address */
-		// 赋给中断号
-		unsigned char irq; /* device IRQ number */
-		/* Low-level status flags. */
-		volatile unsigned char start, /* start an operation */
-			tbusy, /* transmitter busy */
-			interrupt; /* interrupt arrived */
-	
-		struct device *next;
-		/* The device initialization function. Called only once. */
-		// 初始化函数
-		int (*init)(struct device *dev);
-		/* Some hardware also needs these fields, but they are not part of the
-		usual set specified in Space.c. */
-		unsigned char if_port; /* Selectable AUI, TP,..*/
-		unsigned char dma; /* DMA channel */
-		struct enet_statistics* (*get_stats)(struct device *dev);
-		/*
-		* This marks the end of the "visible" part of the structure. All
-		* fields hereafter are internal to the system, and may change at
-		* will (read: may be cleaned up at will).
-		*/
-		/* These may be needed for future network-power-down code. */
-		unsigned long trans_start; /* Time (in jiffies) of last Tx */
-		unsigned long last_rx; /* Time of last Rx */
-		unsigned short flags; /* interface flags (a la BSD) */
-		unsigned short family; /* address family ID (AF_INET) */
-		unsigned short metric; /* routing metric (not used) */
-		unsigned short mtu; /* interface MTU value */
-		unsigned short type; /* interface hardware type */
-		unsigned short hard_header_len; /* hardware hdr length */
-		void *priv; /* pointer to private data */
-		/* Interface address info. */
-		unsigned char broadcast[MAX_ADDR_LEN]; /* hw bcast add */
-		unsigned char dev_addr[MAX_ADDR_LEN]; /* hw address */
-		unsigned char addr_len; /* hardware address length */
-		unsigned long pa_addr; /* protocol address */
-		unsigned long pa_brdaddr; /* protocol broadcast addr */
-		unsigned long pa_dstaddr; /* protocol P-P other side addr */
-		unsigned long pa_mask; /* protocol netmask */
-		unsigned short pa_alen; /* protocol address length */
-		struct dev_mc_list *mc_list; /* Multicast mac addresses */
-		int mc_count; /* Number of installed mcasts*/
-		struct ip_mc_list *ip_mc_list; /* IP multicast filter chain */
-		/* For load balancing driver pair support */
-		unsigned long pkt_queue; /* Packets queued */
-		struct device *slave; /* Slave device */
-		// device的数据缓冲区
-		/* Pointer to the interface buffers. */
-		struct sk_buff_head buffs[DEV_NUMBUFFS];
-		/* Pointers to interface service routines. */
-		// 打开设备
-		int (*open)(struct device *dev);
-		// 关闭设备
-		int (*stop)(struct device *dev);
-		// 调用具体的硬件将数据发到物理介质上，网络栈最终调用它发数据
-		int (*hard_start_xmit) (struct sk_buff *skb, struct device *dev);
-		int (*hard_header) (unsigned char *buff,struct device *dev,unsigned short type,void *daddr,void *saddr,unsigned len,struct sk_buff *skb);
-		int (*rebuild_header)(void *eth, struct device *dev,unsigned long raddr, struct sk_buff *skb);
-		unsigned short (*type_trans) (struct sk_buff *skb, struct device *dev);
-		#define HAVE_MULTICAST
-		void (*set_multicast_list)(struct device *dev, int num_addrs, void *addrs);
-		#define HAVE_SET_MAC_ADDR
-		int (*set_mac_address)(struct device *dev, void *addr);
-		#define HAVE_PRIVATE_IOCTL
-		int (*do_ioctl)(struct device *dev, struct ifreq *ifr, int cmd);
-		#define HAVE_SET_CONFIG
-		int (*set_config)(struct device *dev, struct ifmap *map);
-	};
+```c
+include/linux/netdevice.h
+struct device{
+    /*
+    * This is the first field of the "visible" part of this structure
+    * (i.e. as seen by users in the "Space.c" file). It is the name
+    * the interface.
+    */
+    char *name;
+    /* I/O specific fields - FIXME: Merge these and struct ifmap into one */
+    unsigned long rmem_end; /* shmem "recv" end */
+    unsigned long rmem_start; /* shmem "recv" start */
+    unsigned long mem_end; /* shared mem end */
+    unsigned long mem_start; /* shared mem start */
+    // device 只是一个struct，可能几个struct共用一个物理网卡
+    unsigned long base_addr; /* device I/O address */
+    // 赋给中断号
+    unsigned char irq; /* device IRQ number */
+    /* Low-level status flags. */
+    volatile unsigned char start, /* start an operation */
+        tbusy, /* transmitter busy */
+        interrupt; /* interrupt arrived */
+
+    struct device *next;
+    /* The device initialization function. Called only once. */
+    // 初始化函数
+    int (*init)(struct device *dev);
+    /* Some hardware also needs these fields, but they are not part of the
+    usual set specified in Space.c. */
+    unsigned char if_port; /* Selectable AUI, TP,..*/
+    unsigned char dma; /* DMA channel */
+    struct enet_statistics* (*get_stats)(struct device *dev);
+    /*
+    * This marks the end of the "visible" part of the structure. All
+    * fields hereafter are internal to the system, and may change at
+    * will (read: may be cleaned up at will).
+    */
+    /* These may be needed for future network-power-down code. */
+    unsigned long trans_start; /* Time (in jiffies) of last Tx */
+    unsigned long last_rx; /* Time of last Rx */
+    unsigned short flags; /* interface flags (a la BSD) */
+    unsigned short family; /* address family ID (AF_INET) */
+    unsigned short metric; /* routing metric (not used) */
+    unsigned short mtu; /* interface MTU value */
+    unsigned short type; /* interface hardware type */
+    unsigned short hard_header_len; /* hardware hdr length */
+    void *priv; /* pointer to private data */
+    /* Interface address info. */
+    unsigned char broadcast[MAX_ADDR_LEN]; /* hw bcast add */
+    unsigned char dev_addr[MAX_ADDR_LEN]; /* hw address */
+    unsigned char addr_len; /* hardware address length */
+    unsigned long pa_addr; /* protocol address */
+    unsigned long pa_brdaddr; /* protocol broadcast addr */
+    unsigned long pa_dstaddr; /* protocol P-P other side addr */
+    unsigned long pa_mask; /* protocol netmask */
+    unsigned short pa_alen; /* protocol address length */
+    struct dev_mc_list *mc_list; /* Multicast mac addresses */
+    int mc_count; /* Number of installed mcasts*/
+    struct ip_mc_list *ip_mc_list; /* IP multicast filter chain */
+    /* For load balancing driver pair support */
+    unsigned long pkt_queue; /* Packets queued */
+    struct device *slave; /* Slave device */
+    // device的数据缓冲区
+    /* Pointer to the interface buffers. */
+    struct sk_buff_head buffs[DEV_NUMBUFFS];
+    /* Pointers to interface service routines. */
+    // 打开设备
+    int (*open)(struct device *dev);
+    // 关闭设备
+    int (*stop)(struct device *dev);
+    // 调用具体的硬件将数据发到物理介质上，网络栈最终调用它发数据
+    int (*hard_start_xmit) (struct sk_buff *skb, struct device *dev);
+    int (*hard_header) (unsigned char *buff,struct device *dev,unsigned short type,void *daddr,void *saddr,unsigned len,struct sk_buff *skb);
+    int (*rebuild_header)(void *eth, struct device *dev,unsigned long raddr, struct sk_buff *skb);
+    unsigned short (*type_trans) (struct sk_buff *skb, struct device *dev);
+    #define HAVE_MULTICAST
+    void (*set_multicast_list)(struct device *dev, int num_addrs, void *addrs);
+    #define HAVE_SET_MAC_ADDR
+    int (*set_mac_address)(struct device *dev, void *addr);
+    #define HAVE_PRIVATE_IOCTL
+    int (*do_ioctl)(struct device *dev, struct ifreq *ifr, int cmd);
+    #define HAVE_SET_CONFIG
+    int (*set_config)(struct device *dev, struct ifmap *map);
+};
+```
 
 耐心的看完这个结构体，网络部分的初始化就是围绕device struct的创建及其中字段（和函数）的初始化.
 
-linux内核与网络驱动程序的边界：
-
-linux内核准备好device struct和dev_base指针(这句不准确，或许是ethdev_index[])，kernel启动时，执行驱动程序事先挂好的init函数，init函数初始化device struct并挂到dev_base上(或ethdev_index上)。
+linux内核与网络驱动程序的边界：linux内核准备好device struct和dev_base指针(这句不准确，或许是ethdev_index[])，kernel启动时，执行驱动程序事先挂好的init函数，init函数初始化device struct并挂到dev_base上(或ethdev_index上)。
 
 ei开头的都是驱动程序自己的函数。
 
@@ -275,9 +214,8 @@ io数据的读写，不会一个字节一个字节的来，所以数据会缓存
 
 针对内核空间缓存区
 
-linux文件操作中，会专门开辟一段内存，用来存储磁盘文件系统的超级块和部分磁盘块，通过文件path ==> fd ==> inode ==> ... ==> 块索引 找到块的数据并读写。磁盘块的管理是公共的、独立的，fd记录自己相关的磁盘块索引即可。fd不用这个磁盘块了，除非系统剩余内存不够，这个磁盘块数据不会被释放，下次用到时还能用。即便fd只要一部分数据，系统也会自动加载相关的多个磁盘块到内存。
-
-linux网络操作中，通过socket fd ==> sock ==> write_queue, receive_queue 在缓存读写的数据。sk_buff 的管理是sock各自为政。
+1. linux文件操作中，会专门开辟一段内存，用来存储磁盘文件系统的超级块和部分磁盘块，通过文件path ==> fd ==> inode ==> ... ==> 块索引 找到块的数据并读写。磁盘块的管理是公共的、独立的，fd记录自己相关的磁盘块索引即可。fd不用这个磁盘块了，除非系统剩余内存不够，这个磁盘块数据不会被释放，下次用到时还能用。即便fd只要一部分数据，系统也会自动加载相关的多个磁盘块到内存。
+2. linux网络操作中，通过socket fd ==> sock ==> write_queue, receive_queue 在缓存读写的数据。sk_buff 的管理是sock各自为政。
 
 这其中的不同，值得品味。一个重要原因是，因为linux事先加载了超级块数据，可以根据需要，精确的指定加载和写入多少数据。而对于网络编程来说，一次能读取和写出多少，都是未知的，每个sock都不同。
 
@@ -291,7 +229,7 @@ linux网络操作中，通过socket fd ==> sock ==> write_queue, receive_queue �
 
 1. 软中断的处理过程。我们在执行tcp_v4_rcv 函数的时候，依然处于软中断的处理逻辑里，所以必然会占用这个软中断。
 2. 用户态进程。如果用户态触发系统调用 read 读取网络包，也要从队列里面找。
-3. 内核协议栈。哪怕用户进程没有调用 read，读取网络包，当网络包来的时候，也得有一个地方收着。
+3. 内核协议栈。哪怕用户进程没有调用 read读取网络包，当网络包来的时候，也得有一个地方收着。
 
 
 ## 发送与接收成本 和 优化
@@ -312,6 +250,7 @@ DPDK全称Intel Data Plane Development Kit，是Intel提供的数据平面开发
 
 DPDK能够绕过内核协议栈，本质上是得益于 UIO 技术，UIO技术也不是DPDK创立的，是内核提供的一种运行在用户空间的I/O技术，Linux系统中一般的驱动设备都是运行在内核空间，在用户空间用的程序调用即可，UIO则是将驱动的很少一部分运行在内核空间，绝大多数功能在用户空间实现，通过 UIO 能够拦截中断，并重设中断回调行为，从而绕过内核协议栈后续的处理流程。
 
+![](/public/upload/network/tcp.png)
 
 ## 引用
 

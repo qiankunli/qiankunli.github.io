@@ -43,6 +43,24 @@ linux-1.2.13
 
 系统调用通过 INT $0x80 进入内核执行函数，该函数根据 AX 寄存器中的系统调用号，进一步调用内核网络栈相应的实现函数。
 
+## 网络分层
+
+![](/public/upload/linux/linux_network.png)
+
+从这个图中，可以看到，到传输层时，横生枝节，**代码不再针对任何数据包都通用**。从下到上，收到的数据包由哪个传输层协议处理，根据从数据包传输层header中解析的数据确定。从上到下，数据包的发送使用什么传输层协议，由socket初始化时确定。
+
+1. vfs层
+1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。
+2. sock，负责向下对接内核网络协议栈
+3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责。分层之后，诸如拥塞控制和滑动窗口的 字段和方法就只体现在struct sock和tcp_prot中，代码实现与tcp规范设计是一致的
+4. ip层 负责路由等逻辑，并执行nf_hook，也就是netfilter。netfilter是工作于内核空间当中的一系列网络（TCP/IP）协议栈的钩子（hook），为内核模块在网络协议栈中的不同位置注册回调函数（callback）。也就是说，**在数据包经过网络协议栈的不同位置时做相应的由iptables配置好的处理逻辑**。
+5. link 层，先寻找下一跳（ip ==> mac），有了 MAC 地址，就可以调用 dev_queue_xmit发送二层网络包了，它会调用 __dev_xmit_skb 会将请求放入块设备的队列。同时还会处理一些vlan 的逻辑
+6. 设备层：网卡是发送和接收网络包的基本设备。在系统启动过程中，网卡通过内核中的网卡驱动程序注册到系统中。而在网络收发过程中，**内核通过中断跟网卡进行交互**。网络包的发送会触发一个软中断 NET_TX_SOFTIRQ 来处理队列中的数据。这个软中断的处理函数是 net_tx_action。在软中断处理函数中，会将网络包从队列上拿下来，调用网络设备的传输函数 ixgb_xmit_frame，将网络包发的设备的队列上去。
+
+![](/public/upload/network/linux_recv_send.png)
+
+网卡中断处理程序为网络帧分配的，内核数据结构 sk_buff 缓冲区；是一个维护网络帧结构的双向链表，链表中的每一个元素都是一个网络帧（Packet）。**虽然 TCP/IP 协议栈分了好几层，但上下不同层之间的传递，实际上只需要操作这个数据结构中的指针，而无需进行数据复制**。
+
 ## 网络与文件操作
 
 file_operations 结构定义了普通文件操作函数集。系统中每个文件对应一个 file 结构， file 结构中有一个 file_operations 变量，当使用 write，read 函数对某个文件描述符进行读写操作时，系统首先根据文件描述符索引到其对应的 file 结构，然后调用其成员变量 file_operations 中对应函数完成请求。
@@ -80,33 +98,80 @@ struct inode{
 
 也就是说，对linux系统，一切皆文件，由struct file描述，通过file->ops指向具体操作，由file->inode 存储一些元信息。对于ext文件系统，是载入内存的超级块、磁盘块等数据。对于网络通信，则是待发送和接收的数据块、网络设备等信息。从这个角度看，**struct socket和struct ext_inode_info 等是类似的。**
 
-## 网络分层
+## 数据结构
+
+### sk_buff结构
+
+sk_buff部分字段如下，
 
 
-[容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)在内核中，网络设备驱动是通过中断的方式来接受和处理数据包。当网卡设备上有数据到达的时候，会触发一个硬件中断来通知 CPU 来处理数据，此类处理中断的程序一般称作 ISR (Interrupt Service Routines)。ISR 程序不宜处理过多逻辑，否则会让设备的中断处理无法及时响应。因此 Linux 中将中断处理函数分为上半部和下半部。上半部是只进行最简单的工作，快速处理然后释放 CPU。剩下将绝大部分的工作都放到下半部中，下半部中逻辑由内核线程选择合适时机进行处理。
-Linux 2.4 以后内核版本采用的下半部实现方式是软中断，由 ksoftirqd 内核线程全权处理， 正常情况下每个 CPU 核上都有自己的软中断处理数队列和 ksoftirqd 内核线程。
+```c
+struct sk_buff {  
+    /* These two members must be first. */  
+    struct sk_buff      *next;  
+    struct sk_buff      *prev;  
+    
+    struct sk_buff_head *list;  
+    struct sock     *sk;  
+    struct timeval      stamp;  
+    struct net_device   *dev;  
+    struct net_device   *real_dev;  
+    
+    union {  
+        struct tcphdr   *th;  
+        struct udphdr   *uh;  
+        struct icmphdr  *icmph;  
+        struct igmphdr  *igmph;  
+        struct iphdr    *ipiph;  
+        unsigned char   *raw;  
+    } h;  // Transport layer header 
+    
+    union {  
+        struct iphdr    *iph;  
+        struct ipv6hdr  *ipv6h;  
+        struct arphdr   *arph;  
+        unsigned char   *raw;  
+    } nh;  // Network layer header 
+    
+    union {  
+        struct ethhdr   *ethernet;  
+        unsigned char   *raw;  
+    } mac;  // Link layer header 
+    
+    struct  dst_entry   *dst;  
+    struct  sec_path    *sp;  
+    
+    void            (*destructor)(struct sk_buff *skb);  
 
-![](/public/upload/network/linux_network_package_receive.png)
+    /* These elements must be at the end, see alloc_skb() for details.  */  
+    unsigned int        truesize;  
+    atomic_t        users;  
+    unsigned char       *head,  
+                *data,  
+                *tail,  
+                *end;  
+}; 
+```
+	
+head和end字段指向了buf的起始位置和终止位置。然后使用header指针指像各种协议填值。然后data就是实际数据。tail记录了数据的偏移值。
 
-网络相关的中断程序在网络子系统初始化的时候进行注册， NET_RX_SOFTIRQ 的对应函数为 `net_rx_action()` ，在 `net_rx_action()` 函数中会调用网卡设备设置的 poll 函数，批量收取网络数据包并调用上层注册的协议函数进行处理，如果是为 ip 协议，则会调用 ip_rcv，上层协议为 icmp 的话，继续调用 icmp_rcv 函数进行后续的处理。
+sk_buff 是各层通用的，在应用层数据包叫 data，在 TCP 层我们称为 segment，在 IP 层我们叫 packet，在数据链路层称为 frame。下层协议将上层协议数据作为data部分，并加上自己的header。这也是为什么代码注释中说，哪些字段必须在最前，哪些必须在最后， 这个其中的妙处可以自己体会。
 
-![](/public/upload/linux/linux_network.png)
+sk_buff由sk_buff_head组织
 
-从这个图中，可以看到，到传输层时，横生枝节，**代码不再针对任何数据包都通用**。从下到上，收到的数据包由哪个传输层协议处理，根据从数据包传输层header中解析的数据确定。从上到下，数据包的发送使用什么传输层协议，由socket初始化时确定。
+```c
+struct sk_buff_head {
+    struct sk_buff		* volatile next;
+    struct sk_buff		* volatile prev;
+    #if CONFIG_SKB_CHECK
+    int				magic_debug_cookie;
+    #endif
+};
+```
 
-1. vfs层
-1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。
-2. sock，负责向下对接内核网络协议栈
-3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责。分层之后，诸如拥塞控制和滑动窗口的 字段和方法就只体现在struct sock和tcp_prot中，代码实现与tcp规范设计是一致的
-4. ip层 负责路由等逻辑，并执行nf_hook，也就是netfilter。netfilter是工作于内核空间当中的一系列网络（TCP/IP）协议栈的钩子（hook），为内核模块在网络协议栈中的不同位置注册回调函数（callback）。也就是说，**在数据包经过网络协议栈的不同位置时做相应的由iptables配置好的处理逻辑**。
-5. link 层，先寻找下一跳（ip ==> mac），有了 MAC 地址，就可以调用 dev_queue_xmit发送二层网络包了，它会调用 __dev_xmit_skb 会将请求放入块设备的队列。同时还会处理一些vlan 的逻辑
-6. 设备层：网卡是发送和接收网络包的基本设备。在系统启动过程中，网卡通过内核中的网卡驱动程序注册到系统中。而在网络收发过程中，**内核通过中断跟网卡进行交互**。网络包的发送会触发一个软中断 NET_TX_SOFTIRQ 来处理队列中的数据。这个软中断的处理函数是 net_tx_action。在软中断处理函数中，会将网络包从队列上拿下来，调用网络设备的传输函数 ixgb_xmit_frame，将网络包发的设备的队列上去。
+![](/public/upload/network/sk_buff.png)
 
-![](/public/upload/network/linux_recv_send.png)
-
-网卡中断处理程序为网络帧分配的，内核数据结构 sk_buff 缓冲区；是一个维护网络帧结构的双向链表，链表中的每一个元素都是一个网络帧（Packet）。**虽然 TCP/IP 协议栈分了好几层，但上下不同层之间的传递，实际上只需要操作这个数据结构中的指针，而无需进行数据复制**。
-
-## 网络协议栈实现——数据struct 和 协议struct
+### 网络协议栈实现——数据struct 和 协议struct
 
 socket分为多种，除了inet还有unix。反应在代码结构上，就是net包下只有net/unix,net/inet两个文件夹。之所以叫unix域，可能跟描述其地址时，使用`unix://xxx`有关
 
