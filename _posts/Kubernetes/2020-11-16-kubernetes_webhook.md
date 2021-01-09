@@ -20,6 +20,8 @@ Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个�
 
 apiserver 就能保证在校验（Validating）之前先做完所有的修改（Mutating）
 
+[使用 Admission Webhook 机制实现多集群资源配额控制](https://mp.weixin.qq.com/s/i3KtTSfab2JrjeFR4tdy_A)未读
+
 ## 配置apiserver 发起webhook
 
 

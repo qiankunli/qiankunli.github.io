@@ -19,49 +19,31 @@ keywords: kubernetes security
 
 ## docker 安全
 
+最典型的例子，将`/etc` 等核心文件 挂载到容器中，在容器中进行改写等。
+
 [绝不避谈 Docker 安全](https://mp.weixin.qq.com/s/IN_JJhg_oG7ILVjNj-UexA?)
 
 ![](/public/upload/kubernetes/container_security.png)
 
-[Docker 和 Kubernetes 中的 root 与 privileged](https://mp.weixin.qq.com/s/aCLGh-UiTsJgmV9HUryb6Q)`--privileged` 标志可以将我们前面看到的0的用户 ID 直接映射到主机的用户 ID 0上，使其可以不受限制地访问任何自己的系统调用。在正常的操作中，即使容器内有 root，Docker 也会限制容器的 Linux Capabilities 的，这种限制包括像 CAP_AUDIT_WRITE 这样的东西，
+Linux capabilities
+1. 在 Linux capabilities 出现前，进程的权限可以简单分为两类：特权用户的进程（id=0）；非特权用户的进程（id>0）
+2. 从 kernel 2.2 开始，Linux 把特权用户所有的这些“特权”做了更详细的划分，这样被划分出来的每个单元就被称为 capability。比如说，运行 iptables 命令，对应的进程需要有 CAP_NET_ADMIN 这个 capability。如果要 mount 一个文件系统，那么对应的进程需要有 CAP_SYS_ADMIN 这个 capability。
+3. 在普通 Linux 节点上，非 root 用户启动的进程缺省没有任何 Linux capabilities，而 root 用户启动的进程缺省包含了所有的 Linux capabilities。对于 root 用户启动的进程，如果把 CAP_NET_ADMIN 这个 capability 移除（`capsh --keep=1 --user=root --drop=cap_net_admin`），它就不可以运行 iptables。
+4. 新运行的进程里的相关 capabilities 参数的值，是由它的父进程以及程序文件中的 capabilities 参数值计算得来的（文件中可以设置 capabilities 参数值（以ping 为例，`getcap $(which ping)/setcap -r $(which ping)`），并且这个值会影响到最后运行它的进程）。如果把 iptables 的应用程序加上 CAP_NET_ADMIN 的 capability，那么即使是非 root 用户也有执行 iptables 的权限了。
+5. 因为安全方面的考虑，容器缺省启动的时候，哪怕是容器中 root 用户的进程，系统也只允许了 15 个 capabilities。Privileged 的容器也就是允许容器中的进程可以执行所有的特权操作。如果我们发现容器中进程的权限不够，就需要分析它需要的最小 capabilities 集合，而不是直接赋予容器"privileged"。
 
 ### docker 多用户
 
-[理解 docker 容器中的 uid 和 gid](https://www.cnblogs.com/sparkdev/p/9614164.html)默认情况下，容器中的进程以 root 用户权限运行，并且这个 root 用户和宿主机中的 root 是同一个用户。这就意味着一旦容器中的进程有了适当的机会，它就可以控制宿主机上的一切！
+作为容器中的 root，它还是可以有一些 Linux capabilities，那么在容器中还是可以执行一些特权的操作。怎么办呢？
 
-1. 内核使用的是 uid 和 gid，而不是用户名和组名
-2. 可能会看到同一个 uid 在不同的容器中显示为不同的用户名
-3. 相同的 uid 不能有不同的特权，即使在不同的容器中也是如此
-4. docker 默认并没有启用 user namesapce，新创建的容器进程和宿主机上的进程在相同的 user namespace 中， docker 并没有为容器创建新的 user namespace
+可以给容器指定一个普通用户。`docker run -ti --name root_example -u 6667:6667 -v /etc:/mnt centos bash` 或者在创建镜像时，加入`USER $username`。这样做的缺点是：用户 uid 是整个节点中共享的，比如说，多个客户在建立自己的容器镜像的时候都选择了同一个 uid 6667。那么当多个客户的容器在同一个节点上运行的时候，其实就都使用了宿主机上 uid 6667。在一台 Linux 系统上，每个用户下的资源是有限制的，比如打开文件数目（open files）、最大进程数目（max user processes）等等。一旦有很多个容器共享一个 uid，这些容器就很可能很快消耗掉这个 uid 下的资源，这样很容易导致这些容器都不能再正常工作。
 
-docker 启用user namesapce（此处只是普及，不推荐使用）
+也可以使用User Namespace（一些组件默认不启用），User Namespace 隔离了一台 Linux 节点上的 User ID（uid）和 Group ID（gid），它给 Namespace 中的 uid/gid 的值与宿主机上的 uid/gid 值建立了一个映射关系。经过 User Namespace 的隔离，我们在 Namespace 中看到的进程的 uid/gid，就和宿主机 Namespace 中看到的 uid 和 gid 不一样了。比如`podman run -ti  -v /etc:/mnt --uidmap 0:2000:1000 centos bash`，第一个 0 是指在新的 Namespace 里 uid 从 0 开始，中间的那个 2000 指的是 Host Namespace 里被映射的 uid 从 2000 开始，最后一个 1000 是指总共需要连续映射 1000 个 uid。这个容器里的 uid 0 是被映射到宿主机上的 uid 2000 的，把容器中 root 用户（uid 0）映射成宿主机上的普通用户。
 
-1. `/etc/docker/daemon.json`  增加如下内容 并重启
+rootless container 中的"rootless"不仅仅指容器中以非 root 用户来运行进程，还指以非 root 用户来创建容器，管理容器。也就是说，启动容器的时候，Docker 或者 podman 是以非 root 用户来执行的。
 
-        {
-            "userns-remap": "default"
-        }
 
-2. 没启用user namesapce 时，docker 拿root 来运行容器中进程。启用后， docker 拿什么用户来运行容器中进程呢？
-3. 启用user namesapce 后，docker daemon 会在宿主机上创建一个 dockremap 的用户
-4. 启动容器时，docker 会拿dockremap 的一个“从uid” 作为容器的root 用户来启动容器进程。该从uid 在容器内具有最高权限，在宿主机上具有和dockermap 一致的权限（操作宿主机volume 目录文件的时候）。PS：有点网络设备从设备的意思
-
-### 多用户的使用
-
-我们可以在 Dockerfile 中添加一个用户 dev，并使用 USER 命令指定以该用户的身份运行程序，Dockerfile 的内容如下：
-
-```sh
-FROM ubuntu
-RUN groupadd -r dev && useradd -r -g dev dev
-USER dev
-ENTRYPOINT ["sleep", "infinity"]
-```
-
-则限定了 项目不能在随意位置 写日志，强制项目在 一个特定目录比如 `/logs` 下写日志（为dev 开放`/logs`目录写权限），并将`/logs` 映射到物理机的某个目录，定期整理`/logs` 目录即可。
-
-但该方案带来的问题是：对项目限制比较大，需要一个完备的白名单，理论上不能限制项目对磁盘目录的读写。 
-
-## 概念
+## k8s概念
 
 ### 用户
 

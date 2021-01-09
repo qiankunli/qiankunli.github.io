@@ -13,6 +13,8 @@ keywords: docker
 * TOC
 {:toc}
 
+[容器化实践在金融行业落地面临的问题和挑战](https://mp.weixin.qq.com/s/AZgylzVXwzxCjdgeSXjowQ)分享了容器化的落地思路。
+
 ## 组成内容
 
 一开始只是基于k8s api 做了个发布系统，在容器化落地过程中，单单一个发布系统是远远不够的，对要做的事情做了一个梳理。
@@ -66,3 +68,4 @@ keywords: docker
 3. 从应用的视角来，监控 - 日志系统是一个“无需感知“的机制，例如上线无依赖。
 
 ![](/public/upload/container/cloud_native_monitor.png)
+
