@@ -85,8 +85,12 @@ keywords: 缓存 redis
 2. 非法查询，缓存中存的大多数是有效的数据，那么对于一个非法的数据（或者说合法，但数据库中没有），缓存中没有，则查询压力还是由数据库承担。
 
 ## 不同位置的缓存
+
+![](/public/upload/storage/cache_computer.png)
     
 ![](/public/upload/data/cache_location.png)
+
+
 
 ### 本地缓存
 

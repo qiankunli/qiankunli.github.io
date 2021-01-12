@@ -13,6 +13,8 @@ keywords: Go goroutine scheduler
 * TOC
 {:toc}
 
+异步系统调用 G 会和MP分离（G挂到netpoller），同步系统调用 GM 会和P分离（P另寻M），生动的说明了GPM相对GM的精妙之处。
+
 ## 阻塞
 
 在 Go 里面阻塞主要分为以下 4 种场景：
