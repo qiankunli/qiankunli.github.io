@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: kubernetes crd 及kubebuilder学习
+title: kubebuilder 及controller-runtime学习
 category: 架构
 tags: Kubernetes
 keywords: Kubernetes crd kubebuilder
