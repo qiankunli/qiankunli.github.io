@@ -213,6 +213,8 @@ kube_state_metrics_watch_total{resource="*v1beta1.Ingress",result="success"} 1
 
 ## 需要哪些 alert rule
 
+[monitoring.mixin](https://monitoring.mixins.dev) 列出了各个组件建议配置的alert 规则。
+
 指导原则：宁缺毋滥。其实有十几个报警就不少了，再多也处理不过来。 可以参照《Prometheus 监控实战》中提到的对Prometheus 的报警规则。
 
 ## 制作哪些dashboard
