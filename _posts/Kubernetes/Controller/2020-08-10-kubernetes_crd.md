@@ -112,14 +112,14 @@ controller-runtime 代码结构
 ```
 controller-runtime 的核心是Manager 驱动 Controller 进而驱动 Reconciler。kubebuiler 用Manager.start 作为驱动入口， Reconciler 作为自定义入口（变的部分），Controller 是不变的部分。
 
-![](/public/upload/kubernetes/controller_runtime_overview.png)
-
 Manager 管理多个Controller 的运行，并提供 数据读（cache）写（client）等crudw基础能力。
 
 ![](/public/upload/kubernetes/controller_runtime.png)
 
 1. Cache, 负责在 Controller 进程里面根据 Scheme 同步 Api Server 中所有该 Controller 关心 的资源对象，其核心是 相关Resource的 Informer,Informer 会负责监听对应 Resource的创建/删除/更新操作，以触发 Controller 的 Reconcile 逻辑。
 2. Clients,  Reconciler不可避免地需要对某些资源类型进行crud，就是通过该 Clients 实现的，其中查询功能实际查询是本地的 Cache，写操作直接访问 Api Server。
+
+![](/public/upload/kubernetes/controller_runtime_logic.png)
 
 一个controller中只有一个Reconciler。A Controller manages a work queue fed reconcile.Requests from source.Sources.  Work is performed through the reconcile.Reconciler for each enqueued item. Work typically is reads and writes Kubernetes objects to make the system state match the state specified in the object Spec. 
 
@@ -237,8 +237,6 @@ func (cm *controllerManager) startLeaderElectionRunnables() {
 ```
 
 ### Controller 逻辑
-
-![](/public/upload/kubernetes/controller_runtime_logic.png)
 
 Controller 逻辑主要有两个（任何Controller 都是如此）
 1. 监听 object 事件并加入到 queue 中。为提高扩展性 Controller 将这个职责独立出来交给了 Source 组件，不只是监听apiserver，任何外界资源变动 都可以通过 Source 接口加入 到Reconcile 逻辑中。
