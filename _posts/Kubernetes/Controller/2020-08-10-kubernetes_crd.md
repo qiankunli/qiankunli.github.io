@@ -289,7 +289,36 @@ func (c *Controller) reconcileHandler(obj interface{}) bool {
 }
 ```
 
+### Reconciler 开发模式
+
+```go
+type ApplicationReconciler struct {
+	client.Client
+	Scheme *runtime.Scheme
+    Log    logr.Logger
+}
+type Reconciler interface {
+	Reconcile(Request) (Result, error)
+}
+type Request struct {
+	types.NamespacedName
+}
+type NamespacedName struct {
+	Namespace string
+	Name      string
+}
+type Result struct {
+	Requeue bool
+	RequeueAfter time.Duration
+}
+```
+
+ApplicationReconciler 持有Client，便有能力对 相关资源进行 crud
+1. 从request 中资源name ，进而通过client 获取资源obj
+2. 处理完毕后，通过Result 告知是Requeue 下次重新处理，还是处理成功开始下一个
+
 ## 其它
+
 ### 依赖注入
 
 controllerManager  持有了Config/Client/APIReader/Scheme/Cache/Injector/StopChannel/Mapper 实例，将这些数据通过 SetFields 注入到Controller 中。Controller 再转手 将部分实例注入到 Source 中（Source 需要监听apiserver）

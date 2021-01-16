@@ -206,4 +206,48 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
     panic("unreachable")
 }
 ```
-从示例中可以看到，选主一般是一次性的，成为leader 后即执行核心业务逻辑。如果成为leader 后失去leader，则主协程执行结束。scheduler 和 controller-manager 部署在容器中，所以主协程执行结束后，一般会自动重启。
+
+controller-runtime 是k8s 为支持自定义Controller 写的公共库，入口代码即为`Controller.Start`
+
+```go
+func (cm *controllerManager) Start(stop <-chan struct{}) error {
+    ...
+    // 启动不用选主的任务
+    go cm.startNonLeaderElectionRunnables()
+	if cm.resourceLock != nil { // 如果resourceLock 不为空， 表示需要选主，启动选主逻辑
+		err := cm.startLeaderElection()
+		if err != nil {return err}
+	} 
+    ...
+}
+func (cm *controllerManager) startLeaderElection() (err error) {
+	l, err := leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
+		Lock:          cm.resourceLock,
+		Callbacks: leaderelection.LeaderCallbacks{
+			OnStartedLeading: func(_ context.Context) {
+				cm.startLeaderElectionRunnables()   // 启动需要选主的任务
+			},
+			OnStoppedLeading: func() {
+				cm.errSignal.SignalError(fmt.Errorf("leader election lost"))
+			},
+		},
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		select {
+		case <-cm.internalStop:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	// Start the leader elector process
+	go l.Run(ctx)
+	return nil
+}
+```
+
+从示例中可以看到
+1. 选主一般是一次性的，成为leader 后即执行核心业务逻辑，或者说业务逻辑由OnStartedLeading 触发。
+2. 如果成为leader 后失去leader，则主协程执行结束。
+
+scheduler 和 controller-manager 部署在容器中，所以主协程执行结束后，一般会自动重启。
