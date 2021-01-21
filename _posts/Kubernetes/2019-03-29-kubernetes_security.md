@@ -164,8 +164,6 @@ Secrets can be mounted as data volumes or be exposed as environment variables to
 
 A service account provides an identity for processes that **run in a Pod**. When you (a human) access the cluster (for example, using kubectl), you are authenticated by the apiserver as a particular User Account (currently this is usually admin, unless your cluster administrator has customized your cluster). Processes in containers inside pods can also contact the apiserver. When they do, they are authenticated as a particular Service Account (for example, default).
 
-为什么弄一个Service Accounts？为processes (that run in a Pod) 提供必要的身份认证
-
 
 ```yml
 apiVersion: v1
@@ -241,5 +239,3 @@ nginx:
 4. Pod 和 ServiceAccount 绑定在一起， Pod内进程可以使用 k8s push到本地的ServiceAccount 数据访问 api resource
 
 开阔下视野[Kata Containers 创始人带你入门安全容器技术](https://mp.weixin.qq.com/s/w2SkC6TuSBqurvAae0RAUA)
-
-![](/public/upload/kubernetes/k8s_security.png)
