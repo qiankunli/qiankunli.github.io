@@ -13,14 +13,30 @@ keywords:  Kubernetes event
 * TOC
 {:toc}
 
+![](/public/upload/kubernetes/admission_controller.png)
+
 Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个设计和各类 Web 框架中的 Filter  很像，就是一个插件化的责任链，责任链中的每个插件针对 apiserver 收到的请求做一些操作或校验。分类
 
-1. ValidatingWebhookConfiguration，校验 api 对象的
-2. MutatingWebhookConfiguration，操作 api 对象的
+2. MutatingWebhookConfiguration，操作 api 对象的， 会对request的resource，进行转换，比如填充默认的request/limit
+1. ValidatingWebhookConfiguration，校验 api 对象的, 比如校验Pod副本数必须大于2。
 
-apiserver 就能保证在校验（Validating）之前先做完所有的修改（Mutating）
+使用场景：[使用 Admission Webhook 机制实现多集群资源配额控制](https://mp.weixin.qq.com/s/i3KtTSfab2JrjeFR4tdy_A)未读
 
-[使用 Admission Webhook 机制实现多集群资源配额控制](https://mp.weixin.qq.com/s/i3KtTSfab2JrjeFR4tdy_A)未读
+## Admission Controller
+
+准入控制器是kubernetes 的API Server上的一个链式Filter，它根据一定的规则决定是否允许当前的请求生效，并且有可能会改写资源声明。比如
+
+1. enforcing all container images to come from a particular registry, and prevent other images from being deployed in pods. 
+2. applying pre-create checks
+3. setting up default values for missing fields.
+
+The problem with admission controllers are:
+
+1. **They’re compiled into Kubernetes**: If what you’re looking for is missing, you need to fork Kubernetes, write the admission plugin and keep maintaining a fork yourself.
+2. You need to enable each admission plugin by passing its name to --admission-control flag of kube-apiserver. In many cases, this means redeploying a cluster.
+3. Some managed cluster providers may not let you customize API server flags, therefore you may not be able to enable all the admission controllers available in the source code.
+
+K8s支持30多种admission control 插件，其中有两个具有强大的灵活性，即ValidatingAdmissionWebhooks和MutatingAdmissionWebhooks，这两种控制变换和准入以Webhook的方式提供给用户使用，大大提高了灵活性，用户可以在集群创建自定义的AdmissionWebhookServer进行调整准入策略。
 
 ## 配置apiserver 发起webhook
 

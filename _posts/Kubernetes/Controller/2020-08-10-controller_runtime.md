@@ -21,6 +21,8 @@ keywords: controller-runtime kubebuilder
 
 ## kubebuilder 
 
+[Kubebuilder中文文档](https://cloudnative.to/kubebuilder/introduction.html) 对理解k8s 上下游知识以及使用kubebuiler 编写控制器很有帮助。
+
 ### 和controller-runtime 的关系
 
 对于 CRD Controller 的构建，有几个主流的工具
@@ -75,11 +77,7 @@ type Reconciler interface {
         main.go                         // ApplicationReconciler 添加到 Manager，Manager.Start(stopCh)
         go.mod                          
     ```
-
-Kubernetes 有类型系统，cr 要符合相关的规范（一部分由开发人员手动编写，另一些由代码生成器生成），包括
-
-1. struct 定义放在 项目 `pkg/apis/$group/$version` 包下
-2. struct 嵌入 TypeMeta struct  ObjectMeta，定义spec 和 status
+执行 `make install` 实质是执行 `kustomize build config/crd | kubectl apply -f -` 将cr yaml 提交到apiserver上。之后就可以 提交Application yaml 到 k8s 了。
 
 ## controller-runtime 整体设计
 
@@ -345,55 +343,21 @@ func (c *Controller) Watch(src source.Source, evthdler handler.EventHandler, prc
     ...
 }
 ```
-### kubectl 感知 crd
-《programming Kubernetes》 假设存在 一个CR
+### 其它
 
-```yaml
-apiVersion: cnat.programming-kubernetes.info/v1alpha1
-kind: At
-metadata:
-  name: example-at
-spec:
-  schedule: ...
-status:
-  phase: "pending"
-```
+[kubebuilder2.0学习笔记——搭建和使用](https://segmentfault.com/a/1190000020338350)
+[kubebuilder2.0学习笔记——进阶使用](https://segmentfault.com/a/1190000020359577) 
+go build  之后，可执行文件即可 监听k8s（由`--kubeconfig` 参数指定 ），执行Reconcile 逻辑了
 
-整个感知过程由 RESTMapper实现，kubectl 在`~/.kubectl` 中缓存了资源类型，由此它不必每次访问重新检索感知信息，缓存每隔10分钟失效。
+如果我们需要对 用户录入的 Application 进行合法性检查，可以开发一个webhook
+`kubebuilder create webhook --group apps --version v1alpha1 --kind Application --programmatic-validation --defaulting`
 
-1. 最初，kubectl 并不知道 ats 是什么？
-2. kubectl 使用`/apis` 感知endpoint 的方式，向api server 查询所有的api groups  
-    ```sh
-    $ http://localhost:8080/apis
-    {
-        "groups":[
-            {
-                "name":"at.cnat.programming-kubernetes.info/v1alpha1",
-                "versions":[{
-                    "groupVersion":"cnat.programming-kubernetes.info/v1alpha1",
-                    "version":"v1alpha1"
-                }]
-            },
-            ...
-        ]
-    }
-    ```
-3. 接着，kubectl 使用`/apis/$groupVersion` 感知endpoint 的方式，向apiserver 查询所有API groups 中的资源
-    ```sh
-    $ http://localhost:8080/apis/cnat.programming-kubernetes.info/v1alpha1
-    {
-        "apiVersion":"v1",
-        "groupVersion":"cnat.programming-kubernetes.info/v1alpha1",
-        "kind": "APIResourceList",
-        "resource":[{
-            "kind": "At",
-            "name": "ats",
-            "namespaced": true,
-            "verbs":["create","delete","get","list","update","watch",...]
-        },...]
+[kubebuilder 注释标记](https://book.kubebuilder.io/reference/markers.html)，比如：令crd支持kubectl scale，对crd实例进行基础的值校验，允许在kubectl get命令中显示crd的更多字段，等等
 
-    }
-    ```
-4. 然后kubectl 将 给定的类型ats 转换为一下3 种类型：Group(cnat.programming-kubernetes.info) Version (v1alpha1)  Resource (ats)
 
+reconciler 默认只监听注册的crd 的变更，有时需要监听 crd 与关联资源的变更（比如pod）
+1. Reconcile 方法可以收到 多个object 的变更
+    1. Builder是kubebuilder开放给用户控制 Controller的唯一合法入口，提供了For,Own,Watch 等方法
+    2. 用更hack的手段去构建，可能对源码造成入侵。
+2. 添加自定义的入队器。允许用户自己设计handler.EventHandler接口，这个接口实现了Create,Update,Delete,Generic方法，用来在资源实例的不同生命阶段，进行判断与入队。 比如Reconcile 还只监听crd 的变更，pod 监听则实现自定义入队器，当pod 变更时，则找到所有与pod 相关的crd 加入队列 进而被Reconcile 收到。
 
