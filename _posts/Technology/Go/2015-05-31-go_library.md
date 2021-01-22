@@ -15,6 +15,37 @@ keywords: Go library
 
 本文主要阐述一下golang中常用的库。
 
+## klog
+
+klog是著名google开源C++日志库glog的golang版本
+1. 支持四种日志等级INFO < WARING < ERROR < FATAL，不支持DEBUG等级。
+2. 每个日志等级对应一个日志文件，低等级的日志文件中除了包含该等级的日志，还会包含高等级的日志。
+3. 日志文件可以根据大小切割，但是不能根据日期切割。
+4. **程序开始时必须调用`flag.Parse()`解析命令行参数**，退出时必须调用`glog.Flush()`确保将缓存区日志输出。
+5. Info()与Infoln()没有区别，因为glog为了保证每行只有一条log记录，会主动check末尾是否有换行符，如果没有的话，会自动加上。
+
+```go
+func main() {
+    klog.InitFlags(nil)
+    //Init the command-line flags.
+    flag.Parse()
+    ...
+    // Flushes all pending log I/O.
+    defer klog.Flush()
+}
+```
+通常而言，日志打印会按错误级别进行打印，如:【Fatal,Error,Warning,Info】等级别。但在实际项目开发过程中，还会涉及到一些内部状态切换、基础库以及框架的使用。这些信息显然不能按照错误级别进行打印。所以对 Info 级别日志进行二次分级是必要的。
+
+![](/public/upload/go/klog_vlog.png)
+
+```go
+if glog.V(2) {
+    glog.Info("log this")
+}
+// Equals
+glog.V(2).Info("log this")
+```
+
 ## go runtime
 
 Go does not need a VM and Go application binaries include a small runtime embedded in them to take care of language features like Garbage collection, scheduling & concurrency.

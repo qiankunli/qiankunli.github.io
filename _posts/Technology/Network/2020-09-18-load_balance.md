@@ -91,5 +91,4 @@ $ ipvsadm -a -t $CLUSTER_IP:$PORT -r $POD2_IP -m
 
 需要实现一段代码，编译并加载到内核中
 
-
-
+[使用 eBPF 在生产环境调试 Go 应用](https://mp.weixin.qq.com/s/8TgXD8coi7sltrVURgzz4A)在功能上，eBPF 允许你在一些事件（如定时器、网络事件或函数调用）发生时运行受限的 C 代码，当触发一个函数调用时，我们把这些函数称为 probe，它们可以用来运行在内核内的函数调用上（kprobes），也可以运行在用户空间程序的函数调用上（uprobes）。eBPF 允许内核运行 BPF 字节码，通常都是 C 语言的限制子集，通常先用 Clang 将 C 代码编译成 BPF 字节码，然后对字节码进行验证以确保其安全执行。
