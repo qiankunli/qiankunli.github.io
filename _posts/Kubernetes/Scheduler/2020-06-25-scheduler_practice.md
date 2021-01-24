@@ -79,6 +79,8 @@ NoSchedule 是一个effect. This means that no pod will be able to schedule onto
 
 ## 集群节点负载不均衡的问题
 
+[被集群节点负载不均所困扰？TKE 重磅推出全链路调度解决方案](https://mp.weixin.qq.com/s/-USAfoI-8SDoR-LpFIrGCQ)
+
 [大型Kubernetes集群的资源编排优化](https://mp.weixin.qq.com/s/lYAWxv_4emKv6uRP9eCvag)Kubernetes原生的调度器多是基于Pod Request的资源来进行调度的，没有根据Node当前和过去一段时间的真实负载情况进行相关调度的决策。这样就会导致一个问题在集群内有些节点的剩余可调度资源比较多但是真实负载却比较高，而另一些节点的剩余可调度资源比较少但是真实负载却比较低, 但是这时候Kube-scheduler会优先将Pod调度到剩余资源比较多的节点上（根据LeastRequestedPriority策略）。
 
 ![](/public/upload/kubernetes/dynamic_scheduler_node_annotator.png)
