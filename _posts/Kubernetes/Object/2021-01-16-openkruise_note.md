@@ -26,6 +26,10 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 在云原生与 Kubernetes 项目极大程度的统一与标准化了基础设施层抽象之后，如何进一步帮助平台团队在此之上快速、轻松、可复制的构建上层平台，正在成为业界开始积极思考的一条关键路径。
 
+[KubeVela：标准化的云原生平台构建引擎](KubeVela：标准化的云原生平台构建引擎)
+
+![](/public/upload/kubernetes/kubevela_application.png)
+
 ## 代码结构
 
 ```

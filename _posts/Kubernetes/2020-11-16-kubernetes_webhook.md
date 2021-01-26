@@ -60,6 +60,7 @@ rules 控制apiserver 何时 因为何种资源 发出请求：上例中 匹配�
 clientConfig 描述如何调用webhook
 
 1. url 方式
+
     ```yaml
     apiVersion: admissionregistration.k8s.io/v1
     kind: MutatingWebhookConfiguration
@@ -70,6 +71,7 @@ clientConfig 描述如何调用webhook
         url: "https://my-webhook.example.com:9443/my-webhook-path"
     ```
 2. service 方式
+
     ```yaml
     apiVersion: admissionregistration.k8s.io/v1
     kind: MutatingWebhookConfiguration

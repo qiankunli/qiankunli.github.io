@@ -24,8 +24,16 @@ keywords: application
 
 Kubernetes API 的设计把研发、运维还有基础设施关心的事情全都糅杂在一起了。这导致研发觉得 K8s 太复杂，运维觉得 K8s 的能力非常凌乱、零散，不好管理。很多 PaaS 平台只允许开发填 Deployment 的极个别字段。为什么允许填的字段这么少？是平台能力不够强吗？其实不是的，本质原因在于业务开发根本不想理解这众多的字段。归根到底，Kubernetes 是一个 Platform for Platform 项目，**它的设计是给基础设施工程师用来构建其他平台用的（比如 PaaS 或者 Serverless），而不是直面研发和运维同学的**。从这个角度来看，Kubernetes 的 API，其实可以类比于 Linux Kernel 的 System Call，这跟研发和运维真正要用的东西（Userspace 工具）完全不是一个层次上的。
 
+[KubeVela：标准化的云原生平台构建引擎](KubeVela：标准化的云原生平台构建引擎)
+
+![](/public/upload/kubernetes/kubevela_application.png)
+
+
 ### K8s 实在是太灵活了，插件太多了，各种人员开发的 Controller 和 Operator 也非常多
 
+一开始是deployment/pod 就像原生android 一样，可用但不好用 ，之后是crd  允许我们按照自己的业务来个性化自己的业务 ，再之后就是oam。 
+1. 王波：CRD偏原子能力，OAM是面向应用编排
+2. 辛鹏：其实就跟写代码里面的类一样， 如果把一个crd比作成一个具体的类， 那其实k8s模式方式是：每个类都需要自己实现全部的逻辑，这就导致每个人都需要了解k8s相关的东西，并且完整的实现所有的东西。而oam里面提到的视角分离： 将原来的一个个类，按照“研发、运维、基础架构”进行拆分， 把通用的功能抽象出来，比如备份、监控等，如果后续要声明别的crd，就可以通过组合的方式，提供给新的crd
 
 ## Open Application Model （OAM）
 

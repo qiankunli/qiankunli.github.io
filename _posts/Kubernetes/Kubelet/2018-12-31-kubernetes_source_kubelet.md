@@ -23,6 +23,8 @@ go 程序中大量使用channel
 
 kubelet 源码虽然庞大，但并不复杂，基本适用于上述规律（**以并发的事件驱动替代串联的消息驱动**），在1.13 版本中，kubelet 大约有13个mannager 保证pod 正常运行。
 
+[Kubernetes 源码分析之 kubelet(一)](https://mp.weixin.qq.com/s/pt2lZw4WJJQSCiK09shL8A)
+
 ## 整体结构
 
 **Kubelet 作为 Kubernetes 集群中的 node agent**，一方面，kubelet 扮演的是集群控制器的角色，它定期从 API Server 获取 Pod 等相关资源的信息，并依照这些信息，控制运行在节点上 Pod 的执行;另外一方面， kubelet 作为节点状况的监视器，它获取节点信息，并以集群客户端的角色，把这些 状况同步到 API Server。
