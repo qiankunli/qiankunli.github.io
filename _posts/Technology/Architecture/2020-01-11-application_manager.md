@@ -17,7 +17,7 @@ keywords: application
 
 ## k8s 的问题
 
-### K8s 的 API 里其实并没有“应用”的概念
+### K8s 的 API 没有“应用”的概念
 
 [上 Kubernetes 有什么业务价值？](https://mp.weixin.qq.com/s/a3NE5fSpZIM9qlOofGTMWQ)Kubernetes 作为一个面向基础设施工程师的系统级项目，主要负责提供松耦合的基础设施语义。 K8s 不是一个 PaaS 或者应用管理的平台。实际上它是一个标准化的能力接入层。实际上通过 Kubernetes 对用户暴露出来的是一组声明式 API，这些声明式 API 无论是 Pod 还是 Service 都是对底层基础设施的一个抽象。比如 Pod 是对一组容器的抽象，而 Deployment 是对一组 pod 的抽象。而 **Service 作为 Pod 的访问入口，实际上是对集群基础设施：网络、网关、iptables 的一个抽象**。Node 是对宿主机的抽象。Kubernetes 还提供了我们叫做 CRD（也就是 Custom Resource）的自定义对象。让你自己能够自定义底层基础设施的一个抽象。Kubernetes 他的专注点是“如何标准化的接入来自于底层，无论是容器、虚机、负载均衡各种各样的一个能力，然后通过声明式 API 的方式去暴露给用户”。
 
