@@ -13,30 +13,21 @@ keywords: docker registry
 * TOC
 {:toc}
 
-
 镜像存储分为本地存储和Registry 存储，都是分层存储
 1. 本地存储，镜像下载到本地后，是如何在本地文件系统中存储的。**以快速加载和启动容器为核心**，容器在启动时需要将 镜像层按照顺序堆叠作为容器的运行环境，都是源文件（非压缩的）
 2. Registry 存储是指以什么方式存储在远端的 镜像仓库中。**以方便镜像快速上传和拉取为核心**，使用了压缩格式，按照layer **独立**压缩和存储，使用镜像清单 manifest 包含所有的层，通过镜像摘要 digest 与tag 关联起来
 
-[最新进展 才云基于 Harbor 的企业级镜像仓库高可用实践](http://www.10tiao.com/html/562/201803/2650094752/1.html)
-
-Docker registry，目前它更名为 Distribution。它做的主要事情就是把这些 images 按照 blob 一层一层地存到文件系统里面，每一个 blob 的 name 都是一长串的数字，这数字是根据文件的内容算出来的；甚至它一些描述信息，也是通过 blob 的方式存起来的。然后它提供了一套比较完备的 API 供你去调用，你可以知道这里面有哪些 image 是你可以 pull 或者 push
-
-Harbor做的事情就是说它在原生的一个 Docker registry 的基础上提供了下面这些 features。所以先学习下registry 的基本原理很重要 [关于docker image的那点事儿](http://qiankunli.github.io/2015/09/22/docker_image.html)
-
-1. 图形界面
-2. Image Replication
-3. Access Control
-4. Operation Auditing，所有的操作都会有一个日志来记录
-5. Image Vulnerability Scanning，如果镜像里面 CentOS 有个漏洞，那么这个镜像在任何一个地方部署，漏洞也是一直存在的。
-
-[User Guide](https://github.com/goharbor/harbor/blob/master/docs/user_guide.md)
-
-## 镜像仓库
+## 容器文件系统
 
 联合文件系统是一种 堆叠文件系统，通过不停地叠加文件实现对文件的修改。其中，增加操作通过在读写层增加新文件实现，删除操作一般通过添加额外的删除属性文件实现，比如删除`a.file`时读写层增加一个`a.file.delete`文件。修改只读层文件时，需要先复制一份儿文件到读写层，然后修改复制的文件。PS：所以我们说镜像是一层层的，每个layer是什么呢？ 一堆文件，比如`a.file` 和 `b.file.delete` 文件。
 
 容器的rootfs 由多个layer 文件叠加而成，每个layer 文件在分发时都必须被打包成一个tar 文件（即`a.file` 和`b.file.delete`或whiteout标记 弄成一个文件），可选择压缩或非压缩的方式。打成一个文件的好处 除了发布方便，还可以生成摘要，便于校验和按内容寻址。
+
+## 镜像
+
+### 镜像格式
+
+[最新进展 才云基于 Harbor 的企业级镜像仓库高可用实践](http://www.10tiao.com/html/562/201803/2650094752/1.html)Docker registry，目前它更名为 Distribution。它做的主要事情就是把这些 images 按照 blob 一层一层地存到文件系统里面，每一个 blob 的 name 都是一长串的数字，这数字是根据文件的内容算出来的；甚至它一些描述信息，也是通过 blob 的方式存起来的。然后它提供了一套比较完备的 API 供你去调用，你可以知道这里面有哪些 image 是你可以 pull 或者 push
 
 容器镜像包含以下的信息，镜像的4个部分之间通过digest 相互引用（**内容寻址**）
 
@@ -98,6 +89,10 @@ Harbor做的事情就是说它在原生的一个 Docker registry 的基础上提
 `docker manifest inspect istio/pilot:1.2.2` 可以看到以下数据
 
 ![](/public/upload/container/container_manifest.png)
+
+### 上传下发
+
+开发者可以使用一些工具(如Dockerfile)构建出自己的容器镜像、**签名**并上传到互联网上（分发内容一定会有签名， 更进一步签名还可以作为内容寻址），然后需要运行这些软件的人可以通过指定名称（如_example.com/my-app_）下载、验证和运行这些容器。
 
 那镜像是如何下发的呢？
 1. 把tag解析为对应的manifest
@@ -165,7 +160,7 @@ registry v2架构的的核心是一个web服务器，具体实现是用go语言�
 
 In the context of the Docker registry, garbage collection is **the process** of removing blobs from the filesystem when they are no longer referenced by a manifest. Blobs can include both layers and manifests.
 
-Filesystem layers are stored by their content address in the Registry. This has many advantages, one of which is that data is stored once and referred to by manifests.
+Filesystem layers are stored by their **content address** in the Registry. This has many advantages, one of which is that data is stored once and referred to by manifests.
 
 Content Addressable Storage (CAS)：Manifests are stored and retrieved in the registry by keying off a digest representing a hash of the contents. One of the advantages provided by CAS is security: if the contents are changed, then the digest no longer matches. 
 
@@ -210,6 +205,15 @@ If a layer is deleted, it is removed from the filesystem when garbage collection
 
 
 ## harbor原理（待充实）
+
+Harbor做的事情就是说它在原生的一个 Docker registry 的基础上提供了下面这些 features
+1. 图形界面
+2. Image Replication
+3. Access Control
+4. Operation Auditing，所有的操作都会有一个日志来记录
+5. Image Vulnerability Scanning，如果镜像里面 CentOS 有个漏洞，那么这个镜像在任何一个地方部署，漏洞也是一直存在的。
+
+[User Guide](https://github.com/goharbor/harbor/blob/master/docs/user_guide.md)
 
 ![](/public/upload/docker/harbor_1.png)
 
