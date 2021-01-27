@@ -91,9 +91,13 @@ keywords: memory management
 
 ## gc
 
-第一开发语言是java 尤其是要注意：**gc 以及 mark-and-sweep 不只是jvm 的，是所有mm language 的**。
-
-[深入浅出垃圾回收（一）简介篇](https://liujiacai.net/blog/2018/06/15/garbage-collection-intro/) 是一个系列，垃圾回收的很多机制是语言无关的。
+[V8 增量 GC 之三色标记](https://malcolmyu.github.io/2019/07/07/Tri-Color-Marking/)垃圾回收顾名思义，主要是两点：垃圾、回收。
+1. 什么是垃圾？如何找到垃圾？何时找垃圾？
+    1. 垃圾已经没用的内存区域
+    2. 找垃圾： STW vs 增量。找垃圾就是一种图的遍历，从 Root 出发，对所有能访问的节点进行标记，访问不到的就是垃圾。
+2. 什么是回收？怎么回收？何时回收？
+    1. 怎么回收？ Sweep 和 Compact
+    2. 回收的时机也都是找完了就操作
 
 ![](/public/upload/jvm/gc.png)
 
