@@ -107,6 +107,7 @@ controller-runtime 代码结构
         /controller.go  // 定义了 Controller interface
     /reconcile
         /reconcile.go   // 定义了 Reconciler interface
+    /handler            // 事件处理器/入队器，负责将informer 的cud event 转换为reconcile.Request加入到queue中
 ```
 controller-runtime 的核心是Manager 驱动 Controller 进而驱动 Reconciler。kubebuiler 用Manager.start 作为驱动入口， Reconciler 作为自定义入口（变的部分），Controller 是不变的部分。
 
@@ -343,6 +344,20 @@ func (c *Controller) Watch(src source.Source, evthdler handler.EventHandler, prc
     ...
 }
 ```
+
+### 入队器
+
+reconciler 默认只监听注册的crd 的变更，
+
+控制器可能会监控多种类型的对象（例如Pod + ReplicaSet + Deployment），但是控制器的Reconciler一般仅仅处理单一类型的对象。以Application为例，Application Controller 需要监听  Application及关联的pod的变更，有两类方法
+
+1. Reconcile 方法可以收到 Application 和 Pod object 的变更。此时实现`Reconciler.Reconcile(Request) (Result, error)` 要注意区分 Request 中的object 类型。
+    1. 构建Application Controller时，Watch Pod
+    2. 用更hack的手段去构建，可能对源码造成入侵。
+2. 添加自定义的入队器。比如 当pod 变更时，则找到与pod 相关的Application  加入队列 。这样pod 和Application 变更均可以触发 Application 的Reconciler.Reconcile 逻辑。
+
+controller-runtime 暴露 handler.EventHandler接口，EventHandlers map an Event for one object to trigger Reconciles for either the same object or different objects。这个接口实现了Create,Update,Delete,Generic方法，用来在资源实例的不同生命阶段，进行判断与入队。 
+
 ### 其它
 
 [kubebuilder2.0学习笔记——搭建和使用](https://segmentfault.com/a/1190000020338350)
@@ -355,9 +370,5 @@ go build  之后，可执行文件即可 监听k8s（由`--kubeconfig` 参数指
 [kubebuilder 注释标记](https://book.kubebuilder.io/reference/markers.html)，比如：令crd支持kubectl scale，对crd实例进行基础的值校验，允许在kubectl get命令中显示crd的更多字段，等等
 
 
-reconciler 默认只监听注册的crd 的变更，有时需要监听 crd 与关联资源的变更（比如pod）
-1. Reconcile 方法可以收到 多个object 的变更
-    1. Builder是kubebuilder开放给用户控制 Controller的唯一合法入口，提供了For,Own,Watch 等方法
-    2. 用更hack的手段去构建，可能对源码造成入侵。
-2. 添加自定义的入队器。允许用户自己设计handler.EventHandler接口，这个接口实现了Create,Update,Delete,Generic方法，用来在资源实例的不同生命阶段，进行判断与入队。 比如Reconcile 还只监听crd 的变更，pod 监听则实现自定义入队器，当pod 变更时，则找到所有与pod 相关的crd 加入队列 进而被Reconcile 收到。
+
 

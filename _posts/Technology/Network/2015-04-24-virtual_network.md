@@ -213,7 +213,55 @@ static int veth_forward_skb(struct net_device *dev, struct sk_buff *skb,
 
 [Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)In linux bridge implementation, VMs or Containers will connect to bridge and bridge will connect to outside world. For external connectivity, we would need to use NAT. container 光靠 bridge 无法直接访问外网。
 
-建议看下 [docker中涉及到的一些linux知识](http://qiankunli.github.io/2016/12/02/linux_docker.html) 对网桥源码的分析。
+A bridge transparently relays traffic between multiple network interfaces. **In plain English this means that a bridge connects two or more physical Ethernets together to form one bigger (logical) Ethernet** 
+
+
+<table>
+	<tr>
+		<td>network layer</td>
+		<td colspan="3">iptables rules</td>
+	</tr>
+	<tr>
+		<td>func</td>
+		<td>netif_receive_skb/dev_queue_xmit</td>
+		<td colspan=2>netif_receive_skb/dev_queue_xmit</td>
+	</tr>
+	<tr>
+		<td rowspan="2">data link layer</td>
+		<td rowspan="2">eth0</td>
+		<td colspan="2">br0</td>
+	</tr>
+	<tr>
+		<td>eth1</td>
+		<td>eth2</td>
+	</tr>
+	<tr>
+		<td>func</td>
+		<td>rx_handler/hard_start_xmit</td>
+		<td>rx_handler/hard_start_xmit</td>
+		<td>rx_handler/hard_start_xmit</td>
+	</tr>
+	<tr>
+		<td>phsical layer</td>
+		<td>device driver</td>
+		<td>device driver</td>
+		<td>device driver</td>
+	</tr>
+</table>
+
+通俗的说，网桥屏蔽了eth1和eth2的存在。正常情况下，每一个linux 网卡都有一个device or net_device struct.这个struct有一个rx_handler。
+
+eth0驱动程序收到数据后，会执行rx_handler。rx_handler会把数据包一包，交给network layer。从源码实现就是，接入网桥的eth1，在其绑定br0时，其rx_handler会换成br0的rx_handler。等于是eth1网卡的驱动程序拿到数据后，直接执行br0的rx_handler往下走了。所以，eth1本身的ip和mac，network layer已经不知道了，只知道br0。
+
+br0的rx_handler会决定将收到的报文转发、丢弃或提交到协议栈上层。如果是转发，br0的报文转发在数据链路层，但也会执行一些本来属于network layer的钩子函数。也有一种说法是，网桥处于forwarding状态时，报文必须经过layer3转发。这些细节的确定要通过学习源码来达到，此处先不纠结。
+
+读了上文，应该能明白以下几点。
+
+1. 为什么要给网桥配置ip，或者说创建br0 bridge的同时，还会创建一个br0 iface。
+2. 为什么eth0和eth1在l2,连上br0后，eth1和eth0的连通还要受到iptables rule的控制。
+3. 网桥首先是为了屏蔽eth0和eth1的，其次是才是连通了eth0和eth1。
+
+2018.12.3 补充：一旦一张虚拟网卡被“插”在网桥上，它就会变成该网桥的“从设备”。从设备会被“剥夺”调用网络协议栈处理数据包的资格，从而“降级”成为网桥上的一个端口。而这个端口唯一的作用，就是接收流入的数据包，然后把这些数据包的“生杀大权”（比如转发或者丢弃），全部交给对应的网桥。
 
 ## 虚拟设备 ==> 虚拟网络
 

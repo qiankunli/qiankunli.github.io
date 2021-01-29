@@ -1,9 +1,9 @@
 ---
 
 layout: post
-title: docker中涉及到的一些linux知识
+title: docker namespace和cgroup
 category: 技术
-tags: Linux
+tags: Container
 keywords: network 
 
 ---
@@ -52,20 +52,22 @@ namespace 简单说，就是进程的task_struct 以前都直接 引用资源id�
 
 [Linux内核的namespace机制分析](https://blog.csdn.net/xinxing__8185/article/details/51868685)
 
-	struct task_struct {	
-		……..		
-		/* namespaces */		
-		struct nsproxy *nsproxy;	
-		…….
-	}
-	struct nsproxy {
-         atomic_t count;	// nsproxy可以共享使用，count字段是该结构的引用计数
-         struct uts_namespace *uts_ns;
-         struct ipc_namespace *ipc_ns;
-         struct mnt_namespace *mnt_ns;
-         struct pid_namespace *pid_ns_for_children;
-         struct net             *net_ns;
-	};
+```c
+struct task_struct {	
+    ……..		
+    /* namespaces */		
+    struct nsproxy *nsproxy;	
+    …….
+}
+struct nsproxy {
+        atomic_t count;	// nsproxy可以共享使用，count字段是该结构的引用计数
+        struct uts_namespace *uts_ns;
+        struct ipc_namespace *ipc_ns;
+        struct mnt_namespace *mnt_ns;
+        struct pid_namespace *pid_ns_for_children;
+        struct net             *net_ns;
+};
+```
 
 
 [What is the relation between `task_struct` and `pid_namespace`?](https://stackoverflow.com/questions/26779416/what-is-the-relation-between-task-struct-and-pid-namespace)
@@ -87,19 +89,21 @@ namespace 简单说，就是进程的task_struct 以前都直接 引用资源id�
 
 mount 也是有树的，每个namespace 理解的根 不一样, 挂载点目录彼此看不到. task_struct  ==> nsproxy 包括 mnt_namespace。
 
-    struct mnt_namespace {
-        atomic_t		count;
-        struct vfsmount *	root;///当前namespace下的根文件系统
-        struct list_head	list; ///当前namespace下的文件系统链表（vfsmount list）
-        wait_queue_head_t poll;
-        int event;
-    };
-    struct vfsmount {
-        ...
-        struct dentry *mnt_mountpoint;	/* dentry of mountpoint,挂载点目录 */
-        struct dentry *mnt_root;	/* root of the mounted tree,文件系统根目录 */
-        ...
-    }
+```c
+struct mnt_namespace {
+    atomic_t		count;
+    struct vfsmount *	root;///当前namespace下的根文件系统
+    struct list_head	list; ///当前namespace下的文件系统链表（vfsmount list）
+    wait_queue_head_t poll;
+    int event;
+};
+struct vfsmount {
+    ...
+    struct dentry *mnt_mountpoint;	/* dentry of mountpoint,挂载点目录 */
+    struct dentry *mnt_root;	/* root of the mounted tree,文件系统根目录 */
+    ...
+}
+```
 		
 只是单纯一个隔离的 mnt namespace 环境是不够的，还要"change root"，参见《自己动手写docker》P45
 
@@ -128,40 +132,41 @@ Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的�
 从操作上看：
 
 1. 可以创建一个目录（比如叫cgroup-test）， `mount -t cgroup -o none  cgroup-test ./cgroup-test` cgroup-test 便是一个hierarchy了，一个hierarchy 默认自动创建很多文件
-
-		- cgroup.clone_children
-		- cgroup.procs
-		- notify_on_release
-		- tasks
+    ```
+    - cgroup.clone_children
+    - cgroup.procs
+    - notify_on_release
+    - tasks
+    ```
 
 你为其创建一个子文件`cgroup-test/	cgroup-1`，则目录变成
-
-		- cgroup.clone_children
-		- cgroup.procs
-		- notify_on_release
-		- tasks
-		- cgroup-1
-			- cgroup.clone_children
-			- cgroup.procs
-			- notify_on_release
-			- tasks
+    ```
+    - cgroup.clone_children
+    - cgroup.procs
+    - notify_on_release
+    - tasks
+    - cgroup-1
+        - cgroup.clone_children
+        - cgroup.procs
+        - notify_on_release
+        - tasks
+    ```
 
 往task 中写进程号，则标记该进程 属于某个cgroup。
 
 注意，mount时，`-o none` 为none。 若是  `mount -t cgroup -o cpu cgroup-test ./cgroup-test` 则表示为cgroup-test  hierarchy 挂载 cpu 子系统
-
-	- cgroup.event_control
-	- notify_on_release
-	- cgroup.procs
-	- tasks
-	
-	- cpu.cfs_period_us
-	- cpu.rt_period_us
-	- cpu.shares
-	- cpu.cfs_quota_us
-	- cpu.rt_runtime_us
-	- cpu.stat
-	
+```
+- cgroup.event_control
+- notify_on_release
+- cgroup.procs
+- tasks
+- cpu.cfs_period_us
+- cpu.rt_period_us
+- cpu.shares
+- cpu.cfs_quota_us
+- cpu.rt_runtime_us
+- cpu.stat
+```	
 cpu 开头的都跟cpu 子系统有关。可以一次挂载多个子系统，比如`-o cpu,mem`
 
 ### 从右向左 ==> 和docker run放在一起看 
@@ -186,27 +191,28 @@ cpu 开头的都跟cpu 子系统有关。可以一次挂载多个子系统，比
 
 我们知道， 任何内存申请都是从缺页中断开始的，`handle_pte_fault ==> do_anonymous_page ==> mem_cgroup_newpage_charge（不同linux版本方法名不同） ==> mem_cgroup_charge_common ==> __mem_cgroup_try_charge`
 
-
-    static int __mem_cgroup_try_charge(struct mm_struct *mm,
-                    gfp_t gfp_mask,
-                    unsigned int nr_pages,
-                    struct mem_cgroup **ptr,
-                    bool oom){
-
-        ...
-        struct mem_cgroup *memcg = NULL;
-        ...
-        memcg = mem_cgroup_from_task(p);
-        ...
-    }
+```c
+static int __mem_cgroup_try_charge(struct mm_struct *mm,
+    gfp_t gfp_mask,
+    unsigned int nr_pages,
+    struct mem_cgroup **ptr,
+    bool oom){
+    ...
+    struct mem_cgroup *memcg = NULL;
+    ...
+    memcg = mem_cgroup_from_task(p);
+    ...
+}
+```
 
 `mem_cgroup_from_task ==> mem_cgroup_from_css` 
 
-    struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p){
-        ...
-        return mem_cgroup_from_css(task_subsys_state(p, mem_cgroup_subsys_id));
-    }
-
+```c
+struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p){
+    ...
+    return mem_cgroup_from_css(task_subsys_state(p, mem_cgroup_subsys_id));
+}
+```
 ### 整体
 
 ![](/public/upload/linux/linux_cgroup_object.png)
@@ -234,66 +240,4 @@ cpu 开头的都跟cpu 子系统有关。可以一次挂载多个子系统，比
 
 sibling,children 和 parent 三个嵌入的 list_head 负责将统一层级的 cgroup 连接成一棵 cgroup 树。
 
-### 为什么是vfs操作而不是命令行？为什么符合vfs 的关系
 
-![](/public/upload/linux/linux_cgroup.jpg)
-
-1. 对task 进行资源限制，最直觉得做法就是 task 和 subsystem 直接关联
-2. 因为task 与subsystem 是一对多关系，且想复用 subsystem，因此提取了 cgroup 作为中间层。这样想对10个进程限定 1cpu和2g内存 就不用 创建那么多`<task,subsystem>`了
-3. 如果每种 subsystem 的组合就是一个 cgroup ，则每次 新需求都要创建新的cgroup，可以将共性抽取出来，使得cgroup 具有父子/继承关系
-
-为了让 cgroups 便于用户理解和使用，也为了用精简的内核代码为 cgroup 提供熟悉的权限和命名空间管理，内核开发者们按照 Linux 虚拟文件系统转换器（VFS：Virtual Filesystem Switch）的接口实现了一套名为cgroup的文件系统，非常巧妙地用来表示 cgroups 的 hierarchy 概念，把各个 subsystem 的实现都封装到文件系统的各项操作中。除了 cgroup 文件系统以外，内核没有为 cgroups 的访问和操作添加任何系统调用。
-
-## linux网桥
-
-本文所说的网桥，主要指的是linux 虚拟网桥。
-
-A bridge transparently relays traffic between multiple network interfaces. **In plain English this means that a bridge connects two or more physical Ethernets together to form one bigger (logical) Ethernet** 
-
-
-<table>
-	<tr>
-		<td>network layer</td>
-		<td colspan="3">iptables rules</td>
-	</tr>
-	<tr>
-		<td>func</td>
-		<td>netif_receive_skb/dev_queue_xmit</td>
-		<td colspan=2>netif_receive_skb/dev_queue_xmit</td>
-	</tr>
-	<tr>
-		<td rowspan="2">data link layer</td>
-		<td rowspan="2">eth0</td>
-		<td colspan="2">br0</td>
-	</tr>
-	<tr>
-		<td>eth1</td>
-		<td>eth2</td>
-	</tr>
-	<tr>
-		<td>func</td>
-		<td>rx_handler/hard_start_xmit</td>
-		<td>rx_handler/hard_start_xmit</td>
-		<td>rx_handler/hard_start_xmit</td>
-	</tr>
-	<tr>
-		<td>phsical layer</td>
-		<td>device driver</td>
-		<td>device driver</td>
-		<td>device driver</td>
-	</tr>
-</table>
-
-通俗的说，网桥屏蔽了eth1和eth2的存在。正常情况下，每一个linux 网卡都有一个device or net_device struct.这个struct有一个rx_handler。
-
-eth0驱动程序收到数据后，会执行rx_handler。rx_handler会把数据包一包，交给network layer。从源码实现就是，接入网桥的eth1，在其绑定br0时，其rx_handler会换成br0的rx_handler。等于是eth1网卡的驱动程序拿到数据后，直接执行br0的rx_handler往下走了。所以，eth1本身的ip和mac，network layer已经不知道了，只知道br0。
-
-br0的rx_handler会决定将收到的报文转发、丢弃或提交到协议栈上层。如果是转发，br0的报文转发在数据链路层，但也会执行一些本来属于network layer的钩子函数。也有一种说法是，网桥处于forwarding状态时，报文必须经过layer3转发。这些细节的确定要通过学习源码来达到，此处先不纠结。
-
-读了上文，应该能明白以下几点。
-
-1. 为什么要给网桥配置ip，或者说创建br0 bridge的同时，还会创建一个br0 iface。
-2. 为什么eth0和eth1在l2,连上br0后，eth1和eth0的连通还要受到iptables rule的控制。
-3. 网桥首先是为了屏蔽eth0和eth1的，其次是才是连通了eth0和eth1。
-
-2018.12.3 补充：一旦一张虚拟网卡被“插”在网桥上，它就会变成该网桥的“从设备”。从设备会被“剥夺”调用网络协议栈处理数据包的资格，从而“降级”成为网桥上的一个端口。而这个端口唯一的作用，就是接收流入的数据包，然后把这些数据包的“生杀大权”（比如转发或者丢弃），全部交给对应的网桥。

@@ -14,24 +14,6 @@ keywords: openkruise
 
 [openkruise](http://openkruise.io/) 面向自动化场景的 Kubernetes workload扩展controller，它是一组controller，可在应用程序工作负载管理上扩展和补充Kubernetes核心控制器。
 
-[Kruise 控制器分类指引](http://openkruise.io/zh-cn/blog/blog1.html)Controller 命名惯例
-1. Set 后缀：这类 controller 会直接操作和管理 Pod，比如 CloneSet, ReplicaSet, SidecarSet 等。它们提供了 Pod 维度的多种部署、发布策略。
-2. Deployment 后缀：这类 controller 不会直接地操作 Pod，它们通过操作一个或多个 Set 类型的 workload 来间接管理 Pod，比如 Deployment 管理 ReplicaSet 来提供一些额外的滚动策略，以及 UnitedDeployment 支持管理多个 StatefulSet/AdvancedStatefulSet 来将应用部署到不同的可用区。
-3. Job 后缀：这类 controller 主要管理短期执行的任务，比如 BroadcastJob 支持将任务类型的 Pod 分发到集群中所有 Node 上。
-
-## 源码包
-
-```
-github.com/openkruise/kruise
-    /apis       // kubebuilder自动生成
-    /charts     // helm 安装相关
-    /config     // kubebuilder自动生成， 部署crd 、controller 等的yaml 文件、 controller 运行所需的 rbac 权限等
-    /docs
-    /pkg
-        /controller
-    /main.go
-```
-
 ## CloneSet
 
 [CloneSet](http://openkruise.io/zh-cn/docs/cloneset.html) 控制器提供了高效管理无状态应用的能力，一个简单的 CloneSet yaml 文件如下：

@@ -34,6 +34,32 @@ keywords: Docker image
 
 ![](/public/upload/container/container_image_overview.png)
 
+## 本地存储
+
+[Where are Docker images stored?](http://blog.thoward37.me/articles/where-are-docker-images-stored/)
+
+`docker inspect xx` GraphDriver 的部分输出
+```
+"GraphDriver": {
+    "Data": {
+        "LowerDir": "/var/lib/docker/overlay2/cad72d6e952bbffb754bf3a13af0c401ae1ab743ef4ed0b9994e57ef127c3d29-init/diff:/var/lib/docker/overlay2/6a190d31ec303cc0a4163c2698a38ce449d660265bbab709503a2ac4dde4aa7f/diff:/var/lib/docker/overlay2/05c46a2829a0b37e856434489ef2684c507276697cc325f98225d1d15c84a9bb/diff:/var/lib/docker/overlay2/77aa0717d4e28977139c25a52afb04de25b8bb478670b24f3c8b409b1f1b9495/diff",
+        "MergedDir": "/var/lib/docker/overlay2/cad72d6e952bbffb754bf3a13af0c401ae1ab743ef4ed0b9994e57ef127c3d29/merged",
+        "UpperDir": "/var/lib/docker/overlay2/cad72d6e952bbffb754bf3a13af0c401ae1ab743ef4ed0b9994e57ef127c3d29/diff",
+        "WorkDir": "/var/lib/docker/overlay2/cad72d6e952bbffb754bf3a13af0c401ae1ab743ef4ed0b9994e57ef127c3d29/work"
+    },
+    "Name": "overlay2"
+},
+```
+
+1. lower， 这一层里的文件是不会被修改的，你可以认为它是只读的。
+2. uppder， 在 OverlayFS 中，如果有文件的创建，修改，删除操作，那么都会在这一层反映出来，它是可读写的。
+3. merged，挂载点（mount point）目录，也是用户看到的目录，用户的实际文件操作在这里进行。
+4. work，只是一个存放临时文件的目录，OverlayFS 中如果有文件修改，就会在中间过程中临时存放文件到这里。
+
+![](/public/upload/container/container_aufs.jpg)
+
+镜像要复用，所以只能只读。但程序的运行会写文件，所以要可写。OverlayFS/UnionFS 解决这个折中的问题。
+
 ## 制作镜像
 
 ```sh
@@ -111,25 +137,7 @@ RUN \
 1. 使用private registry
 2. 使用registry mirror,以使用daocloud的registry mirror为例，假设你的daocloud的用户名问`lisi`，则`DOCKER_OPTS=--registry-mirror=http://lisi.m.daocloud.io`
 
-## 本地存储
-[Where are Docker images stored?](http://blog.thoward37.me/articles/where-are-docker-images-stored/)
 
-### local storage/docker镜像与容器存储目录
-
-以virtualbox ubuntu 14.04为例
-
-![Alt text](/public/upload/docker/local_storage.png)
-
-repositories-aufs这个文件输出的内容，跟”docker images”输出的是“一样的”。
-
-graph中，有很多文件夹，名字是image/container的id。文件夹包括两个子文件：
-
-- json                该镜像层的描述，有的还有“parent”表明上一层镜像的id
-- layersize           该镜像层内部文件的总大小
-
-aufs和vfs，一个是文件系统，一个是文件系统接口，从上图每个文件（夹）的大小可以看到，这两个文件夹是实际存储数据的地方。
-
-**不论image 的registry storage 还是 local storage 都在表述一个事儿：layer存储以及 layer 如何组装成一个image**
 
 
 

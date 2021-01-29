@@ -32,6 +32,11 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 ## 代码结构
 
+[Kruise 控制器分类指引](http://openkruise.io/zh-cn/blog/blog1.html)Controller 命名惯例
+1. Set 后缀：这类 controller 会直接操作和管理 Pod，比如 CloneSet, ReplicaSet, SidecarSet 等。它们提供了 Pod 维度的多种部署、发布策略。
+2. Deployment 后缀：这类 controller 不会直接地操作 Pod，它们通过操作一个或多个 Set 类型的 workload 来间接管理 Pod，比如 Deployment 管理 ReplicaSet 来提供一些额外的滚动策略，以及 UnitedDeployment 支持管理多个 StatefulSet/AdvancedStatefulSet 来将应用部署到不同的可用区。
+3. Job 后缀：这类 controller 主要管理短期执行的任务，比如 BroadcastJob 支持将任务类型的 Pod 分发到集群中所有 Node 上。
+
 ```
 github.com/openkruise/kruise
     /pkg
@@ -45,4 +50,10 @@ github.com/openkruise/kruise
 ```
 
 kubebuilder 脚手架生成的项目代码 一般假设只有一个crd 和Controller/Reconciler，因此main.go 的核心逻辑是: Reconciler 注册到Manager； Manager.Start。 对于kruise 来讲因为有多个 Controller，所以每一个controllr pkg 都实现了一个Add 方法负责 将自己注册到 Manager
+
+![](/public/upload/kubernetes/controller_runtime_logic.png)
+
+
+
+
 
