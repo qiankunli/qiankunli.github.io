@@ -40,8 +40,24 @@ cpu 也可以是一个主机的两个进程、两台机器，想对同一个数�
 
 提供的原子操作：
 
-* 关中断指令、内存屏障指令、停止相关流水线指令
-* 对于单核cpu，禁止抢占。
+* 关中断指令、停止相关流水线指令。
+* 内存屏障指令。分别是 LoadLoad 屏障、StoreStore 屏障、LoadStore 屏障和 StoreLoad 屏障。以 LoadLoad 屏障为例，LoadLoad 屏障会确保 Load1 的数据在 Load2 和后续 Load 指令之前，被真实地加载。
+    ```java  
+    class Foo{
+        volatile int a;
+        int b, c;
+        void foo(){
+            int i, j;
+            i = a; // Load1指令,针对volatile变量
+            j = b; // Load2指令，针对普通变量   
+        }
+        }
+    // 编译器在这两条指令之间插入一个 LoadLoad 屏障
+    Load1指令
+    LoadLoad屏障
+    Load2指令
+    ```
+* cmpxchg指令：cmpxchg 在硬件级把原来的两个指令（比较指令和交换指令，Compare and Swap）合并成了一个指令，才能同时完成两个操作：首先看看当前值有没有被改动，然后设置正确的值。cmpxchg 指令在一个内核中执行的时候，可以保证原子性。
 * 对于SMP，提供lock 指令。lock指令是一种前缀，它可与其他指令联合，用来维持总线的锁存信号直到与其联合的指令执行完为止。比如基于AT&T的汇编指令`LOCK_PREFIX xaddw %w0,%1`，xaddw 表示先交换源操作数和目的操作数，然后两个操作数求和，存入目的寄存器。为了防止这个过程被打断，加了LOCK_PREFIX的宏（修饰lock指令）。
 
 这些指令，辅助一定的算法，就可以包装一个自旋锁、读写锁、顺序锁出来。os中，lock一词主要指自旋锁。注意，自旋锁时，线程从来没有停止运行过。
@@ -127,7 +143,7 @@ POSIX表示可移植操作系统接口（Portable Operating System Interface of 
 1. 插入一个内存屏障，相当于告诉CPU和编译器先于这个命令的必须先执行，后于这个命令的必须后执行
 2. 强制更新一次不同CPU的缓存。例如，一个写屏障会把这个屏障前写入的数据刷新到缓存，这样任何试图读取该数据的线程将得到最新值
 
-volatile，Java内存模型将在写操作后插入一个写屏障指令，在读操作前插入一个读屏障指令。
+volatile，有 volatile 修饰的变量，赋值后多执行了一个`lock addl $0x0,(%esp)`操作，这个操作相当于一个内存屏障，指令“addl $0x0,(%esp)”显然是一个空操作，关键在于 lock 前缀，查询 IA32 手册，它的作用是使得本 CPU 的 Cache 写入了内存，该写入动作也会引起别的 CPU invalidate 其 Cache。所以通过这样一个空操作，可让前面 volatile 变量的修改对其他 CPU 立即可见。
 
 说白了，这是除cas 之外，又一个暴露在 java 层面的指令。
 

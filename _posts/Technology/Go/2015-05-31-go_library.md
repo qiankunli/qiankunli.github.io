@@ -46,19 +46,6 @@ if glog.V(2) {
 glog.V(2).Info("log this")
 ```
 
-## go runtime
-
-Go does not need a VM and Go application binaries include a small runtime embedded in them to take care of language features like Garbage collection, scheduling & concurrency.
-
-提到 runtime, 大家可能会想起 java, python 的 runtime. 不过 go 和这两者不太一样, java, python 的 runtime 是虚拟机, 而 go 的 runtime 和用户代码一起编译到一个可执行文件中.用户代码和 runtime 代码除了代码组织上有界限外, 运行的时候并没有明显的界限. 一些常用的关键字被编译成 runtime 包下的一些函数调用.
-
-
-Golang runtime 是go语言运行所需要的基础设施
-1. 协程调度、内存分配、GC
-2. 操作系统及cpu 相关的操作的封装（信号处理、系统调用、寄存器操作、原子操作等）CGO。go 对系统调用进行了封装，可不依赖glibc
-3. pprof,trace,race 检测的支持
-4. map,channel,string 等内置类型及反射的实现
-
 ## unsafe
 
 [深度解密Go语言之unsafe](https://mp.weixin.qq.com/s/OO-kwB4Fp_FnCaNXwGJoEw)相比于 C 语言中指针的灵活，Go 的指针多了一些限制。

@@ -70,6 +70,8 @@ When objects and variables can be stored in various different memory areas in th
 
 可以脑补一下 基于jvm 内存模型，多线程执行 访问 对象的局部变量 的图，直接的观感是jvm 是从内存（heap）中直接拿数据的，会有原子性问题，但没有可见性问题。但实际上，你根本搞不清楚，从heap 中拿到的对象变量的值 是从寄存器、cpu cache、main memory 哪里拿到的，写入问题类似。jvm 提供volatile 等微操工具，介入两种内存模型的映射过程，来确保预期与实际一致，从这个角度看，jvm 并没有完全屏蔽硬件架构的特性（当然，也是为了提高性能考虑），不过确实做到了屏蔽硬件架构的差异性。
 
+汇编代码中访问 Java 堆、栈和方法区中的数据，都是直接访问某个内存地址或者寄存器，之间并没有看见有什么隔阂。HotSpot 虚拟机本身是一个运行在物理机器上的程序，Java 堆、栈、方法区都在 Java 虚拟机进程的内存中分配（这意思是有一个变量指向堆、栈、方法区？）。在 JIT 编译之后，Native Code 面向的是 HotSpot 这个进程的内存，说变量 a 还在 Java Heap 中，应当理解为 a 的位置还在原来的那个内存位置上，但是 Native Code 是不理会 Java Heap 之类的概念的，因为那并不是同一个层次的概念。
+
 
 ## java 内存模型与并发读写控制
 

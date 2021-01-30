@@ -267,6 +267,8 @@ In object-oriented programming the Visitor pattern is commonly used when it is r
 	   	
 	Bill 可能是信用卡账单，也可能是支付宝账单；viewer可能是保存，也可能是打印。假设Bill 有3种，viewer 有2种，则Bill 和 viewer 只实现一个接口，便可以达到 2*3=6 的组合效果。
 
+
+
 ## 小结
 
 数据结构 描述了数据与数据之间的关系；面向对象描述了对象与对象之间的关系；函数式编程则基于函数与函数之间的关系

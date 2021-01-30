@@ -13,6 +13,8 @@ keywords: springboot
 * TOC
 {:toc}
 
+[使用Spring特性优雅书写业务代码](https://mp.weixin.qq.com/s/94oe5c_7ouE1GbyiPfNg5g)
+
 ## 编程模型
 
 面向对象编程
