@@ -131,8 +131,8 @@ CloneSet status 中的字段说明：
 背景知识
 1. CloneSet Owned 三个资源：ControllerRevision、Pod、PVC。
 2. 控制器会为每次更新过的 spec.template 计算一个 revision hash 值并上报到 CloneSet status 中
-3. 比如上文中提到的 nginx，在创建之初拥有的第一个 template 版本，会创建一个对应的 ControllerRevision。而当修改了 image 版本之后，CloneSet Controller 会创建一个新的 ControllerRevision，可以理解为每一个 ControllerRevision 对应了每一个版本的 Template，也对应了每一个版本的 ControllerRevision hash。**通过ControllerRevision，CloneSet  可以很方便地管理不同版本的 template 模板**。或者还原 先后的多个CloneSet
-4. Pod label 中定义的 ControllerRevision hash，就是 ControllerRevision 的名字
+3. 比如上文中提到的 nginx，在创建之初拥有的第一个 template 版本，会创建一个对应的 ControllerRevision。而当修改了 image 版本之后，CloneSet Controller 会创建一个新的 ControllerRevision，可以理解为每一个 ControllerRevision 对应了每一个版本的 Template，也对应了每一个版本的 ControllerRevision hash。通过ControllerRevision，CloneSet  可以很方便地管理不同版本的 template 模板，**还原 CloneSet**。
+4. Pod label 中定义的 ControllerRevision hash（label name = "controller-revision-hash"），就是 ControllerRevision 的名字
 
 ```go
 // kruise/pkg/controller/cloneset/cloneset_controller.go
@@ -182,6 +182,15 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 }
 ```
 ### 扩缩容
+
+syncCloneSet  根据 cloneSet 期望状态（ 由replicas 以及updateStrategy描述 ）以及pod的真实状态， 执行scale **或** update 逻辑
+1. scale逻辑 对应 scale.Interface：
+    1. 需要做扩容或缩容的时候（**也就是pod 实际数量不等于 replicas时**），scale  通过 删除或创建特定Revision的pod 使得 新旧Revision pod 的数量符合replicas/partition/MaxSurge/maxUnavailable 要求
+    2. 如果 pod 实际数量等于 replicas，scale 并不会进行处理，本次syncCloneSet 主要执行 update 逻辑。
+2. update逻辑对应 update.Interface：找到不符合 updateRevision 的pod，根据 partition/MaxSurge/maxUnavailable 以及pod 的ready 情况，计算需要更新的pod 的数量needToUpdateCount，从排序好的 pod 中选取 needToUpdateCount 个pod 执行更新逻辑。
+    1. 如果配置了原地升级策略， 原地升级pod 
+    2. 如果是默认ReCreate 策略，按序删除pod
+
 ```go
 // kruise/pkg/controller/cloneset/cloneset_controller.go
 func (r *ReconcileCloneSet) syncCloneSet(
@@ -189,7 +198,7 @@ func (r *ReconcileCloneSet) syncCloneSet(
 	currentRevision, updateRevision *apps.ControllerRevision, revisions []*apps.ControllerRevision,
 	filteredPods []*v1.Pod, filteredPVCs []*v1.PersistentVolumeClaim,
 ) (time.Duration, error) {
-	// get the current and update revisions of the set. 获取当下 CloneSet(currentSet) 和 目标CloneSet(updateSet) 的对象表示
+	// 根据 ControllerRevision 还原CloneSet
 	currentSet, err := r.revisionControl.ApplyRevision(instance, currentRevision)
     updateSet, err := r.revisionControl.ApplyRevision(instance, updateRevision)
 	scaling, podsScaleErr = r.scaleControl.Manage(currentSet, updateSet, currentRevision.Name, updateRevision.Name, filteredPods, filteredPVCs)
@@ -200,17 +209,8 @@ func (r *ReconcileCloneSet) syncCloneSet(
 	return delayDuration, err
 }
 ```
-syncCloneSet  根据 cloneSet 期望状态（ 由replicas 以及updateStrategy描述 ）以及pod的真实状态， 执行scale **或** update 逻辑（两个逻辑的主体部分不同时执行）
-1. scale逻辑：
-    1. 需要做扩容或缩容的时候（**也就是pod 实际数量不等于 replicas时**），scale  通过 删除或创建特定Revision的pod 使得 新旧Revision pod 的数量符合replicas/partition/MaxSurge/maxUnavailable 要求
-    2. 如果 pod 实际数量等于 replicas，scale 并不会进行处理，本次syncCloneSet 主要执行 update 逻辑。
-2. update逻辑：找到不符合 updateRevision 的pod，根据 partition/MaxSurge/maxUnavailable 以及pod 的ready 情况，计算需要更新的pod 的数量needToUpdateCount，从排序好的 pod 中选取 needToUpdateCount 个pod 执行更新逻辑。
-    1. 如果配置了原地升级策略， 原地升级pod 
-    2. 如果是默认ReCreate 策略，按序删除pod
 
-在运行过程中，经常updatePod 或者 update crd 自身的数据，将一些状态数据持久化 以供下次 Reconcile 使用。graceful period  等策略的存在也决定了 Reconcile 工作不会一次就完成。
-
-![](/public/upload/kubernetes/cloneset_reconcile.png)
+扩容逻辑：如果发布的时候设置了 maxSurge，控制器会先多扩出来 maxSurge 数量的 Pod（此时 Pod 总数为 (replicas+maxSurge))，然后再开始发布存量的 Pod。 然后，当新版本 Pod 数量已经满足 replicas - partition 要求之后，控制器会再把多余的 maxSurge 数量的 Pod 删除掉，保证最终的 Pod 数量符合 replicas。此外，maxSurge 还受 升级方式（type）的影响：maxSurge 不允许配合 InPlaceOnly 更新模式使用（可以认为此时maxSurge=0？）。 另外，如果是与 InPlaceIfPossible 策略配合使用，控制器会先扩出来 maxSurge 数量的 Pod，再对存量 Pod 做原地升级。
 
 ```go
 // kruise/pkg/controller/cloneset/scale/cloneset_scale.go
@@ -249,7 +249,9 @@ func (r *realControl) Manage(
 	return false, nil
 }
 ```
-如果发布的时候设置了 maxSurge，控制器会先多扩出来 maxSurge 数量的 Pod（此时 Pod 总数为 (replicas+maxSurge))，然后再开始发布存量的 Pod。 然后，当新版本 Pod 数量已经满足 replicas - partition 要求之后，控制器会再把多余的 maxSurge 数量的 Pod 删除掉，保证最终的 Pod 数量符合 replicas。此外，maxSurge 还受 升级方式（type）的影响：maxSurge 不允许配合 InPlaceOnly 更新模式使用（可以认为此时maxSurge=0？）。 另外，如果是与 InPlaceIfPossible 策略配合使用，控制器会先扩出来 maxSurge 数量的 Pod，再对存量 Pod 做原地升级。
+
+更新逻辑
+
 ```go
 // 处理 升级间隔，计算真正需要 更新的pod
 // kruise/pkg/controller/cloneset/update/cloneset_update.go
@@ -298,7 +300,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
         ...
         return ...
     }
-    // 如果不是原地升级，则本次Reconcile 删除pod，待下次Reconcile 重建相关pod ？
+    // 如果不是原地升级，则本次Reconcile 删除pod，待下次Reconcile 扩容时创建pod
     if err := c.Delete(context.TODO(), pod); err != nil {
 		return 0, err
 	}
@@ -307,12 +309,11 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 }
 ```
 
-虽然  `spec.updateStrategy.partition` 指定了旧版的数量。但 update 逻辑的主要目的是  更新 （replicas - partition） 个 updateRevision 实例。如果连续多次灰度发布，则旧版 可能存在多个 revision（也就是说不是最新的revision 都是旧版，旧版不是某一个revision），整个cloneset 可能存在2个以上 revision的 pod。 这与直觉上的 多版本pod管理 还是不一样的
-
-
+虽然  `spec.updateStrategy.partition` 指定了旧版的数量。但 update 逻辑的主要目的是  更新 （replicas - partition） 个 updateRevision 实例。如果连续多次灰度发布，则旧版 可能存在多个 revision（也就是说不是最新的revision 都是旧版，旧版不都是某一个revision），整个cloneset 可能存在2个以上 revision的 pod。 这与直觉上的 多版本pod管理 还是不一样的
 
 ## 原地升级
 
+[如何为 Kubernetes 实现原地升级？](https://mp.weixin.qq.com/s/CNLf8MHYGs_xeD4PxChR4A)
 [如何在Kubernetes中实现容器原地升级](https://cloud.tencent.com/developer/article/1413743)一个Pod中可能包含了主业务容器，还有不可剥离的依赖业务容器，以及SideCar组件容器等，如果因为要更新其中一个SideCar Container而继续按照ReCreate Pod的方式进行整个Pod的重建，那负担还是很大的。更新一个轻量的SideCar却导致了分钟级的单个Pod的重建过程，因此，我们迫切希望能实现，只升级Pod中的某个Container，而不用重建整个Pod。
 
 Kubernetes把容器原地升级的能力只做在Kubelet这一层，并没有暴露在Deployment、StatefulSet等Controller中直接提供给用户，原因很简单，还是建议大家把Pod作为完整的部署单元。为了实现容器原地升级，我们更改Pod.Spec中对应容器的Image，就会生成kubetypes.UPDATE类型的事件，kubelet 将容器优雅终止。旧的容器被杀死之后，kubelet启动新的容器，如此即完成Pod不重建的前提下实现容器的原地升级。
@@ -377,6 +378,59 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 ```
 
 计算待更新pod 的spec ,condition,container status 等数据， 加上revision label, inplace-update-grace annotation ，最终使用k8s api 更新pod 到k8s cluster
+
+## 协程间同步状态
+
+事件一直在产生 并由不同的协程处理， 如果一个协程正在对cloneset 做扩容操作，那么另一个协程需要等待一下，所以需要一个协程间的协调机制。
+```go
+type ScaleExpectations interface {
+	ExpectScale(controllerKey string, action ScaleAction, name string)
+	ObserveScale(controllerKey string, action ScaleAction, name string)
+	SatisfiedExpectations(controllerKey string) (bool, time.Duration, map[ScaleAction][]string)
+	DeleteExpectations(controllerKey string)
+	GetExpectations(controllerKey string) map[ScaleAction]sets.String
+}
+type realScaleExpectations struct {
+	sync.Mutex
+	// key: parent key, workload namespace/name
+	controllerCache map[string]*realControllerScaleExpectations
+}
+```
+
+进行某操作前先 ExpectScale，操作完成后再ObserveScale。在一个协程操作过程中，另一个协程可以通过 SatisfiedExpectations 来检查 操作是否完成。
+
+```go
+// github.com/openkruise/kruise/pkg/controller/cloneset/scale/cloneset_scale.go
+func (r *realControl) createPods(...){
+    // 先ExpectScale
+    for _, p := range newPods {
+		clonesetutils.ScaleExpectations.ExpectScale(clonesetutils.GetControllerKey(updateCS), expectations.Create, p.Name)
+		podsCreationChan <- p
+	}
+	// 创建pod 逻辑
+	...
+	// 完成后 ObserveScale
+	for _, pod := range newPods {
+		if _, ok := successPodNames.Load(pod.Name); !ok {
+			clonesetutils.ScaleExpectations.ObserveScale(clonesetutils.GetControllerKey(updateCS), expectations.Create, pod.Name)
+		}
+	}
+}
+// github.com/openkruise/kruise/pkg/controller/cloneset/cloneset_controller.go
+func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcile.Result, retErr error) {
+    ...
+    // 另一个协程做检测
+    if scaleSatisfied, unsatisfiedDuration, scaleDirtyPods := clonesetutils.ScaleExpectations.SatisfiedExpectations(request.String()); !scaleSatisfied {
+		if unsatisfiedDuration >= expectations.ExpectationTimeout {
+			klog.Warningf("Expectation unsatisfied overtime for %v, scaleDirtyPods=%v, overtime=%v", request.String(), scaleDirtyPods, unsatisfiedDuration)
+			return reconcile.Result{}, nil
+		}
+		klog.V(4).Infof("Not satisfied scale for %v, scaleDirtyPods=%v", request.String(), scaleDirtyPods)
+		return reconcile.Result{RequeueAfter: expectations.ExpectationTimeout - unsatisfiedDuration}, nil
+	}
+    ...   
+}
+```
 
 
 
