@@ -75,6 +75,21 @@ long _do_fork(unsigned long clone_flags,
 
 [线程切换的成本](http://qiankunli.github.io/2018/01/07/hardware_software.html)
 
+## Per CPU的struct
+
+linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
+
+1. 结构体 tss， 所有寄存器切换 ==> 内存拷贝/拷贝到特定tss_struct
+2. struct rq，描述在此 CPU 上所运行的所有进程（dt=Deadline进程；rt表示实时进程；cfs表示常规进程）
+    ![](/public/upload/linux/cpu_runqueue.jpg)
+
+在 x86 体系结构中，提供了一种以硬件的方式进行进程切换的模式，对于每个进程，x86 希望在内存里面维护一个 TSS（Task State Segment，任务状态段）结构。这里面有所有的寄存器。另外，还有一个特殊的寄存器 TR（Task Register，任务寄存器），指向某个进程的 TSS。更改 TR 的值，将会触发硬件保存 CPU 所有寄存器的值到当前进程的 TSS 中，然后从新进程的 TSS 中读出所有寄存器值，加载到 CPU 对应的寄存器中。
+
+但是这样有个缺点。我们做进程切换的时候，没必要每个寄存器都切换，这样每个进程一个 TSS，就需要全量保存，全量切换，动作太大了。于是，Linux 操作系统想了一个办法。还记得在系统初始化的时候，会调用 cpu_init 吗？这里面会给每一个CPU 关联一个 TSS，然后将 TR 指向这个 TSS，然后在操作系统的运行过程中，TR 就不切换了，永远指向这个TSS
+
+在 Linux 中，真的参与进程切换的寄存器很少，主要的就是栈顶寄存器
+
+所谓的进程切换，就是将某个进程的 thread_struct里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。
 
 
 ## 进程调度
@@ -309,21 +324,6 @@ static __always_inline struct rq *context_switch(struct rq *rq, struct task_stru
     return finish_task_switch(prev);
 }
 ```
-
-## Per CPU的struct
-
-linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
-
-1. struct rq，描述在此 CPU 上所运行的所有进程
-2. 结构体 tss， 所有寄存器切换 ==> 内存拷贝/拷贝到特定tss_struct
-
-在 x86 体系结构中，提供了一种以硬件的方式进行进程切换的模式，对于每个进程，x86 希望在内存里面维护一个 TSS（Task State Segment，任务状态段）结构。这里面有所有的寄存器。另外，还有一个特殊的寄存器 TR（Task Register，任务寄存器），指向某个进程的 TSS。更改 TR 的值，将会触发硬件保存 CPU 所有寄存器的值到当前进程的 TSS 中，然后从新进程的 TSS 中读出所有寄存器值，加载到 CPU 对应的寄存器中。
-
-但是这样有个缺点。我们做进程切换的时候，没必要每个寄存器都切换，这样每个进程一个 TSS，就需要全量保存，全量切换，动作太大了。于是，Linux 操作系统想了一个办法。还记得在系统初始化的时候，会调用 cpu_init 吗？这里面会给每一个CPU 关联一个 TSS，然后将 TR 指向这个 TSS，然后在操作系统的运行过程中，TR 就不切换了，永远指向这个TSS
-
-在 Linux 中，真的参与进程切换的寄存器很少，主要的就是栈顶寄存器
-
-所谓的进程切换，就是将某个进程的 thread_struct里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。
 
 
 ## 其它

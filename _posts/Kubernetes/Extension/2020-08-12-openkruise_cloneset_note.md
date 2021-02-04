@@ -122,9 +122,17 @@ CloneSet status 中的字段说明：
 5. status.updatedReplicas: 最新版本的 Pod 数量
 6. status.updatedReadyReplicas: 最新版本的 ready Pod 数量
 
-### Reconcile 逻辑
+## Reconcile 逻辑
 
 在kubebuilder 把Controller  控制器模型 的代码 都自动生成之后，不同Controller 之间的逻辑差异便只剩下 Reconcile 了
+
+### 整体逻辑
+
+背景知识
+1. CloneSet Owned 三个资源：ControllerRevision、Pod、PVC。
+2. 控制器会为每次更新过的 spec.template 计算一个 revision hash 值并上报到 CloneSet status 中
+3. 比如上文中提到的 nginx，在创建之初拥有的第一个 template 版本，会创建一个对应的 ControllerRevision。而当修改了 image 版本之后，CloneSet Controller 会创建一个新的 ControllerRevision，可以理解为每一个 ControllerRevision 对应了每一个版本的 Template，也对应了每一个版本的 ControllerRevision hash。**通过ControllerRevision，CloneSet  可以很方便地管理不同版本的 template 模板**。或者还原 先后的多个CloneSet
+4. Pod label 中定义的 ControllerRevision hash，就是 ControllerRevision 的名字
 
 ```go
 // kruise/pkg/controller/cloneset/cloneset_controller.go
@@ -132,25 +140,27 @@ func (r *ReconcileCloneSet) Reconcile(request reconcile.Request) (reconcile.Resu
     // ReconcileCloneSet.reconcileFunc = ReconcileCloneSet.doReconcile
 	return r.reconcileFunc(request)
 }
-// 获取CloneSet desire state=instance， CloneSet 对应的实际的Pod 数据=filteredPods，syncCloneSet，然后更新CloneSet status
 func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcile.Result, retErr error) {
+	startTime := time.Now()
 	// Fetch the CloneSet instance
 	instance := &appsv1alpha1.CloneSet{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	coreControl := clonesetcore.New(instance)
 	selector, err := metav1.LabelSelectorAsSelector(instance.Spec.Selector)
 	// list all active Pods and PVCs belongs to cs
 	filteredPods, filteredPVCs, err := r.getOwnedResource(instance)
-	// list all revisions and sort them 
+	//release Pods ownerRef
+	filteredPods, err = r.claimPods(instance, filteredPods)
+	// list all revisions and sort them
     revisions, err := r.controllerHistory.ListControllerRevisions(instance, selector)
     // 排序规则 byRevision.Less 优先根据 CreationTimestamp排序 其次根据Name
 	history.SortControllerRevisions(revisions)
-    // get the current, and update revisions, filteredPods 中 CreationTimestamp 最小的revision 会被作为currentRevision
-    // 计算 currentRevision 的原因是，扩容时可能要创建一定的 老版本. 在升级时，只需要用到updateRevision
-    currentRevision, updateRevision, collisionCount, err := r.getActiveRevisions(instance, revisions, clonesetutils.GetPodsRevisions(filteredPods))
+	// get the current, and update revisions
+	currentRevision, updateRevision, collisionCount, err := r.getActiveRevisions(instance, revisions, clonesetutils.GetPodsRevisions(filteredPods))
 	newStatus := appsv1alpha1.CloneSetStatus{
-        ObservedGeneration: instance.Generation,
-        //  控制器会为每次更新过的 spec.template 计算一个 revision hash 值并上报到 CloneSet status 中
-		UpdateRevision:     updateRevision.Name,    
+		ObservedGeneration: instance.Generation,
+		CurrentRevision:    currentRevision.Name,
+		UpdateRevision:     updateRevision.Name,
 		CollisionCount:     new(int32),
 		LabelSelector:      selector.String(),
 	}
@@ -160,12 +170,19 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
 	// update new status
 	if err = r.statusUpdater.UpdateCloneSetStatus(instance, &newStatus, filteredPods); err != nil {
 		return reconcile.Result{}, err
-    }
-    // 对于已经被删除的 Pod，控制器会自动从 podsToDelete 列表中清理掉。
-	if err = r.truncatePodsToDelete(instance, filteredPods); err != nil {...}
-	if err = r.truncateHistory(instance, filteredPods, revisions, currentRevision, updateRevision); err != nil {...}
+	}
+	if err = r.truncatePodsToDelete(instance, filteredPods); err != nil {
+		klog.Warningf("Failed to truncate podsToDelete for %s: %v", request, err)
+	}
+	if err = r.truncateHistory(instance, filteredPods, revisions, currentRevision, updateRevision); err != nil {
+		klog.Errorf("Failed to truncate history for %s: %v", request, err)
+	}
+	...
 	return reconcile.Result{RequeueAfter: delayDuration}, syncErr
 }
+```
+### 扩缩容
+```go
 // kruise/pkg/controller/cloneset/cloneset_controller.go
 func (r *ReconcileCloneSet) syncCloneSet(
 	instance *appsv1alpha1.CloneSet, newStatus *appsv1alpha1.CloneSetStatus,
@@ -202,7 +219,7 @@ func (r *realControl) Manage(
 	currentRevision, updateRevision string,
 	pods []*v1.Pod, pvcs []*v1.PersistentVolumeClaim,
 ) (bool, error) {
-	// 删除 podsToDelete 中指定的pod
+	// 获取 podsToDelete 中指定的pod
 	if podsToDelete := getPodsToDelete(updateCS, pods); len(podsToDelete) > 0 {
 		return r.deletePods(updateCS, podsToDelete, pvcs)
     }
@@ -228,11 +245,11 @@ func (r *realControl) Manage(
 		podsToDelete := choosePodsToDelete(diff, currentRevDiff, notUpdatedPods, updatedPods)
 		return r.deletePods(updateCS, podsToDelete, pvcs)
     }
-    // 如果diff = 0 则 重建升级逻辑什么都不做
+    // 如果diff = 0 什么都不做
 	return false, nil
 }
 ```
-如果发布的时候设置了 maxSurge，控制器会先多扩出来 maxSurge 数量的 Pod（此时 Pod 总数为 (replicas+maxSurge))，然后再开始发布存量的 Pod。 然后，当新版本 Pod 数量已经满足 partition 要求之后，控制器会再把多余的 maxSurge 数量的 Pod 删除掉，保证最终的 Pod 数量符合 replicas。此外，maxSurge 还受 升级方式（type）的影响：maxSurge 不允许配合 InPlaceOnly 更新模式使用（可以认为此时maxSurge=0？）。 另外，如果是与 InPlaceIfPossible 策略配合使用，控制器会先扩出来 maxSurge 数量的 Pod，再对存量 Pod 做原地升级。
+如果发布的时候设置了 maxSurge，控制器会先多扩出来 maxSurge 数量的 Pod（此时 Pod 总数为 (replicas+maxSurge))，然后再开始发布存量的 Pod。 然后，当新版本 Pod 数量已经满足 replicas - partition 要求之后，控制器会再把多余的 maxSurge 数量的 Pod 删除掉，保证最终的 Pod 数量符合 replicas。此外，maxSurge 还受 升级方式（type）的影响：maxSurge 不允许配合 InPlaceOnly 更新模式使用（可以认为此时maxSurge=0？）。 另外，如果是与 InPlaceIfPossible 策略配合使用，控制器会先扩出来 maxSurge 数量的 Pod，再对存量 Pod 做原地升级。
 ```go
 // 处理 升级间隔，计算真正需要 更新的pod
 // kruise/pkg/controller/cloneset/update/cloneset_update.go
@@ -292,18 +309,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 
 虽然  `spec.updateStrategy.partition` 指定了旧版的数量。但 update 逻辑的主要目的是  更新 （replicas - partition） 个 updateRevision 实例。如果连续多次灰度发布，则旧版 可能存在多个 revision（也就是说不是最新的revision 都是旧版，旧版不是某一个revision），整个cloneset 可能存在2个以上 revision的 pod。 这与直觉上的 多版本pod管理 还是不一样的
 
-```yaml
-## 直觉上的多版本管理
-spec
-  - template:
-    name: ...
-    image: nginx:1.18.0
-    replicas: 2
-  - template:
-    name: ...
-    image: nginx:1.17.0
-    replicas: 3
-```
+
 
 ## 原地升级
 

@@ -326,6 +326,10 @@ k8s.io/kubernetes
 
 ![](/public/upload/kubernetes/kubelet_cadvisor_object.png)
 
+## cpu 管理
+
+[Kubelet从入门到放弃:识透CPU管理](https://mp.weixin.qq.com/s/ViuaEIE0mEaWMJPCJm5-xg)
+
 ## 其它
 
 1. PodManager, Pod 在内存中的管理结构，crud 访问kubelet 内存中的Pod 都通过它（线程安全），包括mirror Pod 和static Pod

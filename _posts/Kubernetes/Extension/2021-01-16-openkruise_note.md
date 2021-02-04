@@ -10,6 +10,8 @@ keywords:  kubernetes client-go
 
 ## 简介（未完成）
 
+把 k8s 比喻为京东网站，提供的是平台的能力，Openkruise 可以看做是在京东开的第三方店铺。 站在平台层面，Deployment和CloneSet 都是店家，共同享用平台的基础能力。
+
 ## Kubernetes的价值与不足
 
 ![](/public/upload/kubernetes/application_delivery.jpg)
@@ -29,6 +31,7 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 [KubeVela：标准化的云原生平台构建引擎](KubeVela：标准化的云原生平台构建引擎)
 
 ![](/public/upload/kubernetes/kubevela_application.png)
+
 
 ## 代码结构
 
