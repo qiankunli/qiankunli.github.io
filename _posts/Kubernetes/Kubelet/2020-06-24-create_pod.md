@@ -41,3 +41,8 @@ keywords:  create pod
 
 
 ![](/public/upload/kubernetes/kubelet_create_pod.png)
+
+1. Kubelet是一切容器 feature的落地点
+2. 所有的组件只与apiserver交互，不直接互通，更不直接控制kubelet 做某事
+
+![](/public/upload/kubernetes/create_deployment.png)

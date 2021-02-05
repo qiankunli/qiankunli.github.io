@@ -13,6 +13,12 @@ keywords: Go defer
 * TOC
 {:toc}
 
+应用
+
+1. channel 事先创建好 
+    1. 先启动 N 个 goroutine 消费者，读某个 channel，之后，生产者再在某个时候向 channel 中发送元素
+    2. 传递信号，比如用 channel 充当一个 “ready” 的信号，用来指示某个“过程”准备好了，可以接收结果了
+2. 临时创建，就像java 中的future 一样[Go channel 的妙用](https://mp.weixin.qq.com/s/jAUfqu-5nbs8hcua_F7ueQ)
 
 ## channel
 

@@ -12,7 +12,7 @@ keywords: openkruise
 * TOC
 {:toc}
 
-[openkruise](http://openkruise.io/) 面向自动化场景的 Kubernetes workload扩展controller，它是一组controller，可在应用程序工作负载管理上扩展和补充Kubernetes核心控制器。
+[openkruise](http://openkruise.io/) 面向自动化场景的 Kubernetes workload扩展controller，它是一组controller，可在应用程序工作负载管理上扩展和补充Kubernetes核心控制器。cloneset 在很多方面上借鉴了 statefulset ，只是没有 statefulset 的 ordinal 序号。
 
 ## CloneSet
 
@@ -122,6 +122,8 @@ CloneSet status 中的字段说明：
 5. status.updatedReplicas: 最新版本的 Pod 数量
 6. status.updatedReadyReplicas: 最新版本的 ready Pod 数量
 
+cloneset作者提到：cloneset partition其实是继承了原生 statefulset 的 partition 理念，只是没有 statefulset 的 ordinal 序号。Partition 的语义是 保留旧版本 Pod 的数量，笔者曾觉得有点违反直觉。但如果 partition 来表示新版本数量的话，每次全量发布、扩容时都应同步设置partition 的值（与replicas保持一致），partition 的默认值就不能是0 或不填了。
+
 ## Reconcile 逻辑
 
 在kubebuilder 把Controller  控制器模型 的代码 都自动生成之后，不同Controller 之间的逻辑差异便只剩下 Reconcile 了
@@ -187,7 +189,7 @@ syncCloneSet  根据 cloneSet 期望状态（ 由replicas 以及updateStrategy�
 1. scale逻辑 对应 scale.Interface：
     1. 需要做扩容或缩容的时候（**也就是pod 实际数量不等于 replicas时**），scale  通过 删除或创建特定Revision的pod 使得 新旧Revision pod 的数量符合replicas/partition/MaxSurge/maxUnavailable 要求
     2. 如果 pod 实际数量等于 replicas，scale 并不会进行处理，本次syncCloneSet 主要执行 update 逻辑。
-2. update逻辑对应 update.Interface：找到不符合 updateRevision 的pod，根据 partition/MaxSurge/maxUnavailable 以及pod 的ready 情况，计算需要更新的pod 的数量needToUpdateCount，从排序好的 pod 中选取 needToUpdateCount 个pod 执行更新逻辑。
+2. update逻辑对应 update.Interface：找到不符合 updateRevision 的pod，根据 partition/MaxSurge/maxUnavailable 以及pod 的ready 情况，计算需要更新的pod 的数量needToUpdateCount，从排序好的 pod 中选取 needToUpdateCount 个pod 执行更新逻辑。PS：选择该删的删掉，之后创建
     1. 如果配置了原地升级策略， 原地升级pod 
     2. 如果是默认ReCreate 策略，按序删除pod
 
@@ -225,7 +227,8 @@ func (r *realControl) Manage(
     }
     // 符合 updateRevision 的pod 为 updatedPods ，不符合的为notUpdatedPods
     updatedPods, notUpdatedPods := clonesetutils.SplitPodsByRevision(pods, updateRevision)
-    // 一个CloneSet 最多允许(replicas + MaxSurge)个pod 存在，如果实际pod 小于这个数量(diff<0)则需要创建pod，否则(diff>0) 删除pod
+    // 一个CloneSet 最多允许(replicas + MaxSurge)个pod 存在，如果实际pod 小于这个数量(diff<0)则需要创建pod，否则(diff>0) 删除pod。 
+    // diff 标记pod 总量是否ready；currentRevDiff 表示 currentRev 总量是否ready
 	diff, currentRevDiff := calculateDiffs(updateCS, updateRevision == currentRevision, len(pods), len(notUpdatedPods))
 	if diff < 0 {
 		// total number of this creation
@@ -311,7 +314,9 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 
 虽然  `spec.updateStrategy.partition` 指定了旧版的数量。但 update 逻辑的主要目的是  更新 （replicas - partition） 个 updateRevision 实例。如果连续多次灰度发布，则旧版 可能存在多个 revision（也就是说不是最新的revision 都是旧版，旧版不都是某一个revision），整个cloneset 可能存在2个以上 revision的 pod。 这与直觉上的 多版本pod管理 还是不一样的
 
-## 原地升级
+## 高级特性
+
+### 原地升级
 
 [如何为 Kubernetes 实现原地升级？](https://mp.weixin.qq.com/s/CNLf8MHYGs_xeD4PxChR4A)
 [如何在Kubernetes中实现容器原地升级](https://cloud.tencent.com/developer/article/1413743)一个Pod中可能包含了主业务容器，还有不可剥离的依赖业务容器，以及SideCar组件容器等，如果因为要更新其中一个SideCar Container而继续按照ReCreate Pod的方式进行整个Pod的重建，那负担还是很大的。更新一个轻量的SideCar却导致了分钟级的单个Pod的重建过程，因此，我们迫切希望能实现，只升级Pod中的某个Container，而不用重建整个Pod。
@@ -379,7 +384,7 @@ func (c *realControl) updatePodInPlace(pod *v1.Pod, spec *UpdateSpec, opts *Upda
 
 计算待更新pod 的spec ,condition,container status 等数据， 加上revision label, inplace-update-grace annotation ，最终使用k8s api 更新pod 到k8s cluster
 
-## 协程间同步状态
+### 协程间同步状态
 
 事件一直在产生 并由不同的协程处理， 如果一个协程正在对cloneset 做扩容操作，那么另一个协程需要等待一下，所以需要一个协程间的协调机制。
 ```go
@@ -397,7 +402,7 @@ type realScaleExpectations struct {
 }
 ```
 
-进行某操作前先 ExpectScale，操作完成后再ObserveScale。在一个协程操作过程中，另一个协程可以通过 SatisfiedExpectations 来检查 操作是否完成。
+一个协程进行某操作前先 ExpectScale，操作完成后再ObserveScale，另一个协程可以通过 SatisfiedExpectations 来检查 操作是否完成。
 
 ```go
 // github.com/openkruise/kruise/pkg/controller/cloneset/scale/cloneset_scale.go
@@ -431,6 +436,62 @@ func (r *ReconcileCloneSet) doReconcile(request reconcile.Request) (res reconcil
     ...   
 }
 ```
+
+## 通过操作pod 来影响cloneset的策略
+
+
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: CloneSet
+spec:
+  # ...
+  updateStrategy:
+    priorityStrategy:
+      weightPriority:
+      - weight: 50
+        matchSelector:
+          matchLabels:
+            test-key: foo
+      - weight: 30
+        matchSelector:
+          matchLabels:
+            test-key: bar
+```
+
+在操作cloneset 发布之前，为pod 打上label，则test-key=foo 会比test-key= bar的pod 先升级。
+
+CloneSet管理的Pod有以下状态
+• Normal：正常状态
+• PreparingUpdate: 准备原地升级
+• Updating: 原地升级中
+• Updated：原地升级完成
+• PreparingDelete：准备删除
+
+![](/public/upload/kubernetes/cloneset_lifecycle.png)
+
+```yaml
+apiVersion: apps.kruise.io/v1alpha1
+kind: CloneSet
+spec:
+  # 通过 finalizer 定义 hook
+  lifecycle:
+    preDelete:
+      finalizersHandler:
+      - example.io/unready-blocker
+    inPlaceUpdate:
+      finalizersHandler:
+      - example.io/unready-blocker
+  # 或者也可以通过 label 定义
+  lifecycle:
+    inPlaceUpdate:
+      labelsHandler:
+        example.io/block-unready: "true"
+```
+如果定义了 lifecycle hook /preDelete，cloneset先只将 Pod 状态改为 PreparingDelete，当开发移除 label/finalizer后，kruise 才执行 Pod 删除，否则会直接删除pod。PS：也就是说，如果没有定义lifecycle hook /preDelete，pod 是没有PreparingDelete 状态的。
+
+
+
+
 
 
 
