@@ -264,12 +264,10 @@ generateProcedure() 方法把函数转换成汇编代码
         sb.append("\n## 过程:").append(name).append("\n");
         sb.append("\t.globl _").append(name).append("\n");
         sb.append("_").append(name).append(":\n");
-
         // 2.序曲
         sb.append("\n\t# 序曲\n");
         sb.append("\tpushq\t%rbp\n");
         sb.append("\tmovq\t%rsp, %rbp\n");
-
         // 3.设置栈顶
         // 16字节对齐
         if ((rspOffset % 16) != 0) {
@@ -277,27 +275,21 @@ generateProcedure() 方法把函数转换成汇编代码
         }
         sb.append("\n\t# 设置栈顶\n");
         sb.append("\tsubq\t$").append(rspOffset).append(", %rsp\n");
-
         // 4.保存用到的寄存器的值
         saveRegisters();
-
         // 5.函数体
         sb.append("\n\t# 过程体\n");
         sb.append(bodyAsm);
-
         // 6.恢复受保护的寄存器的值
         restoreRegisters();
-
         // 7.恢复栈顶
         sb.append("\n\t# 恢复栈顶\n");
         sb.append("\taddq\t$").append(rspOffset).append(", %rsp\n");
-
         // 8.如果是main函数，设置返回值为0
         if (name.equals("main")) {
             sb.append("\n\t# 返回值\n");
             sb.append("\txorl\t%eax, %eax\n");
         }
-
         // 9.尾声
         sb.append("\n\t# 尾声\n");
         sb.append("\tpopq\t%rbp\n");
@@ -554,3 +546,5 @@ int main(int argc, char **argv) {
 2. 编译原理中很多算法都是基于树和图的，所以对这两个数据结构的理解也会有帮助。
 3. 至于计算机组成原理，跟后端技术的关联很密切。
 4. 程序运行时的环境，内存管理等内容，则跟操作系统有关。
+
+编程语言是自举的，指的是说，我们能用自己写出来的程序编译自己。但是自举，并不要求这门语言的第一个编译器就是用自己写的。比如，这里说到的 Go，先是有了 Go 语言，我们通过 C++ 写了编译器 A。然后呢，我们就可以用这个编译器 A，来编译 Go 语言的程序。接着，我们再用 Go 语言写一个编译器程序 B，然后用 A 去编译 B，就得到了 Go 语言写好的编译器的可执行文件了。这个之后，我们就可以一直用 B 来编译未来的 Go 语言程序，这也就实现了所谓的自举了。所以，**即使是自举，也通常是先有了别的语言写好的编译器，然后再用自己来写自己语言的编译器**。
