@@ -126,6 +126,8 @@ RUN \
 
 ## 镜像下载
 
+![](/public/upload/container/image_push_pull.png)
+
 镜像一般会包括两部分内容，一个是 manifests 文件，这个文件定义了镜像的 元数据，另一个是镜像层，是实际的镜像分层文件。
 
 ### docker login
@@ -143,6 +145,18 @@ RUN \
 
 1. 使用private registry
 2. 使用registry mirror,以使用daocloud的registry mirror为例，假设你的daocloud的用户名问`lisi`，则`DOCKER_OPTS=--registry-mirror=http://lisi.m.daocloud.io`
+
+
+[Serverless 场景下 Pod 创建效率优化](https://mp.weixin.qq.com/s/0OLdyVwg4Nsw0Xvvg8if5w)解压镜像耗时会占拉取镜像总耗时很大的比例，测试的例子最大占比到了 77%，所以需要考虑如何提升解压效率。gzip/gunzip 是单线程的压缩/解压工具，可考虑采用 pigz/unpigz 进行多线程的压缩/解压，充分利用多核优势。containerd 从 1.2 版本开始支持 pigz，节点上安装 unpigz 工具后，会优先用其进行解压。通过这种方法，可通过节点多核能力提升镜像解压效率。这个过程也需要关注 下载/上传 的并发度问题，docker daemon 提供了两个参数来控制并发度，控制并行处理的镜像层的数量，`--max-concurrent-downloads` 和 `--max-concurrent-uploads`。默认情况下，下载的并发度是 3，上传的并发度是 5，可根据测试结果调整到合适的值。
+
+通常内网的带宽足够大，是否有可能省去 解压缩/压缩 的逻辑，将拉取镜像的耗时集中在下载镜像方面？当然，这个动静有点大了，要修改docker daemon。
+
+按需加载镜像。在镜像启动耗时中，拉取镜像占比 76%，但是在启动时，仅有 6.4% 的数据被使用到，即镜像启动时需要的镜像数据量很少。对于「Image 所有 layers 下载完后才能启动镜像」，需要改为启动容器时按需加载镜像，类似启动虚拟机的方式，仅对启动阶段需要的数据进行网络传输。但当前镜像格式通常是 tar.gz 或 tar，而 tar 文件没有索引，gzip 文件不能从任意位置读取数据，这样就不能满足按需拉取时拉取指定文件的需求，镜像格式需要改为可索引的文件格式。Google 提出了一种新的镜像格式，stargz，全称是 seeable tar.gz。它兼容当前的镜像格式，但提供了文件索引，可从指定位置读取数据。然后在 containerd 拉取镜像环节，对 containerd 提供一种 remote snapshotter，在创建容器 rootfs 层时，不通过先下载镜像层再构建的方式，而是直接 mount 远程存储层，要实现这样的能力，一方面需要修改 containerd 当前的逻辑，在 filter 阶段识别远程镜像层，对于这样的镜像层不进行 download 操作，一方面需要实现一个 remote snapshotter，来支持对于远程层的管理。当 containerd 通过 remote snapshotter 创建容器时，省去了拉取镜像的阶段，对于启动过程中需要的文件，可对 stargz 格式的镜像数据发起 HTTP Range GET 请求，拉取目标数据。PS：计算与存储分离，那干脆镜像也在远端得了，serverless 对冷启动极致的追求才有了这样的优化。
+
+
+
+
+
 
 
 
