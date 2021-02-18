@@ -3,7 +3,7 @@
 layout: post
 title: 消息/任务队列
 category: 架构
-tags: Practice
+tags: MQ
 keywords: 消息队列 rabbitmq kafka
 
 ---
@@ -141,6 +141,8 @@ kafka 中partition 是物理上的概念，仅从逻辑概念上看
 消息中间件犹如小马过河，选择合适的才最重要，这需要贴合自身的业务需求，技术服务于业务。**RabbitMQ在于routing，而Kafka在于streaming**，了解其根本对于自己能够对症下药选择到合适的消息中间件尤为重要。从功能维度上来说，RabbitMQ的优势要大于Kafka，但是Kafka的吞吐量要比RabbitMQ高出1至2个数量级，一般RabbitMQ的单机QPS在万级别之内，而Kafka的单机QPS可以维持在十万级别，甚至可以达到百万级。
 
 消息中间件选型切忌一味的追求性能或者功能，性能可以优化，功能可以二次开发。**如果要在功能和性能方面做一个抉择的话，那么首选性能，因为总体上来说性能优化的空间没有功能扩展的空间大**。然而对于长期发展而言，生态又比性能以及功能都要重要。
+
+[RocketMQ如何保证消息的可靠性？](https://developer.aliyun.com/article/781629)未读
 
 ## 消息队列监控
 

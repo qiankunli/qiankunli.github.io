@@ -3,7 +3,7 @@
 layout: post
 title: 让kafka支持优先级队列
 category: 技术
-tags: Java
+tags: MQ
 keywords: kafka
 
 ---

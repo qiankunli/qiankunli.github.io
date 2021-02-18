@@ -8,7 +8,7 @@ keywords: system design principle
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -19,7 +19,7 @@ keywords: system design principle
 
 [Multi-Runtime Microservices Architecture](https://www.infoq.com/articles/multi-runtime-microservice-architecture/)[[译] 多运行时微服务架构](https://skyao.io/post/202003-multi-runtime-microservice-architecture/)  
 
-[云原生时代，Java危矣？](https://mp.weixin.qq.com/s/fVz2A-AmgfhF0sTkz8ADNw)**不可变基础设施的内涵已不再局限于方便运维、程序升级和部署的手段，而是升华一种为向应用代码隐藏环境复杂性的手段，是分布式服务得以成为一种可普遍推广的普适架构风格的必要前提**
+[云原生时代，Java危矣？](https://mp.weixin.qq.com/s/fVz2A-AmgfhF0sTkz8ADNw)不可变基础设施的内涵已不再局限于方便运维、程序升级和部署的手段，而是升华一种为**向应用代码隐藏环境复杂性的手段**，是分布式服务得以成为一种可普遍推广的普适架构风格的必要前提。
 
 rpc 有mesh，db、mq、redis 都搞mesh，mesh 的未来一定不是更多的sidecar， 运维根本受不了。必然需要出现新的形态来解决 Sidecar 过多的问题，合并为一个或者多个 Sidecar 就会成为必然。
 
@@ -72,6 +72,45 @@ public interface DaprClient {
 1. 所有分布式能力使用的过程（包括访问内部生态体系和访问外部系统）都被 Runtime 接管和屏蔽实现
 2. 通过 CRD/ 控制平面实现声明式配置和管理（类似 Servicemesh）
 3. 部署方式上 Runtime 可以部署为 Sidecar 模式，或者 Node 模式，取决于具体需求，不强制
+
+## 从云原生中间件的视角
+
+[无责任畅想：云原生中间件的下一站](https://mp.weixin.qq.com/s/EWR6xwbf53XHZ8O3m2bdVA)在云原生时代，不变镜像作为核心技术的 docker 定义了不可变的单服务部署形态，统一了容器编排形态的 k8s 则定义了不变的 service 接口，二者结合定义了服务可依赖的不可变的基础设施。有了这种完备的不变的基础设置，就可以定义不可变的中间件新形态 -- 云原生中间件。云原生时代的中间件，包含了不可变的缓存、通信、消息、事件(event) 等基础通信设施，应用只需通过本地代理即可调用所需的服务，无需关心服务能力来源。
+
+除了序列化协议和通信协议，微服务时代的中间件体系大概有如下技术栈：
+
+* RPC，其代表是 Dubbo/Spring Cloud/gRPC 等。
+* 限流熔断等流控，如 hystrix/sentinel 等。
+* Cache，其代表是 Redis。
+* MQ，其代表有 kafka/rocketmq 等。
+* 服务跟踪，如兼容 Opentracing 标准的各种框架。
+* 日志收集，如 Flume/Logtail 等。
+* 指标收集，如 prometheus。
+* 事务框架，如阿里的 seata。
+* 配置下发，如 apollo/nacos。
+* 服务注册，如 zookeeper/etcd 等。
+* 流量控制，如 hystrix/sentinel 等。
+* 搜索，如 ElasticSearch。
+* 流式计算，如 spark/flink。
+
+把各种技术栈统一到一种事实上的技术标准，才能反推定义出**不可变的中间件设施的终态**。把上面这些事实上的中间件梳理一番后，整体工作即是：
+
+* 统一定义各服务的标准模型
+* 定义这些标准模型的可适配多种语言的 API
+* 一个具备通信和中间件标准模型 API 的 Proxy
+* 适配这些 API 的业务
+
+![](/public/upload/architecture/application_mesh.png)
+
+Service Proxy 可能是一个集状态管理、event 传递、消息收发、分布式追踪、搜索、配置管理、缓存数据、旁路日志传输等诸多功能于一体的 Proxy， 也可能是分别提供部分服务的多个 Proxy 的集合，但对上提供的各个服务的 API 是不变的。Application Mesh 具有如下更多的收益：
+
+* 更好的扩展性与向后兼容性
+* 与语言无关
+* 与云平台无关
+* 应用与中间件更彻底地解耦
+* 应用开发更简单。基于新形态的中间件方案，Low Code 或者 No Code 技术才能更好落地。单体时代的 IDE 才能更进一步 -- 分布式时代的 IDE，基于各种形态中间件的标准 API 之对这些中间件的能力进行组合，以 WYSIWYG 方式开发出分布式应用。
+* 更快的启动速度
+* 以统一技术形态的 Service Mesh 为基础的云原生中间件技术体系真正发起起来，在其之上的 Serverless 才有更多的落地场景，广大中小企业才能分享云原生时代的技术红利，业务开发人员的编码工作就会越来越少，编程技术也会越来越智能--从手工作坊走向大规模机器自动生产时代。
 
 ## 其它
 

@@ -112,19 +112,22 @@ POSIX表示可移植操作系统接口（Portable Operating System Interface of 
 
 操作系统中，semaphore与自旋锁类似的概念，只有得到信号量的进程才能执行临界区的代码；不同的是获取不到信号量时，进程不会原地打转而是进入休眠等待状态（自己更改自己的状态位）
 
-	struct semaphore{
-		spinlock_t lock;
-		unsigned int count;
-		struct list_head wait_list;
-	}
-	// 获取信号量，会导致睡眠
-	void down(struct semaphore *sem);
-	// 获取信号量，会导致睡眠，但睡眠可被信号打断
-	int down_interruptible(struct semaphore *sem);
-	// 无论是否获得，都立即返回，返回值不同，不会导致睡眠
-	int down_trylock(struct semaphore *sem);
-	// 释放信号量
-	void up(struct semaphore *sem))
+```c
+struct semaphore{
+    spinlock_t lock;
+    unsigned int count;
+    // 等待的线程会进入到队列中
+    struct list_head wait_list; 
+}
+// 获取信号量，会导致睡眠
+void down(struct semaphore *sem);
+// 获取信号量，会导致睡眠，但睡眠可被信号打断
+int down_interruptible(struct semaphore *sem);
+// 无论是否获得，都立即返回，返回值不同，不会导致睡眠
+int down_trylock(struct semaphore *sem);
+// 释放信号量
+void up(struct semaphore *sem))
+```
 
 [大话Linux内核中锁机制之原子操作、自旋锁](http://blog.sina.com.cn/s/blog_6d7fa49b01014q7p.html)
 
@@ -143,7 +146,7 @@ POSIX表示可移植操作系统接口（Portable Operating System Interface of 
 1. 插入一个内存屏障，相当于告诉CPU和编译器先于这个命令的必须先执行，后于这个命令的必须后执行
 2. 强制更新一次不同CPU的缓存。例如，一个写屏障会把这个屏障前写入的数据刷新到缓存，这样任何试图读取该数据的线程将得到最新值
 
-volatile，有 volatile 修饰的变量，赋值后多执行了一个`lock addl $0x0,(%esp)`操作，这个操作相当于一个内存屏障，指令“addl $0x0,(%esp)”显然是一个空操作，关键在于 lock 前缀，查询 IA32 手册，它的作用是使得本 CPU 的 Cache 写入了内存，该写入动作也会引起别的 CPU invalidate 其 Cache。所以通过这样一个空操作，可让前面 volatile 变量的修改对其他 CPU 立即可见。
+volatile，有 volatile 修饰的变量，赋值后多执行了一个`lock addl $0x0,(%esp)`操作，这个操作相当于一个内存屏障，指令`addl $0x0,(%esp)`显然是一个空操作，关键在于 lock 前缀，查询 IA32 手册，它的作用是使得本 CPU 的 Cache 写入了内存，该写入动作也会引起别的 CPU invalidate 其 Cache。所以通过这样一个空操作，可让前面 volatile 变量的修改对其他 CPU 立即可见。
 
 说白了，这是除cas 之外，又一个暴露在 java 层面的指令。
 

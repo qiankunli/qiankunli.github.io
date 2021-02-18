@@ -3,7 +3,7 @@
 layout: post
 title: 《Apache Kafka源码分析》——clients
 category: 技术
-tags: Scala
+tags: MQ
 keywords: Scala  akka
 
 ---

@@ -19,6 +19,8 @@ Service Mesh 的概念最早是由 Buoyant 公司的 CEO William Morgan [What's 
 
 ![](/public/upload/mesh/service_mesh_intro.png)
 
+[云原生中间件的下一站](https://mp.weixin.qq.com/s/EWR6xwbf53XHZ8O3m2bdVA)云原生时代的中间件，包含了不可变的缓存、通信、消息、事件(event) 等基础通信设施，应用只需通过本地代理即可调用所需的服务，**无需关心服务能力来源**。
+
 ## 什么是 Service Mesh
 
 [为什么说 Service Mesh 是微服务发展到今天的必然产物？](https://www.infoq.cn/article/2017/12/why-service-mesh)

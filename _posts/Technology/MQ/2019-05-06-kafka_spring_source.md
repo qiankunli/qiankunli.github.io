@@ -3,7 +3,7 @@
 layout: post
 title: spring kafka 源码分析
 category: 技术
-tags: Spring
+tags: MQ
 keywords: kafka
 
 ---
