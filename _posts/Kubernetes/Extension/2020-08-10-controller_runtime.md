@@ -70,14 +70,14 @@ type Reconciler interface {
             /application_types.go      // 新增 Application/ApplicationSpec/ApplicationStatus struct; 将类型注册到 scheme 辅助接口 
             /zz_generated.deepcopy.go
         /config
-            /crd                        // 新增Application CustomResourceDefinition
+            /crd                        // Application CustomResourceDefinition。提交后apiserver 可crudw该crd
             /...
         /controllers
             /application_controller.go  // 定义 ApplicationReconciler ，核心逻辑就在这里实现
         main.go                         // ApplicationReconciler 添加到 Manager，Manager.Start(stopCh)
         go.mod                          
     ```
-执行 `make install` 实质是执行 `kustomize build config/crd | kubectl apply -f -` 将cr yaml 提交到apiserver上。之后就可以 提交Application yaml 到 k8s 了。
+执行 `make install` 实质是执行 `kustomize build config/crd | kubectl apply -f -` 将cr yaml 提交到apiserver上。之后就可以 提交Application yaml 到 k8s 了。将crd struct 注册到 schema，则client-go 可以支持对crd的 crudw 等操作。
 
 ## controller-runtime 整体设计
 
@@ -97,7 +97,7 @@ for {
     }
 }
 ```
-controller-runtime 代码结构
+**Control Loop通过code-generator生成**，开发者编写差异处理逻辑Reconcile即可。controller-runtime 代码结构
 ```
 /sigs.k8s.io/controller-runtime/pkg
     /manager

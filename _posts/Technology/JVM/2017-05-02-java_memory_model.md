@@ -100,6 +100,46 @@ happens-before规则由两部分组成，一部分是program order，即单线�
 |隔离性|实现mysql 需要大量彼此关联的数据结构，并发读写|锁|
 |java内存模型|java内存模型与硬件内存模型的映射，并发读写 + 编译器、cpu重排序|happens-before 关系 + 内存屏障|
 
+## 进程内存布局
+
+[Linux内核基础知识](http://qiankunli.github.io/2019/05/01/linux_kernel_basic.html)进程内存布局
+
+![](/public/upload/linux/virtual_memory_space.jpg)
+
+左右两侧均表示虚拟地址空间，左侧以描述内核空间为主，右侧以描述用户空间为主。右侧底部有一块区域“read from binary image on disk by execve(2)”，即来自可执行文件加载，jvm的方法区来自class文件加载，那么 方法区、堆、栈 便可以一一对上号了。
+
+jvm 作为 a model of a whole computer，便与os 有许多相似的地方，包括并不限于：
+
+1. 针对os 编程的可执行文件，主要指其背后代表的文件格式、编译、链接、加载 等机制
+2. 可执行文件 的如何被执行，主要指 指令系统及之上的 方法调用等
+3. 指令执行依存 的内存模型
+
+这三者是三个不同的部分，又相互关联，比如jvm基于栈的解释器与jvm 内存模型 相互依存。
+
+![](/public/upload/jvm/jvm_mm.png)
+
+## JVM内存区域新画法 
+
+![](/public/upload/java/jvm_memory_layout.jpg)
+
+一个cpu对应一个线程，一个线程一个栈，或者反过来说，一个栈对应一个线程，所有栈组成栈区。我们从cpu的根据pc指向的指令的一次执行开始：
+
+1. cpu执行pc指向方法区的指令
+2. 指令=操作码+操作数，jvm的指令执行是基于栈的，所以需要从栈帧中的“栈”区域获取操作数，栈的操作数从栈帧中的“局部变量表”和堆中的对象实例数据得到。
+3. 当在一个方法中调用新的方法时，根据栈帧中的对象引用找到对象在堆中的实例数据，进而根据对象实例数据中的方法表部分找到方法在方法区中的地址。根据方法区中的数据在当前线程私有区域创建新的栈帧，切换PC，开始新的执行。
+
+### PermGen ==> Metaspace
+
+[Permgen vs Metaspace in Java](https://www.baeldung.com/java-permgen-metaspace)PermGen (Permanent Generation) is a special heap space separated from the main memory heap.
+
+1. The JVM keeps track of loaded class metadata in the PermGen. 
+2. all the static content: static methods,primitive variables,references to the static objects
+3. bytecode,names,JIT information
+4. before java7,the String Pool
+
+**With its limited memory size, PermGen is involved in generating the famous OutOfMemoryError**. [What is a PermGen leak?](https://plumbr.io/blog/memory-leaks/what-is-a-permgen-leak)
+
+Metaspace is a new memory space – starting from the Java 8 version; it has replaced the older PermGen memory space. The garbage collector now automatically triggers cleaning of the dead classes once the class metadata usage reaches its maximum metaspace size.with this improvement, JVM **reduces the chance** to get the OutOfMemory error.
 
 ## 其它材料
 

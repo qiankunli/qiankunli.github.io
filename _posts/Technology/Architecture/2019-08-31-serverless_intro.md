@@ -17,6 +17,8 @@ keywords: serverless
 
 ![](/public/upload/architecture/serverless_overview.png)
 
+[Serverless 躁动背后的 5 大落地之痛](https://mp.weixin.qq.com/s/F8ZoUywD4ezadfQA6Wu1lg)建议细读。
+
 ## 为什么Serverless 会火
 
 ### 《Serverless入门课》

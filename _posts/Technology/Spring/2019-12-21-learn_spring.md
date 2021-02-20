@@ -15,6 +15,8 @@ keywords: springboot
 
 [使用Spring特性优雅书写业务代码](https://mp.weixin.qq.com/s/94oe5c_7ouE1GbyiPfNg5g)
 
+[程序员必备的思维能力：抽象思维](https://mp.weixin.qq.com/s/cJ0odiYcphhNBoAVjqpCZQ)我们知道Spring的核心功能是Bean容器，那么在看Spring源码的时候，我们可以着重去看它是如何进行Bean管理的？它使用的核心抽象是什么？不难发现，Spring是使用了BeanDefinition、BeanFactory、BeanDefinitionRegistry、BeanDefinitionReader等核心抽象**实现了Bean的定义、获取和创建**。抓住了这些核心抽象，我们就抓住了Spring设计主脉。除此之外，我们还可以进一步深入思考，它为什么要这么抽象？这样抽象的好处是什么？以及它是如何支持XML和Annotation（注解）这两种关于Bean的定义的。
+
 ## 编程模型
 
 面向对象编程

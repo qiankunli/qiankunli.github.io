@@ -15,6 +15,8 @@ keywords: mosn detail
 
 之前mosn 不太懂的时候，整了很多有的没的，画了很多图，舍不得删，先放在这里。
 
+[Service Mesh 双十一后的探索和思考(上)](https://mp.weixin.qq.com/s/-OH9WONueWhydfZlNFsguw)值得细读。
+
 ## 与envoy 对比
 
 Envoy 支持四层的读写过滤器扩展、基于 HTTP 的七层读写过滤器扩展以及对应的 Router/Upstream 实现。如果想要基于 Envoy 的扩展框架实现 L7 协议接入，目前的普遍做法是基于 L4 filter 封装相应的 L7 codec，在此基础之上再实现对应的协议路由等能力，无法复用 HTTP L7 的扩展框架。

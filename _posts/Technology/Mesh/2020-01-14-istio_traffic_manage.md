@@ -13,6 +13,8 @@ keywords: pilot service mesh
 * TOC
 {:toc}
 
+[eBay 基于 Istio 的统一流量管理实践](https://mp.weixin.qq.com/s/8Nv2ApgExwBprfoNFJ2HZw)未读
+
 ## envoy 好在哪里？
 
 [应用交付老兵眼中的Envoy, 云原生时代下的思考](https://mp.weixin.qq.com/s/cZ8iqRKMX6sOnK5orFwTAQ)

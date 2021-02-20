@@ -17,6 +17,8 @@ keywords: mesh microservice
 
 服务框架在微服务架构中占据核心位置，因此，使用 Service Mesh 来替换正在使用的微服务框架，除了需要在 Service Mesh 数据面和控制面组件中对服务注册发现、RPC 协议、配置下发进行扩展之外，还要对现有的上层研发工作台、运维效能平台等支撑平台进行兼容设计
 
+[构建基于Service Mesh 的云原生微服务框架](https://mp.weixin.qq.com/s/toLtpHA9ZbHVzQQbs6rtjA)迁移过程难处多啊，关键是规范和统一。
+
 ## 与微服务框架整合
 
 ||数据面|控制面|
