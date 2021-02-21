@@ -56,6 +56,8 @@ kubebuilder 脚手架生成的项目代码 一般假设只有一个crd 和Contro
 
 ![](/public/upload/kubernetes/controller_runtime_logic.png)
 
+[阿里巴巴云原生应用安全防护实践与 OpenKruise 的新领域](https://mp.weixin.qq.com/s/Bvfr2gsSYxvWpn4K7ZIp2w)
+
 
 
 
