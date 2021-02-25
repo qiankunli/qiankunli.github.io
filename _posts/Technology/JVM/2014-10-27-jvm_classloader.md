@@ -11,6 +11,38 @@ keywords: JAVA JVM
 * TOC
 {:toc}
 
+## 字节码结构
+
+C在开发层面的平台相关性：C语言实现系统兼容性的思路很简单，那就是通过在不同的硬件平台和操作系统上开发各自特定的编译器，从而将相同的C语言源代码翻译为底层平台相关的硬件指令。虽然这种思路很棒，但是仍然有明显的缺点，当涉及系统调用时，开发者仍然要关注具体底层系统的API。在Linux平台上，开发者需要知道Linux平台所提供的创建线程的接口是`pthread_create()`；而在Windows平台上，开发者需要知道Windows平台所提供的创建线程的接口是`CreateThread()`。另外，在Linux和Windows平台上，C程序需要引用不同的头文件，并且所调用的创建线程的两种API的入参和返回值也不相同。所以在开发层面上屏蔽底层差异的关键就是**中间语言**，C可以run anywhere，但不能write once。
+
+以类似C struct 的方式来表达java 字节码文件的结构。
+
+![](/public/upload/jvm/class_code.jpg)
+
+常量池（对应Hotspot C++ constantPoolOop）里放的是字面常量和符号引用
+1. 字面常量主要包含文本串以及被声明为final的常量。
+2. 符号引用包含类和接口的全局限定名、字段的名称和描述符、方法的名称和描述符，因为Java语言在编译的时候没有连接这一步，所有的引用都是运行时动态加载的，所以就需要把这些引用的信息保存在class文件里。
+
+## 字节码生成——ASM
+
+从编译原理的层面看，生成 LLVM 的 IR 时，可以得到 LLVM 的 API 的帮助。字节码就是另一种 IR，而且比 LLVM 的 IR 简单多了，有ASM/Apache BCEL/Javassist 这个工具为我们生成字节码。ASM是一个开源的字节码生成工具/**字节码操纵框架**。Grovvy 语言就是用它来生成字节码的，它还能解析 Java 编译后生成的字节码，从而进行修改。
+
+ASM 解析字节码的过程，有点像 XML 的解析器解析 XML 的过程：先解析类，再解析类的成员，比如类的成员变量（Field）、类的方法（Mothod）。在方法里，又可以解析出一行行的指令。
+
+
+### 部分生成的字节码
+
+Spring 采用的代理技术有两个：一个是 Java 的动态代理（dynamic proxy）技术；一个是采用 cglib 自动生成代理，cglib 采用了 asm 来生成字节码。Java 的动态代理技术，只支持某个类所实现的接口中的方法。如果一个类不是某个接口的实现，那么 Spring 就必须用到 cglib，从而用到字节码生成技术来生成代理对象的字节码。
+
+### 系统的根据编程语言代码AST生成字节码
+
+基于 AST 生成 JVM 的字节码的逻辑还是比较简单的，比生成针对物理机器的目标代码要简单得多，为什么这么说呢？主要有以下几个原因：
+
+1. 不用太关心指令选择的问题。针对 AST 中的每个运算，基本上都有唯一的字节码指令对应，直白地翻译就可以了，不需要用到树覆盖这样的算法。
+2. 不需要关心寄存器的分配，因为 JVM 是使用操作数栈的；
+3. 指令重排序也不用考虑，因为指令的顺序是确定的，按照逆波兰表达式的顺序就可以了；
+4. 优化算法，暂时也不用考虑。
+
 ## 类加载——按类名加载
 
 加载的本质，从磁盘上加载，得到的是一个字节数组，然后按照自己的内存模型，把字节数组中对应的数据放到进程内存对应的地方。并对数据进行校验，转化解析和初始化，最终形成可以被虚拟机直接使用的java类型，这就是虚拟机的类加载机制。
@@ -31,17 +63,17 @@ ClassLoader源码注释：The ClassLoader class uses a delegation model to searc
 
 ![](/public/upload/java/classloader_object.png)
 
-双亲委派模型要求除了顶层的启动类加载器外，其余的类加载器都必须有自己的父类加载器，类加载器间的父子关系不会以继承关系实现，而是以组合的方式来复用父类加载的代码。
+双亲委派模型要求除了顶层的启动类加载器外，其余的类加载器都必须有自己的父类加载器，类加载器间的父子关系不会以继承关系实现，而是以组合的方式来复用父类加载的代码。通过这种**层次模型**，可以避免类的重复加载，也可以避免核心类被不同的类加载器加载到内存中造成冲突和混乱，从而保证了Java核心库的安全。
 
 双亲委派模型的工作过程：当一个类加载器收到类加载请求的时候，它会首先把这个请求委托给父类加载器去执行，因此所有的类加载请求最终都会传送到顶层的启动类加载器中，只有当父类加载器也无法找到时才会交给自己去加载。
 
-双亲委派模型的关键就是定义了类的加载过程，先尝试用父类加载器加载，再使用自定义加载器加载，以确保关键的类不被篡改。
 
-使用场景：
+[Java类加载器 — classloader 的原理及应用](https://mp.weixin.qq.com/s/YzIlIx4t0uqb-fm9rA9EvQ)使用场景：
 
 1. 热部署
-2. 代码加密
-3. 类层次划分
+2. 热加载 spring boot devtools。
+2. 代码加密。基于java开发编译产生的jar包是由.class字节码组成，由于字节码的文件格式是有明确规范的。因此对于字节码进行反编译，就很容易知道其源码实现了。jar包加密的本质，还是对字节码文件进行加密操作。但是JVM虚拟机加载class的规范是统一的，因此在加载class文件之前通过自定义classloader先进行反向的解密操作，然后再按照标准的class文件标准进行加载
+4. 依赖冲突。阿里 pandora(潘多拉）通过自定义类加载器，为每个中间件自定义一个加载器来 解决依赖冲突
 
 ### 延迟加载
 
@@ -66,21 +98,6 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 
 ### ClassLoader 隔离
 
-笔者曾写过一个框架，用户在代码中通过注解使用。注解参数包括类的全类名（用户自定义的策略类），框架通过注解拿到用户的全类名，加载类，然后调用执行。
-
-但当框架给scala小组使用时，scala小组因使用的play框架的classloader是spring classload的子类。用户自定义策略类是scala实现的，写在用户的项目中。
-
-框架实现主流程，其中的某个环节，load 用户自定义的策略类执行。此时，框架代码`Class.forName(class name)`去load scala class name就力不从心了。为何呀？
-
-[Java中隔离容器的实现](http://codemacro.com/2015/09/05/java-lightweight-container/)
-
-1. 当在class A中使用了class B时，JVM默认会用class A的class loader去加载class B。
-2. 每个class loader 有一个自己的search class 文件的classpath 范围。
-3. class的 加载不是一次性加载完毕的，而是根据需要延迟加载的（上文提到过）。
-4. 如果class B 不在class loader的classpath search 范围，则会报ClassNotFoundException
-
-与Spring ioc 隔离的对比 [Spring IOC 级联容器原理探究](https://gitbook.cn/gitchat/activity/5b4d716d6b1c4569aa703e49)。PS：有意思的是，**classloader 和 spring ioc 都称之为容器，都具有隔离功能，这背后是否有一个统一的逻辑在？都是class loader，只是class 来源不同，加载后的组织方式不同**
-
 在 Java 虚拟机中，类的唯一性是由类加载器实例以及类的全名一同确定的（即便是同一串字节流，经由不同的类加载器加载，也会得到两个不同的类。猜测一下，如果是一致的，ClassLoader 该如何实现呢？
 
 1. ClassLoader `Class<?> defineClass(String name, byte[] b, int off, int len)` 时，如果发现name 相同， 可以直接返回。但ClassLoader 是可以自定义实现的，很难约束开发必须遵守这个规则。
@@ -100,15 +117,51 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 
 ### java 对象的C++ 类表示——oop-klass model
 
-[深入理解多线程（二）—— Java的对象模型](https://juejin.im/post/5b7625aa6fb9a009910e641d)HotSpot是基于c++实现，而c++是一门面向对象的语言，本身具备面向对象基本特征，所以Java中的对象表示，最简单的做法是为每个Java类生成一个c++类与之对应。但HotSpot JVM并没有这么做，而是设计了一个OOP-Klass Model。OOP（Ordinary Object Pointer）指的是普通对象指针，而Klass用来描述对象实例的具体类型。为什么HotSpot要设计一套oop-klass model呢？答案是：HotSopt JVM的设计者不想让每个对象中都含有一个vtable（虚函数表）。oop的职能主要在于表示对象的实例数据，所以其中不含有任何虚函数。而klass为了实现虚函数多态，所以提供了虚函数表。
+当C、C++和Delphi等程序被编译成二进制程序后，原来所定义的高级数据结构都不复存在了，当Windows/Linux等操作系统(宿主机)加载这些二进制程序时，是不会加载这些语言中所定义的高级数据结构的，宿主机压根儿就不知道原来定义了哪些数据结构、哪些类，所有的数据结构都被转换为对特定内存段的偏移地址。例如C中的Struct结构体，被编译后不复存在，汇编和机器语言中没有与之对应的数据结构的概念，CPU更不知道何为结构体。C++和Delphi中的类概念被编译后也不复存在，所谓的类最终变成内存首地址。而JVM虚拟机在加载字节码程序时，会记录字节码中所定义的所有类型的原始信息(元数据)，JVM知道程序中包含了哪些类，以及每个类中所关联的字段、方法、父类等信息（类型结构信息被带到了运行期）。这是JVM虚拟机与操作系统最大的区别所在。
+
+```c
+struct iphone6s {
+    int length;
+    int width;
+    int height;
+    int weight;
+    int ram;
+    int rom;
+    int pixel;
+}
+int main(){
+    struct iphone6s iphone; // 定义变量
+    iphone.length = 138;
+    iphone.weight = 64;
+    ...
+    return 0
+}
+// 编译为汇编
+main:
+    pushl %ebp
+    movel%esp, %ebp
+    subl$32, %esp
+    
+    movel$138, -28(%ebp)
+    movel$67, -24(%ebp)
+    ...
+    movel$0,%eax
+    leave
+    ret
+```
+
+[深入理解多线程（二）—— Java的对象模型](https://juejin.im/post/5b7625aa6fb9a009910e641d)HotSpot是基于c++实现，而c++是一门面向对象的语言，本身具备面向对象基本特征，所以Java中的对象表示，最简单的做法是为每个Java类生成一个c++类与之对应。但HotSpot JVM并没有这么做，而是设计了一个OOP-Klass Model。
+1. OOP（Ordinary Object Pointer）用来描述对象实例信息
+2. Klass 用来描述java类，是虚拟机内部Java类型结构的对等体
+为什么HotSpot要设计一套oop-klass model呢？答案是：HotSopt JVM的设计者不想让每个对象中都含有一个vtable（虚函数表）。oop的职能主要在于表示对象的实例数据，所以其中不含有任何虚函数。而klass为了实现虚函数多态，所以提供了虚函数表。
 
 ![](/public/upload/java/oop_kclass_model.png)
 
-**在Java程序运行过程中，每创建一个新的对象，在JVM内部就会相应地创建一个对应类型的OOP对象。**在HotSpot中，根据JVM内部使用的对象业务类型，具有多种oopDesc的子类。除了oppDesc类型外，opp体系中还有很多instanceOopDesc、arrayOopDesc 等类型的实例，他们都是oopDesc的子类。
+**在Java程序运行过程中，每创建一个新的对象，在JVM内部就会相应地创建一个对应类型的OOP对象。**JVM内部定义了各种oop-klass，在JVM看来，不仅Java类是对象，Java方法也是对象，字节码常量池也是对象，一切皆是对象。JVM使用不同的oop-klass模型来表示各种不同的对象。
 
 ![](/public/upload/java/hotspot_oop.png)
 
-JVM在运行时，需要一种用来标识Java内部类型的机制。在HotSpot中的解决方案是：为每一个已加载的Java类创建一个instanceKlass对象，用来在JVM层表示Java类。
+在HotSpot中，根据JVM内部使用的对象业务类型，具有多种oopDesc的子类。除了oppDesc类型外，opp体系中还有很多instanceOopDesc、arrayOopDesc 等类型的实例，他们都是oopDesc的子类。
 
 ![](/public/upload/java/hotspot_kclass.png)
 
@@ -148,6 +201,8 @@ class oopDesc {
 2. 对象字段内存对齐（有六七个对齐规则），让字段只出现在同一 CPU 的缓存行中。如果字段不是对齐的，那么就有可能出现跨缓存行的字段。也就是说，该字段的读取可能需要替换两个缓存行，而该字段的存储也会同时污染两个缓存行。
 3. Java 虚拟机重新分配字段的先后顺序，以达到内存对齐的目的
 
+
+
 ## java 对象在缓存中的读写
 
 ![](/public/upload/jvm/field_align.png)
@@ -155,6 +210,12 @@ class oopDesc {
 通过内存对齐可以避免一个字段同时存在两个缓存行里的情况，但还是无法完全规避缓存伪共享的问题，也就是一个缓存行中存了多个变量，而这几个变量在多核 CPU 并行的时候，会导致竞争缓存行的写权限，当其中一个 CPU 写入数据后，这个字段对应的缓存行将失效，导致这个缓存行的其他字段也失效。
 
 在 Disruptor 中，通过填充几个无意义的字段，让对象的大小刚好在 64 字节，一个缓存行的大小为64字节，这样这个缓存行就只会给这一个变量使用，从而避免缓存行伪共享，但是在 jdk7 中，由于无效字段被清除导致该方法失效，只能通过继承父类字段来避免填充字段被优化，而 jdk8 提供了注解@Contended 来标示这个变量或对象将独享一个缓存行，使用这个注解必须在 JVM 启动的时候加上 `-XX:-RestrictContended` 参数，其实也是用**空间换取时间**。
+
+## 其它
+
+《揭秘Java虚拟机:JVM设计原理与实现》Java选择具备运行时类型识别的特性本身便从一个十分隐晦的层面制约了Java必须选择成为一门面向对象的编程语言，为何？类型本身就是一种“闭包”的技术手段，只有先从语法层面实现了“闭包”，才能实现“对象”的概念，否则，何来的属性、成员变量、类方法一说？类型是实现将若干属性和动作打包成为一个整体对象进行统一识别的策略。如果Java像C++那样，类型不作为属性和方法封装的唯一手段，开发者可以随心所欲地在类的外面定义变量和函数，那么对于这部分数据的“运行时识别”必然是一个难题，可能需要通过类似namespace或者filename这样的机制去实现动态反射了，但是这种反射想想都让人头大，不容易啊！
+
+当一门编程语言实现了完全的闭包语法策略(使用类型包装可以认为是闭包的一种)，便自然而然具备了自动内存管理的技术基础，或者说实现自动内存管理更加容易。所以闭包便成为很多具备自动内存回收特性的编程语言的语法基础，例如GO语言、Phthon、JavaScript等，虽然大家具体实现闭包的手段不同，但是殊途同归，都是为了能够让虚拟机在自动回收内存时尽量简单。
 
 
 

@@ -15,8 +15,6 @@ keywords: Go library
 
 本文主要阐述一下golang中常用的库。
 
-常规的package 需要import 才能使用，go runtime库猜测一下应该是 `go build`时自动import 到代码上的。
-
 ## klog
 
 klog是著名google开源C++日志库glog的golang版本

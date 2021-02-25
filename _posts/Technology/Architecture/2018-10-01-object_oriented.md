@@ -125,7 +125,7 @@ void silly_operation(struct file_operations* operations) {
 
 如此一来，本来应该在 hellofs_read 运行的代码，就跑到了 sillyfs_read 里，程序很容易就崩溃了。对于 C 这种非常灵活的语言来说，你根本禁止不了这种操作，只能靠人为的规定和代码检查。到了面向对象程序设计语言这里，这种做法由一种编程结构变成了一种语法。**给函数指针赋值的操作下沉到了运行时去实现**。
 
-
+[强制类型转换是抽象层次有问题](https://mp.weixin.qq.com/s/cJ0odiYcphhNBoAVjqpCZQ)我们在写代码的过程中，什么时候会用到强制类型转换呢？子类的方法超出了父类的类型定义范围，为了能使用到子类的方法，只能使用类型强制转换将类型转成子类类型。举个例子，在苹果（Apple）类上，有一个isSweet()方法是用来判断水果甜不甜的；西瓜（Watermelon）类上，有一个isJuicy()是来判断水分是否充足的；同时，它们都共同继承一个水果（Fruit）类。我们需要挑选出甜的水果和有水分的习惯，因为pick方法的入参的类型是Fruit，所以为了获得Apple和Watermelon上的特有方法，我们不得不使用instanceof做一个类型判断。这里问题出在哪里？对于这样的代码我们要如何去优化呢？仔细分析一下，我们可以发现，根本原因是因为isSweet和isJuicy的抽象层次不够，站在更高抽象层次也就是Fruit的视角看，我们挑选的就是可口的水果，只是具体到苹果我们看甜度，具体到西瓜我们看水分而已。因此，解决方法就是对isSweet和isJuicy进行抽象，并提升一个层次，在Fruit上创建一个isTasty()的抽象方法，然后让苹果和西瓜类分别去实现这个抽象方法就好了。 
 
 ## 面向对象的渊源——限定修改影响的范围
 
@@ -208,32 +208,36 @@ void silly_operation(struct file_operations* operations) {
 
 我以前的认知，线程只是一个 驱动者，驱动代码执行，对象跟线程没啥关系。一个典型的代码是
 
-	class XXThread extends Thread{
-		private Business business;
-		public XXThread(Business business){
-			this.business = business;
-		}
-		public void run(){
-			business code
-		}
-	}
+```java
+class XXThread extends Thread{
+    private Business business;
+    public XXThread(Business business){
+        this.business = business;
+    }
+    public void run(){  
+        // 一般适用于 task之间没有关联，线程内可以闭环掉所有逻辑，无需共享数据，线程之间无需协作
+        business code
+    }
+}
+```
 	
 在apollo client 中，RemoteRepository 内部聚合线程 完成配置的周期性拉取，线程就是一个更新数据的手段，只是周期性执行下而已。 
 
-	class Business{
-		private Data data;
-		public Business(){
-			Executors.newSingleThread().execute(new Runnable(){
-				public void run(){
-					acquireDataTimely();
-				}
-			});
-		}
-		public void acquireDataTimely(){}
-		public void useData(){}
-		public void transferData(){}
-	
-	}
+```java
+class Business{
+    private Data data;
+    public Business(){
+        Executors.newSingleThread().execute(new Runnable(){
+            public void run(){
+                acquireDataTimely();
+            }
+        });
+    }
+    public void acquireDataTimely(){}
+    public void useData(){}
+    public void transferData(){}
+}
+```
 	
 从两段代码 看，线程与对象的 主从关系 完全相反。[程序的本质复杂性和元语言抽象](https://coolshell.cn/articles/10652.html)指出：程序=control + logic。 同步/异步 等 本质就是一个control，只是拉取数据的手段。因此，在我们理解程序时，同步异步不应成为本质的存在。
 
