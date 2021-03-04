@@ -165,6 +165,10 @@ ip netns exec $pid1 ip link set eth0 up
 
 ### veth
 
+[手把手带你搞定4大容器网络问题](https://mp.weixin.qq.com/s/2PakMU3NR_tkly6K0HsAlQ)如果我们不能与一个专用的网络堆栈通信，那么它就没那么有用了。veth 设备是虚拟以太网设备。它们可以作为网络命名空间之间的隧道（也可以作为独立的网络设备使用）。虚拟以太网设备总是成对出现：`sudo ip link add veth0 type veth peer name ceth0`。创建后，veth0和ceth0都驻留在主机的网络堆栈（也称为根网络命名空间）上。为了连接根命名空间和netns0命名空间，我们需要将一个设备保留在根命名空间中，并将另一个设备移到netns0中：`sudo ip link set ceth0 netns netns0`。一旦我们打开设备并分配了正确的 IP 地址，任何出现在其中一台设备上的数据包都会立即出现在连接两个命名空间的对端设备上。
+
+![](/public/upload/network/linux_veth.png)
+
 veth 发送数据的函数是 veth_xmit()，它里面的主要操作就是找到 veth peer 设备，然后触发 peer 设备去接收数据包。
 ```c
 static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev){
