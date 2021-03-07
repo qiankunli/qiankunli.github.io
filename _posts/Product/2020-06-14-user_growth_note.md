@@ -13,6 +13,8 @@ keywords: 精进
 * TOC
 {:toc}
 
+[从开发视角看数据分析](https://mp.weixin.qq.com/s/T4ClgM8jXRdjYSJl_GgpPA) 精细化运营的一个典型案例。
+
 什么叫用户增长？以终为始，利用一切资源让更多用户更高频的使用核心产品功能。
 
 1. 更多 

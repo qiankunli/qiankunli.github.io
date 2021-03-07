@@ -45,7 +45,7 @@ Spring 采用的代理技术有两个：一个是 Java 的动态代理（dynamic
 
 ## 类加载——按类名加载
 
-加载的本质，从磁盘上加载，得到的是一个字节数组，然后按照自己的内存模型，把字节数组中对应的数据放到进程内存对应的地方。并对数据进行校验，转化解析和初始化，最终形成可以被虚拟机直接使用的java类型，这就是虚拟机的类加载机制。
+最初的jdk 根本没有类加载的概念，jdk的核心类库直接调用 `ClassFileParser::parseClassFile`接口完成加载。加载的本质，从磁盘上加载，得到的是一个字节数组，然后按照自己的内存模型，把字节数组中对应的数据放到进程内存对应的地方。并对数据进行校验，转化解析和初始化，最终形成可以被虚拟机直接使用的java类型，这就是虚拟机的类加载机制。
 
 [JVM类加载器与ClassNotFoundException和NoClassDefFoundError](http://arganzheng.life/jvm-classloader-ClassNotFoundException-NoClassDefFoundError.html)在”加载“阶段，虚拟机需要完成以下三件事：
 
@@ -63,7 +63,7 @@ ClassLoader源码注释：The ClassLoader class uses a delegation model to searc
 
 ![](/public/upload/java/classloader_object.png)
 
-双亲委派模型要求除了顶层的启动类加载器外，其余的类加载器都必须有自己的父类加载器，类加载器间的父子关系不会以继承关系实现，而是以组合的方式来复用父类加载的代码。通过这种**层次模型**，可以避免类的重复加载，也可以避免核心类被不同的类加载器加载到内存中造成冲突和混乱，从而保证了Java核心库的安全。
+双亲委派模型要求除了顶层的启动类加载器外，其余的类加载器都必须有自己的父类加载器，类加载器间的父子关系不会以继承关系实现，而是以组合的方式来复用父类加载的代码。通过这种**层次模型**，规定了类加载器优先级，可以避免类的重复加载，也可以避免核心类被不同的类加载器加载到内存中造成冲突和混乱，从而保证了Java核心库的安全。
 
 双亲委派模型的工作过程：当一个类加载器收到类加载请求的时候，它会首先把这个请求委托给父类加载器去执行，因此所有的类加载请求最终都会传送到顶层的启动类加载器中，只有当父类加载器也无法找到时才会交给自己去加载。
 
@@ -107,17 +107,13 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 
 ## Java对象在内存中的表示
 
-|新建对象的方式||
-|---|---|
-|new|通过构造器来初始化实例字段|
-|反射|通过构造器来初始化实例字段|
-|Object.clone|直接复制已有的数据，来初始化新建对象的实例字段|
-|反序列化|直接复制已有的数据，来初始化新建对象的实例字段|
-|Unsafe.allocateInstance|未初始化实例字段|
+磁盘表示 ：java 源码文件 ==> 磁盘表示： 字节码文件 ==> 内存的c++表示： oop-kclass struct ==> 内存的二进制表示：数据结构和方法对应的机器指令。
 
 ### java 对象的C++ 类表示——oop-klass model
 
 当C、C++和Delphi等程序被编译成二进制程序后，原来所定义的高级数据结构都不复存在了，当Windows/Linux等操作系统(宿主机)加载这些二进制程序时，是不会加载这些语言中所定义的高级数据结构的，宿主机压根儿就不知道原来定义了哪些数据结构、哪些类，所有的数据结构都被转换为对特定内存段的偏移地址。例如C中的Struct结构体，被编译后不复存在，汇编和机器语言中没有与之对应的数据结构的概念，CPU更不知道何为结构体。C++和Delphi中的类概念被编译后也不复存在，所谓的类最终变成内存首地址。而JVM虚拟机在加载字节码程序时，会记录字节码中所定义的所有类型的原始信息(元数据)，JVM知道程序中包含了哪些类，以及每个类中所关联的字段、方法、父类等信息（类型结构信息被带到了运行期）。这是JVM虚拟机与操作系统最大的区别所在。
+
+在编译期生成的字节码文件中，Java 类结构的信息其实是被抹掉的，谁也无法一眼从二进制格式的字节码文件中看出一个Java 类的结构，但字节码文件通过其本身的格式规范，确保JVM 可以据此还原出原始的Java 类结构。字节码文件的解析包含3个主要的过程：常量池解析；字段解析；方法解析。通过字段解析，jvm 能够分析出java 类所封装的数据结构，通过方法解析 可以分析出java 类所封装的算法逻辑，而前两者很多与字符串 等相关的信息都封装于常量池中，因此要最先解析常量池。当常量池、字段、方法被解析完，则字节码文件的“精华”便被完全消化吸收。
 
 ```c
 struct iphone6s {
@@ -150,6 +146,8 @@ main:
     ret
 ```
 
+正因为JVM 需要保存字节码中的类元信息，所以JVM自然而然就演化出了OOP-KLASS二分模型。KLASS 用来保存类元信息，保存在PERM 永久区，OOP 用来表示JVM所创建的类实例对象，分配在堆区。同时JVM 为了支持反射等技术，必须在OOP 中保存一个只恨，用来指向KLASS，这样就可以在运行期获取类的类型、父类、字段、方法等信息。这些有助于开发具有运行时动态特性的程序，例如根据类型来设计更为抽象和优雅的工厂模式，运行时动态生成字节码并执行其方法（ASM字节码编程），进而使得java 成为各种中间件、框架的首选。
+
 [深入理解多线程（二）—— Java的对象模型](https://juejin.im/post/5b7625aa6fb9a009910e641d)HotSpot是基于c++实现，而c++是一门面向对象的语言，本身具备面向对象基本特征，所以Java中的对象表示，最简单的做法是为每个Java类生成一个c++类与之对应。但HotSpot JVM并没有这么做，而是设计了一个OOP-Klass Model。
 1. OOP（Ordinary Object Pointer）用来描述对象实例信息
 2. Klass 用来描述java类，是虚拟机内部Java类型结构的对等体
@@ -157,11 +155,11 @@ main:
 
 ![](/public/upload/java/oop_kclass_model.png)
 
-**在Java程序运行过程中，每创建一个新的对象，在JVM内部就会相应地创建一个对应类型的OOP对象。**JVM内部定义了各种oop-klass，在JVM看来，不仅Java类是对象，Java方法也是对象，字节码常量池也是对象，一切皆是对象。JVM使用不同的oop-klass模型来表示各种不同的对象。
+字节码文件是分段的，加载过程中，也会分段解析 字节码文件来创建和填充 instanceKlass 和methodOop 等， **在Java程序运行过程中，每创建一个新的对象，在JVM内部就会相应地创建一个对应类型的OOP对象。**JVM内部定义了各种oop-klass，在JVM看来，不仅Java类是对象，Java方法也是对象，字节码常量池也是对象，一切皆是对象。JVM使用不同的oop-klass模型来表示各种不同的对象。
 
 ![](/public/upload/java/hotspot_oop.png)
 
-在HotSpot中，根据JVM内部使用的对象业务类型，具有多种oopDesc的子类。除了oppDesc类型外，opp体系中还有很多instanceOopDesc、arrayOopDesc 等类型的实例，他们都是oopDesc的子类。
+无论是oop还是klass，基本都被划分来描述instance/method/constantMethod/methodData/array/objArray/typeArray/constantPool/constantPoolCache 等，用来勾画一个java code 的全部：数据、方法、类型、数组和实例。
 
 ![](/public/upload/java/hotspot_kclass.png)
 
@@ -169,9 +167,38 @@ main:
 
 1. 一般很多人会回答：对象存储在堆上。
 2. 稍微好一点的人会回答：对象存储在堆上，对象的引用存储在栈上。
-3. 一个更加显得牛逼的回答：对象的实例（instantOopDesc)保存在堆上，对象的元数据（instantKlass）保存在方法区，对象的引用保存在栈上。
+3. 一个更加显得牛逼的回答：对象的实例（instanceOopDesc)保存在堆上，对象的元数据（instanceKlass）保存在方法区，对象的引用保存在栈上。
 
 ### 内存布局
+
+```c++
+// Klass_vtbl 描述了虚函数表
+class Klass : public Klass_vtbl{
+    protected: 
+        jint _layout_helper;    // 对象布局综合描述
+        junit _super_check_offset;
+        Symbol* _name;  // 类名
+    public: ...
+    protected:
+        klassOop _secondary_super_cache;
+        objArrayOop _secondary_supers;
+        klassOop _primary_supers[_primary_super_limit];
+        oop _java_mirror;   // 镜像类 Class
+        klassOop _super;    // 父类
+        klassOop _subklass; // 指向第一个子类
+        klassOop _next_sibling; // 指向第一个兄弟节点
+        jint _modifier_flags;   // 修饰符标识 例如static
+        AccessFlags _access_flags;  // 访问权限标识，例如public
+        objectArrayOop _methods   // 方法信息
+        typeArrayOop _fields     // 字段信息
+        oop   _class_loader     // 类加载器
+        typeArrayOop  _inner_classes // 内部类
+        int _nonstatic_field_size  // 非静态字段大小
+        int _static_field_size  // 静态字段大小
+        int vtable_len   // 虚方法表长度
+}
+```
+**instanceKlass 是java 类加载的最终产物**，jvm 根据这个数据结构，可以获取java 类所定义的一切元素。jvm 在创建完instanceKlass 之后，又创建了一个与之对等的镜像类java.lang.Class。Class 是为了被java 程序调用，instanceKlass 是为了被jvm 内部访问。
 
 ```c++
 class oopDesc {
@@ -202,20 +229,13 @@ class oopDesc {
 3. Java 虚拟机重新分配字段的先后顺序，以达到内存对齐的目的
 
 
-
-## java 对象在缓存中的读写
-
-![](/public/upload/jvm/field_align.png)
-
-通过内存对齐可以避免一个字段同时存在两个缓存行里的情况，但还是无法完全规避缓存伪共享的问题，也就是一个缓存行中存了多个变量，而这几个变量在多核 CPU 并行的时候，会导致竞争缓存行的写权限，当其中一个 CPU 写入数据后，这个字段对应的缓存行将失效，导致这个缓存行的其他字段也失效。
-
-在 Disruptor 中，通过填充几个无意义的字段，让对象的大小刚好在 64 字节，一个缓存行的大小为64字节，这样这个缓存行就只会给这一个变量使用，从而避免缓存行伪共享，但是在 jdk7 中，由于无效字段被清除导致该方法失效，只能通过继承父类字段来避免填充字段被优化，而 jdk8 提供了注解@Contended 来标示这个变量或对象将独享一个缓存行，使用这个注解必须在 JVM 启动的时候加上 `-XX:-RestrictContended` 参数，其实也是用**空间换取时间**。
-
 ## 其它
 
 《揭秘Java虚拟机:JVM设计原理与实现》Java选择具备运行时类型识别的特性本身便从一个十分隐晦的层面制约了Java必须选择成为一门面向对象的编程语言，为何？类型本身就是一种“闭包”的技术手段，只有先从语法层面实现了“闭包”，才能实现“对象”的概念，否则，何来的属性、成员变量、类方法一说？类型是实现将若干属性和动作打包成为一个整体对象进行统一识别的策略。如果Java像C++那样，类型不作为属性和方法封装的唯一手段，开发者可以随心所欲地在类的外面定义变量和函数，那么对于这部分数据的“运行时识别”必然是一个难题，可能需要通过类似namespace或者filename这样的机制去实现动态反射了，但是这种反射想想都让人头大，不容易啊！
 
 当一门编程语言实现了完全的闭包语法策略(使用类型包装可以认为是闭包的一种)，便自然而然具备了自动内存管理的技术基础，或者说实现自动内存管理更加容易。所以闭包便成为很多具备自动内存回收特性的编程语言的语法基础，例如GO语言、Phthon、JavaScript等，虽然大家具体实现闭包的手段不同，但是殊途同归，都是为了能够让虚拟机在自动回收内存时尽量简单。
+
+import 语句仅仅是个语法糖，且为了不写那一长串的全限定名，并没有任何关联的运行时行为，更不会导致类的加载，纯粹是为了方便写代码。
 
 
 
