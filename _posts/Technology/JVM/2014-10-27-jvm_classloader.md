@@ -153,8 +153,6 @@ main:
 2. Klass 用来描述java类，是虚拟机内部Java类型结构的对等体
 为什么HotSpot要设计一套oop-klass model呢？答案是：HotSopt JVM的设计者不想让每个对象中都含有一个vtable（虚函数表）。oop的职能主要在于表示对象的实例数据，所以其中不含有任何虚函数。而klass为了实现虚函数多态，所以提供了虚函数表。
 
-![](/public/upload/java/oop_kclass_model.png)
-
 字节码文件是分段的，加载过程中，也会分段解析 字节码文件来创建和填充 instanceKlass 和methodOop 等， **在Java程序运行过程中，每创建一个新的对象，在JVM内部就会相应地创建一个对应类型的OOP对象。**JVM内部定义了各种oop-klass，在JVM看来，不仅Java类是对象，Java方法也是对象，字节码常量池也是对象，一切皆是对象。JVM使用不同的oop-klass模型来表示各种不同的对象。
 
 ![](/public/upload/java/hotspot_oop.png)
