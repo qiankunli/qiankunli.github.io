@@ -55,8 +55,6 @@ Spring 采用的代理技术有两个：一个是 Java 的动态代理（dynamic
 
 ![](/public/upload/java/class_load_process.png)
 
-![](/public/upload/java/jvm_class_loader_reference.png)
-
 ### 类加载器的双亲委派模型
 
 ClassLoader源码注释：The ClassLoader class uses a delegation model to search for classes and resources. 
