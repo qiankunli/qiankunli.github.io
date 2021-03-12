@@ -130,7 +130,16 @@ ip netns exec $pid1 ip addr add 172.17.3.2/16 dev eth0
 ip netns exec $pid1 ip link set eth0 up
 ```
 
-容器的虚拟网络接口，直接连接在了宿主机的物理网络接口上了，直接形成了一个网络二层的连接。
+容器的虚拟网络接口，直接连接在了宿主机的物理网络接口上了，直接形成了一个网络二层的连接。如果从容器里向宿主机外发送数据，通过的接口要比 veth 少了，没有内部额外的 softirq 处理开销。。
+
+```c
+static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev){
+    …
+    /* 拿到ipvlan对应的物理网路接口设备， 然后直接从这个设备发送数据。*/ 
+    skb->dev = ipvlan->phy_dev;
+    return dev_queue_xmit(skb);
+}
+```
 
 ## vxlan
 
@@ -173,18 +182,22 @@ veth 发送数据的函数是 veth_xmit()，它里面的主要操作就是找到
 ```c
 static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev){
     ...
+    /* 拿到veth peer设备的net_device */
     rcv = rcu_dereference(priv->peer);
     ...
+    /* 将数据送到veth peer设备 */
     if (likely(veth_forward_skb(rcv, skb, rq, rcv_xdp) == NET_RX_SUCCESS)) {
-        ...
+    ...
 }
 static int veth_forward_skb(struct net_device *dev, struct sk_buff *skb,
                             struct veth_rq *rq, bool xdp){
+    /* 这里最后调用了 netif_rx()， 是一个网络设备驱动里面标准的接收数据包的函数，netif_rx() 里面会为这个数据包 raise 一个 softirq。*/
     return __dev_forward_skb(dev, skb) ?: xdp ?
         veth_xdp_rx(rq, skb) :
         netif_rx(skb);
 }
 ```
+容器网络延时要比宿主机上的高吗?veth 发送数据的函数是 `veth_xmit()`，它里面的主要操作就是找到 veth peer 设备，然后触发 peer 设备去接收数据包。虽然 veth 是一个虚拟的网络接口，但是在接收数据包的操作上，除了没有硬件中断的处理，虚拟接口和真实的网路接口并没有太大的区别，特别是软中断（softirq）的处理部分和真实的网络接口是一样的。即使 softirq 的执行速度很快，还是会带来额外的开销。如果要减小容器网络延时，可以给容器配置 ipvlan/macvlan 的网络接口来替代 veth 网络接口。Ipvlan/macvlan 直接在物理网络接口上虚拟出接口，在发送对外数据包的时候可以直接通过物理接口完成，可以非常接近物理网络接口的延时。不过，由于 ipvlan/macvlan 网络接口直接挂载在物理网络接口上，对于需要使用 iptables 规则的容器，比如 Kubernetes 里使用 service 的容器，就不能工作了。
 
 ### 网桥
 
