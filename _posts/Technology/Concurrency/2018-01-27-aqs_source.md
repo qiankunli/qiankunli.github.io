@@ -165,18 +165,50 @@ AQS实际上通过头尾指针来管理同步队列，实现包括获取锁失�
 
 ### synchronized原理
 
-从[Java中synchronized的实现原理与应用](http://blog.csdn.net/u012465296/article/details/53022317) [聊聊并发（二）——Java SE1.6中的Synchronized](http://www.infoq.com/cn/articles/java-se-16-synchronized/) 可以看到:
+[JVM源码分析之synchronized实现](https://mp.weixin.qq.com/s/BkrQyi1mbyGig3s3xqmaRw)synchronized的HotSpot实现依赖于对象头的Mark Word。JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor/lock record 的地址。
+
+![](/public/upload/concurrency/biased_lock.png)
+
+markOop中提供了大量方法用于查看当前对象头的状态，以及更新对象头的数据。比如 `markOop->monitor()` 里可以保存ObjectMonitor的对象。
+
+```c++
+class BasicObjectLock {
+    BasicLock _lock; 
+    oop  _obj;      // object holds the lock;
+}
+class BasicLock {
+    volatile markOop _displaced_header; // 保存_obj指向Object对象的对象头数据；
+}
+ObjectMonitor::ObjectMonitor() {
+    _header       = NULL;   //  markOop对象头
+    _count        = 0;
+    _waiters      = 0,      //  markOop对象头
+    _recursions   = 0;      // 重入次数
+    _object       = NULL;   // ObjectMonitor寄生的对象
+    _owner        = NULL;
+    _WaitSet      = NULL;   // 处于wait状态的线程，会被加入到wait set；
+    _WaitSetLock  = 0 ;
+    _Responsible  = NULL ;
+    _succ         = NULL ;
+    _cxq          = NULL ;
+    FreeNext      = NULL ;
+    _EntryList    = NULL ;  // 处于等待锁block状态的线程，会被加入到entryset；
+    _SpinFreq     = 0 ;
+    _SpinClock    = 0 ;
+    OwnerIsThread = 0 ;
+}
+```
 
 1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
-* JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走操作系统。
-* Monitor是线程私有的数据结构，每一个线程都有一个可用monitor record列表，同时还有一个全局的可用列表。JVM中创建对象时会在对象前面加上两个字大小的对象头mark word。Mark Word最后3bit是状态位，根据不同的状态位Mark Word中存放不同的内容。有时存储当前占用的线程id，有时存储某个线程monitor/lock record 的地址。
-
-    ![](/public/upload/concurrency/biased_lock.png)
-* 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了——重量级锁，会导致线程的状态切换，让出cpu。**偏向锁通过对比Mark Word解决加锁问题，避免执行CAS操作。而轻量级锁是通过用CAS操作和自旋来解决加锁问题，避免线程阻塞和唤醒而影响性能。重量级锁是将除了拥有锁的线程以外的线程都阻塞**。
+2. JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走内核。
+3. Monitor是线程私有的数据结构，每一个线程都有一个可用monitor record列表，同时还有一个全局的可用列表。
+4. 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了——重量级锁，会导致线程的状态切换，让出cpu。**偏向锁通过对比Mark Word在没有多线程竞争的情况下，尽量减少不必要的轻量级锁执行路径，轻量级锁的获取及释放依赖多次CAS原子指令，而偏向锁只依赖一次CAS原子指令置换ThreadID。而轻量级锁是通过用CAS操作和自旋来尽量避免重量级锁引起的性能消耗。重量级锁是将除了拥有锁的线程以外的线程都阻塞**。
 
 [Java synchronized原理总结](https://zhuanlan.zhihu.com/p/29866981)
 
 ![](/public/upload/concurrency/synchronized.png)
+
+从底层原理来说，除了时间片中断外，所谓的阻塞都是线程自己让出了cpu（设置状态 + 执行内核调度函数scheduler），区别在于这些逻辑写在用户态还是内核态，由内核lock封装还是自己通过“park/unpark + 等待队列” 直接动手。
 
 ### DK1.6 之后性能优势不大了，只剩下功能优势
 
@@ -192,7 +224,7 @@ synchronized与java.util.concurrent包中的ReentrantLock相比，由于JDK1.6�
 
 ![](/public/upload/java/synchronized_mutex.jpg)
 
-AQS的FIFO的等待队列给解决在锁竞争方面的羊群效应问题提供了一个思路：AQS使用了变种的CLH队列，因为队列里的线程只监视其前面节点线程的状态，根据前面节点来判断自己是继续争用锁，还是需要被阻塞; 线程唤醒也只唤醒队头等待线程。因为每个线程只会读写前一个线程的状态值，这个值只会被当前线程使用到，相比传统的所有线程都监视读写一个同步变量，CLH可以减少变量的变更带来的多处理器缓存同步的开销；
+synchronized 较新实现/AQS的FIFO的等待队列给解决在锁竞争方面的羊群效应问题提供了一个思路：AQS使用了变种的CLH队列，因为队列里的线程只监视其前面节点线程的状态，根据前面节点来判断自己是继续争用锁，还是需要被阻塞; **线程唤醒也只唤醒队头等待线程**。因为每个线程只会读写前一个线程的状态值，这个值只会被当前线程使用到，相比传统的所有线程都监视读写一个同步变量，CLH可以减少变量的变更带来的多处理器缓存同步的开销；
 
 如果你的目标是让端到端的延迟只有 10毫秒，而其中花80纳秒去主存拿一些未命中数据的过程将占很重的一块。
 

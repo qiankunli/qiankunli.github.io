@@ -82,6 +82,8 @@ image的build过程，粗略的说，就是以容器执行命令（`docker run`�
 
 开发者可以使用一些工具(如Dockerfile)构建出自己的容器镜像、**签名**并上传到互联网上（分发内容一定会有签名， 更进一步签名还可以作为内容寻址），然后需要运行这些软件的人可以通过指定名称（如_example.com/my-app_）下载、验证和运行这些容器。
 
+[彻底搞懂容器镜像构建](https://mp.weixin.qq.com/s/zAWr4ezK5kjGVzUqs2eg2Q)未细读
+
 ### build 时使用http代理
 
 2019.4.3 补充
