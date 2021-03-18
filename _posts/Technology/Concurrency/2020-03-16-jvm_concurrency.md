@@ -58,42 +58,41 @@ pthread_create 四个参数
 1. 创建它：继承Thread，实现Runnable，实现TimerTask（现在不推荐）
 2. 启动它：start
 3. 暂停它（唤醒它）：sleep（自动唤醒），wait和notify
-4. 停止它（取消它）：
-    
-    a. interrupt，注意这种停止并不是抢占式的，代码中要遵守一定的约定。 [java exception](http://qiankunli.github.io/2017/04/22/exception.html)
-    
-    b. 设置一个变量（显式的interrupt）
+4. 停止它（取消它）：除了 `unsafe.park` 还可以interrupt，注意这种停止并不是抢占式的，代码中要遵守一定的约定。 [java exception](http://qiankunli.github.io/2017/04/22/exception.html) 或者设置一个变量（显式的interrupt）
         
-        class thread{
-            public boolean isRun = "true";
-            void run(){
-                 while(isRun){
-                     xx
-                 }
-            }
-            void stop(){
-                isRun = false;
-            }
+    ```java
+    class thread{
+        public boolean isRun = "true";
+        void run(){
+                while(isRun){
+                    xx
+                }
         }
-    c. unsafe.park
+        void stop(){
+            isRun = false;
+        }
+    }
+    ```
 
 ## jvm层实现
 
-![](/public/upload/jvm/hospot_thread_object.png)
+
+OSThread: JVM中C++定义的类，代表了JVM中对底层操作系统的osthread的抽象，它维护着实际操作系统创建的线程句柄handle，可以获取底层osthread的状态。
+
+![](/public/upload/concurrency/jvm_thread.png)
 
 [从Java到C++,以JVM的角度看Java线程的创建与运行](https://www.jianshu.com/p/3ce1b5e5a55e)
 
 1. JavaThread: JVM中C++定义的类，一个JavaThread的instance代表了在JVM中的java.lang.Thread的instance, 它维护了线程的状态，并且维护一个指针指向java.lang.Thread创建的对象(oop)。它同时还维护了一个指针指向对应的OSThread，来获取底层操作系统创建的osthread的状态
-2. OSThread: JVM中C++定义的类，代表了JVM中对底层操作系统的osthread的抽象，它维护着实际操作系统创建的线程句柄handle，可以获取底层osthread的状态
-3. VMThread: JVM中C++定义的类，这个类和用户创建的线程无关，是JVM本身用来进行虚拟机操作的线程，比如GC
-
-![](/public/upload/jvm/hospot_thread_sequence.png)
+3. VMThread: JVM中C++定义的类，所有的GC操作都是从VMThread 触发的
 
 [聊聊 Java 并发——基石篇（上）](https://www.infoq.cn/article/Nwq2WyKWevl0mGk_g96C)在创建一个 Thread 对象的时候，除了一些初始化设置之外就没有什么实质性的操作，真正的工作其实是在 start 方法调用中产生的。start() 方法最终调用的是 start0() 这个本地方法，查阅 jdk 源码知道，start0() 方法映射到了 JVM_StartThread 这个方法中，在 `hotspot\src\share\vm\prims\jvm.cpp`
 
+![](/public/upload/jvm/hospot_thread_sequence.png)
+
 ## 线程的状态
 
-[Understanding Linux Process States](https://access.redhat.com/sites/default/files/attachments/processstates_20120831.pdf)
+jvm 运行在不同的操作系统上，独立设计了一套线程状态。比如当jvm thread 创建时，它的状态为NEW，当执行时转变为RUNNABLE，在windows 和linux 上的实现稍有区别：在linux 上创建线程后，虽然设置成NEW，但是Linux 的线程创建完之后就可以执行，所以为了让线程只能在start 之后才能执行， 当linux 线程初始化之后通过一个信号将线程暂停。[Understanding Linux Process States](https://access.redhat.com/sites/default/files/attachments/processstates_20120831.pdf) 
 
 |进程的基本状态|Linux|Java|
 |---|---|---|
@@ -115,20 +114,6 @@ pthread_create 四个参数
 
 从linux内核来看， BLOCKED、WAITING、TIMED_WAITING都是等待状态。做这样的区分，是jvm出于管理的需要（两个原因的线程放两个队列里管理，如果线程运行出了synchronized这段代码，jvm只需要去blocked队列放一个线程出来。而某人调用了notify()，jvm只需要去waitting队列里取个出来。），本质上是：who when how唤醒线程。
 
-[Java线程中wait状态和block状态的区别? - 赵老师的回答 - 知乎](
-https://www.zhihu.com/question/27654579/answer/128050125)
-
-|从上到下|常规java code|synchronized java code|volatile java code|
-|---|---|---|---|
-|编译|编译器加点私货|monitor enter/exist|除了其变量定义的时候有一个Volatile外，之后的字节码跟有无Volatile完全一样|
-||class 字节码 |扩充后的class 字节码 ||
-|运行|jvm加点私货|锁升级：自旋/偏向锁/轻量级锁/重量级锁 ||
-||机器码|扩充后的机器码| 加入了lock指令，查询IA32手册，它的作用是使得本CPU的Cache写入了内存，该写入动作也会引起别的CPU invalidate其Cache |
-|用户态|||
-||系统调用|mutex系统调用|
-|内核态|||
-|||可能用到了 semaphore struct|
-|||线程加入等待队列 + 修改自己的状态 + 触发调度|
 
 ## 锁
 
@@ -137,6 +122,8 @@ Java中往往是按照是否含有某一特性来定义锁
 ![](/public/upload/concurrency/java_lock.png)
 
 ## 其它
+
+![](/public/upload/jvm/hospot_thread_object.png)
 
 ### 设置多少线程数
 

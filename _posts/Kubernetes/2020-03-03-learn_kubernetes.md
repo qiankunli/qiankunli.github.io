@@ -119,6 +119,7 @@ Kubernetes 本身就是微服务的架构，虽然看起来复杂，但是容易
 
 |k8s涉及的组件|功能交付方式||
 |---|---|---|
+|crd|**API**|
 |kubectl|binary，用户直接使用|
 |kubelet|binary，提供http服务|
 |cri-shim|grpc server|

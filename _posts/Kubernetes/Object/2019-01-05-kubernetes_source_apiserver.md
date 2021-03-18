@@ -21,7 +21,7 @@ apiserver 核心职责
 
 1. 命令式命令行操作，比如直接 `kubectl run`
 2. 命令式配置文件操作，比如先`kubectl create -f xx.yaml` 再 `kubectl replace -f xx.yaml` 
-3. 声明式API 操作，比如`kubectl apply -f xx.yaml`。**命令式api 描述和执行 是一体的，声明式api 则需要额外的 执行器**（下文叫Controller） sync desired state 和 real state。
+3. 声明式API 操作，比如`kubectl apply -f xx.yaml`。**命令式api 描述和执行 是一体的，声明式api 则需要额外的 执行器**（下文叫Controller） sync desired state 和 real state。PS：使用方不需要写控制流逻辑
 
 声明式API 有以下优势
 

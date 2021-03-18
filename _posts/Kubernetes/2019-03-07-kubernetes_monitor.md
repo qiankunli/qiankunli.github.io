@@ -20,6 +20,8 @@ keywords: Kubernetes monitor
 [Kubernetes 稳定性保障手册 -- 极简版](https://mp.weixin.qq.com/s/kZmi2gK16qe2yMYMRS3Etg)未细读
 [KubeNode：阿里巴巴云原生容器基础设施运维实践](https://mp.weixin.qq.com/s/Fm_Pbz0ltu2mpFlDP74_fw) 仅仅是一个kubelet 是不够用的。
 
+[KubeEye：Kubernetes 集群自动巡检工具](https://segmentfault.com/a/1190000039173086)
+
 [报警的哲学](https://mp.weixin.qq.com/s/lJRPt7I0SeUwZ4HhVZn8AQ)追踪所有收到的报警。如果收到了报警，而人们只是说 "我看了，没有什么问题"，这是一个相当强烈的信号，你需要删除报警规则，或者降级，或者以其他方式收集数据。准确率低于 50% 报警是不能使用的；即使是那些 10% 的假阳性警报，也值得多加考虑是否对齐进行修改。
 
 ## 容器监控与常规监控的差异
@@ -223,6 +225,8 @@ kube_state_metrics_watch_total{resource="*v1beta1.Ingress",result="success"} 1
 ## 制作哪些dashboard
 
 Grafana 官方有一个 [dashboard 市场](https://grafana.com/grafana/dashboards)，可以针对各个组件找到 全面丰富的dashboard 
+
+[KubeEye：Kubernetes 集群自动巡检工具](https://segmentfault.com/a/1190000039173086)
 
 ## 其它
 
