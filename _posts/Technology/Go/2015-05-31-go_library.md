@@ -166,24 +166,21 @@ default:
 
 [深度解密Go语言之sync.pool](https://mp.weixin.qq.com/s/O8EY0M4_Rt_0BLCcM8OwFw)
 
-sync.Pool 是 sync 包下的一个组件，可以作为保存临时取还对象的一个“池子”。它的名字有一定的误导性，因为 Pool 里装的对象可以被无通知地被回收（GC 发生时清理未使用的对象，Pool 不可以指定⼤⼩，⼤⼩只受制于 GC 临界值），可能 sync.Cache 是一个更合适的名字。
+sync.Pool 是 sync 包下的一个组件，可以作为保存临时取还对象的一个“池子”。它的名字有一定的误导性，与java 里的pool 不同，  sync.Pool 里装的对象可以被无通知地被回收（GC 发生时清理未使用的对象，Pool 不可以指定⼤⼩，⼤⼩只受制于 GC 临界值），可能 sync.Cache 是一个更合适的名字。
 
 ```go
 var pool *sync.Pool
 type Person struct {
   Name string
 }
-func initPool() {
+func main() {
   pool = &sync.Pool {
-    // 用于在 Pool 里没有缓存的对象时，创建一个
+    // 用于在 Pool 里没有缓存的对象时，创建一个。这点就很像guava cache
     New: func()interface{} {
       fmt.Println("Creating a new Person")
       return new(Person)
     },
   }
-}
-func main() {
-  initPool()
   // 当调用 Get 方法时，如果池子里缓存了对象，就直接返回缓存的对象。如果没有存货，则调用 New 函数创建一个新的对象。
   p := pool.Get().(*Person)
   p.Name = "first"
@@ -197,6 +194,20 @@ func main() {
 1. Go 语言内置的 fmt 包，encoding/json 包都可以看到 sync.Pool 的身影；gin，Echo 等框架也都使用了 sync.Pool。
 2. Pool 里对象的生命周期受 GC 影响，不适合于做连接池，因为连接池需要自己管理对象的生命周期。
 3. 不要对 Get 得到的对象有任何假设，更好的做法是归还对象时，将对象“清空”。
+
+
+```go
+type Pool struct {
+    noCopy noCopy
+    // 本地池，本地池数量与P 相等，一个P同时只能执行一个G，因此操作本地池时没有并发问题
+    local     unsafe.Pointer  // local fixed-size per-P pool, actual type is [P]poolLocal
+    localSize uintptr         // size of the local array
+    victim     unsafe.Pointer // local from previous cycle
+    victimSize uintptr        // size of victims array
+    // New optionally specifies a function to generate a value when Get would otherwise return nil.It may not be changed concurrently with calls to Get.
+    New func() interface{}
+}
+```
 
 ## Go代码中的依赖注入
 

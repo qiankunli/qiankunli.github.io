@@ -41,6 +41,8 @@ type hchan struct {
 }
 ```
 
+![](/public/upload/go/go_channel.png)
+
 ### 发送数据
 
 当我们想要向 Channel 发送数据时，就需要使用 `ch <- i` 语句，**编译器**会经过一系列处理后调用runtime.chansend，这个函数负责了发送数据的全部逻辑，如果我们在调用时将 block 参数设置成 true，那么就表示当前发送操作是一个阻塞操作
