@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: 计算机组成原理
+title: 汇编语言
 category: 技术
 tags: Basic
-keywords: cpu
+keywords: 汇编语言
 
 ---
 

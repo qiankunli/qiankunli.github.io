@@ -4,7 +4,7 @@ layout: post
 title: 计算机组成原理
 category: 技术
 tags: Basic
-keywords: cpu
+keywords: cpu 组成原理
 
 ---
 
