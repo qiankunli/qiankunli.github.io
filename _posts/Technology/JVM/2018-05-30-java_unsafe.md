@@ -13,7 +13,9 @@ keywords: java unsafe
 * TOC
 {:toc}
 
-### 实例创建
+我们通常对Java语言的认知是：Java语言是安全的，所有操作都基于JVM，在安全可控的范围内进行。然而，Unsafe这个类会打破这个边界，使Java拥有C的能力，可以操作任意内存地址，是一把双刃剑。
+
+## 实例创建
 
 [Java Magic. Part 4: sun.misc.Unsafe](http://ifeve.com/sun-misc-unsafe/) 英文版 [Java Magic. Part 4: sun.misc.Unsafe](http://mishadoff.com/blog/java-magic-part-4-sun-dot-misc-dot-unsafe/)要点如下：
 
@@ -33,18 +35,22 @@ keywords: java unsafe
 
 Unsafe 提供 Direct memory access methods.
 
-	allocateMemory
-	copyMemory
-	freeMemory
-	put/getAddress
-	getInt/Byte/Object/Char/Float
-	putInt/Byte/Object/Char/Float
+```
+allocateMemory
+copyMemory
+freeMemory
+put/getAddress
+getInt/Byte/Object/Char/Float
+getInt/Byte/Object/Char/FloatVolatile // 直接到主存中拿数据
+putInt/Byte/Object/Char/Float
+// 用例
+Unsafe unsafe = getUnsafe();
+Field f = guard.getClass().getDeclaredField("field_name");
+unsafe.putInt(guard, unsafe.objectFieldOffset(f), 42); // memory corruption
+````
 	
 	
-	// 用例
-	Unsafe unsafe = getUnsafe();
-	Field f = guard.getClass().getDeclaredField("field_name");
-	unsafe.putInt(guard, unsafe.objectFieldOffset(f), 42); // memory corruption
+
 
 如果知道 某个对象某个属性的内存地址，那么连对象的引用都不需要，可以直接设置值
 

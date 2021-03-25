@@ -160,7 +160,7 @@ AVL 树是一种高度平衡的二叉树，所以查找的效率非常高，但�
 
 ![](/public/upload/algorithm/23tree_redblacktree.png)
 
-红黑树只是做到了近似平衡，并不是严格的平衡，所以在维护平衡的成本上，要比 AVL 树要低。
+红黑树只是做到了近似平衡，并不是严格的平衡，所以在维护平衡的成本上，要比 AVL 树要低。[​Java Map中那些巧妙的设计](https://mp.weixin.qq.com/s/7UTEHA6pdHeitg1htzdcRw)红黑树是一种平衡的二叉树搜索树，类似地还有AVL树。两者核心的区别是AVL树追求“绝对平衡”，在插入、删除节点时，成本要高于红黑树，但也因此拥有了更好的查询性能，适用于读多写少的场景。然而，对于HashMap而言，读写操作其实难分伯仲，因此选择红黑树也算是在读写性能上的一种折中。
 
 ![](/public/upload/algorithm/tree_evolution.png)
 

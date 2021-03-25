@@ -17,7 +17,7 @@ keywords: kafka
 
 guava LocalCache与ConcurrentHashMap有以下不同
 
-1. ConcurrentHashMap ”分段控制并发“是隐式的（实现中没有Segment对象），而LocalCache 是显式的。
+1. ConcurrentHashMap ”分段控制并发“是隐式的（实现中没有Segment对象），而LocalCache 是显式的。在jdk1.8 之后，ConcurrentHashMap采用synchronized+CAS 实现：当put的元素在哈希桶数组中不存在时，直接CAS进行写操作；在发生哈希冲突的情况下使用synchronized锁定头节点。其实是比分段锁更细粒度的锁实现，只在特定场景下锁定其中一个哈希桶，降低锁的影响范围。
 2. 在Cache中，使用ReferenceEntry来封装键值对，并且对于值来说，还额外实现了ValueReference引用对象来封装对应Value对象。
 3. 在Cache 中支持过期 + 自动loader机制，这也使得其加锁方式与ConcurrentHashMap 不同。
 4. 在Cache中，在segment 粒度上支持了LRU机制， 体现在Segment上就是 writeQueue 和 accessQueue。队列中的元素按照访问或者写时间排序，新的元素会被添加到队列尾部。如果，在队列中已经存在了该元素，则会先delete掉，然后再尾部add该节点
