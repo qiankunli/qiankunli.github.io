@@ -221,6 +221,22 @@ reader.loadBeanDefinitions(res);
 
 ## ioc启动与停止
 
+ioc/容器上下文生命周期（从这个视角也可以看下 ApplicationContext 与BeanFactory 的不同）
+1. 上下文启动准备阶段 prepareRefresh
+2. BeanFactory 创建阶段 obtainFreshBeanFactory
+3. BeanFactory 准备阶段 prepareBeanFactory
+4. BeanFactory 后置处理阶段 postProcessBeanFactory
+5. BeanFactory 注册BeanPostProcessor 阶段
+6. 初始化内建Bean： MessageSource
+7. 初始化内建Bean：Spring 事件广播器
+8. Spring 应用上下文刷新阶段
+9. Spring 事件上下文注册阶段
+10. BeanFactory 初始化完成阶段
+11. Spring 应用上下文刷新完成阶段
+12. Spring 应用上下文启动阶段
+13. Spring 应用上下文停止阶段
+14. Spring 应用上下文关闭阶段
+
 **一个容器的功能：构建和管理Bean， 分割在启动和getBean 两个部分**，启动时候没有创建Bean 对象。所以BeanFactoryPostProcessor 工作在ioc 启动阶段，BeanPostProcessor 工作在getBean 阶段。
 
 ### 容器启动
@@ -331,15 +347,37 @@ bean在不同阶段的表现形式
 |ioc初始化|BeanDefinition|class二进制 ==> 内存中的Class对象|
 |getBean|Object|堆中的对象实例|
 
+`@Configuration` 含义 indicates that a class declares one or more `@Bean` methods and may be processed by the Spring container to generate bean definitions and service requests for those beans at runtime.
+
 ### Bean工厂的养料——BeanDefinition
 
-在BeanFactory 可以getBean之前，必须要先初始化，**从各种源（比如xml配置文件）中加载bean信息**。
+在BeanFactory 可以getBean之前，必须要先初始化，**从各种源（比如xml配置文件、@Bean）中加载bean信息**。
 
 ![](/public/upload/spring/bean_definition.png)
 
 jvm 基于Class 对象将对象实例化，想new 一个对象，得先有Class 对象，或者使用classLoader 加载，或者动态生成。spring 容器类似，想getBean 对象bean 实例， 就是先register 对应的BeanDefinition，任何来源的bean 通过`BeanDefinitionRegistry.registerBeanDefinition` 都可以纳入到IOC 的管理。
 
 ![](/public/upload/spring/bean_definition_xmind.png)
+
+SpringBean 生命周期
+1. Spring Bean 元信息配置阶段
+2. Spring Bean 元信息解析阶段。面向资源的BeanDefinition 解析（BeanDefinitionReader和xml 解析器BeanDefinitionParser）和面向注解的BeanDefinition 解析（AnnotatedBeanDefinitionReader，比如@ComponentScan）
+3. Spring Bean 注册阶段。BeanDefinitionRegistry
+4. Spring BeanDefinition 合并阶段
+5. Spring Bean Class 加载阶段。每个BeanDefinition 对应一个Bean的class，必然会经过ClassLoader 的加载
+6. Spring Bean 实例化前阶段。InstantiationAwareBeanPostProcesssor.postProcessBeforeInstantiation，比如通过创建一个代理类的方式来创建一个实例来替换传统的实例方法。
+7. Spring Bean 实例化阶段
+8. Spring Bean 实例化后阶段。InstantiationAwareBeanPostProcesssor.postProcessAfterInstantiation，决定bean的属性值是否需要被设置
+9. Spring Bean 属性赋值前阶段。 InstantiationAwareBeanPostProcesssor.postProcessPropertyValues
+10. Spring Bean Aware 接口回调阶段
+11. Spring Bean 初始化前阶段。BeanPostProcessor.postProcessBeforeInitialization
+12. Spring Bean 初始化阶段。@PostConstruction；InitializingBean.afterProperties；自定义初始化方法
+13. Spring Bean 初始化后阶段。BeanPostProcessor.postProcessAfterInitialization
+14. Spring Bean 初始化完成阶段
+15. Spring Bean 销毁前阶段
+16. Spring Bean 销毁阶段
+17. Spring Bean 垃圾收集
+
 
 ### getBean
 
@@ -362,5 +400,13 @@ Properties play an important role in almost all applications,and may originate f
 ![](/public/upload/spring/spring_env.png)
 
 ## 其它
+
+Spring 元信息
+
+2. Spring Bean配置元信息 BeanDefinition
+3. Spring Bean属性元信息 PropertyValues
+4. Spring 容器配置元信息
+5. Spring 外部化配置元信息 PropertySource
+6. Spring Profile 元信息 @Profile
 
 ![](/public/upload/spring/spring_ioc.png)

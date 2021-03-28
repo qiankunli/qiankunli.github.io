@@ -30,7 +30,7 @@ Spring Cloud是一个基于Spring Boot实现的云应用（cloud native）开发
 
 springboot 解决方法
 
-1. 通过自动配置，解决配置复杂问题。[What is Spring Boot Auto Configuration?](http://www.springboottutorial.com/spring-boot-auto-configuration) 如果 classpath 里面有 Spring MAC 的 JAR 包，但没有检查到 web-context.xml 配置，spring boot 会自动配置好 Dispatcher Servlet 
+1. 通过自动配置AutoConfiguration，解决配置复杂问题。[What is Spring Boot Auto Configuration?](http://www.springboottutorial.com/spring-boot-auto-configuration) 如果 classpath 里面有 Spring MAC 的 JAR 包，但没有检查到 web-context.xml 配置，spring boot 会自动配置好 Dispatcher Servlet 
 2. 通过starter和依赖管理解决依赖问题。[自定义SpringBoot Starter](http://objcoding.com/2018/02/02/Costom-SpringBoot-Starter/),SpringBoot 项目就是由一个一个 Starter 组成的,一个 Starter 代表该项目的 SpringBoot 起步依赖。自定义Starter 时 通常包含了 如何创建 starter 对应依赖所需的配置（这句话有一点待考证）。
 3. 通过内嵌web容器，来解决部署运行问题。
 

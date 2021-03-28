@@ -19,8 +19,6 @@ keywords: springboot
 1. 如何自动加载配置，将依赖bean 注入到spring ioc？
 2. 如何自动规范依赖jar？继承 spring-boot-starter-parent
 
-建议先阅读下 [回头看Spring IOC](http://qiankunli.github.io/2015/06/15/spring_ioc.html) 对IOC 和 ApplicationContext 等概念有所了解。
-
 ![](/public/upload/spring/ioc_overview.png)
 
 一个第三方框架想要融入spring ioc
@@ -57,7 +55,6 @@ public class SpringApplication {
     private List<ApplicationListener<?>> listeners;
     public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySources) {
         this.resourceLoader = resourceLoader;
-        Assert.notNull(primarySources, "PrimarySources must not be null");
         this.primarySources = new LinkedHashSet<>(Arrays.asList(primarySources));
         this.webApplicationType = WebApplicationType.deduceFromClasspath();
         setInitializers((Collection) getSpringFactoriesInstances(
@@ -251,6 +248,8 @@ protected void prepareContext(Host host, ServletContextInitializer[] initializer
 
 ## @EnableAutoConfiguration 如何工作
 
+`@EnableAutoConfiguration` 含义 Enable auto-configuration of the Spring Application Context, attempting to guess and configure beans that you are likely to need. Auto-configuration classes are usually applied based on your classpath and what beans you have defined.
+
 Spring Boot 是基于Spring4的条件注册的一套快速开发整合包
 
 ![](/public/upload/spring/SpringBootApplication_annotation.png)
@@ -322,7 +321,46 @@ org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration,\
 
 总结一下就是，@EnableAutoConfiguration 会push springboot 加载各个依赖jar `META-INF/spring.factories` 中key=org.springframework.boot.autoconfigure.EnableAutoConfiguration 指定的@Configuration 类
 
-**starter 的本质是采用import 方式，在如何引用bean 做了创新，最终实现：只要配置了`META-INF/spring.factories`的jar 在classpath 下即可进入spring ioc的效果**。
+
+## 自己实现starter
+
+1. 在pom.xml中引入SpringBoot自动化配置依赖jar spring-boot-autoconfigure
+2. 定义 业务所需要的Bean，比如BusinessService
+3. 定义配置类，业务Bean的运行需要读取一些外部配置
+
+    ```java
+    @ConfigurationProperties(prefix = "config")
+    public class ConfigProperties {
+        // springboot yaml 中config.name 会赋给name 属性
+        private String name;
+        pricate String age;
+    }
+    ```
+4. 创建自动化配置类
+    ```java
+    @Configuration      // 声明该类为一个配置类
+    @ConditionalOnClass(BusinessService.class)  // 只有当BusinessService类存在于classpath中时才会进行相应的实例化
+    @EnableConfigurationProperties(ConfigProperties.class)  // 将application.properties/yaml中对应的属性配置设置于ConfigProperties对象中；
+    public class BusinessAutoConfiguration {
+        @Resource
+        private ConfigProperties configProperties;
+        @Bean           // 该方法实例化的对象会被加载到容器当中；
+        @ConditionalOnMissingBean(BusinessService.class)    // 容器中不存在BusinessService的对象时再进行实例化；
+        @ConditionalOnProperty(prefix = "config", value = "enabled", havingValue = "true") // 指定了配置文件中config.enabled=true时才进行相应的实例化。
+        public BusinessService businessService() {
+            BusinessService businessService = new BusinessService(configProperties.getName(), configProperties.getAge());
+            // 其它实例化逻辑
+            return businessService;
+        }
+    }
+    ```
+5. 添加META-INF/spring.factories
+    ```
+    org.springframework.boot.autoconfigure.EnableAutoConfiguration=xxx.BusinessAutoConfiguration
+    ```
+
+**starter 的本质是采用import 方式，在如何引用bean 做了创新，最终实现：只要配置了`META-INF/spring.factories`的jar 在classpath 下即可进入spring ioc的效果**。外部配置统一定义在 application.properties/yaml 中，按照一定的规范，springboot 会将这些配置注入到starter 内部的Bean 中。
+
 
 ## 其它
 
