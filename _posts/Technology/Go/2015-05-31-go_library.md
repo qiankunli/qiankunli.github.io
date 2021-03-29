@@ -15,6 +15,12 @@ keywords: Go library
 
 本文主要阐述一下golang中常用的库。
 
+[Go 大杀器之性能剖析 PProf](https://eddycjy.gitbook.io/golang/di-9-ke-gong-ju/go-tool-pprof) 未读
+[Go 大杀器之跟踪剖析 trace](https://eddycjy.gitbook.io/golang/di-9-ke-gong-ju/go-tool-trace) 未读
+[用 GODEBUG 看调度跟踪](https://eddycjy.gitbook.io/golang/di-9-ke-gong-ju/godebug-sched) 未读
+[用 GODEBUG 看GC](https://eddycjy.gitbook.io/golang/di-9-ke-gong-ju/godebug-gc) 未读
+
+
 ## klog
 
 klog是著名google开源C++日志库glog的golang版本
