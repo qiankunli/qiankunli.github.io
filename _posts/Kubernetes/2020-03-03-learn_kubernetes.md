@@ -111,6 +111,14 @@ kubelet/api server/scheduler 本身可能会变，但它们的功能以及 彼�
 
 ![](/public/upload/kubernetes/meituan_kubernetes_practice.png)
 
+## 如何看待k8s
+
+笔者最开始接触k8s 是想用k8s 接管公司的测试环境，所以一直以来对k8s的理解停留在 如何将一个项目运行在k8s上，之后向前是ci/cd，向后是监控报警等。一直以来有两个误区：
+1. 虽然知道k8s 支持crd，但只是认为crd 是增强服务发布能力的。**以发布、运行服务为主来先入为主的理解k8s**。
+2. k8s 是声明式的，所以crd 也应该是声明式的。
+
+这个印象在openkruise 推出ImagePullJob 之后产生了动摇，这个crd的作用是将 image 下发到指定个规则的node上。[面对不可避免的故障，我们造了一个“上帝视角”的控制台](https://mp.weixin.qq.com/s/QxTMLqf8VspXWy4N4AIFuQ) 中chaosblade 的crd 则支持向某个进程注入一个故障。chaosblade  本身首先是一个故障注入平台，然后才是支持在k8s 平台上支持故障注入（物理机也是支持的）。
+
 ## 一个充分支持扩展的系统
 
 Kubernetes 本身就是微服务的架构，虽然看起来复杂，但是容易定制化，容易横向扩展。在 Kubernetes 中几乎所有的组件都是无状态化的，状态都保存在统一的 etcd 里面，这使得扩展性非常好，组件之间异步完成自己的任务，将结果放在 etcd 里面，互相不耦合。有了 API Server 做 API 网关，所有其他服务的协作都是基于事件的，**因而对于其他服务进行定制化，对于 client 和 kubelet 是透明的**。

@@ -74,7 +74,7 @@ static void scheduler(void) {
 
 ![](/public/upload/go/go_scheduler_gm.jpg)
 
-在这个阶段，**goroutine 调度跟 java 的ThreadPool 是一样一样的，除了io操作会阻塞线程外，java Executor也可以视为一个用户态线程调度框架**。runnable 表示运行逻辑 提交到queue，ThreadPool 维持多个线程 从queue 中取出runnable 并执行。
+在这个阶段，**goroutine 调度跟 java 的ThreadPool 是一样一样的，除了io操作会阻塞线程外，java Executor也可以视为一个用户态线程调度框架**。runnable 表示运行逻辑 提交到queue，ThreadPool 维持多个线程 从queue 中取出runnable 并执行。调度器本身（schedule 方法），在正常流程下，是不会返回的，也就是不会结束主流程。schedule 会不断地运行调度流程，GoroutineA 完成了，就开始寻找 GoroutineB，寻找到 B 了，就把已经完成的 A 的调度权交给 B，让 GoroutineB 开始被调度，一直继续下去。当然了，也有被正在阻塞（Blocked）的 G。假设 G 正在做一些系统、网络调用，那么就会导致 G 停滞。这时候 M（系统线程）就会被会重新放内核队列中，等待新的一轮唤醒。
 
 ### GPM模型
 
@@ -95,10 +95,20 @@ static void schedule(void) {
 ```
 
 ![](/public/upload/go/go_scheduler_gpm.jpg)
+ 
+ **为什么引入Processor 的概念？为什么把全局队列打散？**
+ 1. 对全局队列的操作均需要竞争同一把锁，mutex 需要保护所有与 goroutine 相关的操作（创建、完成、重排等）， 导致伸缩性不好. 
+ 2. GM 模型下一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。
 
-当有了一个P 存在后，一些数据结构（跨协程的） 就顺势放在了P 中，包括与性能追踪、内存分配(mache)、垃圾回收(gcWork)和计时器相关的字段。
+ [The Go scheduler](https://morsmachine.dk/go-scheduler)为什么我们需要P？我们不能把任务队列直接挂载到M上而去掉P吗？就像linux 那样为每个cpu维护了一个 runqueue 结构
 
-go java 都有runtime，runtime 不只是一对一辅助执行代码，本身也会运行很多协程/线程，以提高io、定时器、gc等的执行效率，为上层高级特性提供支持。在目前的runtime中，线程、处理器、网络轮询器、运行队列、全局内存分配器状态、内存分配缓存和垃圾收集器都是全局资源。
+ ![](/public/upload/linux/cpu_runqueue.jpg)
+ 
+ 答案是不行。如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行。将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行。对runq 及相关信息进行抽象 得到P，我们通过P把任务队列挂载到其它线程中。**M 并不保留 G 状态，这是 G 可以跨 M 调度的基础**。
+ 
+有了P 之后，一些数据结构（跨协程的） 就顺势放在了P 中，包括与性能追踪、内存分配(mache)、垃圾回收(gcWork)和计时器相关的字段。
+
+
 
 [Go: Goroutine, OS Thread and CPU Management](https://medium.com/a-journey-with-go/go-goroutine-os-thread-and-cpu-management-2f5a5eaf518a) 来讲述GPM时，用到了 orchestration 这个词,   Go has its own scheduler to **distribute goroutines over the threads**. This scheduler defines three main concepts
 
@@ -173,11 +183,7 @@ g0 是一个运行时中比较特殊的 Goroutine，它会深度参与运行时�
 
 ### P
 
-**为什么引入Processor 的概念？为什么把全局队列打散？**对全局队列的操作均需要竞争同一把锁, 导致伸缩性不好. 一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。 ==> 为每一个 M 维护一个运行队列 runq ==> 如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行 ==> 将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行 ==> 对runq 及相关信息进行抽象 得到P。 go1.1 以P 为基础实现了基于工作窃取的调度器。linux 也是为每个cpu维护了一个 runqueue 结构
 
-![](/public/upload/linux/cpu_runqueue.jpg)
-
-[The Go scheduler](https://morsmachine.dk/go-scheduler)为什么我们需要P？**我们不能把任务队列直接挂载到M上而去掉P吗？**答案是不行。原因是当运行着的线程由于某些原因需要阻塞时，我们需要通过P把任务队列挂载到其它线程中。**M 并不保留 G 状态，这是 G 可以跨 M 调度的基础**。
 
 P全称是Processor，处理器，表示调度的上下文，它可以被看做一个运行于线程 M 上的本地调度器，所以它维护了一个goroutine队列（环形链表），里面存储了所有需要它来执行的goroutine。通过处理器 P 的调度，每一个内核线程都能够执行多个 Goroutine，它能在 Goroutine 进行一些 I/O 操作时及时切换，提高线程的利用率。
 
@@ -210,6 +216,8 @@ p 结构体中的状态 status 可选值
 
 
 ### Sched
+
+go java 都有runtime，runtime 不只是一对一辅助执行代码，本身也会运行很多协程/线程，以提高io、定时器、gc等的执行效率，为上层高级特性提供支持。在目前的runtime中，线程、处理器、网络轮询器、运行队列、全局内存分配器状态、内存分配缓存和垃圾收集器都是全局资源。
 
 [Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)要实现对goroutine的调度，仅仅有g结构体对象是不够的，至少还需要一个存放所有（可运行）goroutine的容器，便于工作线程寻找需要被调度起来运行的goroutine，于是Go调度器又引入了schedt结构体，一方面用来保存调度器自身的状态信息，另一方面它还拥有一个用来保存goroutine的运行队列。因为每个Go程序只有一个调度器，所以在每个Go程序中schedt结构体只有一个实例对象，该实例对象在源代码中被定义成了一个共享的全局变量，这样每个工作线程都可以访问它以及它所拥有的goroutine运行队列，我们称这个运行队列为全局运行队列。
 

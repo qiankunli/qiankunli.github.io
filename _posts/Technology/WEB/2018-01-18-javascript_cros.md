@@ -17,15 +17,19 @@ keywords: javascript
 
 ## 什么是跨域？
 
-[跨域资源共享 CORS 详解](http://www.ruanyifeng.com/blog/2016/04/cors.html)
+Cookie 是一个Http State Management Mechanism，保存在客户端，由浏览器维护，表示应用状态。客户端得到Cookie 后， 后续请求都会自动将Cookie 携带至请求中。
 
-[跨域资源共享（CORS）](https://www.alibabacloud.com/help/zh/doc-detail/31928.htm) 基本要点：
+同源策略：协议、主机、端口必须完全相同。如果两个 URL 的 protocol、host  和port 都相同的话，则这两个 URL 是同源。在页面中通过 `about:blank` 或 `javascript:` URL 执行的脚本会**继承**打开该 URL 的文档的源，因为这些类型的 URLs 没有包含源服务器的相关信息。
 
-1. 同源策略
-2. CORS 是一个由浏览器共同遵循的一套控制策略——同源策略，**通过HTTP的Header来进行交互**
-3. 如果header 不符合策略要求，浏览器可以拒绝javascript脚本 的http请求和拦截http 响应
-4. 跨域检查由浏览器自动完成，包括向请求添加Origin header、检查响应header等，javascript脚本无需关心
+浏览器为什么要有同源策略？ 为了保证用户信息的安全，防止恶意的网站窃取数据。设想这样一种情况：A 网站是一家银行，用户登录以后，A 网站在用户的机器上设置了一个 Cookie，包含了一些隐私信息（比如存款总额）。用户离开 A 网站以后，又去访问 B 网站，如果没有同源限制，B 网站可以读取 A 网站的 Cookie，那么隐私信息就会泄漏。更可怕的是，Cookie 往往用来保存用户的登录状态，如果用户没有退出登录，其他网站就可以冒充用户，为所欲为。随着互联网的发展，同源政策越来越严格。目前，如果非同源，共有三种行为受到限制。
 
+1. 无法获取非同源网页的 cookie、localstorage 和 indexedDB。
+2. 无法访问非同源网页的 DOM （iframe）。
+3. 无法向非同源地址发送 AJAX 请求 或 fetch 请求（可以发送，但浏览器拒绝接受响应）
+
+也就是说，如果协议、域名或者端口有一个不同，都被当作是不同的域，请求跨域了，虽然请求发出去了，但浏览器会拦截响应。PS： 用户先后在地址栏输入的两个域的地址，比如a.com和b.com，浏览器肯定不能将a.com 的cookie 带到发给b.com 的请求上。但若是一个页面由多个部分组成：图片、javascript等，可能由同一家公司的不同域名提供服务，此时也被同源策略误伤到了。
+
+跨域检查由浏览器自动完成，包括向请求添加Origin header、检查响应header等，javascript脚本无需关心。
 
 ![](/public/upload/apache/cros_1.png)
 

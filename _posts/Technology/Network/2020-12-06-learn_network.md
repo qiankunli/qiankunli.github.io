@@ -26,6 +26,8 @@ keywords: Docker, calico
 
 ![](/public/upload/network/internet_layer.png)
 
+在网络的多个层次中，IP层处于核心地位，其之上或之下每一层都有多个协议实现，而只有网络层，只有一个IP协议（细腰结构）。
+
 ## 网络传输
 
 ![](/public/upload/network/network_transmission.png)

@@ -61,6 +61,8 @@ OAM 支持  Kubernetes 内置的工作负载，那什么时候该使用 Deployme
 
 [如何构建以应用为中心的“Kubernetes”?](https://mp.weixin.qq.com/s/ql_AIFc0s5HwZgsML63zQA)Application Configuration 就像是一个信封，将 Traits 绑定给 Component，这个是显式绑定的。**OAM 里面不建议去使用 Label 这样的松耦合的方式去关联你的工作负载**。建议通过这种结构化的方式，通过 CRD 去显式的绑定你的特征和工作负载。这样的好处是我的绑定关系是可管理的。可以通过 kubectl get 看到这个绑定关系。作为管理员或者用户，就非常容易的看到某一个组件绑定的所有运维能力有哪些，这是可以直接展示出来的，如果通过 label 是很难做到的。同时 Label 本身有个问题是，本身不是版本化的，不是结构体，很难去升级，很难去扩展。通过这么结构化定义，后面的升级扩展将会变得非常简单。 
 
+[KubeVela 是如何将 appfile 转换为 K8s 特定资源对象的](https://mp.weixin.qq.com/s/xXuewzEZQgwXfqMI4mhVow)
+
 ## 未来
 
 在下一代“以应用为中心”的基础设施当中，**业务研发通过声明式 API 定义的不再是具体的运维配置（比如：副本数是 10 个），而是“我的应用期望的最大延时是 X ms”**。接下来的事情，就全部会交给 Kubernetes 这样的应用基础设施来保证实际状态与期望状态的一致，这其中，副本数的设置只是后续所有自动化操作中的一个环节。只有让 Kubernetes 允许研发通过他自己的视角来定义应用，而不是定义 Kubernetes API 对象，才能从根本上的解决 Kubernetes 的使用者“错位”带来的各种问题。

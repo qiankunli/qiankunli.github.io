@@ -26,6 +26,8 @@ TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的�
 
 ### 数据接收过程
 
+
+
 [容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)在内核中，网络设备驱动是通过中断的方式来接受和处理数据包。当网卡设备上有数据到达的时候，会触发一个硬件中断来通知 CPU 来处理数据，此类处理中断的程序一般称作 ISR (Interrupt Service Routines)。ISR 程序不宜处理过多逻辑，否则会让设备的中断处理无法及时响应。因此 Linux 中将中断处理函数分为上半部和下半部。上半部是只进行最简单的工作，快速处理然后释放 CPU。剩下将绝大部分的工作都放到下半部中，下半部中逻辑由内核线程选择合适时机进行处理。
 Linux 2.4 以后内核版本采用的下半部实现方式是软中断，由 ksoftirqd 内核线程全权处理， 正常情况下每个 CPU 核上都有自己的软中断处理数队列和 ksoftirqd 内核线程。
 
@@ -61,6 +63,12 @@ struct prot{
 当用户需要接收数据时，首先根据文件描述符inode得到socket结构和sock结构（**socket结构在用户层，sock在内核层，两者涉及到数据在内核态和用户态的拷贝**），然后从sock结构中指向的队列recieve_queue中读取数据包，将数据包COPY到用户空间缓冲区。数据就完整的从硬件中传输到用户空间。这样也完成了一次完整的从下到上的传输。
 
 ![](/public/upload/network/linux_package_receive.png)
+
+服务器三次握手流程示例
+
+![](/public/upload/network/server_handshake.png)
+
+sync 和accept 队列的长度，sync 的重试次数都可以设置。如果应用程序处理较慢，会导致accept 队列。sync 攻击（伪造很多客户端ip 发送sync请求，但不发送ack）会导致sync 队列满。
 
 ### 数据的发送
 
