@@ -213,8 +213,6 @@ p 结构体中的状态 status 可选值
 4. _Pgcstop	被线程 M 持有，当前处理器由于垃圾回收被停止
 5. _Pdead	当前处理器已经不被使用
 
-
-
 ### Sched
 
 go java 都有runtime，runtime 不只是一对一辅助执行代码，本身也会运行很多协程/线程，以提高io、定时器、gc等的执行效率，为上层高级特性提供支持。在目前的runtime中，线程、处理器、网络轮询器、运行队列、全局内存分配器状态、内存分配缓存和垃圾收集器都是全局资源。
@@ -248,219 +246,17 @@ sched     schedt        // 调度器结构体对象，记录了调度器的工�
 m0 m                    // 代表进程的主线程
 g0  g                   // m0的g0，也就是m0.g0 = &g0
 ```
-## 函数运行
 
-[Go 语言设计与实现 Goroutine](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)
+## 与函数的关系
 
-```
-// go/1.15.2/libexec/src/runtime/asm_amd64.s
-TEXT runtime·rt0_go(SB),NOSPLIT,$0
-	...
-	CALL	runtime·args(SB)    // 初始化执行文件的绝对路径
-	CALL	runtime·osinit(SB)  // 初始化 CPU 个数和内存页大小
-	CALL	runtime·schedinit(SB)   // 调度器初始化
-	// 创建一个新的 goroutine 来启动程序
-	MOVQ	$runtime·mainPC(SB), AX		// entry
-	CALL	runtime·newproc(SB) // 新建一个 goroutine，该 goroutine 绑定 runtime.main
-	CALL	runtime·mstart(SB)  // 启动M，开始调度goroutine/调度循环
-	...
-```
+20 世纪 60 年代高德纳（Donald Ervin Knuth）总结两种子过程（Subroutine）：一种是我们常见的函数调用的方式，而另一种就是协程。和函数的区别是，函数调用时，调用者跟被调用者之间像是一种上下级的关系；而在协程中，调用者跟被调用者更像是互相协作的关系，比如一个是生产者，一个是消费者。
 
-### goroutine 创建
+和函数的区别是，函数调用时，调用者跟被调用者之间像是一种上下级的关系；当我们使用函数的时候，**简单地保持一个调用栈就行了**。当 fun1 调用 fun2 的时候，就往栈里增加一个新的栈帧，用于保存 fun2 的本地变量、参数等信息；这个函数执行完毕的时候，fun2 的栈帧会被弹出（恢复栈顶指针 sp），并跳转到返回地址（调用 fun2 的下一条指令），继续执行调用者 fun1 的代码。
 
-go 关键字在编译期间通过 stmt 和 call 两个方法将该关键字转换成 newproc 函数调用，代码的路径和原理与 defer 关键字几乎完全相同。我们向 newproc 中传入一个表示函数的指针 funcval，在这个函数中我们还会获取当前调用 newproc 函数的 Goroutine 以及调用方的程序计数器 PC，然后调用 newproc1 函数：
+而在协程中，调用者跟被调用者更像是互相协作的关系，比如一个是生产者，一个是消费者。如果调用的是协程 coroutine1，该怎么处理协程的栈帧呢？因为协程并没有执行完，显然还不能把它简单地丢掉。这种情况下，程序可以从堆里申请一块内存，保存协程的活动记录，包括本地变量的值、程序计数器的值（当前执行位置）等等。这样，当下次再激活这个协程的时候，可以在栈帧和寄存器中恢复这些信息。
 
-```go
-// $GOROOT/src/runtime/proc.go
-func newproc(siz int32, fn *funcval) {
-    argp := add(unsafe.Pointer(&fn), sys.PtrSize)
-    gp := getg()    // 获取当前的 G 
-    pc := getcallerpc()
-    newproc1(fn, (*uint8)(argp), siz, gp, pc)
-}
-```
-
-newproc1 函数的主要作用就是创建一个运行传入参数 fn 的 g 结构体，并对其各个成员赋值。
-
-```go
-func newproc1(fn *funcval, argp *uint8, narg int32, callergp *g, callerpc uintptr) {
-    _g_ := getg()
-    siz := narg
-    siz = (siz + 7) &^ 7
-    _p_ := _g_.m.p.ptr()
-    // 获取或创建一个 g struct
-    newg := gfget(_p_)
-    if newg == nil {
-        newg = malg(_StackMin)
-        casgstatus(newg, _Gidle, _Gdead)
-        allgadd(newg)
-    }
-    // 获取新创建 Goroutine 的堆栈并直接通过 memmove 将函数 fn 需要的参数全部拷贝到栈中
-    totalSize := 4*sys.RegSize + uintptr(siz) + sys.MinFrameSize
-    totalSize += -totalSize & (sys.SpAlign - 1)
-    sp := newg.stack.hi - totalSize
-    spArg := sp
-    if narg > 0 {
-        memmove(unsafe.Pointer(spArg), unsafe.Pointer(argp), uintptr(narg))
-    }
-    // 初始化新 Goroutine 的栈指针、程序计数器、调用方程序计数器等属性
-    memclrNoHeapPointers(unsafe.Pointer(&newg.sched), unsafe.Sizeof(newg.sched))
-    newg.sched.sp = sp
-    newg.stktopsp = sp
-    newg.sched.pc = funcPC(goexit) + sys.PCQuantum
-    newg.sched.g = guintptr(unsafe.Pointer(newg))
-    gostartcallfn(&newg.sched, fn)
-    newg.gopc = callerpc
-    newg.startpc = fn.fn
-    if isSystemGoroutine(newg, false) {
-        atomic.Xadd(&sched.ngsys, +1)
-    }
-    // 将新 Goroutine 的状态从 _Gdead 切换成 _Grunnable 并设置 Goroutine 的标识符（goid）
-    casgstatus(newg, _Gdead, _Grunnable)
-
-    newg.goid = int64(_p_.goidcache)
-    _p_.goidcache++
-    // runqput 函数会将新的 Goroutine 添加到处理器 P 的运行队列上
-    runqput(_p_, newg, true)
-    // 如果符合条件，当前函数会通过 wakep 来添加一个新的 p 结构体来执行 Goroutine
-    if atomic.Load(&sched.npidle) != 0 && atomic.Load(&sched.nmspinning) == 0 && mainStarted {
-        wakep() // 唤醒新的  P 执行 G
-    }
-}
-```
-
-### 协程切换/当前协程保留现场，退出执行
-
-协程切换的原因一般有以下几种情况：
-
-1. 系统调用；Go 语言通过 Syscall 和 Rawsyscall 等使用汇编语言编写的方法封装了操作系统提供的所有系统调用
-2. 同步和编配；如果原子、互斥量或通道操作调用将导致 Goroutine 阻塞，调度器可以将之切换到一个新的 Goroutine 去运行。一旦 Goroutine 可以再次运行，它就可以重新排队，并最终在M上切换回来。
-3. 抢占式调度时间片结束；
-4. 垃圾回收
-
-![](/public/upload/go/goroutine_schedule.png)
-
-就好像linux 进程会主动调用schedule() 触发调度让出cpu 控制权，只是linux 多了时间片中断主动触发调度而已。
-
-
-```go
-func gopark(unlockf func(*g, unsafe.Pointer) bool, lock unsafe.Pointer, reason waitReason, traceEv byte, traceskip int) {
-    mp := acquirem()
-    gp := mp.curg
-    mp.waitlock = lock
-    mp.waitunlockf = unlockf
-    gp.waitreason = reason
-    mp.waittraceev = traceEv
-    mp.waittraceskip = traceskip
-    releasem(mp)
-    mcall(park_m)
-}
-```
-
-
-gopark 函数中会更新当前处理器(mp)的状态并在处理器上设置该 Goroutine 的等待原因。gopark中调用的 park_m 函数会将当前 Goroutine 的状态从 _Grunning 切换至 _Gwaiting 并调用 waitunlockf 函数进行解锁
-
-```go
-func park_m(gp *g) {
-    _g_ := getg()
-    casgstatus(gp, _Grunning, _Gwaiting)
-    dropg()
-    if fn := _g_.m.waitunlockf; fn != nil {
-        ok := fn(gp, _g_.m.waitlock)
-        _g_.m.waitunlockf = nil
-        _g_.m.waitlock = nil
-        if !ok {
-            casgstatus(gp, _Gwaiting, _Grunnable)
-            execute(gp, true) // Schedule it back, never returns.
-        }
-    }
-    schedule()
-}
-```
-
-### 协程调度
-
-[从源码角度看 Golang 的调度](https://studygolang.com/articles/20651)
-
-![](/public/upload/go/go_scheduler_sequence.png)
-
-在大多数情况下都会调用 schedule 触发一次 Goroutine 调度，这个函数的主要作用就是从不同的地方查找待执行的 Goroutine：
-
-```go
-func schedule() {
-    _g_ := getg()
-top:
-    var gp *g
-    var inheritTime bool
-    // 有一定几率会从全局的运行队列中选择一个 Goroutine；为了保证调度的公平性，每个工作线程每进行61次调度就需要优先从全局运行队列中获取goroutine出来运行，因为如果只调度本地运行队列中的goroutine，则全局运行队列中的goroutine有可能得不到运行
-    if gp == nil {
-        if _g_.m.p.ptr().schedtick%61 == 0 && sched.runqsize > 0 {
-            lock(&sched.lock)
-            gp = globrunqget(_g_.m.p.ptr(), 1)
-            unlock(&sched.lock)
-        }
-    }
-    // 从当前处理器本地的运行队列中查找待执行的 Goroutine；
-    if gp == nil {
-        gp, inheritTime = runqget(_g_.m.p.ptr())
-        if gp != nil && _g_.m.spinning {
-            throw("schedule: spinning with local work")
-        }
-    }
-    // 尝试从其他处理器上取出一部分 Goroutine，如果没有可执行的任务就会阻塞直到条件满足；
-    if gp == nil {
-        gp, inheritTime = findrunnable() // blocks until work is available
-    }
-    execute(gp, inheritTime)
-}
-```
-
-findrunnable 函数会再次从本地运行队列、全局运行队列、网络轮询器和其他的处理器中偷取/获取待执行的任务，该方法一定会返回待执行的 Goroutine，否则就会一直阻塞。
-
-![](/public/upload/go/goroutine_runq.png)
-
-获取可以执行的任务之后就会调用 execute 函数执行该 Goroutine，执行的过程中会先将其状态修改成 _Grunning、与线程 M 建立起双向的关系并调用 gogo 触发调度。
-
-```go
-func execute(gp *g, inheritTime bool) {
-    _g_ := getg()
-    // 将 g 正式切换为 _Grunning 状态
-    casgstatus(gp, _Grunnable, _Grunning)
-    gp.waitsince = 0
-    gp.preempt = false
-    gp.stackguard0 = gp.stack.lo + _StackGuard
-    if !inheritTime {
-        _g_.m.p.ptr().schedtick++
-    }
-    // 与线程 M 建立起双向的关系
-    _g_.m.curg = gp
-    gp.m = _g_.m
-    gogo(&gp.sched)
-}
-```
-
-gogo 在不同处理器架构上的实现都不相同，但是不同的实现其实也大同小异，下面是该函数在 386 架构上的实现：
-
-```
-TEXT runtime·gogo(SB), NOSPLIT, $8-4
-    MOVL	buf+0(FP), BX		// gobuf
-    MOVL	gobuf_g(BX), DX
-    MOVL	0(DX), CX		// make sure g != nil
-    get_tls(CX)
-    MOVL	DX, g(CX)
-    MOVL	gobuf_sp(BX), SP	// restore SP
-    MOVL	gobuf_ret(BX), AX
-    MOVL	gobuf_ctxt(BX), DX
-    MOVL	$0, gobuf_sp(BX)	// clear to help garbage collector
-    MOVL	$0, gobuf_ret(BX)
-    MOVL	$0, gobuf_ctxt(BX)
-    MOVL	gobuf_pc(BX), BX
-    JMP	BX
-```
-
-这个函数会从 gobuf 中取出 Goroutine 指针、栈指针、返回值、上下文以及程序计数器并将通过 JMP 指令跳转至 Goroutine 应该继续执行代码的位置。PS：就切换几个寄存器，所以协程的切换成本更低
-
-![](/public/upload/go/routine_switch_after.jpg)
+1. Stackful Coroutine，每个协程，都有一个自己专享的协程栈。可以在协程栈的任意一级，暂停协程的运行。可以从一个线程脱离，附加到另一个线程上。PS： Go中的G 所表达的主要内容
+2. Stackless Coroutine，在主栈上运行协程的机制，会被绑定在创建它的线程上
 
 ## G0
 
