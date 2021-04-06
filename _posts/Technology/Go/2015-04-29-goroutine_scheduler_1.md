@@ -234,7 +234,7 @@ type schedt struct {
 }
 ```
 
-重要的全局变量
+重要的全局变量，**尤其是allgs/allm/allp**
 
 ```go
 allgs    []*g           // 保存所有的g

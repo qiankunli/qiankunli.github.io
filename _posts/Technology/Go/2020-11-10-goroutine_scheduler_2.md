@@ -37,20 +37,42 @@ goroutine一些重要设计：
 
 ## go main 函数执行
 
-[Go 语言设计与实现 Goroutine](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)
+[Go 语言设计与实现 Goroutine](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)linux amd64系统的启动函数是在asm_amd64.s的`runtime·rt0_go`函数中。
 
 ```
 // go/1.15.2/libexec/src/runtime/asm_amd64.s
 TEXT runtime·rt0_go(SB),NOSPLIT,$0
 	...
-	CALL	runtime·args(SB)    // 初始化执行文件的绝对路径
-	CALL	runtime·osinit(SB)  // 初始化 CPU 个数和内存页大小
-	CALL	runtime·schedinit(SB)   // 调度器初始化
+	CALL	runtime·args(SB)            // 初始化执行文件的绝对路径
+	CALL	runtime·osinit(SB)          // 初始化 CPU 个数和内存页大小
+	CALL	runtime·schedinit(SB)       // 调度器初始化
 	// 创建一个新的 goroutine 来启动程序
 	MOVQ	$runtime·mainPC(SB), AX		// entry
-	CALL	runtime·newproc(SB) // 新建一个 goroutine，该 goroutine 绑定 runtime.main
-	CALL	runtime·mstart(SB)  // 启动M，开始调度goroutine/调度循环
+	CALL	runtime·newproc(SB)         // 新建一个 goroutine，该 goroutine 绑定 runtime.main
+	CALL	runtime·mstart(SB)          // 启动M，开始调度goroutine/调度循环
 	...
+```
+调度初始化
+```go
+func schedinit() {
+	...
+	_g_ := getg()
+	...
+	sched.maxmcount = 10000     // 最大线程数10000
+	mcommoninit(_g_.m, -1)      // M0 初始化
+	...	  
+	gcinit()                    // 垃圾回收器初始化
+	sched.lastpoll = uint64(nanotime())
+	procs := ncpu               // 通过 CPU 核心数和 GOMAXPROCS 环境变量确定 P 的数量
+	if n, ok := atoi32(gogetenv("GOMAXPROCS")); ok && n > 0 {
+		procs = n
+	}
+    // P 初始化
+	if procresize(procs) != nil {   
+		throw("unknown runnable goroutine during bootstrap")
+	}
+    ...
+}
 ```
 
 ## goroutine 创建
@@ -163,7 +185,7 @@ func park_m(gp *g) {
 }
 ```
 
-## 调度过程
+## 调度过程 `schedule()`
 
 [从源码角度看 Golang 的调度](https://studygolang.com/articles/20651)
 
@@ -200,11 +222,7 @@ top:
 }
 ```
 
-findrunnable 函数会再次从本地运行队列、全局运行队列、网络轮询器和其他的处理器中偷取/获取待执行的任务，该方法一定会返回待执行的 Goroutine，否则就会一直阻塞。
-
-![](/public/upload/go/goroutine_runq.png)
-
-获取可以执行的任务之后就会调用 execute 函数执行该 Goroutine，执行的过程中会先将其状态修改成 _Grunning、与线程 M 建立起双向的关系并调用 gogo 触发调度。
+findrunnable 函数会再次从本地运行队列、全局运行队列、网络轮询器和其他的处理器中偷取/获取待执行的任务，该方法一定会返回待执行的 Goroutine，否则就会一直阻塞。获取可以执行的任务之后就会调用 execute 函数执行该 Goroutine，执行的过程中会先将其状态修改成 _Grunning、与线程 M 建立起双向的关系并调用 gogo 触发调度。
 
 ```go
 func execute(gp *g, inheritTime bool) {
@@ -245,6 +263,8 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
 
 这个函数会从 gobuf 中取出 Goroutine 指针、栈指针、返回值、上下文以及程序计数器并将通过 JMP 指令跳转至 Goroutine 应该继续执行代码的位置。PS：就切换几个寄存器，所以协程的切换成本更低
 
+runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器和待执行函数的程序计数器，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**。runtime.goexit ==> runtime·goexit1 ==> mcall(goexit0) ==> goexit0，goexit0 会对 G 进行复位操作，解绑 M 和 G 的关联关系，将其 放入 gfree 链表中等待其他的 go 语句创建新的 g。在最后，goexit0 会重新调用 schedule触发新一轮的调度。
+
 ![](/public/upload/go/routine_switch_after.jpg)
 
 ## 初始化和调度循环
@@ -257,7 +277,7 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
 
 ![](/public/upload/go/go_scheduler_g0.jpg)
 
-把m0和g0绑定在一起，这样，之后在主线程中通过get_tls可以获取到g0，通过g0的m成员又可以找到m0，于是这里就实现了m0和g0与主线程之间的关联。
+把m0和g0绑定在一起，这样，之后在主线程中通过get_tls可以获取到g0，通过g0的m成员又可以找到m0，于是这里就实现了**m0和g0与主线程之间的关联**。
 
 ![](/public/upload/go/go_scheduler_m0.jpg)
 
@@ -269,7 +289,7 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
 
 ![](/public/upload/go/go_scheduler_newg.jpg)
 
-调整newg的栈空间，把goexit函数的第二条指令的地址入栈，伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作；重新设置newg.buf.pc 为需要执行的函数的地址，即fn，我们这个场景为runtime.main函数的地址。修改newg的状态为_Grunnable并把其放入了运行队列
+调整newg的栈空间，把goexit函数的第二条指令的地址入栈，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**；重新设置newg.buf.pc 为需要执行的函数的地址，即fn，我们这个场景为runtime.main函数的地址。修改newg的状态为_Grunnable并把其放入了运行队列
 
 ![](/public/upload/go/go_scheduler_newg_runnable.jpg)
 
