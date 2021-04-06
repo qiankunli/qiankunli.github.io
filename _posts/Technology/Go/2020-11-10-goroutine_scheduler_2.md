@@ -35,7 +35,9 @@ goroutine一些重要设计：
 1. 用户程序使用系统调用进入操作系统内核；
 2. 硬件中断。硬件中断处理程序由操作系统提供，所以当硬件发生中断时，就会执行操作系统代码。硬件中断有个特别重要的时钟中断，这是操作系统能够发起抢占调度的基础。
 
-## go main 函数执行
+## 源码分析
+
+### go main 函数执行
 
 [Go 语言设计与实现 Goroutine](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-goroutine/)linux amd64系统的启动函数是在asm_amd64.s的`runtime·rt0_go`函数中。
 
@@ -75,7 +77,7 @@ func schedinit() {
 }
 ```
 
-## goroutine 创建
+### goroutine 创建
 
 go 关键字在编译期间通过 stmt 和 call 两个方法将该关键字转换成 newproc 函数调用，代码的路径和原理与 defer 关键字几乎完全相同。我们向 newproc 中传入一个表示函数的指针 funcval，在这个函数中我们还会获取当前调用 newproc 函数的 Goroutine 以及调用方的程序计数器 PC，然后调用 newproc1 函数：
 
@@ -138,7 +140,7 @@ func newproc1(fn *funcval, argp *uint8, narg int32, callergp *g, callerpc uintpt
 }
 ```
 
-## 有哪些调度入口
+### 有哪些调度入口
 
 协程切换的原因一般有以下几种情况：
 
@@ -185,7 +187,7 @@ func park_m(gp *g) {
 }
 ```
 
-## 调度过程 `schedule()`
+### 切换过程 `schedule()`
 
 [从源码角度看 Golang 的调度](https://studygolang.com/articles/20651)
 
@@ -267,7 +269,9 @@ runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器
 
 ![](/public/upload/go/routine_switch_after.jpg)
 
-## 初始化和调度循环
+## 图解
+
+### 初始化
 
 在主线程第一次被调度起来执行第一条指令之前，主线程的函数栈如下图所示：
 
@@ -322,6 +326,8 @@ func main() {
     fmt.Println(<-ch)
 }
 ```
+
+### 调度循环
 
 ```
 schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexit0()->schedule()
