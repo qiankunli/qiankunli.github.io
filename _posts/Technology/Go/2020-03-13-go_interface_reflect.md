@@ -30,11 +30,18 @@ You must do your best to understand what could change and use interfaces to deco
 方法带不带指针：`(p *Person)` refers to a pointer to the created instance of the Person struct. it is like using the keyword `this` in Java or `self` in Python when referring to the pointing object.
 `(p Person)` is a copy of the value of Person ia passed to the function. any change that you make in  p if you pass it by value won't be reflected in source `p`.
 
+结构体方法是要将接收器定义成值，还是指针。**这本质上与函数参数应该是值还是指针是同一个问题**。
 ```go
 func (p *Person)GetFullName() string{
     return fmt.Println("%s %s",p.Name,p.Surname)
 }
 func (p Person)GetFullName() string{
+    return fmt.Println("%s %s",p.Name,p.Surname)
+}
+func GetFullName(p *Person) string{
+    return fmt.Println("%s %s",p.Name,p.Surname)
+}
+func GetFullName(p Person) string{
     return fmt.Println("%s %s",p.Name,p.Surname)
 }
 ```
