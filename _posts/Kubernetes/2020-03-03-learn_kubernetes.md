@@ -106,6 +106,7 @@ kubelet/api server/scheduler 本身可能会变，但它们的功能以及 彼�
     2. 
     3. 
     4. 
+3. 提高资源利用率 [容器化计算资源利用率现象剖析](https://mp.weixin.qq.com/s/8sHsI1pVm-1RX5w1F3uWPg) [资源利用率提升工具大全](https://mp.weixin.qq.com/s/tjpSneIghbGlRpAg1qkhHA)
 
 [美团点评Kubernetes集群管理实践](https://mp.weixin.qq.com/s/lYDYzEUlvXQhCO1xCJ7HAg) 笔者从中得到一个启发就是，整个kubernetes 的实践是分层次的。
 
@@ -118,6 +119,12 @@ kubelet/api server/scheduler 本身可能会变，但它们的功能以及 彼�
 2. k8s 是声明式的，所以crd 也应该是声明式的。
 
 这个印象在openkruise 推出ImagePullJob 之后产生了动摇，这个crd的作用是将 image 下发到指定个规则的node上。[面对不可避免的故障，我们造了一个“上帝视角”的控制台](https://mp.weixin.qq.com/s/QxTMLqf8VspXWy4N4AIFuQ) 中chaosblade 的crd 则支持向某个进程注入一个故障。chaosblade  本身首先是一个故障注入平台，然后才是支持在k8s 平台上支持故障注入（物理机也是支持的）。
+
+当然这个观点在 [面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA) 被认为是错误的。几个错误思维：
+1. 一切设计皆 YAML；
+2. 一切皆合一；
+3. 一切皆终态；
+4. 一切交互皆 cr。
 
 ## 一个充分支持扩展的系统
 
@@ -139,5 +146,7 @@ Kubernetes 本身就是微服务的架构，虽然看起来复杂，但是容易
 |Ingress Controller|pod 部署在 Kubernetes 集群里，根据api server 中Ingress 数据做出处理即可|
 |metric server|以Deployment 方式运行|
 |cadvisor|以源码包方式被集成在 kubelet里|
+
+[你该如何为 Kubernetes 定制特性](https://mp.weixin.qq.com/s/0XZa2KBubdNtN6sJTonluA)
 
 [假如重新设计Kubernetes](https://mp.weixin.qq.com/s/QgROwPVRgpE-jF7vMtjJcQ)

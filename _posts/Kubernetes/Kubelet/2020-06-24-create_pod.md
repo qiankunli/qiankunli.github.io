@@ -46,3 +46,6 @@ keywords:  create pod
 2. 所有的组件只与apiserver交互，不直接互通，更不直接控制kubelet 做某事
 
 ![](/public/upload/kubernetes/create_deployment.png)
+
+
+![](/public/upload/kubernetes/apiserver_create_pod.png)

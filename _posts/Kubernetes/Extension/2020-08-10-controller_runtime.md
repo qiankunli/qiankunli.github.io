@@ -21,6 +21,8 @@ Kubernetes 这样的分布式操作系统对外提供服务是通过 API 的形�
 1. 编写 CRD 并将其部署到 K8s 集群里；这一步的作用就是让 K8s 知道有这个资源及其结构属性，在用户提交该自定义资源的定义时（通常是 YAML 文件定义），K8s 能够成功校验该资源并创建出对应的 Go struct 进行持久化，同时触发控制器的调谐逻辑。
 2. 编写 Controller 并将其部署到 K8s 集群里。这一步的作用就是实现调谐逻辑。
 
+[面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA)
+
 ## kubebuilder 
 
 [Kubebuilder中文文档](https://cloudnative.to/kubebuilder/introduction.html) 对理解k8s 上下游知识以及使用kubebuiler 编写控制器很有帮助。

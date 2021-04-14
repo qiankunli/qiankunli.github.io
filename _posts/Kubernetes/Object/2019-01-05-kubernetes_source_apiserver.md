@@ -21,7 +21,7 @@ apiserver 核心职责
 
 1. 命令式命令行操作，比如直接 `kubectl run`
 2. 命令式配置文件操作，比如先`kubectl create -f xx.yaml` 再 `kubectl replace -f xx.yaml` 
-3. 声明式API 操作，比如`kubectl apply -f xx.yaml`。**命令式api 描述和执行 是一体的，声明式api 则需要额外的 执行器**（下文叫Controller） sync desired state 和 real state。PS：使用方不需要写控制流逻辑
+3. 声明式API 操作，比如`kubectl apply -f xx.yaml`。**命令式api 描述和执行 是一体的，声明式api 则需要额外的 执行器**（下文叫Controller） sync desired state 和 real state。PS：**它不需要创建变量用来存储数据，使用方不需要写控制流逻辑 if/else/for**
 
 声明式API 有以下优势
 
@@ -53,7 +53,7 @@ apiserver 核心职责
 
 ### go-restful框架
 
-API Server使用了go-restful框架，按照go-restful的原理，包含以下的组件
+宏观上来看，APIServer就是一个实现了REST API的WebServer，最终是使用golang的net/http库中的Server运行起来的，按照go-restful的原理，包含以下的组件
 1. Container: 一个Container包含多个WebService
 2. WebService: 一个WebService包含多条route
 3. Route: 一条route包含一个method(GET、POST、DELETE，WATCHLIST等)，一条具体的path以及一个响应的handler
@@ -146,7 +146,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 ### endpoint 层
 
-位于 k8s.io/apiserver/pkg/endpoints 包下。根据Registry层返回的路径与存储逻辑的关联关系，完成服务器上路由的注册。
+位于 k8s.io/apiserver/pkg/endpoints 包下。根据Registry层返回的路径与存储逻辑的关联关系，完成服务器上路由的注册 `<path,handler>` ==>  route ==> webservice。
 
 ```go
 // k8s.io/apiserver/pkg/endpoints/installer.go
@@ -162,6 +162,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
         ...
         switch action.Verb {
             case "GET": // Get a resource.
+                handler = restfulGetResource(getter, exporter, reqScope)
                 ...
                 route := ws.GET(action.Path).To(handler).
                     Doc(doc).
@@ -178,6 +179,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			ws.Route(route)
 		}
     }
+}
+func restfulGetResource(r rest.Getter, e rest.Exporter, scope handlers.RequestScope) restful.RouteFunction {
+	return func(req *restful.Request, res *restful.Response) {
+		handlers.GetResource(r, e, &scope)(res.ResponseWriter, req.Request)
+	}
 }
 func (a *APIInstaller) Install() ([]metav1.APIResource, *restful.WebService, []error) {
 	ws := a.newWebService()
@@ -232,12 +238,13 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 3. 服务器级别的过滤器（filters模块），如，cors,请求数，压缩，超时等过滤器，
 4. server级别的路由（routes模块），如监控，swagger，openapi，监控等。
 
+[Kubernetes APIServer 机制概述](https://mp.weixin.qq.com/s/aPcPx8rZ4nL5hUAgy7aovg)apiserver通过Chain的方式，或者叫Delegation的方式，实现了APIServer的扩展机制，KubeAPIServer是主APIServer，这里面包含了Kubernetes的所有内置的核心API对象，APIExtensions其实就是我们常说的CRD扩展，这里面包含了所有自定义的CRD，而Aggretgator则是另外一种高级扩展机制，可以扩展外部的APIServer，三者通过 Aggregator –> KubeAPIServer –> APIExtensions 这样的方式顺序串联起来，当API对象在Aggregator中找不到时，会去KubeAPIServer中找，再找不到则会去APIExtensions中找，这就是所谓的delegation，通过这样的方式，实现了APIServer的扩展功能。
+
 ## 拦截api请求
 
 1. Admission Controller
 2. Initializers
 3. webhooks, If you’re not planning to modify the object and intercepting just to read the object, [webhooks](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#external-admission-webhooks) might be a faster and leaner alternative to get notified about the objects. Make sure to check out [this example](https://github.com/caesarxuchao/example-webhook-admission-controller) of a webhook-based admission controller.
-
 
 
 ### Initializers
@@ -316,9 +323,6 @@ k8s 在 etcd中的存在
 /registry/services/endpoints/default/kubernetes-ro
 /registry/services/endpoints/default/monitoring-influxdb
 ```
-## create pod
-
-![](/public/upload/kubernetes/apiserver_create_pod.png)
 
 ## 扩展apiserver
 

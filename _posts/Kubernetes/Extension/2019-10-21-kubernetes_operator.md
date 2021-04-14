@@ -13,6 +13,7 @@ keywords: kubernetes operator
 * TOC
 {:toc}
 
+[面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA)
 
 [Kubernetes operator 模式开发实践](https://mp.weixin.qq.com/s/VJVVB5JJ_RlGnbq0hyFd8A)
 

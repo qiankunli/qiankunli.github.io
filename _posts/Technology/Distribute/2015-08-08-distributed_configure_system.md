@@ -60,6 +60,9 @@ You can use these to implement different **recipes** that are required for clust
 
 **其作用类似于集线器，不同主机的各个进程连上它，就不用彼此之间费事通信了，当然，通信的数据一般是对连接上配置中心的所有进程都有用的**。如果是交互的数据量太大，或数据只与某两个进程相关，还是各主机自己动手或使用消息队列。
 
+
+
+
 ## 通过安装过程来体会工具的异同
 
 ### etcd
@@ -275,6 +278,31 @@ Consul做服务发现是专业的，配置管理更像是捎带的
 
 ### nacos
 
+```java
+//Config Service Interface
+public interface ConfigService {
+    String getConfig(String dataId, String group, long timeoutMs) throws NacosException;
+    String getConfigAndSignListener(String dataId, String group, long timeoutMs, Listener listener) throws NacosException;
+    void addListener(String dataId, String group, Listener listener) throws NacosException;
+    boolean publishConfig(String dataId, String group, String content) throws NacosException;
+    boolean removeConfig(String dataId, String group) throws NacosException;
+    void removeListener(String dataId, String group, Listener listener);
+    String getServerStatus();
+}
+```
+
+## 服务模型
+
+consul/nacos等中间件被分成了两块功能：服务注册发现（Naming）和配置中心（Config）。一般在聊注册中心时，都会以 Zookeeper 为引子，这也是很多人最熟悉的注册中心。但如果你真的写过或看过使用 Zookeeper 作为注册中心的适配代码，会发现并不是那么容易，再加上注册中心涉及到的一致性原理，这就导致很多人对注册中心的第一印象是：这个东西好难！但归根到底是因为 Zookeeper 根本不是专门为注册中心而设计的，其提供的 API 以及内核设计，并没有预留出「服务模型」的概念，这就使得开发者需要自行设计一个模型，去填补 Zookeeper 和服务发现之间的鸿沟。微服务架构逐渐深入人心后，Nacos、Consul、Eureka 等注册中心组件进入大众的视线。可以发现，这些“真正”的注册中心都有各自的「服务模型」，在使用上也更加的方便。
+
+1. 服务注册，registerInstance/registerService
+2. 服务隔离，namespace/group/cluster
+3. 服务发现
+    1. 推模型，subscribe/unsubscribe
+    2. 拉模型，getAllInstances/selectInstances
+
+### nacos
+
 [Nacos 概念](https://nacos.io/zh-cn/docs/concepts.html)相关概念
 
 ![](/public/upload/distribute/nacos_concepts.png)
@@ -303,16 +331,7 @@ nacos 对外提供http api，下文进一步通过java client sdk 演示 与naco
         List<ServiceInfo> getSubscribeServices() throws NacosException;
         String getServerStatus();
     }
-    //Config Service Interface
-    public interface ConfigService {
-        String getConfig(String dataId, String group, long timeoutMs) throws NacosException;
-        String getConfigAndSignListener(String dataId, String group, long timeoutMs, Listener listener) throws NacosException;
-        void addListener(String dataId, String group, Listener listener) throws NacosException;
-        boolean publishConfig(String dataId, String group, String content) throws NacosException;
-        boolean removeConfig(String dataId, String group) throws NacosException;
-        void removeListener(String dataId, String group, Listener listener);
-        String getServerStatus();
-    }
+    
 
 我们使用zk 做服务注册中心时，对zk 的api 和服务发现注册操作 之间要进行一些语义转换，NamingService 接口定义了 服务发现注册的 api。
 
