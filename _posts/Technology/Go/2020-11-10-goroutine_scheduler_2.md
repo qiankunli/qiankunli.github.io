@@ -352,3 +352,14 @@ schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexi
 
 1. 因运行时间过长而导致的抢占调度。监控线程负责给被抢占的goroutine设置抢占标记，被抢占的goroutine再在函数的的入口处检查g的stackguard0成员决定是否需要调用morestack_noctxt函数，从而最终调用到newstack函数处理抢占请求；
 2. 因进入系统调用时间过长而发生的抢占调度。而对于系统调用执行时间过长的goroutine，调度器并没有暂停其执行，只是剥夺了正在执行系统调用的工作线程所绑定的p，要等到工作线程从系统调用返回之后绑定p失败的情况下该goroutine才会真正被暂停运行。
+
+## Go的栈
+
+[一文教你搞懂 Go 中栈操作](https://mp.weixin.qq.com/s/H9ZYnJevZAnFaNsIH2wbjQ)
+
+1. 多任务操作系统中的每个进程都在自己的**内存沙盒**中运行。PS: 内存的沙盒
+2. 栈是一种栈数据结构，用于存储有关计算机程序的活动 subroutines 信息。栈帧stack frame又常被称为帧frame是在调用栈中储存的函数之间的调用关系，每一帧对应了函数调用以及它的参数数据。
+3. linux线程的栈是os 进程内存模型的一部分，task_struct 是描述进程/线程的一个环节，栈跟task_struct 关系不大。而goroutine的栈是runtime/编译器分配的， 就在goroutine struct中（待确认）。在 Goroutine 中有一个 stack 数据结构，里面有两个属性 lo 与 hi，描述了实际的栈内存地址。创建goroutine 时将栈赋给goroutine： runtime·newproc ==> runtime.newproc1 ==> malg(stacksize)
+4. 栈会根据大小的不同从不同的位置进行分配。
+    1. 小栈内存分配。从 stackpool 分配栈空间，否则从 mcache 中获取。如果 mcache 对应的 stackcache 获取不到，那么调用 stackcacherefill 从堆上申请一片内存空间填充到 stackcache 中。
+    2. 大栈内存分配。运行时会查看 stackLarge 中是否有剩余的空间，如果不存在剩余空间，它也会调用 mheap_.allocManual 从堆上申请新的内存。

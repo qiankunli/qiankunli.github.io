@@ -96,6 +96,9 @@ jump 和call 的区别是：jump 之后不用回来，而call（也就是函数�
 
 函数通过自身的指令遥控其对应的方法栈，可以往里面放入数值，从里面读取数据，也可以将数值移动到其它地方，从调用者的方法栈里取值。**函数执行的切换，不只是切换pc，还有切换sp 和bp ，因为函数代码中有很多 指令引用了 sp 和bp**。PS：就好比搬家不是换个住处，还有孩子的学校、户籍等等。
 
+[一文教你搞懂 Go 中栈操作](https://mp.weixin.qq.com/s/H9ZYnJevZAnFaNsIH2wbjQ)In computer science, a call stack is a stack data structure that stores information about the active subroutines of a computer program.
+In computer programming, a subroutine is a sequence of program instructions that performs a specific task, packaged as a unit.A stack frame is a frame of data that gets pushed onto the stack. In the case of a call stack, a stack frame would represent a function call and its argument data.栈是一种栈数据结构，用于存储有关计算机程序的活动 subroutines 信息。栈帧stack frame又常被称为帧frame是在调用栈中储存的函数之间的调用关系，每一帧对应了函数调用以及它的参数数据。
+
 ## 为什么需要堆？
 
 Heap is used for dynamic memory allocation(data with dynamic size ) and unlike stack, the program needs to look up the data in heap using pointers.  
