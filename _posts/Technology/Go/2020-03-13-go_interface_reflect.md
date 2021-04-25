@@ -61,6 +61,10 @@ func (this *Person)GetFullName() string{
 }
 ```
 
+[从栈上理解 Go 语言函数调用](https://mp.weixin.qq.com/s/-xn2i2depcN4uWT3wV63Pw)
+1. 调用者 caller 会将参数值写入到栈上，调用函数 callee 实际上操作的是调用者 caller 栈帧上的参数值。
+2. 在进行调用指针接收者(pointer receiver)方法调用的时候，实际上是先复制了结构体的指针到栈中，然后在方法调用中全都是基于指针的操作。
+
 ## interface 底层实现
 
 Go 使用 iface 结构体表示包含方法的接口；使用 eface 结构体表示不包含任何方法的 interface{} 类型
