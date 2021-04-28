@@ -159,6 +159,12 @@ keywords: test environment
 
 本质原因就是，网络隔离只能决定禁止 访问谁，但不能决定 “优先”访问谁，优先是一个偏语义的概念，只能框架层去实现。
 
+## service mesh
+
+[使用service mesh进行流量隔离](https://mp.weixin.qq.com/s/J34ujEMq5V-5ADZnxOsELw)
+
+![](/public/upload/practice/service_mesh_isolation.png)
+
 
 
 

@@ -51,6 +51,8 @@ keywords: memory management
 
 ![](/public/upload/linux/linux_virtual_address.png)
 
+[Linux 内存管理知识总结（一）](https://zhuanlan.zhihu.com/p/366957562)
+
 
 ## 语言/运行时
 

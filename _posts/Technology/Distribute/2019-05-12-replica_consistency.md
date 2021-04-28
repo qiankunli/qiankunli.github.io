@@ -158,6 +158,7 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 
 跟随者中的不一致日志项会被领导者的日志覆盖，而且领导者从来不会覆盖或者删除自己的日志。
 
+[深入剖析共识性算法 Raft](https://mp.weixin.qq.com/s/GhI7RYBdsrqlkU9o9CLEAg)
 
 ## 补充
 

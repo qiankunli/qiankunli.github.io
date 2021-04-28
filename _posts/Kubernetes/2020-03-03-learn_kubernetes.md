@@ -126,6 +126,8 @@ kubelet/api server/scheduler 本身可能会变，但它们的功能以及 彼�
 3. 一切皆终态；
 4. 一切交互皆 cr。
 
+[谈谈 Kubernetes 的问题和局限性](https://mp.weixin.qq.com/s/ULfmxZh2PBYK-298Xskf2Q)
+
 ## 一个充分支持扩展的系统
 
 Kubernetes 本身就是微服务的架构，虽然看起来复杂，但是容易定制化，容易横向扩展。在 Kubernetes 中几乎所有的组件都是无状态化的，状态都保存在统一的 etcd 里面，这使得扩展性非常好，组件之间异步完成自己的任务，将结果放在 etcd 里面，互相不耦合。有了 API Server 做 API 网关，所有其他服务的协作都是基于事件的，**因而对于其他服务进行定制化，对于 client 和 kubelet 是透明的**。
