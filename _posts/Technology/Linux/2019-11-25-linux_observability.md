@@ -206,3 +206,5 @@ perf stat 给出了其他几个最常用的统计信息：
 [Perf -- Linux下的系统性能调优工具，第 2 部分](https://www.ibm.com/developerworks/cn/linux/l-cn-perf2/index.html)未读
 
 perf sched 使用了转储后再分析 (dump-and-post-process) 的方式来分析内核调度器的各种事件
+
+[几十万实例线上系统的抖动问题定位](https://mp.weixin.qq.com/s/PordZi_H5fqX_-Ty9OH6qQ)

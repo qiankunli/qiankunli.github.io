@@ -26,6 +26,8 @@ keywords: java forkjoin
 		
 stream map 之后是stream，optional map 之后是optional ，不要彼此相互干扰
 
+[Optional 是个好东西，你真的会用么？](https://mp.weixin.qq.com/s/QCGBS0gi25Gbp18Hwj7AFg)
+
 ### 获取一个可能为null的对象的成员
 
 2018.11.14 补充，再看一个工具类
