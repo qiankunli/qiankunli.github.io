@@ -90,27 +90,9 @@ kubelet/api server/scheduler 本身可能会变，但它们的功能以及 彼�
 
 感觉你 `go get github.com/kubernetes` 也没什么错，但因为代码中 都是 `import k8s.io/kubernetes/xxx` 所以推荐前者
 
-## 实践
 
-两个基本工作
 
-1. 应用容器化
 
-    1. 
-    2. 
-    3. 
-    4. 
-2. 编排自动化
-
-    1. 
-    2. 
-    3. 
-    4. 
-3. 提高资源利用率 [容器化计算资源利用率现象剖析](https://mp.weixin.qq.com/s/8sHsI1pVm-1RX5w1F3uWPg) [资源利用率提升工具大全](https://mp.weixin.qq.com/s/tjpSneIghbGlRpAg1qkhHA)
-
-[美团点评Kubernetes集群管理实践](https://mp.weixin.qq.com/s/lYDYzEUlvXQhCO1xCJ7HAg) 笔者从中得到一个启发就是，整个kubernetes 的实践是分层次的。
-
-![](/public/upload/kubernetes/meituan_kubernetes_practice.png)
 
 ## 如何看待k8s
 

@@ -36,6 +36,8 @@ func main() {
 
 ## 从各个视角看tomct
 
+我们为什么能通过web服务器映射的url的访问资源？主要3个过程：接收请求；处理请求；响应请求。接收和响应请求是共性功能，于是将这两个功能抽取成web服务器。处理请求的逻辑是不同的，抽取成Servlet（容器），交给程序员来编写。随着后期互联网的发展，出现了三层架构，一些逻辑就从Servlet 抽取出来，分担到Service和Dao。等Spring家族出现后，Servlet 开始退居幕后，SpringMVC的核心DispatcherServlet 本质就是一个Servlet。
+
 ### tomcat是一个Servlet 容器？
 
 
