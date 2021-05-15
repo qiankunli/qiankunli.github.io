@@ -115,5 +115,13 @@ Go Modules 提供了统一的依赖包管理工具 go mod，其思想类似maven
 
 3. go build 代码时，自动解析代码中的import 生成 go.mod 文件。PS：相当于`maven package` 解析代码自动生成pom.xml。
 4. 将 import 路径与项目代码的实际存放路径解耦。PS：import 依赖包在$GOPATH 中的路径，编译时使用依赖包在`$GOPATH/pkg/mod`中的文件。
+5. 在国内访问golang.org/x的各个包都需要翻墙，你可以在go.mod中使用replace替换成github上对应的库。
+    ```
+    replace (
+        golang.org/x/crypto v0.0.0-20180820150726-614d502a4dac => github.com/golang/crypto v0.0.0-20180820150726-614d502a4dac
+        golang.org/x/net v0.0.0-20180821023952-922f4815f713 => github.com/golang/net v0.0.0-20180826012351-8a410e7b638d
+        golang.org/x/text v0.3.0 => github.com/golang/text v0.3.0
+    )
+    ```
 
 

@@ -37,3 +37,8 @@ keywords:  Kubernetes event
 1. 规范用户的使用方式，容器 vs 虚拟机
 2. 部分集群连接的 APIServer 客户端数量超过了 4000 个，其中不乏一些用户用脚本对 Pod 资源进行全量 LIST 来获取数据。这些集群的 APIServer 消耗接近 100G 的内存以及 50 核的 CPU 算力，并且 APIServer 所在节点的网卡流量达到了 15G。
 3. 明确集群稳定性保障以及应用稳定性保障的边界以及有效的评估模型，这种责任边界的不明确带来了交付成本上的增长以及不确定性。PS：出问题无法明确是应用的问题还是k8s的问题
+
+## 排查问题文章汇总
+
+[kubernetes 问题排查: 磁盘 IO 过高导致 Pod 创建超时](https://mp.weixin.qq.com/s/3v84M5idGi-nJ5u8RUzP6A)
+
