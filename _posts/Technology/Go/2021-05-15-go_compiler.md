@@ -20,4 +20,12 @@ keywords: go compiler
 2. 通用编译器方案
     ![](/public/upload/basic/general_compiler.png)
 
-[漫谈Go语言编译器（01）](https://mp.weixin.qq.com/s/0q0k8gGX56SBKJvfMquQkQ) 未读完
+SSA-IR（Single Static Assignment）是一种介于高级语言和汇编语言的中间形态的伪语言，从高级语言角度看，它是（伪）汇编；而从真正的汇编语言角度看，它是（伪）高级语言。顾名思义，SSA（Single Static Assignment）的两大要点是：
+1. Static：每个变量只能赋值一次（因此应该叫常量更合适）；
+2. Single：每个表达式只能做一个简单运算，对于复杂的表达式a*b+c*d要拆分成："t0=a*b; t1=c*d; t2=t0+t1;"三个简单表达式；
+
+## go编译器
+
+![](/public/upload/go/go_compiler.png)
+
+[漫谈Go语言编译器（01）](https://mp.weixin.qq.com/s/0q0k8gGX56SBKJvfMquQkQ) 
