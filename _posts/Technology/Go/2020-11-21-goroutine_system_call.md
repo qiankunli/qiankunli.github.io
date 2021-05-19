@@ -92,7 +92,7 @@ G1将进行同步系统调用以阻塞M1
 
 ![](/public/upload/go/go_scheduler_sysmon.jpg)
 
-在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.在 go 运行时中也有类似的协程 sysmon. 它会每隔一段时间**检查 Go 语言runtime**，确保程序没有进入异常状态。
+在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.在 go 运行时中也有类似的协程 sysmon. sysmon 运行在 M，且不需要 P。它会每隔一段时间**检查 Go 语言runtime**，确保程序没有进入异常状态。
 
 
 系统监控的触发时间就会稳定在 10ms，功能比较多: 
@@ -100,7 +100,7 @@ G1将进行同步系统调用以阻塞M1
 1. 检查死锁runtime.checkdead 
 2. 运行计时器 — 获取下一个需要被触发的计时器；
 3. 定时从 netpoll 中获取 ready 的协程
-4. 抢占运行时间较长的或者处于系统调用的 Goroutine；基本流程是 sysmon 协程标记某个协程运行过久, 需要切换出去, 该协程在运行函数时会检查栈标记, 然后进行切换.
+4. [Go 的抢占式调度](https://mp.weixin.qq.com/s/d7FdGBc0S0V3S4aRL4EByA)当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中，当 G 进行函数调用时，G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。由于它的工作方式（函数调用触发），在 `for{}` 的情况下并不会发生抢占，如果没有函数调用，即使设置了抢占标志，也不会进行该标志的检查。Go1.14 引入抢占式调度（使用信号的异步抢占机制），sysmon 仍然会检测到运行了 10ms 以上的 G（goroutine）。然后，sysmon 向运行 G 的 P 发送信号（SIGURG）。Go 的信号处理程序会调用P上的一个叫作 gsignal 的 goroutine 来处理该信号，将其映射到 M 而不是 G，并使其检查该信号。gsignal 看到抢占信号，停止正在运行的 G。
 5. 在满足条件时触发垃圾收集回收内存；
 6. 打印调度信息,归还内存等定时任务.
 
