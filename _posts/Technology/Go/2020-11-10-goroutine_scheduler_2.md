@@ -271,6 +271,10 @@ runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器
 
 ## 图解
 
+[调度的本质](https://mp.weixin.qq.com/s/5E5V56wazp5gs9lrLvtopA)Go 调度的本质是一个生产-消费流程，这个观点非常新颖，这种熟悉加意外的效果其实就是你成长的时机。
+
+![](/public/upload/go/go_scheduler_overview.png)
+
 ### 初始化
 
 在主线程第一次被调度起来执行第一条指令之前，主线程的函数栈如下图所示：
@@ -329,6 +333,20 @@ func main() {
 
 ### 调度循环
 
+伪代码
+```go
+for i:=0;i<N;i++{   // 创建N个操作系统线程执行schedule函数
+    create_os_thread(schedule) 
+}
+func schedule(){
+    for{
+        g := find_a_runnable_goroutine_from_M_goroutines();
+        run_g(g)    // cpu 运行该goroutine，直到需要调度其它goroutine 才返回
+        save_status_of_g(g) // 保存goroutine的状态，主要是寄存器的值
+    }
+}
+```
+m 拿到 goroutine 并运行它的过程就是一个消费过程
 ```
 schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexit0()->schedule()
 ```
