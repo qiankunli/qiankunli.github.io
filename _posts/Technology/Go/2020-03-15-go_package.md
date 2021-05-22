@@ -123,5 +123,10 @@ Go Modules 提供了统一的依赖包管理工具 go mod，其思想类似maven
         golang.org/x/text v0.3.0 => github.com/golang/text v0.3.0
     )
     ```
+## 其它
 
+[浅谈如何组织Go代码结构](https://mp.weixin.qq.com/s/9_WQUpvHKli4btPqCA89Aw)
+1. 大多数成功的 Go 应用程序的结构并不能从一个项目复制/粘贴到另一个项目。
+2. 使用一个远比需要复杂的程序结构，实际上对项目的伤害比帮助更大。
+3. 对于一个几乎没有 Go 代码经验的人来说，发掘项目的理想结构并不是一个现实的目标。它需要实践、实验和重构来获得正确的结果。
 

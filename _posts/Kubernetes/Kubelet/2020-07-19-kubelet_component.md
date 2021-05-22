@@ -62,6 +62,17 @@ func (kl *Kubelet) initializeModules() error {
 
 ## pleg
 
+[kubernetes 问题排查: 系统时间被修改导致 sandbox 冲突](https://mp.weixin.qq.com/s/DJMrRBP237BE69pTyrKmnQ)
+
+![](/public/upload/kubernetes/kubelet_create_pod_detail.png)
+
+kubelet 启动之后，会运行起 PLEG 组件，定期的缓存 pod 的信息（包括 pod status）。在 PLEG 的每次 relist 逻辑中，会对比 old pod 和 new pod，检查是否存在变化，如果新旧 pod 之间存在变化，则开始执行下面两个逻辑：
+
+2. 更新内部缓存 cache。在更新缓存 updateCache 的逻辑中，会调用 runtime 的相关接口获取到与 pod 相关的 status 状态信息，然后缓存到内部cache中，最后发起通知 ( podWorker 会发起订阅) 。
+1. 生成 event 事件，比如 containerStart 等，最后再投递到 eventChannel 中，供 podWorker 来消费。
+
+podWorker 的工作就是负责 pod 在节点上的正确运行（比如挂载 volume，新起 sandbox，新起 container 等），一个 pod 对应一个 podWorker，直到 pod 销毁。
+
 源码文件
 
 ```
@@ -137,6 +148,8 @@ type podRecord struct {
 	current *kubecontainer.Pod
 }
 ```
+
+
 
 ## probeManager
 

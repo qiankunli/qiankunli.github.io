@@ -49,3 +49,5 @@ keywords:  create pod
 
 
 ![](/public/upload/kubernetes/apiserver_create_pod.png)
+
+![](/public/upload/kubernetes/kubelet_create_pod_detail.png)

@@ -68,11 +68,19 @@ Serverfull 就是服务端运维全由我们自己负责，Serverless 则是服�
 
 ![](/public/upload/distribute/serverless_definition.png)
 
-[喧哗的背后：Serverless 的概念及挑战](https://mp.weixin.qq.com/s/vxFRetml4Kx8WkyoSTD1tQ)虽然说是 Serverless，但 Server（服务器）是不可能真正消失的，Serverless 里这个 less 更确切的说是开发不用关心的意思。这就好比现代编程语言 Java 和 Python，开发就不用手工分配和释放内存了，但内存还在哪里，只不过交给垃圾收集器管理了。称一个能帮助你管理服务器的平台为 Serverless 平台，就好比称呼 Java 和 Python 为 Memoryless 语言一样。
+[喧哗的背后：Serverless 的概念及挑战](https://mp.weixin.qq.com/s/vxFRetml4Kx8WkyoSTD1tQ)虽然说是 Serverless，但 Server（服务器）是不可能真正消失的，Serverless 里这个 **less 更确切的说是开发不用关心的意思**。这就好比现代编程语言 Java 和 Python，开发就不用手工分配和释放内存了，但内存还在哪里，只不过交给垃圾收集器管理了。称一个能帮助你管理服务器的平台为 Serverless 平台，就好比称呼 Java 和 Python 为 Memoryless 语言一样。
 
 这里讲下笔者的一个体会，一开始在公司内搞容器化，当时觉得只要把应用以容器的方式跑起来就可以了（应用托管平台）。一开始拿测试环境试验容器化，运维把测试环境的维护工作完全交给 容器团队。这时，天天干的一个活儿是 给web 开发配域名，为此后来针对域名配置定义了一套规范、 开发了一个nginx插件自动化了（引入了网关之后，改为自动更新网关接口）。这个过程其实就是 less 的过程。
 
-## serverless 领域行业划分
+## 从Kubernetes 到Serverless
+
+[Knative Serverless 之道：如何 0 运维、低成本实现应用托管？](https://mp.weixin.qq.com/s/uihFHmUHeeIWuj5wwjNFrw)计算、存储和网络这三个核心要素已经被 Kubernetes 层统一了，Kubernetes 已经提供了 Pod 的无服务器支持，而应用层想要用好这个能力其实还有很多事情需要处理。
+
+1. 弹性：缩容到零；突发流量
+2. 灰度发布：如何实现灰度发布；灰度发布和弹性的关系
+3. 流量管理：灰度发布的时候如何在 v1 和 v2 之间动态调整流量比例；流量管理和弹性是怎样一个关系；当有突发流量的时候如何和弹性配合，做到突发请求不丢失
+
+我们发现虽然基础资源可以动态申请，但是应用如果要做到实时弹性、按需分配和按量付费的能力还是需要有一层编排系统来完成应用和 Kubernetes 的适配。这个适配不单单要负责弹性，还要有能力同时管理流量和灰度发布。
 
 ![](/public/upload/architecture/serverless_layer.png)
 
@@ -88,7 +96,8 @@ Serverfull 就是服务端运维全由我们自己负责，Serverless 则是服�
 
 ![](/public/upload/architecture/ali_cloud_function.png)
 
-## 手感
+
+## 手感/Knative
 
 ![](/public/upload/distribute/serverless_helloworld.png)
 
@@ -97,6 +106,52 @@ Serverfull 就是服务端运维全由我们自己负责，Serverless 则是服�
 |运行环境|在服务端构建代码的运行环境|FaaS 应用将这一步抽象为函数服务|
 |入口|负载均衡和反向代理|FaaS 应用将这一步抽象为 HTTP 函数触发器|
 ||上传代码和启动应用|FaaS 应用将这一步抽象为函数代码|
+
+Knative 作为最流行的应用 Severlesss 编排引擎，其中一个核心能力就是其简洁、高效的**应用托管服务**。Knative 提供的应用托管服务可以让您免去维护底层资源的烦恼，提升应用的迭代和服务交付效率。
+1. Build构建系统/Tekton：把用户定义的应用构建成容器镜像，面向kubernetes的标准化构建，区别于Dockerfile镜像构建，重点解决kubernetes环境的构建标准化问题。
+2. Serving服务系统：利用Istio的部分功能，来配置应用路由，升级以及弹性伸缩。Serving中包括容器生命周期管理，容器外围对象（service，ingres）生成（恰到好处的把服务实例与访问统一在一起），监控应用请求，自动弹性负载，并且利用Virtual service和destination配置服务访问规则，**流量、灰度（版本）和弹性这三者是完美契合在一起的**。PS: Service 与普通workload 并无多大区别，结合了istio，**你不用为服务配置port 等体现Server的概念**
+
+    ```yml
+    apiVersion: serving.knative.dev/v1alpha1
+    kind: Service
+    metadata:
+      name: stock-service-example
+      namespace: default
+    spec:
+      template:
+        metadata:
+          name: stock-service-example-v2
+          annotations:
+            autoscaling.knative.dev/class: "kpa.autoscaling.knative.dev" # 自动扩缩容
+          spec:
+            containers:
+            - image: registry.cn-hangzhou.aliyuncs.com/knative-sample/rest-api-go:v1
+                env:
+                - name: RESOURCE
+                    value: v2
+              readinessProbe:
+                httpGet:
+                  path: /
+                initialDelaySeconds: 0
+                periodSeconds: 3
+      traffic: # 流量管理
+      - tag: v1
+        revisionName: stock-service-example-v1
+        percent: 50
+      - tag: v2
+        revisionName: stock-service-example-v2
+        percent: 50
+    ```
+
+3. Eventing事件系统：用于自动完成事件的绑定与触发。**事件系统与直接调用**最大的区别在于响应式设计，它允许运行服务本身不需要屏蔽了调用方与被调用方的关系。从而在业务层面能够实现业务的快速聚合，或许为后续业务编排创新提供事件。PS：这块还感受不到价值
+
+客户端请求通过入口网关转发给Activator（此时pod实例数为0），Activator汇报指标给Autoscaler，Autoscaler创建Deployment进而创建Pod，一旦Pod Ready，Activator会将缓存的客户端请求转发给对应的Pod，网关也会将新的请求直接转发给响应的Pod。当一定周期内没有请求时，Autoscaler会将Pod replicas设置为0，同时网关将后续请求路由到Activator。 PS：可以缩容到0是因为有一个常驻的Activator
+
+![](/public/upload/architecture/knative_autoscaler.png)
+
+## 与FaaS的关系
+
+Serverless不等价于FaaS。也有人故意划分为Functions Serverless和容器化的Serverless。
 
 FaaS 与应用托管 PaaS（**应用托管平台**） 平台对比，**最大的区别在于资源利用率**，这也是 FaaS 最大的创新点。FaaS 的应用实例可以缩容到 0，而应用托管 PaaS 平台则至少要维持 1 台服务器或容器。FaaS 优势背后的关键点是可以极速启动，现在的云服务商，基于不同的语言特性，冷启动平均耗时基本在 100～700 毫秒之间。
 
@@ -108,13 +163,7 @@ FaaS 与应用托管 PaaS（**应用托管平台**） 平台对比，**最大的
 
 Serverless 架构和之前的架构相比，最大的差异是：业务服务不再是固定的常驻进程，而是真正按需启动和关闭的服务实例。
 
-在简化微服务管理复杂度上，Serverless 和Service Mesh的目标是一致的，都是将微服务通信和服务治理相关的非功能需求 从业务中剥离， 对于Serverless 是交给Serverless 框架负责处理，各功能函数之间的交互由Serverless接管， 开发者不再需要关注功能函数交互的细节。对于Service Mesh 是下沉到底层，成为通信基础设施的一部分。
-
-在Serverless 中按需执行的代码片段称为函数，它是Serverless 资源管理和调度的基本单位（有点类似进程之于os），Serverless 架构大体由以下几个部分组成：
-
-1. 函数管理，Serverless 需要对用户编写的函数进行管理，通过一定的方式将用户变成可调度、可运行的实例。为了支持多个语言的Serverless 函数，函数管理需要针对每种语言定义函数规范和标准， 提供相应的实现机制。
-2. 事件触发器，事件驱动是Serverless 中非常重要的部分，函数需要事先注册好 关注的事件类型，事件触发时，Serverless 查找关注这个事件的函数 触发执行。
-3. 函数的路由和伸缩管理
+如果基础设施和相关服务不具备实时扩缩容的能力，那么业务整体就不是弹性的。
 
 [无服务器已死？这项技术为什么变得人人嫌弃](https://mp.weixin.qq.com/s/dyCrv-fjN9cGcQXlcl3q1A)一个良好运行的单体应用或许不应变成一个连接到八个网关、四十个队列和数十个数据库实例的一系列”函数“。因此，无服务器适用于那些尚未开发的领域。几乎没有将现有应用（架构）移植过来的案例。
 

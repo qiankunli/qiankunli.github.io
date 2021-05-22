@@ -63,6 +63,14 @@ linux-1.2.13
 
 ## 网络与文件操作
 
+![](/public/upload/linux/vfs_fd.png)
+
+VFS为文件系统抽象了一套API，实现了该系列API就可以把对应的资源当作文件使用，当调用socket函数的时候，我们拿到的不是socket本身，而是一个文件描述符fd。
+
+![](/public/upload/linux/vfs_socket.jpeg)
+
+[从linux5.9看网络层的设计](https://zhuanlan.zhihu.com/p/369460776)整个网络层的实际中，主要分为socket层、af_inet层和具体协议层（TCP、UDP等）。当使用网络编程的时候，首先会创建一个socket结构体（socket层），socket结构体是最上层的抽象，然后通过协议簇类型创建一个对应的sock结构体，sock是协议簇抽象（af_inet层），同一个协议簇下又分为不同的协议类型，比如TCP、UDP（具体协议层），然后根据socket的类型（流式、数据包）找到对应的操作函数集并赋值到socket和sock结构体中，**后续的操作就调用对应的函数就行**，调用某个网络函数的时候，会从socket层到af_inet层，af_inet做了一些封装，必要的时候调用底层协议（TCP、UDP）对应的函数。而不同的协议只需要实现自己的逻辑就能加入到网络协议中。
+
 file_operations 结构定义了普通文件操作函数集。系统中每个文件对应一个 file 结构， file 结构中有一个 file_operations 变量，当使用 write，read 函数对某个文件描述符进行读写操作时，系统首先根据文件描述符索引到其对应的 file 结构，然后调用其成员变量 file_operations 中对应函数完成请求。
 
 ```c
