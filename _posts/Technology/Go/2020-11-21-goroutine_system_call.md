@@ -13,6 +13,8 @@ keywords: Go goroutine scheduler
 * TOC
 {:toc}
 
+Please remember that at the end of the day, all programs that work on UNIX machines end up using C system calls to communicate with the UNIX kernel and perform most of their tasks. 所有在 UNIX 系统上运行的程序最终都会通过 C 系统调用来和内核打交道。用其他语言编写程序进行系统调用，方法不外乎两个：一是自己封装，二是依赖 glibc、或者其他的运行库。Go 语言选择了前者，把系统调用都封装到了 syscall 包。封装时也同样得通过汇编实现。
+
 异步系统调用 G 会和MP分离（G挂到netpoller），同步系统调用 GM 会和P分离（P另寻M），生动的说明了GPM相对GM的精妙之处。
 
 ## 阻塞

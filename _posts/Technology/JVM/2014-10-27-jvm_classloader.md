@@ -29,6 +29,10 @@ C在开发层面的平台相关性：C语言实现系统兼容性的思路很简
 
 ASM 解析字节码的过程，有点像 XML 的解析器解析 XML 的过程：先解析类，再解析类的成员，比如类的成员变量（Field）、类的方法（Mothod）。在方法里，又可以解析出一行行的指令。
 
+[IDEA 的 debug 怎么实现？](https://mp.weixin.qq.com/s/Jf8akRoB-4vgnvtEiS5ZaA)
+1. instrument 是 JVM 提供的一个可以修改已加载类文件的类库
+2. JVM TI（JVM Tool Interface）JVM 工具接口是 JVM 提供的一个非常强大的对 JVM 操作的工具接口。JVM TI 通过事件机制，通过接口注册各种事件勾子，在 JVM 事件触发时同时触发预定义的勾子，以实现对各个 JVM 事件的感知和反应。Agent 是 JVM TI 实现的一种方式。
+
 
 ### 部分生成的字节码
 

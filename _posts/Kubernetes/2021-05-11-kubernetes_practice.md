@@ -42,3 +42,4 @@ keywords:  Kubernetes event
 
 [kubernetes 问题排查: 磁盘 IO 过高导致 Pod 创建超时](https://mp.weixin.qq.com/s/3v84M5idGi-nJ5u8RUzP6A)
 [kubernetes 平台开发者的几个小技巧](https://mp.weixin.qq.com/s/RVYJd_3xzDps-1xFwtl01g)
+[内存回收导致关键业务抖动案例分析-论云原生OS内存QoS保障](https://mp.weixin.qq.com/s/m74OgseP3I9AIKvPP6exrg)

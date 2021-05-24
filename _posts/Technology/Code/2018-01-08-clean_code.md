@@ -23,6 +23,8 @@ keywords: clean code
 1. 什么是整洁代码
 2. 在函数、类、系统、并发等层面上，如何编写整洁代码
 
+Erlang 的作者之一 Joe Armstrong:"Make it work, then make it beautiful, then if you really, really have to, make it fast. 90 percent of the time, if you make it beautiful, it will already be fast. So really, just make it beautiful!"
+
 ## 什么是不好的代码
 
 1. 改动一个需求，涉及的类很多

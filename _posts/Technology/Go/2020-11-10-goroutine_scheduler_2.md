@@ -271,10 +271,11 @@ runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器
 
 ## 图解
 
-[调度的本质](https://mp.weixin.qq.com/s/5E5V56wazp5gs9lrLvtopA)Go 调度的本质是一个生产-消费流程，这个观点非常新颖，这种熟悉加意外的效果其实就是你成长的时机。
+[调度的本质](https://mp.weixin.qq.com/s/5E5V56wazp5gs9lrLvtopA)Go 调度的本质是一个生产-消费流程，生产端是正在运行的 goroutine 执行 go func(){}() 语句生产出 goroutine 并塞到三级队列中去（包含P的runnext），消费端则是 Go 进程中的 m 在不断地执行调度循环。这个观点非常新颖，这种熟悉加意外的效果其实就是你成长的时机。
 
 ![](/public/upload/go/go_scheduler_overview.png)
 
+运行时(runtime)能够将goroutine多路复用到一个小的线程池中。
 ### 初始化
 
 在主线程第一次被调度起来执行第一条指令之前，主线程的函数栈如下图所示：
