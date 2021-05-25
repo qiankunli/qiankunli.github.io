@@ -101,11 +101,11 @@ pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads
 
 ![](/public/upload/kubernetes/pod_lifecycle.png)
 
-1. Pending
-2. Running
-3. Succeeded
-4. Failed
-5. Unknown  For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod. 用户可以执行 `kubectl delete pods <pod> --grace-period=0 --force` 强制删除 Pod
+1. Pending, API Server已经创建该Pod，且Pod内还有一个或多个容器的镜像没有创建，包括正在下载镜像的过程。
+2. Running, Pod内所有容器均已创建，且至少有一个容器处于运行状态、正在启动状态或正在重启状态。
+3. Succeeded, Pod内所有容器均成功执行退出，且不会重启。
+4. Failed, Pod内所有容器均已退出，但至少有一个容器退出为失败状态。
+5. Unknown,  For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod. 用户可以执行 `kubectl delete pods <pod> --grace-period=0 --force` 强制删除 Pod
 
 ### 容器状态及其它状态
 

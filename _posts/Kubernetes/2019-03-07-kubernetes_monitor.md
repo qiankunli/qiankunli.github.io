@@ -37,6 +37,8 @@ keywords: Kubernetes monitor
 
 ## 能搞到哪些metric
 
+在Kubernetes从1.10版本后采用Metrics Server作为默认的性能数据采集和监控，主要用于提供核心指标（Core Metrics），包括Node、Pod的CPU和内存使用指标。对其他自定义指标（Custom Metrics）的监控则由Prometheus等组件来完成。
+
 k8s 社区对k8s 监控的表述 [Kubernetes monitoring architecture](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/instrumentation/monitoring_architecture.md) 将metric 分为
 
 1. core metrics, which are metrics that Kubernetes understands and uses for operation of its internal components and core utilities. metric 应用于k8s 内部组件，比如调度、**扩缩容**、dashboard、kubectl top. 由k8s 提供统一规范和支持（即metrics-server）。

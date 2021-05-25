@@ -24,6 +24,10 @@ keywords: Kubernetes Service
 
 Kubernetes 之所以需要 Service，一方面是因为 Pod 的 IP 不是固定的，另一方面则是因为一组 Pod 实例之间总会有负载均衡的需求。
 
+不管是 iptables 还是 ipvs 转发模式，Kubernetes 中访问 Service 都会进行 DNAT，将原本访问 `ClusterIP:Port`的数据包 DNAT 成 Service 的某个 Endpoint (`PodIP:Port`)，然后内核将连接信息插入 conntrack 表以记录连接，目的端回包的时候内核从 conntrack 表匹配连接并反向 NAT，这样原路返回形成一个完整的连接链路。
+
+kube-proxy运行在所有节点上，iptables模式（1.2）下的kube-proxy核心功能：通过API Server的Watch接口实时跟踪Service与Endpoint的变更信息，并更新对应的iptables规则，Client的请求流量则通过iptables的NAT机制“直接路由”到目标Pod。
+
 ### How do they work?——基于iptables实现
 
 [利用 eBPF 支撑大规模 K8s Service](https://mp.weixin.qq.com/s/TdSOHk5EnSBer8uG5vqNyg) 对Service 的实现解释的非常精到。
@@ -109,6 +113,12 @@ KUBE-SVC-NWV5X2332I4OT4T3 规则实际上是一组随机模式（–mode random�
 ```
 
 当你的宿主机上有大量 Pod 的时候，成百上千条 iptables 规则不断地被刷新，会大量占用该宿主机的 CPU 资源，甚至会让宿主机“卡”在这个过程中。
+
+### ipvs 模式
+
+iptables与IPVS都是基于Netfilter实现的，但因为定位不同，二者有着本质的差别：iptables是为防火墙而设计的；IPVS则专门用于高性能负载均衡，并使用更高效的数据结构（Hash表），允许几乎无限的规模扩张。
+
+IPVS在Kubernetes1.11中升级为GA稳定版。在IPVS模式下，使用iptables的扩展ipset，而不是直接调用iptables来生成规则链。iptables规则链是一个线性的数据结构，ipset则引入了带索引的数据结构，因此当规则很多时，也可以很高效地查找和匹配。可以将ipset简单理解为一个IP（段）的集合，这个集合的内容可以是IP地址、IP网段、端口等，iptables可以直接添加规则对这个“可变的集合”进行操作，这样做的好处在于可以大大减少iptables规则的数量，从而减少性能损耗。
 
 ## Service 的特别形式
 
