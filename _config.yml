@@ -5,16 +5,16 @@ markdown: kramdown
 
 # 作者信息
 author: 
-  name: 李乾坤
-  email: qiankun.li@qq.com
+  name: yuliuyuan
+  email: 1394115658@qq.com
   link: 
   weibo: 
-  github: http://qiankunli.github.io
+  github: http://yuliuyuan.github.io
 
 # 站点信息
-title: 李乾坤的博客 
-description: 李乾坤的博客
-url: http://qiankunli.github.io
+title: 俞柳源的博客 
+description: 俞柳源的博客
+url: http://yuliuyuan.github.io
 rss_url: 
 
 # gavatar头像及Favicon
