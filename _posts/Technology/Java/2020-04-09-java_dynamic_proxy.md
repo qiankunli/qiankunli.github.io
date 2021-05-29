@@ -56,7 +56,10 @@ class HelloImpl implements  Hello {
 }
 ```
 
-首先，实现对应的 InvocationHandler；然后，以Hello interface为纽带，为被调用目标HelloImpl构建代理对象proxyHello，进而应用程序就可以使用代理对象间接运行调用目标的逻辑，代理为应用插入额外逻辑（这里是 println）提供了便利的入口。
+1. 实现对应的 InvocationHandler；
+2. 以Hello interface为纽带，为被调用目标HelloImpl构建代理对象proxyHello
+    1. 原有类的方法的调用：生成后的代理类是使用反射（method.invoke）来完成被代理类的方法调用。PS：有性能损失，但是通用
+    2. 自定义扩展逻辑：method.invoke前后为应用插入额外逻辑（这里是 println）提供了便利的入口。
 
 ## Proxy.newProxyInstance 里面究竟发生了什么？
 
