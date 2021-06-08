@@ -51,3 +51,5 @@ keywords:  create pod
 ![](/public/upload/kubernetes/apiserver_create_pod.png)
 
 ![](/public/upload/kubernetes/kubelet_create_pod_detail.png)
+
+[源码解析：Kubernetes 创建 Pod 时，背后发生了什么](https://mp.weixin.qq.com/s/c78hVA0xRJLlTsVa40-FEA)

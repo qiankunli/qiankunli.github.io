@@ -34,7 +34,7 @@ apiserver 核心职责
 ## k8s api 术语
 
 1. Domain
-2. API group, 在逻辑上相关的一组 Kind 集合。如 Job 和 ScheduledJob 都在 batch API group 里。
+2. API group, 在逻辑上相关的一组 Kind 集合。如 Job 和 ScheduledJob 都在 batch API group 里。同一资源的不同版本的 API，会放到一个 group 里面
 3. Version, 标示 API group 的版本更新， API group 会有多个版本 (version)。v1alpha1: 初次引入 ==> v1beta1: 升级改进 ==> v1: 开发完成毕业。 group  + domain + version 在url 上经常体现为`$group_$domain/version` 比如 `batch.tutorial.kubebuilder.io/v1`
 4. Kind, 表示实体的类型。直接对应一个Golang的类型，会持久化存储在etcd 中
 5. Resource, 通常是小写的复数词，Kind 的小写形式（例如，pods），用于标识一组 HTTP 端点（路径），来对外暴露 CURD 操作。每个 Kind 和 Resource 都存在于一个APIGroupVersion 下，分别通过 GroupVersionKind 和 GroupVersionResource 标识。关联GVK 到GVR （资源存储与http path）的映射过程称作 REST mapping。
@@ -50,6 +50,12 @@ apiserver 核心职责
 ![](/public/upload/kubernetes/apiserver_overview.png)
 
 适合从下到上看。不考虑鉴权等，先解决一个Kind 的crudw，多个Kind （比如/api/v1/pods, /api/v1/services）汇聚成一个APIGroupVersion，多个APIGroupVersion（比如/api/v1, /apis/batch/v1, /apis/extensions/v1） 汇聚为 一个GenericAPIServer 即api server。
+
+启动的一些重要步骤：
+1. 创建 server chain。Server aggregation（聚合）是一种支持多 apiserver 的方式，其中包括了一个 generic apiserver，作为默认实现。
+2. 生成 OpenAPI schema，保存到 apiserver 的 Config.OpenAPIConfig 字段。
+3. 遍历 schema 中的所有 API group，为每个 API group 配置一个 storage provider，这是一个通用 backend 存储抽象层。
+4. 遍历每个 group 版本，为每个 HTTP route 配置 REST mappings。稍后处理请求时，就能将 requests 匹配到合适的 handler。
 
 ### go-restful框架
 

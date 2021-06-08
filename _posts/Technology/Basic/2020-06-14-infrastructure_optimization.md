@@ -27,6 +27,8 @@ keywords: infrastructure optimization
 
 ![](/public/upload/basic/copy_file_to_socket_sg_dma.jpg)
 
+[零拷贝及一些引申内容](https://mp.weixin.qq.com/s/l_MRLyRW8lxvjtsKapT6HA)
+
 ## 用户态与内核态切换有什么代价呢？
 
 我们的应用程序运行在 Ring 3（我们通常叫用户态），而操作系统内核运行在 Ring 0（我们通常叫内核态）。所以一次中断调用，不只是“函数调用”，更重要的是改变了执行权限，从用户态跃迁到了内核态。

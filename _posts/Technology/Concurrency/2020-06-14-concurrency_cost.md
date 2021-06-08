@@ -73,7 +73,11 @@ JVM_END
 
 [The Go scheduler](https://morsmachine.dk/go-scheduler)POSIX线程API在很大程度上可以看做是对现有Unix进程模型的逻辑延伸，线程和进程有很多相似处。线程有自己的信号掩码（signal mask），可以分配与CPU关联，可以被放入cgroups，可以被查询使用了哪些资源。所有这些控制的特性都增加了开销。
 
-如果没有这些微观细节，人就很难直观上 感受 线程池的好处。 
+如果没有这些微观细节，人就很难直观上 感受 线程池的好处。 [空闲线程过多会有什么问题](https://mp.weixin.qq.com/s/axWymUaYaARtvsYqvfyTtw)想额外强调是下面这几个内存占用，需要小心：
+1. ThreadLocal：业务代码是否使用了ThreadLocal？就算没有，Spring框架中也大量使用了ThreadLocal，你所在公司的框架可能也是一样。
+2. 局部变量：线程处于阻塞状态，肯定还有栈帧没有出栈，栈帧中有局部变量表，凡是被局部变量表引用的内存都不能回收。所以如果这个线程创建了比较大的局部变量，那么这一部分内存无法GC。
+3. TLAB机制：如果你的应用线程数处于高位，那么新的线程初始化可能因为Eden没有足够的空间分配TLAB而触发YoungGC。
+
 
 2019.5.27补充：[Linux内核基础知识](http://blog.zhifeinan.top/2019/05/01/linux_kernel_basic.html)
 

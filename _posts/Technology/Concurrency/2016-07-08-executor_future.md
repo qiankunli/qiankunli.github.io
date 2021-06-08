@@ -25,25 +25,31 @@ Runnable + Thread 实现了 logic 和 runner 的分离，runner 又进一步扩�
 
 Executor provides a way of decoupling task submission from the mechanics of how each task will be run, including details of thread use, scheduling, etc. **Executor 是一个如此成功的抽象，就像linux的File 接口一样**。 任务的提交与执行相分离。 PS：有点类似于Spring IOC，Bean的创建与使用相分离。
 
- Executor 框架为并发编程提供了一个完善的架构体系，不仅包括了线程池的管理，还提供了线程工厂、队列（类似于操作系统中的task_struct 数组）以及拒绝策略等，**将线程的调度和管理设置在了用户态**。
+Executor 框架为并发编程提供了一个完善的架构体系，不仅包括了线程池的管理，还提供了线程工厂、队列（类似于操作系统中的task_struct 数组）以及拒绝策略等，**将线程的调度和管理设置在了用户态**。
+
+Executes the given command at some time in the future.  The command may execute in a new thread, in a pooled thread, or in the calling thread, at the discretion of the **Executor** implementation.Executor接口的职责并不是提供一个线程池的接口，而是提供一个“将来执行命令”的接口。真正能代表线程池意义的，是ThreadPoolExecutor类。
 
 ### 谁来处理task
 
 1. 任务被caller’s thread 执行，此时是同步操作。the Executor interface does not strictly require that execution be asynchronous. 比如上图的DirectExecutor
 
-        class DirectExecutor implements Executor {
-            public void execute(Runnable r) {
-                r.run();
-            }
+    ```java
+    class DirectExecutor implements Executor {
+        public void execute(Runnable r) {
+            r.run();
         }
+    }
+    ```
 
 2. ThreadPerTask，PS： 有点类似Kubernetes 中的ip-per-pod
 
-        class ThreadPerTaskExecutor implements Executor {
-            public void execute(Runnable r) {
-                new Thread(r).start();
-            }
+    ```java
+    class ThreadPerTaskExecutor implements Executor {
+        public void execute(Runnable r) {
+            new Thread(r).start();
         }
+    }
+    ```
 
 3. 最常用的还是 ThreadPoolExecutor 这种，executes each submitted task using one of possibly several pooled threads，**线程复用，这也是logic 和 runner 分离的好处**
 
@@ -70,25 +76,30 @@ ThreadPoolExecutor.execute 这个方法看着比较简单，但是线程池什�
 #### 作业线程逻辑
 
 worker线程在受限的条件下创建，其工作内容便是 不停的从workQueue 中取出task 并执行。
-
-    private final class Worker implements Runnable{
-        public void run() {
-            try {
-                Runnable task = firstTask;
-                // 循环从线程池的任务队列获取任务 
-                while (task != null || (task = getTask()!= null) {
-                    // 执行任务 
-                    runTask(task);
-                    task = null;
-                }
-            } finally {
-                workerDone(this);
+```java
+private final class Worker implements Runnable{
+    public void run() {
+        try {
+            Runnable task = firstTask;
+            // 循环从线程池的任务队列获取任务 
+            while (task != null || (task = getTask()!= null) {
+                runTask(task);// 执行任务 
+                task = null;
             }
-        }
-        private void runTask(Runnable task) {         
-                task.run();
+        } finally {
+            workerDone(this);
         }
     }
+    private void runTask(Runnable task) {         
+            task.run();
+    }
+}
+```
+
+[你真的了解线程池吗？](https://mp.weixin.qq.com/s/axWymUaYaARtvsYqvfyTtw)每一个Worker在创建出来的时候，会调用它本身的run()方法，实现是runWorker(this)，这个实现的核心是一个while循环，这个循环不结束，Worker线程就不会终止，就是这个基本逻辑。
+1. 在这个while条件中，有个getTask()方法是核心中的核心，它所做的事情就是从等待队列中取出任务来执行
+2. 如果没有达到corePoolSize，则创建的Worker在执行完它承接的任务后，**核心线程**会用workQueue.take()取任务、注意，这个接口是阻塞接口，如果取不到任务，Worker线程一直阻塞。
+3. 如果超过了corePoolSize，或者allowCoreThreadTimeOut，一个Worker在空闲了之后，**非核心线程**会用workQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS)取任务。注意，这个接口只阻塞等待keepAliveTime时间，超过这个时间返回null，则Worker的while循环执行结束，则被终止了。
 
 #### 作业线程的管理
 
@@ -99,16 +110,19 @@ ThreadPoolExecutor 作业线程 由一个HashSet 成员专门持有， 管理/cr
 
 创建新的作业线程逻辑
 
-    private Thread addThread(Runnable firstTask) {
-        // 为当前接收到的任务 firstTask 创建 Worker
-        Worker w = new Worker(firstTask);
-        Thread t = threadFactory.newThread(w);
-        w.thread = t;
-        // 将 Worker 添加到作业集合 HashSet<Worker> workers 中，并启动作业 
-        workers.add(w);
-        t.start();
-        return t;
-    }
+```java
+private Thread addThread(Runnable firstTask) {
+    // 为当前接收到的任务 firstTask 创建 Worker
+    Worker w = new Worker(firstTask);
+    Thread t = threadFactory.newThread(w);
+    w.thread = t;
+    // 将 Worker 添加到作业集合 HashSet<Worker> workers 中，并启动作业 
+    workers.add(w);
+    t.start();
+    return t;
+}
+```
+对于资源紧张的应用，如果担心线程池资源使用不当，可以利用ThreadPoolExecutor的API（有很多get方法可以获取状态）实现简单的监控，然后进行分析和优化。
 
 ## 对Executor 的扩展
 
@@ -126,15 +140,16 @@ ThreadPoolExecutor 作业线程 由一个HashSet 成员专门持有， 管理/cr
 在上图中，netty EventExecutorGroup 的方法返回的是netty 自己实现的`io.netty.util.concurrent.Future extends java.util.concurrent.Future`，guava 则直接一点，ListeningExecutorService 直接返回自己定义的`com.google.common.util.concurrent.ListenableFuture extends java.util.concurrent.Future`
 
 EventExecutorGroup 使用实例（不一定非得netty里才能用）
-
-    EventExecutorGroup group = new DefaultEventExecutorGroup(4); // 4 threads
-    Future<?> f = group.submit(new Runnable() { ... });
-    f.addListener(new FutureListener<?> {
-        public void operationComplete(Future<?> f) {
-            ..
-        }
-    });
-    ...
+```java
+EventExecutorGroup group = new DefaultEventExecutorGroup(4); // 4 threads
+Future<?> f = group.submit(new Runnable() { ... });
+f.addListener(new FutureListener<?> {
+    public void operationComplete(Future<?> f) {
+        ..
+    }
+});
+...
+```
 
 ## Executor的使用
 
@@ -158,8 +173,8 @@ EventExecutorGroup 使用实例（不一定非得netty里才能用）
 
 异步和回调是孪生兄弟，毕竟不管同步还是异步，都要对拿到的结果进行处理。对结果的处理，可以直接写在异步方法的回调中，也可以挂在异步方法返回的future中。异步本身分为调用线程和执行线程，对异步结果的后续处理也有几种情况
 
-    1. 执行线程处理
-    2. 额外传入一个executor线程（池）处理，此时对异步结果的处理 本身又可以一个异步操作
+1. 执行线程处理
+2. 额外传入一个executor线程（池）处理，此时对异步结果的处理 本身又可以一个异步操作
 
 
 此外，**我们可以按功能对线程池进行划分，比如rpc框架中的快慢线程池、IO框架中的IO线程池和CPU密集型线程池**。
@@ -170,22 +185,70 @@ One issue with complex workflows is that you might have a mixture of CPU and I/O
 
 我们来看一个Futrue的简单使用
 
-    ExecutorService executor = Executors.newFixedThreadPool();
-    Future<Integer> future = executor.submit(new MyJob()));
+```java
+ExecutorService executor = Executors.newFixedThreadPool();
+Future<Integer> future = executor.submit(new MyJob()));
+```
     
 跟踪submit方法所属的类，Executors.newFixedThreadPool() ==> ThreadPoolExecutor ==> AbstractExecutorService
 
-    public <T> Future<T> submit(Callable<T> task) {
-        if (task == null) throw new NullPointerException();
-        RunnableFuture<T> ftask = newTaskFor(task);
-        execute(ftask);
-        return ftask;
-    }
-    protected <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
-        return new FutureTask<T>(runnable, value);
-    }
+```java
+public <T> Future<T> submit(Callable<T> task) {
+    if (task == null) throw new NullPointerException();
+    RunnableFuture<T> ftask = newTaskFor(task);
+    execute(ftask);
+    return ftask;
+}
+protected <T> RunnableFuture<T> newTaskFor(Runnable runnable, T value) {
+    return new FutureTask<T>(runnable, value);
+}
+```
     
-   返回的future是一个FutureTask，FutureTask是`interface RunnableFuture<V> extends Runnable, Future<V>`的实现类。
+返回的future是一个FutureTask，FutureTask是`interface RunnableFuture<V> extends Runnable, Future<V>`的实现类。
+[你真的了解线程池吗？](https://mp.weixin.qq.com/s/axWymUaYaARtvsYqvfyTtw)get的核心实现是有个awaitDone方法，这是一个死循环，只有任务的状态是“已完成”，才会跳出死循环；否则会依赖UNSAFE包下的LockSupport.park原语进行阻塞，等待LockSupport.unpark信号量。而这个信号量只有当运行结束获得结果、或者出现异常的情况下，才会发出来。分别对应方法set和setException。这就是**异步执行、阻塞获取**的原理
+
+```java
+public V get() throws InterruptedException, ExecutionException {
+    int s = state;
+    if (s <= COMPLETING)
+        // 核心代码
+        s = awaitDone(false, 0L);
+   
+    return report(s);
+}
+private int awaitDone(boolean timed, long nanos)
+    throws InterruptedException {
+    final long deadline = timed ? System.nanoTime() + nanos : 0L;
+    WaitNode q = null;  boolean queued = false;
+    for (;;) { // 死循环
+        if (Thread.interrupted()) { removeWaiter(q);throw new InterruptedException();}
+        int s = state;
+        // 只有任务的状态是’已完成‘，才会跳出死循环
+        if (s > COMPLETING) {
+            if (q != null)
+                q.thread = null;
+            return s;
+        }
+        else if (s == COMPLETING) // cannot time out yet
+            Thread.yield();
+        else if (q == null)
+            q = new WaitNode();
+        else if (!queued)
+            queued = UNSAFE.compareAndSwapObject(this, waitersOffset,q.next = waiters, q);
+        else if (timed) {
+            nanos = deadline - System.nanoTime();
+            if (nanos <= 0L) {
+                removeWaiter(q);
+                return state;
+            }
+            LockSupport.parkNanos(this, nanos);
+        }
+        else
+            LockSupport.park(this);
+    }
+}
+```
+
 
 ## 对Future 的扩展
 
@@ -212,64 +275,60 @@ the biggest advantage of using Futures is composability. You might imagine that 
 
 我们看jdk1.8 CompletionFutre，可以看到：各种thenXX，即便对同步调用的返回值进行各种处理，也不过如此了。**将异步代码写的如何更像 同步代码 一点，是异步抽象/封装一个发展方向**。
 
-
-    void business(){
-        Value value1 = timeConsumingOperation1();
-        Object result1 = function1(value1);
-        Object result2 = function2(value1);
-        Value value2 = timeConsumingOperation2();
-        Object result3 = function3(value1,value2);
-        ...
-    }
-
-    void business(){
-        CompletionFutre future1 = timeConsumingOperationAsync1();
-        CompletionFutre future2 = timeConsumingOperationAsync2();
-        future.thenApply(function1).thenApply(function2).thenCombine(future2,function3);
-        ...
-    }
+```java
+void business(){
+    Value value1 = timeConsumingOperation1();
+    Object result1 = function1(value1);
+    Object result2 = function2(value1);
+    Value value2 = timeConsumingOperation2();
+    Object result3 = function3(value1,value2);
+    ...
+}
+void business(){
+    CompletionFutre future1 = timeConsumingOperationAsync1();
+    CompletionFutre future2 = timeConsumingOperationAsync2();
+    future.thenApply(function1).thenApply(function2).thenCombine(future2,function3);
+    ...
+}
+```
 
 ### guava ListenableFuture和AbstractFuture
 
 ListenableFuture的简单使用
 
-    ListeningExecutorService executorService =             MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
-    final ListenableFuture<Integer> listenableFuture = executorService.submit(new MyJob<Integer>());
-    // 添加监听事件
-    Futures.addCallback(listenableFuture, new FutureCallback() {
-        public void onSuccess(Integer result) {
-          
-        }
-        public void onFailure(Throwable thrown) {
-          
-        }
-    });
-
+```java
+ListeningExecutorService executorService=MoreExecutors.listeningDecorator(Executors.newCachedThreadPool());
+final ListenableFuture<Integer> listenableFuture = executorService.submit(new MyJob<Integer>());
+// 添加监听事件
+Futures.addCallback(listenableFuture, new FutureCallback() {
+    public void onSuccess(Integer result) {}
+    public void onFailure(Throwable thrown) {}
+});
+```
 
 跟踪submit方法所属的类，ListeningExecutorService ==> AbstractListeningExecutorService ==> AbstractExecutorService
-
-    public abstract class AbstractListeningExecutorService extends AbstractExecutorService{
-        protected final <T> ListenableFutureTask<T> newTaskFor(Runnable runnable, T value){
-            return ListenableFutureTask.create(runnable, value);
-        }
-        public <T> ListenableFuture<T> submit(Callable<T> task) {
-            return (ListenableFuture)super.submit(task);
-        }
+```java
+public abstract class AbstractListeningExecutorService extends AbstractExecutorService{
+    protected final <T> ListenableFutureTask<T> newTaskFor(Runnable runnable, T value){
+        return ListenableFutureTask.create(runnable, value);
     }
-    public abstract class AbstractExecutorService implements ExecutorService{
-        public <T> Future<T> submit(Callable<T> task) {
-            if (task == null) throw new NullPointerException();
-            RunnableFuture<T> ftask = newTaskFor(task);
-            execute(ftask);
-            return ftask;
-        }
+    public <T> ListenableFuture<T> submit(Callable<T> task) {
+        return (ListenableFuture)super.submit(task);
     }
+}
+public abstract class AbstractExecutorService implements ExecutorService{
+    public <T> Future<T> submit(Callable<T> task) {
+        if (task == null) throw new NullPointerException();
+        RunnableFuture<T> ftask = newTaskFor(task);
+        execute(ftask);
+        return ftask;
+    }
+}
+```
 
 实际执行的submit方法和上节的submit方法一样一样的，但在submit方法中，上节执行的是`AbstractExecutorService.newTaskFor`返回FutureTask，此处执行的是`AbstractListeningExecutorService.newTaskFor`返回ListenableFutureTask，其实际也是个`java.util.concurrent.FutureTask`。所以一个ListenableFuture具有cancel的能力就不奇怪了。**看来本质上，ListenableFutureTask取消任务的方式还是和FutureTask一样。**
 
 ListenableFuture所具备的addListener方法则是任务挂在一个地方，当run方法执行完毕后，执行这些任务。（不同的guava版本实现代码有很大不同）
-
-
 
 ## 保护调用者/驱动线程
 
@@ -278,4 +337,5 @@ ListenableFuture所具备的addListener方法则是任务挂在一个地方，�
 在一个项目中，不同的线程的重要性是不同的，比如tomcat 线程池中的线程、mq 消费者线程、netty 的事件驱动线程等，它们是驱动 代码执行的源动力。假设tomcat 线程池一共10个线程，当中有一个任务处理较慢，一个线程被占用较长的时间，会严重限制tomcat的吞吐量。
 
 但总有各种耗时的任务，此时，一个重要方法是将 任务交给另一个 线程执行。调用线程 持有 future 对象，可以主动选择 等、不等或者等多长时间。这一点 可以在hystrix 看到。
+
 
