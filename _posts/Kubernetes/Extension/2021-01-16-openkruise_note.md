@@ -59,6 +59,10 @@ kubebuilder 脚手架生成的项目代码 一般假设只有一个crd 和Contro
 
 [阿里巴巴云原生应用安全防护实践与 OpenKruise 的新领域](https://mp.weixin.qq.com/s/Bvfr2gsSYxvWpn4K7ZIp2w)
 
+## 其它
+
+[OpenKruise v0.9.0 版本发布：新增 Pod 重启、删除防护等重磅功能](https://mp.weixin.qq.com/s/V4cYY2GTYwJJ_C4gZxgypA)Pod 容器重启/重建；级联删除防护；配合原地升级的镜像预热；先扩再缩的 Pod 置换方式；[sidecar 热升级功能](https://openkruise.io/zh-cn/docs/sidecarset.html) 实现原理还挺好玩的。
+
 
 
 

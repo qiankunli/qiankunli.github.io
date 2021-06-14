@@ -218,6 +218,8 @@ kube_state_metrics_watch_total{resource="*v1beta1.Ingress",result="success"} 1
 
 **kube-state-metrics 可以采集到的 自定义的k8s label（比如deployment等），基于此经常将kube-state-metrics metric 与其它metric 聚合后 制作报警规则**。
 
+[有道 Kubernetes 容器API监控系统设计和实践](https://mp.weixin.qq.com/s/K6UJnnpbhciHyvrACo1xAw)
+
 ## 需要哪些 alert rule
 
 [monitoring.mixin](https://monitoring.mixins.dev) 列出了各个组件建议配置的alert 规则。

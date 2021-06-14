@@ -13,8 +13,7 @@ keywords: Scala  akka
 * TOC
 {:toc}
 
-建议先阅读下[《Apache Kafka源码分析》——Producer与Consumer](http://qiankunli.github.io/2017/12/08/kafka_learn_1.html)
-
+Kafka 使用 Scala 和 Java 语言开发，**设计上大量使用了批量和异步的思想**，这种设计使得 Kafka 能做到超高的性能。Kafka 的性能，尤其是异步收发的性能是Rabbitmq/Kafka/Rocketmq中最好的。这种异步批量的设计带来的问题是，它的同步收发消息的响应时延比较高，因为当客户端发送一条消息的时候，Kafka 并不会立即发送出去，而是要等一会儿攒一批再发送。在服务端，Kafka 不会把一批消息再还原成多条消息，再一条一条地处理，这样太慢了。Kafka 这块儿处理的非常聪明，每批消息都会被当做一个“批消息”来处理。也就是说，在 Broker 整个处理流程中，无论是写入磁盘、从磁盘读出来、还是复制到其他副本这些流程中，批消息都不会被解开，一直是作为一条“批消息”来进行处理的。
 
 ## 重新理解kafka
 

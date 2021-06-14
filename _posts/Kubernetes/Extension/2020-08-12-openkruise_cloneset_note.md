@@ -122,6 +122,7 @@ CloneSet status 中的字段说明：
 5. status.updatedReplicas: 最新版本的 Pod 数量
 6. status.updatedReadyReplicas: 最新版本的 ready Pod 数量
 
+Partition 的语义是保留旧版本 Pod 的数量或百分比。比如说一个 100 个副本的 CloneSet，在升级镜像时将 partition 数值阶段性改为 80 -> 60 -> 40 -> 20 -> 0，则完成了分 5 批次发布。在灰度发布的过程中，只需要前后调节 partition 数值，就能灵活得控制新旧版本的比例数量。CloneSet 所依据的 “新旧版本” 对应的是其 status 中的 updateRevision 和 currentRevision。
 cloneset作者提到：cloneset partition其实是继承了原生 statefulset 的 partition 理念，只是没有 statefulset 的 ordinal 序号。Partition 的语义是 保留旧版本 Pod 的数量，笔者曾觉得有点违反直觉。但如果 partition 来表示新版本数量的话，每次全量发布、扩容时都应同步设置partition 的值（与replicas保持一致），partition 的默认值就不能是0 或不填了。
 
 ## Reconcile 逻辑
