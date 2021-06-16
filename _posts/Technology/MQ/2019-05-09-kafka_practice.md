@@ -29,8 +29,46 @@ kafka 较新的1.0 和 2.0 也主要集中于kafka streams的改进。
 
 从[spring kafka 源码分析](http://qiankunli.github.io/2019/05/06/kafka_spring_source.html) 可以看到， spring-kafka 仅使用了一个线程来 操作consumer 从broker 拉取消息，一个线程够用么？ 是否可以通过加线程 提高consumer的消费能力呢？
 
-
 [【原创】探讨kafka的分区数与多线程消费](https://raising.iteye.com/blog/2252456) 一个消费线程可以对应若干个分区，但**一个分区只能被一个KafkaConsumer对象 消费 + KafkaConsumer 对象是线程不安全的==> 一个分区只能被具体某一个线程消费**。因此，topic 的分区数必须大于一个（由server.properties 的 num.partitions 控制），否则消费端再怎么折腾，也用不了多线程。
+
+Kafka主动检测不支持的情况并抛出异常，避免系统产生不可预期的行为。下列代码展示了KafkaConsumer 如何进行并发检测
+
+```java
+public class KafkaConsumer<K, V> implements Consumer<K, V> {
+    private static final long NO_CURRENT_THREAD = -1L;
+    // currentThread holds the threadId of the current thread accessing KafkaConsumer
+    // and is used to prevent multi-threaded access
+    private final AtomicLong currentThread = new AtomicLong(NO_CURRENT_THREAD);
+    public void subscribe(Collection<String> topics, ConsumerRebalanceListener listener) {
+        acquire();
+        try {
+            if (topics == null) {
+                throw new IllegalArgumentException("Topic collection to subscribe to cannot be null");
+            } else if (topics.isEmpty()) {
+                // treat subscribing to empty topic list as the same as unsubscribing
+                this.unsubscribe();
+            } else {
+                for (String topic : topics) {
+                    if (topic == null || topic.trim().isEmpty())
+                        throw new IllegalArgumentException("Topic collection to subscribe to cannot contain null or empty topic");
+                }
+                log.debug("Subscribed to topic(s): {}", Utils.join(topics, ", "));
+                this.subscriptions.subscribe(new HashSet<>(topics), listener);
+                metadata.setTopics(subscriptions.groupSubscription());
+            }
+        } finally {
+            release();
+        }
+    }
+    private void acquire() {
+        ensureNotClosed();
+        long threadId = Thread.currentThread().getId();
+        if (threadId != currentThread.get() && !currentThread.compareAndSet(NO_CURRENT_THREAD, threadId))
+            throw new ConcurrentModificationException("KafkaConsumer is not safe for multi-threaded access");
+        refcount.incrementAndGet();
+    }
+}
+```
 
 [【原创】Kafka Consumer多线程实例](https://www.cnblogs.com/huxi2b/p/6124937.html)KafkaConsumer和KafkaProducer不同，后者是线程安全的，因此我们鼓励用户在多个线程中共享一个KafkaProducer实例，这样通常都要比每个线程维护一个KafkaProducer实例效率要高。但对于KafkaConsumer而言，它不是线程安全的，所以实现多线程时通常由两种实现方法：
 

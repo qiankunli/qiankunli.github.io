@@ -182,6 +182,12 @@ producer面对的是一个broker集群，这个meta信息找哪个broker要都�
 
 早期consumer.properties 也是要配置 zk地址的，在靠后的版本就不需要了，这个变迁也体现了zk 作用的变化。producer.properties 未发现要配置zk 地址。
 
+![](/public/upload/mq/kafka_zk.png)
+
+图中圆角的矩形是临时节点，直角矩形是持久化的节点。
+1. 左侧这棵树保存的是 Kafka 的 Broker 信息，/brokers/ids/[0…N]，每个临时节点对应着一个在线的 Broker，Broker 启动后会创建一个临时节点，代表 Broker 已经加入集群可以提供服务了，节点名称就是 BrokerID，节点内保存了包括 Broker 的地址、版本号、启动时间等等一些 Broker 的基本信息。如果 Broker 宕机或者与 ZooKeeper 集群失联了，这个临时节点也会随之消失。
+2. 右侧部分的这棵树保存的就是主题和分区的信息。/brokers/topics/ 节点下面的每个子节点都是一个主题，节点的名称就是主题名称。每个主题节点下面都包含一个固定的 partitions 节点，pattitions 节点的子节点就是主题下的所有分区，节点名称就是分区编号。每个分区节点下面是一个名为 state 的临时节点，节点中保存着分区当前的 leader 和所有的 ISR 的 BrokerID。这个 state 临时节点是由这个分区当前的 Leader Broker 创建的。如果这个分区的 Leader Broker 宕机了，对应的这个 state 临时节点也会消失，直到新的 Leader 被选举出来，再次创建 state 临时节点。
+
 ## Kafka Pipeline
 
 《软件架构设计》
