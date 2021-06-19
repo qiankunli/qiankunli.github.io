@@ -43,3 +43,11 @@ keywords:  Kubernetes event
 [kubernetes 问题排查: 磁盘 IO 过高导致 Pod 创建超时](https://mp.weixin.qq.com/s/3v84M5idGi-nJ5u8RUzP6A)
 [kubernetes 平台开发者的几个小技巧](https://mp.weixin.qq.com/s/RVYJd_3xzDps-1xFwtl01g)
 [内存回收导致关键业务抖动案例分析-论云原生OS内存QoS保障](https://mp.weixin.qq.com/s/m74OgseP3I9AIKvPP6exrg)
+[去哪儿容器化落地过程踩过的那些坑](https://mp.weixin.qq.com/s/TEHKO9M1BdkQre2IrIQUlA)Qunar 在做容器化过程中，各个系统 portal 平台、中间件、ops 基础设施、监控等都做了相应的适配改造
+1. portal：Qunar 的 PAAS 平台入口，提供CI CD 能力、资源管理、自助运维、应用画像、应用授权(db授权、支付授权、应用间授权)等功能
+2. 运维工具：提供应用的可观测性工具, 包括 watcher（监控和报警）、bistoury （java 应用在线 debug）、qtrace （tracing 系统）, loki/elk （提供实时日志/离线日志查看）
+3. 中间件：应用用到的所有中间件, mq、配置中心、分布式调度系统 qschedule、dubbo 、mysql sdk等
+4. 虚拟化集群：底层的 k8s 和 openstack 集群，多k8s集群管理工具 kubesphere
+5. noah：测试环境管理平台，支持应用 kvm / 容器混合部署
+
+![](/public/upload/kubernetes/qunar_overview.png)
