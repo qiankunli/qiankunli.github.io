@@ -71,7 +71,9 @@ type Request interface {
 }
 ```
 
-APIServer启动时，可以指定一种或多种Authentication方法,如果指定了多种方法，那么APIServer将会逐个使用这些方法对客户端请求进行验证，只要通过其中一种方法的验证，APIServer就会认为Authentication成功；
+[说说Kubernetes的访问控制实现方式](https://mp.weixin.qq.com/s/mcnq-eWbskuc0J3H9CPDwA)Kubernetes 各组件都是以 APIServer 作为网关通信的。为了安全，**APIServer 一般通过 TLS 认证对外暴露**，集群组件若要访问 APIServer 则需要相应的 TLS 证书。APIServer 本身支持多种认证方式，并不只是 TLS 一种，默认我们使用 TLS 认证。APIServer 和集群组件通信使用 TLS 双向认证，顾名思义，客户端和服务器端都需要验证对方的身份，相比单向认证，双向认证客户端除了需要从服务器端下载服务器的公钥证书进行验证外，还需要把客户端的公钥证书上传到服务器端给服务器端进行验证，等双方都认证通过了，才开始建立安全通信通道进行数据传输
+
+APIServer启动时，可以指定一种或多种Authentication方法，如果指定了多种方法，那么APIServer将会逐个使用这些方法对客户端请求进行验证，只要通过其中一种方法的验证，APIServer就会认为Authentication成功；
 
 ||APIServer启动参数|请求|
 |---|---|---|
@@ -84,7 +86,7 @@ APIServer启动时，可以指定一种或多种Authentication方法,如果指�
 
 ### 授权
 
-授权就是判断user是否拥有操作资源的相应权限。
+认证之后我们如何**在认证基础上**针对资源授权管理呢？授权就是判断user是否拥有操作资源的相应权限。
 
 这个阶段面对的输入是http request context中的各种属性，包括：user、group、request path（比如：/api/v1、/healthz、/version等）、request verb(比如：get、list、create等)。APIServer会将这些属性值与事先配置好的访问策略(access policy）相比较。APIServer支持多种authorization mode，包括AlwaysAllow、AlwaysDeny、ABAC、RBAC和Webhook。APIServer启动时，可以指定一种或多种authorization mode，和认证一样，只要有一种鉴权模块通过，即可返回资源。
 

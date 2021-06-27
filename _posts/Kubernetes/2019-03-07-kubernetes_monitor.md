@@ -151,6 +151,8 @@ kube-apiserver 是集群所有请求的入口，指标的分析可以反应集�
 4. 进程状态：文件系统、内存、CPU
 5. golang 程序的状态：GC、进程、线程, `go_gc_*/go_info`
 
+[Pinterest如何平稳扩展K8s？](https://mp.weixin.qq.com/s/YwZsSfWO-xIvbJlLk9146w)监控apiserver，我们通过查看 QPS 和并发请求、错误率，以及请求延迟来监控 kube-apiserver 的负载。我们也可以将流量按照资源类型、请求动词以及相关的服务账号进行细分。而对于 listing 这类的昂贵流量，我们通过对象计数和字节大小来计算请求负载，即使只有很小的 QPS，这类流量也很容易导致 kube-apiserver 过载。最后，我们还监测了 etcd 的 watch 事件处理 QPS 和延迟处理的计数，以作为重要的服务器性能指标。
+
 ### ETCD 指标分析
 
 Kubernetes使用etcd来存储集群中组件的所有状态，是 Kubernetes数据库，监视etcd的性能和行为应该是整个Kubernetes监控计划的一部分。
