@@ -13,6 +13,8 @@ keywords: JAVA netty review
 * TOC
 {:toc}
 
+[从操作系统层面分析Java IO演进之路](https://mp.weixin.qq.com/s/KgJFyEmZApF7l5UUJeWf8Q) netty 和 kernel 交互图
+![](/public/upload/netty/netty_kernel.png)
 
 ## netty做了什么工作
 

@@ -13,9 +13,9 @@ keywords: linux 进程调度
 * TOC
 {:toc}
 
-之所以抽象一个执行体（进程/线程/协程）的概念，是要分时使用硬件（cpu和寄存器等）。 
+之所以抽象一个执行体（进程/线程/协程）的概念，是要分时使用硬件（cpu和寄存器等）。 调度器就好比教练，线程就好比球员，给线程调度cpu就好比安排哪个球员上球场。
 
-调度器就好比教练，线程就好比球员，给线程调度cpu就好比安排哪个球员上球场。
+[万字详解Linux内核调度器及其妙用](https://mp.weixin.qq.com/s/gkZ0kve8wOrV5a8Q2YeYPQ)可以试着切换到硬件CPU的视角，这样应用程序和内核，就都变成客体研究对象了，很多逻辑也就清晰了。
 
 [调度系统设计精要](https://mp.weixin.qq.com/s/R3BZpYJrBPBI0DwbJYB0YA)CFS 的调度过程还是由 schedule 函数完成的，该函数的执行过程可以分成以下几个步骤：
 
@@ -25,7 +25,9 @@ keywords: linux 进程调度
 4. 调用 context_switch 切换运行的上下文，包括寄存器的状态和堆栈；
 5. 重新开启当前 CPU 的抢占功能；
 
-## 进程数据结构
+## 数据结构
+
+### 进程部分
 
 ![](/public/upload/linux/linux_task_struct_data.png)
 
@@ -59,29 +61,15 @@ long _do_fork(unsigned long clone_flags,
         put_pid(pid);
     } 
 ```
-
-
-![](/public/upload/linux/task_fork.jpeg)
-
-
-||创建进程|创建线程|
-|---|---|---|
-|系统调用|fork|clone|
-|copy_process逻辑|会将五大结构 files_struct、fs_struct、sighand_struct、signal_struct、mm_struct 都复制一遍<br>从此父进程和子进程各用各的数据结构|五大结构仅仅是引用计数加一<br>也即线程共享进程的数据结构|
-||完全由内核实现|由内核态和用户态合作完成<br>相当一部分逻辑由glibc库函数pthread_create来做|
-|数据结构||内核态struct task_struct <br>用户态 struct pthread|
-
-[线程创建的成本](http://qiankunli.github.io/2014/10/09/Threads.html)
-
-[线程切换的成本](http://qiankunli.github.io/2018/01/07/hardware_software.html)
-
-## Per CPU的struct
+### Per CPU的struct
 
 linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
 
 1. 结构体 tss， 所有寄存器切换 ==> 内存拷贝/拷贝到特定tss_struct
-2. struct rq，描述在此 CPU 上所运行的所有进程（dt=Deadline进程；rt表示实时进程；cfs表示常规进程）
+2. struct rq，为每一个CPU都创建一个队列来保存可以在这个CPU上运行的任务，这里面包括一个实时进程队列rt_rq和一个CFS运行队列cfs_rq ，task_struct就是用sched_entity这个成员变量将自己挂载到某个CPU的队列上的。
     ![](/public/upload/linux/cpu_runqueue.jpg)
+
+进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，将这个进程放进某个CPU的队列上来，虽然不一定马上运行，但是说明可以在这个CPU上被调度上去运行了。
 
 在 x86 体系结构中，提供了一种以硬件的方式进行进程切换的模式，对于每个进程，x86 希望在内存里面维护一个 TSS（Task State Segment，任务状态段）结构。这里面有所有的寄存器。另外，还有一个特殊的寄存器 TR（Task Register，任务寄存器），指向某个进程的 TSS。更改 TR 的值，将会触发硬件保存 CPU 所有寄存器的值到当前进程的 TSS 中，然后从新进程的 TSS 中读出所有寄存器值，加载到 CPU 对应的寄存器中。
 
@@ -91,6 +79,32 @@ linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的�
 
 所谓的进程切换，就是将某个进程的 thread_struct里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。
 
+### cpu 如何访问task_struct
+
+从CPU的视角，是如何访问task_struct结构的？进程的地址空间分为用户态和内核态，无论从哪个进程进入的内核态，进来后访问的是同一份，对应的也是物理内存中同一块空间。内核态 有一个数据结构 struct list_head tasks 维护了task_struct 列表。在处理器内部，有一个控制寄存器叫 CR3，存放着页目录的物理地址，故 CR3 又叫做页目录基址寄存器。
+1. 每个进程都有自己的用户态虚拟地址空间，因而每个进程都有自己的页表，每个进程的页表的根，放在task_struct结构中。进程运行在用户态，则从task_struct里面找到页表顶级目录，加载到CR3里面去，则程序里面访问的虚拟地址就通过CPU指向的页表转换成物理地址进行访问。
+2. 内核有统一的一个内核虚拟地址空间，因而内核也应该有个页表，内核页表的根是内存初始化的时候预设在一个虚拟地址和物理地址。进程进入内核后，CR3要变成指向内核页表的顶级目录。
+
+## 进程创建
+
+[万字详解Linux内核调度器及其妙用](https://mp.weixin.qq.com/s/gkZ0kve8wOrV5a8Q2YeYPQ) 整个Linux系统的第一个用户态进程就是这样运行起来的。Linux系统启动的时候，先初始化的肯定是内核，当内核初始化结束了，会创建第一个用户态进程，1号进程。创建的方式是在内核态运行do_execve，来运行"/sbin/init"，"/etc/init"，"/bin/init"，"/bin/sh"中的一个，不同的Linux版本不同。
+
+写过Linux程序的我们都知道，execve是一个系统调用，它的作用是运行一个执行文件。加一个do_的往往是内核系统调用的实现。
+
+在do_execve中，会有一步是设置struct pt_regs，主要设置的是ip和sp，指向第一个进程的起始位置，这样调用iret就可以从系统调用中返回。这个时候会从pt_regs恢复寄存器。指令指针寄存器IP恢复了，指向用户态下一个要执行的语句。函数栈指针SP也被恢复了，指向用户态函数栈的栈顶。所以，下一条指令，就从用户态开始运行了。
+
+接下来所有的用户进程都是这个1号进程的徒子徒孙了。如果要创建新进程，是某个用户态进程调用fork，fork是系统调用会调用到内核，在内核中子进程会复制父进程的几乎一切，包括task_struct，内存空间等。这里注意的是，fork作为一个系统调用，是将用户态的当前运行状态放在pt_regs里面了，IP和SP指向的就是fork这个函数，然后就进内核了。
+
+子进程创建完了，如果像前面讲过的check_preempt_curr里面成功抢占了父进程，则父进程会被标记TIF_NEED_RESCHED，则在fork返回的时候，会检查这个标记，会将CPU主动让给子进程，然后让子进程从内核返回用户态，因为子进程是完全复制的父进程，因而返回用户态的时候，仍然在fork的位置，当然父进程将来返回的时候，也会在fork的位置，只不过返回值不一样，等于0说明是子进程。
+
+![](/public/upload/linux/task_fork.jpeg)
+
+||创建进程|创建线程|
+|---|---|---|
+|系统调用|fork|clone|
+|copy_process逻辑|会将五大结构 files_struct、fs_struct、sighand_struct、signal_struct、mm_struct 都复制一遍<br>从此父进程和子进程各用各的数据结构|五大结构仅仅是引用计数加一<br>也即线程共享进程的数据结构|
+||完全由内核实现|由内核态和用户态合作完成<br>相当一部分逻辑由glibc库函数pthread_create来做|
+|数据结构||内核态struct task_struct <br>用户态 struct pthread|
 
 ## 进程调度
 
@@ -112,7 +126,7 @@ struct task_struct{
 }
 ```
 
-CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，定义一个vruntime来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的。PS， vruntime 正是理解 docker --cpu-shares 的钥匙。
+CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，task_struct.sched_entity里面有一个重要的变量vruntime，来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的。PS， vruntime 正是理解 docker --cpu-shares 的钥匙。
 
 ```c
 /*
@@ -241,6 +255,8 @@ static ssize_t tap_do_read(struct tap_queue *q,
 
 ### 抢占式调度
 
+所谓的抢占调度，就是A进程运行的时间太长了，会被其他进程抢占。还有一种情况是，有一个进程B原来等待某个I/O事件，等待到了被唤醒，发现比当前正在CPU上运行的进行优先级高，于是进行抢占。
+
 在计算机里面有一个时钟，会过一段时间触发一次时钟中断，时钟中断处理函数会调用 scheduler_tick()，代码如下
 
     void scheduler_tick(void){
@@ -324,8 +340,12 @@ static __always_inline struct rq *context_switch(struct rq *rq, struct task_stru
     return finish_task_switch(prev);
 }
 ```
+假如进程AB switch_to：在task_struct里面，还有一个成员变量struct thread_struct thread，里面保存了进程切换时的寄存器的值。在switch_to里面，A进程的SP就保存进A进程的task_struct的thread结构中，而B进程的SP就从他的task_struct的thread结构中取出来，加载到CPU的SP栈顶寄存器里面。在switch_to里面，还将这个CPU的current_task指向B进程的task_struct。当switch_to干完了上面的事情，返回的时候，IP就指向了下一行代码finish_task_switch。下面请问，这里的finish_task_switch是B进程的finish_task_switch，还是A进程的finish_task_switch呢？其实是B进程的finish_task_switch，因为当年B进程就是运行到switch_to被切走的，所以现在回来，运行的是B进程的finish_task_switch。其实从CPU的角度来看，这个时候还不区分A还是B的finish_task_switch，在CPU眼里，这就是内核的一行代码。但是代码再往下运行，就能区分出来了，因为finish_task_switch结束，要从schedule函数返回了，那应该是返回到A还是B对应的内核态代码呢？根据函数调用栈的原理，栈顶指针指向哪行，就返回哪行，别忘了前面SP已经切换成为B进程的了，已经指向B的内核栈了，所以返回的是B内核态代码。
 
+虽然指令指针寄存器IP还是一行一行代码的执行下去，但由于所有的调度都会走schedule函数，IP没变，但是SP变了，进程切换就完成了。
 
 ## 其它
+
+应用：CFS的抢占，其实是不那么暴力的抢占。目前互联网企业都拥有海量的服务器，其中大部分只运行交互类延时敏感的在线业务，使CPU利用率非常低，造成资源的浪费（据统计全球服务器CPU利用率不足20%）。为提高服务器CPU的利用率，需要在运行在线业务的服务器上，混合部署一些高CPU消耗且延时不敏感的离线业务。为了使得在离线互相不影响，需要在在线业务CPU使用率低的时候，可以运行一些离线业务，而当在线业务CPU利用率高的时候，可以对离线业务快速抢占。如果在离线业务都使用不暴力的CFS调度器，现有的混部方案没办法做到及时抢占的。在同调度类优先级的进程，互相抢占的时候，需要满足两个条件。第一个是抢占进程的虚拟时间要小于被抢占进程，第二是被抢占进程已经运行的实际要大于最小运行时间。如果两个条件不能同时满足，就会导致无法抢占。基于这种考虑，开发了针对离线业务的新调度算法[bt](https://github.com/Tencent/TencentOS-kernel)，该算法可以保证在线业务优先运行。
 
 ![](/public/upload/basic/scheduler_design.png)

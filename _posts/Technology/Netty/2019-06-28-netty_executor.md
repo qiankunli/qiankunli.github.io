@@ -53,7 +53,13 @@ SingleThreadEventExecutor 作为一个Executor，实现Executor.execute 方法�
 
 ## 作业线程
 
+
+
 Runnable + Thread 实现了 logic 和 runner 的分离，runner 又进一步扩展为 executor，与ThreadPerTaskExecutor 中的线程不同，线程复用之后，SingleThreadEventExecutor/ThreadPoolExecutor 中的线程必须改造为拥有task处理逻辑的作业线程。
+
+[从操作系统层面分析Java IO演进之路](https://mp.weixin.qq.com/s/KgJFyEmZApF7l5UUJeWf8Q)work的线程数量，取决于初始化时创建了几个epoll，worker的复用本质上是epoll的复用。work之间为什么要独立使用epoll？为什么不共享？
+1. 为了避免各个worker之间发生争抢连接处理，netty直接做了物理隔离，避免竞争。各个worker只负责处理自己管理的连接，并且后续该worker中的每个client的读写操作完全由 该线程单独处理，天然避免了资源竞争，避免了锁。
+2. worker单线程，性能考虑：worker不仅仅要epoll_wait，还是处理read、write逻辑，加入worker处理了过多的连接，势必造成这部分消耗时间片过多，来不及处理更多连接，性能下降。
 
 ### 作业线程的逻辑——取任务并执行
 
