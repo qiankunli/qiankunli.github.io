@@ -141,8 +141,6 @@ Erlang 的作者之一 Joe Armstrong:"Make it work, then make it beautiful, then
 	* 良好的抽象，通过提供新的实现类的方式新增功能
 
 	
-
-
 ## 并发代码的整洁
 
 1. 对象是过程的抽象，线程是调度的抽象

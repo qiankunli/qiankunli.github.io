@@ -1,17 +1,19 @@
 ---
 
 layout: post
-title: BFF
+title: 可观察性和监控系统
 category: 架构
 tags: Architecture
 keywords: observability
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
+
+[看Netflix如何简化应用程序监控体系](https://mp.weixin.qq.com/s/DkW09mFukT5DNFnc66_AhA)
 
 ## 可观察性
 

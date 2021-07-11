@@ -179,6 +179,7 @@ class BasicObjectLock {
 class BasicLock {
     volatile markOop _displaced_header; // 保存_obj指向Object对象的对象头数据；
 }
+// 每个对象有一个监视器锁（monitor）， 每个锁对象拥有一个锁计数器和一个指向持有该锁的线程的指针。
 ObjectMonitor::ObjectMonitor() {
     _header       = NULL;   //  markOop对象头
     _count        = 0;
@@ -200,9 +201,10 @@ ObjectMonitor::ObjectMonitor() {
 ```
 
 1. synchronized 实现中，无锁、偏向锁、轻量级锁、重量级锁（使用操作系统锁）。中间两种锁不是“锁”，而是一种机制，减少获得锁和释放锁带来的性能消耗。
-2. JVM中monitor enter和monitor exit字节码依赖于底层的操作系统的Mutex Lock来实现的，但是由于使用Mutex Lock需要将当前线程挂起并从用户态切换到内核态来执行，这种切换的代价是非常昂贵的。所以monitor enter的时候，多个心眼儿，看看能不能不走内核。
 3. Monitor是线程私有的数据结构，每一个线程都有一个可用monitor record列表，同时还有一个全局的可用列表。
-4. 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害，则只好走操作系统锁流程了——重量级锁，会导致线程的状态切换，让出cpu。**偏向锁通过对比Mark Word在没有多线程竞争的情况下，尽量减少不必要的轻量级锁执行路径，轻量级锁的获取及释放依赖多次CAS原子指令，而偏向锁只依赖一次CAS原子指令置换ThreadID。而轻量级锁是通过用CAS操作和自旋来尽量避免重量级锁引起的性能消耗。重量级锁是将除了拥有锁的线程以外的线程都阻塞**。
+4. 线程会根据自己获取锁的情况更改 mark word的状态位。**mark word 状态位本质上反应了锁的竞争激烈程度**。若一直是一个线程自嗨，mark word存一下线程id即可。严格意义上来讲偏向锁并不算一把真正的锁，因为只有一个线程去访问共享资源的时候才会有偏向锁这个情况，jdk15之后默认已经禁用了偏向锁。若是两个线程虽说都访问，但没发生争抢，或者自旋一下就拿到了，则哪个线程占用对象，mark word就指向哪个线程的monitor record。若是线程争抢的很厉害（10次自旋或等待cpu调度的线程数超过cpu核数的一半），则只好走操作系统锁流程了——重量级锁，会导致线程的状态切换，让出cpu。**偏向锁通过对比Mark Word在没有多线程竞争的情况下，尽量减少不必要的轻量级锁执行路径，轻量级锁的获取及释放依赖多次CAS原子指令，而偏向锁只依赖一次CAS原子指令置换ThreadID。而轻量级锁是通过用CAS操作和自旋来尽量避免重量级锁引起的性能消耗。重量级锁是将除了拥有锁的线程以外的线程都阻塞**。[谈谈JVM内部锁升级过程](https://mp.weixin.qq.com/s/2yxexZUr5MWdMZ02GCSwdA)
+
+![](/public/upload/concurrency/jvm_lock_upgrade.png)
 
 [Java synchronized原理总结](https://zhuanlan.zhihu.com/p/29866981)
 
@@ -212,7 +214,7 @@ ObjectMonitor::ObjectMonitor() {
 
 ### DK1.6 之后性能优势不大了，只剩下功能优势
 
-**由于Java的线程是映射到操作系统的原生线程之上的，如果要阻塞或唤醒一条线程，都需要操作系统来帮忙完成**，这就需要从用户态转换到核心态中，因此状态转换需要耗费很多的处理器时间。所以synchronized是Java语言中的一个重量级操作。在JDK1.6中，虚拟机进行了一些优化，譬如在通知操作系统阻塞线程之前加入一段自旋等待过程，避免频繁地切入到核心态中。
+**由于Java的线程是映射到操作系统的原生线程之上的，如果要阻塞或唤醒一条线程，都需要操作系统来帮忙完成**，这就需要从用户态转换到核心态中，因此状态转换需要耗费很多的处理器时间。所以synchronized是Java语言中的一个重量级操作。在JDK1.6中，虚拟机进行了一些优化，譬如在通知操作系统阻塞线程之前加入一段自旋等待过程，避免频繁地切入到核心态中，**在用户态/jvm层完成锁操作**。
 
 synchronized与java.util.concurrent包中的ReentrantLock相比，由于JDK1.6中加入了针对锁的优化措施（见后面），使得synchronized与ReentrantLock的性能基本持平。ReentrantLock只是提供了synchronized更丰富的功能，而不一定有更优的性能，所以在synchronized能实现需求的情况下，优先考虑使用synchronized来进行同步。
 

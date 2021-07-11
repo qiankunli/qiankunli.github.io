@@ -13,9 +13,11 @@ keywords: reactive
 * TOC
 {:toc}
 
+In computing, reactive programming is a declaractive programming paradigm concerned with data streams and the propagation of change.
+
 从术语上，本文不严格区分反应式编程/响应式编程，从各种材料看，称呼为“反应式”更好。对应的，反应式编程的反面——顺序编程/命令式编程 也不做严格区分。
 
-反应式思想也分为不同的层次， 有架构层面的，代码层面的——[rxjava1——概念](http://qiankunli.github.io/2018/06/20/rxjava.html)
+反应式思想也分为不同的层次， 有架构层面的，代码层面的——[rxjava1——概念](http://qiankunli.github.io/2018/06/20/rxjava.html) ReactiveX（RxJava/RxGo） 不等于反应式编程，仅仅是用于反应式编程的API。
 
 ## 20200522补充
 

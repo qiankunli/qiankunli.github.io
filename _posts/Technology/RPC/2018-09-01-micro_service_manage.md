@@ -131,7 +131,79 @@ rpc 就好像函数调用一样，有数据有状态的往来。也就是需要�
 2. 使用socket 发送调用数据，包括但不限于类名、方法名、方法参数及其它信息，比如为分析调用链路 而设置的链路id
 3. 读取服务端返回，并将返回结果反序列化
 
-在实际的实现中，这一步骤通常是自动生成的，比如thrift
+在实际的实现中，这一步骤通常是自动生成的，比如thrift。
+
+### 客户端的核心——桩
+
+在客户端，业务代码得到的 Iface的实例，并不是我们在服务端提供的真正的实现类（实现类写在服务端）  的一个实例。它实际上是由 RPC 框架提供的一个代理类的实例。这个代理类有一个专属的名称，叫“桩（Stub）”。在不同的 RPC 框架中，这个桩的生成方式并不一样，有些是在编译阶段生成的，gRPC 它是在编译 IDL 的时候就把桩生成好了、再和业务代码使用目标语言的编译器一起编译的，有些（Dubbo）是在运行时动态生成的，这个和编程语言的语言特性是密切相关的。
+
+```java
+public interface StubFactory {
+    <T> T createStub(Transport transport, Class<T> serviceClass);
+}
+```
+
+StubFactory工厂接口只定义了一个方法 createStub，它的功能就是创建一个桩的实例，这个桩实现的接口可以是任意类型的，也就是上面代码中的泛型 T。这个方法有两个参数，第一个参数是一个 Transport 对象，是用来给服务端发请求的时候使用的。第二个参数是一个 Class 对象，它用来告诉桩工厂：我需要你给我创建的这个桩，应该是什么类型的。createStub 核心逻辑是把方法名和参数封装成请求，发送给服务端，然后再把服务端返回的调用结果返回给调用方。
+
+要解耦调用方和实现类，需要解决一个问题：谁来创建实现类的实例？我们上面定义的 StubFactory 它是一个接口，假如它的实现类是 DynamicStubFactory，调用方是 NettyRpcAccessPoint，调用方 NettyAccessPoint 并不依赖实现类 DynamicStubFactory，就可以调用 DynamicStubFactory 的 createStub 方法。一般来说，都是谁使用谁创建，但这里面我们为了解耦调用方和实现类，调用方就不能来直接创建实现类，因为这样就无法解耦了。这个问题怎么来解决？使用 Spring 的依赖注入是可以解决的。Java 语言内置的更轻量级的解决方案SPI也行。
+
+### 服务端
+
+RPC 服务
+1. 服务端的业务代码把服务的实现类注册到 RPC 框架中 ;
+    ```java
+    @Singleton
+    public class RpcRequestHandler implements RequestHandler, ServiceProviderRegistry {
+        @Override
+        public synchronized <T> void addServiceProvider(Class<? extends T> serviceClass, T serviceProvider) {
+            serviceProviders.put(serviceClass.getCanonicalName(), serviceProvider);
+            logger.info("Add service: {}, provider: {}.",
+                    serviceClass.getCanonicalName(),
+                    serviceProvider.getClass().getCanonicalName());
+        }
+        // ...
+    }
+    ```
+        
+2. 接收客户端桩发出的请求，调用服务的实现类并返回结果。
+    ```java
+    @Override
+    protected void channelRead0(ChannelHandlerContext channelHandlerContext, Command request) throws Exception {
+        RequestHandler handler = requestHandlerRegistry.get(request.getHeader().getType());
+        if(null != handler) {
+            Command response = handler.handle(request);
+            if(null != response) {
+                channelHandlerContext.writeAndFlush(response).addListener((ChannelFutureListener) channelFuture -> {
+                    if (!channelFuture.isSuccess()) {
+                        logger.warn("Write response failed!", channelFuture.cause());
+                        channelHandlerContext.channel().close();
+                    }
+                });
+            } else {
+                logger.warn("Response is null!");
+            }
+        } else {
+            throw new Exception(String.format("No handler for request with type: %d!", request.getHeader().getType()));
+        }
+    }
+    @Override
+    public Command handle(Command requestCommand) {
+        Header header = requestCommand.getHeader();
+        // 从payload中反序列化RpcRequest
+        RpcRequest rpcRequest = SerializeSupport.parse(requestCommand.getPayload());
+        // 查找所有已注册的服务提供方，寻找rpcRequest中需要的服务
+        Object serviceProvider = serviceProviders.get(rpcRequest.getInterfaceName());
+        // 找到服务提供者，利用Java反射机制调用服务的对应方法
+        String arg = SerializeSupport.parse(rpcRequest.getSerializedArguments());
+        Method method = serviceProvider.getClass().getMethod(rpcRequest.getMethodName(), String.class);
+        String result = (String ) method.invoke(serviceProvider, arg);
+        // 把结果封装成响应命令并返回
+        return new Command(new ResponseHeader(type(), header.getVersion(), header.getRequestId()), SerializeSupport.serialize(result));
+        // ...
+    }
+    ```
+
+
 
 ### 如何聚合旁路系统
 
@@ -211,6 +283,8 @@ rpc 就好像函数调用一样，有数据有状态的往来。也就是需要�
 4. 漏桶算法
 
 一个大牛开源的限流框架：[wangzheng0822/ratelimiter4j](https://github.com/wangzheng0822/ratelimiter4j)
+
+如果是同步发送请求，客户端需要等待服务端返回响应，服务端处理这个请求需要花多长时间，客户端就要等多长时间。这实际上是一个天然的背压机制（Back pressure），服务端处理速度会天然地限制客户端请求的速度。但是在异步请求中，客户端异步发送请求并不会等待服务端，缺少了这个天然的背压机制，如果服务端的处理速度跟不上客户端的请求速度，客户端的发送速度也不会因此慢下来，就会出现在途的请求越来越多，这些请求堆积在服务端的内存中，内存放不下就会一直请求失败。服务端处理不过来的时候，客户端还一直不停地发请求显然是没有意义的。为了避免这种情况，我们需要增加一个背压机制，在服务端处理不过来的时候限制一下客户端的请求速度。这个背压机制的实现也在 InFlightRequests （`map<requestId,responseFuture>`）类中，在这里面我们定义了一个信号量：`private final Semaphore semaphore = new Semaphore(10);`这个信号量有 10 个许可，我们每次往 inFlightRequest 中加入一个 ResponseFuture 的时候，需要先从信号量中获得一个许可，如果这时候没有许可了，就会阻塞当前这个线程，也就是发送请求的这个线程，直到有人归还了许可，才能继续发送请求。我们每结束一个在途请求，就归还一个许可，这样就可以保证在途请求的数量最多不超过 10 个请求，积压在服务端正在处理或者待处理的请求也不会超过 10 个。这样就实现了一个简单有效的背压机制。
 
 ## 微服务不是银弹
 

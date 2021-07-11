@@ -13,6 +13,8 @@ keywords: linux 进程调度
 * TOC
 {:toc}
 
+作为初学者，了解数据结构之间的组织关系，这远比了解一个数据结构所有字段的作用和细节重要得多。
+
 之所以抽象一个执行体（进程/线程/协程）的概念，是要分时使用硬件（cpu和寄存器等）。 调度器就好比教练，线程就好比球员，给线程调度cpu就好比安排哪个球员上球场。
 
 [万字详解Linux内核调度器及其妙用](https://mp.weixin.qq.com/s/gkZ0kve8wOrV5a8Q2YeYPQ)可以试着切换到硬件CPU的视角，这样应用程序和内核，就都变成客体研究对象了，很多逻辑也就清晰了。
@@ -78,6 +80,8 @@ linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的�
 在 Linux 中，真的参与进程切换的寄存器很少，主要的就是栈顶寄存器
 
 所谓的进程切换，就是将某个进程的 thread_struct里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。
+
+![](/public/upload/linux/cpu_rq.png)
 
 ### cpu 如何访问task_struct
 
@@ -257,20 +261,48 @@ static ssize_t tap_do_read(struct tap_queue *q,
 
 所谓的抢占调度，就是A进程运行的时间太长了，会被其他进程抢占。还有一种情况是，有一个进程B原来等待某个I/O事件，等待到了被唤醒，发现比当前正在CPU上运行的进行优先级高，于是进行抢占。
 
-在计算机里面有一个时钟，会过一段时间触发一次时钟中断，时钟中断处理函数会调用 scheduler_tick()，代码如下
+vruntime就是一个数据，如果没有任何机制对它进行更新，就会导致一个进程永远运行下去，因为那个进程的虚拟时间没有更新，虚拟时间永远最小，这当然不行。在计算机里面有一个时钟，会过一段时间触发一次时钟中断，时钟中断处理函数会调用 scheduler_tick()，代码如下
 
-    void scheduler_tick(void){
-        int cpu = smp_processor_id();
-        struct rq *rq = cpu_rq(cpu);
-        struct task_struct *curr = rq->curr;
-        ......
-        curr->sched_class->task_tick(rq, curr, 0);
-        cpu_load_update_active(rq);
-        calc_global_load_tick(rq);
-        ......
-    }
+```c
+void scheduler_tick(void){
+    int cpu = smp_processor_id();
+    struct rq *rq = cpu_rq(cpu);
+    struct task_struct *curr = rq->curr;
+    ......
+    curr->sched_class->task_tick(rq, curr, 0);
+    cpu_load_update_active(rq);
+    calc_global_load_tick(rq);
+    ......
+}
+```
 
 对于普通进程 scheduler_tick ==> fair_sched_class.task_tick_fair ==> entity_tick ==> update_curr 更新当前进程的 vruntime ==> check_preempt_tick 检查是否是时候被抢占了
+
+```c
+static void check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr){
+    unsigned long ideal_runtime, delta_exec;
+    struct sched_entity *se;
+    s64 delta;
+    //计算当前进程在本次调度中分配的运行时间
+    ideal_runtime = sched_slice(cfs_rq, curr);
+    //当前进程已经运行的实际时间
+    delta_exec = curr->sum_exec_runtime - curr->prev_sum_exec_runtime;
+    //如果实际运行时间已经超过分配给进程的运行时间，就需要抢占当前进程。设置进程的TIF_NEED_RESCHED抢占标志。
+    if (delta_exec > ideal_runtime) {
+        resched_curr(rq_of(cfs_rq));
+        return;
+    }
+    //因此如果进程运行时间小于最小调度粒度时间，不应该抢占
+    if (delta_exec < sysctl_sched_min_granularity)
+        return;
+    //从红黑树中找到虚拟时间最小的调度实体
+    se = __pick_first_entity(cfs_rq);
+    delta = curr->vruntime - se->vruntime;
+    //如果当前进程的虚拟时间仍然比红黑树中最左边调度实体虚拟时间小，也不应该发生调度
+    if (delta < 0)
+        return;
+}
+```
 
 当发现当前进程应该被抢占，不能直接把它踢下来，而是把它标记为应该被抢占。为什么呢？因为进程调度第一定律呀，一定要等待正在运行的进程调用 __schedule 才行
 

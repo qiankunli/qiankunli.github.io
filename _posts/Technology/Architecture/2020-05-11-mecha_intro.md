@@ -21,7 +21,10 @@ keywords: system design principle
 
 [云原生时代，Java危矣？](https://mp.weixin.qq.com/s/fVz2A-AmgfhF0sTkz8ADNw)不可变基础设施的内涵已不再局限于方便运维、程序升级和部署的手段，而是升华一种为**向应用代码隐藏环境复杂性的手段**，是分布式服务得以成为一种可普遍推广的普适架构风格的必要前提。
 
-rpc 有mesh，db、mq、redis 都搞mesh，mesh 的未来一定不是更多的sidecar， 运维根本受不了。必然需要出现新的形态来解决 Sidecar 过多的问题，合并为一个或者多个 Sidecar 就会成为必然。
+rpc 有mesh，db、mq、redis 都搞mesh，mesh 的未来一定不是更多的sidecar， 运维根本受不了。[蚂蚁云原生应用运行时的探索和实践](https://mp.weixin.qq.com/s/vi1lWDIbhCFdQKf1FKqoVg)
+1. 跨语言 SDK 的维护成本高：拿 RPC 举例，大部分逻辑已经下沉到了 MOSN 里，但是还有一部分通信编解码协议的逻辑是在 Java 的一个轻量级 SDK 里的，这个 SDK 还是有一定的维护成本的，有多少个语言就有多少个轻量级 SDK，一个团队不可能有精通所有语言的研发，所以这个轻量级 SDK 的代码质量就是一个问题。
+2. 从 Service Mesh 到 Multi-Mesh：蚂蚁最早的场景是 Service Mesh，MOSN 通过网络连接代理的方式进行了流量拦截，其它的中间件都是通过原始的 SDK 与服务端进行交互。而现在的 MOSN 已经不仅仅是 Service Mesh 了，而是 Multi-Mesh，因为除了 RPC，我们还支持了更多中间件的 Mesh 化落地，包括消息、配置、缓存的等等。可以看到每个下沉的中间件，在应用侧几乎都有一个对应的轻量级 SDK 存在，这个在结合刚才的第一问题，就发现有非常多的轻量级 SDK 需要维护。为了保持功能不互相影响，每个功能它们开启不同的端口，通过不同的协议去和 MOSN 进行调用。例如 RPC 用的 RPC 协议，消息用的 MQ 协议，缓存用的 Redis 协议。然后现在的 MOSN 其实也不仅仅是面向流量了，例如配置就是暴露了一下 API 给业务代码去使用。
+必然需要出现新的形态来解决 Sidecar 过多的问题，合并为一个或者多个 Sidecar 就会成为必然。
 
 
 现代分布式应用的对外需求分为四种类型（生命周期，网络，状态，绑定）。
@@ -64,7 +67,7 @@ public interface DaprClient {
     ......
 }
 ```
-
+[蚂蚁开源多运行时项目 Layotto 简介](https://mp.weixin.qq.com/s/IkvsQqpyCTVhnXOfUXswcA)
 ## Mecha 架构
 
 ![](/public/upload/architecture/mecha_intro.png)
@@ -109,7 +112,7 @@ Service Proxy 可能是一个集状态管理、event 传递、消息收发、分
 * 与云平台无关
 * 应用与中间件更彻底地解耦
 * 应用开发更简单。基于新形态的中间件方案，Low Code 或者 No Code 技术才能更好落地。单体时代的 IDE 才能更进一步 -- 分布式时代的 IDE，基于各种形态中间件的标准 API 之对这些中间件的能力进行组合，以 WYSIWYG 方式开发出分布式应用。
-* 更快的启动速度
+* 更快的启动速度。[蚂蚁云原生应用运行时的探索和实践](https://mp.weixin.qq.com/s/vi1lWDIbhCFdQKf1FKqoVg)FaaS 冷启预热池也是我们近期在探索的一个场景，大家知道 FaaS 里的 Function 在冷启的时候，是需要从创建 Pod 到下载 Function 再到启动的，这个过程会比较长。有了运行时之后，我们可以提前把 Pod 创建出来并启动好运行时，等到应用启动的时候其实已经非常简单的应用逻辑了，经过测试发现可以将从 5s 缩短 80% 到 1s。这个方向我们还会持续探索当中。
 * 以统一技术形态的 Service Mesh 为基础的云原生中间件技术体系真正发起起来，在其之上的 Serverless 才有更多的落地场景，广大中小企业才能分享云原生时代的技术红利，业务开发人员的编码工作就会越来越少，编程技术也会越来越智能--从手工作坊走向大规模机器自动生产时代。
 
 ## 其它
