@@ -321,6 +321,11 @@ org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration,\
 
 总结一下就是，@EnableAutoConfiguration 会push springboot 加载各个依赖jar `META-INF/spring.factories` 中key=org.springframework.boot.autoconfigure.EnableAutoConfiguration 指定的@Configuration 类
 
+[JDK/Dubbo/Spring 三种 SPI 机制，谁更好？](https://mp.weixin.qq.com/s/6SU1BPvNTCv_fhnMx3GhLw)Spring 的 SPI 配置文件是一个固定的文件 - `META-INF/spring.factories`，Spring的SPI 虽然属于spring-framework(core)，但是目前主要用在spring boot中。
+
+
+
+
 
 ## 自己实现starter
 

@@ -32,7 +32,9 @@ xxx
 
 ## spi
 
+
 ### 概念
+[JDK/Dubbo/Spring 三种 SPI 机制，谁更好？](https://mp.weixin.qq.com/s/6SU1BPvNTCv_fhnMx3GhLw) SPI 的本质是将接口实现类的全限定名配置在文件中，并由服务加载器读取配置文件，加载实现类。
 
 [java中的SPI机制](http://www.cnblogs.com/javaee6/p/3714719.html)
 
@@ -112,7 +114,7 @@ spi 是与 api 相对应的一个词，代码上会有一个接口类与其对�
 
 ## 重新理解工厂模式
 
-A factory class decouples the client and implementing class.
+A factory class decouples the client and implementing class. 工厂模式解决的是bean的生产问题，简单工厂模式根据入参生产不同的bean，普通工厂模式针对每个bean都构建一个工厂，此两者各有优劣，看需要。如果每个bean主要的功能都在方法中，不涉及类变量的使用，可以利用spring容器生成的bean（bean作为factory的成员由spring注入）。
 
 那么当一个类有多层级继承关系时，就有必要为顶层接口/类准备一个工厂了。
 
