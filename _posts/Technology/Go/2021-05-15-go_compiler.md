@@ -29,3 +29,18 @@ SSA-IR（Single Static Assignment）是一种介于高级语言和汇编语言�
 ![](/public/upload/go/go_compiler.png)
 
 [漫谈Go语言编译器（01）](https://mp.weixin.qq.com/s/0q0k8gGX56SBKJvfMquQkQ) 
+
+
+[一个95分位延迟要求5ms的场景，如何做性能优化](https://mp.weixin.qq.com/s/BUpsa22bQhK1pQKW8fUVOw)Golang 的生态中相关工具我们能用到的有 pprof 和 trace。pprof 可以看 CPU、内存、协程等信息在压测流量进来时系统调用的各部分耗时情况。而 trace 可以查看 runtime 的情况，比如可以查看协程调度信息等。代码层面的优化，是 us 级别的，而针对业务对存储进行优化，可以做到 ms 级别的，所以优化越靠近应用层效果越好。对于代码层面，优化的步骤是：
+
+1. 压测工具模拟场景所需的真实流量
+2. pprof 等工具查看服务的 CPU、mem 耗时
+3. 锁定**平顶山逻辑**，看优化可能性：异步化，改逻辑，加 cache 等
+4. 局部优化完写 benchmark 工具查看优化效果
+5. 整体优化完回到步骤一，重新进行 压测+pprof 看效果，看 95 分位耗时能否满足要求(如果无法满足需求，那就换存储吧~。
+
+火焰图中圈出来的大平顶山都是可以优化的地方
+
+![](/public/upload/go/go_profiler.png)
+
+另外推荐一个不错的库，这是 Golang 布道师 Dave Cheney 搞的用来做性能调优的库，使用起来非常方便：https://github.com/pkg/profile，可以看 pprof和 trace 信息。有兴趣读者可以了解一下。
