@@ -21,60 +21,19 @@ keywords: system design principle
 
 [云原生时代，Java危矣？](https://mp.weixin.qq.com/s/fVz2A-AmgfhF0sTkz8ADNw)不可变基础设施的内涵已不再局限于方便运维、程序升级和部署的手段，而是升华一种为**向应用代码隐藏环境复杂性的手段**，是分布式服务得以成为一种可普遍推广的普适架构风格的必要前提。
 
+## Kubernetes+Mesh是不够的
+
+对于Kubernetes，要管理的最小原语是容器，它专注于在容器级别和流程模型上交付分布式原语。这意味着它在管理应用的生命周期，健康检查，恢复，部署和扩展方面做得很出色，但是在容器内的分布式应用的其他方面却没有做得很好，例如灵活的网络，状态管理和绑定。 
+
+[Dapr 在阿里云原生的实践](https://mp.weixin.qq.com/s/6t7BGz_rC4N-n-DPxcnuhQ)
+1. Service Mesh 的实现，本质是**原协议转发**，原协议转发可以给应用带来零侵入的优势。但是原协议转发也带来了一些问题，应用侧中间件SDK还需要去实现序列化和编解码工作，所以在多语言实现方面还有一定成本；随着开源技术的不断发展，使用的技术也在不断迭代，如果想从 Spring Cloud 迁移到 Dubbo ，要么应用开发者需要切换依赖的 SDK，如果想借助Service Mesh来达到这个效果，Service Mesh 需要进行协议转换，成本较高。
+2. Service Mesh 更加聚焦于服务间的通讯，而对其他形态的 Mesh 的支持上非常少。比如 Envoy， 除了在 RPC 领域比较成功外，在 Redis、消息等领域的尝试都未见成效。如此多形态的 Mesh ，是共用一个进程吗？如果是共用一个进程，那么是共用一个端口吗？许多问题都没有答案。而控制面方面，从功能角度来看的话，大都围绕流量来展开。看过 xDS 协议里的内容，核心是围绕发现服务和路由来展开。其他类型的分布式能力，在 Service Mesh的控制面中基本没有涉及，更谈不上抽象各种类似 xDS 的协议去支持这些分布式能力。
+3. 用户在云上部署业务的形态主要有普通应用类型和FaaS类型。Faas 场景下，比较吸引用户的是成本和研发效率。FaaS 对多语言和编程 API 的友好性上有了更多诉求，那么 Service Mesh 在这两块还是不能给客户带来额外的的价值。
+
 rpc 有mesh，db、mq、redis 都搞mesh，mesh 的未来一定不是更多的sidecar， 运维根本受不了。[蚂蚁云原生应用运行时的探索和实践](https://mp.weixin.qq.com/s/vi1lWDIbhCFdQKf1FKqoVg)
 1. 跨语言 SDK 的维护成本高：拿 RPC 举例，大部分逻辑已经下沉到了 MOSN 里，但是还有一部分通信编解码协议的逻辑是在 Java 的一个轻量级 SDK 里的，这个 SDK 还是有一定的维护成本的，有多少个语言就有多少个轻量级 SDK，一个团队不可能有精通所有语言的研发，所以这个轻量级 SDK 的代码质量就是一个问题。
 2. 从 Service Mesh 到 Multi-Mesh：蚂蚁最早的场景是 Service Mesh，MOSN 通过网络连接代理的方式进行了流量拦截，其它的中间件都是通过原始的 SDK 与服务端进行交互。而现在的 MOSN 已经不仅仅是 Service Mesh 了，而是 Multi-Mesh，因为除了 RPC，我们还支持了更多中间件的 Mesh 化落地，包括消息、配置、缓存的等等。可以看到每个下沉的中间件，在应用侧几乎都有一个对应的轻量级 SDK 存在，这个在结合刚才的第一问题，就发现有非常多的轻量级 SDK 需要维护。为了保持功能不互相影响，每个功能它们开启不同的端口，通过不同的协议去和 MOSN 进行调用。例如 RPC 用的 RPC 协议，消息用的 MQ 协议，缓存用的 Redis 协议。然后现在的 MOSN 其实也不仅仅是面向流量了，例如配置就是暴露了一下 API 给业务代码去使用。
 必然需要出现新的形态来解决 Sidecar 过多的问题，合并为一个或者多个 Sidecar 就会成为必然。
-
-
-现代分布式应用的对外需求分为四种类型（生命周期，网络，状态，绑定）。
-
-![](/public/upload/architecture/four_needs_of_app.jpg)
-
-单机时代，我们习惯性认为 应用 ==> systemcall ==> 内核。  但实际上，换个视角（以应用为中心），应用 对外的需求由systemcall 抽象，最终由内核提供服务。那么在分布式时代，就缺一个类似systemcall 的分布式原语，把分布式的能力 统一标准化之后 给到应用。
-
-![](/public/upload/architecture/mecha_overview.png)
-
-当前的项目开发，开发人员就像老妈子一样，把db、redis、mq 等资源聚在一起，还得考虑他们的容量、负载、连接池等。后续，它们 会向水电一样，支持项目随取随用。
-
-API 和配置的制订以及标准化，预计将会是 Mecha 成败的关键。PS：历史一次次的告诉我们：产品不重要，协议才重要，协议才是最直接反应理念的东西
-
-1. 数据库产品不重要，牛逼的是sql
-2. istio 还好， 牛逼的是xds
-
-## Kubernetes 是基础，但单靠Kubernetes是不够的
-
-对于Kubernetes，要管理的最小原语是容器，它专注于在容器级别和流程模型上交付分布式原语。这意味着它在管理应用的生命周期，健康检查，恢复，部署和扩展方面做得很出色，但是在容器内的分布式应用的其他方面却没有做得很好，例如灵活的网络，状态管理和绑定。 
-
-## 应用运行时——以dapr 为例
-
-[在云原生的时代，我们到底需要什么样的应用运行时？](https://mp.weixin.qq.com/s/PwPC1ZWNZvzQoOZvOAF2Qw)
-
-以微软开源的 dapr 为例，应用所有与 外界的交互（消息队列、redis、db、rpc） 都通过dapr http api
-
-1. 消息队列：
-    * 发布消息 `http://localhost:daprport/v1.0/publish/<topic>`
-    * 订阅消息  dapr 询问app 要订阅哪些topic，dapr 订阅topic， 当收到topic 消息时，发给app
-
-2. rpc : 请求远程服务 `http://localhost:daprport/v1.0/invoke/<appId>/method/<method-name>`
-
-为了进一步简化调用的过程（毕竟发一个最简单的 HTTP GET 请求也要应用实现 HTTP 协议的调用 / 连接池管理等），dapr 提供了各个语言的 SDK，如 java / go / python / dotnet / js / cpp / rust 。另外同时提供 HTTP 客户端和 gRPC 客户端。我们以 Java 为例，java 的 client API 接口定义如下：
-
-```java
-public interface DaprClient {  
-   Mono<Void> publishEvent(String topic, Object event);
-   Mono<Void> invokeService(Verb verb, String appId, String method, Object request);
-    ......
-}
-```
-[蚂蚁开源多运行时项目 Layotto 简介](https://mp.weixin.qq.com/s/IkvsQqpyCTVhnXOfUXswcA)
-## Mecha 架构
-
-![](/public/upload/architecture/mecha_intro.png)
-
-1. 所有分布式能力使用的过程（包括访问内部生态体系和访问外部系统）都被 Runtime 接管和屏蔽实现
-2. 通过 CRD/ 控制平面实现声明式配置和管理（类似 Servicemesh）
-3. 部署方式上 Runtime 可以部署为 Sidecar 模式，或者 Node 模式，取决于具体需求，不强制
 
 ## 从云原生中间件的视角
 
@@ -114,6 +73,64 @@ Service Proxy 可能是一个集状态管理、event 传递、消息收发、分
 * 应用开发更简单。基于新形态的中间件方案，Low Code 或者 No Code 技术才能更好落地。单体时代的 IDE 才能更进一步 -- 分布式时代的 IDE，基于各种形态中间件的标准 API 之对这些中间件的能力进行组合，以 WYSIWYG 方式开发出分布式应用。
 * 更快的启动速度。[蚂蚁云原生应用运行时的探索和实践](https://mp.weixin.qq.com/s/vi1lWDIbhCFdQKf1FKqoVg)FaaS 冷启预热池也是我们近期在探索的一个场景，大家知道 FaaS 里的 Function 在冷启的时候，是需要从创建 Pod 到下载 Function 再到启动的，这个过程会比较长。有了运行时之后，我们可以提前把 Pod 创建出来并启动好运行时，等到应用启动的时候其实已经非常简单的应用逻辑了，经过测试发现可以将从 5s 缩短 80% 到 1s。这个方向我们还会持续探索当中。
 * 以统一技术形态的 Service Mesh 为基础的云原生中间件技术体系真正发起起来，在其之上的 Serverless 才有更多的落地场景，广大中小企业才能分享云原生时代的技术红利，业务开发人员的编码工作就会越来越少，编程技术也会越来越智能--从手工作坊走向大规模机器自动生产时代。
+
+
+
+## Mecha 架构
+
+现代分布式应用的对外需求分为四种类型（生命周期，网络，状态，绑定）。
+
+![](/public/upload/architecture/four_needs_of_app.jpg)
+
+单机时代，我们习惯性认为 应用 ==> systemcall ==> 内核。  但实际上，换个视角（以应用为中心），应用 对外的需求由systemcall 抽象，最终由内核提供服务。那么在分布式时代，就缺一个类似systemcall 的分布式原语，把分布式的能力 统一标准化之后 给到应用。
+
+![](/public/upload/architecture/mecha_overview.png)
+
+当前的项目开发，开发人员就像老妈子一样，把db、redis、mq 等资源聚在一起，还得考虑他们的容量、负载、连接池等。后续，它们 会向水电一样，支持项目随取随用。
+
+API 和配置的制订以及标准化，预计将会是 Mecha 成败的关键。PS：历史一次次的告诉我们：产品不重要，协议才重要，协议才是最直接反应理念的东西
+
+1. 数据库产品不重要，牛逼的是sql
+2. istio 还好， 牛逼的是xds
+
+![](/public/upload/architecture/mecha_intro.png)
+
+1. 所有分布式能力使用的过程（包括访问内部生态体系和访问外部系统）都被 Runtime 接管和屏蔽实现
+2. 通过 CRD/ 控制平面实现声明式配置和管理（类似 Servicemesh）
+3. 部署方式上 Runtime 可以部署为 Sidecar 模式，或者 Node 模式，取决于具体需求，不强制
+
+在传统的中间件模式下，应用和分布式能力是在一个进程中，以 SDK 方式进行集成。随着各种基础设施下沉，各种分布式能力从应用中移到了应用外。如 K8s 负责了生命周期相关的需求，Istio、Knative 等都负责一些分布式能力。如果将这些能力都移动到独立的 Runtime 中，那么这种情况无论从运维层面还是资源层面来看，都是没办法接受的。所以这时候肯定需要将部分 Runtime 进行整合，最理想的方式肯定是整合成一个。这种方式被定义成 Mecha ，中文意思是机甲的意思。那么对于将各种分布式能力进行整合的 Mecha Runtime 这一目标本身问题不大，那么怎么整合呢？对 Mecha 有什么要求呢？
+
+1. Mecha 的组件能力是抽象的，任何一个开源产品可以快速进行扩展和集成。
+2. Mecha 需要有一定的可配置能力，可以通过 yaml/json 进行配置和激活。这些文件格式最好能和主流的云原生方式对齐。
+3. Mecha 提供标准的 API ，和主应用之间的交互的网络通信基于此 API 来完成，不再是原协议转发，这样对于组件扩展和 SDK 的维护都能带来极大的便利性。
+分布式能力中的生命周期，可以将部分能力交接过底层的基础设施，比如 K8s。当然有些复杂的场景，可能需要 K8s、APP、Mecha Runtime 一起来完成。
+
+## 应用运行时落地——以dapr 为例
+
+[在云原生的时代，我们到底需要什么样的应用运行时？](https://mp.weixin.qq.com/s/PwPC1ZWNZvzQoOZvOAF2Qw)
+
+以微软开源的 dapr 为例，应用所有与 外界的交互（消息队列、redis、db、rpc） 都通过dapr http api
+
+1. 消息队列：
+    * 发布消息 `http://localhost:daprport/v1.0/publish/<topic>`
+    * 订阅消息  dapr 询问app 要订阅哪些topic，dapr 订阅topic， 当收到topic 消息时，发给app
+
+2. rpc : 请求远程服务 `http://localhost:daprport/v1.0/invoke/<appId>/method/<method-name>`
+
+为了进一步简化调用的过程（毕竟发一个最简单的 HTTP GET 请求也要应用实现 HTTP 协议的调用 / 连接池管理等），dapr 提供了各个语言的 SDK，如 java / go / python / dotnet / js / cpp / rust 。另外同时提供 HTTP 客户端和 gRPC 客户端。我们以 Java 为例，java 的 client API 接口定义如下：
+
+```java
+public interface DaprClient {  
+   Mono<Void> publishEvent(String topic, Object event);
+   Mono<Void> invokeService(Verb verb, String appId, String method, Object request);
+    ......
+}
+```
+[蚂蚁开源多运行时项目 Layotto 简介](https://mp.weixin.qq.com/s/IkvsQqpyCTVhnXOfUXswcA)
+
+函数计算和 Dapr 结合的点：Dapr 能够给函数计算的价值就是提供多语言的统一的面向能力的编程界面，而开发者无需关注具体的产品。像 Java 语言如果要使用阿里云上的 OSS 服务，需要引入 maven 依赖，同时需要写一些 OSS 代码，而通过 Dapr 你只需要调用 Dapr SDK 的 Binding 方法即可以做到，方便编程的同时，整个可运行包也无需引入多余的依赖包，而是可控的。函数计算英文名是 Function Compute，简称为 FC。FC 的架构包含的系统比较多，和开发者相关的主要包括 Function Compute Gateway和函数运行的环境。FC Gateway主要负责承接流量，同时会根据承接的流量的大小，当前的 CPU、内存使用情况，对当前函数实例进行扩缩容。函数计算运行时环境部署在一个 Pod 中，函数实例在主容器中，dapr 则是在 sidecar 容器中。当有外部流量访问函数计算的服务时，流量会先走到 Gateway ，Gateway 会根据访问的内容将流量转发到提供当前服务的函数实例中，函数实例接收到请求之后如果需要访问外部资源，就可以通过Dapr 的多语言 SDK 来发起调用。这时候 SDK 会向 Dapr实例发起gRPC请求，而在dapr 实例中回根据请求的类型和 body 体，选择对应的能力和组件实现，进而向外部资源发起调用。
+
 
 ## 其它
 

@@ -40,6 +40,16 @@ Java 的标准类库，由于其基础性、通用性的定位，往往过于关
 |channel||完全重写|
 |线程模型||固定好了|
 
+## 分层视角
+
+![](/public/upload/netty/netty_layer.png)
+
+1. 网络通信层：它执行网络 I/O 操作，核心组件包含 BootStrap、ServerBootStrap、Channel。——Channel 通道，提供了基础的 API 用于操作网络 IO，比如 bind、connect、read、write、flush 等等。它以 JDK NIO Channel 为基础，提供了更高层次的抽象，同时屏蔽了底层 Socket 的复杂性。Channel 有多种状态，比如连接建立、数据读写、连接断开。随着状态的变化，Channel 处于不同的生命周期，背后绑定相应的事件回调函数。
+2. 事件调度层：它的核心组件包含 EventLoopGroup、EventLoop。——EventLoop 本质是一个线程池，主要负责接收 Socket I/O 请求，并分配事件循环器来处理连接生命周期中所发生的各种事件。
+3. 服务编排层：它的职责实现网络事件的动态编排和有序传播——ChannelPipeline 基于责任链模式，方便业务逻辑的拦截和扩展；本质上它是一个双向链表将不同的 ChannelHandler 链接在一块，当 I/O 读写事件发生时, 会依次调用 ChannelHandler 对 Channel(Socket) 读取的数据进行处理。
+
+
+
 ## channel
 
 netty channel: A nexus to a network socket or a component which is capable of I/O operations such as read, write, connect, and bind.
