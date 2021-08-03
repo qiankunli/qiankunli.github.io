@@ -15,6 +15,8 @@ keywords: kubernetes security
 
 [火得一塌糊涂的kubernetes有哪些值得初学者学习的？](https://mp.weixin.qq.com/s/iI5vpK5bVkKmdbf9sbAGWw) Kubernetes 是透明的，它没有隐藏的内部 API。换句话说 **Kubernetes 系统内部用来交互的 API 和我们用来与 Kubernetes 交互的 API 相同**。这样做的好处是，当 Kubernetes 默认的组件无法满足我们的需求时，我们可以利用已有的 API 实现我们自定义的特性。
 
+[Kubernetes 多租户集群的实践](https://mp.weixin.qq.com/s/Tsnb5GYUhRqHiRn1piLtMw)
+
 ## docker 安全
 
 最典型的例子，将`/etc` 等核心文件 挂载到容器中，在容器中进行改写等。

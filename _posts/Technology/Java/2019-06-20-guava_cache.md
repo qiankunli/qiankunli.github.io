@@ -138,6 +138,8 @@ segment 简单说也是数组加链表，只是元素类型是ReferenceEntry，�
 
 ### 请求合并的实现——waitForLoadingValue
 
+loadingholder 本质是SettingFuture
+
     V waitForLoadingValue(ReferenceEntry<K, V> e, K key, ValueReference<K, V> valueReference)
         throws ExecutionException {
         checkState(!Thread.holdsLock(e), "Recursive load of: %s", key);
@@ -182,7 +184,7 @@ segment 简单说也是数组加链表，只是元素类型是ReferenceEntry，�
 从上述代码可以看到
 
 1. “其它线程等待”的效果，不是对key 加锁， 其它线程得不到锁而等待
-2. **LoadingValueReference 持有了 future对象**，也是线程的“竞争点”，线程发现value 处于loading状态时 便直接 `LoadingValueReference.waitForValue` ==> `future.get` 准备等结果了。这个竞争点选的很精巧
+2. **LoadingValueReference 持有了 SettingFuture对象**，也是线程的“竞争点”，线程发现value 处于loading状态时 便直接 `LoadingValueReference.waitForValue` ==> `future.get` 准备等结果了。这个竞争点选的很精巧
 
     1. 以 key 或者value 作为竞争点 + lock/unlock，线程发现key 数据过期，锁住key（标识key等手段），获取数据，解锁key。**因为你不知道key/value 什么时候过期，所以每次lock/unlock 是很大的浪费**。
     2. 以 value isLoading 作为竞争点，线程发现value isNotLoading，创建一个新的value 对象设置状态为loading，原子的修改entry的value，这样其它线程可以根据loading 状态决定自己的行为，而不是无脑lock/unlock

@@ -323,10 +323,6 @@ org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration,\
 
 [JDK/Dubbo/Spring 三种 SPI 机制，谁更好？](https://mp.weixin.qq.com/s/6SU1BPvNTCv_fhnMx3GhLw)Spring 的 SPI 配置文件是一个固定的文件 - `META-INF/spring.factories`，Spring的SPI 虽然属于spring-framework(core)，但是目前主要用在spring boot中。
 
-
-
-
-
 ## 自己实现starter
 
 1. 在pom.xml中引入SpringBoot自动化配置依赖jar spring-boot-autoconfigure
