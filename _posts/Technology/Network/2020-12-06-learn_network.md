@@ -15,6 +15,10 @@ keywords: network
 
 用思考的方式去记忆，而不是用记忆的方式去思考。
 
+[读完这篇文章，就再也不怕遇到网络问题啦！](https://mp.weixin.qq.com/s/Tnerf7M_a6HUC4ucaOWzeg)
+
+[快速界定故障：Socket Tracer网络监控实践](https://mp.weixin.qq.com/s/0w5t_KkHRLXkEY1_qbdTtw)
+
 ## 网络协议
 
 ![](/public/upload/network/network_protocol.png)

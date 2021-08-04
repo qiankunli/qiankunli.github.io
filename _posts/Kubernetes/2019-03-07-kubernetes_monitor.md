@@ -46,6 +46,8 @@ k8s 社区对k8s 监控的表述 [Kubernetes monitoring architecture](https://gi
 
 ![](/public/upload/go/kubernetes_metric.png)
 
+[prometheus使用missing-container-metrics监控pod oomkill](https://mp.weixin.qq.com/s/IDmuoPOcYsGISrYb1n9aKw)
+
 ### Metrics Server/cadvisor
 
 Metrics server复用了api-server的库来实现自己的功能，比如鉴权、版本等，为了实现将数据存放在内存中，去掉了默认的etcd存储，引入了内存存储。因为存放在内存中，因此监控数据是没有持久化的，可以通过第三方存储来拓展

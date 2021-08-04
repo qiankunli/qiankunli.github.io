@@ -51,6 +51,7 @@ spec:
 ```
 
 ## 亲和性与调度
+[云原生高可用与容灾系列(一): Pod 打散调度](https://mp.weixin.qq.com/s/Nh4kwSy54rfe4X7zQXeh6Q)
 
 1. 对于Pod yaml进行配置，约束一个 Pod 只能在特定的 Node(s) 上运行，或者优先运行在特定的节点上
     1. nodeSelector

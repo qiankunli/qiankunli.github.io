@@ -124,6 +124,8 @@ type Deployment struct {
 } 
 ```
 
+[Kubernetes 资源对象序列化实现](https://mp.weixin.qq.com/s/fJf1mtCR49XO7BOUn2FRTg)序列化和反序列化在很多项目中都有应用，Kubernetes也不例外。Kubernetes中定义了大量的API对象，为此还单独设计了一个包(https://github.com/kubernetes/api)，方便多个模块引用。API对象在不同的模块之间传输(尤其是跨进程)可能会用到序列化与反序列化，不同的场景对于序列化个格式又不同，比如grpc协议用protobuf，用户交互用yaml(因为yaml可读性强)，etcd存储用json。Kubernetes反序列化API对象不同于我们常用的json.Unmarshal()函数(需要传入对象指针)，Kubernetes需要解析对象的类型(Group/Version/Kind)，根据API对象的类型构造API对象，然后再反序列化。因此，Kubernetes定义了Serializer接口(https://github.com/kubernetes/apimachinery/blob/release-1.21/pkg/runtime/interfaces.go#L86)，专门用于API对象的序列化和反序列化。
+
 ## 集大成者——StatefulSet
 
 StatefulSet 的设计其实非常容易理解。它把真实世界的应用状态，抽象为了两种情况：

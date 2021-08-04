@@ -42,6 +42,7 @@ keywords:  Kubernetes event
 [Kubernetes 两年使用经验总结](https://mp.weixin.qq.com/s/5W8NemCKXK70OMyUQUlOfg)对几乎所有人来说，开箱即用的 Kubernetes 都远远不够。Kubernetes 平台是一个学习和探索的好地方。但是您很可能需要更多基础设施组件，并将它们很好地结合在一起作为应用程序的解决方案，以使其对开发人员更有意义。通常，这一套带有额外基础设施组件和策略的 Kubernetes 被称为内部 Kubernetes 平台。有几种方法可以扩展 Kubernetes。指标、日志、服务发现、分布式追踪、配置和 secret 管理、持续集成 / 持续部署、本地开发体验、根据自定义指标自动扩展都是需要关注和做出决策的问题。配置一个基础的集群可能并不困难，而大多数问题发生在我们开始部署工作负载时。从调整集群自动伸缩器（autoscaler）到在正确的时间配置资源，再到正确配置网络以实现所需的性能，你都必须自己研究和配置。我们的学习到的是，操作 Kubernetes 是很复杂的。它有很多活动部件。而学习如何操作 Kubernetes 很可能不是你业务的核心。尽可能多地将这些工作卸载给云服务提供商 (EKS、GKE、AKS)。你自己做这些事并不会带来价值。
 
 [还在为多集群管理烦恼吗？OCM来啦！](https://mp.weixin.qq.com/s/t1AGv3E7Q00N7LmHLbdZyA)
+[关于多集群Kubernetes的一些思考](https://mp.weixin.qq.com/s/haBM1BSDWLhRYBJH4cJHvA)
 
 ## 排查问题文章汇总
 

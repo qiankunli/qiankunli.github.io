@@ -81,7 +81,7 @@ liveness 起初是`/healthcheck`
 针对开发日常的各种问题，比如项目ip是多少，项目为什么启动失败等，我们专门开发了一个后台，起了一个很唬的名字：容器云平台。试图将我们日常碰到的客服问题通过技术问题来解决，**通过一个平台来归拢**，哪怕不能实现开发完全自助式的操作，也可以尽量减少容器开发的排查时间。比如我们开发了一个wrench 检查组件，用来扫描java 项目的classpath、日志等，分析项目是否有jar 冲突、类冲突、tomcat 日志报错、业务日志报错等，开发在web页面 上触发wrench 执行即可。
 
 [云原生下的灰度体系建设](https://mp.weixin.qq.com/s/xKfBizlmImyGB0QRGKL_pQ)阿里对灰度发布的系统性描述。
-
+[云原生 CI/CD 框架 Tekton 初体验](https://mp.weixin.qq.com/s/ZI9vWJ4giVsMhxZYHjjd5A)
 
 ## 与已有中间件对接
 

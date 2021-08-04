@@ -21,6 +21,10 @@ keywords: container cpu
 
 ## 观察cpu 使用
 
+[腾讯TencentOS 十年云原生的迭代演进之路](https://mp.weixin.qq.com/s/Cbck85WmivAW0mtMYdeEIw)通过将 Kubernetes Service QoS Class 与 TencentOS Priority 一一对应，在内核层原生感知优先级(Tencent Could Native Scheduler)，在底层提供强隔离机制(Cgroup Priority/CPU QoS/Memory QoS/IO QoS/Net QoS)，最大程度保证混部后业务的服务质量。而且这种优先级机制是贯穿在整个 cgroups 子系统中。
+
+![](/public/upload/container/container_schedule.png)
+
 ### linux 视角
 
 ![](/public/upload/container/process_top.png)
@@ -171,6 +175,7 @@ f2321226620e
 $ docker inspect 472abbce32a5 --format '{{.HostConfig.CpuShares}} {{.HostConfig.CpuQuota}} {{.HostConfig.CpuPeriod}}'
 51 10000 100000
 ```
+
 
 ## 内存 
 
