@@ -15,27 +15,165 @@ keywords: linux 内核
 
 ![](/public/upload/linux/linux_memory_management.png)
 
-## 活学活用
+## 内存管理数据结构及初始化
 
-1. OOM Killer 在 Linux 系统里如果内存不足时，会杀死一个正在运行的进程来释放一些内存。
-2. Linux 里的程序都是调用 malloc() 来申请内存，如果内存不足，直接 malloc() 返回失败就可以，为什么还要去杀死正在运行的进程呢？Linux允许进程申请超过实际物理内存上限的内存。因为 malloc() 申请的是内存的虚拟地址，系统只是给了程序一个地址范围，由于没有写入数据，所以程序并没有得到真正的物理内存。物理内存只有程序真的往这个地址写入数据的时候，才会分配给程序。
+彭东《操作系统实战》案例操作系统 定义了几个数据结构来管理内存
+1. memarea_t 结构表示一个内存区，逻辑上的概念，并不是硬件上必需的，按功能划分对应硬件区、内核区、应用区。比如虚拟地址主要依赖于 CPU 中的 MMU，但有很多外部硬件能直接和内存交换数据，常见的有 DMA，并且它只能访问低于 24MB 的物理内存。
+2. msadsc_t 表示一个内存页，包含页的状态、页的地址、页的分配记数、页的类型、页的链表。物理内存页有多少就需要有多少个 msadsc_t 结构。
+    ```c
+    //内存空间地址描述符标志
+    typedef struct s_MSADFLGS
+    {
+        u32_t mf_olkty:2;    //挂入链表的类型
+        u32_t mf_lstty:1;    //是否挂入链表
+        u32_t mf_mocty:2;    //分配类型，被谁占用了，内核还是应用或者空闲
+        u32_t mf_marty:3;    //属于哪个区
+        u32_t mf_uindx:24;   //分配计数
+    }__attribute__((packed)) msadflgs_t; 
+    //物理地址和标志  
+    typedef struct s_PHYADRFLGS
+    {
+        u64_t paf_alloc:1;     //分配位
+        u64_t paf_shared:1;    //共享位
+        u64_t paf_swap:1;      //交换位
+        u64_t paf_cache:1;     //缓存位
+        u64_t paf_kmap:1;      //映射位
+        u64_t paf_lock:1;      //锁定位
+        u64_t paf_dirty:1;     //脏位
+        u64_t paf_busy:1;      //忙位
+        u64_t paf_rv2:4;       //保留位
+        u64_t paf_padrs:52;    //页物理地址位
+    }__attribute__((packed)) phyadrflgs_t;
+    //内存空间地址描述符
+    typedef struct s_MSADSC
+    {
+        list_h_t md_list;           //链表
+        spinlock_t md_lock;         //保护自身的自旋锁
+        msadflgs_t md_indxflgs;     //内存空间地址描述符标志
+        phyadrflgs_t md_phyadrs;    //物理地址和标志
+        void* md_odlink;            //相邻且相同大小msadsc的指针
+    }__attribute__((packed)) msadsc_t;
+    ```
+3. 组织内存页就是组织 msadsc_t 结构，它其中需要锁、状态、msadsc_t 结构数量，挂载 msadsc_t 结构的链表、和一些统计数据——bafhlst_t。
+4. 有了 bafhlst_t 数据结构，我们只是有了挂载 msadsc_t 结构的地方，这并没有做到科学合理。但是，如果我们把多个 bafhlst_t 数据结构组织起来，形成一个 bafhlst_t 结构数组，并且把这个 bafhlst_t 结构数组放在一个更高的数据结构中，这个数据结构就是内存分割合并数据结构——memdivmer_t。为什么要用分割和合并呢？这其实取意于我们的内存分配、释放算法，对这个算法而言分配内存就是分割内存，而释放内存就是合并内存。如果 memdivmer_t 结构中 dm_mdmlielst 数组只是一个数组，那是没有意义的。我们正是要通过 dm_mdmlielst 数组，来划分物理内存地址不连续的 msadsc_t 结构。每个内存区 memarea_t 结构中包含一个内存分割合并 memdivmer_t 结构，而在 memdivmer_t 结构中又包含 dm_mdmlielst 数组。在 dm_mdmlielst 数组中挂载了多个 msadsc_t 结构。
 
-## 内存管理
+确定了用分页方式管理内存，并且一起动手设计了表示内存页、内存区相关的内存管理数据结构。**在代码中实际操作的数据结构必须在内存中有相应的变量**，这个由初始化函数解决。内核初始化时会调用 init_memmgr
 
-对于内存的访问，用户态的进程使用虚拟地址，内核的也基本都是使用虚拟地址
+```c
+void init_memmgr(){
+    // 初始化内存页结构
+    init_msadsc();
+    //初始化内存区结构
+    init_memarea();
+    //处理内存占用，标记哪些 msadsc_t 结构对应的物理内存被内核占用了，这些被标记 msadsc_t 结构是不能纳入内存管理结构中去的。
+    init_search_krloccupymm(&kmachbsp);
+    //合并内存页到内存区中，把所有的空闲 msadsc_t 结构按最大地址连续的形式组织起来，挂载到 memarea_t 结构下的 memdivmer_t 结构中，对应的 dm_mdmlielst 数组中。
+    init_merlove_mem();
+    init_memmgrob();  //物理地址转为虚拟地址，便于以后使用
+    return;
+}
+```
+内存管理代码的结构是：接口函数调用框架函数，框架函数调用核心函数。可以发现，这个接口函数返回的是一个 msadsc_t 结构的指针。如果能在 dm_mdmlielst 数组中找到对应请求页面数的 msadsc_t 结构就直接返回，如果没有就寻找下一个 dm_mdmlielst 数组中元素，依次迭代直到最大的 dm_mdmlielst 数组元素，然后依次对半分割，直到分割到请求的页面数为止。释放时会查找相邻且物理地址连续的 msadsc_t 结构，进行合并，合并工作也是迭代过程，直到合并到最大的连续 msadsc_t 结构或者后面不能合并为止，最后把这个合并到最大的连续 msadsc_t 结构，挂载到对应的 dm_mdmlielst 数组中。释放算法核心逻辑是要对空闲页面进行合并，合并成更大的连续的内存页面。
+```c
+//内存分配页面框架函数
+msadsc_t *mm_divpages_fmwk(memmgrob_t *mmobjp, uint_t pages, uint_t *retrelpnr, uint_t mrtype, uint_t flgs)
+{
+    //返回mrtype对应的内存区结构的指针
+    memarea_t *marea = onmrtype_retn_marea(mmobjp, mrtype);
+    if (NULL == marea)
+    {
+        *retrelpnr = 0;
+        return NULL;
+    }
+    uint_t retpnr = 0;
+    //内存分配的核心函数
+    msadsc_t *retmsa = mm_divpages_core(marea, pages, &retpnr, flgs);
+    if (NULL == retmsa)
+    {
+        *retrelpnr = 0;
+        return NULL;
+    }
+    *retrelpnr = retpnr;
+    return retmsa;
+}
+//内存分配页面接口
+//mmobjp->内存管理数据结构指针
+//pages->请求分配的内存页面数
+//retrealpnr->存放实际分配内存页面数的指针
+//mrtype->请求的分配内存页面的内存区类型
+//flgs->请求分配的内存页面的标志位
+msadsc_t *mm_division_pages(memmgrob_t *mmobjp, uint_t pages, uint_t *retrealpnr, uint_t mrtype, uint_t flgs)
+{
+    if (NULL == mmobjp || NULL == retrealpnr || 0 == mrtype)
+    {
+        return NULL;
+    }
 
-### 物理内存空间布局
+    uint_t retpnr = 0;
+    msadsc_t *retmsa = mm_divpages_fmwk(mmobjp, pages, &retpnr, mrtype, flgs);
+    if (NULL == retmsa)
+    {
+        *retrealpnr = 0;
+        return NULL;
+    }
+    *retrealpnr = retpnr;
+    return retmsa;
+}
+//释放内存页面核心
+bool_t mm_merpages_core(memarea_t *marea, msadsc_t *freemsa, uint_t freepgs)
+{
+    bool_t rets = FALSE;
+    cpuflg_t cpuflg;
+    //内存区加锁
+    knl_spinlock_cli(&marea->ma_lock, &cpuflg);
+    //针对一个内存区进行操作
+    rets = mm_merpages_onmarea(marea, freemsa, freepgs);
+    //内存区解锁
+    knl_spinunlock_sti(&marea->ma_lock, &cpuflg);
+    return rets;
+}
+//释放内存页面框架函数
+bool_t mm_merpages_fmwk(memmgrob_t *mmobjp, msadsc_t *freemsa, uint_t freepgs)
+{
+    //获取要释放msadsc_t结构所在的内存区
+    memarea_t *marea = onfrmsa_retn_marea(mmobjp, freemsa, freepgs);
+    if (NULL == marea)
+    {
+        return FALSE;
+    }
+    //释放内存页面的核心函数
+    bool_t rets = mm_merpages_core(marea, freemsa, freepgs);
+    if (FALSE == rets)
+    {
+        return FALSE;
+    }
+    return rets;
+}
+//释放内存页面接口
+//mmobjp->内存管理数据结构指针
+//freemsa->释放内存页面对应的首个msadsc_t结构指针
+//freepgs->请求释放的内存页面数
+bool_t mm_merge_pages(memmgrob_t *mmobjp, msadsc_t *freemsa, uint_t freepgs)
+{
+    if (NULL == mmobjp || NULL == freemsa || 1 > freepgs)
+    {
+        return FALSE;
+    }
+    //调用释放内存页面的框架函数
+    bool_t rets = mm_merpages_fmwk(mmobjp, freemsa, freepgs);
+    if (FALSE == rets)
+    {
+        return FALSE;
+    }
+    return rets;
+}
+```
 
 ![](/public/upload/linux/linux_physical_memory.jpg)
 
-### 虚拟内存与物理内存的映射
+## 进程
 
-|页表|用户态|内核态|备注|
-|---|---|---|---|
-|在哪|task_struct的mm_struct|mm_struct init_mm|
-|地址映射方式|走四级页表来翻译|线性映射|内核空间也必须有一部分是非线性映射，比如下图的vmalloc|
-|何时创建|随进程创建产生|内核初始化时|
-|独立性|独占|共享|
+对于内存的访问，用户态的进程使用虚拟地址，内核的也基本都是使用虚拟地址
 
 ### 进程“独占”虚拟内存及虚拟内存划分
 
@@ -277,3 +415,7 @@ cr3 是 CPU 的一个寄存器，它会指向当前进程的顶级 pgd。如果 
     }
 
 
+## 活学活用
+
+1. OOM Killer 在 Linux 系统里如果内存不足时，会杀死一个正在运行的进程来释放一些内存。
+2. Linux 里的程序都是调用 malloc() 来申请内存，如果内存不足，直接 malloc() 返回失败就可以，为什么还要去杀死正在运行的进程呢？Linux允许进程申请超过实际物理内存上限的内存。因为 malloc() 申请的是内存的虚拟地址，系统只是给了程序一个地址范围，由于没有写入数据，所以程序并没有得到真正的物理内存。物理内存只有程序真的往这个地址写入数据的时候，才会分配给程序。

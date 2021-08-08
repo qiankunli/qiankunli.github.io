@@ -13,120 +13,180 @@ keywords: concurrency control
 * TOC
 {:toc}
 
-并发控制的基本手段（没有好不好，只有合适不合适）
 
-1. 悲观锁：假定冲突的概率很高。
-    1. 当你无法判断锁住的代码会执行多久时，互斥
-    2. 如果你能确定被锁住的代码执行时间很短，自旋
-    3. 如果能区分出读写操作
-2. 乐观锁，假定冲突的概率很低，先修改完共享资源，再验证这段时间内有没有发生冲突。如果没有其他线程在修改资源，那么操作完成。如果发现其他线程已经修改了这个资源，就放弃本次操作。至于放弃后如何重试，则与业务场景相关。无锁编程中，验证是否发生了冲突是关键。
+线程同步出现的根本原因是访问公共资源需要多个操作，而这多个操作的执行过程不具备原子性，**被任务调度器分开了**，而其他线程会破坏共享资源，所以需要在临界区做线程的同步，这里我们先明确一个概念，就是临界区，临界区是指多个任务访问共享资源如内存或文件时候的指令，**临界区是指令并不是受访问的资源**。
 
-## 为什么要做并发控制
-
-线程同步出现的根本原因是访问公共资源需要多个操作，而这多个操作的执行过程不具备原子性，被任务调度器分开了，而其他线程会破坏共享资源，所以需要在临界区做线程的同步，这里我们先明确一个概念，就是临界区，临界区是指多个任务访问共享资源如内存或文件时候的指令，**临界区是指令并不是受访问的资源**。
-
-1. 一个资源 同一时间只能被一个进程操作，在current进程操作完成之前，其它进程不可以操作。
-2. 操作资源 的代码 可以认为是一个有状态服务，被调度到某个进程去执行。
-
-[聊聊原子变量、锁、内存屏障那点事](http://0xffffff.org/2017/02/21/40-atomic-variable-mutex-and-memory-barrier/)
-
-![](/public/upload/java/cpu_cache_memory.png)
-
-cpu 也可以是一个主机的两个进程、两台机器，想对同一个数据进行操作。
-
-**共享资源就像cpu，只能分时共享**。 cpu 如何执行分时共享呢？cpu 执行完每条指令后，会检查下有没有中断，若有则执行中断处理程序。对应到进程/线程调度上，就是时间片中断。进程每次访问共享资源之前，本质上也是先去查询一个变量，若允许则执行，不允许，则让出cpu。
+有两个核心点，一个是原子操作，另一个则是中断；并发安全有以下几个办法（防中断，防其它执行体）：
+1. 原子操作，x86中带lock 前缀的指令，lock 前缀表示锁定总线（中断是不能打断这个操作的），仅适用单体变量。
+2. 关中断。当要操作的数据很多的情况下，用原子变量就不适合了。单 CPU同一时刻只有一条代码执行流，除了中断会中止当前代码执行流，转而运行另一条代码执行流（中断处理程序），再无其它代码执行流。这种情况下只要控制了中断，就能安全地操作全局数据。
+3. 自旋锁。多cpu时代，大家都自觉地点，操作数据之前先去检查下锁变量。首先读取锁变量，判断其值是否已经加锁，如果未加锁则执行加锁，然后返回，表示加锁成功；如果已经加锁了，就要返回第一步继续执行后续步骤，因而得名自旋锁。这个算法看似很好，但是想要正确执行它，就必须保证**读取锁变量和判断并加锁的操作是原子执行的**。否则，CPU0 在读取了锁变量之后，CPU1 读取锁变量判断未加锁执行加锁，然后 CPU0 也判断未加锁执行加锁，这时就会发现两个 CPU 都加锁成功，因此这个算法出错了。怎么解决这个问题呢？这就要找硬件要解决方案了，x86 CPU 给我们提供了一个原子交换指令，xchg，它可以让寄存器里的一个值跟内存空间中的一个值做交换。在使用自旋锁的时候我们仍然要注意中断。
+4. 信号量。如果长时间等待后才能获取数据，在这样的情况下，前面中断控制和自旋锁都不能很好地解决，于是我们开发了信号量。信号量由一套数据结构和函数组成，它能使获取数据的代码执行流进入睡眠，然后在相关条件满足时被唤醒，这样就能让 CPU 能有时间处理其它任务。所以信号量同时解决了三个问题：等待、互斥、唤醒。PS：**通过等待队列来记录加锁失败的执行体，并后续通过一定的策略来选择唤醒**，已经带入了调度的概念，这也是很多编程语言中信号量的实现方式。
 
 ## 硬件对并发控制的支持
 
-提供的原子操作：
+原子变量的实现
 
-* 关中断指令、停止相关流水线指令。
-* 内存屏障指令。分别是 LoadLoad 屏障、StoreStore 屏障、LoadStore 屏障和 StoreLoad 屏障。以 LoadLoad 屏障为例，LoadLoad 屏障会确保 Load1 的数据在 Load2 和后续 Load 指令之前，被真实地加载。
-    ```java  
-    class Foo{
-        volatile int a;
-        int b, c;
-        void foo(){
-            int i, j;
-            i = a; // Load1指令,针对volatile变量
-            j = b; // Load2指令，针对普通变量   
-        }
-        }
-    // 编译器在这两条指令之间插入一个 LoadLoad 屏障
-    Load1指令
-    LoadLoad屏障
-    Load2指令
-    ```
-* cmpxchg指令：cmpxchg 在硬件级把原来的两个指令（比较指令和交换指令，Compare and Swap）合并成了一个指令，才能同时完成两个操作：首先看看当前值有没有被改动，然后设置正确的值。cmpxchg 指令在一个内核中执行的时候，可以保证原子性。
-* 对于SMP，提供lock 指令。lock指令是一种前缀，它可与其他指令联合，用来维持总线的锁存信号直到与其联合的指令执行完为止。比如基于AT&T的汇编指令`LOCK_PREFIX xaddw %w0,%1`，xaddw 表示先交换源操作数和目的操作数，然后两个操作数求和，存入目的寄存器。为了防止这个过程被打断，加了LOCK_PREFIX的宏（修饰lock指令）。
+```c
+// 常用的32位的原子变量类型
+typedef struct { 
+    int counter;
+} atomic_t;
+//原子读取变量中的值
+static __always_inline int arch_atomic_read(const atomic_t *v){ return __READ_ONCE((v)->counter);}
+//原子写入一个具体的值
+static __always_inline void arch_atomic_set(atomic_t *v, int i){ __WRITE_ONCE(v->counter, i);}
+//原子加上一个具体的值
+static  __always_inline void arch_atomic_add(int i, atomic_t *v){ 
+    asm volatile(LOCK_PREFIX "addl %1,%0" : "+m" (v->counter) : "ir" (i) : "memory");
+}
+//原子减去一个具体的值
+static __always_inline void arch_atomic_sub(int i, atomic_t *v){ 
+    asm volatile(LOCK_PREFIX "subl %1,%0" : "+m" (v->counter) : "ir" (i) : "memory");
+}
+```
 
-这些指令，辅助一定的算法，就可以包装一个自旋锁、读写锁、顺序锁出来。os中，lock一词主要指自旋锁。注意，自旋锁时，线程从来没有停止运行过。
+LOCK_PREFIX 是一个宏，根据需要展开成“lock;”或者空串。单核心 CPU 是不需要 lock 前缀的，只要在多核心 CPU 下才需要加上 lock 前缀。Linux 定义了 __READ_ONCE，__WRITE_ONCE 这两个宏，是对代码封装并利用 GCC 的特性对代码进行检查，把让错误显现在编译阶段。其中的“volatile int *”是为了提醒编译器：这是对内存地址读写，不要有优化动作，每次都必须强制写入内存或从内存读取。
+
 	
 ## 操作系统对并发控制的支持
 
 我们常见的各种锁是有层级的，**最底层的两种锁就是互斥锁和自旋锁，其他锁都是基于它们实现的**。
 
-POSIX表示可移植操作系统接口（Portable Operating System Interface of UNIX，缩写为 POSIX ），POSIX标准定义了操作系统应该为应用程序提供的接口标准。POSIX 定义了五种同步对象，互斥锁，条件变量，自旋锁，读写锁，信号量。有些时候，名词限制了我们对事物的认识。我们谈到锁、信号量这些，分析它们如何实现，或许走入了一个误区。[Locks, Mutexes, and Semaphores: Types of Synchronization Objects](https://www.justsoftwaresolutions.co.uk/threading/locks-mutexes-semaphores.html) 中认为锁是一个抽象概念，包括：
+spinlock_t 以及操作函数spin_lock 和spin_unlock
 
-1. 竞态条件。只有一个进入，还是多个进入，还是读写进入，线程能否重复获取自己已占用的锁
-2. 获取锁失败时的反应。提示失败、自旋还是直接阻塞，阻塞能不能被打断
+```c
+//最底层的自旋锁数据结构
+typedef struct{
+    // 真正的锁值变量，用volatile标识
+    volatile unsigned long lock;
+}spinlock_t;
+#define spin_unlock_string 
+    \ "movb $1,%0" \ //写入1表示解锁 
+    :"=m" (lock->lock) : : "memory"
+#define spin_lock_string \ 
+    "\n1:\t" \ "lock ; decb %0\n\t" \ //原子减1 
+    "js 2f\n" \ //当结果小于0则跳转到标号2处，表示加锁失败 
+    ".section .text.lock,\"ax\"\n" \ //重新定义一个代码段，这是优化技术，避免后面的代码填充cache，因为大部分情况会加锁成功，链接器会处理好这个代码段的 
+    "2:\t" \ 
+    "cmpb $0,%0\n\t" \ //和0比较 
+    "rep;nop\n\t" \ //空指令 
+    "jle 2b\n\t" \ //小于或等于0跳转到标号2 
+    "jmp 1b\n" \ //跳转到标号1 
+    ".previous"//获取自旋锁
+static inline void spin_lock(spinlock_t*lock){ 
+    __asm__ __volatile__( 
+    spin_lock_string 
+    :"=m"(lock->lock)::"memory" 
+    );
+}
+//释放自旋锁
+static inline void spin_unlock(spinlock_t*lock){
+    __asm__ __volatile__( spin_unlock_string );
+}
+```
 
-按照这些不同，人们给它mutex、信号量等命名。
-
-### 互斥锁和自旋锁
-
-[如何使用Redis实现分布式锁？](https://time.geekbang.org/column/article/301092)我们通常说的线程调用加锁和释放锁的操作，到底是啥意思呢？我来解释一下。实际上，一个线程调用加锁操作，其实就是检查锁变量值是否为 0。如果是 0，就把锁的变量值设置为 1，表示获取到锁，如果不是 0，就返回错误信息，表示加锁失败，已经有别的线程获取到锁了。而一个线程调用释放锁操作，其实就是将锁变量的值置为 0，以便其它线程可以来获取锁。
-
-当你无法判断锁住的代码会执行多久时，应该首选互斥锁，互斥锁是一种独占锁。当 A 线程取到锁后，互斥锁将被 A 线程独自占有，当 A 没有释放这把锁时，其他线程的取锁代码都会被阻塞。**阻塞是如何实现的呢？**对于 99% 的线程级互斥锁而言，阻塞都是由操作系统内核实现的（比如 Linux 下它通常由内核提供的信号量实现）。当获取锁失败时，内核会将线程置为休眠状态，等到锁被释放后，内核会在合适的时机唤醒线程，而这个线程成功拿到锁后才能继续执行。**互斥锁通过内核帮忙切换线程，简化了业务代码使用锁的难度**。但是，线程获取锁失败时，增加了两次上下文切换的成本：从运行中切换为休眠，以及锁释放时从休眠状态切换为运行中。上下文切换耗时在几十纳秒到几微秒之间，或许这段时间比锁住的代码段执行时间还长。
-
-互斥锁能够满足各类功能性要求，特别是被锁住的代码执行时间不可控时，**它通过内核执行线程切换及时释放了资源**，但它的性能消耗最大。
-
-如果你能确定被锁住的代码执行时间很短，就应该用自旋锁取代互斥锁。自旋锁比互斥锁快得多，因为它通过 CPU 提供的 CAS 函数（全称 Compare And Swap），**在用户态代码中完成加锁与解锁操作**。
-
-多线程竞争锁的时候，加锁失败的线程会“忙等待”，直到它拿到锁。什么叫“忙等待”呢？它并不意味着一直执行 CAS 函数，生产级的自旋锁在“忙等待”时，会与 CPU 紧密配合 ，它通过 CPU 提供的 PAUSE 指令，减少循环等待时的耗电量；对于单核 CPU，忙等待并没有意义，此时它会主动把线程休眠。
-
-当取不到锁时，互斥锁用“线程切换”来面对，自旋锁则用“忙等待”来面对。这是两种最基本的处理方式，更高级别的锁都会选择其中一种来实现，比如读写锁就既可以基于互斥锁实现，也可以基于自旋锁实现。
-
-
-
-### 实现
-
-通过对硬件指令的包装，os提供原子整数操作等系统调用。本质上，通过硬件指令，可以提供对一个变量的独占访问。
-
-	int atomic_read(const atomic_t *v)
-	// 将v设置为i
-	int atomic_set(atomic_t *v,int id);
-
-通过对硬件指令的封装，操作系统可以封装一个自旋锁出来。
-
-1. 获取锁spin_lock_irq：用变量标记是否被其他线程占用，变量的独占访问，发现占用后自旋，结合关中断指令。
-2. 释放锁spin_unlock_irq：独占的将变量标记为未访问状态
-
-那么在获取锁与释放锁之间，可以实现一个临界区。
-
-	spin_lock_irq();
-	// 临界区
-	spin_unlock_irq();
-
-通过自旋锁，os可以保证count 修改的原子性。线程尝试修改count的值，根据修改后count值，决定是否挂起当前进程，进而提供semaphore和mutex（类似于semaphore=1）等抽象。**也就是说，semaphore = 自旋锁 + 线程挂起/恢复。**
-
-操作系统中，semaphore与自旋锁类似的概念，只有得到信号量的进程才能执行临界区的代码；不同的是获取不到信号量时，进程不会原地打转而是进入休眠等待状态（自己更改自己的状态位）
+信号量 semaphore 及接口函数 down和up
 
 ```c
 struct semaphore{
-    spinlock_t lock;
-    unsigned int count;
-    // 等待的线程会进入到队列中
-    struct list_head wait_list; 
+    raw_spinlock_t lock;//保护信号量自身的自旋锁
+    unsigned int count;//信号量值
+    struct list_head wait_list;//挂载睡眠等待进程的链表
+};
+#define down_console_sem() do { \
+    down(&console_sem);\
+} while (0)
+static void __up_console_sem(unsigned long ip) {
+    up(&console_sem);
 }
-// 获取信号量，会导致睡眠
-void down(struct semaphore *sem);
-// 获取信号量，会导致睡眠，但睡眠可被信号打断
-int down_interruptible(struct semaphore *sem);
-// 无论是否获得，都立即返回，返回值不同，不会导致睡眠
-int down_trylock(struct semaphore *sem);
-// 释放信号量
-void up(struct semaphore *sem))
+#define up_console_sem() __up_console_sem(_RET_IP_)
+//加锁console
+void console_lock(void)
+{
+    might_sleep();
+    down_console_sem();//获取信号量console_sem
+    if (console_suspended)
+        return;
+    console_locked = 1;
+    console_may_schedule = 1;
+}
+//解锁console
+void console_unlock(void)
+{
+    static char ext_text[CONSOLE_EXT_LOG_MAX];
+    static char text[LOG_LINE_MAX + PREFIX_MAX];
+    //……删除了很多代码
+    up_console_sem();//释放信号量console_sem
+    raw_spin_lock(&logbuf_lock);
+    //……删除了很多代码   
+}
+
+static inline int __sched __down_common(struct semaphore *sem, long state,long timeout)
+{
+    struct semaphore_waiter waiter;
+    //把waiter加入sem->wait_list的头部
+    list_add_tail(&waiter.list, &sem->wait_list);
+    waiter.task = current;//current表示当前进程，即调用该函数的进程
+    waiter.up = false;
+    for (;;) {
+        if (signal_pending_state(state, current))
+            goto interrupted;
+        if (unlikely(timeout <= 0))
+            goto timed_out;
+        __set_current_state(state);//设置当前进程的状态，进程睡眠，即先前__down函数中传入的TASK_UNINTERRUPTIBLE：该状态是等待资源有效时唤醒（比如等待键盘输入、socket连接、信号（signal）等等），但不可以被中断唤醒
+        raw_spin_unlock_irq(&sem->lock);//释放在down函数中加的锁
+        timeout = schedule_timeout(timeout);//真正进入睡眠
+        raw_spin_lock_irq(&sem->lock);//进程下次运行会回到这里，所以要加锁
+        if (waiter.up)
+            return 0;
+    }
+ timed_out:
+    list_del(&waiter.list);
+    return -ETIME;
+ interrupted:
+    list_del(&waiter.list);
+    return -EINTR;
+
+    //为了简单起见处理进程信号（signal）和超时的逻辑代码我已经删除
+}
+//进入睡眠等待
+static noinline void __sched __down(struct semaphore *sem)
+{
+    __down_common(sem, TASK_UNINTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
+}
+//获取信号量
+void down(struct semaphore *sem)
+{
+    unsigned long flags;
+    //对信号量本身加锁并关中断，必须另一段代码也在操作该信号量
+    raw_spin_lock_irqsave(&sem->lock, flags);
+    if (likely(sem->count > 0))
+        sem->count--;//如果信号量值大于0,则对其减1
+    else
+        __down(sem);//否则让当前进程进入睡眠
+    raw_spin_unlock_irqrestore(&sem->lock, flags);
+}
+//实际唤醒进程 
+static noinline void __sched __up(struct semaphore *sem)
+{
+    struct semaphore_waiter *waiter = list_first_entry(&sem->wait_list, struct semaphore_waiter, list);
+    //获取信号量等待链表中的第一个数据结构semaphore_waiter，它里面保存着睡眠进程的指针
+    list_del(&waiter->list);
+    waiter->up = true;
+    wake_up_process(waiter->task);//唤醒进程重新加入调度队列
+}
+//释放信号量
+void up(struct semaphore *sem)
+{
+    unsigned long flags;
+    //对信号量本身加锁并关中断，必须另一段代码也在操作该信号量
+    raw_spin_lock_irqsave(&sem->lock, flags);
+    if (likely(list_empty(&sem->wait_list)))
+        sem->count++;//如果信号量等待链表中为空，则对信号量值加1
+    else
+        __up(sem);//否则执行唤醒进程相关的操作
+    raw_spin_unlock_irqrestore(&sem->lock, flags);
+}
 ```
 
 [大话Linux内核中锁机制之原子操作、自旋锁](http://blog.sina.com.cn/s/blog_6d7fa49b01014q7p.html)
@@ -214,3 +274,26 @@ volatile 也是有成本的 [剖析Disruptor:为什么会这么快？（二）�
 
 **所有这一切，讲的都是共享内存模式的并发**。 所以 go 的协程让程序猿 少学多少东西。
 
+## 其它
+
+[如何使用Redis实现分布式锁？](https://time.geekbang.org/column/article/301092)我们通常说的线程调用加锁和释放锁的操作，到底是啥意思呢？我来解释一下。实际上，一个线程调用加锁操作，其实就是检查锁变量值是否为 0。如果是 0，就把锁的变量值设置为 1，表示获取到锁，如果不是 0，就返回错误信息，表示加锁失败，已经有别的线程获取到锁了。而一个线程调用释放锁操作，其实就是将锁变量的值置为 0，以便其它线程可以来获取锁。
+
+当你无法判断锁住的代码会执行多久时，应该首选互斥锁，互斥锁是一种独占锁。当 A 线程取到锁后，互斥锁将被 A 线程独自占有，当 A 没有释放这把锁时，其他线程的取锁代码都会被阻塞。**阻塞是如何实现的呢？**对于 99% 的线程级互斥锁而言，阻塞都是由操作系统内核实现的（比如 Linux 下它通常由内核提供的信号量实现）。当获取锁失败时，内核会将线程置为休眠状态，等到锁被释放后，内核会在合适的时机唤醒线程，而这个线程成功拿到锁后才能继续执行。**互斥锁通过内核帮忙切换线程，简化了业务代码使用锁的难度**。但是，线程获取锁失败时，增加了两次上下文切换的成本：从运行中切换为休眠，以及锁释放时从休眠状态切换为运行中。上下文切换耗时在几十纳秒到几微秒之间，或许这段时间比锁住的代码段执行时间还长。
+
+互斥锁能够满足各类功能性要求，特别是被锁住的代码执行时间不可控时，**它通过内核执行线程切换及时释放了资源**，但它的性能消耗最大。如果你能确定被锁住的代码执行时间很短，就应该用自旋锁取代互斥锁。自旋锁比互斥锁快得多，因为它通过 CPU 提供的 CAS 函数（全称 Compare And Swap），**在用户态代码中完成加锁与解锁操作**。
+
+多线程竞争锁的时候，加锁失败的线程会“忙等待”，直到它拿到锁。什么叫“忙等待”呢？它并不意味着一直执行 CAS 函数，生产级的自旋锁在“忙等待”时，会与 CPU 紧密配合 ，它通过 CPU 提供的 PAUSE 指令，减少循环等待时的耗电量；对于单核 CPU，忙等待并没有意义，此时它会主动把线程休眠。
+
+当取不到锁时，互斥锁用“线程切换”来面对，自旋锁则用“忙等待”来面对。这是两种最基本的处理方式，更高级别的锁都会选择其中一种来实现，比如读写锁就既可以基于互斥锁实现，也可以基于自旋锁实现。
+
+并发控制的基本手段（没有好不好，只有合适不合适）
+
+1. 悲观锁：假定冲突的概率很高。
+    1. 当你无法判断锁住的代码会执行多久时，互斥
+    2. 如果你能确定被锁住的代码执行时间很短，自旋
+    3. 如果能区分出读写操作
+2. 乐观锁，假定冲突的概率很低，先修改完共享资源，再验证这段时间内有没有发生冲突。如果没有其他线程在修改资源，那么操作完成。如果发现其他线程已经修改了这个资源，就放弃本次操作。至于放弃后如何重试，则与业务场景相关。无锁编程中，验证是否发生了冲突是关键。
+
+[聊聊原子变量、锁、内存屏障那点事](http://0xffffff.org/2017/02/21/40-atomic-variable-mutex-and-memory-barrier/)
+
+![](/public/upload/java/cpu_cache_memory.png)

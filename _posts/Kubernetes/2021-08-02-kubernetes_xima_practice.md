@@ -98,6 +98,8 @@ liveness 起初是`/healthcheck`
 
 k8s-sync 同时也将 pod 信息同步到mysql 中，方便开发根据项目名、ip 等在后台查询并访问项目容器。随着k8s-sync 功能的丰富，我们对k8s-sync 也进行了多次重构。
 
+[微服务与K8s生命周期对齐](https://mp.weixin.qq.com/s/ahqtXp56o4943wmJp6x4zg)
+
 ## 体会
 
 从16年到现在，一路走来，容器的各种上下游组件、公司的中间件并不是一开始就有或成熟的，落地过程真的可以用“逢山开路遇水搭桥” 来形容。
