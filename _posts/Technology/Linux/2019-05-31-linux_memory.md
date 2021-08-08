@@ -15,11 +15,14 @@ keywords: linux 内核
 
 ![](/public/upload/linux/linux_memory_management.png)
 
-## 内存管理数据结构及初始化
+前半部分来自彭东《操作系统实战》，与Linux不同，但是一个完整的虚拟地址空间和物理地址空间的管理思路。
+
+## 物理内存管理数据结构及初始化
 
 彭东《操作系统实战》案例操作系统 定义了几个数据结构来管理内存
+
 1. memarea_t 结构表示一个内存区，逻辑上的概念，并不是硬件上必需的，按功能划分对应硬件区、内核区、应用区。比如虚拟地址主要依赖于 CPU 中的 MMU，但有很多外部硬件能直接和内存交换数据，常见的有 DMA，并且它只能访问低于 24MB 的物理内存。
-2. msadsc_t 表示一个内存页，包含页的状态、页的地址、页的分配记数、页的类型、页的链表。物理内存页有多少就需要有多少个 msadsc_t 结构。
+2. msadsc_t 表示一个内存页，包含页的状态、页的地址、页的分配记数、页的类型、页的链表。**物理内存页有多少就需要有多少个 msadsc_t 结构**。
     ```c
     //内存空间地址描述符标志
     typedef struct s_MSADFLGS
@@ -169,7 +172,152 @@ bool_t mm_merge_pages(memmgrob_t *mmobjp, msadsc_t *freemsa, uint_t freepgs)
 }
 ```
 
+从 MMU 角度看，内存是以页为单位的，但内核中有大量远小于一个页面的内存分配请求。我们用一个内存对象来表示，把一个或者多个内存页面分配出来，作为一个内存对象的容器，在这个容器中容纳相同的内存对象，为此需定义内存对象以及内存对象管理容器的数据结构、初始化、分配、释放、扩容函数。
+
+```c
+typedef struct s_FREOBJH{
+    list_h_t oh_list;     //链表
+    uint_t oh_stus;       //对象状态
+    void* oh_stat;        //对象的开始地址
+}freobjh_t;
+
+//管理内存对象容器占用的内存页面所对应的msadsc_t结构
+typedef struct s_MSCLST
+{
+    uint_t ml_msanr;  //多少个msadsc_t
+    uint_t ml_ompnr;  //一个msadsc_t对应的连续的物理内存页面数
+    list_h_t ml_list; //挂载msadsc_t的链表
+}msclst_t;
+//内存对象容器
+typedef struct s_KMSOB
+{
+    list_h_t so_list;        //链表
+    spinlock_t so_lock;      //保护结构自身的自旋锁
+    uint_t so_stus;          //状态与标志
+    uint_t so_flgs;
+    adr_t so_vstat;          //内存对象容器的开始地址
+    adr_t so_vend;           //内存对象容器的结束地址
+    size_t so_objsz;         //内存对象大小
+    size_t so_objrelsz;      //内存对象实际大小
+    uint_t so_mobjnr;        //内存对象容器中总共的对象个数
+    uint_t so_fobjnr;        //内存对象容器中空闲的对象个数
+    list_h_t so_frelst;      //内存对象容器中空闲的对象链表头
+    list_h_t so_alclst;      //内存对象容器中分配的对象链表头
+    list_h_t so_mextlst;     //内存对象容器扩展kmbext_t结构链表头
+    uint_t so_mextnr;        //内存对象容器扩展kmbext_t结构个数
+    msomdc_t so_mc;          //内存对象容器占用内存页面管理结构
+    void* so_privp;          //本结构私有数据指针
+    void* so_extdp;          //本结构扩展数据指针
+}kmsob_t;
+```
+
 ![](/public/upload/linux/linux_physical_memory.jpg)
+
+## 虚拟地址空间的数据结构及初始化
+
+由于虚拟地址空间非常巨大，我们绝不能像管理物理内存页面那样，一个页面对应一个结构体。虚拟地址空间往往是以区为单位的，比如栈区、堆区，指令区、数据区，这些区内部往往是连续的，区与区之间却间隔了很大空间。
+
+```c
+// kmvarsdsc_t 表示一个虚拟地址区间
+typedef struct KMVARSDSC{
+    spinlock_t kva_lock;        //保护自身自旋锁
+    u32_t  kva_maptype;         //映射类型
+    list_h_t kva_list;          //链表
+    u64_t  kva_flgs;            //相关标志
+    u64_t  kva_limits;
+    void*  kva_mcstruct;        //指向它的上层结构
+    adr_t  kva_start;           //虚拟地址的开始
+    adr_t  kva_end;             //虚拟地址的结束
+    kvmemcbox_t* kva_kvmbox;    //管理这个结构映射的物理页面
+    void*  kva_kvmcobj;
+}kmvarsdsc_t;
+// virmemadrs_t管理了整个虚拟地址空间的 kmvarsdsc_t 结构
+typedef struct s_VIRMEMADRS
+{
+    spinlock_t vs_lock;            //保护自身的自旋锁
+    u32_t  vs_resalin;
+    list_h_t vs_list;              //链表，链接虚拟地址区间
+    uint_t vs_flgs;                //标志
+    uint_t vs_kmvdscnr;            //多少个虚拟地址区间
+    mmadrsdsc_t* vs_mm;            //指向它的上层的数据结构
+    kmvarsdsc_t* vs_startkmvdsc;   //开始的虚拟地址区间
+    kmvarsdsc_t* vs_endkmvdsc;     //结束的虚拟地址区间
+    kmvarsdsc_t* vs_currkmvdsc;    //当前的虚拟地址区间
+    adr_t vs_isalcstart;           //能分配的开始虚拟地址
+    adr_t vs_isalcend;             //能分配的结束虚拟地址
+    void* vs_privte;               //私有数据指针
+    void* vs_ext;                  //扩展数据指针
+}virmemadrs_t;
+// 虚拟地址空间作用于应用程序，而应用程序在操作系统中用进程表示。当然，一个进程有了虚拟地址空间信息还不够，还要知道进程和虚拟地址到物理地址的映射信息，应用程序文件中的指令区、数据区的开始、结束地址信息。这些信息综合起来，才能表示一个进程的完整地址空间。
+typedef struct s_MMADRSDSC
+{
+    spinlock_t msd_lock;               //保护自身的自旋锁
+    list_h_t msd_list;                 //链表
+    uint_t msd_flag;                   //状态和标志
+    uint_t msd_stus;
+    uint_t msd_scount;                 //计数，该结构可能被共享
+    sem_t  msd_sem;                    //信号量
+    mmudsc_t msd_mmu;                  //MMU相关的信息
+    virmemadrs_t msd_virmemadrs;       //虚拟地址空间
+    adr_t msd_stext;                   //应用的指令区的开始、结束地址
+    adr_t msd_etext;
+    adr_t msd_sdata;                   //应用的数据区的开始、结束地址
+    adr_t msd_edata;
+    adr_t msd_sbss;
+    adr_t msd_ebss;
+    adr_t msd_sbrk;                    //应用的堆区的开始、结束地址
+    adr_t msd_ebrk;
+}mmadrsdsc_t;
+// 因为一个物理页msadsc_t 可能会被多个虚拟地址空间共享，所以没直接把 msadsc_t挂载到 kmvarsdsc_t 结构中去。一个 kmvarsdsc_t 结构，必须要有一个 kvmemcbox_t 结构，才能分配物理内存。
+typedef struct KVMEMCBOX 
+{
+    list_h_t kmb_list;        //链表
+    spinlock_t kmb_lock;      //保护自身的自旋锁
+    refcount_t kmb_cont;      //共享的计数器
+    u64_t kmb_flgs;           //状态和标志
+    u64_t kmb_stus;
+    u64_t kmb_type;           //类型
+    uint_t kmb_msanr;         //多少个msadsc_t
+    list_h_t kmb_msalist;     //挂载msadsc_t结构的链表
+    kvmemcboxmgr_t* kmb_mgr;  //指向上层结构
+    void* kmb_filenode;       //指向文件节点描述符
+    void* kmb_pager;          //指向分页器 暂时不使用
+    void* kmb_ext;            //自身扩展数据指针
+}kvmemcbox_t;
+//分配虚拟地址空间的核心函数
+adr_t vma_new_vadrs_core(mmadrsdsc_t *mm, adr_t start, size_t vassize, u64_t vaslimits, u32_t vastype){}
+//释放虚拟地址空间的核心函数
+bool_t vma_del_vadrs_core(mmadrsdsc_t *mm, adr_t start, size_t vassize){}
+//缺页异常处理接口
+sint_t vma_map_fairvadrs(mmadrsdsc_t *mm, adr_t vadrs){   }
+// 一个进程持有一个  mmadrsdsc_t 结构的指针，在这个结构中有虚拟地址区间结构和 MMU 相关的信息
+typedef struct s_THREAD
+{
+    spinlock_t  td_lock;           //进程的自旋锁
+    list_h_t    td_list;           //进程链表 
+    uint_t      td_flgs;           //进程的标志
+    uint_t      td_stus;           //进程的状态
+    uint_t      td_cpuid;          //进程所在的CPU的id
+    uint_t      td_id;             //进程的id
+    uint_t      td_tick;           //进程运行了多少tick
+    uint_t      td_privilege;      //进程的权限
+    uint_t      td_priority;       //进程的优先级
+    uint_t      td_runmode;        //进程的运行模式
+    adr_t       td_krlstktop;      //应用程序内核栈顶地址
+    adr_t       td_krlstkstart;    //应用程序内核栈开始地址
+    adr_t       td_usrstktop;      //应用程序栈顶地址
+    adr_t       td_usrstkstart;    //应用程序栈开始地址
+    mmadrsdsc_t* td_mmdsc;         //地址空间结构
+    context_t   td_context;        //机器上下文件结构
+    objnode_t*  td_handtbl[TD_HAND_MAX];//打开的对象数组
+}thread_t;
+```
+
+每个进程拥有 x86 CPU 的整个虚拟地址空间，这个虚拟地址空间被分成了两个部分，上半部分是所有进程都共享的内核部分 ，里面放着一份内核代码和数据，下半部分是应用程序，分别独立，互不干扰。从**进程的**虚拟地址空间开始，而进程的虚拟地址是由 kmvarsdsc_t 结构表示的，一个 kmvarsdsc_t 结构就表示一个已经分配出去的虚拟地址空间。一个进程所有的 kmvarsdsc_t 结构，要交给进程的 mmadrsdsc_t 结构中的 virmemadrs_t 结构管理。为了管理虚拟地址空间对应的物理内存页面，我们建立了 kvmembox_t 结构，它由 kvmemcboxmgr_t 结构统一管理。在 kvmembox_t 结构中，挂载了物理内存页面对应的 msadsc_t 结构。
+
+整个虚拟地址空间就是由一个个虚拟地址区间组成的。那么不难猜到，分配一个虚拟地址空间就是在整个虚拟地址空间分割出一个区域，而释放一块虚拟地址空间，就是把这个区域合并到整个虚拟地址空间中去。我们分配一段虚拟地址空间，并没有分配对应的物理内存页面，而是等到真正访问虚拟地址空间时，才触发了缺页异常。查找缺页地址对应的 kmvarsdsc_t 结构，没找到说明没有分配该虚拟地址空间，那属于非法访问不予处理；然后，查找 kmvarsdsc_t 结构下面的对应 kvmemcbox_t 结构，它是用来挂载物理内存页面的；最后，分配物理内存页面并建立 MMU 页表映射关系，即调用物理页分配接口分配一个物理内存页面并把对应的 msadsc_t 结构挂载到 kvmemcbox_t 结构上，接着获取 msadsc_t 结构对应内存页面的物理地址，最后是调用 hal_mmu_transform 函数完成虚拟地址到物理地址的映射工作，它主要是建立 MMU 页表。
+
+Linux 系统中用来管理物理内存页面的**伙伴系统**，以及负责分配比页更小的内存对象的 **SLAB 分配器**。
 
 ## 进程
 
@@ -212,7 +360,7 @@ bool_t mm_merge_pages(memmgrob_t *mmobjp, msadsc_t *freemsa, uint_t freepgs)
         void  *stack;   // 指向内核栈的指针
     }
 
-内核使用内存描述符mm_struct来表示进程的地址空间，该描述符表示着进程所有地址空间的信息
+Linux使用mm_struct来表示进程的地址空间，该描述符表示着进程所有地址空间的信息
 
 ![](/public/upload/linux/linux_virtual_address.png)
 

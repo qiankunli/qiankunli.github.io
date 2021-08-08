@@ -23,6 +23,8 @@ keywords: debug
 
 ## 中断
 
+**内核是这样提供服务的**：通过停止应用程序代码运行，进入内核地址空间运行内核代码，然后返回结果。
+
 单机操作系统的系统调用需要「陷入」内核，所谓的陷入（trap）也叫做中断（interrupt），无论内核是什么类型，单机操作系统都需要在启动时将系统调用注册到内存中的一个区域里，这个区域叫做中断向量（Interrupt Vector）或中断描述符表（IDT，Interrupt Descriptor Table）。当然，现代操作系统的中断处理非常复杂，系统调用也很多，因此除了IDT之外，还需要一张系统调用表（SCV，System Call Vector），系统调用通过一个统一的中断入口（如 INT 80）调用某个中断处理程序，由这个中断处理程序通过 SCV 把系统调用分发给内核中不同的函数代码。因此 SCV 在操作系统中的位置和在星际争霸中的位置同样重要。对微内核架构来说，除了 SCV 中的系统调用之外，用户态服务提供什么样的系统能力，同样需要注册到某个区域。
 
 ## 微内核 vs 宏内核
@@ -55,5 +57,64 @@ BIOS 只会加载硬盘上的第 1 个扇区。不过这个扇区仅有 512 字�
 2. 从 vmlinux.bin 文件中 startup32、startup64 函数开始建立新的全局段描述符表和 MMU 页表，切换到长模式下解压 vmlinux.bin.gz。释放出 vmlinux 文件之后，由解析 **elf 格式**的函数进行解析，释放 vmlinux 中的代码段和数据段到指定的内存。然后调用其中的 startup_64 函数，在这个函数的最后调用 Linux 内核的第一个 C 函数x86_64_start_kernel。
 3. Linux 内核第一个 C 函数重新设置 MMU 页表，随后便调用了最有名的 start_kernel 函数， start_kernel 函数中调用了大多数 Linux 内核功能性初始化函数（硬件层、内核层、接口层），在最后调用 rest_init 函数建立了两个内核线程，在其中的 kernel_init 线程建立了第一个用户态进程。
 
+```c
+void start_kernel(void){    
+    char *command_line;    
+    char *after_dashes;
+    //CPU组早期初始化
+    cgroup_init_early();
+    //关中断
+    local_irq_disable();
+    //ARCH层初始化
+    setup_arch(&command_line);
+    //日志初始化      
+    setup_log_buf(0);    
+    sort_main_extable();
+    //陷阱门初始化    
+    trap_init();
+    //内存初始化    
+    mm_init();
+    ftrace_init();
+    //调度器初始化
+    sched_init();
+    //工作队列初始化
+    workqueue_init_early();
+    //RCU锁初始化
+    rcu_init();
+    //IRQ 中断请求初始化
+    early_irq_init();    
+    init_IRQ();    
+    tick_init();    
+    rcu_init_nohz();
+    //定时器初始化 
+    init_timers();    
+    hrtimers_init();
+    //软中断初始化    
+    softirq_init();    
+    timekeeping_init();
+    mem_encrypt_init();
+    //每个cpu页面集初始化
+    setup_per_cpu_pageset();    
+    //fork初始化建立进程的 
+    fork_init();    
+    proc_caches_init();    
+    uts_ns_init();
+    //内核缓冲区初始化    
+    buffer_init();    
+    key_init();    
+    //安全相关的初始化
+    security_init();  
+    //VFS数据结构内存池初始化  
+    vfs_caches_init();
+    //页缓存初始化    
+    pagecache_init();
+    //进程信号初始化    
+    signals_init();    
+    //运行第一个进程 
+    arch_call_rest_init();
+}
+```
+
+**要实现一个功能模块，首先要设计出相应的数据结构(以及这些数据结构的管理数据结构，比如链表等)，基于数据结构设计初始化函数以及该功能模块对应的业务函数**。
 
 任何软件工程，第一个函数总是简单的，因为它是总调用者，像是一个管理者，坐在那里发号施令，自己却是啥活也不干。

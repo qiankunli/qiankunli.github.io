@@ -13,21 +13,58 @@ keywords: linux 进程调度
 * TOC
 {:toc}
 
-作为初学者，了解数据结构之间的组织关系，这远比了解一个数据结构所有字段的作用和细节重要得多。
+作为初学者，了解数据结构之间的组织关系，这远比了解一个数据结构所有字段的作用和细节重要得多。彭东《操作系统实战》中自己实现的os的进程调度部分提供了一个很好的认知思路
+1. 进程数据结构 thread_t，管理结构thrdlst_t/schdata_t/schedclass_t
+2. 初始化：初始化schedclass_t 变量（全局的）。至于初始化thread_t 内部包括分配进程的内核栈与应用程序栈，并对进程的内核栈进行初始化，最后将进程加入调度系统
+3. 实现进程调度器，入口函数krlschedul，获取当前运行的进程krlsched_retn_currthread，选择进程函数krlsched_select_thread，最后是进程切换函数，进程切换过程：我们把当前进程的通用寄存器保存到当前进程的内核栈中；然后，保存 CPU 的 RSP 寄存器到当前进程的机器上下文结构中，并且读取保存在下一个进程机器上下文结构中的 RSP 的值，把它存到 CPU 的 RSP 寄存器中；接着，调用一个函数切换 MMU 页表；最后，从下一个进程的内核栈中恢复下一个进程的通用寄存器。
+3. 进程等待函数 krlsched_wait，设置进程状态为等待状态，让进程从调度系统数据结构中脱离，最后让进程加入到 kwlst_t 等待结构中。
+4. 进程唤醒函数 krlsched_up
+5. 提供一个空转进程
 
 之所以抽象一个执行体（进程/线程/协程）的概念，是要分时使用硬件（cpu和寄存器等）。 调度器就好比教练，线程就好比球员，给线程调度cpu就好比安排哪个球员上球场。
 
 [万字详解Linux内核调度器及其妙用](https://mp.weixin.qq.com/s/gkZ0kve8wOrV5a8Q2YeYPQ)可以试着切换到硬件CPU的视角，这样应用程序和内核，就都变成客体研究对象了，很多逻辑也就清晰了。
 
-[调度系统设计精要](https://mp.weixin.qq.com/s/R3BZpYJrBPBI0DwbJYB0YA)CFS 的调度过程还是由 schedule 函数完成的，该函数的执行过程可以分成以下几个步骤：
-
-1. 关闭当前 CPU 的抢占功能；
-2. 如果当前 CPU 的运行队列中不存在任务，调用 idle_balance 从其他 CPU 的运行队列中取一部分执行；
-3. 调用 pick_next_task 选择红黑树中优先级最高的任务；
-4. 调用 context_switch 切换运行的上下文，包括寄存器的状态和堆栈；
-5. 重新开启当前 CPU 的抢占功能；
-
 ## 数据结构
+
+彭东《操作系统实战》
+```c
+struct task_struct {
+    struct thread_info thread_info;//处理器特有数据 
+    volatile long   state;       //进程状态 
+    void            *stack;      //进程内核栈地址 
+    refcount_t      usage;       //进程使用计数
+    int             on_rq;       //进程是否在运行队列上
+    int             prio;        //动态优先级
+    int             static_prio; //静态优先级
+    int             normal_prio; //取决于静态优先级和调度策略
+    unsigned int    rt_priority; //实时优先级
+    const struct sched_class    *sched_class;//指向其所在的调度类
+    struct sched_entity         se;//普通进程的调度实体
+    struct sched_rt_entity      rt;//实时进程的调度实体
+    struct sched_dl_entity      dl;//采用EDF算法调度实时进程的调度实体
+    struct sched_info       sched_info;//用于调度器统计进程的运行信息 
+    struct list_head        tasks;//所有进程的链表
+    struct mm_struct        *mm;  //指向进程内存结构
+    struct mm_struct        *active_mm;
+    pid_t               pid;            //进程id
+    struct task_struct __rcu    *parent;//指向其父进程
+    struct list_head        children; //链表中的所有元素都是它的子进程
+    struct list_head        sibling;  //用于把当前进程插入到兄弟链表中
+    struct task_struct      *group_leader;//指向其所在进程组的领头进程
+    u64             utime;   //用于记录进程在用户态下所经过的节拍数
+    u64             stime;   //用于记录进程在内核态下所经过的节拍数
+    u64             gtime;   //用于记录作为虚拟机进程所经过的节拍数
+    unsigned long           min_flt;//缺页统计 
+    unsigned long           maj_flt;
+    struct fs_struct        *fs;    //进程相关的文件系统信息
+    struct files_struct     *files;//进程打开的所有文件
+    struct vm_struct        *stack_vm_area;//内核栈的内存区
+  };
+```
+**进程及调度数据结构的组织**：在 task_struct 结构中，会包含至少一个 sched_entity 结构的变量。它其实是 Linux 进程调度系统的一部分，被嵌入到了 Linux 进程数据结构中，与调度器进行关联，能间接地访问进程。我们只要通过 sched_entity 结构变量的地址，减去它在 task_struct 结构中的偏移（由编译器自动计算），就能获取到 task_struct 结构的地址。这样就能达到通过 sched_entity 结构，访问 task_struct 结构的目的了。sched_entity 结构是通过红黑树组织起来的，红黑树的根在 cfs_rq 结构中，cfs_rq 结构又被包含在 rq 结构，每个 CPU 对应一个 rq 结构。
+
+![](/public/upload/linux/thread_sturct_relation.png)
 
 ### 进程部分
 
@@ -316,6 +353,14 @@ static void check_preempt_tick(struct cfs_rq *cfs_rq, struct sched_entity *curr)
 
 ### Schedule
 
+[调度系统设计精要](https://mp.weixin.qq.com/s/R3BZpYJrBPBI0DwbJYB0YA)CFS 的调度过程还是由 schedule 函数完成的，该函数的执行过程可以分成以下几个步骤：
+
+1. 关闭当前 CPU 的抢占功能；
+2. 如果当前 CPU 的运行队列中不存在任务，调用 idle_balance 从其他 CPU 的运行队列中取一部分执行；
+3. 调用 pick_next_task 选择红黑树中优先级最高的任务；
+4. 调用 context_switch 切换运行的上下文，包括寄存器的状态和堆栈；
+5. 重新开启当前 CPU 的抢占功能；
+
 ```c
 // schedule 方法入口
 asmlinkage __visible void __sched schedule(void){
@@ -375,6 +420,8 @@ static __always_inline struct rq *context_switch(struct rq *rq, struct task_stru
 假如进程AB switch_to：在task_struct里面，还有一个成员变量struct thread_struct thread，里面保存了进程切换时的寄存器的值。在switch_to里面，A进程的SP就保存进A进程的task_struct的thread结构中，而B进程的SP就从他的task_struct的thread结构中取出来，加载到CPU的SP栈顶寄存器里面。在switch_to里面，还将这个CPU的current_task指向B进程的task_struct。当switch_to干完了上面的事情，返回的时候，IP就指向了下一行代码finish_task_switch。下面请问，这里的finish_task_switch是B进程的finish_task_switch，还是A进程的finish_task_switch呢？其实是B进程的finish_task_switch，因为当年B进程就是运行到switch_to被切走的，所以现在回来，运行的是B进程的finish_task_switch。其实从CPU的角度来看，这个时候还不区分A还是B的finish_task_switch，在CPU眼里，这就是内核的一行代码。但是代码再往下运行，就能区分出来了，因为finish_task_switch结束，要从schedule函数返回了，那应该是返回到A还是B对应的内核态代码呢？根据函数调用栈的原理，栈顶指针指向哪行，就返回哪行，别忘了前面SP已经切换成为B进程的了，已经指向B的内核栈了，所以返回的是B内核态代码。
 
 虽然指令指针寄存器IP还是一行一行代码的执行下去，但由于所有的调度都会走schedule函数，IP没变，但是SP变了，进程切换就完成了。
+
+什么是调度延迟？其实就是保证每一个可运行的进程，都至少运行一次的时间间隔。假设系统中有 3 个可运行进程，每个进程都运行 10ms，那么调度延迟就是 30ms；随着进程的增加，每个进程分配的时间在减少，进程调度次数会增加，调度器占用的时间就会增加。因此，CFS 调度器的调度延迟时间的设定并不是固定的。当运行进程少于 8 个的时候，调度延迟是固定的 6ms 不变。当运行进程个数超过 8 个时，就要保证每个进程至少运行一段时间，才被调度。这个“至少一段时间”叫作最小调度粒度时间。在 CFS 默认设置中，最小调度粒度时间是 0.75ms
 
 ## 其它
 

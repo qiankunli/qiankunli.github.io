@@ -61,9 +61,36 @@ linux-1.2.13
 
 网卡中断处理程序为网络帧分配的，内核数据结构 sk_buff 缓冲区；是一个维护网络帧结构的双向链表，链表中的每一个元素都是一个网络帧（Packet）。**虽然 TCP/IP 协议栈分了好几层，但上下不同层之间的传递，实际上只需要操作这个数据结构中的指针，而无需进行数据复制**。
 
-## 网络与文件操作
+## 数据结构
 
-![](/public/upload/linux/vfs_fd.png)
+### 套接字
+
+每个程序使用的套接字都有一个 struct socket 数据结构与 struct sock 数据结构的实例，socket 与sock 一一对应。
+```c
+struct socket { 
+    socket_state            state;  // 套接字的状态
+    unsigned long           flags;  // 套接字的设置标志。存放套接字等待缓冲区的状态信息，其值的形式如SOCK_ASYNC_NOSPACE等
+    struct fasync_struct    *fasync_list;  // 等待被唤醒的套接字列表，该链表用于异步文件调用
+    struct file             *file;  // 套接字所属的文件描述符
+    struct sock             *sk;  // 指向存放套接字属性的结构指针
+    wait_queue_head_t       wait;  //套接字的等待队列
+    short                   type;  // 套接字的类型。其取值为SOCK_XXXX形式
+    const struct proto_ops *ops;  // 套接字层的操作函数块
+}
+struct sock {
+    ...
+    struct sk_buff_head	write_queue,	receive_queue;
+    ...	
+}
+```
+
+套接字的连接建立起来后，用户进程就可以使用常规文件操作访问套接字了。每个套接字都分配了一个该类型的 inode，inode 和 socket 的链接是通过直接分配一个辅助数据结构来socket_slloc实现的
+```c
+struct socket_slloc {
+  struct socket socket;
+  struct inode vfs_inode;
+}
+```
 
 VFS为文件系统抽象了一套API，实现了该系列API就可以把对应的资源当作文件使用，当调用socket函数的时候，我们拿到的不是socket本身，而是一个文件描述符fd。
 
@@ -106,9 +133,9 @@ struct inode{
 
 也就是说，对linux系统，一切皆文件，由struct file描述，通过file->ops指向具体操作，由file->inode 存储一些元信息。对于ext文件系统，是载入内存的超级块、磁盘块等数据。对于网络通信，则是待发送和接收的数据块、网络设备等信息。从这个角度看，**struct socket和struct ext_inode_info 等是类似的。**
 
-## 数据结构
-
 ### sk_buff结构
+
+当在内核中对数据包进行时，**内核还需要一些其他的数据来管理数据包和操作数据包**（就像加入jvm堆的数据必须有mark word一样），例如协议之间的交换信息，数据的状态，时间等。在发送数据时，在套接字层创建了 Socket Buffer 缓冲区与管理数据结构，存放来自应用程序的数据。在接收数据包时，Socket Buffer 则在网络设备的驱动程序中创建，存放来自网络的数据。在发送和接受数据的过程中，各层协议的头信息会不断从数据包中插入和去掉，sk_buff 结构中描述协议头信息的地址指针也会被不断地赋值和复位。
 
 sk_buff部分字段如下，
 
@@ -124,7 +151,6 @@ struct sk_buff {
     struct timeval      stamp;  
     struct net_device   *dev;  
     struct net_device   *real_dev;  
-    
     union {  
         struct tcphdr   *th;  
         struct udphdr   *uh;  
@@ -133,7 +159,6 @@ struct sk_buff {
         struct iphdr    *ipiph;  
         unsigned char   *raw;  
     } h;  // Transport layer header 
-    
     union {  
         struct iphdr    *iph;  
         struct ipv6hdr  *ipv6h;  
@@ -177,7 +202,9 @@ struct sk_buff_head {
 };
 ```
 
-![](/public/upload/network/sk_buff.png)
+TCP/IP 协议栈处理完输入数据包后，将数据包交给套接字层，放在套接字的接收缓冲区队列（sk_rcv_queue）。然后数据包从套接字层离开内核，送给应用层等待数据包的用户程序。用户程序向外发送的数据包缓存在套接字的传送缓冲区队列（sk_write_queue），从套接字层进入内核地址空间。
+
+
 
 ### 网络协议栈实现——数据struct 和 协议struct
 

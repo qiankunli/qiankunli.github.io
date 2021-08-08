@@ -17,15 +17,92 @@ keywords: network
 
 许式伟：存储它不应该只能保存一个文件，而是应该是多个。既然是多个，就需要组织这些文件。那么，怎么组织呢？操作系统的设计者们设计了文件系统这样的东西，来组织这些文件。虽然文件系统的种类有很多（比如：FAT32、NTFS、EXT3、EXT4 等等），但是它们有统一的抽象：文件系统是一颗树；节点要么是目录，要么是文件；文件必然是叶节点；根节点是目录，目录可以有子节点。
 
+## 彭东《操作系统实战》
+
+**文件系统只是一个设备**，文件系统一定要有储存设备，HD 机械硬盘、SSD 固态硬盘、U 盘、各种 TF 卡等都属于存储设备，这些设备上的文件储存格式都不相同，甚至同一个硬盘上不同的分区的储存格式也不同。这个储存格式就是相应文件系统在储存设备上组织储存文件的方式。不难发现让文件系统成为 Cosmos 内核中一部分，是个非常愚蠢的想法。因此：文件系统组件是独立的与内核分开的；第二，操作系统需要动态加载和删除不同的文件系统组件。
+
+关于文件系统存放文件数据的格式，类 UNIX 系统和 Windows 系统都采用了相同的方案，那就是**逻辑上认为一个文件就是一个可以动态增加、减少的线性字节数组**。我们如何把这个逻辑上的文件数据字节数组，映射到具体的储存设备上呢？现在的机械硬盘、SSD 固态硬盘、TF 卡，它们都是以储存块为单位储存数据的，一个储存块的大小可以是 512、1024、2048、4096 字节，访问这些储存设备的最小单位也是一个储存块，不像内存设备可以最少访问一个字节。
+
+现在 PC 机上的文件数量都已经上十万的数量级了，如果把十万个文件顺序地排列在一起，要找出其中一个文件，那是非常困难的，所以，需要一个叫文件目录或者叫文件夹的东西，我们习惯称其为目录。这样我们就可以用不同的目录来归纳不同的文件。可以看出，整个文件层次结构就像是一棵倒挂的树。
+
+```c
+// 文件系统的超级块或者文件系统描述块
+typedef struct s_RFSSUBLK
+{
+    spinlock_t rsb_lock;//超级块在内存中使用的自旋锁
+    uint_t rsb_mgic;//文件系统标识
+    uint_t rsb_vec;//文件系统版本
+    uint_t rsb_flg;//标志
+    uint_t rsb_stus;//状态
+    size_t rsb_sz;//该数据结构本身的大小
+    size_t rsb_sblksz;//超级块大小
+    size_t rsb_dblksz;//文件系统逻辑储存块大小，我们这里用的是4KB
+    uint_t rsb_bmpbks;//位图的开始逻辑储存块
+    uint_t rsb_bmpbknr;//位图占用多少个逻辑储存块
+    uint_t rsb_fsysallblk;//文件系统有多少个逻辑储存块
+    rfsdir_t rsb_rootdir;//根目录，后面会看到这个数据结构的
+}rfssublk_t;
+// 目录
+typedef struct s_RFSDIR
+{
+    uint_t rdr_stus;//目录状态
+    uint_t rdr_type;//目录类型，可以是空类型、目录类型、文件类型、已删除的类型
+    uint_t rdr_blknr;//指向文件数据管理头的块号，不像内存可以用指针，只能按块访问
+    char_t rdr_name[DR_NM_MAX];//名称数组，大小为DR_NM_MAX
+}rfsdir_t;
+// 文件，包含文件名、状态、类型、创建时间、访问时间、大小，更为重要的是要知道该文件使用了哪些逻辑储存块。
+typedef struct s_fimgrhd
+{
+    uint_t fmd_stus;//文件状态
+    uint_t fmd_type;//文件类型：可以是目录文件、普通文件、空文件、已删除的文件
+    uint_t fmd_flg;//文件标志
+    uint_t fmd_sfblk;//文件管理头自身所在的逻辑储存块
+    uint_t fmd_acss;//文件访问权限
+    uint_t fmd_newtime;//文件的创建时间，换算成秒
+    uint_t fmd_acstime;//文件的访问时间，换算成秒
+    uint_t fmd_fileallbk;//文件一共占用多少个逻辑储存块
+    uint_t fmd_filesz;//文件大小
+    uint_t fmd_fileifstbkoff;//文件数据在第一块逻辑储存块中的偏移
+    uint_t fmd_fileiendbkoff;//文件数据在最后一块逻辑储存块中的偏移
+    uint_t fmd_curfwritebk;//文件数据当前将要写入的逻辑储存块
+    uint_t fmd_curfinwbkoff;//文件数据当前将要写入的逻辑储存块中的偏移
+    filblks_t fmd_fleblk[FBLKS_MAX];//文件占用逻辑储存块的数组，一共32个filblks_t结构
+    uint_t fmd_linkpblk;//指向文件的上一个文件管理头的逻辑储存块
+    uint_t fmd_linknblk;//指向文件的下一个文件管理头的逻辑储存块
+}fimgrhd_t;
+// 基于上述结构的驱动程序
+drvstus_t rfs_entry(driver_t* drvp,uint_t val,void* p){……}
+drvstus_t rfs_exit(driver_t* drvp,uint_t val,void* p){……}
+drvstus_t rfs_open(device_t* devp,void* iopack){……}
+drvstus_t rfs_close(device_t* devp,void* iopack){……}
+drvstus_t rfs_read(device_t* devp,void* iopack){……}
+drvstus_t rfs_write(device_t* devp,void* iopack){……}
+drvstus_t rfs_lseek(device_t* devp,void* iopack){……}
+drvstus_t rfs_ioctrl(device_t* devp,void* iopack){……}
+drvstus_t rfs_dev_start(device_t* devp,void* iopack){……}
+drvstus_t rfs_dev_stop(device_t* devp,void* iopack){……}
+drvstus_t rfs_set_powerstus(device_t* devp,void* iopack){……}
+drvstus_t rfs_enum_dev(device_t* devp,void* iopack){……}
+drvstus_t rfs_flush(device_t* devp,void* iopack){……}
+drvstus_t rfs_shutdown(device_t* devp,void* iopack){……}
+```
+格式化操作并不是把设备上所有的空间都清零，而是在这个设备上重建了文件系统用于管理文件的那一整套数据结构。
+
 ## vfs 数据结构 / 两个关系
 
 [从文件 I/O 看 Linux 的虚拟文件系统](https://www.ibm.com/developerworks/cn/linux/l-cn-vfs/index.html)
 
-![](/public/upload/linux/linux_vfs_xmind.png)
+![](/public/upload/linux/linux_vfs.png)
 
 ### 进程与超级块、文件、索引结点、目录项的关系
 
+VFS 为了屏蔽各个文件系统的差异，就必须要定义一组通用的数据结构，规范各个文件系统的实现，每种结构都对应一套回调函数集合，这是典型的面向对象的设计方法。这些数据结构包含描述文件系统信息的超级块、表示文件名称的目录结构、描述文件自身信息的索引节点结构、表示打开一个文件的实例结构。
+
 ![](/public/upload/linux/linux_vfs_2.jpg)
+
+**超级重点**：有了超级块和超级块函数集合结构，VFS 就能让一个文件系统的信息和表示变得规范了。也就是说，文件系统只要实现了 super_block 和super_operations 两个结构，就可以插入到 VFS 中了。Linux 系统中所有文件都是用目录组织的，对应数据结构 dentry 和dentry_operations。VFS 用 inode 结构表示一个文件索引结点，它里面包含文件权限、文件所属用户、文件访问和修改时间、文件数据块号等一个文件的全部信息，一个 inode 结构就对应一个文件，但这个 inode 结构是 VFS 使用的，跟某个具体文件系统上的“inode”结构并不是一一对应关系。inode 结构还有一套函数集合inode_operations，用于具体文件系统根据自己特有的信息，构造出 VFS 使用的 inode 结构。应用程序直接处理的就是文件，而不是超级块、索引节点或目录项，VFS 设计了一个文件对象结构file表示进程已打开的文件，包含了我们非常熟悉的信息，如访问模式、当前读写偏移等。进程每打开一个文件就会建立一个 file 结构实例，并将其地址放入数组中，最后返回对应的数组下标，就是我们调用 open 函数返回的那个整数。对于 file 结构，也有对应的函数集合 file_operations 结构。
+
+**超级块、目录结构、文件索引节点，打开文件的实例，通过四大对象就可以描述抽象出一个文件系统了。而四大对象的对应的操作函数集合，又由具体的文件系统来实现，这两个一结合，一个文件系统的状态和行为都具备了**。
 
 linux系统的进程结构体有以下几个字段
 
