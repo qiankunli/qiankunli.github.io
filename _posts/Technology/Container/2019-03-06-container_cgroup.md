@@ -176,6 +176,9 @@ $ docker inspect 472abbce32a5 --format '{{.HostConfig.CpuShares}} {{.HostConfig.
 51 10000 100000
 ```
 
+### Qos
+
+[Kubernetes Resources Management – QoS, Quota, and LimitRange](https://www.cncf.io/blog/2020/06/10/kubernetes-resources-management-qos-quota-and-limitrangeb/)A node can be overcommitted when it has pod scheduled that make no request, or when the sum of limits across all pods on that node exceeds the available machine capacity. In an **overcommitted environment**, the pods on the node may attempt to use more compute resources than the ones available at any given point in time.When this occurs, the node must give priority to one container over another. Containers that have the lowest priority are terminated/throttle first. The entity used to make this decision is referred as the Quality of Service (QoS) Class.
 
 ## 内存 
 

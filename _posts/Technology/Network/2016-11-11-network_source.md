@@ -15,8 +15,6 @@ keywords: network
 
 以下来自linux1.2.13源码，算是参见[Linux1.0](https://github.com/wanggx/Linux1.0.git)的学习笔记。
 
-linux的网络部分由网卡的驱动程序和kernel的网络协议栈部分组成，它们相互交互，完成数据的接收和发送。
-
 ## 源码目录
 
 ```

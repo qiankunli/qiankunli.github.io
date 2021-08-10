@@ -373,7 +373,7 @@ DiscoveryServer 启动时 触发sendPushes ，负责消费PushQueue ==> doSendPu
 为什么要用pilot-agent？负责Envoy的生命周期管理（生老病死）
 
 1. 启动envoy
-2. 热更新envoy，poilt-agent只负责启动另一个envoy进程，其他由新旧两个envoy自行处理
+2. 热更新envoy，poilt-agent只负责启动另一个envoy进程，其他由新旧两个envoy自行处理 [endless 如何实现不停机重启 Go 程序？](https://www.cnblogs.com/luozhiyun/p/15038401.html)
 3. 抢救envoy
 4. 优雅关闭envoy
 
