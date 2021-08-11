@@ -201,7 +201,7 @@ POSIX表示可移植操作系统接口（Portable Operating System Interface of 
 ![](/public/upload/linux/glibc_systemcall_kernel.jpg)
 
 
-1.  glibc 的 syscal.list 列出 glibc 函数对应的系统调用
+1. glibc 的 syscal.list 列出 glibc 函数对应的系统调用
 2. glibc 的脚本 make_syscall.sh 根据 syscal.list 生成对应的宏定义(函数映射到系统调用)
 3. glibc 的 syscal-template.S 使用这些宏, 定义了系统调用的调用方式(也是通过宏)
 4. 其中会调用 DO_CALL (也是一个宏), 32位与 64位实现不同
@@ -237,6 +237,55 @@ glibc 里面的 open 函数
     # define ENTER_KERNEL int $0x80
 
 函数传参到底层就是寄存器传参了。glibc 让我们完全以C语言的方式与内核交互，屏蔽了系统调用表、软中断、寄存器等硬件细节。
+
+《操作系统实战》Cosmos 示例操作系统：int 指令提供了应用程序进入操作系统内核函数的底层机制；寄存器解决参数传递问题（个系统服务接口函数不会超过 5 个参数）最终由 C 语言中嵌入汇编代码的方式来实现。PS： 找一下一段汇编是一个c函数的感觉
+
+```c
+//传递一个参数所用的宏
+#define API_ENTRY_PARE1(intnr,rets,pval1) \
+__asm__ __volatile__(\
+         "movq %[inr],%%rax\n\t"\//系统服务号
+         "movq %[prv1],%%rbx\n\t"\//第一个参数
+         "int $255 \n\t"\//触发中断
+         "movq %%rax,%[retval] \n\t"\//处理返回结果
+         :[retval] "=r" (rets)\
+         :[inr] "r" (intnr),[prv1]"r" (pval1)\
+         :"rax","rbx","cc","memory"\
+    )
+//传递四个参数所用的宏    
+#define API_ENTRY_PARE4(intnr,rets,pval1,pval2,pval3,pval4) \
+__asm__ __volatile__(\
+         "movq %[inr],%%rax \n\t"\//系统服务号
+         "movq %[prv1],%%rbx \n\t"\//第一个参数
+         "movq %[prv2],%%rcx \n\t"\//第二个参数
+         "movq %[prv3],%%rdx \n\t"\//第三个参数
+         "movq %[prv4],%%rsi \n\t"\//第四个参数
+         "int $255 \n\t"\//触发中断
+         "movq %%rax,%[retval] \n\t"\//处理返回结果
+         :[retval] "=r" (rets)\
+         :[inr] "r" (intnr),[prv1]"g" (pval1),\
+         [prv2] "g" (pval2),[prv3]"g" (pval3),\
+         [prv4] "g" (pval4)\
+         :"rax","rbx","rcx","rdx","rsi","cc","memory"\
+    )
+//示例：时间库函数
+sysstus_t api_time(buf_t ttime)
+{
+    sysstus_t rets;
+    API_ENTRY_PARE1(INR_TIME,rets,ttime);//处理参数，执行int指令 
+    return rets;
+}
+// 根据 INR_TIME 查询系统服务表 得到krlsvetabl_time 入口函数
+sysstus_t krlsvetabl_time(uint_t inr, stkparame_t *stkparv)
+{
+    if (inr != INR_TIME)//判断是否时间服务号
+    {
+        return SYSSTUSERR;
+    }
+    //调用真正时间服务函数 
+    return krlsve_time((time_t *)stkparv->parmv1);
+}
+```
 
 ## 输入输出
 

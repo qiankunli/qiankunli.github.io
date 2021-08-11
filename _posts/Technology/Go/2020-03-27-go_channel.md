@@ -13,6 +13,8 @@ keywords: Go defer
 * TOC
 {:toc}
 
+[通信原语](https://golang.design/under-the-hood/zh-cn/part1basic/ch03lang/chan/)Go 语言中 Channel 与 Select 语句受到 1978 年 CSP 原始理论的启发。 语言设计中，Goroutine 就是 CSP 理论中的并发实体， 而 Channel 则对应 CSP 中输入输出指令的消息信道，**Select 语句则是 CSP 中守卫和选择指令的组合**。Channel 与 Select 是 Go 语言中提供的语言级的、基于消息传递的同步原语。
+
 应用
 
 1. channel 事先创建好 

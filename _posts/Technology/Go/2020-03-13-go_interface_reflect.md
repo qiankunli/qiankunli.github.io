@@ -25,6 +25,20 @@ You must do your best to understand what could change and use interfaces to deco
 
 鸭子类型，是动态编程语言的一种对象推断策略，它更关注对象能如何被使用，而不是对象的类型本身。Go 语言作为一门现代静态语言，是有后发优势的。它引入了动态语言的便利，同时又会进行静态语言的类型检查。 [Go是如何判断实现了interface](https://mp.weixin.qq.com/s/qH9HDEelHGi96u-tkiOPdQ)
 
+一个语言的类型系统 经常需要 一个“地位超然”的类型，可以表示任何类型，比如void* 或者 Object， 但真正在使用这个 类型的变量时，需要判断其真实类型，在类型转换后才能使用，所以会有类型断言的需求。
+
+```go
+func xx(p interface){
+    if  v,ok := p.(string);ok{
+        xxx
+    }
+    switch v:=p.(type){
+        case int:
+        case string:
+    }
+}
+```
+
 ## 值接收者和指针接收者
 
 方法带不带指针：`(p *Person)` refers to a pointer to the created instance of the Person struct. it is like using the keyword `this` in Java or `self` in Python when referring to the pointing object.
