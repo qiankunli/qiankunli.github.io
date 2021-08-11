@@ -23,7 +23,7 @@ You must do your best to understand what could change and use interfaces to deco
 
 [深度解密Go语言之关于 interface 的 10 个问题](https://mp.weixin.qq.com/s/EbxkBokYBajkCR-MazL0ZA)
 
-鸭子类型，是动态编程语言的一种对象推断策略，它更关注对象能如何被使用，而不是对象的类型本身。Go 语言作为一门现代静态语言，是有后发优势的。它引入了动态语言的便利，同时又会进行静态语言的类型检查。
+鸭子类型，是动态编程语言的一种对象推断策略，它更关注对象能如何被使用，而不是对象的类型本身。Go 语言作为一门现代静态语言，是有后发优势的。它引入了动态语言的便利，同时又会进行静态语言的类型检查。 [Go是如何判断实现了interface](https://mp.weixin.qq.com/s/qH9HDEelHGi96u-tkiOPdQ)
 
 ## 值接收者和指针接收者
 
