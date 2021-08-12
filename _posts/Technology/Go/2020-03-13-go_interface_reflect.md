@@ -19,6 +19,28 @@ interface，接口，restful接口，SQL 也是一种接口
 
 You must do your best to understand what could change and use interfaces to decouple.
 
+Go 的类型系统不太常见，而且非常简单。内建类型包括结构体、函数和接口。 任何实现了接口的方法的类型都可以成为实现了该接口。类型可以被隐式的从表达式中推导， 而且不需要被显式的指定。 有关接口的特殊处理以及隐式的类型推导使得 Go 看起来**像是**一种轻量级的动态类型语言。
+
+运行时类型结构（类似于jvm的kclass？）
+
+```go
+type _type struct {
+	size       uintptr
+	ptrdata    uintptr // size of memory prefix holding all pointers
+	hash       uint32
+	tflag      tflag
+	align      uint8
+	fieldAlign uint8
+	kind       uint8 // 类型
+	// function for comparing objects of this type (ptr to object A, ptr to object B) -> ==?
+	equal func(unsafe.Pointer, unsafe.Pointer) bool
+	// gcdata stores the GC type data for the garbage collector. If the KindGCProg bit is set in kind, gcdata is a GC program. Otherwise it is a ptrmask bitmap. See mbitmap.go for details.
+	gcdata    *byte
+	str       nameOff
+	ptrToThis typeOff
+}
+```
+
 ## interface
 
 [深度解密Go语言之关于 interface 的 10 个问题](https://mp.weixin.qq.com/s/EbxkBokYBajkCR-MazL0ZA)

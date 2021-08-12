@@ -13,14 +13,17 @@ keywords: Go goroutine scheduler
 * TOC
 {:toc}
 
-过去的语言（如C语言）只是**提供标准的库**，让你访问操作系统的线程管理功能，包括信号量、同步互斥什么的。Java语言增加了一些**专门处理多线程的元素**，比如synchronized关键字。go语言又更进一步，把操作系统的线程进行了封装，变成了轻量级的goroutine。
-
-[万字长文深入浅出 Golang Runtime](https://zhuanlan.zhihu.com/p/95056679)调度在计算机中是分配工作所需资源的方法，linux的调度为CPU找到可运行的线程，而Go的调度是为M（线程）找到P（内存、执行票据）和可运行的G。
-
-
 [The Go scheduler](https://morsmachine.dk/go-scheduler)为什么Go 运行时需要一个用户态的调度器？
 1. 线程调度成本高，比如context switch比如陷入内核执行，如创建一个 Goroutine 的栈内存消耗为 2 KB，而 thread 占用 1M 以上空间
 2. 操作系统在Go模型下不能做出好的调度决策。os 只能根据时间片做一些简单的调度。
+
+[调度的本质](https://mp.weixin.qq.com/s/5E5V56wazp5gs9lrLvtopA)Go 调度的本质是一个生产-消费流程，生产端是正在运行的 goroutine 执行 go func(){}() 语句生产出 goroutine 并塞到三级队列中去（包含P的runnext），消费端则是 Go 进程中的 m 在不断地执行调度循环。运行时(runtime)能够将goroutine多路复用到一个小的线程池中。这个观点非常新颖，这种熟悉加意外的效果其实就是你成长的时机。
+
+![](/public/upload/go/go_scheduler_overview.png)
+
+调度器的任务是给不同的工作线程 (worker thread) 分发可供运行的（ready-to-run）Goroutine。 
+
+[万字长文深入浅出 Golang Runtime](https://zhuanlan.zhihu.com/p/95056679)调度在计算机中是分配工作所需资源的方法，linux的调度为CPU找到可运行的线程，而Go的调度是为M（线程）找到P（内存、执行票据）和可运行的G。
 
 ## 调度模型的演化
 
@@ -96,8 +99,8 @@ static void schedule(void) {
 
 ![](/public/upload/go/go_scheduler_gpm.jpg)
  
- **为什么引入Processor 的概念？为什么把全局队列打散？**
- 1. 对全局队列的操作均需要竞争同一把锁，mutex 需要保护所有与 goroutine 相关的操作（创建、完成、重排等）， 导致伸缩性不好. 
+ **为什么引入Processor 的概念？为什么把全局队列打散？** 它存在的意义在于实现工作窃取（work stealing）算法
+ 1. 在没有 P 的情况下，所有的 G 只能放在一个全局的队列中。对全局队列的操作均需要竞争同一把锁，mutex 需要保护所有与 goroutine 相关的操作（创建、完成、重排等）， 导致伸缩性不好. 
  2. GM 模型下一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。
 
  [The Go scheduler](https://morsmachine.dk/go-scheduler)为什么我们需要P？我们不能把任务队列直接挂载到M上而去掉P吗？就像linux 那样为每个cpu维护了一个 runqueue 结构
@@ -106,9 +109,6 @@ static void schedule(void) {
  
  答案是不行。如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行。将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行。对runq 及相关信息进行抽象 得到P，我们通过P把任务队列挂载到其它线程中。**M 并不保留 G 状态，这是 G 可以跨 M 调度的基础**。
  
-有了P 之后，一些数据结构（跨协程的） 就顺势放在了P 中，包括与性能追踪、内存分配(mache)、垃圾回收(gcWork)和计时器相关的字段。
-
-
 
 [Go: Goroutine, OS Thread and CPU Management](https://medium.com/a-journey-with-go/go-goroutine-os-thread-and-cpu-management-2f5a5eaf518a) 来讲述GPM时，用到了 orchestration 这个词,   Go has its own scheduler to **distribute goroutines over the threads**. This scheduler defines three main concepts
 
@@ -166,7 +166,7 @@ M代表内核级线程，一个M就是一个线程，goroutine就是跑在M之�
 
 ```go
 type m struct {
-	g0   *g         // 持有调度栈的 Goroutine
+	g0   *g         // 用于执行调度指令的 Goroutine
     curg *g         // 在当前线程上运行的用户 Goroutine
     p             puintptr  // 正在运行代码的处理器 p
 	nextp         puintptr  // 暂存的处理器 nextp
@@ -186,6 +186,8 @@ g0 是一个运行时中比较特殊的 Goroutine，它会深度参与运行时�
 
 
 P全称是Processor，处理器，表示调度的上下文，它可以被看做一个运行于线程 M 上的本地调度器，所以它维护了一个goroutine队列（环形链表），里面存储了所有需要它来执行的goroutine。通过处理器 P 的调度，每一个内核线程都能够执行多个 Goroutine，它能在 Goroutine 进行一些 I/O 操作时及时切换，提高线程的利用率。
+
+P 整个结构除去 本地 G 队列外，就是一些性能追踪、内存分配(mcache)、统计、调试、GC 辅助的字段了。
 
 ```go
 struct P {
@@ -215,7 +217,7 @@ p 结构体中的状态 status 可选值
 
 ### Sched
 
-go java 都有runtime，runtime 不只是一对一辅助执行代码，本身也会运行很多协程/线程，以提高io、定时器、gc等的执行效率，为上层高级特性提供支持。在目前的runtime中，线程、处理器、网络轮询器、运行队列、全局内存分配器状态、内存分配缓存和垃圾收集器都是全局资源。
+调度器，所有 Goroutine 被调度的核心，存放了调度器持有的全局资源，以及访问这些资源需要的锁。
 
 [Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)要实现对goroutine的调度，仅仅有g结构体对象是不够的，至少还需要一个存放所有（可运行）goroutine的容器，便于工作线程寻找需要被调度起来运行的goroutine，于是Go调度器又引入了schedt结构体，一方面用来保存调度器自身的状态信息，另一方面它还拥有一个用来保存goroutine的运行队列。因为每个Go程序只有一个调度器，所以在每个Go程序中schedt结构体只有一个实例对象，该实例对象在源代码中被定义成了一个共享的全局变量，这样每个工作线程都可以访问它以及它所拥有的goroutine运行队列，我们称这个运行队列为全局运行队列。
 
@@ -269,6 +271,14 @@ g0  g                   // m0的g0，也就是m0.g0 = &g0
 此外 g0 has a fix and larger stack. This allows Go to perform operations where a bigger stack is needed. 比如 Goroutine creation, Defer functions allocations, Garbage collector operations
 
 ## 补充
+
+过去的语言（如C语言）只是**提供标准的库**，让你访问操作系统的线程管理功能，包括信号量、同步互斥什么的。Java语言增加了一些**专门处理多线程的元素**，比如synchronized关键字。go语言又更进一步，把操作系统的线程进行了封装，变成了轻量级的goroutine。
+
+goroutine一些重要设计：
+1. 堆栈开始很小（只有 4K），但可按需自动增长；
+2. 坚决干掉了 “线程局部存储（TLS）” 特性的支持，让执行体更加精简；
+3. 提供了同步、互斥和其他常规执行体间的通讯手段，包括大家非常喜欢的 channel；
+4. 提供了几乎所有重要的系统调用（尤其是 IO 请求）的包装。
 
 [Scheduling In Go : Part I - OS Scheduler](https://www.ardanlabs.com/blog/2018/08/scheduling-in-go-part1.html)
 [Scheduling In Go : Part II - Go Scheduler](https://www.ardanlabs.com/blog/2018/08/scheduling-in-go-part2.html)
