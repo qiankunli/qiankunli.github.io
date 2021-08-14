@@ -200,6 +200,7 @@ POSIX表示可移植操作系统接口（Portable Operating System Interface of 
 
 ![](/public/upload/linux/glibc_systemcall_kernel.jpg)
 
+syscal和 int 指令一样，都会发生特权级切换，都可以让 CPU 跳转到特定的地址上，只不过不经过中断门，系统调用返回时要用 sysexit 指令。intel体系的系统调用限制最多六个参数，参数和返回值（rax）都通过寄存器传递。
 
 1. glibc 的 syscal.list 列出 glibc 函数对应的系统调用
 2. glibc 的脚本 make_syscall.sh 根据 syscal.list 生成对应的宏定义(函数映射到系统调用)

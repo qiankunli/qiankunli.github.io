@@ -13,6 +13,37 @@ keywords: kafka
 * TOC
 {:toc}
 
+”有则返回，无则查db“的基本思路
+
+```java
+cache.get(key){
+	value = loadFromCache(key);
+	if(null != value){
+		return value;
+	}
+	value = loader.load(key);
+}
+loader.load(key){
+	// 此处是竞争点，得有线程安全保护，线程发现有其它线程在查询key时，放弃执行，直接等待结果
+	value = loadFromDB(key);	
+	storeToCache(value);
+	
+}
+// 增强版本
+loader.load(key){
+	// map<key,future> futureMap 
+	Future future = futureMap.get(key);
+	if(null != future){
+		value = loadFromDB(key);	
+		storeToCache(value);
+	}{
+		future.get();
+	}
+}
+```
+
+## Cache的核心是LocalCache
+
 [Guava LocalCache 缓存介绍及实现源码深入剖析](https://ketao1989.github.io/2014/12/19/Guava-Cache-Guide-And-Implement-Analyse/)
 
 guava LocalCache与ConcurrentHashMap有以下不同
@@ -21,9 +52,6 @@ guava LocalCache与ConcurrentHashMap有以下不同
 2. 在Cache中，使用ReferenceEntry来封装键值对，并且对于值来说，还额外实现了ValueReference引用对象来封装对应Value对象。
 3. 在Cache 中支持过期 + 自动loader机制，这也使得其加锁方式与ConcurrentHashMap 不同。
 4. 在Cache中，在segment 粒度上支持了LRU机制， 体现在Segment上就是 writeQueue 和 accessQueue。队列中的元素按照访问或者写时间排序，新的元素会被添加到队列尾部。如果，在队列中已经存在了该元素，则会先delete掉，然后再尾部add该节点
-
-
-## Cache的核心是LocalCache
 
 ![](/public/upload/java/guava_cache.png)
 
@@ -138,7 +166,7 @@ segment 简单说也是数组加链表，只是元素类型是ReferenceEntry，�
 
 ### 请求合并的实现——waitForLoadingValue
 
-loadingholder 本质是SettingFuture
+**loadingholder 本质是SettingFuture**
 
     V waitForLoadingValue(ReferenceEntry<K, V> e, K key, ValueReference<K, V> valueReference)
         throws ExecutionException {
