@@ -248,4 +248,6 @@ func (tc *TFController) createNewService(...) {
 
 ## Running jobs with gang-scheduling
 
-Take tf-operator for example, enable gang-scheduling in tf-operator by setting true to `--enable-gang-scheduling` flag. Volcano scheduler and operator in Kubeflow achieve gang-scheduling by using PodGroup. operator will create the PodGroup of the job automatically. operator 会创建PodGroup，Volcano scheduler（较早版本是kube-batch）  会根据PodGroup 实现gang-scheduling，TFJob yaml 本身无区别。
+Take tf-operator for example, enable gang-scheduling in tf-operator by setting true to `--enable-gang-scheduling` flag. Volcano scheduler and operator in Kubeflow achieve gang-scheduling by using PodGroup. operator will create the PodGroup of the job automatically. operator 会创建PodGroup，Volcano scheduler  会根据PodGroup 实现gang-scheduling，TFJob yaml 本身无区别。
+
+至于是 Volcano 还是kube-batch ，是默认 Volcano 还是在yaml 中写schedulerName 不同的tf-operator版本有点不同。 

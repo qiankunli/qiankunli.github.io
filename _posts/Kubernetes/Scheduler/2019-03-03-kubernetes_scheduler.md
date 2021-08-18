@@ -160,6 +160,8 @@ Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的
 
 ## 基于Scheduling Framework
 
+**为什么引入？**最初对于 Kube-scheduler 进行扩展的方式主要有两种，一种是Scheduler Extender（http外挂）， 另外一种是多调度器，部署多个调度器（一个公司两个老板，可能命令冲突）。Scheduler Extender 的性能较差可是维护成本较小，Custom Scheduler 的研发和维护的成本特别高但是性能较好，这种情况是开发者面临这种两难处境。这时候 Kubernetes Scheduling Framework V2 横空出世，给我们带来鱼和熊掌可以兼得的方案。
+
 明确了 Kubernetes 中的各个调度阶段，提供了设计良好的基于插件的接口。调度框架认为 Kubernetes 中目前存在调度（Scheduling）和绑定（Binding）两个循环：
 
 1. 调度循环在多个 Node 中为 Pod 选择最合适的 Node；
@@ -182,10 +184,11 @@ Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的
 7. Reserve, 是 scheduler v1 版本的 assume 的操作，此处会对调度结果进行缓存，如果在后边的阶段发生了错误或者失败的情况，会直接进入 Unreserve 阶段，进行数据回滚。
 8. Permit, ，当 Pod 在 Reserve 阶段完成资源预留之后，Bind 操作之前，开发者可以定义自己的策略在 Permit 节点进行拦截，根据条件对经过此阶段的 Pod 进行 allow、reject 和 wait 的 3 种操作。
 
- binding cycle, 需要调用 apiserver 的接口，耗时较长，为了提高调度的效率，需要异步执行，所以此阶段线程不安全。
- 1. Bind, 是 scheduler v1 版本中的 Bind 操作，会调用 apiserver 提供的接口，将 pod 绑定到对应的节点上。
- 2. PreBind 和 PostBind, 在 PreBind 和 PostBind 分别在 Bind 操作前后执行，这两个阶段可以进行一些数据信息的获取和更新。
- 3. UnReserve, 用于清理到 Reserve 阶段的的缓存，回滚到初始的状态。当前版本 UnReserve 与 Reserve 是分开定义的，未来会将 UnReserve 与 Reserve 统一到一起，即要求开发者在实现 Reserve 同时需要定义 UnReserve，保证数据能够有效的清理，避免留下脏数据。
+binding cycle, 需要调用 apiserver 的接口，耗时较长，为了提高调度的效率，需要异步执行，所以此阶段线程不安全。
+1. Bind, 是 scheduler v1 版本中的 Bind 操作，会调用 apiserver 提供的接口，将 pod 绑定到对应的节点上。
+2. PreBind 和 PostBind, 在 PreBind 和 PostBind 分别在 Bind 操作前后执行，这两个阶段可以进行一些数据信息的获取和更新。
+3. UnReserve, 用于清理到 Reserve 阶段的的缓存，回滚到初始的状态。当前版本 UnReserve 与 Reserve 是分开定义的，未来会将 UnReserve 与 Reserve 统一到一起，即要求开发者在实现 Reserve 同时需要定义 UnReserve，保证数据能够有效的清理，避免留下脏数据。
+
 
 插件规范定义在 `$GOPATH/src/k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/interface.go` 中，各类插件继承 Plugin
 
