@@ -160,7 +160,7 @@ Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的
 
 ## 基于Scheduling Framework
 
-**为什么引入？**最初对于 Kube-scheduler 进行扩展的方式主要有两种，一种是Scheduler Extender（http外挂）， 另外一种是多调度器，部署多个调度器（一个公司两个老板，可能命令冲突）。Scheduler Extender 的性能较差可是维护成本较小，Custom Scheduler 的研发和维护的成本特别高但是性能较好，这种情况是开发者面临这种两难处境。这时候 Kubernetes Scheduling Framework V2 横空出世，给我们带来鱼和熊掌可以兼得的方案。
+**为什么引入？**最初对于 Kube-scheduler 进行扩展的方式主要有两种，一种是Scheduler Extender（http外挂）， 另外一种是多调度器，部署多个调度器（一个公司两个老板，可能命令冲突）。Scheduler Extender 的性能较差可是维护成本较小，Custom Scheduler 的研发和维护的成本特别高但是性能较好，这种情况是开发者面临这种两难处境。这时候 Kubernetes Scheduling Framework V2 横空出世，在scheduler core基础上进行了改造和提取，在scheduler几乎所有关键路径上设置了plugins扩展点，**用户可以在不修改scheduler core代码的前提下开发plugins，最后与core一起编译打包成二进制包实现扩展**。
 
 明确了 Kubernetes 中的各个调度阶段，提供了设计良好的基于插件的接口。调度框架认为 Kubernetes 中目前存在调度（Scheduling）和绑定（Binding）两个循环：
 
