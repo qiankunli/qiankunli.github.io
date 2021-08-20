@@ -13,7 +13,27 @@ keywords:  Kubernetes event
 * TOC
 {:toc}
 
+假设run 是真正的业务逻辑，加入选主逻辑之后，将run挂在 `election.RunOrDie` 的 OnStartedLeading 回调上。
+
+```go
+election.RunOrDie(election.LeaderElectionConfig{
+		Lock:          rl,
+		LeaseDuration: leaseDuration,
+		RenewDeadline: renewDuration,
+		RetryPeriod:   retryPeriod,
+		Callbacks: election.LeaderCallbacks{
+			OnStartedLeading: run,	// 业务逻辑
+			OnStoppedLeading: func() {
+				log.Fatalf("leader election lost")
+			},
+		},
+	})
+// 笔者觉得应该函数封装下，直接 election.RunOrDie(rl,leaseDuration,renewDuration,retryPeriod,run)
+```
+
 ## 选主原理
+
+leaderelection 主要是利用了k8s API操作的原子性实现了一个分布式锁，在不断的竞争中进行选举。选中为leader的实体才会执行具体的业务代码。
 
 代码结构
 ```
@@ -29,9 +49,11 @@ k8s.io/client-go/tools/leaderelection
 
 ![](/public/upload/kubernetes/leader_election.png)
 
+
+
 ### 乐观锁
 
-[K8S 中 scheduler 组件的选主逻辑](http://www.xuyasong.com/?p=2037)存在形式：configmap/endpoint 的annotation 上，key = `control-plane.alpha.kubernetes.io/leader`， 值对应了 LeaderElectionRecord struct，记录了当前leader 的Identity 以及renewTime
+[K8S 中 scheduler 组件的选主逻辑](http://www.xuyasong.com/?p=2037)锁的存在形式：configmap/endpoint 的annotation 上，key = `control-plane.alpha.kubernetes.io/leader`， 值对应了 LeaderElectionRecord struct，记录了当前leader 的Identity 以及renewTime
 
 ```yml
 apiVersion: v1
@@ -46,6 +68,17 @@ metadata:
   selfLink: /api/v1/namespaces/kube-system/endpoints/kube-scheduler
   uid: f3535807-0575-483f-8471-f8d4fd9eeac6
 ```
+“锁”即annotation value 记录了 leader 的一些信息
+```json
+{
+    "holderIdentity": "instance-o24xykos-3_1ad55d32-2abe-49f7-9d68-33ec5eadb906", 
+    "leaseDurationSeconds": 15, 
+    "acquireTime": "2020-04-23T06:45:07Z", 
+    "renewTime": "2020-04-25T07:55:58Z", 
+    "leaderTransitions": 1
+}
+```
+
 代码体现
 ```go
 // k8s.io/client-go/tools/leaderelection/resourcelock/interface.go
@@ -73,6 +106,9 @@ type ObjectMeta struct {
 所谓的选主，就是看哪个follower能将自己的信息更新到 object 的annotation 上。 
 
 ### 选主逻辑
+
+1. leader 每隔RetryPeriod时间会通过tryAcquireOrRenew续约, 如果续约失败, 还会进行再次尝试. 一直到尝试的总时间超过RenewDeadline后该client就会失去leadership.
+2. follower 获得leadership需要的等待LeaseDuration 时间.
 
 ```go
 // 等待，直到ctx 取消/成为leader再失去leader 后返回
