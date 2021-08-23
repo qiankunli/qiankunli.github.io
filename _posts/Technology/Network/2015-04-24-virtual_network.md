@@ -239,6 +239,12 @@ static int veth_forward_skb(struct net_device *dev, struct sk_buff *skb,
 
 **Switching was just a fancy name for bridging**, and that was a 1980s technology – or so the thinking went.A bridge can be a physical device or implemented entirely in software. Linux kernel is able to perform bridging since 1999. Switches have meanwhile became specialized physical devices and software bridging had almost lost its place. However, with the advent of virtualization, virtual machines running on physical hosts required Layer 2 connection to the physical network and other VMs. Linux bridging provided a well proven technology and entered it’s Renaissance（文艺复兴）. 最开始bridge是一个硬件， 也叫swtich，后来软件也可以实现bridge了，swtich就专门称呼硬件交换机了，再后来虚拟化时代到来，bridge 迎来了第二春。
 
+[Linux 虚拟网络设备之 bridge](https://mp.weixin.qq.com/s/BWyO9zb4I2lMyjVBAoVCiA)bridge 常用场景
+
+![](/public/upload/network/bridge_tun.png)
+
+![](/public/upload/network/bridge_veth.png)
+
 
 [Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)In linux bridge implementation, VMs or Containers will connect to bridge and bridge will connect to outside world. For external connectivity, we would need to use NAT. container 光靠 bridge 无法直接访问外网。
 
