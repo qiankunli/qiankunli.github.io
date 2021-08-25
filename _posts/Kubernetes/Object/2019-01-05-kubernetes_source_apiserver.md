@@ -33,18 +33,6 @@ apiserver 核心职责
 
 [不是技术也能看懂云原生](https://mp.weixin.qq.com/s/csY8T02Ck8bnE3vVcZxVjQ)Kubernetes还有一个亮点，是他是基于声明式API的，这和传统的运维模式有所区别。传统的运维模式是面向动作的，比如说需求是启动三个应用，那面向动作的运维就是找三个地方，把三个应用启动起来，检查启动没有问题，然后完事儿。稍微自动化一点的，就是写个脚本做这个事情。这种模式的问题是一旦三个应用因为某种原因挂了一个，除非人工检查一遍，要不就没人知道这件事情。而声明式API是面向期望状态的，客户提交的期望状态，kubernetes会保存这种期望状态，并且会自动检查当前状态是否和期望状态一致，如果不一致，则自动进行修复。这在大规模微服务运维的时候更加友好，因为几万个程序，无论靠人还是靠脚本，都很难维护，必须有这么一个Kubernetes平台，才能解放运维，让运维只需要关心期望状态。
 
-## k8s api 术语
-
-1. Domain
-2. API group, 在逻辑上相关的一组 Kind 集合。如 Job 和 ScheduledJob 都在 batch API group 里。同一资源的不同版本的 API，会放到一个 group 里面
-3. Version, 标示 API group 的版本更新， API group 会有多个版本 (version)。v1alpha1: 初次引入 ==> v1beta1: 升级改进 ==> v1: 开发完成毕业。 group  + domain + version 在url 上经常体现为`$group_$domain/version` 比如 `batch.tutorial.kubebuilder.io/v1`
-4. Kind, 表示实体的类型。直接对应一个Golang的类型，会持久化存储在etcd 中
-5. Resource, 通常是小写的复数词，Kind 的小写形式（例如，pods），用于标识一组 HTTP 端点（路径），来对外暴露 CURD 操作。每个 Kind 和 Resource 都存在于一个APIGroupVersion 下，分别通过 GroupVersionKind 和 GroupVersionResource 标识。关联GVK 到GVR （资源存储与http path）的映射过程称作 REST mapping。
-
-![](/public/upload/kubernetes/k8s_rest_api.png)
-
-通常情况下，Kind 和 resources 之间有一个一对一的映射。 例如，pods 资源对应于 Pod 种类。但是有时，同一类型可能由多个资源返回。例如，Scale Kind 是由所有 scale 子资源返回的，如 deployments/scale 或 replicasets/scale。这就是允许 Kubernetes HorizontalPodAutoscaler(HPA) 与不同资源交互的原因。然而，使用 CRD，每个 Kind 都将对应一个 resources。
-
 ## 分层架构
 
 [apiserver分析-路由注册管理](https://mp.weixin.qq.com/s/pto9_I5PWDWw1S0lklVrlQ)
@@ -58,6 +46,14 @@ apiserver 核心职责
 2. 生成 OpenAPI schema，保存到 apiserver 的 Config.OpenAPIConfig 字段。
 3. 遍历 schema 中的所有 API group，为每个 API group 配置一个 storage provider，这是一个通用 backend 存储抽象层。
 4. 遍历每个 group 版本，为每个 HTTP route 配置 REST mappings。稍后处理请求时，就能将 requests 匹配到合适的 handler。
+
+### 请求处理流程 
+
+[资深专家深度剖析Kubernetes API Server第1章](https://cloud.tencent.com/developer/article/1330591)
+
+![](/public/upload/kubernetes/apiserver_handle_api.png)
+[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)
+![](/public/upload/kubernetes/apiserver_handle_request.png)
 
 ### go-restful框架
 

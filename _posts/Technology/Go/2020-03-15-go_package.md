@@ -103,26 +103,62 @@ vendor属性就是让go编译时，优先从项目源码树根目录下的vendor
 
 ### Go Modules 一统天下
 
-Go Modules 提供了统一的依赖包管理工具 go mod，其思想类似maven：摒弃vendor和GOPATH，拥抱本地库。
+[一文读懂Go Modules原理](https://mp.weixin.qq.com/s/FhUty8prexpxggXkkumDdw)
 
-1. 依赖包统一收集在 `$GOPATH/pkg/mod` 中进行集中管理。有点mvn `.m2` 文件夹的意思
-2. `$GOPATH/pkg/mod` 中的按版本管理
-
-        $GOPATH/pkg/mod/k8s.io
-            api@v0.17.0
-            client-go@v0.17.0
-            kube-openapi@v0.0.0-20191107075043-30be4d16710a
-
-3. go build 代码时，自动解析代码中的import 生成 go.mod 文件。PS：相当于`maven package` 解析代码自动生成pom.xml。
-4. 将 import 路径与项目代码的实际存放路径解耦。PS：import 依赖包在$GOPATH 中的路径，编译时使用依赖包在`$GOPATH/pkg/mod`中的文件。
-5. 在国内访问golang.org/x的各个包都需要翻墙，你可以在go.mod中使用replace替换成github上对应的库。
+Go Modules 提供了统一的依赖包管理工具 go mod
+1. 基本思想semantic version（**社区实际上做不到**）
+    1. MAJOR version when you make incompatible API changes(不兼容的修改)
+    2. MINOR version when you add functionality in a backwards compatible manner(特性添加，版本兼容)
+    3. PATCH version when you make backwards compatible bug fixes(bug修复，版本兼容)
+3. 依赖包统一收集在 `$GOPATH/pkg/mod` 中进行集中管理，有点mvn `.m2` 文件夹的意思。`$GOPATH/pkg/mod` 中的按版本管理
     ```
-    replace (
-        golang.org/x/crypto v0.0.0-20180820150726-614d502a4dac => github.com/golang/crypto v0.0.0-20180820150726-614d502a4dac
-        golang.org/x/net v0.0.0-20180821023952-922f4815f713 => github.com/golang/net v0.0.0-20180826012351-8a410e7b638d
-        golang.org/x/text v0.3.0 => github.com/golang/text v0.3.0
-    )
+    $GOPATH/pkg/mod/k8s.io
+        api@v0.17.0
+        client-go@v0.17.0
+        kube-openapi@v0.0.0-20191107075043-30be4d16710a
     ```
+4. go.mod
+    1. module：代表go模块名，也即被其它模块引用的名称，位于文件第一行
+    2. require：最小需求列表(依赖模块及其版本信息)
+    3. replace：通过replace将一个模块的地址转换为其它地址(开发者github 上给自己的项目换个地址，删除某个版本等，常事)，用于解决某些依赖模块地址发生改变的场景。同时import命令可以无需改变(**无侵入**)。 在国内访问golang.org/x的各个包都需要翻墙，你可以在go.mod中使用replace替换成github上对应的库。
+        ```
+        replace (
+            golang.org/x/crypto v0.0.0-20180820150726-614d502a4dac => github.com/golang/crypto v0.0.0-20180820150726-614d502a4dac
+            golang.org/x/net v0.0.0-20180821023952-922f4815f713 => github.com/golang/net v0.0.0-20180826012351-8a410e7b638d
+            golang.org/x/text v0.3.0 => github.com/golang/text v0.3.0
+        )
+        ```
+    4. exclude：明确排除一些依赖包中不想导入或者有问题的版本
+
+
+![](/public/upload/go/go_mod.png)
+
+```
+// go.mod
+module A1
+go 1.14
+require (
+	B1.2
+	C1.3 
+	D1.4 // indirect
+	E1.3 // indirect
+    X v0.0.0-20120604004816-cd527374f1e5 
+)
+```
+1. 依赖管理可以归纳为如下四个操作 ，尽量不要手动修改go.mod文件，通过go命令来操作go.mod文件
+    1. 构建项目当前build list `go build`
+    2. 升级所有依赖模块到它们的最新版本 `go get -u`
+    3. 升级某个依赖模块到指定版本 `go get C@1.3`
+    4. 将某个依赖模块降级到指定版本 `go get D@1.2`
+2. 通过go build编译项目时
+    1. 如果在go.mod文件中指定了直接依赖模块版本，则根据最小版本选择算法会下载对应版本；
+    2. 否则go build会默认自动下载直接依赖模块的最新semantic version
+    3. 若没有semantic version则自动生成标签：`(v0.0.0)-(提交UTC时间戳)-(commit id前12位)`作为版本标识
+3. 出现indirect标记的两种情况：
+    1. A1的某个依赖模块没有使用Go Modules(也即该模块没有go.mod文件)，那么必须将该模块的间接依赖记录在A1的需求列表中
+    2. A1对某个间接依赖模块有特殊的版本要求，必须显示指明版本信息(例如上述的D1.4和E1.3)，以便Go可以正确构建依赖模块
+
+        
 ## 其它
 
 [浅谈如何组织Go代码结构](https://mp.weixin.qq.com/s/9_WQUpvHKli4btPqCA89Aw)

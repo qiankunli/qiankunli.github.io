@@ -1,34 +1,124 @@
 ---
 
 layout: post
-title: Kubernetes objects 
+title: Kubernetes类型系统
 category: 技术
 tags: Kubernetes
-keywords: kubernetes stateset
+keywords: kubernetes Apimachinery
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
 
-Kubernetes 对象是系统中的持久实体，描述集群的期望状态
+[k8s中Apimachinery、Api、Client-go库之间的关系](https://cloud.tencent.com/developer/article/1814637)k8s.io/client-go, k8s.io/api, k8s.io/apimachinery 是基于Golang的 Kubernetes 编程的核心。
+1. apimachinery 是最基础的库，包括核心的数据结构，比如 Scheme、Group、Version、Kind、Resource，以及排列组合出来的 常用的GVK、GV、GK、GVR等等，再就是编码、解码等操作。**类似于Java 中的Class/Method/Field 这些**。
+2. api 库，这个库依赖 apimachinery，提供了k8s的内置资源，以及注册到 Scheme 的接口，这些资源比如：Pod、Service、Deployment、Namespace
+3. client-go 库，这个库依赖前两个库，提供了访问k8s 内置资源的sdk，最常用的就是 clientSet。底层通过 http 请求访问k8s 的 api-server，从etcd获取资源信息
 
-![](/public/upload/kubernetes/kubernetes_object.png)
+## k8s api
 
-你一定有方法在不使用 Kubernetes、甚至不使用容器的情况下，自己 DIY 一个类似的方案出来。但是，一旦涉及到升级、版本管理等更工程化的能力，Kubernetes 的好处，才会更加凸现。
+Kubernetes API是一个HTTP形式的API，主要有三种形式
+1. core group API（在/api/v1路径下，由于某些历史原因而并没有在/apis/core/v1路径下）
+2. named groups API（在对应的/apis/$NAME/$VERSION路径下）
+3. system-wide API（比如/metrics,/healthz）。
 
-**Kubernetes 的各种object，就是常规的各个项目组件在 kubernetes 上的表示** [深入理解StatefulSet（三）：有状态应用实践](https://time.geekbang.org/column/article/41217) 充分体现了在我们把服务 迁移到Kubernetes 的过程中，要做多少概念上的映射。
+出于可扩展性原因考虑，Kubernetes可支持多个API版本，通过不同的API路径的方式区分。
+
+1. Domain
+2. API group, 在逻辑上相关的一组 Kind 集合。如 Job 和 ScheduledJob 都在 batch API group 里。同一资源的不同版本的 API，会放到一个 group 里面
+3. Version, 标示 API group 的版本更新， API group 会有多个版本 (version)。v1alpha1: 初次引入 ==> v1beta1: 升级改进 ==> v1: 开发完成毕业。 group  + domain + version 在url 上经常体现为`$group_$domain/version` 比如 `batch.tutorial.kubebuilder.io/v1`
+4. Kind, 表示实体的类型。直接对应一个Golang的类型，会持久化存储在etcd 中
+5. Resource, 通常是小写的复数词，Kind 的小写形式（例如，pods），用于标识一组 HTTP 端点（路径），来对外暴露 CURD 操作。每个 Kind 和 Resource 都存在于一个APIGroupVersion 下，分别通过 GroupVersionKind 和 GroupVersionResource 标识。关联GVK 到GVR （资源存储与http path）的映射过程称作 REST mapping。
+
+![](/public/upload/kubernetes/k8s_rest_api.png)
+
+通常情况下，Kind 和 resources 之间有一个一对一的映射。 例如，pods 资源对应于 Pod 种类。但是有时，同一类型可能由多个资源返回。例如，Scale Kind 是由所有 scale 子资源返回的，如 `deployments/scale` 或 `replicasets/scale`。这就是允许 Kubernetes HorizontalPodAutoscaler(HPA) 与不同资源交互的原因。然而，使用 CRD，每个 Kind 都将对应一个 resources。
 
 ## Kubernetes 基础类型系统
 
-k8s.io/client-go, k8s.io/api, k8s.io/apimachinery 是基于Golang的 Kubernetes 编程的核心。api machinery 代码库实现了 Kubernetes 基础类型系统（实际指的是kinds）
+api machinery 代码库实现了 Kubernetes 基础类型系统（实际指的是kinds）。kinds被分为 group 和verison，因此api machinery 代码中的核心术语是 GroupVersionKind，简称GVK。 与kinds 同级概念的是 resource，也按group 和version 划分，因此有术语GroupVersionResource 简称GVR，**每个GVR 对应一个http 路径**，用于标识 Kubernetes API的REST 接口
+
+```go
+// k8s.io/apimachinery/pkg/runtime/schema/group_version.go
+// 对应一个 http 路径
+type GroupVersionResource struct {
+	Group    string
+	Version  string
+	Resource string
+}
+// 对应一个golang struct
+type GroupVersionKind struct {
+	Group   string
+	Version string
+	Kind    string
+}
+```
+scheme struct 将golang object 映射为可能的GVK。一个GVK 到一个GVR 的映射被称为 REST mapping,  RESTMapper interface/ RESTMapping struct 来完成转换。
 
 ![](/public/upload/kubernetes/kubernetes_type.png)
-kinds被分为 group 和verison，因此api machinery 代码中的核心术语是 GroupVersionKind，简称GVK。 与kinds 同级概念的是 resource，也按group 和version 划分，因此有术语GroupVersionResource 简称GVR，每个GVR 对应一个http 路径（kind 不会），用于标识 Kubernetes API的REST 接口
 
-scheme struct 将golang object 映射为可能的GVK。一个GVK 到一个GVR 的映射被称为 REST mapping,  RESTMapper interface/ RESTMapping struct 来完成转换。
+[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)**http server 或者 rpc server 要解决的一个问题是：如何解析用户的请求数据，并把他反序列化为语言中的一个具体的类型**。以一个 EchoService 为例，decode 程序需要从用户请求（如 post http://echo ） 文本或者二进制数据中创建出  EchoRequestV1，提供给上层处理，同时这个 decode 函数需要足够通用，他返回的是可能是一个 Message Interface, 里面是 EchoRequestV1，decode 相关的细节要么通过代码生成的技术提供给 decoder，要么在 二进制或者文本请求数据（或者 header等元数据）中携带这部分信息。解决这个问题有两种方式Protobuf Unmarshal/Kubernetes Scheme
+
+### Protobuf Unmarshal
+
+根据 生成的 golang 结构体的 Field tag来做 Unmarshal
+```go
+// 生成的 golang 结构体
+type EchoRequest struct {
+    A  string   `protobuf:"bytes,1,opt,name=A,proto3" json:"A,omitempty"`
+}
+// 收到请求，在 Unmarshal 过程中会调用这个函数
+func (m *EchoRequest) XXX_Unmarshal(b []byte) error {
+    return xxx_messageInfo_EchoRequest.Unmarshal(m, b)
+}
+var xxx_messageInfo_EchoRequest proto.InternalMessageInfo
+// InternalMessageInfo 是 Unmarshal 相关信息的存储位置
+// b 是 protocol buffer raw 数据，而a 是要 unmarshal 到的结构
+// 基础库不关心具体 unmarshal 类型，始终 unmarshal 到一个 interface Message
+// 实际上面到结构调用到时候 会是 EchoRequest 类型
+func (a *InternalMessageInfo) Unmarshal(msg Message, b []byte) error {
+    // ... 略
+    err := u.unmarshal(toPointer(&msg), b)
+    return err
+}
+func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error{
+    if atomic.LoadInt32(&u.initialized) == 0 {
+        // 保存 unmarshal 这个类型的函数、信息到一个结构里面，加速重复的 unmarshal
+		u.computeUnmarshalInfo()
+	}
+	// .... 略
+	if fn := f.unmarshal; fn != nil {
+		var err error
+		// unmarshal 这个 field 这里的关键是 unmarshal 到原始 bytes 设置到对应字段的
+		// offset上面去，里面比较关键的是用了 golang reflect的 StructField 
+		// StructField 的 Offset 是固定的，根据 一个结构的指针的 pointer 以及 Field的
+		// offset 就可以直接用指针设置 结构的某个字段内容了
+		b, err = fn(b, m.offset(f.field), wire)
+		// ....
+	}
+}
+```
+### Kubernetes Scheme
+GVK 是一个 Object 概念，而 GVR 代表一个 Http Path。反序列化使用 api.Scheme + gvk，而 gvk 中的信息可以从 request中获取
+
+```go
+gvk := schema.GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "Job"} 
+obj := api.Scheme.New(gvk)
+codec := api.Codecs.LegacyCodec(gvk.GroupVersion())
+codec.Decode(reqBody, gvk, obj)
+type Job struct {  
+    metav1.TypeMeta     ---> type TypeMeta struct { Kind string; APIVersion string }
+    metav1.ObjectMeta   ---> type ObjectMeta struct { Name string...}
+    Spec JobSpec
+    Status JobStatus 
+}
+```
+
+Scheme defines methods for serializing and deserializing API objects, a type registry for converting group, version, and kind information to and from Go schemas, and mappings between Go schemas of different versions. **A scheme is the foundation for a versioned API and versioned configuration over time**.
+
 
 ```go
 // k8s.io/apimachinery/pkg/api/meta/interface.go
@@ -39,10 +129,19 @@ type RESTMapper interface {
 }
 // k8s.io/apimachinery/pkg/runtime/scheme.go
 type Scheme struct {
+    // a Type is a particular Go struct，比如k8s.io/api/apps/v1.StatefulSet
 	gvkToType map[schema.GroupVersionKind]reflect.Type
     typeToGVK map[reflect.Type][]schema.GroupVersionKind
+    ...
 }
 func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error) {...}
+func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
+	if t, exists := s.gvkToType[kind]; exists {
+		return reflect.New(t).Interface().(Object), nil
+	}
+    ...
+	return nil, NewNotRegisteredErrForKind(s.schemeName, kind)
+}
 ```
 为了使 scheme正常工作，必须将golang 类型注册到 scheme 中。对于Kubernetes 核心类型，在`k8s.io/client-go/kubernetes/scheme` 包中 均已预先注册
 
@@ -126,92 +225,20 @@ type Deployment struct {
 
 [Kubernetes 资源对象序列化实现](https://mp.weixin.qq.com/s/fJf1mtCR49XO7BOUn2FRTg)序列化和反序列化在很多项目中都有应用，Kubernetes也不例外。Kubernetes中定义了大量的API对象，为此还单独设计了一个包(https://github.com/kubernetes/api)，方便多个模块引用。API对象在不同的模块之间传输(尤其是跨进程)可能会用到序列化与反序列化，不同的场景对于序列化个格式又不同，比如grpc协议用protobuf，用户交互用yaml(因为yaml可读性强)，etcd存储用json。Kubernetes反序列化API对象不同于我们常用的json.Unmarshal()函数(需要传入对象指针)，Kubernetes需要解析对象的类型(Group/Version/Kind)，根据API对象的类型构造API对象，然后再反序列化。因此，Kubernetes定义了Serializer接口(https://github.com/kubernetes/apimachinery/blob/release-1.21/pkg/runtime/interfaces.go#L86)，专门用于API对象的序列化和反序列化。
 
-## 集大成者——StatefulSet
 
-StatefulSet 的设计其实非常容易理解。它把真实世界的应用状态，抽象为了两种情况：
-1. 拓扑状态，比如应用的主节点 A 要先于从节点 B 启动
-2. 存储状态，应用的多个实例分别绑定了不同的存储数据
+## kubernetes 对象
 
-StatefulSet 的核心功能，就是通过某种方式记录这些状态，然后在 Pod 被重新创建时，能够为新 Pod 恢复这些状态。程序 = 数据结构 + 算法。**新增了一个功能，一定在数据表示上有体现（对应数据结构），一定在原来的工作流程中有体现或者改了工作流程（对应算法）**
+Kubernetes 对象是系统中的持久实体，描述集群的期望状态
 
+![](/public/upload/kubernetes/kubernetes_object.png)
 
-StatefulSet 这个控制器的主要作用之一，就是使用Pod 模板创建 Pod 的时候，对它们进行编号，并且按照编号顺序逐一完成创建工作。而当 StatefulSet 的“控制循环”发现 Pod 的“实际状态”与“期望状态”不一致，需要新建或者删除 Pod 进行“调谐”的时候，它会严格按照这些Pod 编号的顺序，逐一完成这些操作。**所以，StatefulSet 其实可以认为是对 Deployment 的改良。**
+你一定有方法在不使用 Kubernetes、甚至不使用容器的情况下，自己 DIY 一个类似的方案出来。但是，一旦涉及到升级、版本管理等更工程化的能力，Kubernetes 的好处，才会更加凸现。
 
-StatefulSet 里的不同 Pod 实例，不再像 ReplicaSet 中那样都是完全一样的，而是有了细微区别的。比如，每个 Pod 的 hostname、名字等都是不同的、携带了编号的。Kubernetes 通过 Headless Service，为这些有编号的 Pod，在 DNS 服务器中生成带有同样编号的 DNS 记录。StatefulSet 还为每一个 Pod 分配并创建一个同样编号的 PVC。
+**Kubernetes 的各种object，就是常规的各个项目组件在 kubernetes 上的表示** [深入理解StatefulSet（三）：有状态应用实践](https://time.geekbang.org/column/article/41217) 充分体现了在我们把服务 迁移到Kubernetes 的过程中，要做多少概念上的映射。
 
 
- [DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/) “Normal” (not headless) Services are assigned a DNS A record for a name of the form `my-svc.my-namespace.svc.cluster.local`. Headless Service 所代理的所有 Pod 的 IP 地址，都会被绑定一个这样格式的 DNS 记录 `<pod-name>.<svc-name>.<namespace>.svc.cluster.local`
-
-通过 Headless Service 的方式，StatefulSet 为每个 Pod 创建了一个固定并且稳定的 DNS记录，来作为它的访问入口。在部署“有状态应用”的时候，应用的每个实例拥有唯一并且稳定的“网络标识”，是一个非常重要的假设。
-
-Persistent Volume Claim 和 PV 的关系。运维人员创建PV，告知有多少volume。开发人员创建Persistent Volume Claim 告知需要多少大小的volume。创建一个 PVC，Kubernetes 就会自动为它绑定一个符合条件的Volume。即使 Pod 被删除，它所对应的 PVC 和 PV 依然会保留下来。所以当这个 Pod 被重新创建出来之后，Kubernetes 会为它找到同样编号的 PVC，挂载这个 PVC 对应的 Volume，从而获取到以前保存在 Volume 里的数据。
-
-## ConfigMap
-
-1. ConfigMap 资源用来保存key-value配置数据，这个数据可以在pods里使用，或者被用来为像controller一样的系统组件存储配置数据。
-2. yaml data 包括了配置数据，ConfigMap中的每个data项都会成为一个新文件。每个data 项可以用来保存单个属性，也可以用来保存一个配置文件。
 
 
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: special-config
-  namespace: default
-data:
-  SPECIAL_LEVEL: very
-  SPECIAL_TYPE: charm
-  demo.yaml: |
-    abc: 123
-    edf: 456
----
-apiVersion: apps/v1
-kind: Deployment
-spec:
-  ...
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-      - name: nginx
-        ...
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/config
-      volumes:
-      - name: config-volume
-        configMap:
-          name: special-config
-```
-查看执行结果
-```
-root@nginx-deployment-6576c57d87-4vmk4:/etc/config# ls -al
-total 12
-drwxrwxrwx 3 root root 4096 Nov  9 06:06 .
-drwxr-xr-x 1 root root 4096 Nov  9 04:00 ..
-drwxr-xr-x 2 root root 4096 Nov  9 06:06 ..2020_11_09_06_06_22.828693221
-lrwxrwxrwx 1 root root   31 Nov  9 06:06 ..data -> ..2020_11_09_06_06_22.828693221
-lrwxrwxrwx 1 root root   20 Nov  9 03:56 SPECIAL_LEVEL -> ..data/SPECIAL_LEVEL
-lrwxrwxrwx 1 root root   19 Nov  9 03:56 SPECIAL_TYPE -> ..data/SPECIAL_TYPE
-lrwxrwxrwx 1 root root   16 Nov  9 06:06 demo.yaml -> ..data/demo.yaml
-```
 
-## DaemonSet
 
-## Job/CronJob
 
-## 体会
-
-学习rc、deployment、service、pod 这些Kubernetes object 时，因为功能和yaml 有直接的一对一关系，所以体会不深。在学习StatefulSet 和 DaemonSet 时，有几个感觉
-
-1. Kubernetes object 是分层次的，pod 是很基础的层次，然后rc、deployment、StatefulSet 等用来描述如何管理它。
-
-    * 换句话说，pod 的配置更多是给docker看的，deployment 和StatefulSet 等配置更多是给 Kubernetes Controller 看的
-    * pod 其实有一份儿配置的全集， DaemonSet 的生效 是背后偷偷改 pod 配置 加上 恰当的时机操作pod api
-2. Kubernetes objects是否可以笼统的划分一下，编排对象架构在调度对象之上？
-
-    1. 调度对象pod、service、volume
-    2. 编排对象StatefulSet、DaemonSet 和Job/CronJob 等
