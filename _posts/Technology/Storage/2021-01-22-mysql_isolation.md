@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: mysql 事务
+title: mysql 事务的隔离级别
 category: 技术
 tags: Storage
-keywords: Redis
+keywords: mysql transaction isolation mvcc
 
 ---
 

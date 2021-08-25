@@ -4,7 +4,7 @@ layout: post
 title: mysql 索引
 category: 技术
 tags: Storage
-keywords: Redis
+keywords: mysql index
 
 ---
 

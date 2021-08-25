@@ -4,7 +4,7 @@ layout: post
 title: mysql 事务
 category: 技术
 tags: Storage
-keywords: Redis
+keywords: mysql transaction 
 
 ---
 
