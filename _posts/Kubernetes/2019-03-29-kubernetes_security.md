@@ -48,7 +48,7 @@ rootless container 中的"rootless"不仅仅指容器中以非 root 用户来运
 
 [一文读懂 TKE 及 Kubernetes 访问权限控制](https://mp.weixin.qq.com/s/oijt_iqhMAe6JRJGTypKGw)
 
-### 认证
+### 认证/Authentication
 
 认证的过程即是证明user身份的过程。Kubernetes中有两类用户：
 
@@ -86,7 +86,7 @@ APIServer启动时，可以指定一种或多种Authentication方法，如果指
 
 若APiServer开启Webhook Token Server进行认证校验，则在接受到用户的Request之后，会包装Bearer Token成一个TokenReview发送给WebHookServer，Server端接收到之后会进行校验，并返回TokenReview接口，在status字段中进行反馈是否通过校验通过和user.Info信息。
 
-### 授权
+### 授权/Authorization
 
 认证之后我们如何**在认证基础上**针对资源授权管理呢？授权就是判断user是否拥有操作资源的相应权限。
 
@@ -129,6 +129,8 @@ APIServer启动时，可以指定一种或多种Authentication方法，如果指
 ![](/public/upload/kubernetes/admission_controller.png)
 
 K8s支持30多种admission control 插件，其中有两个具有强大的灵活性，即ValidatingAdmissionWebhooks和MutatingAdmissionWebhooks，这两种控制变换和准入以Webhook的方式提供给用户使用，大大提高了灵活性，用户可以在集群创建自定义的AdmissionWebhookServer进行调整准入策略。
+
+比如volcano 的webhook会拦截create pod请求，确保找不到相关的podgroup则拒绝，确保podgroup先于pod 创建成功。
 
 ## 安全相关的 kubernetes objects
 
@@ -173,8 +175,8 @@ A service account provides an identity for processes that **run in a Pod**. When
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-namespace: mynamespace
-name: example-sa
+  namespace: mynamespace
+  name: example-sa
 ```
 
 Kubernetes 会为一个 ServiceAccount**自动创建并分配一个 Secret 对象**，secret `{data.token}` 就是用户 token 的 base64 编码，可以用来配置kubeconfig
@@ -201,9 +203,9 @@ Annotations:  kubernetes.io/service-account.name: example-sa
 Type:  kubernetes.io/service-account-token
 Data
 ====
-ca.crt:     1346 bytes
-namespace:  11 bytes
-token:      xx      # base64 编码，反解析后是一个json 
+ca.crt:     1346 bytes      # apiserver 的公钥数字证书
+namespace:  11 bytes        # secret 所在namespace 值的base64 编码
+token:      xx      # 用API Server私钥签发(sign)的bearer tokens的base64编码，反解析后是一个json，也称之为 service-account-token
 ```
 
 用户的 Pod可以声明使用这个 ServiceAccount
@@ -234,8 +236,14 @@ nginx:
     Mounts:
     /var/run/secrets/kubernetes.io/serviceaccount from example-sa-token-vmfg6 (ro)
 ```
+service count 的认证和授权过程
 
-小结一下
+1. API Server的authenticating环节支持多种身份校验方式：client cert、bearer token、static password auth等（Kubernetes API Server会逐个方式尝试），这些方式中有一种方式通过authenticating，那么身份校验就会通过。一旦API Server发现client发起的request使用的是service account token的方式，API Server就会自动采用signed bearer token方式进行身份校验。
+    1. 用户名为：`system:serviceaccount:(namespace):(serviceaccount)`
+    2. credentials： service-account-token
+2. 通过authenticating后，API Server将根据Pod username所在的`group：system:serviceaccounts`和`system:serviceaccounts:(NAMESPACE)`的权限对其进行authority 和admission control两个环节的处理。在这两个环节中，cluster管理员可以对service account的权限进行细化设置。
+
+## 小结
 
 1. 有哪些资源
 2. Role 表述对这些资源的操作能力

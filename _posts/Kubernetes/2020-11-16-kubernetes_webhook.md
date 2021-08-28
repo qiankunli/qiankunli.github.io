@@ -40,7 +40,6 @@ K8s支持30多种admission control 插件，其中有两个具有强大的灵活
 
 ## 配置apiserver 发起webhook
 
-
 ```yaml
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -87,7 +86,11 @@ clientConfig 描述如何调用webhook
         port: 1234
     ```
 
+在volcano 的webhook中，ValidatingWebhookConfiguration 的配置是通过代码写入到 apiserver 的。对于volcano 这种大型框架，可能包含多个crd，每个crd 都会注册一个VatingWebhookConfiguration，adminssion webhook 本身就要统一管理（有一个集中的 adminssion webhook map或slice）。代码实现上，实现crd 的adminssion webhook时，只需要在crd 对应的包 init 方法里注册下 就可以，如果是自己写的话，yaml 文件要写五六个。
+
 ## 请求响应参数
+
+web 户口本身是一个约定接口的**web server**。
 
 ```go
 type AdmissionReview struct {

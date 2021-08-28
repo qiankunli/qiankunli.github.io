@@ -13,7 +13,7 @@ keywords: kafka
 * TOC
 {:toc}
 
-”有则返回，无则查db“的基本思路
+”有则返回，无则查db“的基本思路，有点像缺页中断。
 
 ```java
 cache.get(key){
@@ -211,11 +211,13 @@ segment 简单说也是数组加链表，只是元素类型是ReferenceEntry，�
 
 从上述代码可以看到
 
-1. “其它线程等待”的效果，不是对key 加锁， 其它线程得不到锁而等待
+1. “其它线程等待”的效果，不是对key 加锁， 其它线程 主动查询状态位，发现有人去load 了自己就等着。 
 2. **LoadingValueReference 持有了 SettingFuture对象**，也是线程的“竞争点”，线程发现value 处于loading状态时 便直接 `LoadingValueReference.waitForValue` ==> `future.get` 准备等结果了。这个竞争点选的很精巧
 
     1. 以 key 或者value 作为竞争点 + lock/unlock，线程发现key 数据过期，锁住key（标识key等手段），获取数据，解锁key。**因为你不知道key/value 什么时候过期，所以每次lock/unlock 是很大的浪费**。
     2. 以 value isLoading 作为竞争点，线程发现value isNotLoading，创建一个新的value 对象设置状态为loading，原子的修改entry的value，这样其它线程可以根据loading 状态决定自己的行为，而不是无脑lock/unlock
+
+[Guava Cache 原理分析与最佳实践](https://mp.weixin.qq.com/s/ADcu_XKTJxXectMQ8S20SQ)为什么这个方案解了 “缓存击穿” 问题但又没完全解？大量的线程阻塞导致线程无法释放，甚至会出现线程池满的尴尬场景。比较合适的方式是通过添加一个异步线程池异步刷新数据，所有请求线程直接返回老值（业务线程不会阻塞），同时对于 DB 的访问的流量可以被后台线程池的池大小控住。
 
 ## 如果不想线程排队
 
