@@ -224,6 +224,58 @@ kube_state_metrics_watch_total{resource="*v1beta1.Ingress",result="success"} 1
 
 [有道 Kubernetes 容器API监控系统设计和实践](https://mp.weixin.qq.com/s/K6UJnnpbhciHyvrACo1xAw)
 
+### 基于k8s 抓取metric
+
+[Kubernetes 集群监控 kube-prometheus 自动发现](https://cloud.tencent.com/developer/article/1802679)
+Prometheus 通过与 Kubernetes API 集成主要支持5种服务发现模式：
+1. Node, 适用于与主机相关的监控资源
+2. Service、Ingress, 适用于通过黑盒监控的场景，如对服务的可用性以及服务质量的监控
+3. Pod、Endpoints, 获取 Pod 实例的监控数据
+
+通过添加额外的配置来进行服务发现进行自动监控（自声明），比如 在 kube-prometheus 当中去自动发现并监控具有 `prometheus.io/scrape=true` 这个 annotations 的 Service。
+
+```
+# kubectl describe service xxx
+Annotations:        example.com/port: 2121
+                    example.com/scrape: true
+IP:                10.103.173.42
+Port:              <unset>  8080/TCP
+Endpoints:         172.31.10.228:8080
+```
+
+
+```yaml
+- job_name: 'kubernetes-service-endpoints'
+    kubernetes_sd_configs:
+      role: endpoints # 从列出的服务端点发现目标，这个endpoints来自于Kubernetes中的service， 每一个service都有对应的endpoints，所以endpoints角色就是用来发现server对应的pod的IP的
+    relabel_configs:  # 对采集过来的指标做二次处理，比如要什么不要什么以及替换什么等等
+    - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape] # 以__meta_开头的这些元数据标签都是实例中包含的
+      action: keep
+      regex: true   # 仅抓取到的具有 "prometheus.io/scrape: true" 的annotation的端点
+    - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+      action: replace # 根据regex来去匹配source_labels标签上的值，并将并将匹配到的值写入target_label中
+      target_label: __scheme__
+      regex: (https?)
+    - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+      action: replace
+      target_label: __metrics_path__
+      regex: (.+)
+    - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port] # 以__开头的标签通常是系统内部使用的
+      action: replace
+      target_label: __address__   
+      regex: ([^:]+)(?::\d+)?;(\d+)
+      replacement: $1:$2
+    # 下面主要是为了给样本添加额外信息
+    - action: labelmap  
+      regex: __meta_kubernetes_service_label_(.+)
+    - source_labels: [__meta_kubernetes_namespace]    # namespace 名称
+      action: replace
+      target_label: kubernetes_namespace
+    - source_labels: [__meta_kubernetes_service_name] # service 对象的名称
+      action: replace
+      target_label: kubernetes_name
+```
+
 ## 需要哪些 alert rule
 
 [monitoring.mixin](https://monitoring.mixins.dev) 列出了各个组件建议配置的alert 规则。

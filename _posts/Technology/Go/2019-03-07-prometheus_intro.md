@@ -115,7 +115,7 @@ scrape_configs:
     ```
     在consul_sd_configs定义当中通过server定义了Consul服务的访问地址，services则定义了当前需要发现哪些类型服务实例的信息，这里限定了只获取node_exporter的服务实例信息。
 
-4. 平台提供的api，比如Kubernetes.  **不同的role 获取target ip:port/path 的方式不同，默认值也不同**，比如pod和service 优先从annnotation 汇总获取ip:port/path
+4. 平台提供的api，比如Kubernetes. 
     ```yaml
     - job_name: 'kubernetes-cadvisor'
       kubernetes_sd_configs:
@@ -234,36 +234,7 @@ Time series Selectors 从time series 中选择需要的数据
 
 [Prometheus 常用 PromQL 语句](https://mp.weixin.qq.com/s/vr1C6S_jAnMMu_5sUmYPMQ)
 
-### 基于k8s 抓取metric
 
-```
-Annotations:        example.com/port: 2121
-                    example.com/scrape: true
-```
-
-pod 信息如上
-
-```yaml
-- job_name: 'kubernetes-cadvisor'
-    kubernetes_sd_configs:
-    - api_server: 'http://localhost:8080';
-      role: pod         # 自动获取到所有 pod 的ip
-    relabel_configs:
-    - source_labels: [__meta_kubernetes_pod_annotation_example_com_scrape] #  从pod annotation example.com/scrape 获取值
-      action: keep
-      regex: true
-    - source_labels: [__address__, __meta_kubernetes_pod_annotation_example_com_port] #  从pod annotation example.com/port 获取值。此次假设pod 内部启动了进程 来暴露metric 
-      action: replace
-      regex: ([^:]+)(?::\d+)?;(\d+)
-      replacement: $1:$2
-      target_label: __address__
-    - source_labels: [__meta_kubernetes_namespace]  #  获取pod 的 namespace
-      action: replace
-      target_label: kubernetes_namespace
-    - source_labels: [__meta_kubernetes_pod_name]   #  获取pod 的 name
-      action: replace
-      target_label: kubernetes_pod_name
-```
 
 ## rules
 
