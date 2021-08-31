@@ -17,7 +17,9 @@ keywords: network
 
 许式伟：存储它不应该只能保存一个文件，而是应该是多个。既然是多个，就需要组织这些文件。那么，怎么组织呢？操作系统的设计者们设计了文件系统这样的东西，来组织这些文件。虽然文件系统的种类有很多（比如：FAT32、NTFS、EXT3、EXT4 等等），但是它们有统一的抽象：文件系统是一颗树；节点要么是目录，要么是文件；文件必然是叶节点；根节点是目录，目录可以有子节点。
 
-## 彭东《操作系统实战》
+## 单个文件系统设计
+
+来自彭东《操作系统实战》
 
 **文件系统只是一个设备**，文件系统一定要有储存设备，HD 机械硬盘、SSD 固态硬盘、U 盘、各种 TF 卡等都属于存储设备，这些设备上的文件储存格式都不相同，甚至同一个硬盘上不同的分区的储存格式也不同。这个储存格式就是相应文件系统在储存设备上组织储存文件的方式。不难发现让文件系统成为 Cosmos 内核中一部分，是个非常愚蠢的想法。因此：文件系统组件是独立的与内核分开的；第二，操作系统需要动态加载和删除不同的文件系统组件。
 
@@ -29,26 +31,26 @@ keywords: network
 // 文件系统的超级块或者文件系统描述块
 typedef struct s_RFSSUBLK
 {
-    spinlock_t rsb_lock;//超级块在内存中使用的自旋锁
-    uint_t rsb_mgic;//文件系统标识
-    uint_t rsb_vec;//文件系统版本
-    uint_t rsb_flg;//标志
-    uint_t rsb_stus;//状态
-    size_t rsb_sz;//该数据结构本身的大小
-    size_t rsb_sblksz;//超级块大小
-    size_t rsb_dblksz;//文件系统逻辑储存块大小，我们这里用的是4KB
-    uint_t rsb_bmpbks;//位图的开始逻辑储存块
-    uint_t rsb_bmpbknr;//位图占用多少个逻辑储存块
-    uint_t rsb_fsysallblk;//文件系统有多少个逻辑储存块
-    rfsdir_t rsb_rootdir;//根目录，后面会看到这个数据结构的
+    spinlock_t rsb_lock;    //超级块在内存中使用的自旋锁
+    uint_t rsb_mgic;        //文件系统标识
+    uint_t rsb_vec;         //文件系统版本
+    uint_t rsb_flg;         //标志
+    uint_t rsb_stus;        //状态
+    size_t rsb_sz;          //该数据结构本身的大小
+    size_t rsb_sblksz;      //超级块大小
+    size_t rsb_dblksz;      //文件系统逻辑储存块大小，我们这里用的是4KB
+    uint_t rsb_bmpbks;      //位图的开始逻辑储存块
+    uint_t rsb_bmpbknr;     //位图占用多少个逻辑储存块
+    uint_t rsb_fsysallblk;  //文件系统有多少个逻辑储存块
+    rfsdir_t rsb_rootdir;   //根目录，后面会看到这个数据结构的
 }rfssublk_t;
 // 目录
 typedef struct s_RFSDIR
 {
-    uint_t rdr_stus;//目录状态
-    uint_t rdr_type;//目录类型，可以是空类型、目录类型、文件类型、已删除的类型
-    uint_t rdr_blknr;//指向文件数据管理头的块号，不像内存可以用指针，只能按块访问
-    char_t rdr_name[DR_NM_MAX];//名称数组，大小为DR_NM_MAX
+    uint_t rdr_stus;            //目录状态
+    uint_t rdr_type;            //目录类型，可以是空类型、目录类型、文件类型、已删除的类型
+    uint_t rdr_blknr;           //指向文件数据管理头的块号，不像内存可以用指针，只能按块访问
+    char_t rdr_name[DR_NM_MAX]; //名称数组，大小为DR_NM_MAX
 }rfsdir_t;
 // 文件，包含文件名、状态、类型、创建时间、访问时间、大小，更为重要的是要知道该文件使用了哪些逻辑储存块。
 typedef struct s_fimgrhd
@@ -158,7 +160,43 @@ linux 和 windows 一个很大区别就是，window 有c盘、d盘等，而linux
 
 文件对象所对应的文件操作函数 列表是通过索引结点的域i_fop得到的
 
-## mount 过程
+## mount 
+
+### 数据结构
+
+struct mount代表着一个mount实例，最开始所有字段都在 vfsmount ，后来拆分为vfsmount 和mount 两个。
+```c
+struct mount {
+    struct hlist_node mnt_hash;
+    struct mount *mnt_parent;   // 装载点所在的父文件系统
+    struct dentry *mnt_mountpoint; // 装载点在父文件系统中的dentry
+    struct vfsmount mnt;
+    union {
+        struct rcu_head mnt_rcu;
+        struct llist_node mnt_llist;
+    };
+    struct list_head mnt_mounts;	/* list of children, anchored here */
+    struct list_head mnt_child;	/* and going through their mnt_child */
+    struct list_head mnt_instance;	/* mount instance on sb->s_mounts */
+    const char *mnt_devname;	/* Name of device e.g. /dev/dsk/hda1 */
+    struct list_head mnt_list;
+    ......
+} __randomize_layout;
+struct vfsmount {
+    struct dentry *mnt_root; // 当前文件系统根目录的dentry
+    struct super_block *mnt_sb;	// 指向超级块的指针
+    int mnt_flags;
+} __randomize_layout;
+```
+一个文件系统可以挂装载到不同的挂载点。所以**文件系统树的一个位置要由<mount, dentry>二元组（或者说<vfsmount, dentry>）来确定**，也有说是根据 dentry 的状态位确定被 被mount，进而根据path hash从mount hashtable 里获取的mount struct。
+```c
+struct path {
+	struct vfsmount *mnt;  
+	struct dentry *dentry;
+};
+```
+
+### mount 过程
 
 [linux文件系统之mount流程分析](https://www.cnblogs.com/cslunatic/p/3683117.html)
 
@@ -170,23 +208,26 @@ linux 和 windows 一个很大区别就是，window 有c盘、d盘等，而linux
 
 那么mount 如何实现这个神奇的效果呢？mount系统调用 入口
 
-    SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name, char __user *, type, unsigned long, flags, void __user *, data){
-        ......
-        ret = do_mount(kernel_dev, dir_name, kernel_type, flags, options);
-        ......
-    }
+```c
+SYSCALL_DEFINE5(mount, char __user *, dev_name, char __user *, dir_name, char __user *, type, unsigned long, flags, void __user *, data){
+    ......
+    ret = do_mount(kernel_dev, dir_name, kernel_type, flags, options);
+    ......
+}
+```
 
 接下里的调用链：do_mount->do_new_mount
 
-    static int do_new_mount(struct path *path, const char *fstype, int flags,
-                int mnt_flags, const char *name, void *data)
-    {
-        ...
-        mnt = vfs_kern_mount(type, flags, name, data);
-        ...
-        err = do_add_mount(real_mount(mnt), path, mnt_flags);
-        ...
-    }
+```c
+static int do_new_mount(struct path *path, const char *fstype, int flags,
+            int mnt_flags, const char *name, void *data){
+    ...
+    mnt = vfs_kern_mount(type, flags, name, data);
+    ...
+    err = do_add_mount(real_mount(mnt), path, mnt_flags);
+    ...
+}
+```
 
 do_new_mount()函数主要分成两大部分：
 
@@ -236,40 +277,12 @@ do_new_mount()函数主要分成两大部分：
 
 
 1. alloc_vfsmnt，vfs_kern_mount 先是创建 struct mount 结构，内部包含一个vfsmount 结构
-2. mount_fs，mount_fs()函数中会调用特定文件系统的mount方法，对于 `/dev/sdb`设备上的ext3文件系统，ext3_mount--> mount_bdev，Mount_bdev()函数主要完成superblock对象的内存初始化，并且加入到全局superblock链表中。
+2. mount_fs，mount_fs()函数中会调用特定文件系统的mount方法，对于 `/dev/sdb`设备上的ext3文件系统，`ext3_mount--> mount_bdev`，Mount_bdev()函数主要完成superblock对象的内存初始化，并且加入到全局superblock链表中。
 3. Vfsmount中的mnt_root指向superblock对象的s_root根目录项。
-
-相关的数据结构
-
-    struct mount {
-        struct hlist_node mnt_hash;
-        struct mount *mnt_parent;   // 装载点所在的父文件系统
-        struct dentry *mnt_mountpoint; // 装载点在父文件系统中的dentry
-        struct vfsmount mnt;
-        union {
-            struct rcu_head mnt_rcu;
-            struct llist_node mnt_llist;
-        };
-        struct list_head mnt_mounts;	/* list of children, anchored here */
-        struct list_head mnt_child;	/* and going through their mnt_child */
-        struct list_head mnt_instance;	/* mount instance on sb->s_mounts */
-        const char *mnt_devname;	/* Name of device e.g. /dev/dsk/hda1 */
-        struct list_head mnt_list;
-        ......
-    } __randomize_layout;
-
-
-    struct vfsmount {
-        struct dentry *mnt_root; // 当前文件系统根目录的dentry
-        struct super_block *mnt_sb;	// 指向超级块的指针
-        int mnt_flags;
-    } __randomize_layout;
 
 ### do_add_mount
 
-do_add_mount--> graft_tree--> attach_recursive_mnt
-
-将创建的vfsmount对象加入到mount树和VFSMOUNT Hash Table中，并且将老的dentry目录项标识成DCACHE_MOUNTED，一旦dentry被标识成DCACHE_MOUNTED，也就意味着在访问路径上对其进行了屏蔽。
+`do_add_mount--> graft_tree--> attach_recursive_mnt`将创建的vfsmount对象加入到mount树和VFSMOUNT Hash Table中，并且将老的dentry目录项标识成DCACHE_MOUNTED，一旦dentry被标识成DCACHE_MOUNTED，也就意味着在访问路径上对其进行了屏蔽。
 
 ## 挂载方式
 
@@ -277,7 +290,7 @@ do_add_mount--> graft_tree--> attach_recursive_mnt
 
 ### bind mount
 
-mount --bind olddir newdir
+`mount --bind olddir newdir`
 
 ln分为软链接和硬链接
 

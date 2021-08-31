@@ -72,6 +72,8 @@ keywords: 深度学习
 3. [大数据竞赛平台——Kaggle 入门](https://blog.csdn.net/u012162613/article/details/41929171)未做
 
 
+[从技术到科学，中国AI向何处去？](https://mp.weixin.qq.com/s/GV0UFUvDtIiBong0ZAe0LA)
+
 ## 自动编码器
 
 如何学习特征，用到了自编码器。参考文章

@@ -115,7 +115,7 @@ scrape_configs:
     ```
     在consul_sd_configs定义当中通过server定义了Consul服务的访问地址，services则定义了当前需要发现哪些类型服务实例的信息，这里限定了只获取node_exporter的服务实例信息。
 
-4. 平台提供的api，比如Kubernetes.
+4. 平台提供的api，比如Kubernetes.  **不同的role 获取target ip:port/path 的方式不同，默认值也不同**，比如pod和service 优先从annnotation 汇总获取ip:port/path
     ```yaml
     - job_name: 'kubernetes-cadvisor'
       kubernetes_sd_configs:
