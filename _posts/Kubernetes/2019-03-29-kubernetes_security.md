@@ -243,6 +243,8 @@ service count 的认证和授权过程
     2. credentials： service-account-token
 2. 通过authenticating后，API Server将根据Pod username所在的`group：system:serviceaccounts`和`system:serviceaccounts:(NAMESPACE)`的权限对其进行authority 和admission control两个环节的处理。在这两个环节中，cluster管理员可以对service account的权限进行细化设置。
 
+根据serviceaccount 还可以制作 kubeconfig 文件 [使用serviceaccount制作kubeconfig文件](https://blog.csdn.net/sysushui/article/details/104881715)
+
 ## 小结
 
 1. 有哪些资源
