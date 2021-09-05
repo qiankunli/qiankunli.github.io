@@ -227,7 +227,15 @@ $ go run main.go
 ```
 
 ## panic /recover
-
+[Go 的 panic 的秘密都在这](https://mp.weixin.qq.com/s/pxWf762ODDkcYO-xCGMm2g)
+```go
+func main() {
+	defer func() {
+		recover()    // runtime.gorecover
+	}()
+	panic(nil)       //  runtime.gopanic
+}
+```
 数据结构
 
 ```go
@@ -239,19 +247,68 @@ type _panic struct {
 	aborted   bool           // 表明 panic 是否忽略
 }
 type g struct {
-    ...
-    _panic       *_panic // 最内侧的 panic 结构体
+    // ...
+    _panic         *_panic // panic 链表，这是最里的一个
+    _defer         *_defer // defer 链表，这是最里的一个；
+    // ...
 }
 ```
-首先是确定 panic 是否可恢复（一系列条件），对可恢复panic，创建一个 _panic 实例，保存在 goroutine 链表中先前的 panic 链表，接下来开始逐一调用当前 goroutine 的 defer 方法， 检查用户态代码是否需要对 panic 进行恢复，如果某个包含了 recover 的调用（即 gorecover 调用）被执行，这时 _panic 实例 p.recovered 会被标记为 true， 从而会通过 mcall 的方式来执行 recovery 函数来重新进入调度循环，如果所有的 defer 都没有指明显式的 recover，那么这时候则直接在运行时抛出 panic 信息
+![](/public/upload/go/goroutine_panic.png)
+
+
+panic 的实现在一个叫做 gopanic 的函数： 创建一个panic 实例，检查有没有defer 兜着自己，有则过关执行panic后面的代码，无则gg（exit）。
+
 ```go
-func main() {
-	defer func() {
-		recover()    // runtime.gorecover
-	}()
-	panic(nil)       //  runtime.gopanic
+// runtime/panic.go
+func gopanic(e interface{}) {
+    // 在栈上分配一个 _panic 结构体
+    var p _panic
+    // 把当前最新的 _panic 挂到链表最前面
+    p.link = gp._panic
+    gp._panic = (*_panic)(noescape(unsafe.Pointer(&p)))
+    
+    for {
+        // 取出当前最近的 defer 函数；
+        d := gp._defer
+        if d == nil {
+            // 如果没有 defer ，那就没有 recover 的时机，只能跳到循环外，退出进程了；
+            break
+        }
+        // 进到这个逻辑，那说明了之前是有 panic 了，现在又有 panic 发生，这里一定处于递归之中；
+        if d.started {... continue}
+        // 标记 _defer 为 started = true （panic 递归的时候有用）
+        d.started = true
+        // 记录当前 _defer 对应的 panic
+        d._panic = (*_panic)(noescape(unsafe.Pointer(&p)))
+        // 执行 defer 函数
+        reflectcall(nil, unsafe.Pointer(d.fn), deferArgs(d), uint32(d.siz), uint32(d.siz))
+        // defer 执行完成，把这个 defer 从链表里摘掉；
+        gp._defer = d.link
+        // 取出 pc，sp 寄存器的值；
+        pc := d.pc
+        sp := unsafe.Pointer(d.sp)
+        // 如果 _panic 被设置成恢复，那么到此为止；
+        if p.recovered {
+            // 摘掉当前的 _panic
+            gp._panic = p.link
+            // 如果前面还有 panic，并且是标记了 aborted 的，那么也摘掉；
+            // panic 的流程到此为止，恢复到业务函数堆栈上执行代码；
+            gp.sigcode0 = uintptr(sp)
+            gp.sigcode1 = pc
+            // 注意：恢复的时候 panic 函数将从此处跳出，本 gopanic 调用结束，后面的代码永远都不会执行。
+            mcall(recovery)
+            throw("recovery failed") // mcall should not return
+        }
+    }
+	// 一旦走到循环外，说明 _panic 没人处理，程序即将退出；
+    // 打印错误信息和堆栈，并且退出进程；
+    preprintpanics(gp._panic)
+    fatalpanic(gp._panic) // should not return
+    *(*int)(nil) = 0      // not reached
 }
 ```
+
+首先是确定 panic 是否可恢复（一系列条件），对可恢复panic，创建一个 _panic 实例，保存在 goroutine 链表中先前的 panic 链表，接下来开始逐一调用当前 goroutine 的 defer 方法， 检查用户态代码是否需要对 panic 进行恢复，如果某个包含了 recover 的调用（即 gorecover 调用）被执行，这时 _panic 实例 p.recovered 会被标记为 true， 从而会通过 mcall 的方式来执行 recovery 函数来重新进入调度循环，如果所有的 defer 都没有指明显式的 recover，那么这时候则直接在运行时抛出 panic 信息
 
 ## error
 

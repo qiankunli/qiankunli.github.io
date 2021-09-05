@@ -57,14 +57,35 @@ MyBatis框架要做的事情，就是在运行`session.selectList("mybatis.mappe
     <mapper resource="mybatis/mapper/UserMapper.xml"/>
   </mappers>
 </configuration>
+// UserMapper.xml 
+<mapper namespace="io.github.dunwu.spring.orm.mapper.UserMapper">
+  ...
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+    delete from user
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+</mapper>
 ```
+
+```java
+public interface UserMapper {
+    int deleteByPrimaryKey(Long id);
+    int insert(User record);
+    User selectByPrimaryKey(Long id);
+    List<User> selectAll();
+    int updateByPrimaryKey(User record);
+}
+```
+
+Mapper.xml 文件可以看做是 MyBatis 的 JDBC SQL 模板，Mapper.java 文件是 Mapper.xml 对应的 Java 对象。UserMapper.java 中的方法和 UserMapper.xml 的 CRUD 语句元素（ `<insert>`、`<delete>`、`<update>`、`<select>`）存在一一对应关系。使用时，**SqlSession 可以直接执行sql，也可以通过动态代理生成UserMapper 实例`UserMapper userMapper = sqlSession.getMapper(UserMapper.class);`，底层仍是 `SqlSession.xx`**。
+
 ## 整体架构
 
 [MyBatis版本升级引发的线上告警回顾及原理分析](https://mp.weixin.qq.com/s/sk0Kou9V727tRe5wddmDig)MyBatis要将SQL语句完整替换成带参数值的版本，需要经历框架初始化以及实际运行时动态替换这两个部分。
 
 在框架初始化阶段，有一些组件会被构建：
 
-1. SqlSession：作为MyBatis工作的主要顶层API，表示和数据库交互的会话，完成必要的数据库增删改查功能。
+1. SqlSession：作为MyBatis工作的主要顶层API，表示和数据库交互的会话（包括对事务的控制），完成必要的数据库增删改查功能。
 2. SqlSource：负责根据用户传递的parameterObject，动态地生成SQL语句，将信息封装到BoundSql对象中，并返回。
 3. Configuration：MyBatis所有的配置信息都维持在Configuration对象之中。**在构建Configuration的过程中，会涉及到构建对应每一条SQL语句对应的MappedStatement**
 
@@ -94,7 +115,7 @@ MyBatis框架要做的事情，就是在运行`session.selectList("mybatis.mappe
 
 ![](/public/upload/java/mybatis_object.png)
 
-mybatis 最重要的接口是 SqlSession，它是应用程序与持久层之间执行交互操作的一个单线程对象，SqlSessionTemplate 只是mybatis-spring 对它的封装
+mybatis 最重要的接口是 SqlSession，它是**应用程序与持久层之间**执行交互操作的一个单线程对象，SqlSessionTemplate 只是mybatis-spring 对它的封装
 
 1. SqlSession对象完全包含以数据库为背景的所有执行SQL操作的方法,它的底层封装了JDBC连接,可以用SqlSession实例来直接执行被映射的SQL语句.
 2. SqlSession是线程不安全的，每个线程都应该有它自己的SqlSession实例.

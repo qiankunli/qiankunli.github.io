@@ -95,7 +95,17 @@ linux 信号机制
     2. 捕获，用户进程可以注册自己针对这个信号的 handler
     3. Default，，Linux 为每个信号都定义了一个默认的行为，包含终止、忽略等，SIGKILL 和 SIGSTOP 的默认行为都是终止。
 2. SIGTERM 是kill 默认发出的  `kill pid` = `kill -SIGTERM pid`
-3. 在每个 Namespace 的 init 进程建立的时候，就会打上 SIGNAL_UNKILLABLE 这个标签，1 号进程永远不会响应 SIGKILL 和 SIGSTOP 这两个特权信号，对于其他的信号，如果用户自己注册了 handler，1 号进程可以响应。即如果init 注册了SIGTERM handler， 可以被 SIGTERM 杀死。
+3. init 进程的特殊性，在每个 Namespace 的 init 进程建立的时候，就会打上 SIGNAL_UNKILLABLE 这个标签，1 号进程永远不会响应 SIGKILL 和 SIGSTOP 这两个特权信号。对于其他的信号，如果用户自己注册了 handler，1 号进程可以响应。
+3. 容器的一般使用专用的init 进程（注册并实现非SIGKILL 和 SIGSTOP  信号的处理函数）， 负责转发信号到所有的子进程，并且回收僵尸进程。 docker原生提供的init进程为tini 
+
+```sh
+docker run -d --init ubuntu:14.04 bash -c "cd /home/ && sleep 100
+oot@24cc26039c4d:/# ps -ef
+UID PID PPID C STIME TTY TIME CMD
+root 1 0 2 14:50 ? 00:00:00 /sbin/docker-init -- bash -c cd /home/ && sleep 100
+root 6 1 0 14:50 ? 00:00:00 bash -c cd /home/ && sleep 100
+root 7 6 0 14:50 ? 00:00:00 sleep 100
+```
 
 ## 以进程管理工具作为entrypoint
 
