@@ -427,4 +427,6 @@ static __always_inline struct rq *context_switch(struct rq *rq, struct task_stru
 
 应用：CFS的抢占，其实是不那么暴力的抢占。目前互联网企业都拥有海量的服务器，其中大部分只运行交互类延时敏感的在线业务，使CPU利用率非常低，造成资源的浪费（据统计全球服务器CPU利用率不足20%）。为提高服务器CPU的利用率，需要在运行在线业务的服务器上，混合部署一些高CPU消耗且延时不敏感的离线业务。为了使得在离线互相不影响，需要在在线业务CPU使用率低的时候，可以运行一些离线业务，而当在线业务CPU利用率高的时候，可以对离线业务快速抢占。如果在离线业务都使用不暴力的CFS调度器，现有的混部方案没办法做到及时抢占的。在同调度类优先级的进程，互相抢占的时候，需要满足两个条件。第一个是抢占进程的虚拟时间要小于被抢占进程，第二是被抢占进程已经运行的实际要大于最小运行时间。如果两个条件不能同时满足，就会导致无法抢占。基于这种考虑，开发了针对离线业务的新调度算法[bt](https://github.com/Tencent/TencentOS-kernel)，该算法可以保证在线业务优先运行。
 
+cpu 就是不端从pc 找活儿（指令）干，加上scheduler + task list之后就是不断从task list找个活儿（task_struct）干，跟java executor 不断从队列找活儿（runnable）干是一样的。又比如go中，用户逻辑包在goroutine中，goroutine 放在P中，M 不断从P 中取出G 来干活儿。 就好像网络包，一层套一层，符合一定的格式才可以收发和识别。
+
 ![](/public/upload/basic/scheduler_design.png)
