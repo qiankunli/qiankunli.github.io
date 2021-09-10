@@ -199,7 +199,7 @@ Prometheus服务器还提供了一套内置查询语言PromQL、一个表达式�
 
 
 
-### Prometheus expression language
+### PromQL/Prometheus expression language
 
 [QUERYING PROMETHEUS](https://prometheus.io/docs/prometheus/latest/querying/basics/)即便一个表达语言，那也是麻雀虽小五脏俱全，字面量、运算符、语法规则、函数等都有，虽然没有编程语言全面，但也像SQL一样很完备了
 
@@ -216,7 +216,9 @@ http_requests_total{code="200",handler="/rules",instance="0.0.0.0:9099",job="pro
 ```
 Time series Selectors 从time series 中选择需要的数据
 
-1. Instant vector selectors 基于metric name 、label 做选择，以下3个实例
+在 Prometheus 的表达语言中，一个表达式或子表达式可以计算为以下四种类型之一：
+
+1. 瞬时向量（Instant vector）：一组时间序列，每个时间序列包含一个样本，所有样本共享相同的时间戳。基于metric name 、label 做选择，以下3个实例
     ```
     ## 根据metric name 选择
     http_requests_total
@@ -225,12 +227,17 @@ Time series Selectors 从time series 中选择需要的数据
     ## label 支持多个运算符
     http_requests_total{environment=~"staging|testing|development",method!="GET"}
     ```
-2. Range Vector Selectors  为查询数据指定一个时间范围
+    
+2. 范围向量（Range vector）：一组时间序列，其中包含每个时间序列随时间变化的一系列数据点。
     ```
     # 使用[]指定一个range duration
     http_requests_total{job="prometheus"}[5m]
     ```
-3. 对指标进行 函数计算，比如`sum(http_requests_total)` 支持的函数[expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
+3. 标量（Scalar）：一个简单的数字浮点值。
+4. 字符串（String）：一个简单的字符串值，目前未使用。
+
+
+对指标进行 函数计算，比如`sum(http_requests_total)` 支持的函数[expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
 
 [Prometheus 常用 PromQL 语句](https://mp.weixin.qq.com/s/vr1C6S_jAnMMu_5sUmYPMQ)
 
