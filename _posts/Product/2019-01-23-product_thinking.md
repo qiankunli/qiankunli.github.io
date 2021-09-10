@@ -98,6 +98,8 @@ keywords: Product thinking
 
 ![](/public/upload/mesh/design_tradeoff.png)
 
+[技术人员的一点产品思维思考](https://mp.weixin.qq.com/s/ahoA3re0BIEPN7MFEYEigQ)抽象能力相信大家做技术的都或多或少有一些、平时写代码中也经常用到。但是根据已有的内容去抽象、和**面向未来去抽象**是2种完全不一样的能力。当技术人员具备产品视角之后，会更容易发现抽象的角度、也更容易表达出来抽象的概念
+
 
 
 

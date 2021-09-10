@@ -24,7 +24,7 @@ KubeFlow不是什么
 3. KubeFlow不是一个软件，他更像是一个技术栈，用户从这个技术栈中挑选符合需求的组件使用，各个组件是非常松耦合的
 4. KubeFlow不是机器学习算法，这个不解释了
 
-阿里推出类似 kube-flow 的 [KubeDL 加入 CNCF Sandbox，加速 AI 产业云原生化](https://mp.weixin.qq.com/s/7SUhnW4cnk_3G9Q7lIytcA)
+kubeflow 也在不断发展，[Kubeflow Training Operator 统一云上 AI 训练](https://mp.weixin.qq.com/s/20eFlnOmbydmklCM3K8lJw)。阿里推出类似 kube-flow 的 [KubeDL 加入 CNCF Sandbox，加速 AI 产业云原生化](https://mp.weixin.qq.com/s/7SUhnW4cnk_3G9Q7lIytcA)
 
 ## 案例
 
@@ -71,7 +71,10 @@ spec:
 
 ## 源码分析
 
-实现crd 有两派思路，tf-operator 都有体现：tf-operator.v1 是目前在用的版本，training-operator.v1 是下一个大版本的设计，还不太稳定，没有发布出去。training-operator.v1 是基于 controller runtime 写的，tf-operator.v1 是基于 informer 和 client 裸写的。 当然都有大量的复用部分，因此抽了一个 `github.com/kubeflow/commmon`。
+实现crd 有两派思路，tf-operator 都有体现：
+1. tf-operator.v1 是目前在用的版本，基于 informer 和 client 裸写的。
+2. training-operator.v1 是下一个大版本的设计，还不太稳定，没有发布出去。training-operator.v1 是基于 controller runtime 写的
+当然都有大量的复用部分，因此抽了一个 `github.com/kubeflow/commmon`。`kubeflow/commmon` 不仅用于tf-operator 自身的迭代，也用于整合其它机器学习framework的operator。对于机器学习任务来说，一般都是运行多个进程，ps/master 进程负责协调，worker 进程负责干活儿，所有进程运行同一段代码，相互之间互相访问， 并共享一些全局信息，所以整体上各个operator 包括tf/pytorch/mpi 等都是很像的。
 
 tf-operator.v1  核心struct 是 TFController，training-operator.v1 的核心struct 是TFJobReconciler， 它们都实现了ControllerInterface， 都聚合了JobController。同时 JobController 也聚合了 ControllerInterface。 具体的说TFController 和 JobController 互为成员。可以初步认为 在新老切换阶段，JobController 沉淀了TFController 和 TFJobReconciler 的一些通用逻辑，Reconcile 的核心逻辑是：ReconcileJobs ==> ReconcilePods ==> ReconcileServices，流程由TFController/TFJobReconciler触发，这几个方法TFController/TFJobReconciler 自己实现就用自己的，自己没实现就用JobController的。不必纠结这些细节。
 

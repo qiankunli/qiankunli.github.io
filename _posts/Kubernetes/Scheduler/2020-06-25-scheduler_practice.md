@@ -122,3 +122,5 @@ Allocatable:
 ......
 ```
 
+`allocatale = capacity - kube_reserved - system_reserved - eviction_hard`Node Capacity 是节点的所有硬件资源，kube-reserved 是给 kube 组件预留的资源，system-reserved 是给系统进程预留的资源，eviction-threshold 是 kubelet 驱逐的阈值设定，allocatable 才是真正调度器调度 Pod 时的参考值（保证节点上所有 Pods 的 request 资源不超过 Allocatable）。 
+

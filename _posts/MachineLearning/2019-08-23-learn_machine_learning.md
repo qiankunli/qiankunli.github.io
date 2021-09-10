@@ -11,6 +11,8 @@ keywords: 深度学习
 
 ## 前言
 
+机器通过分析大量数据来进行学习。比如说，不需要通过编程来识别猫或人脸，它们可以通过使用图片来进行训练，从而归纳和识别特定的目标。
+
 ![](/public/upload/machine/machine_learning_xmind.png)
 
 ## 学习路线

@@ -35,6 +35,9 @@ try (SqlSession session = sqlSessionFactory.openSession()) {
 }
 ```
 
+Mapper.xml 文件可以看做是 MyBatis 的 JDBC SQL 模板，Mapper.java 文件是 Mapper.xml 对应的 Java 对象。UserMapper.java 中的方法和 UserMapper.xml 的 CRUD 语句元素（ `<insert>`、`<delete>`、`<update>`、`<select>`）存在一一对应关系。使用时，**SqlSession 可以直接执行sql，也可以通过动态代理生成UserMapper 实例`UserMapper userMapper = sqlSession.getMapper(UserMapper.class);`，底层仍是 `SqlSession.xx`**。PS：核心就是如何构造SQLsession，如何使用SQLsession
+
+
 MyBatis框架要做的事情，就是在运行`session.selectList("mybatis.mapper.UserMapper.getAll")`的时候，将 `mybatis.mapper.UserMapper.getAll`进行替换，使SQL语句变成`SELECT id,name FROM user`。
 
 ```xml
@@ -77,7 +80,6 @@ public interface UserMapper {
 }
 ```
 
-Mapper.xml 文件可以看做是 MyBatis 的 JDBC SQL 模板，Mapper.java 文件是 Mapper.xml 对应的 Java 对象。UserMapper.java 中的方法和 UserMapper.xml 的 CRUD 语句元素（ `<insert>`、`<delete>`、`<update>`、`<select>`）存在一一对应关系。使用时，**SqlSession 可以直接执行sql，也可以通过动态代理生成UserMapper 实例`UserMapper userMapper = sqlSession.getMapper(UserMapper.class);`，底层仍是 `SqlSession.xx`**。
 
 ## 整体架构
 

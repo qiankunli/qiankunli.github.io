@@ -114,6 +114,12 @@ patchTemplate := map[string]interface{}{
 	}
 patchdata, _ := json.Marshal(patchTemplate)
 _, err := clientset.CoreV1().Nodes().Patch(ctx, Nodes[i].Name, types.StrategicMergePatchType, patchdata, metav1.PatchOptions{})
+
+```
+给pod 添加label，有时直接Update 容器revision conflict 
+```go
+labelPatch := fmt.Sprintf(`[{"op":"add","path":"/metadata/labels/%s","value":"%s" }]`, "labelkey", "labelvaule")
+_, err = sc.kubeClient.CoreV1().Pods(p.Namespace).Patch(context.TODO(), p.Name, types.JSONPatchType, []byte(labelPatch), metav1.PatchOptions{})
 ```
 
 ![](/public/upload/kubernetes/client_go_layer.png)
