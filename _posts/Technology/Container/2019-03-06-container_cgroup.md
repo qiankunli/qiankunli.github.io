@@ -115,7 +115,6 @@ NICE_0_LOAD = 1024
 |--cpu-quota||Impose a CPU CFS quota on the container，和cpu-period结合使用|
 |--cpus|1|表示quota/period=1<br>docker 1.13支持支持，替换cpu-period和cpu-quota|
 
-现在的多核系统中每个核心都有自己的缓存，如果频繁的调度进程在不同的核心上执行势必会带来缓存失效等开销。--cpuset-cpus 可以让容器始终在一个或某几个 CPU 上运行。--cpuset-cpus 选项的一个缺点是必须指定 CPU 在操作系统中的编号，这对于动态调度的环境(无法预测容器会在哪些主机上运行，只能通过程序动态的检测系统中的 CPU 编号，并生成 docker run 命令)会带来一些不便。
 
 If you have 1 CPU, each of the following commands guarantees the container at most 50% of the CPU every second.
 1. Docker 1.13 and higher:`docker run -it --cpus=".5" ubuntu /bin/bash`
@@ -123,7 +122,19 @@ If you have 1 CPU, each of the following commands guarantees the container at mo
 
 shares值即CFS中每个进程的(准确的说是调度实体)权重(weight/load)，shares的大小决定了在一个CFS调度周期中，进程占用的比例，比如进程A的shares是1024，B的shares是512，假设调度周期为3秒，那么A将只用2秒，B将使用1秒
 
+现在的多核系统中每个核心都有自己的缓存，如果频繁的调度进程在不同的核心上执行势必会带来缓存失效等开销。--cpuset-cpus 可以让容器始终在一个或某几个 CPU 上运行。--cpuset-cpus 选项的一个缺点是必须指定 CPU 在操作系统中的编号，这对于动态调度的环境(无法预测容器会在哪些主机上运行，只能通过程序动态的检测系统中的 CPU 编号，并生成 docker run 命令)会带来一些不便。解决办法 [深入理解 Kubernetes CPU Manager](https://mp.weixin.qq.com/s/4qnbtwXi4TScEIYyfRm9Qw)
+
 ## Kubernetes
+
+假设`cat /proc/cpuinfo| grep "processor"| wc -l` 查看某个node 的逻辑core 数为48，使用`kubectl describe node xx`查看node cpu情况
+```
+Capacity:     # 节点的总资源
+  ...
+  cpu:                       48
+Allocatable:  # 可以分配用来运行pod的
+  ...
+  cpu:                       47
+```
 
 [Understanding resource limits in kubernetes: cpu time](https://medium.com/@betz.mark/understanding-resource-limits-in-kubernetes-cpu-time-9eff74d3161b)
 
@@ -136,22 +147,14 @@ resources:
     memory: 100Mi
     cpu: 100m
 ```
-单位后缀 m 表示千分之一核，也就是说 1 Core = 1000m。so this resources object specifies that the container process needs 50/1000 of a core (5%) and is allowed to use at most 100/1000 of a core (10%).同样，2000m 表示两个完整的 CPU 核心，你也可以写成 2 或者 2.0。
+单位后缀 m 表示千分之一核，也就是说 1 Core = 1000m。so this resources object specifies that the container process needs 50/1000 of a core (5%) and is allowed to use at most 100/1000 of a core (10%).同样，2000m 表示两个完整的 CPU 核心，你也可以写成 2 或者 2.0。 **不带单位 默认单位就是1000，就是一个cpu**
 
-cpu requests and cpu limits are implemented using two separate control systems.
+cpu requests and cpu limits are implemented using two separate control systems.**cpu request和limit 是两个cpu cgroup 子系统**
 
 |Kubernetes|docker|cpu,cpuacct cgroup|
 |---|---|---|
 |request=50m|cpu-shares=51|cpu.shares|
 |limit=100m|cpu-period=100000,cpu-quota=10000|cpu.cfs_period_us,cpu.cfs_quota_us|
-
-request并不能限定 容器使用cpu 的上界
-
-request 和 limit 
-
-1. if you set a limit but don’t set a request kubernetes will default the request to the limit. This can be fine if you have very good knowledge of how much cpu time your workload requires. 
-2. How about setting a request with no limit? In this case kubernetes is able to accurately schedule your pod, and the kernel will make sure it gets at least the number of shares asked for, but your process will not be prevented from using more than the amount of cpu requested, which will be stolen from other process’s cpu shares when available. 
-3. Setting neither a request nor a limit is the worst case scenario: the scheduler has no idea what the container needs, and the process’s use of cpu shares is unbounded, which may affect the node adversely. 
 
 ### request
 
@@ -164,6 +167,9 @@ $ docker inspect f2321226620e --format '{{.HostConfig.CpuShares}}'
 51
 ```
 Why 51, and not 50? The cpu control group and docker both divide a core into 1024 shares, whereas kubernetes divides it into 1000.
+
+Requests 使用的是 cpu shares 系统，cpu shares 将每个 CPU 核心划分为 1024 个时间片，并保证每个进程将获得固定比例份额的时间片。如果总共有 1024 个时间片，并且两个进程中的每一个都将 cpu.shares 设置为 512，那么它们将分别获得大约一半的 CPU 可用时间。但 cpu shares 系统无法精确控制 CPU 使用率的上限，也就是说如果一个进程没有使用它的这一份，其它进程是可以使用的。
+
 
 ### limit
 ```
@@ -178,9 +184,17 @@ $ docker inspect 472abbce32a5 --format '{{.HostConfig.CpuShares}} {{.HostConfig.
 51 10000 100000
 ```
 
+cpu limits 会被带宽控制组设置为 cpu.cfs_period_us 和 cpu.cfs_quota_us 属性的值。
+
 ### Qos
 
 [Kubernetes Resources Management – QoS, Quota, and LimitRange](https://www.cncf.io/blog/2020/06/10/kubernetes-resources-management-qos-quota-and-limitrangeb/)A node can be overcommitted when it has pod scheduled that make no request, or when the sum of limits across all pods on that node exceeds the available machine capacity. In an **overcommitted environment**, the pods on the node may attempt to use more compute resources than the ones available at any given point in time.When this occurs, the node must give priority to one container over another. Containers that have the lowest priority are terminated/throttle first. The entity used to make this decision is referred as the Quality of Service (QoS) Class.
+
+request 和 limit 
+
+1. if you set a limit but don’t set a request kubernetes will default the request to the limit（Kubernetes 会将 CPU 的 requests 设置为 与 limits 的值一样）. This can be fine if you have very good knowledge of how much cpu time your workload requires.  
+2. How about setting a request with no limit? In this case kubernetes is able to accurately schedule your pod, and the kernel will make sure it gets at least the number of shares asked for, but your process will not be prevented from using more than the amount of cpu requested, which will be stolen from other process’s cpu shares when available. 
+3. Setting neither a request nor a limit is the worst case scenario: the scheduler has no idea what the container needs, and the process’s use of cpu shares is unbounded, which may affect the node adversely. 
 
 ## 内存 
 
