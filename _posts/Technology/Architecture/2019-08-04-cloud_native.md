@@ -40,6 +40,8 @@ keywords: alibaba cloud native
 
 ![](/public/upload/architecture/company_architecture_3.png)
 
+[2021 年云原生技术发展现状及未来趋势](https://mp.weixin.qq.com/s/ZMCskVFy7WRA1DSVx7S1kg)从系统层次分可以区分出云原生基础设施【如存储、网络、管理平台 K8s】、云原生中间件、云原生应用架构以及云原生交付运维体系
+
 
 ## 全面上云
 

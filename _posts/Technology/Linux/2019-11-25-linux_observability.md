@@ -208,3 +208,12 @@ perf stat 给出了其他几个最常用的统计信息：
 perf sched 使用了转储后再分析 (dump-and-post-process) 的方式来分析内核调度器的各种事件
 
 [几十万实例线上系统的抖动问题定位](https://mp.weixin.qq.com/s/PordZi_H5fqX_-Ty9OH6qQ)
+
+## 日志
+
+[linux内核输出的日志去哪里了](https://mp.weixin.qq.com/s/mdDLw6AIp9ws9LTaHg64pg)在内核编码时，如果想要输出一些信息，通常并不会直接使用printk，而是会使用其衍生函数，比如 pr_err / pr_info / pr_debug 等，这些衍生函数附带了日志级别、所属模块等其他信息，比较友好，但其最终还是调用了printk。printk函数会将每次输出的日志，放到内核为其专门分配的名为ring buffer的一个槽位里。ring buffer其实就是一个用数组实现的环形队列，不过既然是环形队列，就会有一个问题，即当ring buffer满了的时候，下一条新的日志，会覆盖最开始的旧的日志。ring buffer的大小，可以通过内核参数来修改。
+
+dmesg命令，在默认情况下，是通过读取/dev/kmsg文件，来实现查看内核日志的。当该命令运行时，dmesg会先调用open函数，打开/dev/kmsg文件，该打开操作在内核中的逻辑，会为dmesg分配一个file实例，在这个file实例里，会有一个seq变量，该变量记录着下一条要读取的内核日志在ring buffer中的位置。刚打开/dev/kmsg文件时，这个seq指向的就是ring buffer中最开始的那条日志。之后，dmesg会以打开的/dev/kmsg文件为媒介，不断的调用read函数，从内核中读取日志消息，每读取出一条，seq的值都会加一，即指向下一条日志的位置，依次往复，直到所有的内核日志读取完毕，dmesg退出。
+
+
+

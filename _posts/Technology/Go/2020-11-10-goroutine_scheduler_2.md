@@ -352,7 +352,7 @@ schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexi
 
 [Go 的抢占式调度](https://mp.weixin.qq.com/s/d7FdGBc0S0V3S4aRL4EByA)有两种主要的多任务调度方法：“协作”和“抢占”。协作式多任务处理也称为“非抢占”。在协作式多任务处理中，程序的切换方式取决于程序本身。“协作”一词是指这样一个事实：程序应设计为可互操作的，并且它们必须彼此“协作”。在抢占式多任务处理中，程序的切换交给操作系统。调度是基于某种算法的，例如基于优先级，FCSV，轮询等。
 
-那么现在，goroutine 的调度是协作式还是抢占式的？至少在 Go1.13 之前，它是协作式的。当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中，当 G 进行函数调用时，G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。
+那么现在，goroutine 的调度是协作式还是抢占式的？至少在 Go1.13 之前，它是协作式的。当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中，**当 G 进行函数调用时**（os 中断是指令完毕时，进而执行中断处理程序，重新拿到cpu使用权），G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。
 ```go
 func main() {
     go fmt.Println("hi")
