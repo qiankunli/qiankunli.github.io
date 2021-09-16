@@ -149,25 +149,35 @@ k8s.io/client-go
     /tools/leaderelection/metrics.go
     /util/workqueue/metrics.go
 ```
-比如client-go workqueue 在Add逻辑中记录metric 数据，但client-go 并不负责创建 XXVec，  XXVec的创建由开发手动负责，通过MetricsProvider 注入到 workqueue 中 `workqueue.SetProvider(workqueueMetricsProvider{})`。  `k8s.io.component-base.metrics.prometheus.workqueue` 的init 方法实现了上述逻辑，import 即可。PS： 若client-go 创建XXVec则无法确定开发是否一定使用，也无法直接对外暴露metrics api（不确定端口号等），因此将MetricsProvider 作为client-go 与业务开发的边界。
-```go
-// k8s.io/client-go/util/workqueue/metrics.go
-type MetricsProvider interface {
-	NewDepthMetric(name string) GaugeMetric
-	NewAddsMetric(name string) CounterMetric
-	NewLatencyMetric(name string) HistogramMetric
-	NewWorkDurationMetric(name string) HistogramMetric
-	NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
-	NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric
-	NewRetriesMetric(name string) CounterMetric
-}
-type CounterMetric interface {
-	Inc()
-}
-// k8s.io/client-go/util/workqueue/queue.go
-func (q *Type) Add(item interface{}) {
-    ...	
-	q.metrics.add(item)
-	...
-}
-```
+MetricsProvider 作为client-go 与业务开发的边界。
+
+1. client-go 并不负责创建 XXVec，  XXVec的创建由使用者手动创建，并注册到prometheus registry中，对外通过prometheus server 暴露http api出去。对内通过MetricsProvider 暴露给 client-go workqueue
+	```go
+	// k8s.io.component-base.metrics.prometheus.workqueue
+	function init(){	
+		workqueue.SetProvider(workqueueMetricsProvider{})
+	}
+	```
+2. client-go 通过MetricsProvider 获取到 metric 并赋值数据
+
+	```go
+	// k8s.io/client-go/util/workqueue/metrics.go
+	type MetricsProvider interface {
+		NewDepthMetric(name string) GaugeMetric
+		NewAddsMetric(name string) CounterMetric
+		NewLatencyMetric(name string) HistogramMetric
+		NewWorkDurationMetric(name string) HistogramMetric
+		NewUnfinishedWorkSecondsMetric(name string) SettableGaugeMetric
+		NewLongestRunningProcessorSecondsMetric(name string) SettableGaugeMetric
+		NewRetriesMetric(name string) CounterMetric
+	}
+	type CounterMetric interface {
+		Inc()
+	}
+	// k8s.io/client-go/util/workqueue/queue.go
+	func (q *Type) Add(item interface{}) {
+		...	
+		q.metrics.add(item)
+		...
+	}
+	```

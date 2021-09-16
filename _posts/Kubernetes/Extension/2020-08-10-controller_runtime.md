@@ -1,92 +1,16 @@
 ---
 
 layout: post
-title: kubebuilder 及controller-runtime学习
+title: controller-runtime源码分析
 category: 架构
 tags: Kubernetes
-keywords: controller-runtime kubebuilder
+keywords: controller-runtime 
 ---
 
 ## 简介
 
 * TOC
 {:toc}
-
-Kubernetes 这样的分布式操作系统对外提供服务是通过 API 的形式，**分布式操作系统本身提供的 API 相当于单机操作系统的系统调用**。Kubernetes 本身提供的API，通过名为 Controller 的组件来支持，由开发者为 Kubernetes 提供的新的 API，则通过 Operator 来支持，Operator 本身和 Controller 基于同一套机制开发。Kubernetes 的工作机制和单机操作系统也较为相似，etcd 提供一个 watch 机制，Controller 和 Operator 需要指定自己 watch 哪些内容，并告诉 etcd，这相当于是微内核架构在 IDT 或 SCV 中注册系统调用的过程。
-
-[Kubebuilder：让编写 CRD 变得更简单](https://mp.weixin.qq.com/s/Gzpq71nCfSBc1uJw3dR7xA)K8s 作为一个“容器编排”平台，其核心的功能是编排，Pod 作为 K8s 调度的最小单位,具备很多属性和字段，K8s 的编排正是通过一个个控制器根据被控制对象的属性和字段来实现。PS：再具体点就是 crud pod及其属性字段
-
-对于用户来说，实现 CRD 扩展主要做两件事：
-
-1. 编写 CRD 并将其部署到 K8s 集群里；这一步的作用就是让 K8s 知道有这个资源及其结构属性，在用户提交该自定义资源的定义时（通常是 YAML 文件定义），K8s 能够成功校验该资源并创建出对应的 Go struct 进行持久化，同时触发控制器的调谐逻辑。
-2. 编写 Controller 并将其部署到 K8s 集群里。这一步的作用就是实现调谐逻辑。
-
-[面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA)
-
-## kubebuilder 
-
-[Kubebuilder中文文档](https://cloudnative.to/kubebuilder/introduction.html) 对理解k8s 上下游知识以及使用kubebuiler 编写控制器很有帮助。
-
-### 和controller-runtime 的关系
-
-对于 CRD Controller 的构建，有几个主流的工具
-1.  coreOS 开源的 Operator-SDK（https://github.com/operator-framework/operator-sdk ）
-2.  K8s 兴趣小组维护的 Kubebuilder（https://github.com/kubernetes-sigs/kubebuilder ）
-
-[kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) 是一个用来帮助用户快速实现 Kubernetes CRD Operator 的 SDK。当然，kubebuilder 也不是从0 生成所有controller 代码，k8s 提供给一个 [Kubernetes controller-runtime Project](https://github.com/kubernetes-sigs/controller-runtime)  a set of go libraries for building Controllers. controller-runtime 在Operator SDK中也有被用到。
-
-有点类似于spring/controller-runtime提供核心抽象,springboot/kubebuilder 将一切集成起来，**我们只需要实现 Reconcile 方法即可**。
-
-```go
-type Reconciler interface {
-    // Reconciler performs a full reconciliation for the object referred to by the Request.The Controller will requeue the Request to be processed again if an error is non-nil or Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
-    Reconcile(Request) (Result, error)
-}
-```
-
-### 示例demo
-
-1. 在`GOPATH/src/app`创建脚手架工程 `kubebuilder init --domain example.io`
-    ```
-    GOPATH/src/app
-        /config                 // 跟k8s 集群交互所需的一些yaml配置
-            /certmanager
-            /default
-            /manager
-            /prometheus
-            /rbac
-            /webhook
-        main.go                 // 创建并启动 Manager，容器的entrypoint
-        Dockerfile              // 制作Controller 镜像
-        go.mod                   
-            module app
-            go 1.13
-            require (
-                k8s.io/apimachinery v0.17.2
-                k8s.io/client-go v0.17.2
-                sigs.k8s.io/controller-runtime v0.5.0
-            )
-    ```
-2.  创建 API `kubebuilder create api --group apps --version v1alpha1 --kind Application` 后文件变化
-    ```
-    GOPATH/src/app
-        /api/v1alpha1
-            /application_types.go      // 新增 Application/ApplicationSpec/ApplicationStatus struct; 将类型注册到 scheme 辅助接口 
-            /zz_generated.deepcopy.go
-        /config
-            /crd                        // Application CustomResourceDefinition。提交后apiserver 可crudw该crd
-            /...
-        /controllers
-            /application_controller.go  // 定义 ApplicationReconciler ，核心逻辑就在这里实现
-        main.go                         // ApplicationReconciler 添加到 Manager，Manager.Start(stopCh)
-        go.mod                          
-    ```
-执行 `make install` 实质是执行 `kustomize build config/crd | kubectl apply -f -` 将cr yaml 提交到apiserver上。之后就可以 提交Application yaml 到 k8s 了。将crd struct 注册到 schema，则client-go 可以支持对crd的 crudw 等操作。
-
-## controller-runtime 整体设计
-
-[controller-runtime 之控制器实现](https://mp.weixin.qq.com/s/m-eNII-h-Gq74bMZ3fQLKg)
-[controller-runtime 之 manager 实现](https://mp.weixin.qq.com/s/3i3t-PBP3UN8W9quEhAQDQ)
 
 当我们谈到 k8s 的控制器模型时，其伪代码如下
 
@@ -106,7 +30,7 @@ for {
 /sigs.k8s.io/controller-runtime/pkg
     /manager
         /manager.go     // 定义了 Manager interface
-        /internal.go    // 定义了Manager 实现类 controllerManager  
+        /internal.go    // 定义了Manager 实现类 controllerManager ，因为可能有多个controller
     /controller
         /controller.go  // 定义了 Controller interface
     /reconcile
@@ -114,6 +38,8 @@ for {
     /handler            // 事件处理器/入队器，负责将informer 的cud event 转换为reconcile.Request加入到queue中
 ```
 controller-runtime 的核心是Manager 驱动 Controller 进而驱动 Reconciler。kubebuiler 用Manager.start 作为驱动入口， Reconciler 作为自定义入口（变的部分），Controller 是不变的部分。
+
+## 整体设计
 
 Manager 管理多个Controller 的运行，并提供 数据读（cache）写（client）等crudw基础能力。
 
@@ -124,25 +50,29 @@ Manager 管理多个Controller 的运行，并提供 数据读（cache）写（c
 
 ![](/public/upload/kubernetes/controller_runtime_logic.png)
 
-一个controller中只有一个Reconciler。A Controller manages a work queue fed reconcile.Requests from source.Sources.  Work is performed through the reconcile.Reconciler for each enqueued item. Work typically is reads and writes Kubernetes objects to make the system state match the state specified in the object Spec. 
+A Controller manages a work queue fed reconcile.Requests from source.Sources.  Work is performed through the reconcile.Reconciler for each enqueued item. Work typically is reads and writes Kubernetes objects to make the system state match the state specified in the object Spec. 
 
-## 源码分析
+当我们观察Manager/Contronller/Reconciler Interface 的时候，接口定义是非常清晰的，但是为了实现接口定义的 能力（方法）要聚合很多struct，初始化时要为它们赋值，这个部分代码实现的比较负责，可能是go 缺少类似ioc 工具带来的问题。 
 
-### 启动流程
+## 启动流程
 
-启动逻辑比较简单：
+kubebuilder 生成的 controller-runtime 代码相对晦涩一些，很多时候crd 已经在其它项目中定义完成，我们需要监听一个或多个crd 完成一些工作，这种场景下对crd 的处理逻辑可以参考 kubeflow/tf-operator 等项目。
+
+启动逻辑比较简单：创建数据结构，并建立数据结构之间的关系。
 1. 初始化Manager；初始化流程主要是创建cache 与 Clients。 
-    1. 创建 Cache，可以看到 Cache 主要就是创建了 InformersMap，Scheme 里面的每个 GVK 都创建了对应的 Informer，通过 informersByGVK 这个 map 做 GVK 到 Informer 的映射，每个 Informer 会根据 ListWatch 函数对对应的 GVK 进行 List 和 Watch。
+    1. 创建 Cache，可以看到 Cache 主要就是创建了 InformersMap，Scheme 里面的每个 GVK 都创建了对应的 Informer，通过 informersByGVK 这个 map 做 GVK 到 Informer 的映射，每个 Informer 会根据 ListWatch 函数对对应的 GVK 进行 List 和 Watch。PS： 肯定不能一个Controller 一个informer，但controller 之间会共用informer，所以informer 要找一个地方集中持有。 
     2. 创建 Clients，读操作使用上面创建的 Cache，写操作使用 K8s go-client 直连。
 2. 将 Manager 的 Client 传给 Controller，并且调用 SetupWithManager 方法传入 Manager 进行 Controller 的初始化；
 3. 启动 Manager。即 `Manager.Start(stopCh)`
+
+因为Controller 的逻辑相对固定， 所以main 入口只有Reconciler 和Manager，Controller 被隐藏了。 
 
 ```go
 func main() {
 	...
     // 1. init Manager 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
+		Scheme:             scheme,		// 要将你监听的crd 加入到scheme 中
 		Port:               9443,})
     // 2. init Reconciler（Controller）
 	if err = (&controllers.ApplicationReconciler{
@@ -153,7 +83,10 @@ func main() {
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {...}
 }
 ```
-ApplicationReconciler 是我们定义的Application object 对应的Reconciler 实现。ApplicationReconciler.SetupWithManager 有点绕，把构造Controller 以及Reconciler/Controller/Manager 一步做掉了。
+ApplicationReconciler 是我们定义的Application object 对应的Reconciler 实现。ApplicationReconciler.SetupWithManager 有点绕
+1. 创建Reconciler，将Reconciler 加入到controller
+1. 创建controller，将controller 加入到manager
+2. 创建时 会执行`Controller.watch` 配置controller 监听哪些gvk 或者说将哪些gvk 加入到cache
 
 ```go
 // kubebuilder 生成
@@ -161,18 +94,6 @@ func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).    // 生成Controller Builder 对象
 		For(&appsv1alpha1.Application{}).       // 为Controller指定cr
         Complete(r)                             // 为Controller指定Reconciler
-}
-// sigs.k8s.io/controller-runtime/pkg/controller/controller.go
-type Controller struct {
-	Name string // Name is used to uniquely identify a Controller in tracing, logging and monitoring. Name is required.
-	Do reconcile.Reconciler
-	Client client.Client // Client is a lazily initialized Client.  
-	Scheme *runtime.Scheme
-	Cache cache.Cache
-	Config *rest.Config // Config is the rest.Config used to talk to the apiserver.  
-	// Queue is an listeningQueue that listens for events from Informers and adds object keys to the Queue for processing
-	Queue workqueue.RateLimitingInterface
-    ...
 }
 // Complete ==> Build
 func (blder *Builder) Build(r reconcile.Reconciler) (controller.Controller, error) {
@@ -200,52 +121,96 @@ func New(name string, mgr manager.Manager, options Options) (Controller, error) 
 }
 ```
 
-### Manager 启动
 
-Manager 可以管理 Runnable/Controller 的生命周期（添加/启动），持有Controller共同的依赖：client、cache、scheme 等。提供了object getter(例如GetClient())，还有一个简单的依赖注入机制(runtime/inject)，还支持领导人选举，提供了一个用于优雅关闭的信号处理程序。
+## Controller
+
+[controller-runtime 之控制器实现](https://mp.weixin.qq.com/s/m-eNII-h-Gq74bMZ3fQLKg)
 
 ```go
-func (cm *controllerManager) Start(stop <-chan struct{}) error {
-    // 启动metric 组件供Prometheus 拉取数据
-    go cm.serveMetrics(cm.internalStop)
-    // 启动健康检查探针
-	go cm.serveHealthProbes(cm.internalStop)
-	go cm.startNonLeaderElectionRunnables()
-	if cm.resourceLock != nil {
-		if err := cm.startLeaderElection(); err != nil{...}
-	} else {
-		go cm.startLeaderElectionRunnables()
-	}
+type Controller interface {
+	// Reconciler is called to reconcile an object by Namespace/Name
+	reconcile.Reconciler
+	// Watch takes events provided by a Source and uses the EventHandler to
+	// enqueue reconcile.Requests in response to the events.
+	Watch(src source.Source, eventhandler handler.EventHandler, predicates ...predicate.Predicate) error
+	// Start starts the controller.  Start blocks until the context is closed or a controller has an error starting.
+	Start(ctx context.Context) error
+	...
+}
+// sigs.k8s.io/controller-runtime/pkg/controller/controller.go
+type Controller struct {
+	Name string // Name is used to uniquely identify a Controller in tracing, logging and monitoring. Name is required.
+	Do reconcile.Reconciler
+	Client client.Client // Client is a lazily initialized Client.  
+	Scheme *runtime.Scheme
+	Cache cache.Cache
+	Config *rest.Config // Config is the rest.Config used to talk to the apiserver.  
+	// Queue is an listeningQueue that listens for events from Informers and adds object keys to the Queue for processing
+	Queue workqueue.RateLimitingInterface
     ...
 }
-type controllerManager struct {
-    ...
-	// leaderElectionRunnables is the set of Controllers that the controllerManager injects deps into and Starts.
-	// These Runnables are managed by lead election.
-	leaderElectionRunnables []Runnable
-}
-// 启动cache/informer 及 Controller
-func (cm *controllerManager) startLeaderElectionRunnables() {
-    // 核心是启动Informer, waitForCache ==> cm.startCache = cm.cache.Start ==> InformersMap.Start ==> 
-    // InformersMap.structured/unstructured.Start ==> Informer.Run
-	cm.waitForCache()
-	for _, c := range cm.leaderElectionRunnables {
-		ctrl := c
-		go func() {
-            // 启动Controller
-			if err := ctrl.Start(cm.internalStop); err != nil {...}
-		}()
-	}
+func New(name string, mgr manager.Manager, options Options) (Controller, error) {
+	c, err := NewUnmanaged(name, mgr, options)
+	// Add the controller as a Manager components
+	return c, mgr.Add(c)
 }
 ```
-
-### Controller 逻辑
-
-Controller 逻辑主要有两个（任何Controller 都是如此）
+Controller 逻辑主要有两个（任何Controller 都是如此），对应两个函数是 Watch 与 Start
 1. 监听 object 事件并加入到 queue 中。为提高扩展性 Controller 将这个职责独立出来交给了 Source 组件，不只是监听apiserver，任何外界资源变动 都可以通过 Source 接口加入 到Reconcile 逻辑中。
 2. 从queue 中取出object event 执行Reconcile 逻辑。 
 
-![](/public/upload/kubernetes/controller_runtime_object.png)
+### watch
+
+
+
+![](/public/upload/kubernetes/controller_watch.png)
+
+```go
+// 这里明确了 Controller 监听哪些Type， 或者说哪些 event 会触发Controller
+func (r *TFJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	c, err := controller.New(r.ControllerName(), mgr, controller.Options{Reconciler: r,})
+	// using onOwnerCreateFunc is easier to set defaults
+	c.Watch(&source.Kind{Type: &tfv1.TFJob{}}, &handler.EnqueueRequestForObject{},predicate.Funcs{...}) 
+	// inject watching for job related pod
+	c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{...}, predicate.Funcs{...)
+	// inject watching for job related service
+	...
+	return nil
+}
+// watch 就是启动 source.start
+func (c *Controller) Watch(src source.Source, evthdler handler.EventHandler, prct ...predicate.Predicate) error {
+	// Inject Cache into arguments
+	c.SetFields(src)
+	c.SetFields(evthdler)
+	for _, pr := range prct {
+		c.SetFields(pr)
+	}
+	c.Log.Info("Starting EventSource", "source", src)
+	return src.Start(c.ctx, evthdler, c.Queue, prct...)
+}
+```
+Source 是事件的源，使用 Kind 来处理来自集群的事件（如 Pod 创建、Pod 更新、Deployment 更新）；使用 Channel 来处理来自集群外部的事件（如 GitHub Webhook 回调、轮询外部 URL）。
+```go
+// Kind 用于提供来自集群内部的事件源，这些事件来自于 Watches（例如 Pod Create 事件）
+type Kind struct {
+ 	// Type 是 watch 对象的类型，比如 &v1.Pod{}
+ 	Type runtime.Object
+ 	// cache 用于 watch 的 APIs 接口
+ 	cache cache.Cache
+}
+func (ks *Kind) Start(handler handler.EventHandler, queue workqueue.RateLimitingInterface,prct ...predicate.Predicate) error {
+ 	// 从 Cache 中获取 Informer 并添加一个事件处理程序来添加队列
+ 	i, err := ks.cache.GetInformer(context.TODO(), ks.Type)
+	i.AddEventHandler(internal.EventHandler{Queue: queue, EventHandler: handler, Predicates: prct})
+ 	return nil
+}
+```
+
+watch 在 controller 初始化时调用，明确了 Controller 监听哪些Type，订阅这些Type的变化（入队逻辑挂到informer 上）。Controller.Watch ==> Source.Start 也就是 Kind.Start 就是从cache 中获取资源对象的 Informer 并注册事件监听函数。 对 事件监听函数进行了封装，放入到工作队列中的元素不是以前默认的元素唯一的 KEY，而是经过封装的 reconcile.Request 对象，当然通过这个对象也可以很方便获取对象的唯一标识 KEY。
+
+### start
+
+start 由manager.Start 触发，消费workqueue，和 一般控制器中启动控制循环比较类似
 
 ```go
 func (c *Controller) Start(stop <-chan struct{}) error {
@@ -292,7 +257,47 @@ func (c *Controller) reconcileHandler(obj interface{}) bool {
 }
 ```
 
-### Reconciler 开发模式
+## Manager 启动
+
+[controller-runtime 之 manager 实现](https://mp.weixin.qq.com/s/3i3t-PBP3UN8W9quEhAQDQ)
+
+Manager 可以管理 Runnable/Controller 的生命周期（添加/启动），持有Controller共同的依赖：client、cache、scheme 等。提供了object getter(例如GetClient())，还有一个简单的依赖注入机制(runtime/inject)，还支持领导人选举，提供了一个用于优雅关闭的信号处理程序。
+
+```go
+func (cm *controllerManager) Start(stop <-chan struct{}) error {
+    // 启动metric 组件供Prometheus 拉取数据
+    go cm.serveMetrics(cm.internalStop)
+    // 启动健康检查探针
+	go cm.serveHealthProbes(cm.internalStop)
+	go cm.startNonLeaderElectionRunnables()
+	if cm.resourceLock != nil {
+		if err := cm.startLeaderElection(); err != nil{...}
+	} else {
+		go cm.startLeaderElectionRunnables()
+	}
+    ...
+}
+type controllerManager struct {
+    ...
+	// leaderElectionRunnables is the set of Controllers that the controllerManager injects deps into and Starts.
+	// These Runnables are managed by lead election.
+	leaderElectionRunnables []Runnable
+}
+// 启动cache/informer 及 Controller
+func (cm *controllerManager) startLeaderElectionRunnables() {
+    // 核心是启动Informer, waitForCache ==> cm.startCache = cm.cache.Start ==> InformersMap.Start ==> 
+    // InformersMap.structured/unstructured.Start ==> Informer.Run
+	cm.waitForCache()
+	for _, c := range cm.leaderElectionRunnables {
+		ctrl := c
+		go func() {
+            // 启动Controller
+			if err := ctrl.Start(cm.internalStop); err != nil {...}
+		}()
+	}
+}
+```
+## Reconciler 开发模式
 
 ```go
 type ApplicationReconciler struct {
@@ -364,15 +369,8 @@ controller-runtime 暴露 handler.EventHandler接口，EventHandlers map an Even
 
 ### 其它
 
-[kubebuilder2.0学习笔记——搭建和使用](https://segmentfault.com/a/1190000020338350)
-[kubebuilder2.0学习笔记——进阶使用](https://segmentfault.com/a/1190000020359577) 
-go build  之后，可执行文件即可 监听k8s（由`--kubeconfig` 参数指定 ），执行Reconcile 逻辑了
-
-如果我们需要对 用户录入的 Application 进行合法性检查，可以开发一个webhook
-`kubebuilder create webhook --group apps --version v1alpha1 --kind Application --programmatic-validation --defaulting`
-
-[kubebuilder 注释标记](https://book.kubebuilder.io/reference/markers.html)，比如：令crd支持kubectl scale，对crd实例进行基础的值校验，允许在kubectl get命令中显示crd的更多字段，等等
 
 
+![](/public/upload/kubernetes/controller_runtime_object.png)
 
 

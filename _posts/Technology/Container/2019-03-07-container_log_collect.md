@@ -96,7 +96,8 @@ Docker 则通过 docker logs 命令向用户提供日志接口。`docker logs` �
     /modules.d // 各种存储后端的配置文件
 ```
 
-1. log-pilot 比较喜欢用环境变量，比如采集插件/组件 使用fluentd 还是filebeat 都是由环境变量指定 `PILOT_TYPE=filebeat`
+1. log-pilot 比较喜欢用环境变量，比如采集插件/组件 使用fluentd 还是filebeat 都是由环境变量指定 `PILOT_TYPE=filebeat` 后来镜像专门区分开 `registry.cn-hangzhou.aliyuncs.com/acs/log-pilot:0.9.7-filebeat` 和
+`registry.cn-hangzhou.aliyuncs.com/acs/log-pilot:0.9.7-fluentd`
 2. fluentd/filebeat 就像nginx 一样，根据配置文件运行，本身不具备动态发现容器日志文件的能力，log-pilot 对其封装了下（exec.Command 启动`/usr/bin/filebeat -c /etc/filebeat/filebeat.yml`）。就像istio pilot-agent 对envoy 所做的那样。
 3. log-pilot 监听docker 拿到container 数据（比如container的label），如果container 是新的， 并为container 生成一个filebeat yml 文件，reload filebeat（filebeat 本身会动态 发现`/prospectors.d`下的配置文件，reload  fluentd则需要向 fluentd 进程发送syscall.SIGHUP 信号 ），filebeat 便可以搜集容器日志发往后端存储了。
 
@@ -152,11 +153,9 @@ func (p *Pilot) watch() error {
 
 ### 为每一个容器生成filebeat yml文件
 
-Log-Pilot 支持声明式日志配置，可以依据容器的 Label 或者 ENV 来动态地生成日志采集配置文件
+Log-Pilot 支持声明式日志配置，可以依据容器的 Label 或者 ENV 来动态地生成日志采集配置文件，或者说采集哪些容器的哪些日志。采集带有 `PILOT_LOG_PREFIX.logs.$name=$path` 容器标签（注意不是pod 标签） 或`PILOT_LOG_PREFIX_logs_$name=$path` 容器env 的容器。
 
-1. PILOT_LOG_PREFIX  指定了Label和ENV 集合中 跟 log 相关的前缀。假设 PILOT_LOG_PREFIX=log
-2. 标签 log.$name=$path 
-3. 环境变量 log_$name=$path 
+
 
 name 和 path的含义
 

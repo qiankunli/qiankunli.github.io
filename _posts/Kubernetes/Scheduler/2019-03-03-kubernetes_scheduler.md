@@ -102,6 +102,8 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 ### Predicate
 
+从Pod 属性中检索“硬性要求”（比如 CPU/内存请求值，nodeSelector/nodeAffinity），然后过滤阶段发生，在该阶段计算出满足要求的节点候选列表。
+
 1. GeneralPredicates
 	1. PodFitsResources，检查的只是 Pod 的 requests 字段
 	2. PodFitsHost，宿主机的名字是否跟 Pod 的 spec.nodeName 一致。
@@ -116,7 +118,7 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 ### Priorities
 
-在 Predicates 阶段完成了节点的“过滤”之后，Priorities 阶段的工作就是为这些节点打分。这里打分的范围是 0-10 分，得分最高的节点就是最后被 Pod 绑定的最佳节点。
+从 Pod 属性中检索“软需求”，并应用一些默认的“软策略”（比如 Pod 倾向于在节点上更加聚拢或分散），最后，它为每个候选节点给出一个分数，这里打分的范围是 0-10 分，得分最高的节点就是最后被 Pod 绑定的最佳节点。
 
 1. LeastRequestedPriority + BalancedResourceAllocation
 
@@ -160,7 +162,7 @@ Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的
 
 ## 基于Scheduling Framework
 
-**为什么引入？**最初对于 Kube-scheduler 进行扩展的方式主要有两种，一种是Scheduler Extender（http外挂）， 另外一种是多调度器，部署多个调度器（一个公司两个老板，可能命令冲突）。Scheduler Extender 的性能较差可是维护成本较小，Custom Scheduler 的研发和维护的成本特别高但是性能较好，这种情况是开发者面临这种两难处境。这时候 Kubernetes Scheduling Framework V2 横空出世，在scheduler core基础上进行了改造和提取，在scheduler几乎所有关键路径上设置了plugins扩展点，**用户可以在不修改scheduler core代码的前提下开发plugins，最后与core一起编译打包成二进制包实现扩展**。
+**为什么引入？**最初对于 Kube-scheduler 进行扩展的方式主要有两种，一种是Scheduler Extender（http外挂）， 另外一种是多调度器，部署多个调度器（一个公司两个老板，可能命令冲突）。Scheduler Extender 的性能较差可是维护成本较小，Custom Scheduler 的研发和维护的成本特别高但是性能较好，这种情况是开发者面临这种两难处境。这时候 Kubernetes Scheduling Framework V2 横空出世，在scheduler core基础上进行了改造和提取，在scheduler几乎所有关键路径上设置了plugins扩展点，**用户可以在不修改scheduler core代码的前提下开发plugins，最后与core一起编译打包成二进制包实现扩展/重新编译kube-schduler**。
 
 明确了 Kubernetes 中的各个调度阶段，提供了设计良好的基于插件的接口。调度框架认为 Kubernetes 中目前存在调度（Scheduling）和绑定（Binding）两个循环：
 
