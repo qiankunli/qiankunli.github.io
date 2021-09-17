@@ -261,6 +261,23 @@ func (c *Controller) reconcileHandler(obj interface{}) bool {
 
 [controller-runtime 之 manager 实现](https://mp.weixin.qq.com/s/3i3t-PBP3UN8W9quEhAQDQ)
 
+```go
+// Manager 初始化共享的依赖关系，比如 Caches 和 Client，并将他们提供给 Runnables
+type Manager interface {
+ 	// Add 将在组件上设置所需的依赖关系，并在调用 Start 时启动组件
+  	// Add 将注入接口的依赖关系 - 比如 注入 inject.Client
+  	// 根据 Runnable 是否实现了 LeaderElectionRunnable 接口判断Runnable 可以在非 LeaderElection 模式（始终运行）或 LeaderElection 模式（如果启用了 LeaderElection，则由 LeaderElection 管理）下运行
+  	Add(Runnable) error
+ 	// SetFields 设置对象上的所有依赖关系，而该对象已经实现了 inject 接口
+  	// 比如 inject.Client
+ 	SetFields(interface{}) error
+ 	// Start 启动所有已注册的控制器，并一直运行，直到停止通道关闭
+  	// 如果使用了 LeaderElection，则必须在此返回后立即退出二进制，否则需要 Leader 选举的组件可能会在 Leader 锁丢失后继续运行
+ 	Start(<-chan struct{}) error
+ 	...
+}
+```
+
 Manager 可以管理 Runnable/Controller 的生命周期（添加/启动），持有Controller共同的依赖：client、cache、scheme 等。提供了object getter(例如GetClient())，还有一个简单的依赖注入机制(runtime/inject)，还支持领导人选举，提供了一个用于优雅关闭的信号处理程序。
 
 ```go
@@ -332,6 +349,15 @@ ApplicationReconciler 持有Client，便有能力对 相关资源进行 crud
 controllerManager  持有了Config/Client/APIReader/Scheme/Cache/Injector/StopChannel/Mapper 实例，将这些数据通过 SetFields 注入到Controller 中。Controller 再转手 将部分实例注入到 Source 中（Source 需要监听apiserver）
 
 ```go
+func (c *Controller) Watch(src source.Source, evthdler handler.EventHandler, prct ...predicate.Predicate) error {
+	// Inject Cache into arguments   
+	if err := c.SetFields(src); err != nil {...}
+	if err := c.SetFields(evthdler); err != nil {...}
+	for _, pr := range prct {
+		if err := c.SetFields(pr); err != nil {...}
+    }
+    ...
+}
 func (cm *controllerManager) SetFields(i interface{}) error {
 	if _, err := inject.ConfigInto(cm.config, i); err != nil {return err}
 	if _, err := inject.ClientInto(cm.client, i); err != nil {return err}
@@ -343,22 +369,33 @@ func (cm *controllerManager) SetFields(i interface{}) error {
 	if _, err := inject.MapperInto(cm.mapper, i); err != nil {return err}
 	return nil
 }
-func (c *Controller) Watch(src source.Source, evthdler handler.EventHandler, prct ...predicate.Predicate) error {
-	// Inject Cache into arguments   
-	if err := c.SetFields(src); err != nil {...}
-	if err := c.SetFields(evthdler); err != nil {...}
-	for _, pr := range prct {
-		if err := c.SetFields(pr); err != nil {...}
-    }
-    ...
+```
+以注入client 为例，Client interface 很像spring 中的XXAware ，受体声明和实现自己可以/需要注入啥，注入方根据受体的type 进行注入
+
+```go
+// sigs.k8s.io/controller-runtime/pkg/runtime/inject/inject.go
+func ClientInto(client client.Client, i interface{}) (bool, error) {
+	if s, ok := i.(Client); ok {
+		return true, s.InjectClient(client)
+	}
+	return false, nil
+}
+type Client interface {
+	InjectClient(client.Client) error
+}
+// ReplicaSetReconciler 实现了 Client 接口
+type ReplicaSetReconciler struct {
+	client.Client
+}
+func (a *ReplicaSetReconciler) InjectClient(c client.Client) error {
+	a.Client = c
+	return nil
 }
 ```
 
 ### 入队器
 
-reconciler 默认只监听注册的crd 的变更，
-
-控制器可能会监控多种类型的对象（例如Pod + ReplicaSet + Deployment），但是控制器的Reconciler一般仅仅处理单一类型的对象。以Application为例，Application Controller 需要监听  Application及关联的pod的变更，有两类方法
+一般一个crd 对应一个 reconciler。以Application crd为例，可能需要根据pod 变化采取动作，因此Application Controller 需要监听  Application及关联的pod的变更，有两类方法
 
 1. Reconcile 方法可以收到 Application 和 Pod object 的变更。此时实现`Reconciler.Reconcile(Request) (Result, error)` 要注意区分 Request 中的object 类型。
     1. 构建Application Controller时，Watch Pod
