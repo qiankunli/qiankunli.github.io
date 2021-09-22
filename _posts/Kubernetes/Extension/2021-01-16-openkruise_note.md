@@ -4,7 +4,7 @@ layout: post
 title: openkruise学习
 category: 架构
 tags: Kubernetes
-keywords:  kubernetes client-go
+keywords:  openkruise
 
 ---
 

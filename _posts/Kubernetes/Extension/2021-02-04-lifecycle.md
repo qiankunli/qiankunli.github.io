@@ -4,7 +4,7 @@ layout: post
 title: 生命周期管理
 category: 架构
 tags: Kubernetes
-keywords:  kubernetes client-go
+keywords:  lifecycle
 
 ---
 

@@ -236,6 +236,8 @@ Kubernetes 对象是系统中的持久实体，描述集群的期望状态
 
 **Kubernetes 的各种object，就是常规的各个项目组件在 kubernetes 上的表示** [深入理解StatefulSet（三）：有状态应用实践](https://time.geekbang.org/column/article/41217) 充分体现了在我们把服务 迁移到Kubernetes 的过程中，要做多少概念上的映射。
 
+[百度混部实践：如何提高 Kubernetes 集群资源利用率？](https://mp.weixin.qq.com/s/12XFN2lPB3grS5FteaF__A)百度为支持混部在每个node 除了kubelet 之外还部署了一个agent（负责数据上报和下发动作执行），定义了很多策略，通过给这些策略设计了一个这个 CRD ，单机引擎通过对 APIServer 发起 List-watch，实时的 Watch CR 的变更，实时调整参数和相关策略。
+
 
 
 

@@ -190,11 +190,38 @@ cpu limits 会被带宽控制组设置为 cpu.cfs_period_us 和 cpu.cfs_quota_us
 
 [Kubernetes Resources Management – QoS, Quota, and LimitRange](https://www.cncf.io/blog/2020/06/10/kubernetes-resources-management-qos-quota-and-limitrangeb/)A node can be overcommitted when it has pod scheduled that make no request, or when the sum of limits across all pods on that node exceeds the available machine capacity. In an **overcommitted environment**, the pods on the node may attempt to use more compute resources than the ones available at any given point in time.When this occurs, the node must give priority to one container over another. Containers that have the lowest priority are terminated/throttle first. The entity used to make this decision is referred as the Quality of Service (QoS) Class.
 
+
 request 和 limit 
 
 1. if you set a limit but don’t set a request kubernetes will default the request to the limit（Kubernetes 会将 CPU 的 requests 设置为 与 limits 的值一样）. This can be fine if you have very good knowledge of how much cpu time your workload requires.  
 2. How about setting a request with no limit? In this case kubernetes is able to accurately schedule your pod, and the kernel will make sure it gets at least the number of shares asked for, but your process will not be prevented from using more than the amount of cpu requested, which will be stolen from other process’s cpu shares when available. 
 3. Setting neither a request nor a limit is the worst case scenario: the scheduler has no idea what the container needs, and the process’s use of cpu shares is unbounded, which may affect the node adversely. 
+
+kubelet 为每个 Pod 设置 Cgroup 的目录结构：首先有一个一级目录叫 kubepod，所有 Pod 的 Cgroup 都会被挂到它下面， Burstable，BestEffort 这两种 Pod 没有直接挂在 kubepod 目录下，而是自己有一个原本是空白的没有值的二级目录。
+
+```
+cgroup
+  /kubepod
+    /pod1   // Guaranted pod
+    /pod2   // Guaranted pod
+    /Burstable
+      /pod3
+      /pod4   
+    /BestEffort
+      /pod5
+      /pod6  
+``` 
+
+
+[百度混部实践：如何提高 Kubernetes 集群资源利用率？](https://mp.weixin.qq.com/s/12XFN2lPB3grS5FteaF__A) 是一篇很好的讲混部的文章
+为什么原生 Kubernetes 没办法直接解决资源利用率的问题？
+1. 资源使用是动态的，而配额是静态限制。在线业务会根据其使用的峰值去预估 Quota（Request 和 Limit），配额申请之后就不能再修改，但资源用量却是动态的，白天和晚上的用量可能都不一样。
+2. 原生调度器并不感知真实资源的使用情况。对于 Burstable 这种想要超发的业务来说，无法做到合理的配置。
+
+Kubernetes 原本的资源模型存在局限性。 我们可以基于原生的 QOS 体系做一些不修改原本语义的扩展行为，并且基于质量建立相应的定价体系，通过给出不同质量的资源供给 SLA，来对资源进行差异化定价，从而引导用户更加合理地使用资源。
+
+每个节点运行一个agent，agent根据 Guaranteed-Pod 的真实用量去给 Burstable/BestEffort 目录整体设置了一个值，这个值通过**动态计算而来**。
+`Burstable 资源使用 = 单机最大 CPU 用量 - Guaranteed容器用量 - Safety-Margin`，`BestEffort = 单机最大 CPU 用量 - Guaranteed容器用量 - Burstable容器用量 - Safety-Margin`，比如一个pod request=limit=5，日常使用1，当pod 忙起来了，即申请的 Pod 现在要把自己借出去的这部分资源拿回来了，如何处理？此时会通过动态计算缩小 Burstable 和 BestEffort 的这两个框的值，达到一个压制的效果。当资源用量持续上涨时，如果 BestEffort 框整体 CPU 用量小于 1c ，单机引擎会把 BestEffort Pod 全部驱逐掉。当 Guaranteed-Pod 的用量还在持续上涨的时候，就会持续的压低 Burstable 整框 CPU 的 Quota，如果Burstable 框下只有一个 Pod，Request 是 1c，Limit 是 10c，那么单机引擎最低会将 Burstable 整框压制到 1c。换言之，对于 Request，就是说那些用户真实申请了 Quota 的资源，一定会得到得到供给；对于 Limit - Request 这部分资源，单机引擎和调度器会让它尽量能够得到供给；对于 BestEffort，也就是 No Limit 这部分资源，只要单机的波动存在，就存在被优先驱逐的风险.
 
 ## 内存 
 
