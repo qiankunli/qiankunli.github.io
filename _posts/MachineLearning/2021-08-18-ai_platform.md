@@ -8,7 +8,7 @@ keywords:  ai platform
 
 ---
 
-## 简介（持续更新）
+## 简介
 
 * TOC
 {:toc}

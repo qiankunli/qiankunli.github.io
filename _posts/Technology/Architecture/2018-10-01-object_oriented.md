@@ -12,45 +12,6 @@ keywords: 面向对象
 
 我一直有一个比方，如果把程序员写程序比作史官写历史，那么面向过程就是编年体通史，而面向对象更像是纪传体通史。编年体通史以时间（或一段时间）为中心，而纪传体通史则以人物为中心，譬如《史记》的《高祖本纪》等。类似的，面向过程多认为程序由一个个函数组成（依照顺序先后调用），譬如历史由一件件大事组成。而面向对象倾向于认为程序由一个个对象组成，譬如历史由一个个人的故事组成。
 
-## 喷一喷面向对象
-
-### 不要为了面向对象而面向对象
-
-2019.1.2 补充[如此理解面向对象编程](https://coolshell.cn/articles/8745.html)，有一个需求：代码检查操作系统类型，若是linux 输出：linux很不错；若是windows，输出windows 很差
-
-1. 过程化的方案
-2. 一般面向对象方案（一个os 抽象class，一个具体os 对应一个子class）
-3. 面向对象进化：不仅弄子类，还弄一map 保存os 和 子类的关系
-4. 大神 Rob Pike 对此的评论是：根本就不需要什么Object，只需要一张小小的配置表格，里面配置了对应的操作系统和你想输出的文本。这不就完了。所谓的代码进化相当疯狂和愚蠢的，这个完全误导了对编程的认知。
-
-还有的人喜欢用Object来替换所有的if-else语句，他们甚至还喜欢把函数的行数限制在10行以内 [programming in the
-twenty-first century](https://prog21.dadgum.com/156.html)
-6. **那23个经典的设计模式和OO半毛钱关系没有**，只不过人家用OO来实现罢了。设计模式就三个准则：1）中意于组合而不是继承，2）依赖于接口而不是实现，3）高内聚，低耦合。你看，这完全就是Unix的设计准则。
-
-
-[Don't Distract New Programmers with OOP](https://prog21.dadgum.com/93.html)The shift from procedural to OO brings with it a shift from thinking about problems and solutions to thinking about architecture. That's easy to see just by comparing a procedural Python program with an object-oriented one. The latter is almost always longer, full of extra interface and indentation and annotations. The temptation（诱惑） is to start moving trivial bits of code into classes and adding all these little methods and anticipating（预料） methods that aren't needed yet but might be someday. 封装对象、类、接口等对很多简单代码来说是不必要的。
-
-When you're trying to help someone learn how to go from a problem statement to working code, the last thing you want is to get them sidetracked（转移话题） by faux（人造的）-engineering busywork（作业、额外工作）. Some people are going to run with those scraps（点滴） of OO knowledge and build crazy class hierarchies and end up not as focused on on what they should be learning. Other people are going to lose interest because there's a layer of extra nonsense（无意义的） that makes programming even more cumbersome（笨重的）.
-
-面向对象逼着你除了思考问题本身外，还要思考结构、设计，很多人无此意识或功力不足， 滥用面向对象的特性，整出大量无意义的代码，使得代码复杂度大大超过了问题本身的复杂度。
-
-### 走偏的controller-service-dao
-
-controller-service-dao说白了，跟面向对象没啥关系，说面向过程也不算错。web 开发其实是在进行**数据处理**，这估计也是现在在倡导异步处理、反应式处理的初衷，而进行**逻辑处理**的框架，对代码设计是非常讲究的。习惯了Controller-service-dao这种思维，**在关键领域不会用类解决问题**，所有的代码都是把字段取出来计算，然后再塞回去。各种不同层面的业务计算混在一起，将来有一点调整，所有的代码都得跟着变，其实就是面向过程的代码。
-
-面向对象几个基本概念：抽象、封装、继承、多态等，现在看，最难的就是抽象，抽象是在说啥？在厘定边界，什么活该什么类干是精确的，**变动被局限在一个很小的范围内**（比如，我把map 改成guava cache，变动越小越优秀）。理论上，不违背基本设计的变动，修改起来应该是很容易的。没有抽象，写出来的都是方法和方法的组合
-
-一个类，有几个方法，有几个字段，叫啥名，哪些对外可见的，很重要，绝不是随意的，反应了你的设计理念。尤其是在重逻辑，轻数据处理的项目中。Controller-service-dao 给了很不好的恶习。
-
-在一些从结构化编程起步的程序员的视角里，面向对象就是数据加函数。虽然这种理解不算完全错误，但理解的程度远远不够。面向对象是解决更大规模应用开发的一种尝试，它提升了程序员管理程序的尺度。谈到面向对象，你可能会想到面向对象的三个特点：封装、继承和多态。**封装，则是面向对象的根基**。对象之间就是靠方法调用来通信的。但这个方法调用并不是简单地把对象内部的数据通过方法暴露。因为，封装的重点在于对象提供了哪些行为，而不是有哪些数据。也就是说，即便我们把对象理解成数据加函数，**数据和函数也不是对等的地位**。函数是接口，而数据是内部的实现，正如我们一直说的那样，接口是稳定的，实现是易变的。**“封装”的要点是行为，数据只是实现细节**，而很多人习惯性的写法是面向数据的，这也是导致很多人在设计上缺乏扩展性思考的一个重要原因。
-
-一个模型的封装应该是以行为为基础的。PS： 一个类不应该只当数据类用，除非目的就是数据类。
-
-理解了这一点，我们来看一个很多人都有的日常编程习惯。他们编写一个类的方法时，把这个类有哪些字段写出来，然后，生成一大堆 getter 和 setter，将这些字段的访问暴露出去。**这种做法的错误就在于把数据当成了设计的核心**，这一堆的 getter 和 setter，是对于封装的破坏，它把一个类内部的实现细节暴露了出来。请注意，方法的命名，体现的是你的意图，而不是具体怎么做。所以，**getXXX 和 setXXX 绝对不是一个好的命名**。不过，在真实的项目中，有时确实需要暴露一些数据，所以，等到你确实需要暴露的时候，再去写 getter 也不迟，你一定要问问自己为什么要加 getter。至于 setter，首先，大概率是你用错了名字，应该用一个表示意图的名字；其次，setter 通常意味着修改，一个好的设计应该尽可能追求不变性。所以，setter 也是一个提示符，告诉我们，这个地方的设计可能有问题。
-
-
-setter 的出现，是对于封装的破坏，它把一个类内部的实现细节暴露了出来。面向对象的封装，关键点是行为，而使用 setter 多半只是做了数据的聚合，缺少了行为的设计。setter 通常还意味着变化，一个好的设计应该尽可能追求不变性。所以，setter 也是一个提示符，告诉我们，这个地方的设计可能有问题。
-
 ## 抽象
 
 [程序员必备的思维能力：抽象思维](https://mp.weixin.qq.com/s/cJ0odiYcphhNBoAVjqpCZQ)
@@ -86,7 +47,7 @@ setter 的出现，是对于封装的破坏，它把一个类内部的实现细�
 面向对象的程序设计语言必须有描述对象及其相互之间关系的语言成分。这些程序设计语言可以归纳为以下几类：
 
 1. 系统中一切事物皆为对象；
-2. 对象是属性及其操作的封装体；
+2. 对象是属性及其操作的封装体；《effective java》：尽可能地使每个类或者成员不被外界访问。
 2. 对象可按其性质划分为类，
 3. 对象成为类的实例；
 4. 实例关系和继承关系是对象之间的静态关系；
@@ -246,6 +207,46 @@ class Business{
 ```
 	
 从两段代码 看，线程与对象的 主从关系 完全相反。[程序的本质复杂性和元语言抽象](https://coolshell.cn/articles/10652.html)指出：程序=control + logic。 同步/异步 等 本质就是一个control，只是拉取数据的手段。因此，在我们理解程序时，同步异步不应成为本质的存在。
+
+
+## 喷一喷面向对象
+
+### 不要为了面向对象而面向对象
+
+2019.1.2 补充[如此理解面向对象编程](https://coolshell.cn/articles/8745.html)，有一个需求：代码检查操作系统类型，若是linux 输出：linux很不错；若是windows，输出windows 很差
+
+1. 过程化的方案
+2. 一般面向对象方案（os 抽象为class，一个具体os 对应一个子class）
+3. 面向对象进化：不仅弄子类，还弄一map 保存os 和 子类的关系
+4. 大神 Rob Pike 对此的评论是：根本就不需要什么Object，只需要一张小小的配置表格，里面配置了对应的操作系统和你想输出的文本。这不就完了。所谓的代码进化相当疯狂和愚蠢的，这个完全误导了对编程的认知。
+
+还有的人喜欢用Object来替换所有的if-else语句，他们甚至还喜欢把函数的行数限制在10行以内 [programming in the
+twenty-first century](https://prog21.dadgum.com/156.html)
+6. **那23个经典的设计模式和OO半毛钱关系没有**，只不过人家用OO来实现罢了。设计模式就三个准则：1）中意于组合而不是继承，2）依赖于接口而不是实现，3）高内聚，低耦合。你看，这完全就是Unix的设计准则。
+
+
+[Don't Distract New Programmers with OOP](https://prog21.dadgum.com/93.html)The shift from procedural to OO brings with it a shift from thinking about problems and solutions to thinking about architecture. That's easy to see just by comparing a procedural Python program with an object-oriented one. The latter is almost always longer, full of extra interface and indentation and annotations. The temptation（诱惑） is to start moving trivial bits of code into classes and adding all these little methods and anticipating（预料） methods that aren't needed yet but might be someday. 封装对象、类、接口等对很多简单代码来说是不必要的。
+
+When you're trying to help someone learn how to go from a problem statement to working code, the last thing you want is to get them sidetracked（转移话题） by faux（人造的）-engineering busywork（作业、额外工作）. Some people are going to run with those scraps（点滴） of OO knowledge and build crazy class hierarchies and end up not as focused on on what they should be learning. Other people are going to lose interest because there's a layer of extra nonsense（无意义的） that makes programming even more cumbersome（笨重的）.
+
+面向对象逼着你除了思考问题本身外，还要思考结构、设计，很多人无此意识或功力不足， 滥用面向对象的特性，整出大量无意义的代码，使得代码复杂度大大超过了问题本身的复杂度。
+
+### 走偏的controller-service-dao
+
+controller-service-dao说白了，跟面向对象没啥关系，说面向过程也不算错。web 开发其实是在进行**数据处理**，这估计也是现在在倡导异步处理、反应式处理的初衷，而进行**逻辑处理**的框架，对代码设计是非常讲究的。习惯了Controller-service-dao这种思维，**在关键领域不会用类解决问题**，所有的代码都是把字段取出来计算，然后再塞回去。各种不同层面的业务计算混在一起，将来有一点调整，所有的代码都得跟着变，其实就是面向过程的代码。
+
+面向对象几个基本概念：抽象、封装、继承、多态等，现在看，最难的就是抽象，抽象是在说啥？在厘定边界，什么活该什么类干是精确的，**变动被局限在一个很小的范围内**（比如，我把map 改成guava cache，变动越小越优秀）。理论上，不违背基本设计的变动，修改起来应该是很容易的。没有抽象，写出来的都是方法和方法的组合
+
+一个类，有几个方法，有几个字段，叫啥名，哪些对外可见的，很重要，绝不是随意的，反应了你的设计理念。尤其是在重逻辑，轻数据处理的项目中。Controller-service-dao 给了很不好的恶习。
+
+在一些从结构化编程起步的程序员的视角里，面向对象就是数据加函数。虽然这种理解不算完全错误，但理解的程度远远不够。面向对象是解决更大规模应用开发的一种尝试，它提升了程序员管理程序的尺度。谈到面向对象，你可能会想到面向对象的三个特点：封装、继承和多态。**封装，则是面向对象的根基**。对象之间就是靠方法调用来通信的。但这个方法调用并不是简单地把对象内部的数据通过方法暴露。因为，封装的重点在于对象提供了哪些行为，而不是有哪些数据。也就是说，即便我们把对象理解成数据加函数，**数据和函数也不是对等的地位**。函数是接口，而数据是内部的实现，正如我们一直说的那样，接口是稳定的，实现是易变的。**“封装”的要点是行为，数据只是实现细节**，而很多人习惯性的写法是面向数据的，这也是导致很多人在设计上缺乏扩展性思考的一个重要原因。
+
+一个模型的封装应该是以行为为基础的。PS： 一个类不应该只当数据类用，除非目的就是数据类。
+
+理解了这一点，我们来看一个很多人都有的日常编程习惯。他们编写一个类的方法时，把这个类有哪些字段写出来，然后，生成一大堆 getter 和 setter，将这些字段的访问暴露出去。**这种做法的错误就在于把数据当成了设计的核心**，这一堆的 getter 和 setter，是对于封装的破坏，它把一个类内部的实现细节暴露了出来。请注意，方法的命名，体现的是你的意图，而不是具体怎么做。所以，**getXXX 和 setXXX 绝对不是一个好的命名**。不过，在真实的项目中，有时确实需要暴露一些数据，所以，等到你确实需要暴露的时候，再去写 getter 也不迟，你一定要问问自己为什么要加 getter。至于 setter，首先，大概率是你用错了名字，应该用一个表示意图的名字；其次，setter 通常意味着修改，一个好的设计应该尽可能追求不变性。所以，setter 也是一个提示符，告诉我们，这个地方的设计可能有问题。
+
+
+setter 的出现，是对于封装的破坏，它把一个类内部的实现细节暴露了出来。面向对象的封装，关键点是行为，而使用 setter 多半只是做了数据的聚合，缺少了行为的设计。setter 通常还意味着变化，一个好的设计应该尽可能追求不变性。所以，setter 也是一个提示符，告诉我们，这个地方的设计可能有问题。
 
 ## 小结
 

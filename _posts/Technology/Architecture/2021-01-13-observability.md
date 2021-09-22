@@ -23,7 +23,7 @@ keywords: observability
 
 [看Netflix如何简化应用程序监控体系](https://mp.weixin.qq.com/s/DkW09mFukT5DNFnc66_AhA)
 
-
+[淘宝客户端诊断体系升级实践](https://mp.weixin.qq.com/s/9nQUQPT9NWILRxsnZxllUQ)
 
 ## 可观察性
 

@@ -69,7 +69,7 @@ github 也有一些demo 项目layout [golang-standards/project-layout](https://g
 |godep|1.5之前可以用，1.6依赖vendor||
 |Go Modules|1.11 发布，1.12 增强，1.13正式默认开启||
 
-### 最早的GOPATH
+## 最早的GOPATH
 
 对于go来说，其实并不在意你的代码是内部还是外部的，总之都在GOPATH里，任何import包的路径都是从GOPATH开始的；唯一的区别，就是内部依赖的包是开发者自己写的，外部依赖的包是go get下来的。Go 语言原生包管理的缺陷：
 
@@ -78,7 +78,7 @@ github 也有一些demo 项目layout [golang-standards/project-layout](https://g
 3. 依赖 列表/关系 无法持久化到本地，需要找出所有依赖包然后一个个 go get
 4. 只能依赖本地全局仓库（GOPATH/GOROOT），无法将库放置于局部仓库（$PROJECT_HOME/vendor）
 
-### vendor
+## vendor
 
 vendor属性就是让go编译时，优先从项目源码树根目录下的vendor目录查找代码(可以理解为切了一次GOPATH)，如果vendor中有，则不再去GOPATH中去查找。
 
@@ -87,7 +87,7 @@ vendor属性就是让go编译时，优先从项目源码树根目录下的vendor
 1. vendor目录中依赖包没有版本信息。这样依赖包脱离了版本管理，对于升级、问题追溯，会有点困难。
 2. 如何方便的得到本项目依赖了哪些包，并方便的将其拷贝到vendor目录下？依靠人工实在不现实。
 
-### godep/govendor
+## godep/govendor
 
 在支持vendor机制之后， gopher 们把注意力都集中在如何利用 vendor 解决包依赖问题，从手工添加依赖到 vendor、手工更新依赖，到一众包依赖管理工具的诞生，比如：govendor、glide 以及号称准官方工具的 dep，努力地尝试着按照当今主流思路解决着诸如 “钻石型依赖” 等难题。
 
@@ -101,34 +101,60 @@ vendor属性就是让go编译时，优先从项目源码树根目录下的vendor
 
 **vendor机制有一个问题**：同样的库，同样的版本，就因为在不同的工程里用了，就要在vendor里单独搞一份，不浪费吗？所有这些基于vendor的包管理工具，都会有这个问题。
 
-### Go Modules 一统天下
+## Go Modules 一统天下
+
+1. repo，仓库，用来管理modules
+2. modules是打tag的最小单位，也是go mod的最小单位
+3. packages是被引用的最小单位
 
 [一文读懂Go Modules原理](https://mp.weixin.qq.com/s/FhUty8prexpxggXkkumDdw)
 
 Go Modules 提供了统一的依赖包管理工具 go mod
-1. 基本思想semantic version（**社区实际上做不到**）
-    1. MAJOR version when you make incompatible API changes(不兼容的修改)
-    2. MINOR version when you add functionality in a backwards compatible manner(特性添加，版本兼容)
-    3. PATCH version when you make backwards compatible bug fixes(bug修复，版本兼容)
-3. 依赖包统一收集在 `$GOPATH/pkg/mod` 中进行集中管理，有点mvn `.m2` 文件夹的意思。`$GOPATH/pkg/mod` 中的按版本管理
-    ```
-    $GOPATH/pkg/mod/k8s.io
-        api@v0.17.0
-        client-go@v0.17.0
-        kube-openapi@v0.0.0-20191107075043-30be4d16710a
-    ```
-4. go.mod
-    1. module：代表go模块名，也即被其它模块引用的名称，位于文件第一行
-    2. require：最小需求列表(依赖模块及其版本信息)
-    3. replace：通过replace将一个模块的地址转换为其它地址(开发者github 上给自己的项目换个地址，删除某个版本等，常事)，用于解决某些依赖模块地址发生改变的场景。同时import命令可以无需改变(**无侵入**)。 在国内访问golang.org/x的各个包都需要翻墙，你可以在go.mod中使用replace替换成github上对应的库。
-        ```
-        replace (
-            golang.org/x/crypto v0.0.0-20180820150726-614d502a4dac => github.com/golang/crypto v0.0.0-20180820150726-614d502a4dac
-            golang.org/x/net v0.0.0-20180821023952-922f4815f713 => github.com/golang/net v0.0.0-20180826012351-8a410e7b638d
-            golang.org/x/text v0.3.0 => github.com/golang/text v0.3.0
-        )
-        ```
-    4. exclude：明确排除一些依赖包中不想导入或者有问题的版本
+基本思想semantic version（**社区实际上做不到**）
+1. MAJOR version when you make incompatible API changes(不兼容的修改)
+2. MINOR version when you add functionality in a backwards compatible manner(特性添加，版本兼容)
+3. PATCH version when you make backwards compatible bug fixes(bug修复，版本兼容)
+依赖包统一收集在 `$GOPATH/pkg/mod` 中进行集中管理，有点mvn `.m2` 文件夹的意思。`$GOPATH/pkg/mod` 中的按版本管理
+```
+$GOPATH/pkg/mod/k8s.io
+    api@v0.17.0
+    client-go@v0.17.0
+    kube-openapi@v0.0.0-20191107075043-30be4d16710a
+```
+go.mod
+1. module：代表go模块名，也即被其它模块引用的名称，位于文件第一行
+2. require：最小需求列表(依赖模块及其版本信息)
+3. replace：通过replace将一个模块的地址转换为其它地址(开发者github 上给自己的项目换个地址，删除某个版本等，常事)，用于解决某些依赖模块地址发生改变的场景。同时import命令可以无需改变(**无侵入**)。 
+4. exclude：明确排除一些依赖包中不想导入或者有问题的版本
+
+
+### replace
+
+[这一次，彻底掌握go mod](https://mp.weixin.qq.com/s/e4yGVxN8-NocIdguCrpTBA)
+1. replace 只在 main module 里面有效。什么叫 main module? 打个比方，项目 A 的 module 用 replace 替换了本地文件，那么当项目 B 引用项目 A 后，项目 A 的 replace 会失效，此时对 replace 而言，项目 A 就是 main module。因为对于包进行替换后，通常不能保证兼容性，对于一些使用了这个包的第三方module来说可能意味着潜在的缺陷
+2. replace 指定中需要替换的包及其版本号必须出现在 require 列表中才有效。replace命令只能管理顶层依赖（无法管理间接依赖）
+
+```
+replace (
+    golang.org/x/crypto v0.0.0-20180820150726-614d502a4dac => github.com/golang/crypto v0.0.0-20180820150726-614d502a4dac
+    golang.org/x/net v0.0.0-20180821023952-922f4815f713 => github.com/golang/net v0.0.0-20180826012351-8a410e7b638d
+    golang.org/x/text v0.3.0 => github.com/golang/text v0.3.0
+)
+``` 
+
+replace 的使用场景
+
+1. 替换无法下载的包，比如在国内访问golang.org/x的各个包都需要翻墙，你可以在go.mod中使用replace替换成github上对应的库。
+2. 替换本地自己的包
+3. 替换 fork 包，有时候我们依赖的第三方库可能有 bug，我们就可以 fork 一份他们的库，然后自己改下，然后通过 replace 将我们 fork 的替换成原来的
+
+### 冲突解决（还不清晰）
+
+[如何欺骗 Go Mod ?](https://mp.weixin.qq.com/s/S8XBbklDsGLyC4xquLK1eQ)
+[go mod 的智障版本选择](https://xargin.com/go-mod-is-rubbish/)
++incompatible ：如果 major version 升级至 v2 时，如果该版本没有打算向前兼容，且不想把module path添加版本后缀，则可以在build tag时以 +incompatible 结尾即可，则别的工程引用示例为 `require github.com/anqiansong/foo v2.0.0+incompatible`
+
+### 示例
 
 
 ![](/public/upload/go/go_mod.png)
@@ -158,6 +184,7 @@ require (
     1. A1的某个依赖模块没有使用Go Modules(也即该模块没有go.mod文件)，那么必须将该模块的间接依赖记录在A1的需求列表中
     2. A1对某个间接依赖模块有特殊的版本要求，必须显示指明版本信息(例如上述的D1.4和E1.3)，以便Go可以正确构建依赖模块
 
+运行go build或是go mod tidy时golang会自动更新go.mod导致某些修改无效，所以一个包是顶层依赖还是间接依赖，取决于它在本module中是否被直接import，而不是在go.mod文件中是否包含`// indirect`注释。
         
 ## 其它
 

@@ -260,6 +260,7 @@ func (c *Controller) reconcileHandler(obj interface{}) bool {
 ## Manager 启动
 
 [controller-runtime 之 manager 实现](https://mp.weixin.qq.com/s/3i3t-PBP3UN8W9quEhAQDQ)
+Manager interface 充分体现了它的作用：添加Controller 并Start 它们。 
 
 ```go
 // Manager 初始化共享的依赖关系，比如 Caches 和 Client，并将他们提供给 Runnables

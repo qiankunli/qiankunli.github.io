@@ -82,6 +82,10 @@ struct prot{
 
 ![](/public/upload/linux/tcp_rcv.png)
 
+[深入理解高性能网络开发路上的绊脚石 - 同步阻塞网络 IO](https://mp.weixin.qq.com/s/cIcw0S-Q8pBl1-WYN0UwnA)汇总一下
+
+![](/public/upload/linux/network_recv.png)
+
 ### 数据的发送
 
 用户在初始化socket之后，会得到一个fd，socket.write ==> sock.write ==> inet.write ==> tcp.write ==> ip_queue_xmit ==> dev_queue_xmit ==> ei_start_xmit.
