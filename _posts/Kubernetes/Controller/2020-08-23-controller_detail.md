@@ -4,7 +4,7 @@ layout: post
 title: controller 组件介绍
 category: 架构
 tags: Kubernetes
-keywords: openkruise
+keywords: controller
 ---
 
 ## 简介

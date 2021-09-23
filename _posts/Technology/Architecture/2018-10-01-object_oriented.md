@@ -12,6 +12,8 @@ keywords: 面向对象
 
 我一直有一个比方，如果把程序员写程序比作史官写历史，那么面向过程就是编年体通史，而面向对象更像是纪传体通史。编年体通史以时间（或一段时间）为中心，而纪传体通史则以人物为中心，譬如《史记》的《高祖本纪》等。类似的，面向过程多认为程序由一个个函数组成（依照顺序先后调用），譬如历史由一件件大事组成。而面向对象倾向于认为程序由一个个对象组成，譬如历史由一个个人的故事组成。
 
+[Is Inheritance Dead? A Detailed Look Into the Decorator Pattern](https://dzone.com/articles/is-inheritance-dead)未读完
+
 ## 抽象
 
 [程序员必备的思维能力：抽象思维](https://mp.weixin.qq.com/s/cJ0odiYcphhNBoAVjqpCZQ)
