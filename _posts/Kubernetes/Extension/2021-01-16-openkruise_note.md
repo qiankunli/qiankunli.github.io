@@ -8,7 +8,7 @@ keywords:  openkruise
 
 ---
 
-## 简介（未完成）
+## 简介
 
 把 k8s 比喻为京东网站，提供的是平台的能力，Openkruise 可以看做是在京东开的第三方店铺。 站在平台层面，Deployment和CloneSet 都是店家，共同享用平台的基础能力。
 

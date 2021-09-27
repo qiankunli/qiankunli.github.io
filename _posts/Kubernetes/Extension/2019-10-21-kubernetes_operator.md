@@ -75,7 +75,7 @@ An Operator is an application-specific controller that extends the Kubernetes AP
 |扩展|自定义namespace及NamespaceHandler|CRD|
 |微创新|比如整合rabbitmq `<rabbit:template>`|etcd/redis operator|
 
-Linux 提供了一个 vfs 接口，任何资源都是File， 提供Open/Close/Create/Read/Write 5个基本api， 从linux 内置文件、Socket 到外设的各种显示器、键盘、鼠标 都统一到一个vfs体系之下。 
+Linux 提供了一个 vfs 接口，任何资源都是File， 提供Open/Close/Create/Read/Write 5个基本api， 从linux 内置文件、Socket 到外设的各种显示器、键盘、鼠标 都统一到一个vfs体系之下。 PS：开发提供一个fs驱动，用户就可以通过读写文件实现特定的业务逻辑，比如cgroup/内存文件系统/网络通信/共享文件系统等。 
 
 ||Linux vfs|Kubernetes 控制器模式|
 |---|---|---|

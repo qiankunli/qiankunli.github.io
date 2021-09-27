@@ -17,6 +17,9 @@ keywords: JAVA netty
 
 ![](/public/upload/netty/learn_netty.png)
 
+可以和go 版本的netty 对比着看 [Go 语言网络库 getty 的那些事](https://mp.weixin.qq.com/s/z22k-E2ybjAMNtxzj5Aikw) 未读完
+
+
 ## 三个基本的技术点
 
 一个稍微复杂的框架，必然伴随几个抽象以及抽象间的依赖关系，那么依赖的关系的管理，可以选择spring（像大多数j2ee项目那样），也可以硬编码。这就是我们看到的，每个抽象对象有一套自己的继承体系，然后抽象对象子类之间又彼此复杂的交织。比如Netty的eventloop、unsafe和pipeline，**channel作为最外部操作对象**，聚合这三者，根据聚合的子类的不同，Channel也有多个子类来体现。

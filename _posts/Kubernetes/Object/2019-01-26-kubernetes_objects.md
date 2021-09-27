@@ -238,6 +238,56 @@ Kubernetes 对象是系统中的持久实体，描述集群的期望状态
 
 [百度混部实践：如何提高 Kubernetes 集群资源利用率？](https://mp.weixin.qq.com/s/12XFN2lPB3grS5FteaF__A)百度为支持混部在每个node 除了kubelet 之外还部署了一个agent（负责数据上报和下发动作执行），定义了很多策略，通过给这些策略设计了一个这个 CRD ，单机引擎通过对 APIServer 发起 List-watch，实时的 Watch CR 的变更，实时调整参数和相关策略。
 
+## CustomResourceDefinition 的版本
+
+[Versions in CustomResourceDefinitions](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/)CustomResourceDefinition API 的 versions 字段可用于支持你所开发的 定制资源的多个版本。
+
+```yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: mpijobs.kubeflow.org
+spec:
+  group: kubeflow.org
+  names:
+    kind: MPIJob
+    plural: mpijobs
+    shortNames:
+    - mj
+    - mpij
+    singular: mpijob
+  scope: Namespaced
+  versions:
+  - name: v1alpha2
+    schema: ...
+    served: true
+    storage: false
+  - name: v1
+    schema: ...
+    served: true
+    storage: false
+  - name: v2beta1
+    schema: ...
+    served: true
+    storage: true
+```
+
+1. 对apiserver，crd版本可以具有不同的schema，默认存储storage=true的版本，版本之间如果字段相同 默认直接转化，如果字段不同 可以自定义Webhook conversion。 如果storage version发生变化， 已有对象不会被自动转换。
+2. 当读取对象时，作为路径的一部分，你需要指定版本。 如果所指定的版本与对象的持久版本不同，Kubernetes 会按所请求的版本将对象返回，你可以以当前提供的任何版本 来请求对象，自然也可以通过client-go 监听到变化。如果你更新一个现有对象，它将以当前的存储版本被重写。 
+2. 对kubectl，kubectl 使用 具有最高优先级的版本作为访问对象的默认版本，顺序示例
+
+    ```
+    - v10
+    - v2
+    - v1
+    - v11beta2
+    - v10beta3
+    - v3beta1
+    - v12alpha1
+    - v11alpha2
+    - foo1
+    - foo10
+    ```
 
 
 
