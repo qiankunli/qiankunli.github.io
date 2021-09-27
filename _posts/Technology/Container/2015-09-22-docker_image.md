@@ -25,6 +25,7 @@ keywords: Docker image
 1. 当说镜像的时候第一反应是啥？一键ghost ==> 装系统 ==> 装qq  ==>  自动启动项目 ==> 装系统顺带装app 
 2. App最完整的依赖的OS ==> 为了启动app干脆配上一个系统 ==> 裸操作系统 + docker即可运行任何项目。
 
+进一步延伸到集群概念 [集群镜像：实现高效的分布式应用交付](https://mp.weixin.qq.com/s/0SBslzaMWtqn9H8Q57urNA)
 
 ## 镜像与操作系统的关系
 

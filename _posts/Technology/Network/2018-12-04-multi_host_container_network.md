@@ -38,13 +38,16 @@ keywords: container network
 
 ## Kubernetes IP-per-pod model
 
+Kubernetes 网络大致分为两大类，使用不同的技术
+1. 一类是 Cluster IP，是一层反向代理的虚拟ip；service/ingress，早期 kube-proxy 是采用 iptables，后来引入 IPVS 也解决了大规模容器集群的网络编排的性能问题。
+2. 一类是 Pod IP，容器间交互数据
+
 [深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)主机A上的实例(容器、VM等)如何与主机B上的另一个实例通信?有很多解决方案:
 
 1. 直接路由: BGP等
 2. 隧道: VxLAN, IPIP, GRE等
 3. NAT: 例如docker的桥接网络模式
 4. 其它方式
-
 
 针对docker 跨主机通信时网络中一堆的NAT包，Kubernetes 提出IP-per-pod model ，这个 IP 是真正属于该 Pod 的，对这个 Pod IP 的访问就是真正对它的服务的访问，中间拒绝任何的变造。比如以 10.1.1.1 的 IP 去访问 10.1.2.1 的 Pod，结果到了 10.1.2.1 上发现，它实际上借用的是宿主机的 IP，而不是源 IP，这样是不被允许的。**在通信的两端Pod看来，以及整个通信链路中`<source ip,source port,dest ip,dest port>` 是不能改变的**。设计这个原则的原因是，用户不需要额外考虑如何建立Pod之间的连接，也不需要考虑如何将容器端口映射到主机端口等问题。
 
@@ -208,3 +211,15 @@ There are two main ways they do it:
 
 Kubernetes 对 Pod 进行“隔离”的手段，即：NetworkPolicy，NetworkPolicy 实际上只是宿主机上的一系列 iptables 规则。在具体实现上，凡是支持 NetworkPolicy 的 CNI 网络插件，都维护着一个 NetworkPolicy Controller，通过控制循环的方式对 NetworkPolicy 对象的增删改查做出响应，然后在宿主机上完成 iptables 规则的配置工作。
 
+## Cilium 
+
+[Cilium 容器网络的落地实践](https://mp.weixin.qq.com/s/3B1JZVpS8NI1ESkTp-PHKg)  服务网格和无服务器等新技术对 Kubernetes 底层提出了更多的定制化要求。这些新需求都有一些共同点：它们需要一个更可编程的数据平面（也就是agent），能够在不牺牲性能的情况下执行 Kubernetes 感知的网络数据操作。Cilium 项目通过引入扩展的伯克利数据包过滤器（eBPF）技术，在 Linux 内核内向网络栈暴露了可编程的钩子。使得网格数据包不需要在用户和内核空间之间来回切换就可以通过上下文快速进行数据交换操作。PS： envoy 运行在用户态，Cilium 能将所有的逻辑下沉到内核。这是一种新型的网络范式，它也是 Cilium 容器网络项目的核心思想。
+
+一种技术满足所有的 网络需求
+1. service/ingress 提供一个虚拟ip，负载均衡，访问多个pod
+2. 容器间网络通信
+2. 网络隔离
+3. metric 监控，数据可视化
+4. trace 跟踪
+
+![](/public/upload/network/cilium_network.png)

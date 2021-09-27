@@ -18,6 +18,18 @@ keywords: Go Concurrence
 
 Go 语言的并发模型是 fork-join 型的。使用 go 关键字启动子协程工作，使用 sync.Wait 和 channel 来收集结果。
 
+
+## 原子操作
+
+Go语言通过内置包sync/atomic提供了对原子操作的支持
+1. 增减，操作的方法名方式为AddXXXType，保证对操作数进行原子的增减，支持的类型为int32、int64、uint32、uint64、uintptr，使用时以实际类型替换前面我说的XXXType就是对应的操作方法。
+2. Load，保证了读取到操作数前没有其他任务对它进行变更，操作方法的命名方式为LoadXXXType，支持的类型除了基础类型外还支持Pointer，也就是支持载入任何类型的指针。
+3. 存储，有载入了就必然有存储操作，这类操作的方法名以Store开头，支持的类型跟载入操作支持的那些一样。如果你想要并发安全的设置一个结构体的多个字段，atomic.Value保证任意值的读写安全
+4. 比较并交换，也就是CAS （Compare And Swap），像Go的很多并发原语实现就是依赖的CAS操作，同样是支持上面列的那些类型。
+5. 交换，这个简单粗暴一些，不比较直接交换，这个操作很少会用。
+
+**互斥锁是用来保护一段逻辑，原子操作用于对一个变量的更新保护。原子操作由底层硬件支持，这些指令在执行的过程中是不允许中断的，而锁则由操作系统的调度器实现**，G1 操作变量时，其它操作变量的G 不允许被调度执行（跟允许被中断一个味道）。Mutex的底层实现也用到了原子操作中的CAS实现的。
+
 ## 同步原语
 
 [Go 语言设计与实现-同步原语与锁](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-sync-primitives/)Go 语言在 sync 包中提供了用于同步的一些基本原语，包括常见的 sync.Mutex、sync.RWMutex、sync.WaitGroup、sync.Once 和 sync.Cond。这些基本原语提高了较为基础的同步功能，但是它们是一种相对原始的同步机制，在多数情况下，我们都应该使用**抽象层级的更高的** Channel 实现同步。
@@ -29,10 +41,13 @@ type Mutex struct {
 	state int32     // 表示当前互斥锁的状态，最低三位分别表示 mutexLocked、mutexWoken 和 mutexStarving，剩下的位置用来表示当前有多少个 Goroutine 等待互斥锁的释放
 	sema  uint32
 }
+// 先快速 检测下mutex 此时是否空闲，是，则cas对其加锁
 func (m *Mutex) Lock() {
+	// Fast path
 	if atomic.CompareAndSwapInt32(&m.state, 0, mutexLocked) {
 		return
     }
+	// Slow path 
 	m.lockSlow()
 }
 // src/runtime/sema.go

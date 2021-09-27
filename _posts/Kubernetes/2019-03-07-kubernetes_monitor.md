@@ -24,6 +24,8 @@ keywords: Kubernetes monitor
 
 [报警的哲学](https://mp.weixin.qq.com/s/lJRPt7I0SeUwZ4HhVZn8AQ)追踪所有收到的报警。如果收到了报警，而人们只是说 "我看了，没有什么问题"，这是一个相当强烈的信号，你需要删除报警规则，或者降级，或者以其他方式收集数据。准确率低于 50% 报警是不能使用的；即使是那些 10% 的假阳性警报，也值得多加考虑是否对齐进行修改。
 
+[通过Kubernetes监控探索应用架构，发现预期外的流量](https://mp.weixin.qq.com/s/RasRiNYo8OyTTselaSwHKA) 是一个系列文章，阿里已经将应用 ==> k8s ==> 内核监控打通。构建拓扑图 ==>  发现异常流量、阈值报警（拓扑图的边黄色或红色）==> 异常流量上下游各种信息。
+
 ## 容器监控与常规监控的差异
 
 [基于Prometheus的云原生监控系统架构演进](https://mp.weixin.qq.com/s/SBqYGeWDMQwmente8JBaHA)
