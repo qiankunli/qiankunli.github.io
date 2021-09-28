@@ -3,7 +3,7 @@
 layout: post
 title: Prometheus 告警学习
 category: 技术
-tags: Go
+tags: Monitor
 keywords: Prometheus alert
 
 ---

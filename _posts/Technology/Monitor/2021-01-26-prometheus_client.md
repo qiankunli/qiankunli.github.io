@@ -3,7 +3,7 @@
 layout: post
 title: Prometheus client
 category: 技术
-tags: Go
+tags: Monitor
 keywords: Prometheus 实战
 
 ---

@@ -3,7 +3,7 @@
 layout: post
 title: Prometheus 学习
 category: 技术
-tags: Go
+tags: Monitor
 keywords: Prometheus
 
 ---
@@ -76,10 +76,9 @@ scrape_configs:
 3. 周期性得往抓取对象发起抓取请求，得到数据
 4. 将数据写入本地盘或者写往远端存储
 
-具体的说：服务发现 ==> targets ==> relabel ==> 抓取 ==> metrics_relabel ==> 缓存 ==> 2小时落盘。
+具体的说：服务发现 ==> targets ==> relabel ==> 抓取 ==> metrics_relabel ==> 缓存 ==> 2小时落盘。[Prometheus Relabeling 重新标记的使用](https://mp.weixin.qq.com/s/6BtqApQKI4OzUWXM-8u_nw)
 
-1. relabel：当服务发现得到所有target后，Prometheus会根据job中的relabel_configs配置对target进行relabel操作，得到target最终的label集合。每个Job都可以配置一个或多个relabel_config，relabel_config会对Target的label集合进行处理，可以根据label过滤一些Target或者修改，增加，删除一些label。relabel_config过程发生在Target开始进行采集之前，针对的是通过服务发现得到的label集合。
-2. Prometheus为这些target创建采集循环，按配置文件里配置的采集间隔进行周期性拉取，采集到的数据根据Job中的metrics_relabel_configs进行relabel，然后再加入上边得到的target最终label集合，综合后得到最终的数据。每个Job还可以配置一个或者多个metrics_relabel_config，其配置方式和relabel_configs一模一样，但是其用于处理的是从Target采集到的数据中的label。
+![](/public/upload/go/prometheus_relabel.png)
 
 ## prometheus 服务发现
 

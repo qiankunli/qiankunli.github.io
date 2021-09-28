@@ -3,7 +3,7 @@
 layout: post
 title: Prometheus 源码分析
 category: 技术
-tags: Go
+tags: Monitor
 keywords: Prometheus Source
 
 ---
