@@ -4,7 +4,7 @@ layout: post
 title: mecha 架构学习
 category: 架构
 tags: Architecture
-keywords: system design principle 
+keywords: mecha
 
 ---
 

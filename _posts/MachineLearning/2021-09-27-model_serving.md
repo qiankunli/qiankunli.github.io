@@ -39,3 +39,7 @@ KubeDL-Morphling 组件实现了推理服务的自动规格调优，通过主动
 [携程AI推理性能的自动化优化实践](https://mp.weixin.qq.com/s/jVnNMQNo_MsX3uSFRDmevA)
 
 ## 基于镜像的模型管理
+
+## 其它
+
+推理服务不仅可以运行在服务端，还可以运行在客户端、浏览器端（比如Tensorflow 提供tensorflow.js）

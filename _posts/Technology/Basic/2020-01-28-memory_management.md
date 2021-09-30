@@ -68,6 +68,8 @@ keywords: memory management
 1. 栈内存生命周期有限，它会随着函数调用结束后自动释放，在堆中分配的内存，并不随着分配时所在函数调用的结束而释放，它的生命周期足够使用。
 2. 栈的容量有限，如 CentOS 7 中是 8MB 字节，如果你申请的内存超过限制会造成栈溢出错误（比如，递归函数调用很容易造成这种问题），而堆则没有容量限制。
 
+[Go 内存对齐的那些事儿](https://mp.weixin.qq.com/s/cg0pq6X1eGlm2lbD14F_bA)
+
 ### jvm
 
 [java gc](http://qiankunli.github.io/2016/06/17/gc.html)
