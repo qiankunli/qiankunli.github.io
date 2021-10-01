@@ -258,8 +258,26 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 
 首先说client之前，必须要先初始化一个config结构。 
 
+```go
+// k8s.io/client-go@v0.19.11/tools/clientcmd/client_config.go
+func BuildConfigFromFlags(masterUrl, kubeconfigPath string) (*restclient.Config, error) {
+	if kubeconfigPath == "" && masterUrl == "" {
+		klog.Warningf("Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.")
+		kubeconfig, err := restclient.InClusterConfig()
+		if err == nil {
+			return kubeconfig, nil
+		}
+		klog.Warning("error creating inClusterConfig, falling back to default config: ", err)
+	}
+	return NewNonInteractiveDeferredLoadingClientConfig(
+		&ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
+		&ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterUrl}}).ClientConfig()
+}
+```
+
 1. 如果在外部集群，可以读取kubeconfig作为配置(默认为`~/.kube/config`)；
 2. 如果运行在集群中，可以采用serviceaccount 的方式，client-go从`/var/run/secrets/kubernetes.io/serviceaccount/token` 和 `/var/run/secrets/kubernetes.io/serviceaccount/ca.crt` 读取文件，对应InClusterConfig
+
 
 client-go 定义了一个 ClientConfig interface，包含DeferredLoadingClientConfig/DirectClientConfig/InClusterConfig 实现。  `clientcmd.BuildConfigFromFlags(masterUrl,kubeconfigPath)`读取k8s config 是有搜索顺序的，如果masterUrl/kubeconfigPath 都为空，则会返回InClusterConfig，否则返回DeferredLoadingClientConfig。
 

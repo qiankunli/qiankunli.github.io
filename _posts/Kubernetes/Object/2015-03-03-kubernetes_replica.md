@@ -58,6 +58,7 @@ Deployments are a newer and higher level concept than Replication Controllers. T
 | Deployment |控制 ReplicaSet 的数目，以及每个 ReplicaSet 的属性|**Deployment 实际上是一个两层控制器**|
 | ReplicaSet |保证系统中 Pod 的个数永远等于指定的个数（比如，3 个）|一个应用的版本，对应的正是一个 ReplicaSet|
 
+[OpenKruise 如何实现应用的可用性防护？](https://mp.weixin.qq.com/s/Vm_NBMsyNz53Ygxn9K4YCg)Deployment 的 MaxUnavailable 是在应用滚动发布的过程中保证最小的 Pod 数量，而 RS Controller 控制器则是尽快让应用实际的福本数等于预期的副本数，并不能保证应用每时每刻的最小可用副本数。
 
 ## What is a replication controller?（逐步弃用）
 

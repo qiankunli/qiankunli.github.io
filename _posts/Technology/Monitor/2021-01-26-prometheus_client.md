@@ -4,7 +4,7 @@ layout: post
 title: Prometheus client
 category: 技术
 tags: Monitor
-keywords: Prometheus 实战
+keywords: Prometheus 客户端库
 
 ---
 
@@ -12,6 +12,12 @@ keywords: Prometheus 实战
 
 * TOC
 {:toc}
+
+[如何在自己的应用程序中暴露监控指标](https://mp.weixin.qq.com/s/I6S57en1HdN2YOykFPXc8Q)
+
+![](/public/upload/monitor/prometheus_client.png)
+
+## metric object
 
 ```go
 package metric

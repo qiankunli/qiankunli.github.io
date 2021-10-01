@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: docker和k8s安全机制
+title: docker和k8s安全访问机制
 category: 技术
 tags: Kubernetes
 keywords: kubernetes security
@@ -12,6 +12,8 @@ keywords: kubernetes security
 
 * TOC
 {:toc}
+
+访问安全就是防止人恶意使用，笔者在公司操作物理机、k8s 集群，都是用一个受限的账号，除了查询外， 很多操作要通过运维执行。
 
 [火得一塌糊涂的kubernetes有哪些值得初学者学习的？](https://mp.weixin.qq.com/s/iI5vpK5bVkKmdbf9sbAGWw) Kubernetes 是透明的，它没有隐藏的内部 API。换句话说 **Kubernetes 系统内部用来交互的 API 和我们用来与 Kubernetes 交互的 API 相同**。这样做的好处是，当 Kubernetes 默认的组件无法满足我们的需求时，我们可以利用已有的 API 实现我们自定义的特性。
 
@@ -25,7 +27,7 @@ keywords: kubernetes security
 
 ![](/public/upload/kubernetes/container_security.png)
 
-Linux capabilities
+Linux capabilities（有点k8s sa 的味道了）
 1. 在 Linux capabilities 出现前，进程的权限可以简单分为两类：特权用户的进程（id=0）；非特权用户的进程（id>0）
 2. 从 kernel 2.2 开始，Linux 把特权用户所有的这些“特权”做了更详细的划分，这样被划分出来的每个单元就被称为 capability。比如说，运行 iptables 命令，对应的进程需要有 CAP_NET_ADMIN 这个 capability。如果要 mount 一个文件系统，那么对应的进程需要有 CAP_SYS_ADMIN 这个 capability。
 3. 在普通 Linux 节点上，非 root 用户启动的进程缺省没有任何 Linux capabilities，而 root 用户启动的进程缺省包含了所有的 Linux capabilities。对于 root 用户启动的进程，如果把 CAP_NET_ADMIN 这个 capability 移除（`capsh --keep=1 --user=root --drop=cap_net_admin`），它就不可以运行 iptables。
@@ -42,13 +44,15 @@ Linux capabilities
 
 rootless container 中的"rootless"不仅仅指容器中以非 root 用户来运行进程，还指以非 root 用户来创建容器，管理容器。也就是说，启动容器的时候，Docker 或者 podman 是以非 root 用户来执行的。
 
-## 访问权限控制
+## k8s访问权限控制
 
 ![](/public/upload/kubernetes/k8s_api_access_control.svg)
 
 [一文读懂 TKE 及 Kubernetes 访问权限控制](https://mp.weixin.qq.com/s/oijt_iqhMAe6JRJGTypKGw)
 
 ### 认证/Authentication
+
+#### 面向对象
 
 认证的过程即是证明user身份的过程。Kubernetes中有两类用户：
 
@@ -60,18 +64,7 @@ rootless container 中的"rootless"不仅仅指容器中以非 root 用户来运
 1. **User accounts are for humans. Service accounts are for processes, which run in pods**.
 2. User accounts are intended to be global. Names must be unique across all namespaces of a cluster, future user resource will not be namespaced. Service accounts are namespaced.
 
-任何的认证方式都是一下Interface的实现方式都是接收http Request请求，然后会返回一个user.Info的结构体，一个bool，以及一个error。user.Info中包含了用户的信息，包括UserName、UUID、Group、Extra。
-bool返回了用户是否通过认证，false的话即返回无法通过认证，即返回401错误。error则返回了当Request无法被检查的错误，如果遇到错误则会继续进行下一种注册的方式进行认证。
-如果认证通过，则会把user.Info写入到到请求的context中，后续请求过程可以随时获取用户信息，比如授权时进行鉴权。
-
-```go
-// Request attempts to extract authentication information from a request and returns
-// information about the current user and true if successful, false if not successful,
-// or an error if the request could not be checked.
-type Request interface {
-   AuthenticateRequest(req *http.Request) (user.Info, bool, error)
-}
-```
+#### 认证方式/“来者何人”
 
 [说说Kubernetes的访问控制实现方式](https://mp.weixin.qq.com/s/mcnq-eWbskuc0J3H9CPDwA)Kubernetes 各组件都是以 APIServer 作为网关通信的。为了安全，**APIServer 一般通过 TLS 认证对外暴露**，集群组件若要访问 APIServer 则需要相应的 TLS 证书。APIServer 本身支持多种认证方式，并不只是 TLS 一种，默认我们使用 TLS 认证。APIServer 和集群组件通信使用 TLS 双向认证，顾名思义，客户端和服务器端都需要验证对方的身份，相比单向认证，双向认证客户端除了需要从服务器端下载服务器的公钥证书进行验证外，还需要把客户端的公钥证书上传到服务器端给服务器端进行验证，等双方都认证通过了，才开始建立安全通信通道进行数据传输
 
@@ -84,9 +77,49 @@ APIServer启动时，可以指定一种或多种Authentication方法，如果指
 |Bearer Token（有多种方式）|csv文件`--token-auth-file=SOMEFILE`|HTTP Header中Authentication为Bearer，并跟上Base64Encode(user:passward)值|
 |Webhook Token Server|`--authentication-token-webhook-config-file`<br>`--authentication-token-webhook-cache-ttl`||
 
-若APiServer开启Webhook Token Server进行认证校验，则在接受到用户的Request之后，会包装Bearer Token成一个TokenReview发送给WebHookServer，Server端接收到之后会进行校验，并返回TokenReview接口，在status字段中进行反馈是否通过校验通过和user.Info信息。
 
-### 授权/Authorization
+以我们常用的kubectl 工作所需的 kubeconfig 文件为例，user 可以配置 tls 方式：client-certificate-data+client-key-data，也可以配置token 方式
+
+```yaml
+apiVersion: v1
+kind: Config
+users:
+  - name: example
+    user: 
+        client-certificate-data: xx
+        client-key-data: xx
+```
+token 方式
+```yaml
+apiVersion: v1
+kind: Config
+users:
+  - name: example
+    user: 
+        token: xx
+```
+#### 实现细节
+
+k8s任何的认证方式都是以下Interface的实现方式
+
+```go
+// Request attempts to extract authentication information from a request and returns
+// information about the current user and true if successful, false if not successful,
+// or an error if the request could not be checked.
+type Request interface {
+   AuthenticateRequest(req *http.Request) (user.Info, bool, error)
+}
+```
+
+都是接收http Request请求，然后会返回一个user.Info的结构体，一个bool，以及一个error。
+1. user.Info中包含了用户的信息，包括UserName、UUID、Group、Extra。
+2. bool返回了用户是否通过认证，false的话即返回无法通过认证，即返回401错误。
+3. error则返回了当Request无法被检查的错误，如果遇到错误则会继续进行下一种注册的方式进行认证。
+如果认证通过，则会把user.Info写入到到请求的context中，后续请求过程可以随时获取用户信息，比如授权时进行鉴权。
+
+若APIServer开启Webhook Token Server进行认证校验，则在接受到用户的Request之后，会包装Bearer Token成一个TokenReview发送给WebHookServer，Server端接收到之后会进行校验，并返回TokenReview接口，在status字段中进行反馈是否通过校验通过和user.Info信息。
+
+### 授权/Authorization/“有没有权”
 
 认证之后我们如何**在认证基础上**针对资源授权管理呢？授权就是判断user是否拥有操作资源的相应权限。
 
@@ -122,7 +155,9 @@ APIServer启动时，可以指定一种或多种Authentication方法，如果指
 
 2. WebHook， Webhook模式是一种基于HTTP回调的方式，通过配置好授权webhook server地址。当APIServer接收到request的时候，会进行包装SubjectAccessReview请求Webhook Server，Webhook Server会进行判断是否可以访问，然后返回allow信息。
 
-### 准入控制
+### 准入控制/“事能不能干”
+
+apiserver 确定了来者身份，也确定了有权操作，但也不能恣意妄为。比如volcano 的webhook会拦截create pod请求，找不到相关的podgroup则拒绝create pod，确保podgroup先于pod 创建成功。
 
 从技术的角度看，Admission control就像a chain of interceptors（拦截器链模式），它拦截那些已经顺利通过authentication和authorization的http请求。http请求沿着APIServer启动时配置的admission control chain顺序逐一被拦截和处理，如果某个interceptor拒绝了该http请求，那么request将会被直接reject掉，而不是像authentication或authorization那样有继续尝试其他interceptor的机会。
 
@@ -130,7 +165,7 @@ APIServer启动时，可以指定一种或多种Authentication方法，如果指
 
 K8s支持30多种admission control 插件，其中有两个具有强大的灵活性，即ValidatingAdmissionWebhooks和MutatingAdmissionWebhooks，这两种控制变换和准入以Webhook的方式提供给用户使用，大大提高了灵活性，用户可以在集群创建自定义的AdmissionWebhookServer进行调整准入策略。
 
-比如volcano 的webhook会拦截create pod请求，确保找不到相关的podgroup则拒绝，确保podgroup先于pod 创建成功。
+
 
 ## 安全相关的 kubernetes objects
 
@@ -141,9 +176,7 @@ K8s支持30多种admission control 插件，其中有两个具有强大的灵活
 
 [Secrets](https://kubernetes.io/docs/concepts/configuration/secret/)
 
-为什么要弄一个Secrets？ **回答为什么的一般方法是：对比前后差异**。 
-
-Kubernetes secret objects let you store and manage sensitive information, such as passwords, OAuth tokens, and ssh keys. Putting this information in a secret is safer and more flexible than putting it verbatim(原样的) in a Pod Lifecycle definition or in a container image . 管理敏感信息，如果没有Secrets，这些信息可能被保存在 pod 定义或者 docker 镜像中，有信息泄露的风险（PS：笔者曾把密码写在代码测试类里提交到公司仓库， 结果被几个看源码的小哥发现并使用了）
+为什么要弄一个Secrets？ Kubernetes secret objects let you store and manage sensitive information, such as passwords, OAuth tokens, and ssh keys. Putting this information in a secret is safer and more flexible than putting it verbatim(原样的) in a Pod Lifecycle definition or in a container image . 管理敏感信息，如果没有Secrets，这些信息可能被保存在 pod 定义或者 docker 镜像中，有信息泄露的风险（PS：笔者曾把密码写在代码测试类里提交到公司仓库， 结果被几个看源码的小哥发现并使用了）
 
 K8s Secrets 中保存的数据都必须经过 base64加密
 
@@ -166,6 +199,8 @@ Secrets can be mounted as data volumes or be exposed as environment variables to
 
 ### Service Accounts——让pod 可以访问apiserver
 
+#### 配置
+
 [配置 Pod 的 Service Account](https://jimmysong.io/kubernetes-handbook/guide/configure-pod-service-account.html) service account 只是提供了一个类似用户名的标识，真正ServiceAccount 有哪些权限要 通过 ClusterRoleBinding 绑定 ClusterRole。
 
 A service account provides an identity for processes that **run in a Pod**. When you (a human) access the cluster (for example, using kubectl), you are authenticated by the apiserver as a particular User Account (currently this is usually admin, unless your cluster administrator has customized your cluster). Processes in containers inside pods can also contact the apiserver. When they do, they are authenticated as a particular Service Account (for example, default).
@@ -179,10 +214,10 @@ metadata:
   name: example-sa
 ```
 
-Kubernetes 会为一个 ServiceAccount**自动创建并分配一个 Secret 对象**，secret `{data.token}` 就是用户 token 的 base64 编码，可以用来配置kubeconfig
+Kubernetes 会为一个 ServiceAccount**自动创建并分配一个 Secret 对象**，secret `{data.token}` 就是用户 token 的 base64 编码。PS：`kubectl describe secret` 和 `kubectl get secret` 看到的信息不同
 
 ```sh
-$ kubectl get sa -n mynamespace -o yaml
+$ kubectl get sa example-sa -n mynamespace -o yaml
 - apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -205,7 +240,7 @@ Data
 ====
 ca.crt:     1346 bytes      # apiserver 的公钥数字证书
 namespace:  11 bytes        # secret 所在namespace 值的base64 编码
-token:      xx      # 用API Server私钥签发(sign)的bearer tokens的base64编码，反解析后是一个json，也称之为 service-account-token
+token:      xx              # 用API Server私钥签发(sign)的bearer tokens的base64编码，反解析后是一个json，也称之为 service-account-token
 ```
 
 用户的 Pod可以声明使用这个 ServiceAccount
@@ -223,7 +258,7 @@ containers:
 serviceAccountName: example-sa
 ```
 
-等这个 Pod 运行起来之后，我们就可以看到，该 ServiceAccount 的 token，也就是一个 Secret 对象，被 Kubernetes 自动挂载到了容器的 `/var/run/secrets/kubernetes.io/serviceaccount` 目录下
+等这个 Pod 运行起来之后，我们就可以看到，该 ServiceAccount 的 token，也就是一个 Secret 对象，被 Kubernetes 自动挂载到了容器的 `/var/run/secrets/kubernetes.io/serviceaccount` 目录下（volume 方式），client-go `restclient.InClusterConfig()` 会从这个位置加载认证信息。
 
 ```bash
 $ kubectl describe pod sa-token-test -n mynamespace
@@ -236,14 +271,45 @@ nginx:
     Mounts:
     /var/run/secrets/kubernetes.io/serviceaccount from example-sa-token-vmfg6 (ro)
 ```
-service count 的认证和授权过程
+#### service count 的认证和授权过程
 
 1. API Server的authenticating环节支持多种身份校验方式：client cert、bearer token、static password auth等（Kubernetes API Server会逐个方式尝试），这些方式中有一种方式通过authenticating，那么身份校验就会通过。一旦API Server发现client发起的request使用的是service account token的方式，API Server就会自动采用signed bearer token方式进行身份校验。
     1. 用户名为：`system:serviceaccount:(namespace):(serviceaccount)`
     2. credentials： service-account-token
 2. 通过authenticating后，API Server将根据Pod username所在的`group：system:serviceaccounts`和`system:serviceaccounts:(NAMESPACE)`的权限对其进行authority 和admission control两个环节的处理。在这两个环节中，cluster管理员可以对service account的权限进行细化设置。
 
-根据serviceaccount 还可以制作 kubeconfig 文件 [使用serviceaccount制作kubeconfig文件](https://blog.csdn.net/sysushui/article/details/104881715)
+#### 根据serviceaccount 制作 kubeconfig 文件 
+
+
+从sa 获取的 secret 获取信息
+
+```sh
+name=default-token-sg96k
+ca=$(kubectl get secret/$name -o jsonpath='{.data.ca\.crt}')
+token=$(kubectl get secret/$name -o jsonpath='{.data.token}' | base64 --decode)
+namespace=$(kubectl get secret/$name -o jsonpath='{.data.namespace}' | base64 --decode)
+```
+将以上信息 替换下列yaml 文件中的变量
+```yaml
+apiVersion: v1
+kind: Config
+clusters:
+- name: default-cluster
+  cluster:
+    certificate-authority-data: ${ca}
+    server: ${server}
+contexts:
+- name: default-context
+  context:
+    cluster: default-cluster
+    namespace: default
+    user: default-user
+current-context: default-context
+users:
+- name: default-user
+  user:
+    token: ${token}
+```
 
 ## 小结
 
