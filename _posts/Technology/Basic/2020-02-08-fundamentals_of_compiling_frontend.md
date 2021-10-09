@@ -41,20 +41,22 @@ keywords:  Fundamentals Compiling
 
 Antlr支持的词法规则文件
 
-    lexer grammar Hello;  //lexer关键字意味着这是一个词法规则文件，名称是Hello，要与文件名相同
-    //关键字
-    If :               'if';
-    Int :              'int';
-    //字面量
-    IntLiteral:        [0-9]+;
-    StringLiteral:      '"' .*? '"' ;  //字符串字面量
-    //操作符
-    AssignmentOP:       '=' ;    
-    RelationalOP:       '>'|'>='|'<' |'<=' ;    
-    LeftParen:          '(';
-    RightParen:         ')';
-    //标识符
-    Id :                [a-zA-Z_] ([a-zA-Z_] | [0-9])*;
+```
+lexer grammar Hello;  //lexer关键字意味着这是一个词法规则文件，名称是Hello，要与文件名相同
+//关键字
+If :               'if';
+Int :              'int';
+//字面量
+IntLiteral:        [0-9]+;
+StringLiteral:      '"' .*? '"' ;  //字符串字面量
+//操作符
+AssignmentOP:       '=' ;    
+RelationalOP:       '>'|'>='|'<' |'<=' ;    
+LeftParen:          '(';
+RightParen:         ')';
+//标识符
+Id :                [a-zA-Z_] ([a-zA-Z_] | [0-9])*;
+```
 
 
 ## 语法分析——将Token List+语法规则转换为AST
@@ -104,111 +106,7 @@ AST的生成有很多现成的工具，比如 Yacc（或 GNU 的版本，Bison�
 4. 第四遍做类型检查，比如当赋值语句左右两边的类型不兼容的时候，就可以报错。
 5. 第五遍做一些语义合法性的检查，比如 break 只能出现在循环语句中，如果某个函数声明了返回值，就一定要有 return 语句等等。
 
-
-
-## 实例分析——一个简单的解释器
-
-1. 支持变量声明和初始化语句
-2. 支持赋值语句“age = 45”；
-3. 在表达式中可以使用变量，例如“age + 10 *2”；
-
-![](/public/upload/basic/repl.jpg)
-
-java类实现
-
-![](/public/upload/basic/repl_object.png)
-
-一个最简单版 脚本解释器实现
-
-    public class SimpleScript {
-        // 简单地用了一个 HashMap 作为变量存储区。在变量声明语句和赋值语句里，都可以修改这个变量存储区中的数据
-        private HashMap<String, Integer> variables = new HashMap<String, Integer>();
-        public static void main(String[] args) {
-            SimpleScript script = new SimpleScript();
-            SimpleParser parser = new SimpleParser();
-            ...
-            // 读取输入的一行
-            String line = reader.readLine().trim();
-            // 将输入经过词法分析器转为Token数组，再转换为AST
-            ASTNode tree = parser.parse(scriptText);
-            // 所谓解释执行，其实是对AST进行遍历计算
-            script.evaluate(tree, "");
-            ...
-        }
-    }
-
-### 语法分析
-
-    public class SimpleParser {
-        // 解析脚本 生成AST
-        public ASTNode parse(String script) throws Exception {
-            SimpleLexer lexer = new SimpleLexer();
-            TokenReader tokens = lexer.tokenize(script);
-            ASTNode rootNode = prog(tokens);
-            return rootNode;
-        }
-        private SimpleASTNode prog(TokenReader tokens) throws Exception{
-            SimpleASTNode node = new SimpleASTNode(ASTNodeType.Programm, "pwc");
-            // 穷举词法分析得到的tokens 是什么语句，作为AST 根节点的子节点
-            while (tokens.peek() != null) {
-                SimpleASTNode child = intDeclare(tokens);
-                if (child == null) {
-                    child = expressionStatement(tokens);
-                }
-                if (child == null) {
-                    child = assignmentStatement(tokens);
-                }
-                if (child != null) {
-                    node.addChild(child);
-                } else {
-                    throw new Exception("unknown statement");
-                }
-            }
-            return node;
-        }
-    }
-
-### 脚本解释器
-
-AST 是语法解析的成果，解释器所谓“解释”就是对AST 的运算
-
-    public class SimpleScript {
-        // 遍历AST，计算值
-        private Integer evaluate(ASTNode node, String indent) throws Exception {
-            switch (node.getType()) {
-            case Programm://程序入口，根节点
-            case Additive://加法表达式
-                ASTNode child1 = node.getChildren().get(0);
-                Integer value1 = evaluate(child1, indent + "\t");
-                ASTNode child2 = node.getChildren().get(1);
-                Integer value2 = evaluate(child2, indent + "\t");
-                // 取出左右节点，递归求职，然后根据加法符号进行计算
-                if (node.getText().equals("+")) {
-                    result = value1 + value2;
-                } else {
-                    result = value1 - value2;
-                }
-                break;
-            case Multiplicative://乘法表达式
-            case IntLiteral://整型字面量
-            case Identifier://标识符
-            case AssignmentStmt://赋值语句
-            case IntDeclaration://整型变量声明
-            }
-        }
-    }
-
-从某个视角看，脚本解释跟md/OpenAPI渲染 是一样一样的，只是代码的词法规则、语法规则更多
-
-||源文件|内部处理|效果呈现|
-|---|---|---|---|
-|markdown引擎|md文本|java对象|html|
-|OpenAPI渲染|OpenAPI规范文本|java对象|html|
-|代码解释器|代码文本|AST|代码执行|
-
-
-
-## 其它
+## AST
 
 ### 为什么是AST？
 
@@ -227,38 +125,66 @@ AST 是语法解析的成果，解释器所谓“解释”就是对AST 的运算
 1. 语法，编程语言之间的差异直接体现在 语法和语义上，比如java 和go 的方法定义就不同。 具体的说，语法可以认为是 一个语言包含多少中语句（比如赋值语句、函数定义），每个语句有哪些组成。然后因为语句之间 包含关系，进而构成一棵树。
 2. 树，**计算机语言总是一个结构套着另一个结构，大的程序套着子程序，子程序又可以包含子程序**。 就像一个树状结构一样。从 可视化的角度看，只要能够表达 层次关系，也可以不按树形输出，以java 对象的语法规则为例
 
+    ```
+    classDeclaration // classDeclaration 几个组成（包括两个可选）
+        : CLASS IDENTIFIER
+        (EXTENDS typeType)?
+        (IMPLEMENTS typeList)?
+        classBody // classBody的详细组成另行描述
+        ;
 
-        classDeclaration // classDeclaration 几个组成（包括两个可选）
-            : CLASS IDENTIFIER
-            (EXTENDS typeType)?
-            (IMPLEMENTS typeList)?
-            classBody // classBody的详细组成另行描述
-            ;
+    classBody
+        : '{' classBodyDeclaration* '}'
+        ;
 
-        classBody
-            : '{' classBodyDeclaration* '}'
-            ;
+    classBodyDeclaration
+        : ';'
+        | memberDeclaration
+        ;
 
-        classBodyDeclaration
-            : ';'
-            | memberDeclaration
-            ;
+    memberDeclaration
+        : functionDeclaration
+        | fieldDeclaration
+        ;
 
-        memberDeclaration
-            : functionDeclaration
-            | fieldDeclaration
-            ;
-
-        functionDeclaration
-            : typeTypeOrVoid IDENTIFIER formalParameters ('[' ']')*
-            (THROWS qualifiedNameList)?
-            functionBody
-            ;
-
+    functionDeclaration
+        : typeTypeOrVoid IDENTIFIER formalParameters ('[' ']')*
+        (THROWS qualifiedNameList)?
+        functionBody
+        ;
+    ```
 
 3. **语法树 只是代码另一种形态的文字表示**。代码中看到 “=” 知道是赋值语句，在语法树中则是一个明确的 VariableDeclaration。但语法树只是 代码的另一种表示，就好像水有固态、液态和气态，但都是H2O一样。至于一个赋值语句涉及到的 给变量申请空间，将内存某个地址设置为某个值的动作，是语义的事情，针对每个语句定义解释器的行为。PS：在k8s中，我们编写yaml 文件，k8s 负责操作集群 使其符合yaml 定义的状态。再往前推，有java sdk 用来封装 k8s api，`Deloyment deployment = new Deployment` 这个赋值语句可以解释为 内存中新建了一个Deployment 对象，也可以解释为 集群中新出现了一个 Deployment 
 
-抽象语法树的使用场景
+### 语言示例
+
+[抽象语法树go/ast库使用](https://mp.weixin.qq.com/s/uLpmEV8mI4JpfNVfSK8cRQ)
+
+一个go source 文件通过`  f, err := parser.ParseFile(fset, "filepath", src, 0)` 可以得到一个 ast.File  
+
+```go
+type File struct {
+    Doc        *CommentGroup   // associated documentation; or nil
+    Package    token.Pos       // position of "package" keyword    
+    Name       *Ident          // package name
+    Decls      []Decl          // top-level declarations; or nil    文件中的顶级声明
+    Scope      *Scope          // package scope (this file only)
+    Imports    []*ImportSpec   // imports in this file              
+    Unresolved []*Ident        // unresolved identifiers in this file
+    Comments   []*CommentGroup // list of all comments in the source file
+}
+type Decl interface {
+	Node
+	declNode()
+}
+BadDecl struct {}   // implement Decl
+GenDecl struct {}   // implement Decl 引入声明，记录了import语句的位置信息
+FuncDecl struct {}  // implement Decl 函数声明
+type Stmt interface {}  // 语句
+```
+[golang 和 ast](https://xargin.com/ast/) 在规则引擎、 批量把 thrift 文件转化成 proto 文件、解析 sql 语句并做一些审计等也有妙用。
+
+抽象语法树哪怕不用来做编译器，也有很多使用场景
 
 1. 语法检查、代码错误提示、代码自动补全
 2. 代码高亮、代码格式化、代码风格检查
@@ -266,9 +192,114 @@ AST 是语法解析的成果，解释器所谓“解释”就是对AST 的运算
 4. 作用域判断
 5. 代码压缩
 
-但从AST 的学习来说，js 相关文章比较多，语法树格式也比较易懂。
+java 中有一个 [INRIA/spoon](https://github.com/INRIA/spoon)java AST库，支持将一个java source 文件解析为CtClass 类，笔者使用这个库 根据CtClass 解析web controller 类代码文本，生成web api 数据并同步到api 管理系统上。
 
-[golang 和 ast](https://xargin.com/ast/) 在规则引擎、 批量把 thrift 文件转化成 proto 文件、解析 sql 语句并做一些审计等也有妙用。
+## 实例分析——一个简单的解释器
+
+1. 支持变量声明和初始化语句
+2. 支持赋值语句“age = 45”；
+3. 在表达式中可以使用变量，例如“age + 10 *2”；
+
+![](/public/upload/basic/repl.jpg)
+
+java类实现
+
+![](/public/upload/basic/repl_object.png)
+
+一个最简单版 脚本解释器实现
+```java
+public class SimpleScript {
+    // 简单地用了一个 HashMap 作为变量存储区。在变量声明语句和赋值语句里，都可以修改这个变量存储区中的数据
+    private HashMap<String, Integer> variables = new HashMap<String, Integer>();
+    public static void main(String[] args) {
+        SimpleScript script = new SimpleScript();
+        SimpleParser parser = new SimpleParser();
+        ...
+        // 读取输入的一行
+        String line = reader.readLine().trim();
+        // 将输入经过词法分析器转为Token数组，再转换为AST
+        ASTNode tree = parser.parse(scriptText);
+        // 所谓解释执行，其实是对AST进行遍历计算
+        script.evaluate(tree, "");
+        ...
+    }
+}
+```
+
+### 语法分析
+
+```java
+public class SimpleParser {
+    // 解析脚本 生成AST
+    public ASTNode parse(String script) throws Exception {
+        SimpleLexer lexer = new SimpleLexer();
+        TokenReader tokens = lexer.tokenize(script);
+        ASTNode rootNode = prog(tokens);
+        return rootNode;
+    }
+    private SimpleASTNode prog(TokenReader tokens) throws Exception{
+        SimpleASTNode node = new SimpleASTNode(ASTNodeType.Programm, "pwc");
+        // 穷举词法分析得到的tokens 是什么语句，作为AST 根节点的子节点
+        while (tokens.peek() != null) {
+            SimpleASTNode child = intDeclare(tokens);
+            if (child == null) {
+                child = expressionStatement(tokens);
+            }
+            if (child == null) {
+                child = assignmentStatement(tokens);
+            }
+            if (child != null) {
+                node.addChild(child);
+            } else {
+                throw new Exception("unknown statement");
+            }
+        }
+        return node;
+    }
+}
+```
+
+### 脚本解释器
+
+AST 是语法解析的成果，解释器所谓“解释”就是对AST 的运算
+
+```java
+public class SimpleScript {
+    // 遍历AST，计算值
+    private Integer evaluate(ASTNode node, String indent) throws Exception {
+        switch (node.getType()) {
+        case Programm://程序入口，根节点
+        case Additive://加法表达式
+            ASTNode child1 = node.getChildren().get(0);
+            Integer value1 = evaluate(child1, indent + "\t");
+            ASTNode child2 = node.getChildren().get(1);
+            Integer value2 = evaluate(child2, indent + "\t");
+            // 取出左右节点，递归求职，然后根据加法符号进行计算
+            if (node.getText().equals("+")) {
+                result = value1 + value2;
+            } else {
+                result = value1 - value2;
+            }
+            break;
+        case Multiplicative://乘法表达式
+        case IntLiteral://整型字面量
+        case Identifier://标识符
+        case AssignmentStmt://赋值语句
+        case IntDeclaration://整型变量声明
+        }
+    }
+}
+```
+
+从某个视角看，脚本解释跟md/OpenAPI渲染 是一样一样的，只是代码的词法规则、语法规则更多
+
+||源文件|内部处理|效果呈现|
+|---|---|---|---|
+|markdown引擎|md文本|java对象|html|
+|OpenAPI渲染|OpenAPI规范文本|java对象|html|
+|代码解释器|代码文本|AST|代码执行|
+
+## 其它
 
 ### 类型系统
 
@@ -294,19 +325,21 @@ AST 是语法解析的成果，解释器所谓“解释”就是对AST 的运算
 
 `a = b + 10` 类型推导的代码实现。我们在编译期实现了这段代码，就不用放在运行期了。
 
-    case PlayScriptParser.ADD:
-        if (type1 == PrimitiveType.String || 
-            type2 == PrimitiveType.String){
-            type = PrimitiveType.String;
-        }
-        else if (type1 instanceof PrimitiveType && 
-                type2 instanceof PrimitiveType){
-            //类型“向上”对齐，比如一个int和一个float，取float
-            type = PrimitiveType.getUpperType(type1,type2);
-        }else{
-            at.log("operand should be PrimitiveType for additive operation", ctx);
-        }
-        break;
+```java
+case PlayScriptParser.ADD:
+    if (type1 == PrimitiveType.String || 
+        type2 == PrimitiveType.String){
+        type = PrimitiveType.String;
+    }
+    else if (type1 instanceof PrimitiveType && 
+            type2 instanceof PrimitiveType){
+        //类型“向上”对齐，比如一个int和一个float，取float
+        type = PrimitiveType.getUpperType(type1,type2);
+    }else{
+        at.log("operand should be PrimitiveType for additive operation", ctx);
+    }
+    break;
+```
 
 ### 闭包的实现
 

@@ -76,7 +76,7 @@ k8s.io/cri-api
 
 pkg 下几乎每一个文件夹对应了 kubelet 的一个功能组件，每个功能组件一般对应一个manager 协程，负责具体的功能实现，启动时只需 `go manager.start`。此外有一个syncLoop 负责kubelet 主功能的实现。
 
-![](/public/upload/kubernetes/kubelet_object.png)
+
 
 ## 启动流程
 
@@ -176,6 +176,13 @@ case kubetypes.RESTORE:
 最终的立足点还是 syncHandler（还是Kubelet 自己实现的），下面分析下 HandlePodAdditions
 	
 ## sync pod
+[Kubernetes容器重启原理-Kubelet Hash计算](https://mp.weixin.qq.com/s/dcEFXE7VasUAvYG7HbgqgA)SyncPod保证运行中的 Pod 与我们期望的配置时刻保持一致。通过以下步骤完成
+1. 根据从 API Server 获得的 Pod Spec 以及当前 Pod 的 Status 计算所需要执行的 Actions
+2. 在需要情况下 Kill 掉当前 Pod 的 sandbox
+3. 根据需要（如重启）kill 掉 Pod 内的 containers
+4. 根据需要创建 Pod 的 sandbox
+5. 启动下一个 init container
+6. 启动 Pod 内的 containers
 
 代码中去掉了跟创建 无关的部分，删减了日志、错误校验等
 
@@ -295,6 +302,8 @@ kubeGenericRuntimeManager.startContainer 相对 runtimeService.startContainer来
 ![](/public/upload/kubernetes/kubelet_create_pod_sequence.png)
 
 从图中可以看到，蓝色区域 grpc 调用 dockershim等cri shim 完成。
+
+![](/public/upload/kubernetes/kubelet_object.png)
 
 
 

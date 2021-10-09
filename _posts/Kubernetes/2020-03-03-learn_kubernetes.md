@@ -83,9 +83,11 @@ kubelet/api server/scheduler 本身可能会变，但它们的功能以及 彼�
 
 源码地址 [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes)
 
-	go get -d k8s.io/kubernetes
-	cd $GOPATH/src/k8s.io/kubernetes
-	
+```
+go get -d k8s.io/kubernetes
+cd $GOPATH/src/k8s.io/kubernetes
+```
+
 然后使用ide 工具比如goland 等就可以打开Kubernetes 文件夹查看源码了。
 
 感觉你 `go get github.com/kubernetes` 也没什么错，但因为代码中 都是 `import k8s.io/kubernetes/xxx` 所以推荐前者
