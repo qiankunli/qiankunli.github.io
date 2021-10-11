@@ -172,8 +172,8 @@ Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组
 2. 周期性的开启会话，一个调度周期开始。
 3. 将没有被调度的Job发送到会话的待调度队列中。
 4. 遍历所有的待调度Job，按照定义的次序依次执行enqueue、allocate、preempt、reclaim、backfill等动作，为每个Job找到一个最合适的节点。将该Job 绑定到这个节点。action中执行的具体算法逻辑取决于注册的plugin中各函数的实现。
-	1. Enqueue action负责通过一系列的过滤算法筛选出符合要求的待调度任务并将它们送入待调度队列。经过这个action，任务的状态将由pending变为inqueue。
-	2. Allocate action负责通过一系列的预选和优选算法筛选出最适合的节点。删除可以牺牲的pod 
+	1. Enqueue action负责通过一系列的过滤算法筛选出符合要求的待调度任务并将它们送入待调度队列`session.Jobs`。经过这个action，任务的状态将由pending变为inqueue。比如 一个job 申请的资源超过 所在queue 的capacity 则这个job 便在这个环节被过滤掉。
+	2. Allocate action负责通过一系列的预选和优选算法筛选出最适合的节点。
 	3. Preempt action用于同一个Queue中job之间的抢占，或同一Job下Task之间的抢占。
 	4. Reclaim action负责当一个新的任务进入待调度队列，但集群资源已不能满足该任务所在队列的要求时，根据队列权重回收队列应得资源。选择满足条件的pod 删除。PS：对应queue.reclaimalble 配置。
 	5. backfill action负责将处于pending状态的任务尽可能的调度下去以保证节点资源的最大化利用。处理待调度Pod列表中没有指明资源申请量的Pod调度，在对单个Pod执行调度动作的时候，遍历所有的节点，只要节点满足了Pod的调度请求，就将Pod调度到这个节点上。在一个集群中，主要资源被“胖业务”占用，例如AI模型的训练。Backfill action让集群可以快速调度诸如单次AI模型识别、小数据量通信的“小作业” 。Backfill能够提高集群吞吐量，提高资源利用率。
@@ -191,7 +191,6 @@ Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组
 // 5. use predicateFn to filter out node that T can not be allocated on.
 // 6. use ssn.NodeOrderFn to judge the best node and assign it to T
 ```
-
 
 ## 其它
 
