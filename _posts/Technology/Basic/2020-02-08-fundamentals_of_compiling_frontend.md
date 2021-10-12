@@ -183,6 +183,7 @@ FuncDecl struct {}  // implement Decl 函数声明
 type Stmt interface {}  // 语句
 ```
 [golang 和 ast](https://xargin.com/ast/) 在规则引擎、 批量把 thrift 文件转化成 proto 文件、解析 sql 语句并做一些审计等也有妙用。
+[在Go中使用Failpoint注入故障](https://mp.weixin.qq.com/s/BZyqsVnlJTb6j9OergxHRg) `failpoint.Inject `在代码上起到了一个类似占位符的作用，常规build时该函数为空，特殊build时通过解析AST 等替换掉“占位符代码”（failpoint.Inject 函数），从而实现注入故障的效果。
 
 抽象语法树哪怕不用来做编译器，也有很多使用场景
 

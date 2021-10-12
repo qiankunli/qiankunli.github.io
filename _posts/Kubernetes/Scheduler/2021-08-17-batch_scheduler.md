@@ -128,8 +128,6 @@ kube-batch 本身是一个是scheduler，从apiserver 获取pod信息，如果po
 
 虽然我们使用kube-batch主要是为了gang-scheduler，kube-batch 作为一个调度器，基本的“为pod 选择一个最合适的node/node间pod 数量尽可能均衡/抢占” 这些特性还是要支持的。因此在设计上，即便不需要 像default scheduler 那么灵活，至少在代码层面要方便扩展，方便塞入个性化的调度需求。扩展性具体体现为 Action + Plugin。
 
-![](/public/upload/kubernetes/volcano_workflow.png)
-
 Action 实现了调度机制（mechanism），Plugin 实现了调度的不同策略（policy）。
 
 ![](/public/upload/kubernetes/kube_batch_action_plugin.png)
@@ -166,10 +164,15 @@ Volcano 支持`jobs.batch.volcano.sh.Job` workload，Volcano Controller 依据Jo
 ## 工作流程
 
 
-Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组成。action定义了调度各环节中需要执行的动作；plugin根据不同场景提供了action 中算法的具体实现细节。Volcano scheduler的工作流程如下：
+Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组成。action定义了调度各环节中需要执行的动作；plugin根据不同场景提供了action 中算法的具体实现细节。
 
-1. 客户端提交的Job被scheduler观察到并缓存起来。
-2. 周期性的开启会话，一个调度周期开始。
+每次调用 `Scheduler.runOnce` 的过程如下面调度流程图所示：
+
+![](/public/upload/kubernetes/volcano_workflow.png)
+
+
+1. 客户端提交的Job被scheduler观察到并缓存起来。 
+2. 周期性的开启会话，一个调度周期开始。主要是对 cache 的信息（JobInfos，NodeInfos）做一次 snapshot，然后注册不同 actions 的 plugins。
 3. 将没有被调度的Job发送到会话的待调度队列中。
 4. 遍历所有的待调度Job，按照定义的次序依次执行enqueue、allocate、preempt、reclaim、backfill等动作，为每个Job找到一个最合适的节点。将该Job 绑定到这个节点。action中执行的具体算法逻辑取决于注册的plugin中各函数的实现。
 	1. Enqueue action负责通过一系列的过滤算法筛选出符合要求的待调度任务并将它们送入待调度队列`session.Jobs`。经过这个action，任务的状态将由pending变为inqueue。比如 一个job 申请的资源超过 所在queue 的capacity 则这个job 便在这个环节被过滤掉。

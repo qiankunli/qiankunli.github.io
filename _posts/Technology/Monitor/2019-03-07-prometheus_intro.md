@@ -200,7 +200,7 @@ Prometheus服务器还提供了一套内置查询语言PromQL、一个表达式�
 
 ### PromQL/Prometheus expression language
 
-[QUERYING PROMETHEUS](https://prometheus.io/docs/prometheus/latest/querying/basics/)即便一个表达语言，那也是麻雀虽小五脏俱全，字面量、运算符、语法规则、函数等都有，虽然没有编程语言全面，但也像SQL一样很完备了
+[QUERYING PROMETHEUS](https://prometheus.io/docs/prometheus/latest/querying/basics/)提供了 对时间序列数据的丰富的查询、聚合以及逻辑运行能力。即便一个表达语言，那也是麻雀虽小五脏俱全，字面量、运算符、语法规则、函数等都有，虽然没有编程语言全面，但也像SQL一样很完备了
 
 ```
 http_requests_total{code="200",handler="/api/v1/label/:name/values",instance="0.0.0.0:9099",job="prometheus"}	802
@@ -239,7 +239,6 @@ Time series Selectors 从time series 中选择需要的数据
 对指标进行 函数计算，比如`sum(http_requests_total)` 支持的函数[expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
 
 [Prometheus 常用 PromQL 语句](https://mp.weixin.qq.com/s/vr1C6S_jAnMMu_5sUmYPMQ)
-
 
 
 ## rules
