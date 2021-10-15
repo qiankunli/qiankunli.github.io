@@ -85,7 +85,7 @@ func park_m(gp *g) {
 }
 ```
 
-Mutex.Lock 有一个类似jvm 锁膨胀的过程（go 调度器运行在 用户态，因此实现比java synchronized 关键字更简单），Goroutine 会自旋、休眠自己，也会修改 mutex 的state
+**Mutex.Lock 有一个类似jvm 锁膨胀的过程**（go 调度器运行在 用户态，因此实现比java synchronized 关键字更简单），Goroutine 会先自旋、实在不行休眠自己，修改 mutex 的state。也有普通/饥饿模式对应aqs 的公平锁和非公平锁机制。
 
 Goroutine修改自己的行为/状态
 
@@ -98,6 +98,7 @@ Goroutine修改 mutex 的状态
 1. 如果当前 Goroutine 等待锁的时间超过了 1ms，当前 Goroutine 会将互斥锁切换到饥饿模式
 2. 如果当前 Goroutine 是互斥锁上的最后一个等待的协程或者等待的时间小于 1ms，当前 Goroutine 会将互斥锁切换回正常模式；
 
+[Go精妙的互斥锁设计](https://mp.weixin.qq.com/s/YYvoeDfPMm8Y2kFu9uesGw)
 
 ### 读写锁
 

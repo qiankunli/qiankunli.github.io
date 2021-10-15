@@ -109,12 +109,35 @@ spec:
           restartPolicy: OnFailure
 ```
 
+## 整体设计
+
+volcano 支持自定义的crd  `jobs.batch.volcano.sh.Job`（因此有附属的Controller等）作为workload，也支持第三方workload 直接使用podgroup/queue 等crd 来进行批量调度。 
+
+![](/public/upload/kubernetes/volcano_overview.png)
+
+Volcano Controller 依据JobSpec创建依赖的Pod， Service， ConfigMap等资源，执行配置的插件，并负责Job后续的生命周期管理(状态监控，事件响应，资源清理等)。之后，Volcano Scheduler监听Pod资源的创建，依据策略，完成Pod资源的调度和绑定。
+
+![](/public/upload/kubernetes/volcano_example_yml.jpeg)
+
+整体流程
+
+1. 接口：创建xxjob
+2. Controller 
+    1. volcano Controller resync vcjob，创建pg 。pg 非pending后，创建pod。
+    2. 一些operator 创建pg + pod。
+    3. Controller 会根据pg 所属的pod 为pg 计算minResources
+3. webhook： 如果pg pending，则拦截create pod。 保证pod 在pg 非pending后被创建
+4. scheduler
+    1. enqueue： 判断pg 能不能enqueue，能则 pg pending ==> enqueue
+    2. allocate: pod 创建得到task，根据task 判断queue 有没有资源，有则分配
+    3. backfill: 如果pod 没有标明 request resource，且集群有富余资源，就运行一下这类pod。
+
 ## 基本概念
 
 kube-batch 本身是一个是scheduler，从apiserver 获取pod信息，如果pod 的 schedulerName 不是kube-batch 就会ignore。
 
 
-### queue/podgroup
+### 接口层：queue/podgroup
 
 1. queue是容纳一组podgroup的队列，也是该组podgroup获取集群资源的划分依据。queue 是资源管理的基本单位（weight是软约束，capacity 是硬约束，reclaimable 是超出软约束占据资源后是不是可以吐出来），podGroup 是调度的基本单位
 2. 当创建vcjob（Volcano Job的简称）时，若没有指定该vcjob所属的podgroup，默认会为该vcjob创建同名的podgroup。
@@ -124,7 +147,7 @@ kube-batch 本身是一个是scheduler，从apiserver 获取pod信息，如果po
 
 能够将一个训练任务的多个worker当做一个整体进行调度，只有当任务所有worker的资源都满足，才会将容器在节点上启动；kube-batch还提供了Queue的机制（其实就是**多租户**），不同队列之间可以设置优先级，优先级高的队列中的任务会优先得到调度。队列还可以设置权重，权重高的队列分配到的资源会更多。PS: 换个表述，将调度单元从 Pod 修改为 PodGroup，**以组的形式进行调度**。
 
-### action 和plugin
+### 实现层：action 和plugin
 
 虽然我们使用kube-batch主要是为了gang-scheduler，kube-batch 作为一个调度器，基本的“为pod 选择一个最合适的node/node间pod 数量尽可能均衡/抢占” 这些特性还是要支持的。因此在设计上，即便不需要 像default scheduler 那么灵活，至少在代码层面要方便扩展，方便塞入个性化的调度需求。扩展性具体体现为 Action + Plugin。
 
@@ -138,31 +161,7 @@ action负责管理核心逻辑和流程，xxFns 是流程里暴露出来的hook�
 
 总体来讲，带有动作属性的功能，一般需要引入 action 插件；带有选择 (包括排序) 属性的功能，一般使用 plugin 插件。
 
-
-### pod 状态变化
-
-pod 在k8s cluster、scheduler session（一个调度周期）、scheduler cache中的状态，目前Volcano调度器仅使用了状态的部分功能
-1. Pending: 当Pod被创建后就处于Pending状态，等待调度器对其进行调度；调度的主要目的也是为这些Pending的Pod寻找最优的资源
-2. Allocated: 当Pod被分配空闲资源，但是还没有向kube-apiserver发送调度决策时，Pod处于Allocated状态。 Allocated状态仅存在于调度周期内部，用于记录Pod和资源分配情况。当作业满足启动条件时 (e.g. 满足minMember)，会向kube-apiserver提交调度决策。如果本轮调度周期内无法提交调度决策，由状态会回滚为Pending状态。
-3. Pipelined: 该状态与Allocated状态相似，区别在于处于该状态的Pod分配到的资源为正在被释放的资源 (Releasing)。该状态主要用于等待被抢占的资源释放。该状态是调度周期中的状态，不会更新到kube-apiserver以减少通信，节省kube-apiserver的qps。
-4. Binding: 当作业满足启动条件时，调度器会向kube-apiserver提交调度决策，在kube-apiserver返回最终状态之前，Pod一直处于Binding状态。该状态也保存在调度器的Cache之中，因此**跨调度周期**有效。
-5. Bound: 当作业的调度决策在kube-apiserver确认后，该Pod即为Bound状态。
-6. Releasing: Pod等待被删除时即为Releasing状态。
-7. Running, Failed, Succeeded, Unknown: 与Pod的现有含义一致。
-
-![](/public/upload/kubernetes/podgroup_status_dag.png)
-
-## 整体设计
-
-![](/public/upload/kubernetes/volcano_overview.png)
-
-Volcano 支持`jobs.batch.volcano.sh.Job` workload，Volcano Controller 依据JobSpec创建依赖的Pod， Service， ConfigMap等资源，执行配置的插件，并负责Job后续的生命周期管理(状态监控，事件响应，资源清理等)。之后，Volcano Scheduler监听Pod资源的创建，依据策略，完成Pod资源的调度和绑定。
-
-![](/public/upload/kubernetes/volcano_example_yml.jpeg)
-
-
-## 工作流程
-
+## 调度流程
 
 Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组成。action定义了调度各环节中需要执行的动作；plugin根据不同场景提供了action 中算法的具体实现细节。
 
@@ -173,16 +172,19 @@ Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组
 
 1. 客户端提交的Job被scheduler观察到并缓存起来。 
 2. 周期性的开启会话，一个调度周期开始。主要是对 cache 的信息（JobInfos，NodeInfos）做一次 snapshot，然后注册不同 actions 的 plugins。
-3. 将没有被调度的Job发送到会话的待调度队列中。
 4. 遍历所有的待调度Job，按照定义的次序依次执行enqueue、allocate、preempt、reclaim、backfill等动作，为每个Job找到一个最合适的节点。将该Job 绑定到这个节点。action中执行的具体算法逻辑取决于注册的plugin中各函数的实现。
-	1. Enqueue action负责通过一系列的过滤算法筛选出符合要求的待调度任务并将它们送入待调度队列`session.Jobs`。经过这个action，任务的状态将由pending变为inqueue。比如 一个job 申请的资源超过 所在queue 的capacity 则这个job 便在这个环节被过滤掉。
-	2. Allocate action负责通过一系列的预选和优选算法筛选出最适合的节点。
-	3. Preempt action用于同一个Queue中job之间的抢占，或同一Job下Task之间的抢占。
-	4. Reclaim action负责当一个新的任务进入待调度队列，但集群资源已不能满足该任务所在队列的要求时，根据队列权重回收队列应得资源。选择满足条件的pod 删除。PS：对应queue.reclaimalble 配置。
-	5. backfill action负责将处于pending状态的任务尽可能的调度下去以保证节点资源的最大化利用。处理待调度Pod列表中没有指明资源申请量的Pod调度，在对单个Pod执行调度动作的时候，遍历所有的节点，只要节点满足了Pod的调度请求，就将Pod调度到这个节点上。在一个集群中，主要资源被“胖业务”占用，例如AI模型的训练。Backfill action让集群可以快速调度诸如单次AI模型识别、小数据量通信的“小作业” 。Backfill能够提高集群吞吐量，提高资源利用率。
-5. 关闭本次会话（清理中间数据，有些plugin 记录一些数据）。
+5. 关闭本次会话。 触发plugin 清理中间数据；session snapshot 数据清空；部分状态更新到cache： 比如`cache.UpdateJobStatus` 根据job running task数量与 minMember 对比更新 job（也就是pg）的状态。
 
-以allocate为例，它定义了调度中资源分配过程：根据 plugin 的 JobOrderFn 对作业进行排序，根据NodeOrderFn对节点进行排序，检测节点上的资源是否满足，满足作业的分配要求(JobReady)后提交分配决定。由于action也是基于插件机制，因此用户可以重新定义自己的分配动作，例如 基于图的调度算法firmament。
+
+各个action 的主要逻辑
+
+1. Enqueue action 将`session.Jobs` 中符合条件的job 状态从pending 改为非pending（allocate 不处理pending状态的job） 。比如 一个job 申请的资源超过 所在queue 的capacity 则这个job 便在这个环节被过滤掉。PS： 按组调度的落地点
+2. Allocate action负责通过一系列的预选和优选算法筛选出最适合的节点。
+3. Preempt action 为谁抢占? JobStarving 的job，主要是不够minAvailable 的job。谁来牺牲？preemptableFns， 用于同一个Queue中job之间的抢占，或同一Job下Task之间的抢占（存疑）。PS： 对应job 及task 的优先级字段，优先级也用于处理时的排队
+4. Reclaim action 为谁抢占？queue 配额还够但是 存在pending的task。谁来牺牲？reclaimableFns， 会尝试抢占其它Queue 已经调度 jobs 的资源。PS：对应queue.reclaimalble 配置。
+5. backfill action 负责将处于pending状态的Task（注意不是job）尽可能的调度下去以保证节点资源的最大化利用。当前只有一个case：为没有指明资源申请量的Pod 调度（这类pod allocate action 不处理）。
+
+以allocate为例，它定义了调度中资源分配过程：根据 plugin 的 JobOrderFn 对作业进行排序，根据NodeOrderFn对节点进行排序，检测节点上的资源是否满足，满足作业的分配要求(JobReady)后提交分配决定。
 
 ```
 // allocate 逻辑
@@ -212,6 +214,19 @@ Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组
 |SLA|用户可以在自己的集群定制SLA相关参数，例如最长等待时间(JobWaitingTime)|
 |Tdm|在特定的时间将任务调度到标记的节点上，其它时间则不调度|提高了volcano在调度过程中节点资源的分时复用能力|
 |Numa-aware|许多工作负载对cpu资源迁移并不敏感。然而，有一些cpu的缓存亲和度以及调度延迟显著影响性能的工作负载|
+
+### pod 状态变化
+
+pod 在k8s cluster、scheduler session（一个调度周期）、scheduler cache中的状态，目前Volcano调度器仅使用了状态的部分功能
+1. Pending: 当Pod被创建后就处于Pending状态，等待调度器对其进行调度；调度的主要目的也是为这些Pending的Pod寻找最优的资源
+2. Allocated: 当Pod被分配空闲资源，但是还没有向kube-apiserver发送调度决策时，Pod处于Allocated状态。 Allocated状态仅存在于调度周期内部，用于记录Pod和资源分配情况。当作业满足启动条件时 (e.g. 满足minMember)，会向kube-apiserver提交调度决策。如果本轮调度周期内无法提交调度决策，由状态会回滚为Pending状态。
+3. Pipelined: 该状态与Allocated状态相似，区别在于处于该状态的Pod分配到的资源为正在被释放的资源 (Releasing)。该状态主要用于等待被抢占的资源释放。该状态是调度周期中的状态，不会更新到kube-apiserver以减少通信，节省kube-apiserver的qps。
+4. Binding: 当作业满足启动条件时，调度器会向kube-apiserver提交调度决策，在kube-apiserver返回最终状态之前，Pod一直处于Binding状态。该状态也保存在调度器的Cache之中，因此**跨调度周期**有效。
+5. Bound: 当作业的调度决策在kube-apiserver确认后，该Pod即为Bound状态。
+6. Releasing: Pod等待被删除时即为Releasing状态。
+7. Running, Failed, Succeeded, Unknown: 与Pod的现有含义一致。
+
+![](/public/upload/kubernetes/podgroup_status_dag.png)
 
 ### 监控
 
