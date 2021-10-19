@@ -26,14 +26,20 @@ keywords: TIDB
     ```
 
 
+
+
 当我一开始学习mysql 的实现，我跟着mysql 脉络去学习一个db 如何实现，学习tidb 时也是。然后再回头看， 发现两者很多问题是类似的，知识在这个时候开始分层了。再去看mysql 的博客，你会发现内容是混杂的，一方面是 实现一个db的通用思想、机制， 一方面是msyql的实现细节。当学习了多个数据库实现之后，通用思想、机制提炼出来， mysql/tidb 专属细节整理一下，上帝的归上帝、凯撒的归凯撒。
 
 ![](/public/upload/storage/learn_storage.png)
 
+## 对象存储
+
+对象存储：常见的操作都是通过PUT实现上传和GET 实现下载等；它的表现形式，你可以认为后端存储空间无限大，你只需要使用PUT、GET方式实现上传下载即可，无需关心后端存储 ；可扩展性强，使用简单，但上传的文件，无法在对象存储中对其进行修改编辑，如果有需要，下载到本地，然后再上传，无法为服务器提供块级别的存储；产品举例，百度网盘，HDFS、FastDFS、swift、公有云的：ASW S3，腾讯云的COS，阿里云的OSS等；
 
 
+## 关于一致性
 
-## 存储大势的发展：ACID’s Consistency vs. CAP’s Consistency
+### 存储大势的发展：ACID’s Consistency vs. CAP’s Consistency
 
 一开始数据库都是单机的，实现ACID 的特性相对简单，然后数据量开始变大，在分布式场景下可用性盖过了一致性（所谓的CAP，大部分最终选择了牺牲了部分一致性），此时一致性由上游根据业务需要来取舍。 但是ACID 的需求只是被转移却从未消失过，Avoiding lost updates, dirty reads, stale reads and enforcing app-specific integrity constraints are critical concerns for app developers，Solving these concerns directly **at the database layer** using the consistency provided by ACID transactions is a much simpler approach.
 

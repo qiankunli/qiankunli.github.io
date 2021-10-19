@@ -180,8 +180,8 @@ Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组
 
 1. Enqueue action 将`session.Jobs` 中符合条件的job 状态从pending 改为非pending（allocate 不处理pending状态的job） 。比如 一个job 申请的资源超过 所在queue 的capacity 则这个job 便在这个环节被过滤掉。PS： 按组调度的落地点
 2. Allocate action负责通过一系列的预选和优选算法筛选出最适合的节点。
-3. Preempt action 为谁抢占? JobStarving 的job，主要是不够minAvailable 的job。谁来牺牲？preemptableFns， 用于同一个Queue中job之间的抢占，或同一Job下Task之间的抢占（存疑）。PS： 对应job 及task 的优先级字段，优先级也用于处理时的排队
-4. Reclaim action 为谁抢占？queue 配额还够但是 存在pending的task。谁来牺牲？reclaimableFns， 会尝试抢占其它Queue 已经调度 jobs 的资源。PS：对应queue.reclaimalble 配置。
+3. Preempt action 为谁抢占? JobStarving 的job，主要是不够minAvailable 的job。谁来牺牲？preemptableFns， 用于同一个Queue中job之间的抢占。PS： 对应job 及task 的优先级字段，优先级也用于处理时的排队
+4. Reclaim action 为谁抢占？queue 配额还够但是 存在pending的task。谁来牺牲？reclaimableFns， 会尝试抢占其它Queue 已经running 的task。PS：对应queue.reclaimalble 配置。
 5. backfill action 负责将处于pending状态的Task（注意不是job）尽可能的调度下去以保证节点资源的最大化利用。当前只有一个case：为没有指明资源申请量的Pod 调度（这类pod allocate action 不处理）。
 
 以allocate为例，它定义了调度中资源分配过程：根据 plugin 的 JobOrderFn 对作业进行排序，根据NodeOrderFn对节点进行排序，检测节点上的资源是否满足，满足作业的分配要求(JobReady)后提交分配决定。
