@@ -99,6 +99,7 @@ Goroutine修改 mutex 的状态
 2. 如果当前 Goroutine 是互斥锁上的最后一个等待的协程或者等待的时间小于 1ms，当前 Goroutine 会将互斥锁切换回正常模式；
 
 [Go精妙的互斥锁设计](https://mp.weixin.qq.com/s/YYvoeDfPMm8Y2kFu9uesGw)
+[sync.Once 的前世今生](https://mp.weixin.qq.com/s/VoBHdLUdFjFDDv24-PggeQ)
 
 ### 读写锁
 

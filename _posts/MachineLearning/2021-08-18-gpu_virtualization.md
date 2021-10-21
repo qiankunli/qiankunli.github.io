@@ -45,7 +45,7 @@ keywords:  gpu
 
 1. Horovod / mpi-operator[云原生的弹性 AI 训练系列之一：基于 AllReduce 的弹性分布式训练实践](https://mp.weixin.qq.com/s/X4VDynLfKdVp-tyciQccyQ)
 2. pytorch [云原生的弹性 AI 训练系列之二：PyTorch 1.9.0 弹性分布式训练的设计与实现](https://mp.weixin.qq.com/s/hlOYLKSHFDZWN21AsUn6bg)
-3. [云原生的弹性 AI 训练系列之三：借助弹性伸缩的 Jupyter Notebook，大幅提高 GPU 利用率](https://mp.weixin.qq.com/s/Hms33MbcSB2DERfQE2TcEg) 未读
+3. [云原生的弹性 AI 训练系列之三：借助弹性伸缩的 Jupyter Notebook，大幅提高 GPU 利用率](https://mp.weixin.qq.com/s/Hms33MbcSB2DERfQE2TcEg) Jupyter Notebooks 在 Kubernetes 上部署往往需要绑定一张 GPU，而大多数时候 GPU 并没有被使用，因此利用率低下。为了解决这一问题，我们开源了 elastic-jupyter-operator将占用 GPU 的 Kernel 组件单独部署，在长期空闲的情况下自动回收，释放占用的 GPU。
 
 
 实现弹性训练需要注意的问题

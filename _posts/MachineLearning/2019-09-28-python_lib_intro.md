@@ -86,23 +86,6 @@ pyhone 库安装命令：`python3 -m pip install xx`
 
 提交result.csv 到kaggle ，可能因为简化的太狠了，得了一个0分，尴尬
 
-## numpy
-
-![](/public/upload/machine/numpy.png)
-
-### 数组访问
-
-    import numpy as np
-    b = np.array([[1,2,3],[4,5,6],[7,8,9],[10,11,12]],dtype=int)
-    c = b[0,1]  #1行 第二个单元元素
-    # 输出： 2
-    d = b[:,1]  #所有行 第二个单元元素
-    # 输出： [ 2  5  8 11]
-    e = b[1,:]  #2行 所有单元元素
-    # 输出： [4 5 6]
-    f = b[1,1:]  #2行 第2个单元开始以后所有元素
-    # 输出： [5 6]
-    g = b[1,:2]  #2行 第1个单元开始到索引为2以前的所有元素
 
 
 ## Matplotlib
