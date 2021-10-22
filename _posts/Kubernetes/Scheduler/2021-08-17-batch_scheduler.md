@@ -64,50 +64,9 @@ spec:
   minMember: 6
 ```
 
-[使用Kubeflow和Volcano实现典型AI训练任务](https://support.huaweicloud.com/bestpractice-cce/cce_bestpractice_0075.html)通过简单的设置schedulerName字段的值为“volcano”，启用Volcano调度器
+[使用Kubeflow和Volcano实现典型AI训练任务](https://support.huaweicloud.com/bestpractice-cce/cce_bestpractice_0075.html)
 
-```yml
-kind: TFJob
-metadata:
-  name: {train_name}  
-spec:
-  schedulerName: volcano
-  tfReplicaSpecs:
-    Ps:
-      replicas: {num_ps}
-      template:
-        metadata:
-          annotations:
-            sidecar.istio.io/inject: "false"
-        spec:
-          serviceAccount: default-editor
-          containers:
-          - name: tensorflow
-            command:
-            ...
-            env:
-            ...
-            image: {image}
-            workingDir: /opt
-          restartPolicy: OnFailure
-    Worker:
-      replicas: 1
-      template:
-        metadata:
-          annotations:
-            sidecar.istio.io/inject: "false"
-        spec:
-          serviceAccount: default-editor
-          containers:
-          - name: tensorflow
-            command:
-            ...
-            env:
-            ...
-            image: {image}
-            workingDir: /opt
-          restartPolicy: OnFailure
-```
+![](/public/upload/kubernetes/volcano_example_yml.jpeg)
 
 ## 整体设计
 
@@ -116,8 +75,6 @@ volcano 支持自定义的crd  `jobs.batch.volcano.sh.Job`（因此有附属的C
 ![](/public/upload/kubernetes/volcano_overview.png)
 
 Volcano Controller 依据JobSpec创建依赖的Pod， Service， ConfigMap等资源，执行配置的插件，并负责Job后续的生命周期管理(状态监控，事件响应，资源清理等)。之后，Volcano Scheduler监听Pod资源的创建，依据策略，完成Pod资源的调度和绑定。
-
-![](/public/upload/kubernetes/volcano_example_yml.jpeg)
 
 整体流程
 
