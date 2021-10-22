@@ -108,7 +108,7 @@ kube-batch 本身是一个是scheduler，从apiserver 获取pod信息，如果po
 
 虽然我们使用kube-batch主要是为了gang-scheduler，kube-batch 作为一个调度器，基本的“为pod 选择一个最合适的node/node间pod 数量尽可能均衡/抢占” 这些特性还是要支持的。因此在设计上，即便不需要 像default scheduler 那么灵活，至少在代码层面要方便扩展，方便塞入个性化的调度需求。扩展性具体体现为 Action + Plugin。
 
-Action 实现了调度机制（mechanism），Plugin 实现了调度的不同策略（policy）。
+Action 实现了调度机制（mechanism），Plugin 实现了调度的不同策略（policy）。举个例子，在 Allocate 中，每次会从优先队列中找到一个容器进行调度，这是机制，是由 Action 决定的。而在优先队列中容器排序的策略，是调用了 session 的 TaskOrderFn 方法，这个方法会调用 Plugin 注册的方法，因此策略是由 Plugin 实现。这种机制和策略分离的软件设计，带来了很好的扩展性和灵活性。总体来讲，带有动作属性的功能，一般需要引入 action 插件；带有选择 (包括排序) 属性的功能，一般使用 plugin 插件。
 
 ![](/public/upload/kubernetes/kube_batch_action_plugin.png)
 
@@ -116,7 +116,7 @@ action负责管理核心逻辑和流程，xxFns 是流程里暴露出来的hook�
 1. action是第一级插件，定义了调度周期内需要的各个动作；默认提供 enqueue、allocate、 preempt和backfill四个action。比如allocate 为pod 分配node ，preempt 实现抢占。
 2. plugin是第二级插件，定义了action需要的各个算法；比如如何为job排序，为node排序，优先抢占谁。
 
-总体来讲，带有动作属性的功能，一般需要引入 action 插件；带有选择 (包括排序) 属性的功能，一般使用 plugin 插件。
+
 
 ## 调度流程
 
