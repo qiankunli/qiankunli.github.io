@@ -37,6 +37,8 @@ It pops out a pod from the scheduling queue and starts a standard scheduling cyc
 4. It retrieves “soft requirements” from the pod’s API spec and also applies some default soft “policies” (like the pods prefer to be more packed or scattered across the nodes). It finally gives a score for each candidate node, and picks up the final winner with the highest score.
 5. It talks to the apiserver (by issuing a bind call) and sets
 
+![](/public/upload/kubernetes/scheduler_arch.png)
+
 ## Kubernetes 资源模型与资源管理
 
 在 Kubernetes 里，Pod 是最小的原子调度单位。这也就意味着，所有跟调度和资源管理相关的属性都应该是属于 Pod 对象的字段。而这其中最重要的部分，就是 Pod 的CPU 和内存配置

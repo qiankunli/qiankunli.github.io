@@ -100,7 +100,10 @@ NoSchedule 是一个effect. This means that no pod will be able to schedule onto
 
 [kubernetes-sigs/descheduler](https://github.com/kubernetes-sigs/descheduler) 会监控Node的高负载情况，将一些配置了高负载迁移的Pod迁移到负载比较低的Node上。 PS：未细读
 
-## 资源预留
+
+[作业帮 Kubernetes 原生调度器优化实践](https://mp.weixin.qq.com/s/ULFfmxFH_Y7QOCsySaNUQw)实时调度器，在调度的时候获取各节点实时数据来参与节点打分，但是实际上实时调度在很多场景并不适用，尤其是对于具备明显规律性的业务来说，比如我们大部分服务晚高峰流量是平时流量的几十倍，高低峰资源使用差距巨大，而业务发版一般选择低峰发版，采用实时调度器，往往发版的时候比较均衡，到晚高峰就出现节点间巨大差异，很多实时调度器往往在出现巨大差异的时候会使用再平衡策略来重新调度，高峰时段对服务 POD 进行迁移，服务高可用角度来考虑是不现实的。显然，实时调度是远远无法满足业务场景的。针对这种情况，需要预测性调度方案，根据以往高峰时候 CPU、IO、网络、日志等资源的使用量，通过对服务在节点上进行最优排列组合回归测算，得到各个服务和资源的权重系数，基于资源的权重打分扩展，也就是使用过去高峰数据来预测未来高峰节点服务使用量，从而干预调度节点打分结果。
+
+## 节点资源预留
 
 [Kubernetes 资源预留配置](https://mp.weixin.qq.com/s/tirMYoC_o9ahRjiErc99AQ)考虑一个场景，由于某个应用无限制的使用节点的 CPU 资源，导致节点上 CPU 使用持续100%运行，而且压榨到了 kubelet 组件的 CPU 使用，这样就会导致 kubelet 和 apiserver 的心跳出问题，节点就会出现 Not Ready 状况了。默认情况下节点 Not Ready 过后，5分钟后会驱逐应用到其他节点，当这个应用跑到其他节点上的时候同样100%的使用 CPU，是不是也会把这个节点搞挂掉，同样的情况继续下去，也就导致了整个集群的雪崩。
 

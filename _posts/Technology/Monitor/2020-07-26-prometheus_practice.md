@@ -154,7 +154,7 @@ Prometheus 本身自带了监控自己的许多指标，比如
 
 如果需要对某些区域或功能进行整体视图查看，那么可以使用federat ion功能将时间序列提取到集中的Prometheus服务器。
 
-
+[vivo AI计算平台的监控高可用方案](https://mp.weixin.qq.com/s/fu_e4SPKrJNhigXbgEsSSg)
 
 ### 存储扩展
 

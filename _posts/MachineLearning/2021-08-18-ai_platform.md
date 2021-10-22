@@ -19,6 +19,7 @@ keywords:  ai platform
 
 ![](/public/upload/machine/ai_develop_progress.jpeg)
 
+
 ## 虎牙
 
 [互动直播场景下的AI基础设施建设](https://time.geekbang.org/qconplus/detail/100059720)
@@ -55,6 +56,32 @@ AI平台的定位：面向算法工程师，围绕AI 模型的全生命周期去
 7. 部署组件->模型部署上线
 8. 串联上述所有组件的**工作流组件**，以支持算法工程师 模型训练部署的整个过程。
 自动化能自动的，加速能加速的，减少模型耗时，加快算法工程师的产出效率，并以此为前提提高资源利用率。 
+
+## vivo
+
+训练平台 + 推理平台 + 容器平台（日常维护cli ==> 白屏化）
+
+[一站式机器学习平台在 vivo AI 的实践](https://www.infoq.cn/article/thlkstomylrgxl2hzm8w)
+
+算力的易用性
+1. 分布式训练
+2. 交互式调试
+3. 容量托管
+4. 训练sdk
+
+算力的灵活调度
+1. 基于容器的资源调度
+2. 在离线统一资源池
+3. 混合云 [vivo AI 计算平台的 ACK 混合云实践](https://mp.weixin.qq.com/s/O7y6kr01Au-T8M0kah7D9w)
+4. 基于GPU 拓扑的调度
+ 
+算力的高效利用
+1. 资源分配：弹性伸缩、算力超卖（多个容器使用一张卡，GPU隔离）
+2. 资源使用：训练/推理加速，训练容错
+3. 弹性训练 [vivo AI 计算平台弹性分布式训练的探索和实践](https://www.infoq.cn/article/EhRjlkwxs6C6cT4cHzlt)
+4. 训练性能剖析
+5. GPU 远程调用
+6. 数据编排和加速
 
 ## 其它
 

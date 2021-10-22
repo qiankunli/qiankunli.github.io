@@ -14,6 +14,8 @@ keywords: openkruise
 
 [openkruise](http://openkruise.io/) 面向自动化场景的 Kubernetes workload扩展controller，它是一组controller，可在应用程序工作负载管理上扩展和补充Kubernetes核心控制器。cloneset 在很多方面上借鉴了 statefulset ，只是没有 statefulset 的 ordinal 序号。
 
+类似功能 的还有 [Argo Rollouts ](https://github.com/argoproj/argo-rollouts)Argo Rollouts is a Kubernetes controller and set of CRDs which provide advanced deployment capabilities such as blue-green, canary, canary analysis, experimentation, and progressive delivery features to Kubernetes.
+
 ## CloneSet
 
 [CloneSet](http://openkruise.io/zh-cn/docs/cloneset.html) 控制器提供了高效管理无状态应用的能力，一个简单的 CloneSet yaml 文件如下：

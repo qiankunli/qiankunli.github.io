@@ -69,6 +69,14 @@ spec:
 ```
 
 
+[vivo AI 计算平台弹性分布式训练的探索和实践](https://www.infoq.cn/article/EhRjlkwxs6C6cT4cHzlt)
+
+![](/public/upload/machine/tf_operator_workflow.png)
+
+syncTFJob 是 tf-operator 管理对象的核心逻辑实现，内部对不同 ReplicaType 的 Pod 进行检查并推导出任务状态，逻辑流程图如下：
+
+![](/public/upload/machine/tf_operator_synctfjob.png)
+
 ## 源码分析
 
 2020.9.23 实现crd 有两派思路，tf-operator 都有体现：

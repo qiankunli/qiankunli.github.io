@@ -8,7 +8,9 @@ keywords:  mpi
 
 ---
 
-## 简介（未完成）
+<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
+
+## 简介
 
 * TOC
 {:toc}
@@ -50,19 +52,13 @@ g = b[1,:2]  #2行 第1个单元开始到索引为2以前的所有元素
 
 ## pytorch 张量/Tensor
 
-在深度学习过程中最多使用`$5$`个维度的张量，张量的维度（dimension）通常叫作轴（axis）
+在深度学习过程中最多使用$5$个维度的张量，张量的维度（dimension）通常叫作轴（axis）
 1. 标量（0维张量）
 2. 向量（1维度张量）
 3. 矩阵（2维张量）
-4. 3维张量，最常见的三维张量就是图片，例如`$[224, 224, 3]$`
-4. 4维张量，4维张量最常见的例子就是批图像，加载一批 `$[64, 224, 224, 3]$` 的图片，其中 `$64$` 表示批尺寸，`$[224, 224, 3]$` 表示图片的尺寸。
-5. 5维张量，使用5维度张量的例子是视频数据。视频数据可以划分为片段，一个片段又包含很多张图片。例如，`$[32, 30, 224, 224, 3]$` 表示有 `$32$` 个视频片段，每个视频片段包含 `$30$` 张图片，每张图片的尺寸为 `$[224, 224, 3]$`。
-
-张量运算
-
-1. 标量运算：（标量之间）加减乘除 长度 求导（导数是切线的斜率）
-2. 向量运算：（标量向量之间，向量之间）加减乘除 长度 求导（也就是梯度，跟等高线正交）
-3. 矩阵运算：（标量矩阵之间，向量矩阵之间，矩阵矩阵之间）加减乘 转置 求导
+4. 3维张量，最常见的三维张量就是图片，例如$[224, 224, 3]$
+4. 4维张量，4维张量最常见的例子就是批图像，加载一批 $[64, 224, 224, 3] 的图片，其中 $64$ 表示批尺寸，$[224, 224, 3]$ 表示图片的尺寸。
+5. 5维张量，使用5维度张量的例子是视频数据。视频数据可以划分为片段，一个片段又包含很多张图片。例如，$[32, 30, 224, 224, 3]$ 表示有 $32$ 个视频片段，每个视频片段包含 $30$ 张图片，每张图片的尺寸为 $[224, 224, 3]$。
 
 本质上来说，**PyTorch 是一个处理张量的库**。能计算梯度、指定设备等是 Tensor 相对numpy ndarray 特有的
 1. Tensor的结构操作包括：创建张量，查看属性，修改形状，**指定设备**，数据转换， 索引切片，**广播机制（不同形状的张量相加）**，元素操作，归并操作；
@@ -77,8 +73,61 @@ g = b[1,:2]  #2行 第1个单元开始到索引为2以前的所有元素
 5. tensor.grad：查看张量的梯度；
 6. tensor.requires_grad：查看张量是否可微。
 
+## 张量运算
 
-使用gpu
+《李沐的深度学习课》
+
+1. 标量运算：（标量之间）加减乘除,长度,求导（导数是切线的斜率）
+2. 向量运算：（标量向量之间，向量之间）加减乘除, 长度, 求导（也就是梯度，跟等高线正交）
+3. 矩阵运算：（标量矩阵之间，向量矩阵之间，矩阵矩阵之间）加减乘, 转置, 求导
+
+![](/public/upload/machine/derivative.png)
+
+[Tensor的自动求导(AoutoGrad)](https://zhuanlan.zhihu.com/p/51385110)
+```python
+x = torch.tensor([[1.0,2,3],[4,5,6]],requires_grad=True)
+print(x)
+y = x + 1
+print(y)
+z = 2 * y * y
+print(z)
+j = torch.mean(z)
+print(j)
+j.backward()
+print(x.grad)
+```
+
+在机器学习模型是，j 就是损失函数。x 是 `<w,b>` (存疑 )，机器学习中，`<w,b>` 是参数或变量，样本数据数据是为了计算 loss值。
+
+![](/public/upload/machine/cal_derivative.jpeg)
+
+$$\frac{dj}{dz_i}=\frac{1}{6}$$
+$$\frac{dz}{dy}=4y$$
+$$\frac{dy}{dx}=1$$
+$$\frac{dj}{dx_i}=\frac{1}{6} * 4 * (x_i+1) = \frac{2}{3}(x_i+1)$$
+
+线性模型可以看做是单层（带权重的层只有1层）神经网络。 使用pytorch 实现线性模型
+
+```python
+from torch import nn
+// 预定义好层
+net = nn.Sequential(nn.Linear(2,1))
+// 初始化模型参数
+net[0].weight.data.normal_(0,0.01)
+net[0].bias.data.fill_(0)
+// 使用均方误差MSELoss 类，也称为平方范数
+loss = nn.MSELoss
+// 实例化SGD 实例
+trainer = torch.optim.SGD(net.parameters,lr=0.03)
+for 每个batch的样本
+    X, y = 获取样本特征和样本值
+    l = loss(net(X),y)
+    trainer.zero_grad()
+    l.backward()
+    trainer.step()  // 有了梯度之后进行一次模型更新，即w,b更新
+```
+
+## 使用gpu
 ```python
 cpu = torch.device("cpu")
 gpu = torch.device("cuda:0")  # 使用第一个cpu
@@ -86,20 +135,4 @@ x = torch.rand(10)
 x = x.to(gpu)
 ```
 
-梯度
-```python
-x = torch.tensor(3.)
-w = torch.tensor(4., requires_grad=True) # 是否要求计算 y 相对 w 的梯度
-b = torch.tensor(5., requires_grad=True) # 是否要求计算 y 相对 b 的梯度
-y = w * x + b
-print y
-# tensor(17. grad_fn=<AddBackward0>)
-y.backward()
-print('dy/dx:', x.grad)
-# dy/dx: Node
-print('dy/dw:', w.grad)
-# dy/dx: tensor(3.)
-print('dy/db:', b.grad)
-# dy/dx: tensor(1.)
-```
-我们已经创建了 3 个张量：x、w 和 b, y 是值为 3 * 4 + 5 = 17 的张量
+
