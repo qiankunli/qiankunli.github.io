@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: python与线性代数
+title: python与线性回归
 category: 架构
 tags: MachineLearning
-keywords:  mpi
+keywords:  线性回归 pytorch
 
 ---
 
@@ -23,8 +23,6 @@ NumPy是Python中用于数据分析、机器学习、科学计算的重要软件
 2. 支持多种不同类型的节点，包括矩阵乘法、加法、数乘、卷积、池化等，还有若干激活函数和损失函数。比如向量操作pytorch 跟numpy 函数命名都几乎一样
 3. 提供了一些辅助类和工具函数，例如构造全连接层、卷积层和池化层的函数、各种优化器类、单机和分布式训练器类等，为搭建和训练模型提供便利
 
-
-![](/public/upload/machine/numpy.png)
 
 多维数组的属性
 1. ndim, 数组维度（或轴）的个数
@@ -75,7 +73,7 @@ g = b[1,:2]  #2行 第1个单元开始到索引为2以前的所有元素
 
 ## 张量运算
 
-《李沐的深度学习课》
+《李沐的深度学习课》  有一点非常好，就是针对线性回归/softmax回归/感知机 都提供了一个 基于numpy 的实现以及pytorch 的简单实现。
 
 1. 标量运算：（标量之间）加减乘除,长度,求导（导数是切线的斜率）
 2. 向量运算：（标量向量之间，向量之间）加减乘除, 长度, 求导（也就是梯度，跟等高线正交）
@@ -106,26 +104,140 @@ $$\frac{dz}{dy}=4y$$
 $$\frac{dy}{dx}=1$$
 $$\frac{dj}{dx_i}=\frac{1}{6} * 4 * (x_i+1) = \frac{2}{3}(x_i+1)$$
 
-线性模型可以看做是单层（带权重的层只有1层）神经网络。 使用pytorch 实现线性模型
+线性模型可以看做是单层（带权重的层只有1层）神经网络
+
+<table>
+<tr>
+<td>
+使用pytorch 手动实现线性模型
+</td>
+<td>
+使用pytorch直接配置线性模型
+</td>
+</tr>
+<tr>
+<td valign="top">
+<pre>
+// Initialize Model Parameters
+w = torch.zeros(size=(num_inputs, 1)).normal_(std=0.01)
+b = torch.zeros(size=(1,))
+w.requires_grad_(True)
+b.requires_grad_(True)
+
+// Define the Model
+def linreg(X, w, b):
+    return torch.matmul(X, w) + b
+
+// Define the Loss Function
+def squared_loss(y_hat, y):
+    return (y_hat - y.reshape(y_hat.shape)) ** 2 / 2
+
+// Define the Optimization Algorithm
+def sgd(params, lr, batch_size):
+    for param in params:
+        param.data.sub_(lr*param.grad/batch_size)
+        param.grad.data.zero_()
+
+// Training
+lr = 0.03  # Learning rate
+num_epochs = 3  # Number of iterations
+net = linreg  # Our fancy linear model
+loss = squared_loss  # 0.5 (y-y')^2
+
+for epoch in range(num_epochs):
+    # Assuming the number of examples can be divided by the batch size, all
+    # the examples in the training data set are used once in one epoch
+    # iteration. The features and tags of mini-batch examples are given by X
+    # and y respectively
+    for X, y in data_iter(batch_size, features, labels):
+        l = loss(net(X, w, b), y)  # Minibatch loss in X and y
+        l.mean().backward()  # Compute gradient on l with respect to [w,b]
+        sgd([w, b], lr, batch_size)  # Update parameters using their gradient
+    with torch.no_grad():
+        train_l = loss(net(features, w, b), labels)
+        print('epoch %d, loss %f' % (epoch + 1, train_l.mean().numpy()))
+
+// print training result
+print('Error in estimating w', true_w - w.reshape(true_w.shape))
+print('Error in estimating b', true_b - b)
+
+</pre>
+</td>
+<td valign="top">
+<pre>
+// Define the Model
+net = LinearRegressionModel()
+
+// Initialize Model Parameters
+net.layer1.weight.data=torch.Tensor(np.random.normal(size=(1,2),scale=0.01,loc=0))
+net.layer1.bias.data=torch.Tensor([0])
+
+// Define the Loss Function
+loss = torch.nn.MSELoss(reduction = "sum")
+
+// Define the Optimization Algorithm
+trainer = torch.optim.SGD(net.parameters(), lr = 0.03)
+
+// Training
+num_epochs = 3
+for epoch in range(num_epochs): 
+    for X,y in data_iter:
+        l=loss(net(X) ,y)
+        trainer.zero_grad() 
+        l.backward() 
+        trainer.step() 
+    l_epoch = loss(net(features), labels) 
+    print('epoch {}, loss {}'.format(epoch+1, l_epoch))
+
+// print training result
+w = list(net.parameters())[0][0]
+print('Error in estimating w', true_w.reshape(w.shape) - w)
+b = list(net.parameters())[1][0]
+print('Error in estimating b', true_b - b)
+
+</pre>
+</td>
+</tr>
+</table>
+
+基本过程
+1. 准备数据
+2. 定义模型
+3. 确定损失函数
+4. 确定优化算法。即使得损失函数值最小。
+
+从中可以找到一点感觉，就是如果 mapreduce 让你写map和reduce 函数，那么pytorch 就只是让你设定 网络每层大小、损失函数、 优化器方法名等。
+
+![](/public/upload/machine/net_overview.jpeg)
+
+net 此处代表一层网路模型，具象化为一个tensor 计算。
 
 ```python
-from torch import nn
-// 预定义好层
-net = nn.Sequential(nn.Linear(2,1))
-// 初始化模型参数
-net[0].weight.data.normal_(0,0.01)
-net[0].bias.data.fill_(0)
-// 使用均方误差MSELoss 类，也称为平方范数
-loss = nn.MSELoss
-// 实例化SGD 实例
-trainer = torch.optim.SGD(net.parameters,lr=0.03)
-for 每个batch的样本
-    X, y = 获取样本特征和样本值
-    l = loss(net(X),y)
-    trainer.zero_grad()
-    l.backward()
-    trainer.step()  // 有了梯度之后进行一次模型更新，即w,b更新
+def linreg(X, w, b):
+    return torch.matmul(X, w) + b
 ```
+
+对于两层网络模型
+
+```python
+W1 = xx
+b1 = xx
+W2 = xx
+b2 = xx
+def relu(X):        # 定义激活函数
+    a = torch.zeros_like(X)
+    return torch.max(X,a)
+def net(X):         # 模型可以表示为矩阵运算
+    X = X.reshape((-1,num_inputs))
+    H = relu(X * W1 + b1)
+    return (H * W2 + b2) 
+```
+
+假设一个层数为L 的多层感知机的第l 层 $H^{(l)}$ 的权重参数为 $W^{(l)}$，输出层$H^{(L)}$的权重参数为$W^{L}$。为了方便讨论，不考虑偏差函数，且设所有隐藏层的激活函数为恒等映射 $\sigma(x) = x$。
+给定输入X，多层感知机的第l 层的输出$H^{(l)}=XW^{(1)}W^{(2)}...W^{(l)}$
+
+
+手动实现时，net 是一个方法，定义了模型参数及计算方法，**模型可以表示为矩阵运算**。**应该尽可能表示为矩阵运算**，以提升计算效率。 pytorch nn模块定义了大量神经网络的层，loss模块定义了各种损失函数，net和 tensor  一样可以 `net.to(device="cuda:1")` 将数据挪到某个gpu 上。要想在某个 gpu 上做运算，需要将模型参数（net）和输入（tensor） 都挪到这个gpu 上。
 
 ## 使用gpu
 ```python
@@ -136,3 +248,6 @@ x = x.to(gpu)
 ```
 
 
+## 其它
+
+![](/public/upload/machine/numpy.png)

@@ -40,6 +40,8 @@ keywords: 深度学习
 
 [李宏毅2020机器学习深度学习(完整版)国语](https://www.bilibili.com/video/BV1JE411g7XF?p=16) 也非常的不错。
 
+《李沐的深度学习课》  有一点非常好，就是针对线性回归/softmax回归/感知机 都提供了一个 基于numpy 的实现以及pytorch 的简单实现。
+
 ## AI 的范畴
 
 

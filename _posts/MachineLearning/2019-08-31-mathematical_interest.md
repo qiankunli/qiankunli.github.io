@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 直觉上理解机器学习
+title: 直觉上理解深度学习
 category: 技术
 tags: MachineLearning
 keywords: 深度学习
@@ -13,9 +13,19 @@ keywords: 深度学习
 * TOC
 {:toc}
 
-## 前言
+## 发展历史
 
-区块链、docker是各种技术的整合，机器学习也是
+神经网络技术起源于上世纪五、六十年代，当时叫感知机（perceptron），拥有输入层、输出层和一个隐含层。输入的特征向量通过隐含层变换达到输出层，在输出层得到分类结果。但是，单层感知机有一个严重得不能再严重的问题，即它对稍复杂一些的函数都无能为力（比如最为典型的“异或”操作）。随着数学的发展，一票大牛发明多层感知机，摆脱早期离散传输函数的束缚，使用sigmoid或tanh等连续函数模拟神经元对激励的响应，在训练算法上则使用反向传播BP算法。对，这货就是我们现在所说的神经网络NN。多层感知机给我们带来的启示是，**神经网络的层数直接决定了它对现实的刻画能力**——利用每层更少的神经元拟合更加复杂的函数。但随着神经网络层数的加深带来了很多问题，参数数量膨胀，优化函数越来越容易陷入局部最优解，“梯度消失”现象更加严重。当然有一些通用方法可以解决部分问题， 但在具体的问题领域 人们利用问题域的特点提出了 一些变形来解决 层数加深带来的问题。PS：充分利用问题域的特点 是设计算法的基本思路。
+
+Artificial neural networks use networks of activation units (hidden units) to map inputs to outputs. The concept of deep learning applied to this model allows the model to have multiple layers of hidden units where we feed output from the previous layers. However, **dense connections between the layers is not efficient, so people developed models that perform better for specific tasks**.
+
+The whole "convolution" in convolutional neural networks is essentially based on the fact that we're lazy and want to exploit spatial relationships in images. This is a huge deal because we can then group small patches of pixels and effectively "downsample" the image while training multiple instances of small detectors with those patches. Then a CNN just moves those filters around the entire image in a convolution. The outputs are then collected in a pooling layer. The pooling layer is again a down-sampling of the previous feature map. If we have activity on an output for filter a, we don't necessarily care if the activity is for (x, y) or (x+1, y), (x, y+1) or (x+1, y+1), so long as we have activity. So we often just take the highest value of activity on a small grid in the feature map called max pooling.
+
+If you think about it from an abstract perspective, **the convolution part of a CNN is effectively doing a reasonable way of dimensionality reduction**. After a while you can flatten the image and process it through layers in a dense network. Remember to use dropout layers! (because our guys wrote that paper :P)
+
+Let's talk RNN. Recurrent networks are basically neural networks that evolve through time. Rather than exploiting spatial locality, they exploit sequential, or temporal locality. Each iteration in an RNN takes an input and it's previous hidden state, and produces some new hidden state. The weights are shared in each level, but we can unroll an RNN through time and get your everyday neural net. Theoretically RNN has the capacity to store information from as long ago as possible, but historically people always had problems with the gradients vanishing as we go back further in time, meaning that the model can't be differentiated numerically and thus cannot be trained with backprop. This was later solved in the proposal of the LSTM architecture and subsequent work, and now we train RNNs with BPTT (backpropagation through time). Here's a link that explains LSTMs really well: http://colah.github.io/posts/2015-08-Understanding-LSTMs/Since then RNN has been applied in many areas of AI, and many are now designing RNN with the ability to extract specific information (read: features) from its training examples with attention-based models.
+
+学习路径上，先通过单层神经网络（线性回归、softmax回归）理解基本原理，再通过两层感知机理解正向传播和反向传播，增加层数可以增强表现能力，增加特殊的层来应对特定领域的问题。
 
 ## 线性回归
 
@@ -60,6 +70,15 @@ keywords: 深度学习
 
 
 ### 梯度下降法 ==> 求使得J极小的(w1,w2,b)
+
+梯度是一个矢量，梯度的方向是**方向导数**中取到最大值的方向，梯度的值是方向导数的最大值。举例来说，对于3变量函数 $f=x^2+3xy+y^2+z^3$ ，它的梯度可以这样求得
+$$\frac{d_f}{d_x}=2x+3y$$
+$$\frac{d_f}{d_y}=3x+2y$$
+$$\frac{d_f}{d_z}=3z^2$$
+
+于是，函数f的梯度可表示为：$grad(f)=(2x+3y,3x+2y,3z^2)$，针对某个特定点，如点`A(1, 2, 3)`，带入对应的值即可得到该点的梯度`(8,7,27)`，朝着向量点`(8,7,27)`方向进发，函数f的值增长得最快。
+
+对于机器学习来说
 
 1. 首先对(w1,w2,b)赋值，这个值可以是随机的，也可以让(w1,w2,b)是一个全零的向量
 2. 改变(w1,w2,b)的值，使得J(w1,w2,b)按梯度下降的方向进行减少，梯度方向由J(w1,w2,b)对(w1,w2,b)的偏导数确定
@@ -108,15 +127,15 @@ https://zhuanlan.zhihu.com/p/46928319
 
 ## 从自动微分法来理解线性回归
 
-训练的目的是 得到一个 `<W,b>` 使损失函数值最小。最优解（极大值/极小值）在 导数为0 的地方，对于`y=f(x)`，手动可以求解 `f'(x)=0` 的解，但对于计算机 只能梯度下降法来求微分， 已知 $x_i$，计算`dy/dx`，进而得到 $x_{i+1}$，使得$f'(x_{i+1})$ 更接近0。结论：求最优解必须  先求微分。
+训练的目的是 得到一个 `<W,b>` 使损失函数值最小，损失函数是所有样本数据 损失值的和，是一个关于`<W,b>` 的函数（只是工程上通常不求所有样本，只取 batch ）。 最优解（极大值/极小值）在 导数为0 的地方，对于`y=f(x)`，手动可以求解 `f'(x)=0` 的解（解析解），大部分深度学习模型并没有解析解，对于计算机 只能梯度下降法来求微分， 已知 $x_i$，计算`dy/dx`，进而得到 $x_{i+1}$，使得$f'(x_{i+1})$ 更接近0。结论：求最优解必须  先求微分。
 
 [一文读懂自动微分（ AutoDiff）原理](https://zhuanlan.zhihu.com/p/60048471)假设我们定义了 $f(x,y)=x^2y+y+2$
 ，需要计算它的偏微分 `df/dx` 和 `df/dy` 来进行梯度下降，微分求解大致可以分为4种方式：
-1. 手动求解法(Manual Differentiation)，直接算出来 `df/dx=2xy`
-2. 数值微分法(Numerical Differentiation)，强调一开始直接代入数值近似求解. 直接 `x->x0, h'(x)=(h(x)-h(x0))/(x-x0)`
+1. 手动求解法(Manual Differentiation)，直接算出来 $\frac{df}{dx}=2xy$，用代码实现这个公式。然而大部分深度学习模型不好算公式。 
+2. 数值微分法(Numerical Differentiation)，强调一开始直接代入数值近似求解. 直接 $\lim_{x \to x_0}\frac{h(x)-h(x_0)}{x-x_0}$
+
 3. 符号微分法(Symbolic Differentiation)，代替第一种手动求解法的过程，强调直接对代数进行求解，最后才代入问题数值；
 4. 自动微分法(Automatic Differentiation)
-
 
 自动微分法是一种介于符号微分和数值微分的方法，自动微分将符号微分法应用于**最基本的算子**（不直接算完），比如常数，幂函数，指数函数，对数函数，三角函数等，然后代入数值，保留中间结果，最后再应用于整个函数。因此它应用相当灵活，可以做到完全向用户隐藏微分求解过程，由于它只对基本函数或常数运用符号微分法则，所以它可以灵活结合编程语言的循环结构，条件结构等，使用自动微分和不使用自动微分对代码总体改动非常小，并且由于它的计算实际是一种图计算，可以对其做很多优化，这也是为什么该方法在现代深度学习系统中得以广泛应用。
 
@@ -126,7 +145,7 @@ https://zhuanlan.zhihu.com/p/46928319
 
 如果你在Tensorflow 中加入一个新类型的操作，你希望它和自动微分兼容，你需要提供一个函数来建一个计算它的偏导数（相对于它的输入）的图。例如你实现了一个函数来计算输入的平方，$f(x)=x^2$，你需要提供一个偏导数函数 $f'(x)=2x$。
 
-个人理解，对于`y=f(x)`， `f'(x)` 要么是个常量，要么也是x 的函数。也就是`dn7/dn5` 不是常量 就是关于n5 的函数，在自上到下 求导之前，得先自下而上求出来n5 再说。所以正向 + 负向传播加起来 是为了求微分。 
+个人理解，对于`y=f(x)`， `f'(x)` 要么是个常量，要么也是x 的函数。也就是`dn7/dn5` 不是常量 就是关于n5 的函数，在自上到下 求导（反向传播）用到 `dn7/dn5`之前，得先自下而上（正向传播）求出来n5 再说。所以正向 + 负向传播加起来 是为了求微分，反向传播依赖正向传播，下一次迭代正向传播依赖本次反向传播。在机器学习框架里，每个node 会包含一个grad 属性，记录了当前的node微分函数或值。
 
 ## 逻辑回归
 
@@ -155,8 +174,8 @@ $h_\theta(x)$与y 只有0和1两个取值
 $$
 cost(h_\theta(x),y)=
 \begin{cases}
--logh_\theta(x)         if y=1 \\
--log(1-h_\theta(x))     if y=0 
+-logh_\theta(x)      & \text{if y=1} \\
+-log(1-h_\theta(x))  & \text{if y=0} 
 \end{cases}
 $$
 
@@ -205,8 +224,8 @@ $$
 $$
 P(X=n)=
 \begin{cases}
-1-p        n=0  \\
-p          n=1
+1-p      & \text{n=0}  \\
+p        & \text{n=1}
 \end{cases}
 $$
 
@@ -255,6 +274,32 @@ parameters: $W^{[1]},b^{[1]},W^{[2]},b^{[2]},...$
 ### 为什么批量是一个超参数
 
 理论上来讲，要减小优化的损失是在整个训练集上的损失，所以每次更新参数时应该用训练集上的所有样本来计算梯度。但是实际中，如果训练集太大，每次更新参数时都用所有样本来计算梯度，训练将非常慢，耗费的计算资源也很大。所以用训练集的一个子集上计算的梯度来近似替代整个训练集上计算的梯度。这个子集的大小即为batch size，相应地称这样的优化算法为batch梯度下降。batch size可以为训练集大小，可以更小，甚至也可以为1，即每次用一个样本来计算梯度更新参数。batch size越小收敛相对越快，但是收敛过程相对不稳定，在极值附近振荡也比较厉害。
+
+## 各种深度模型
+
+虽然深度模型看上去只是一个具有很多层的神经网络，然而获得有效的深度模型并不容易。 
+
+### CNN
+
+卷积神经网络 CNN 是含有卷积层的神经网络。CNN 新增了卷积核大小、卷积核数量、填充、步幅、输出通道数等超参数。
+1. 卷积层保留输入形状，使图像的像素在高和宽两个方向上的相关性均可能被有效识别。
+2. 卷积层通过滑动窗口将同一卷积核与不同位置的输入重复计算，从而避免参数尺寸过大。
+
+提起卷积神经网络，也许可以避开VGG、GoogleNet，甚至可以忽略AlexNet，但是很难不提及LeNet。LeNet开创性的利用卷积从直接图像中学习特征，在计算性能受限的当时能够节省很多计算量，同时卷积层的使用可以保证图像的空间相关性，最后再使用全连接神经网络进行分类识别。
+
+原始的LeNet是一个5层的卷积神经网络，它主要包括两部分：卷积层块 和 全连接层块，其中卷积层数为2（池化和卷积往往是被算作一层的），全连接层数为3。卷积层块由卷积层加池化层两个这样的基本单位重复堆叠构成。卷积层用来识别图像里的空间模式，如线条和物体局部，之后的最大池化层则用来降低卷积层对位置的敏感性。
+
+![](/public/upload/machine/lenet5_overview.jpeg)
+
+`28*28` 的灰度图片 如果直接用 DNN来训练的话，全连接层输入为28*28=784。LeNet 中卷积层块的输出形状为(通道数 × 高 × 宽)，当卷积层块的输出传入全连接层块时，全连接层块会将每个样本变平（flatten）。原来是形状是：(16 × 5 × 5)，现在直接变成一个长向量，向量长度为通道数 × 高 × 宽。在本例中，展平后的向量长度为：16 × 5 × 5 = 400。全连接层块含3个全连接层。它们的输出个数分别是120、84和10，其中10为输出的类别个数。
+
+![](/public/upload/machine/lenet5_layer.jpeg)
+
+在卷积神经网络，卷积核的数值是未知的，是需要通过“学习”得到的，也就是我们常说的参数。根据不同的卷积核计算出不同的“响应图”，这个“响应图”，就是特征图(feature map)。这就是为什么总是说利用CNN提取图像特征，卷积层的输出就是图像的特征。卷积核的数量关系到特征的丰富性。
+
+### RNN
+
+循环神经网络，引入状态变量来存储过去的信息，并用其与当期的输入共同决定当前的输出。
 
 ## 小结
 
