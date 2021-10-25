@@ -62,3 +62,41 @@ keywords:  programming paradigms
 面向对象创造性地把契约的重要性提高到了非常重要的高度，但这还远远不够。这是因为，并不是只有对象需要契约，语言设计的方方面面都需要契约。
 1. 比如，代码规范约束了人的行为，是人与人的连接契约。如果面对同一种语言，大家写代码的方式很不一样，语言就可能存在很多种方言，这对达成共识十分不利。所以 Go 语言直接从语言设计上就消灭掉那些最容易发生口水的地方，让大家专注于意图的表达。PS：go 的一个设计理念就是 实现一个目的只能有一种实现方式
 2. 消息传递约束了进程（这里的进程是抽象意义上的，在 Go 语言中叫 goroutine）的行为，是进程与进程的连接契约。消息传递是多核背景下流行起来的一种编程思想，其核心主张是：尽可能用消息传递来取代共享内存，从而尽可能避免显式的锁，降低编程负担。PS：虽然本质都是共享内存，但并发处理的方式统一了。
+
+## 符号式编程
+
+命令式编程
+```python
+def add(a,b):
+    return a + b
+def fancy_func(a,b,c,d):
+    e = add(a,b)
+    f = add(c,d)
+    g = add(e,f)
+    return g
+print(fancy_func(1,2,3,4))
+```
+对应的符号式编程
+```python
+def add_str():
+    return '''
+    def add(a,b):
+        return a + b
+    '''
+def fancy_func_str():
+    return '''
+    def fancy_func(a,b,c,d):
+        e = add(a,b)
+        f = add(c,d)
+        g = add(e,f)
+        return g
+    '''
+def evoke_str():
+    return add_str() + fancy_func_str() + '''
+    print(fancy_func(1,2,3,4))
+    '''
+prog = evoke_str()
+y = compile(prog,'','exec')
+exec(y)
+```
+定义的三个函数以字符串形式返回计算流程，最后通过compile 编译完整的计算流程并执行，由于编译器能够完整的获取整个程序，因此有更多空间优化计算。

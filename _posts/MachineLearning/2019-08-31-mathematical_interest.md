@@ -13,17 +13,7 @@ keywords: 深度学习
 * TOC
 {:toc}
 
-## 发展历史
-
-神经网络技术起源于上世纪五、六十年代，当时叫感知机（perceptron），拥有输入层、输出层和一个隐含层。输入的特征向量通过隐含层变换达到输出层，在输出层得到分类结果。但是，单层感知机有一个严重得不能再严重的问题，即它对稍复杂一些的函数都无能为力（比如最为典型的“异或”操作）。随着数学的发展，一票大牛发明多层感知机，摆脱早期离散传输函数的束缚，使用sigmoid或tanh等连续函数模拟神经元对激励的响应，在训练算法上则使用反向传播BP算法。对，这货就是我们现在所说的神经网络NN。多层感知机给我们带来的启示是，**神经网络的层数直接决定了它对现实的刻画能力**——利用每层更少的神经元拟合更加复杂的函数。但随着神经网络层数的加深带来了很多问题，参数数量膨胀，优化函数越来越容易陷入局部最优解，“梯度消失”现象更加严重。当然有一些通用方法可以解决部分问题， 但在具体的问题领域 人们利用问题域的特点提出了 一些变形来解决 层数加深带来的问题。PS：充分利用问题域的特点 是设计算法的基本思路。
-
-Artificial neural networks use networks of activation units (hidden units) to map inputs to outputs. The concept of deep learning applied to this model allows the model to have multiple layers of hidden units where we feed output from the previous layers. However, **dense connections between the layers is not efficient, so people developed models that perform better for specific tasks**.
-
-The whole "convolution" in convolutional neural networks is essentially based on the fact that we're lazy and want to exploit spatial relationships in images. This is a huge deal because we can then group small patches of pixels and effectively "downsample" the image while training multiple instances of small detectors with those patches. Then a CNN just moves those filters around the entire image in a convolution. The outputs are then collected in a pooling layer. The pooling layer is again a down-sampling of the previous feature map. If we have activity on an output for filter a, we don't necessarily care if the activity is for (x, y) or (x+1, y), (x, y+1) or (x+1, y+1), so long as we have activity. So we often just take the highest value of activity on a small grid in the feature map called max pooling.
-
-If you think about it from an abstract perspective, **the convolution part of a CNN is effectively doing a reasonable way of dimensionality reduction**. After a while you can flatten the image and process it through layers in a dense network. Remember to use dropout layers! (because our guys wrote that paper :P)
-
-Let's talk RNN. Recurrent networks are basically neural networks that evolve through time. Rather than exploiting spatial locality, they exploit sequential, or temporal locality. Each iteration in an RNN takes an input and it's previous hidden state, and produces some new hidden state. The weights are shared in each level, but we can unroll an RNN through time and get your everyday neural net. Theoretically RNN has the capacity to store information from as long ago as possible, but historically people always had problems with the gradients vanishing as we go back further in time, meaning that the model can't be differentiated numerically and thus cannot be trained with backprop. This was later solved in the proposal of the LSTM architecture and subsequent work, and now we train RNNs with BPTT (backpropagation through time). Here's a link that explains LSTMs really well: http://colah.github.io/posts/2015-08-Understanding-LSTMs/Since then RNN has been applied in many areas of AI, and many are now designing RNN with the ability to extract specific information (read: features) from its training examples with attention-based models.
+## 简介
 
 学习路径上，先通过单层神经网络（线性回归、softmax回归）理解基本原理，再通过两层感知机理解正向传播和反向传播，增加层数可以增强表现能力，增加特殊的层来应对特定领域的问题。
 
@@ -63,9 +53,7 @@ Let's talk RNN. Recurrent networks are basically neural networks that evolve thr
     * J(θ)是一个标量；
 
 2. 当我们确定了模型h，后面做的所有事情就是训练模型的参数θ。那么什么时候模型的训练才能结束呢？这时候也涉及到代价函数，由于代价函数是用来衡量模型好坏的，我们的目标当然是得到最好的模型（也就是最符合训练样本(x, y)的模型）。因此训练参数的过程就是不断改变θ，从而得到更小的J(θ)的过程。理想情况下，当我们取到代价函数J的最小值时，就得到了最优的参数θ.例如，J(θ) = 0，表示我们的模型完美的拟合了观察的数据，没有任何误差。
-
 3. 代价函数衡量的是模型预测值h(θ) 与标准答案y之间的差异，所以**总的代价函数J是h(θ)和y的函数**，即J=f(h(θ), y)。又因为y都是训练样本中给定的，h(θ)由θ决定，所以，最终还是模型参数θ的改变导致了J的改变。
-
 4. 在优化参数θ的过程中，最常用的方法是梯度下降，这里的梯度就是代价函数J(θ)对`θ1, θ2, ..., θn`的偏导数。由于需要求偏导，我们可以得到另一个关于代价函数的性质：选择代价函数时，最好挑选对参数θ可微的函数（全微分存在，偏导数一定存在）
 
 
@@ -127,7 +115,7 @@ https://zhuanlan.zhihu.com/p/46928319
 
 ## 从自动微分法来理解线性回归
 
-训练的目的是 得到一个 `<W,b>` 使损失函数值最小，损失函数是所有样本数据 损失值的和，是一个关于`<W,b>` 的函数（只是工程上通常不求所有样本，只取 batch ）。 最优解（极大值/极小值）在 导数为0 的地方，对于`y=f(x)`，手动可以求解 `f'(x)=0` 的解（解析解），大部分深度学习模型并没有解析解，对于计算机 只能梯度下降法来求微分， 已知 $x_i$，计算`dy/dx`，进而得到 $x_{i+1}$，使得$f'(x_{i+1})$ 更接近0。结论：求最优解必须  先求微分。
+训练的目的是 得到一个 `<W,b>` 使损失函数值最小，损失函数是所有样本数据 损失值的和，是一个关于`<W,b>` 的函数，只是工程上通常不求所有样本，只取 batch 个样本计算梯度来更新`<W,b>`。 最优解（极大值/极小值）在 导数为0 的地方，对于`y=f(x)`，手动可以求解 `f'(x)=0` 的解（解析解），大部分深度学习模型并没有解析解（比如导数永远大于0），对于计算机 只能梯度下降法来求微分， 已知 $x_i$，计算`dy/dx`，进而得到 $x_{i+1}$，使得$f'(x_{i+1})$ 更接近0。结论：求最优解必须  先求微分。
 
 [一文读懂自动微分（ AutoDiff）原理](https://zhuanlan.zhihu.com/p/60048471)假设我们定义了 $f(x,y)=x^2y+y+2$
 ，需要计算它的偏微分 `df/dx` 和 `df/dy` 来进行梯度下降，微分求解大致可以分为4种方式：
@@ -296,6 +284,8 @@ parameters: $W^{[1]},b^{[1]},W^{[2]},b^{[2]},...$
 ![](/public/upload/machine/lenet5_layer.jpeg)
 
 在卷积神经网络，卷积核的数值是未知的，是需要通过“学习”得到的，也就是我们常说的参数。根据不同的卷积核计算出不同的“响应图”，这个“响应图”，就是特征图(feature map)。这就是为什么总是说利用CNN提取图像特征，卷积层的输出就是图像的特征。卷积核的数量关系到特征的丰富性。
+
+https://www.cs.ryerson.ca/~aharley/vis/conv/flat.html 是一个很不错的CNN 2D 动画效果演示。 
 
 ### RNN（未完成）
 

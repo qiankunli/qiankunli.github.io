@@ -45,6 +45,18 @@ keywords: 深度学习
 一个旧的网络，对同样的刺激会特别敏感，每次都会比前一次启动得更快、更有力。多次之后，这个网络便会深刻到成为习惯或本能了。这便是学习和记忆的成因。
 
 
+## 发展历史
+
+神经网络技术起源于上世纪五、六十年代，当时叫感知机（perceptron），拥有输入层、输出层和一个隐含层。输入的特征向量通过隐含层变换达到输出层，在输出层得到分类结果。但是，单层感知机有一个严重得不能再严重的问题，即它对稍复杂一些的函数都无能为力（比如最为典型的“异或”操作）。随着数学的发展，一票大牛发明多层感知机，摆脱早期离散传输函数的束缚，使用sigmoid或tanh等连续函数模拟神经元对激励的响应，在训练算法上则使用反向传播BP算法。对，这货就是我们现在所说的神经网络NN。多层感知机给我们带来的启示是，**神经网络的层数直接决定了它对现实的刻画能力**——利用每层更少的神经元拟合更加复杂的函数。但随着神经网络层数的加深带来了很多问题，参数数量膨胀，优化函数越来越容易陷入局部最优解，“梯度消失”现象更加严重。当然有一些通用方法可以解决部分问题， 但在具体的问题领域 人们利用问题域的特点提出了 一些变形来解决 层数加深带来的问题。PS：充分利用问题域的特点 是设计算法的基本思路。
+
+Artificial neural networks use networks of activation units (hidden units) to map inputs to outputs. The concept of deep learning applied to this model allows the model to have multiple layers of hidden units where we feed output from the previous layers. However, **dense connections between the layers is not efficient, so people developed models that perform better for specific tasks**.
+
+The whole "convolution" in convolutional neural networks is essentially based on the fact that we're lazy and want to exploit spatial relationships in images. This is a huge deal because we can then group small patches of pixels and effectively "downsample" the image while training multiple instances of small detectors with those patches. Then a CNN just moves those filters around the entire image in a convolution. The outputs are then collected in a pooling layer. The pooling layer is again a down-sampling of the previous feature map. If we have activity on an output for filter a, we don't necessarily care if the activity is for (x, y) or (x+1, y), (x, y+1) or (x+1, y+1), so long as we have activity. So we often just take the highest value of activity on a small grid in the feature map called max pooling.
+
+If you think about it from an abstract perspective, **the convolution part of a CNN is effectively doing a reasonable way of dimensionality reduction**. After a while you can flatten the image and process it through layers in a dense network. Remember to use dropout layers! (because our guys wrote that paper :P)
+
+Let's talk RNN. Recurrent networks are basically neural networks that evolve through time. Rather than exploiting spatial locality, they exploit sequential, or temporal locality. Each iteration in an RNN takes an input and it's previous hidden state, and produces some new hidden state. The weights are shared in each level, but we can unroll an RNN through time and get your everyday neural net. Theoretically RNN has the capacity to store information from as long ago as possible, but historically people always had problems with the gradients vanishing as we go back further in time, meaning that the model can't be differentiated numerically and thus cannot be trained with backprop. This was later solved in the proposal of the LSTM architecture and subsequent work, and now we train RNNs with BPTT (backpropagation through time). Here's a link that explains LSTMs really well: http://colah.github.io/posts/2015-08-Understanding-LSTMs/Since then RNN has been applied in many areas of AI, and many are now designing RNN with the ability to extract specific information (read: features) from its training examples with attention-based models.
+
 ## AI 在国内的发展
 
 
