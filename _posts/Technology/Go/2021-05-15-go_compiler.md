@@ -8,7 +8,7 @@ keywords: go compiler
 
 ---
 
-## 前言(持续更新)
+## 前言
 
 * TOC
 {:toc}

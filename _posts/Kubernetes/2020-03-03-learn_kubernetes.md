@@ -40,9 +40,9 @@ keywords: learn kubernetes
 3. 数据驱动机制 - Kubernetes Controller/Operator
 4. 数据监听变更与索引机制 - Kubernetes 的 Informer 机制
 
-随着 Kubernetes 基础设施越来越复杂，第三方插件与能力越来越多，社区的维护者们也发现 Kubernetes 这个“数据库”内置的“数据表”无论从规模还是复杂度上，都正在迎来爆炸式的增长。所以  Kubernetes 社区很早就在讨论如何给 Kubernetes  设计出一个“数据视图（View）”出来。阿里正在推 （OAM）及 oam-kubernetes-runtime
+随着 Kubernetes 基础设施越来越复杂，第三方插件与能力越来越多，社区的维护者们也发现 Kubernetes 这个“数据库”内置的“数据表”无论从规模还是复杂度上，都正在迎来爆炸式的增长。所以  Kubernetes 社区很早就在讨论如何给 Kubernetes  设计出一个“数据视图（View）”出来。阿里正在推 （OAM）及 oam-kubernetes-runtime。
 
-
+k8s 重新定义了上下游交付的标准。有了k8s 之前，公有云卖货是 xx 配置服务器xx 钱一年，交付的是虚拟机。有了k8s 之后，公有云交付的是k8s 集群，业务方 将自己的业务 部署到k8s，并根据 需要调用公有云接口 扩容或缩容 k8s 集群。
 
 ## 通用实现
 

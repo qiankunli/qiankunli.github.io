@@ -161,8 +161,6 @@ Controller 逻辑主要有两个（任何Controller 都是如此），对应两�
 
 ### watch
 
-
-
 ![](/public/upload/kubernetes/controller_watch.png)
 
 ```go
