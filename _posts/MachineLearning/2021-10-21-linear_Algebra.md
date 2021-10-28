@@ -50,7 +50,10 @@ g = b[1,:2]  #2行 第1个单元开始到索引为2以前的所有元素
 
 ## pytorch 张量/Tensor
 
+the deep learning machine  is a rather complex mathematical function mapping inputs to an output. To facilitate expressing this function, PyTorch provides a core data structure, the tensor, which is a multidimensional array that shares many similarities with NumPy arrays. Around that foundation, PyTorch comes with features to perform accelerated mathematical operations on dedicated hardware, which makes it convenient to design neural network architectures and train them on individual machines or parallel computing resources.
+
 在深度学习过程中最多使用$5$个维度的张量，张量的维度（dimension）通常叫作轴（axis）
+
 1. 标量（0维张量）
 2. 向量（1维度张量）
 3. 矩阵（2维张量）

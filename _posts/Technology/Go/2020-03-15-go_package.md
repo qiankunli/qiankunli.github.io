@@ -13,19 +13,44 @@ keywords: Go 打包
 * TOC
 {:toc}
 
-## 包管理
-
-Golang使用包（package）这种语法元素来组织源码，所有**语法可见性均定义在package这个级别**，与Java 、python等语言相比，这算不上什么创新，但与C传统的include相比，则是显得“先进”了许多。参见[理解Golang包导入](http://tonybai.com/2015/03/09/understanding-import-packages/)
+![](/public/upload/go/go_module.png)
 
 
-||编译|install|
-|---|---|---|
-|maven|mvn package/compile|mvn install|
-|go|go build|go install|
 
 ## 如何组织一个大项目的go 代码
 
-![](/public/upload/go/go_module.png)
+### 宏观
+
+```
+
+$tree -F exe-layout 
+exe-layout
+├── cmd/
+│   ├── app1/
+│   │   └── main.go
+│   └── app2/
+│       └── main.go
+├── go.mod
+├── go.sum
+├── internal/
+│   ├── pkga/
+│   │   └── pkg_a.go
+│   └── pkgb/
+│       └── pkg_b.go
+├── pkg1/
+│   └── pkg1.go
+├── pkg2/
+│   └── pkg2.go
+└── vendor/
+```
+
+1. cmd 目录就是存放项目要编译构建的可执行文件对应的 main 包的源文件
+2. pkgN 目录，这是一个存放项目自身要使用、同样也是可执行文件对应 main 包所要依赖的库文件，同时这些目录下的包还可以被外部项目引用。有的项目偏好 只有一个pkg 目录。
+3. 存放仅项目内部引用的 Go 包，这些包无法被项目之外引用；
+4. 对于以生产可复用库为目的的 Go 项目，可以在 Go 可执行程序项目的基础上去掉 cmd 目录和 vendor 目录。
+
+### 具体业务
+
 
 
 [使用 Go 语言开发的一些经验（含代码示例）](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651008064&idx=2&sn=cdc19d0db8decad85b671ba79fd2d1f5&chksm=bdbed4138ac95d05dbfd6672babba8e4d4a547d7845cd46b23fe3802dd5a1c49777b476fadd5&mpshare=1&scene=23&srcid=0708wchJyw4BGm9vtQxV8qaT%23rd) 要点如下
@@ -51,6 +76,15 @@ github 也有一些demo 项目layout [golang-standards/project-layout](https://g
 并发中处理的内容才是关键，新启一个线程或者协程才是万里长城的第一步，如果其中的业务逻辑有10个分支，还要多次访问数据库并调用远程服务，那无论用什么语言都白搭。所以在业务逻辑复杂的情况下，语言的差异并不会太明显，至少在Java和Go的对比下不明显	
 [Organizing Go source code part 2](http://neurocline.github.io/dev/2016/02/01/organizing-go-source-code.html) 未读
 
+## 包管理
+
+Golang使用包（package）这种语法元素来组织源码，所有**语法可见性均定义在package这个级别**，与Java 、python等语言相比，这算不上什么创新，但与C传统的include相比，则是显得“先进”了许多。参见[理解Golang包导入](http://tonybai.com/2015/03/09/understanding-import-packages/)
+
+
+||编译|install|
+|---|---|---|
+|maven|mvn package/compile|mvn install|
+|go|go build|go install|
 
 ## Go 依赖包管理
 
@@ -103,18 +137,32 @@ vendor属性就是让go编译时，优先从项目源码树根目录下的vendor
 
 ## Go Modules 一统天下
 
+一个 Go Module 是一个 Go 包的集合。module 是有版本的，所以 module 下的包也就有了版本属性。这个 module 与这些包会组成一个独立的版本单元，它们一起打版本、发布和分发。
+
 1. repo，仓库，用来管理modules
 2. modules是打tag的最小单位，也是go mod的最小单位
 3. packages是被引用的最小单位
 
 [一文读懂Go Modules原理](https://mp.weixin.qq.com/s/FhUty8prexpxggXkkumDdw)
 
+### 版本
+
 Go Modules 提供了统一的依赖包管理工具 go mod
 基本思想semantic version（**社区实际上做不到**）
 1. MAJOR version when you make incompatible API changes(不兼容的修改)
 2. MINOR version when you add functionality in a backwards compatible manner(特性添加，版本兼容)
 3. PATCH version when you make backwards compatible bug fixes(bug修复，版本兼容)
+
 依赖包统一收集在 `$GOPATH/pkg/mod` 中进行集中管理，有点mvn `.m2` 文件夹的意思。`$GOPATH/pkg/mod` 中的按版本管理
+
+由 `go mod tidy` 下载的依赖 module 会被放置在本地的 module 缓存路径下，默认值为 `$GOPATH/pkg/mod`，Go 1.15 及以后版本可以通过 GOMODCACHE 环境变量，自定义本地 module 的缓存路径，有点maven `.m2` 文件夹的意思。go build 命令会读取 go.mod 中的依赖及版本信息，并在本地 module 缓存路径下找到对应版本的依赖 module，执行编译和链接。
+
+几项创新
+
+1. 语义导入版本：如果同一个包的新旧版本是兼容的，那么它们的包导入路径应该是相同的。如果新旧两个包不兼容，那么我们就应该采用不同的导入路径。将包主版本号引入到包导入路径中，我们可以像下面这样导入 logrus v2.0.0 版本依赖包：`import "github.com/sirupsen/logrus/v2"`
+2. 最小版本选择原则：主流编程语言，以及 Go Module 出现之前的很多 Go 包依赖管理工具都会选择依赖项的“最新最大 (Latest Greatest) 版本”，Go 会在该项目依赖项的所有版本中，选出符合项目整体要求的“最小版本”。
+
+### go.mod
 ```
 $GOPATH/pkg/mod/k8s.io
     api@v0.17.0
@@ -126,7 +174,6 @@ go.mod
 2. require：最小需求列表(依赖模块及其版本信息)
 3. replace：通过replace将一个模块的地址转换为其它地址(开发者github 上给自己的项目换个地址，删除某个版本等，常事)，用于解决某些依赖模块地址发生改变的场景。同时import命令可以无需改变(**无侵入**)。 
 4. exclude：明确排除一些依赖包中不想导入或者有问题的版本
-
 
 ### replace
 
@@ -176,6 +223,7 @@ require (
     2. 升级所有依赖模块到它们的最新版本 `go get -u`
     3. 升级某个依赖模块到指定版本 `go get C@1.3`
     4. 将某个依赖模块降级到指定版本 `go get D@1.2`
+    5. 移除某个依赖 `go mod tidy`。 仅从源码中删除对依赖项的导入语句不够的
 2. 通过go build编译项目时
     1. 如果在go.mod文件中指定了直接依赖模块版本，则根据最小版本选择算法会下载对应版本；
     2. 否则go build会默认自动下载直接依赖模块的最新semantic version
@@ -185,7 +233,7 @@ require (
     2. A1对某个间接依赖模块有特殊的版本要求，必须显示指明版本信息(例如上述的D1.4和E1.3)，以便Go可以正确构建依赖模块
 
 运行go build或是go mod tidy时golang会自动更新go.mod导致某些修改无效，所以一个包是顶层依赖还是间接依赖，取决于它在本module中是否被直接import，而不是在go.mod文件中是否包含`// indirect`注释。
-        
+
 ## 其它
 
 [浅谈如何组织Go代码结构](https://mp.weixin.qq.com/s/9_WQUpvHKli4btPqCA89Aw)
