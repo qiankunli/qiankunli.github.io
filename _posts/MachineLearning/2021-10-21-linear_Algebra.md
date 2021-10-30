@@ -241,6 +241,8 @@ def net(X):         # 模型可以表示为矩阵运算
 
 手动实现时，net 是一个方法，定义了**预测值的计算方法**，**模型可以表示为矩阵运算**。**应该尽可能表示为矩阵运算**，以提升计算效率。 pytorch nn模块定义了大量神经网络的层，loss模块定义了各种损失函数，net和 tensor  一样可以 `net.to(device="cuda:1")` 将数据挪到某个gpu 上。要想在某个 gpu 上做运算，需要将模型参数（net）和输入（tensor） 都挪到这个gpu 上。
 
+训练集有1000个样本，batchsize=10，那么：训练完整个样本集需要100次iteration，1次epoch。
+
 ## 使用gpu
 ```python
 cpu = torch.device("cpu")

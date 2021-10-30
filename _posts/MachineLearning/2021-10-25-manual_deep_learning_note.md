@@ -15,7 +15,7 @@ keywords:  线性回归 pytorch
 * TOC
 {:toc}
 
-
+书籍附带的代码 是由MXNet 写的，github 有一个项目将所有代码 转成了 Pytorch，https://tangshusen.me/Dive-into-DL-PyTorch/#/。
 
 ## 异步计算
 
@@ -187,14 +187,4 @@ def train(num_gpus, batch_size, lr):
         train_time = time.time() - start
 ```
 
-## 分布式训练
-[分布式训练](https://time.geekbang.org/opencourse/videodetail/100077201-407557)
 
-![](/public/upload/machine/multi_gpu.png)
-
-![](/public/upload/machine/distribute_gpu.png)
-
-1. 黄色表示 参数，绿色表示梯度
-2. 分布式**同步**数据并行 是多GPU 数据并行在多机器上的扩展。异步并行是每个机器做自己的批量更新，不用同步。
-3. 网络通信是瓶颈。从分布式文件系统上读数据；参数同步。
-4. 大batch 可能会导致收敛变慢
