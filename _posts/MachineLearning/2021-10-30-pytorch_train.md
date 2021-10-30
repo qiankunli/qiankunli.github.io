@@ -368,7 +368,7 @@ net = Net().to(device) # device 代表到某个 gpu 或cpu 上
 net = torch.nn.parallel.DistributedDataParallel(net)
 ```
 
-pytorch 中的任何 net 都 是 `torch.nn.Module` 的子类，DistributedDataParallel 也是 `torch.nn.Module` 子类，任何 `torch.nn.Module` 子类 都可以覆盖 `__init__` 和  ` forward`方法 ，DistributedDataParallel 可以从  net 拿到模型数据（以及 在哪个gpu 卡上运行） ，也可以 从指定或默认的 process_group 获取信息。最后在`__init__`  和 forward 中加入 同步梯度的逻辑，**完美的将 同步梯度的逻辑 隐藏了起来**。
+pytorch 中的任何 net 都 是 `torch.nn.Module` 的子类，DistributedDataParallel 也是 `torch.nn.Module` 子类，任何 `torch.nn.Module` 子类 都可以覆盖 `__init__` 和  `forward`方法 ，DistributedDataParallel 可以从  net 拿到模型数据（以及 在哪个gpu 卡上运行） ，也可以 从指定或默认的 process_group 获取信息。最后在`__init__`  和 forward 中加入 同步梯度的逻辑，**完美的将 同步梯度的逻辑 隐藏了起来**。
 
 ### 实际例子
 
