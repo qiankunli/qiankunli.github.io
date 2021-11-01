@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: kubernetes垂直扩缩容
+title: kubernetes扩缩容
 category: 技术
 tags: Kubernetes
 keywords: kubernetes autoscaler
@@ -137,6 +137,55 @@ updatePolicy
 对于公有云来说，Cluster Auto Scaler 就是监控这个集群因为资源不足而 pending 的 pod，根据用户配置的阈值调用公有云的接口来申请创建机器或者销毁机器。对于私有云，则需要对接内部的管理平台。
 
 [Kubernetes 的自动伸缩你用对了吗？](https://mp.weixin.qq.com/s/GKS3DJHm4p0Tjtj8nJRGmA)
+
+
+## 自定义crd 支持autoscaler
+
+[Scale subresource](https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#scale-subresource) CustomResourceDefinition 需要在定义中支持 scale subresource
+
+```yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: crontabs.stable.example.com
+spec:
+  group: stable.example.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema: ...
+      subresources:
+        # status enables the status subresource.
+        status: {}
+        # scale enables the scale subresource.
+        scale:
+          # specReplicasPath defines the JSONPath inside of a custom resource that corresponds to Scale.Spec.Replicas.
+          specReplicasPath: .spec.replicas
+          # statusReplicasPath defines the JSONPath inside of a custom resource that corresponds to Scale.Status.Replicas.
+          statusReplicasPath: .status.replicas
+          # labelSelectorPath defines the JSONPath inside of a custom resource that corresponds to Scale.Status.Selector.
+          labelSelectorPath: .status.labelSelector
+  scope: Namespaced
+  names:
+    plural: crontabs
+    singular: crontab
+    kind: CronTab
+    shortNames:
+    - ct
+```
+apply crd 之后 apiserver 提供api `/apis/stable.example.com/v1/namespaces/*/crontabs/scale`，也可以 通过  `kubectl scale --replicas=5 crontabs/my-new-cron-object` 命令来修改 `CronTab.spec.replicas`。 可以直接修改 yaml  `CronTab.spec.replicas` 来控制crd 的副本数，但无法与 hpa 等组件集成（hpa 使用rest api）。
+```
+apiVersion: "stable.example.com/v1"
+kind: CronTab
+metadata:
+  name: my-new-cron-object
+spec:
+  cronSpec: "* * * * */5"
+  image: my-awesome-cron-image
+  replicas: 3
+```
+
 
 ## 其它
 

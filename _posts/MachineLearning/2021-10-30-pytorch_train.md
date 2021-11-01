@@ -415,7 +415,7 @@ if __name__ == "__main__":
     if rank == 0:
         print("            =======  Training  ======= \n")
     # 4. start to train
-    net.train()
+    net.train()     # 标记为训练模式，推理时使用 net.eval()
     for ep in range(1, EPOCHS + 1):
         train_loss = correct = total = 0
         # set sampler

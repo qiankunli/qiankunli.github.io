@@ -72,7 +72,15 @@ the deep learning machine  is a rather complex mathematical function mapping inp
 3. tensor.dtype，tensor.type()：查看张量的数据类型；
 4. tensor.is_cuda：查看张量是否在GPU上；
 5. tensor.grad：查看张量的梯度；
+6. grad_fn: 包含着创建该张量的运算的导数信息。在反向传播过程中，通过传入后一层的神经网络的梯度，该函数会计算出参与运算的所有张量的梯度。grad_fn本身也携带着计算图的信息，该方法本身有一个next_functions属性，包含连接该张量的其他张量的grad_fn。通过不断反向传播回溯中间张量的计算节点，可以得到所有张量的梯度。
 6. tensor.requires_grad：查看张量是否可微。
+7. tensor.device: 获取张量所在的设备
+
+涉及单个张量的函数运算，例如 对张量做四则运算、线性变换和激活等。可以由张量自带的方法实现，也可以由torch包中的一些函数实现
+
+涉及多个张量的函数运算
+1. 比如，两个形状相同的张量之间逐个元素的四则运算（参与运算的两个元素的位置一一对应），既可以使用加、减、乘、除的运算符进行张量间的运算，也可以使用add、sub、mul和div方法来进行运算。同样，这些内置方法有原地操作版本add_、sub_、mul_/div_。
+2. 矩阵乘法（线性变换）
 
 ## 张量运算
 
