@@ -76,13 +76,29 @@ the deep learning machine  is a rather complex mathematical function mapping inp
 6. tensor.requires_grad：查看张量是否可微。
 7. tensor.device: 获取张量所在的设备
 
-涉及单个张量的函数运算，例如 对张量做四则运算、线性变换和激活等。可以由张量自带的方法实现，也可以由torch包中的一些函数实现
+涉及单个张量的函数运算，例如 对张量做四则运算、线性变换和激活、缩并、沿着某个维度求和、数据在设备之间移动。可以由张量自带的方法实现，也可以由torch包中的一些函数实现
 
 涉及多个张量的函数运算
 1. 比如，两个形状相同的张量之间逐个元素的四则运算（参与运算的两个元素的位置一一对应），既可以使用加、减、乘、除的运算符进行张量间的运算，也可以使用add、sub、mul和div方法来进行运算。同样，这些内置方法有原地操作版本add_、sub_、mul_/div_。
 2. 矩阵乘法（线性变换）
 
-## 张量运算
+## 用张量运算表示 多层感知机
+
+![](/public/upload/machine/two_layer_neural_network.jpeg)
+
+```python
+import torch
+w1 = torch.randn(2,3,requires_grad=True)
+x = torch.randn(3,1,requires_grad=True)
+b1 = torch.randn(2,1,requires_grad=True)
+w2 = torch.randn(2,2,requires_grad=True)
+b2 = torch.randn(1,1,requires_grad=True)
+z =  w1 @ x + b1
+y =  (w2 @ z + b2).sum()
+print(y)
+y.backward()
+print(w1.grad)
+```
 
 《李沐的深度学习课》  有一点非常好，就是针对线性回归/softmax回归/感知机 都提供了一个 基于numpy 的实现以及pytorch 的简单实现。
 
@@ -105,6 +121,8 @@ print(j)
 j.backward()
 print(x.grad)
 ```
+
+## 用张量运算表示机器学习过程
 
 在机器学习模型是，j 就是损失函数。x 是 `<w,b>` (存疑 )，机器学习中，`<w,b>` 是参数或变量，样本数据数据是为了计算 loss值。
 
@@ -258,7 +276,6 @@ gpu = torch.device("cuda:0")  # 使用第一个gpu
 x = torch.rand(10)
 x = x.to(gpu)
 ```
-
 
 ## 其它
 
