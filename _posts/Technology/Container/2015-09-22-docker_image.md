@@ -4,7 +4,7 @@ layout: post
 title: 关于docker image的那点事儿
 category: 技术
 tags: Container
-keywords: Docker image 
+keywords: Docker image Dockerfile
 
 ---
 ## 简介
@@ -126,6 +126,28 @@ RUN \
 	COPY app .
 	CMD ["./app"]  
 
+### entrypoint 和 cmd
+[Dockerfile: ENTRYPOINT vs CMD](https://www.ctl.io/developers/blog/post/dockerfile-entrypoint-vs-cmd/)
+1. ENTRYPOINT和CMD都是让用户指定一个可执行程序，这个可执行程序在container启动后自动启动。
+2. 在写Dockerfile时，ENTRYPOINT或者CMD命令会自动覆盖之前镜像的ENTRYPOINT或者CMD命令。
+3. 在docker镜像运行时，用户也可以在命令指定具体命令，覆盖在Dockerfile里的命令。 `docker run -it imageName $command` 覆盖 CMD ， `docker run -it imageName --entrypoint $entrypoint`覆盖 ENTRYPOINT
+4. CMD命令很容易被`docker run`命令的方式覆盖，如果你希望你的docker镜像只执行一个具体程序,不希望用户在执行`docker run`的时候随意覆盖默认程序。建议用ENTRYPOINT.
+
+ENTRYPOINT和CMD指令支持2种不同的写法: shell表示法和exec表示法，建议采用exec表示法
+
+1. shell表示法 `CMD executable  param1 param2`，命令行程序作为sh程序的子程序运行，docker用`/bin/sh -c`的语法调用， pid=1 进程是 `/bin/sh`，那么 sigterm 等信号就不会传给 executable
+2. exec表示法 `CMD ["executable","param1","param2"] `，有的镜像甚至连shell程序都可以没有，pid=1进程是 executable
+
+ENTRYPOINT和CMD可以组合使用，ENTRYPOINT指定默认的运行命令, CMD指定默认的运行参数，此时只能使用Exec表示法
+
+```
+FROM ubuntu:trusty
+ENTRYPOINT ["/bin/ping","-c","3"]
+CMD ["localhost"] 
+# docker build -t pingimage .
+```
+1. 可以不带任何参数运行`docker run`命令： `docker run pingimage`
+2. 可以覆盖CMD指令的值，如果你希望这个docker镜像启动后不是`ping localhost`， 而是ping其他服务器，可以`docker run pingimage docker.io`
 
 ## 镜像下载
 

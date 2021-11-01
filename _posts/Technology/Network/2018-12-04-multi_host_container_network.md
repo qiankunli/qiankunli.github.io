@@ -223,3 +223,7 @@ Kubernetes 对 Pod 进行“隔离”的手段，即：NetworkPolicy，NetworkPo
 4. trace 跟踪
 
 ![](/public/upload/network/cilium_network.png)
+
+[eBPF 如何简化服务网格](https://mp.weixin.qq.com/s/4Ug8OBuhkO8ExMaR57ruZQ)
+
+![](/public/upload/network/sidecar_vs_ebpf.png)

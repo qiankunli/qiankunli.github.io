@@ -61,7 +61,7 @@ Basic Paxos达成一次决议至少需要两次网络来回，并发情况下可
 
 1. leader选取， 在一个leader宕机之后必须要选取一个新的leader
 2. 日志复制，leader必须从client接收日志然后复制到集群中的其他服务器，并且强制要求其他服务器的日志保持和自己相同
-3. 安全性（Safety），一系列的规则约束
+3. 安全性（Safety），一系列的规则约束，其实真正要做的就两个，第三个问题贯穿前两个事情。
 
 ### Raft 和 Paxos
 
@@ -160,6 +160,15 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 
 [深入剖析共识性算法 Raft](https://mp.weixin.qq.com/s/GhI7RYBdsrqlkU9o9CLEAg)
 
+## 工程化
+[最难 paxos 和最易 raft ？](https://mp.weixin.qq.com/s/C8Mgl9ebMAG0hh6ekoO58w)
+1. paxos 本质是确定一个值，把参与确定这个值的角色打包称为一组实例（ paxos instance ）；
+2. 不同实例之间决议互不干扰。多组 paxos 实例确定多个值，形成一组操作序列，也是就日志 ；
+3. 确定一个值序列有啥用？加个状态机就起飞了。**日志 + 状态机 可以成为任何有意义的工程系统**。比如 rocksdb，leveldb 等等 lsm 存储，它们数据先写 append log ，通过重放日志到达的系统状态一定是一致的。
+4. 为了解决递交提案混乱可能引发的效率问题（比如活锁），可以通过指定 Leader 角色来解决；
+
+raft 天生就是 paxos 协议工程化的一种样子。
+
 ## 补充
 
 ### 复制模型
@@ -227,6 +236,7 @@ N、W、R 值的不同组合，会产生不同的一致性效果，具体来说�
 * -1：producer 需要等待 ISR 中的所有 follower 都确认接收到数据后才算一次发送完成，可靠性最高。但是这样也不能保证数据不丢失，比如当 ISR 中只有 leader 时（前面 ISR 那一节讲到，ISR 中的成员由于某些情况会增加也会减少，最少就只剩一个 leader），这样就变成了 acks=1 的情况。
 
 如果要提高数据的可靠性，在设置 `request.required.acks=-1` 的同时，也要 `min.insync.replicas` 这个参数 (可以在 broker 或者 topic 层面进行设置) 的配合，这样才能发挥最大的功效。
+
 
 ## 其它
 

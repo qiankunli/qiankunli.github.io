@@ -133,6 +133,8 @@ containers:
 
 配置一个Prometheus scrape job，结合Kubernetes daemonset, 只需要定义一次，未来所有Kubernetes服务端点都将被自动发现 和监控。
 
+[使用 Node Exporter 自定义监控指标](https://mp.weixin.qq.com/s/X73XRrhU_lYMvkJvF1z2uw)
+
 ### k8s 组件 指标分析
 
 
