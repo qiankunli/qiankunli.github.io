@@ -84,11 +84,24 @@ the deep learning machine  is a rather complex mathematical function mapping inp
 
 ## 用张量运算表示 多层感知机
 
+
+```python
+x = torch.randn(3,1,requires_grad=True)
+print(x)
+y = x.pow(2).sum()
+y.backward()
+print(x.grad)
+```
+
+
 ![](/public/upload/machine/two_layer_neural_network.jpeg)
+
+**输入向量 乘以 权重矩阵 得到输出向量**，然后我们可以得到权重矩阵的 梯度。 如果演示 矩阵运算 $Y = X^2$ 观察X梯度矩阵 与 矩阵X的 值（前者是后者的2倍）会更明显一些。
 
 ```python
 import torch
 w1 = torch.randn(2,3,requires_grad=True)
+print(w1)
 x = torch.randn(3,1,requires_grad=True)
 b1 = torch.randn(2,1,requires_grad=True)
 w2 = torch.randn(2,2,requires_grad=True)
@@ -98,6 +111,12 @@ y =  (w2 @ z + b2).sum()
 print(y)
 y.backward()
 print(w1.grad)
+## 输出
+tensor([[-0.1884,  0.2570, -0.7091],
+        [ 0.3521, -0.1305, -3.2695]], requires_grad=True)
+tensor(0.4844, grad_fn=<SumBackward0>)
+tensor([[-0.1294,  0.0312, -0.0236],
+        [-0.9929,  0.2397, -0.1814]])
 ```
 
 《李沐的深度学习课》  有一点非常好，就是针对线性回归/softmax回归/感知机 都提供了一个 基于numpy 的实现以及pytorch 的简单实现。

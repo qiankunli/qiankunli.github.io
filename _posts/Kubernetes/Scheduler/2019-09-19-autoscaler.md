@@ -28,8 +28,6 @@ keywords: kubernetes autoscaler
 2. How can I keep containers running in a healthy state and running efficiently?
 3. With the on-going changes in my code and my users’ workloads, how can I keep up with such changes?
 
-
-
 ## HPA和VPA工作原理——CRD的典型应用
 
 ![](/public/upload/kubernetes/auto_scaler.png)
@@ -174,7 +172,7 @@ spec:
     shortNames:
     - ct
 ```
-apply crd 之后 apiserver 提供api `/apis/stable.example.com/v1/namespaces/*/crontabs/scale`，也可以 通过  `kubectl scale --replicas=5 crontabs/my-new-cron-object` 命令来修改 `CronTab.spec.replicas`。 可以直接修改 yaml  `CronTab.spec.replicas` 来控制crd 的副本数，但无法与 hpa 等组件集成（hpa 使用rest api）。
+apply 带有subresource 的crd 之后， apiserver 提供api `/apis/stable.example.com/v1/namespaces/*/crontabs/scale`，也可以 通过  `kubectl scale --replicas=5 crontabs/my-new-cron-object` 命令来修改 `CronTab.spec.replicas`。 
 ```
 apiVersion: "stable.example.com/v1"
 kind: CronTab
@@ -185,7 +183,7 @@ spec:
   image: my-awesome-cron-image
   replicas: 3
 ```
-
+可以直接修改 yaml  `CronTab.spec.replicas` 来控制crd 的副本数，但无法与 hpa 等组件集成，hpa 使用rest api，无法直接 基于struct update apiserver，这样要依赖crd struct package。
 
 ## 其它
 
