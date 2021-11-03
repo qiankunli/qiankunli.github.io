@@ -47,3 +47,32 @@ keywords:  gpu
 1. 弹性训练需要一种机制来解决节点/训练进程间相互发现的问题。Horovod 将这一问题交给用户来解决，Horovod 定期执行用户定义的逻辑来发现目前的节点。PyTorch 通过第三方的分布式一致性中间件 etcd 等来实现高可用的节点发现。
 2. 要实现弹性训练还需要捕获训练失效。Horovod 和 PyTorch 都通过一个后台进程（Horovod 中是 Driver，PyTorch 中是每个节点的 Local Elastic Agent）来实现这一逻辑。当进程 crash，或在梯度通信中遇到问题时，后台进程会捕获到失效并且重新进行节点发现，然后重启训练。
 3. 训练时的数据切分的逻辑和学习率/ batch size 的设置也要对应进行修改。由于参与训练的进程会动态的增减，因此可能需要根据新的训练进程的规模来重新设置学习率和数据分配的逻辑，避免影响模型收敛。
+
+## gpu 监控
+
+NVIDIA官方提供DCGM方案来进行GPU数据采集，通过Prometheus进行整个监控和告警的集成。
+
+dcgm-exporter采集指标项以及含义:
+
+|指标|    含义|
+|---|---|
+|dcgm_fan_speed_percent     |    GPU 风扇转速占比（%）|
+|dcgm_sm_clock               |   GPU sm 时钟(MHz)|
+|dcgm_memory_clock           |   GPU 内存时钟(MHz)|
+|dcgm_gpu_temp               |   GPU 运行的温度(℃)|
+|dcgm_power_usage             |  GPU 的功率（w）|
+|dcgm_pcie_tx_throughput       |     GPU PCIe TX传输的字节总数 |（kb）
+|dcgm_pcie_rx_throughput       |     GPU PCIe RX接收的字节总数 |（kb）
+|dcgm_pcie_replay_counter     |  GPU PCIe重试的总数|
+|dcgm_gpu_utilization         |  GPU 利用率（%）|
+|dcgm_mem_copy_utilization   |   GPU 内存利用率（%）|
+|dcgm_enc_utilization         |  GPU 编码器利用率 （%）|
+|dcgm_dec_utilization         |  GPU 解码器利用率 (%)|
+|dcgm_xid_errors               |     GPU 上一个xid错误的值|
+|dcgm_power_violation         |  GPU 功率限制导致的节流持续时间(us)|us)
+|dcgm_thermal_violation     |    GPU 热约束节流持续时间(us)|
+|dcgm_sync_boost_violation   |   GPU 同步增强限制，限制持续时间(us)|us)
+|dcgm_fb_free                 |  GPU fb（帧缓存）的剩余（MiB）|
+|dcgm_fb_used                 |  GPU fb （帧缓存）的使用 （MiB）|
+
+dcgm-exporter 可以物理机部署，也可以根据官方建议 使用daemonset 部署。
