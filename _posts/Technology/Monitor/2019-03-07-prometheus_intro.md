@@ -235,8 +235,30 @@ Time series Selectors 从time series 中选择需要的数据
 3. 标量（Scalar）：一个简单的数字浮点值。
 4. 字符串（String）：一个简单的字符串值，目前未使用。
 
+对metric 的操作 
 
-对指标进行 函数计算，比如`sum(http_requests_total)` 支持的函数[expression language functions](https://prometheus.io/docs/prometheus/latest/querying/functions/)
+1. [OPERATORS](https://prometheus.io/docs/prometheus/latest/querying/operators/) 是正经的官方文档，各种操作说明都有
+2. [Prometheus语法初探](https://mp.weixin.qq.com/s/mpi5GcT6kg0oZPrk1Hb1zg)**相同label 值的两个 瞬时向量 之间 可以进行加减乘除**，如果两个metric label 有差异，可以使用 ignoring 或 on。如果 算术运算的两个metric 数量不同，可以使用 group_left/group_right，指定结果集个数 以左右哪个metric 为准。
+    ```
+    method_code:http_errors:rate5m{method="get", code="500"}  24
+    method_code:http_errors:rate5m{method="get", code="404"}  30
+    method_code:http_errors:rate5m{method="put", code="501"}  3
+    method_code:http_errors:rate5m{method="post", code="500"} 6
+    method_code:http_errors:rate5m{method="post", code="404"} 21
+
+    method:http_requests:rate5m{method="get"}  600
+    method:http_requests:rate5m{method="del"}  34
+    method:http_requests:rate5m{method="post"} 120
+
+    # Example query
+    method_code:http_errors:rate5m{code="500"} / ignoring(code) method:http_requests:rate5m
+    # Result
+    {method="get"}  0.04            //  24 / 600
+    {method="post"} 0.05            //   6 / 120
+    ```
+3. 相同label 值的两个 瞬时向量 之间 可以进行集合运算 and/or/unless。 分别返回 vector1 and vector2 的交集/或集/差集等。
+4. 函数 分为用于瞬时向量的函数 和用于 区间向量的函数
+5. 小技巧，很多时候两个 metric 完全不同，只有一两个label 相同，此时可以使用 on 对两个metric 进行运算，也可以 使用`max(xx) by(label)` 将向量转换为一个新向量。
 
 [Prometheus 常用 PromQL 语句](https://mp.weixin.qq.com/s/vr1C6S_jAnMMu_5sUmYPMQ)
 

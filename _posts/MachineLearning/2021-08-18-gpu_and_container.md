@@ -138,4 +138,11 @@ Allocatable:
   pods:               110
 ```
 
+## nvidia gpu operator
 
+如果在k8s 上支持gpu 设备调度，需要做
+1. 节点上安装 nvidia 驱动
+2. 节点上安装 nvidia-docekr
+3. 集群部署 gpu device plugin
+3. 部署 dcgm-exporter 监控gpu 使用
+为此， nvidia 开源了 nvidia-gpu-exporter 自动化管理上述组件

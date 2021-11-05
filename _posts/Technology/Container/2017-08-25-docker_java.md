@@ -106,6 +106,8 @@ Linux有两种IO：Direct IO和Buffered IO。Direct IO直接写磁盘，Duffered
 
 很多方面，**容器内应用无法感知容器的存在**，此外，容器间也在不常见的地方相互影响着。此时需要更改glibc、更深入点比如内核等。
 
+[Java容器化参数配置最佳实践](https://mp.weixin.qq.com/s/qfhNalb1DUFhRtch2uIBoQ)
+
 ## 监控jvm
 
 [手把手教你使用 Prometheus 监控 JVM](https://mp.weixin.qq.com/s/ZnQqtImbh81L-HBBvI686g)JMX-Exporter 提供了两种用法:

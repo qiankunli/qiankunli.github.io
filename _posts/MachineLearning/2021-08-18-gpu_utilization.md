@@ -50,7 +50,7 @@ keywords:  gpu
 
 ## gpu 监控
 
-NVIDIA官方提供DCGM方案来进行GPU数据采集，通过Prometheus进行整个监控和告警的集成。
+[NVIDIA GPU Operator分析四：DCGM Exporter安装](https://developer.aliyun.com/article/784152)[DCGM Exporter](https://github.com/NVIDIA/dcgm-exporter)是一个用golang编写的收集节点上GPU信息（比如GPU卡的利用率、卡温度、显存使用情况等）的工具，结合Prometheus和Grafana（提供dashboard template）可以提供丰富的仪表大盘。
 
 dcgm-exporter采集指标项以及含义:
 
@@ -75,4 +75,6 @@ dcgm-exporter采集指标项以及含义:
 |dcgm_fb_free                 |  GPU fb（帧缓存）的剩余（MiB）|
 |dcgm_fb_used                 |  GPU fb （帧缓存）的使用 （MiB）|
 
-dcgm-exporter 可以物理机部署，也可以根据官方建议 使用daemonset 部署。
+dcgm-exporter 可以物理机部署，也可以根据官方建议 使用daemonset 部署，之后配置一个 service，用于Prometheus找到节点上dcgm-exporter服务监听的端口，然后访问dcgm-exporter。
+
+从k8s 1.13开始，kubelet通过`/var/lib/kubelet/pod-resources`下的Unix套接字来提供pod资源查询服务，dcgm-exporter可以访问`/var/lib/kubelet/pod-resources/`下的套接字服务查询为每个pod分配的GPU设备，然后将GPU的pod信息附加到收集的度量中。
