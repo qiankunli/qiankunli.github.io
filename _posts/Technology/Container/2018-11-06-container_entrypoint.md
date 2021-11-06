@@ -69,7 +69,7 @@ panic("No working init found.  Try passing init= option to kernel. "
 
 僵尸进程（内存文件等都已释放，只留了一个stask_struct instance）如果不清理，就会消耗系统中的进程号资源，最坏会导致创建新进程。
 
-社区 有一个容器init 项目tini
+社区 有一个容器init 项目tini [使用 Tini 清理 Docker 容器僵死进程](https://mp.weixin.qq.com/s/Ktd56YQsU8pP6kUs3_uU4Q)
 
 ```c
 int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
@@ -112,7 +112,7 @@ root 7 6 0 14:50 ? 00:00:00 sleep 100
 [理解Docker容器的进程管理](https://yq.aliyun.com/articles/5545)docker stop  对PID1进程 的要求
 
 1. 支持管理运行过程中可能产生的僵尸/孤儿进程
-2. 容器的PID1进程需要能够正确的处理SIGTERM信号来支持优雅退出，如果容器中包含多个进程，需要PID1进程能够正确的传播SIGTERM信号来结束所有的子进程之后再退出。
+2. 容器的PID=1进程需要能够正确的处理SIGTERM信号来支持优雅退出，如果容器中包含多个进程，需要PID=1进程能够正确的传播SIGTERM信号来结束所有的子进程之后再退出。
 
 
 综上，如果一个容器有多个进程，可选的实践方式为：
