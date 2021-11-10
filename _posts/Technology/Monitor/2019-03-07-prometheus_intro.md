@@ -262,6 +262,7 @@ Time series Selectors 从time series 中选择需要的数据
 
 [Prometheus 常用 PromQL 语句](https://mp.weixin.qq.com/s/vr1C6S_jAnMMu_5sUmYPMQ)
 
+[Grafana 图形面板高级定制方法](https://mp.weixin.qq.com/s/4GHAr1gevw6leCYhuNWu4g)
 
 ## rules
 

@@ -68,24 +68,14 @@ if __name__ == "__main__":
     print("            =======  Training  ======= \n")
     # 4. start to train
     net.train()
-    for ep in range(1, EPOCHS + 1):
-        train_loss = correct = total = 0
-
+    for ep in range(1, EPOCHS + 1):                 # 控制在全部数据上训练的次数
         for idx, (inputs, targets) in enumerate(train_loader):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)
-
-            loss = criterion(outputs, targets)
+            loss = criterion(outputs, targets)      # 获得输出结果和样本值的损失函数
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            train_loss += loss.item()
-            total += targets.size(0)
-            correct += torch.eq(outputs.argmax(dim=1), targets).sum().item()
-
-             # 输出loss 和 正确率
-    print("\n            =======  Training Finished  ======= \n")
+            loss.backward()                         # 根据loss 进行反向梯度传播
+            optimizer.step()                        # 用计算的梯度去做优化
 ```
 如果是单机多卡，定义网络时加入 `net = nn.DataParallel(net)`
 
@@ -173,7 +163,6 @@ if __name__ == "__main__":
         train_loss = correct = total = 0
         # set sampler
         train_loader.sampler.set_epoch(ep)
-
         for idx, (inputs, targets) in enumerate(train_loader):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = net(inputs)

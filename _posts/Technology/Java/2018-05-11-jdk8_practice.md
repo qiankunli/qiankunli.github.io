@@ -72,6 +72,9 @@ stream map 之后是stream，optional map 之后是optional ，不要彼此相�
 	    }
 	}
 
+## Supplier
+
+[函数式编程的Java编码实践：利用惰性写出高性能且抽象的代码](https://mp.weixin.qq.com/s/e-9hrjWK513VJqqyeGLxrQ)Java 8 引入了全新的函数式接口 Supplier，从老 Java 程序员的角度理解，它不过就是一个可以获取任意值的接口而已，Lambda 不过是这种接口实现类的语法糖。这是站在语言角度而不是计算角度的理解。当你了解了严格（strict）与惰性（lazy）的区别之后，可能会有更加接近计算本质的看法。因为 Java 和 C 都是严格的编程语言，所以我们习惯了变量在定义的地方就完成了计算。事实上，还有另外一个编程语言流派，它们是在变量使用的时候才进行计算的，比如函数式编程语言 Haskell。
 
 ##  filter
 

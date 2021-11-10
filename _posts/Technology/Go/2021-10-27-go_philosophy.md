@@ -4,7 +4,7 @@ layout: post
 title: go设计哲学
 category: 技术
 tags: Go
-keywords: go compiler
+keywords: go 设计哲学
 
 ---
 

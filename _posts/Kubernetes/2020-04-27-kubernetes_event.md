@@ -71,6 +71,8 @@ Events 量非常大，只能存在一个很短的时间，很有必要将它们e
 
 ## kube-eventer
 
+https://github.com/AliyunContainerService/kube-eventer
+
 ### 源码包
 
 ```
