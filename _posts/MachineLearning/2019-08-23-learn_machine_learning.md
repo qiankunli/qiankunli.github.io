@@ -34,7 +34,7 @@ keywords: 深度学习
 
 [吴恩达给你的人工智能第一课](https://mooc.study.163.com/smartSpec/detail/1001319001.htm) 这是笔者实际的入门课程
 
-才云内部的课程资料：[适合传统软件工程师的 Machine Learning 学习路径](https://github.com/caicloud/mlsys-ladder?from=timeline)
+<font color="red">才云内部的课程资料</font>[适合传统软件工程师的 Machine Learning 学习路径](https://github.com/caicloud/mlsys-ladder?from=timeline)
 
 [ 2017 斯坦福李飞飞视觉识别课程](https://github.com/caicloud/mlsys-ladder?from=timeline) 虽然说得是视觉识别，但一些机器学习的基本原理也值得一看。[CS231n课程笔记翻译：神经网络笔记1（上）](https://zhuanlan.zhihu.com/p/21462488?refer=intelligentunit) 未读
 
