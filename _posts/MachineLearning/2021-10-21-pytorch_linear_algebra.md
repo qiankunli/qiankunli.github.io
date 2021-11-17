@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: python与线性回归
+title: pytorch与线性回归
 category: 架构
 tags: MachineLearning
 keywords:  线性回归 pytorch
@@ -82,6 +82,17 @@ the deep learning machine  is a rather complex mathematical function mapping inp
 1. 比如，两个形状相同的张量之间逐个元素的四则运算（参与运算的两个元素的位置一一对应），既可以使用加、减、乘、除的运算符进行张量间的运算，也可以使用add、sub、mul和div方法来进行运算。同样，这些内置方法有原地操作版本add_、sub_、mul_/div_。
 2. 矩阵乘法（线性变换）
 
+## 用张量验证 链式法则
+
+```python
+y1 = x * w1 + b1
+y2 = y1 * w2 + b2
+dy2_dy1 = autograd.grad(y2,[y1],retain_graph=True)[0]
+dy1_dw1 = autograd.grad(y1,[w1],retain_graph=True)[0]
+dy2_dw1 = autograd.grad(y2,[w1],retain_graph=True)[0]
+可以对比下  dy2_dy1 * dy1_dw1 和 dy2_dw1 的值
+```
+
 ## 用张量运算表示 多层感知机
 
 
@@ -93,8 +104,7 @@ y.backward()
 print(x.grad)
 ```
 
-
-![](/public/upload/machine/two_layer_neural_network.jpeg)
+![](/public/upload/machine/two_layer_neural_network.png)
 
 **输入向量 乘以 权重矩阵 得到输出向量**，然后我们可以得到权重矩阵的 梯度。 如果演示 矩阵运算 $Y = X^2$ 观察X梯度矩阵 与 矩阵X的 值（前者是后者的2倍）会更明显一些。
 
@@ -289,13 +299,7 @@ def net(X):         # 模型可以表示为矩阵运算
 
 用所有数据训练一遍就是一个 Epoch。但受到硬件设备的限制，训练时不会一次性的读入所有数据，而是一次读入一部分进行训练，这里的“每次”就是对应的 Step 这个概念。那每次读入的数据量就是 batch_size。训练集有1000个样本，batchsize=10，那么：训练完整个样本集需要100次iteration，1次epoch。
 
-## 使用gpu
-```python
-cpu = torch.device("cpu")
-gpu = torch.device("cuda:0")  # 使用第一个gpu
-x = torch.rand(10)
-x = x.to(gpu)
-```
+
 
 ## 其它
 
