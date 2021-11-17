@@ -195,7 +195,7 @@ tus的基本理念：
 
 [虚拟座谈会：有关分布式存储的三个基本问题](http://www.infoq.com/cn/articles/virtual-forum-three-basic-issues-about-distributed-storage?utm_campaign=infoq_content&utm_source=infoq&utm_medium=feed&utm_term=global)对象存储、文件存储与块存储之间的关系
 
-1. 首先对象存储和文件存储的区别是不大的，存储的都是一样的东西，只是抛弃了统一的命名空间和目录树的结构
+1. 首先对象存储和文件存储的区别是不大的，存储的都是一样的东西，**只是抛弃了统一的命名空间和目录树的结构**
 2. 独立的互联网存储服务一般都是做对象存储的，因为块存储是给计算机用的，对象存储是给浏览器等HTTP客户端用的。
 3. 可用性是存储系统的基本性能，提高可用性的办法是多副本，多副本就会带来一致性问题。不仅数据库会有一致性问题，存储系统、文件系统、磁盘都会有一致性问题，比如磁盘的raid，只是不太为大家所常见。
 
