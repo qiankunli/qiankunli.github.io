@@ -242,6 +242,8 @@ train_script 启动方式有以下几种
 2. 由 launch.py 启动，大部分参数直接 传给 train_script.py，只是根据 nnodes 和 nproc_per_node 算了一下 local_rank 和 world_size 传给train_script
 3. 由 run.py 启动，**参数 都是给 rendezvous 用的**， 由rendezvous 协商出 train_script 需要的参数，由 run.py spawn worker 进程时传给worker/传给train_script。
 
+后两种 仅仅是为启动 train_script 方便，该给 train_script 传的参数还是要传。PS：train_script 是算法写的，在train_script 内使用的库 具备分布式、弹性 能力之前，能力扩充 主要通过 加壳子的方式来解决。
+
 ```python
 # 老的
 python -m torch.distributed.launch 
