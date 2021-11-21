@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: pytorch 弹性分布式训练
+title: pytorch分布式训练
 category: 架构
 tags: MachineLearning
 keywords:  pytorch distributed elastic 弹性
@@ -15,18 +15,7 @@ keywords:  pytorch distributed elastic 弹性
 
 ## 整体思路
 
-多gpu 训练
-
-![](/public/upload/machine/multi_gpu.png)
-
-[分布式训练](https://time.geekbang.org/opencourse/videodetail/100077201-407557)
-
-![](/public/upload/machine/distribute_gpu.png)
-
-1. 黄色表示 参数，绿色表示梯度
-2. 分布式**同步**数据并行 是多GPU 数据并行在多机器上的扩展。异步并行是每个机器做自己的批量更新，不用同步。
-3. 网络通信是瓶颈。从分布式文件系统上读数据；参数同步。
-4. 大batch 可能会导致收敛变慢
+![](/public/upload/machine/data_parallel_train.png)
 
 [DDP系列第一篇：入门教程](https://zhuanlan.zhihu.com/p/178402798)多机多卡 
 1. 分布式训练的几个选择：模型并行 vs 数据并行，PS 模型 vs Ring-Allreduce ，pytorch 单机多卡（DP）用PS 模型，多机多卡（DDP）用Ring-Allreduce
@@ -77,9 +66,29 @@ if __name__ == "__main__":
             loss.backward()                         # 根据loss 进行反向梯度传播
             optimizer.step()                        # 用计算的梯度去做优化
 ```
+
+
+## 单机多卡
+
 如果是单机多卡，定义网络时加入 `net = nn.DataParallel(net)`
 
+![](/public/upload/machine/data_parallel.png)
+
+[ PyTorch 分布式(2) ----- DataParallel(上)](https://mp.weixin.qq.com/s/cGfKl6yydc5Xmd_Ok3mnkA) 缺点很多。
+
 ## 分布式训练
+
+[ PyTorch 分布式(5) ------ DistributedDataParallel 总述&如何使用](https://mp.weixin.qq.com/s/WdLpHfWLRvDLLxeanFduxA)
+
+![](/public/upload/machine/data_distributed_parallel.png)
+
+GPU之间只传递梯度
+1. 加载模型阶段。每个GPU都拥有模型的一个副本，所以不需要拷贝模型。rank为0的进程会将网络初始化参数broadcast到其它每个进程中，确保每个进程中的模型都拥有一样的初始化值。
+2. 加载数据阶段。**DDP 不需要广播数据，而是使用多进程并行加载数据**。在 host 之上，每个worker进程都会把自己负责的数据从硬盘加载到 page-locked memory。DistributedSampler 保证每个进程加载到的数据是彼此不重叠的。
+3. 前向传播阶段。在每个GPU之上运行前向传播，计算输出。每个GPU都执行同样的训练，所以不需要有主 GPU。
+4. 计算损失。在每个GPU之上计算损失。
+5. 反向传播阶段。运行后向传播来计算梯度，在计算梯度同时也对梯度执行all-reduce操作。每一层的梯度不依赖于前一层，所以梯度的All-Reduce和后向过程同时计算，以进一步缓解网络瓶颈。在后向传播的最后，每个节点都得到了平均梯度，这样模型参数保持同步。[关于AllReduce](https://zhuanlan.zhihu.com/p/100012827)
+6. 更新模型参数阶段。因为每个GPU都从完全相同的模型开始训练，并且梯度被all-reduced，因此每个GPU在反向传播结束时最终得到平均梯度的相同副本，所有GPU上的权重更新都相同，也就**不需要模型同步了**。注意，在每次迭代中，模型中的Buffers 需要从rank为0的进程广播到进程组的其它进程上。
 
 ### 模板代码
 
@@ -109,6 +118,7 @@ net = torch.nn.parallel.DistributedDataParallel(net)
 [PyTorch分布式训练简明教程](https://mp.weixin.qq.com/s/0aSBHvscloEnPMRLyNjQsg)
 1. 用dist.init_process_group初始化分布式环境
     1. 一般来说，nccl 用于 GPU 分布式训练，gloo 用于 CPU 进行分布式训练。
+    2. 这个调用是阻塞的，必须等待所有进程来同步，如果任何一个进程出错，就会失败。
 1. 数据侧，我们nn.utils.data.DistributedSampler来给各个进程切分数据，只需要在dataloader中使用这个sampler就好
     1. 使用 DDP 时，不再是从主 GPU 分发数据到其他 GPU 上，而是各 GPU 从自己的硬盘上读取属于自己的那份数据。
     1. 训练循环过程的每个epoch开始时调用train_sampler.set_epoch(epoch)，（主要是为了保证每个epoch的划分是不同的）其它的训练代码都保持不变。
@@ -184,82 +194,68 @@ if __name__ == "__main__":
 
 每条命令表示一个进程。若已开启的进程未达到 word_size 的数量，则所有进程会一直等待
 
-## 弹性分布式训练 （未完成）
+### 进程间通信
 
-###  checkpoint 的保存与加载
+如何发现对方（怎么知道大家是一伙儿的？），发现了对方之后如何定身份？谁是master 谁是worker？ 定了身份之后怎么协作？涉及到几个概念
 
-checkpoint 代码模版
+worker 发现彼此
+1. init_method，开始的前提：如何联系到其它机器上的进程。
+    1. Shared file-system initialization：init_method='file:///mnt/nfs/sharedfile'
+    1. dist.init_process_group(backend, init_method='tcp://10.1.1.20:23456',ank=args.rank, world_size=4)
+    2. dist.init_process_group(backend, init_method='env://',ank=args.rank, world_size=4) 这个进程会自动读取环境变量 MASTER_ADDR/MASTER_PORT/WORLD_SIZE/RANK
+4. store ，**elastic 机制之后支持的**，主要是给 elastic agent 使用的。
+
+worker 交流梯度
+1. processgroup。 进程组就是给每一个训练的 process 建立一个Communication thread。主线程（Computation thread）在前台进行训练，这个Communication thread 在后台做通信（交流梯度）。[PyTorch 分布式(7) ----- DistributedDataParallel 之进程组](https://mp.weixin.qq.com/s/XPzLC7nuXDkQKtmZgTFalQ)
+    ![](/public/upload/machine/pytorch_process_group.png)
+2. backend，如何协作？后端这个概念是一个**逻辑上**的概念。本质上后端是一种IPC通信机制。对于用户来说，就是采用那种方式来进行集合通信，从代码上看，就是走什么流程（一系列流程），以及后端使用 ProcessGroupMPI 还是  ProcessGroupGloo …..。各主机之间需要进行通信。因此，需要指定通信的协议架构等。torch.distributed 对其进行了封装。提供了分布式通信原语
+
+    ![](/public/upload/machine/pytorch_distributed_backend.jpeg)
+
+## 弹性分布式训练 
+
+### 如何启动 train_script 
+
+train_script 启动方式有以下几种
+1. 直接 python 启动 需要以下参数（来自run.py 代码注释），比较重要的是local_rank,world_size,master_host,master_port, backend
+    1. ``LOCAL_RANK`` -  The local rank.
+    2. ``RANK`` -  The global rank.
+    3. ``GROUP_RANK`` - The rank of the worker group. A number between 0 and ``max_nnodes``. When
+    running a single worker group per node, this is the rank of the node.
+    4. ``ROLE_RANK`` -  The rank of the worker across all the workers that have the same role. The role
+    of the worker is specified in the ``WorkerSpec``.
+    5. ``LOCAL_WORLD_SIZE`` - The local world size (e.g. number of workers running locally); equals to
+    ``--nproc_per_node`` specified on ``torchrun``.
+    6. ``WORLD_SIZE`` - The world size (total number of workers in the job).
+    7. ``ROLE_WORLD_SIZE`` - The total number of workers that was launched with the same role specified
+    in ``WorkerSpec``.
+    8. ``MASTER_ADDR`` - The FQDN of the host that is running worker with rank 0; used to initialize
+    the Torch Distributed backend.
+    9. ``MASTER_PORT`` - The port on the ``MASTER_ADDR`` that can be used to host the C10d TCP store.
+    10. ``TORCHELASTIC_RESTART_COUNT`` - The number of worker group restarts so far.
+    11. ``TORCHELASTIC_MAX_RESTARTS`` - The configured maximum number of restarts.
+    12. ``TORCHELASTIC_RUN_ID`` - Equal to the rendezvous ``run_id`` (e.g. unique job id).
+2. 由 launch.py 启动，大部分参数直接 传给 train_script.py，只是根据 nnodes 和 nproc_per_node 算了一下 local_rank 和 world_size 传给train_script
+3. 由 run.py 启动，**参数 都是给 rendezvous 用的**， 由rendezvous 协商出 train_script 需要的参数，由 run.py spawn worker 进程时传给worker/传给train_script。
 
 ```python
-def main():
-     args = parse_args(sys.argv[1:])
-     state = load_checkpoint(args.checkpoint_path)
-     initialize(state)
-     # torch.distributed.run ensure that this will work
-     # by exporting all the env vars needed to initialize the process group
-     torch.distributed.init_process_group(backend=args.backend)
-     for i in range(state.epoch, state.total_num_epochs)
-          for batch in iter(state.dataset)
-              train(batch, state.model)
-          state.epoch += 1
-          save_checkpoint(state)
+# 老的
+python -m torch.distributed.launch 
+    --nnodes=2
+    --nproc_per_node=xx
+    --master_addr=xx 
+    --master_port=xx
+# 新的
+python -m torchelastic.distributed.run 
+    --nnodes=1:4
+    --nproc_per_node=xx
+    --rdzv_id=JOB_ID
+    --rdzv_backend=etcd
+    --rdzv_endpoint=ETCD_HOST:ETCD_PORT
+    TRAINING_SCRIPT.py (... train script args ...)
 ```
 
-1. 定义一个 State class 保存到文件上。如果文件存在共享存储，所有worker 都可以访问到，则所有worker 直接加载最新的checkpoint 即可。如果每个worker 将checkpoint 保存在本地，则有一个worker 间彼此通信 确定最新checkpoint 的过程。PS： 一个worker 挂掉了，重启启动，加载本地的checkpoint，这个checkpoint 大概率不是最新的了。
-2. State class 包含哪些内容由 开发 自己决定。
-
-```python
-class State:
-    def __init__(self, arch, model, optimizer):
-        self.epoch = -1
-        self.best_acc1 = 0
-        self.arch = arch
-        self.model = model
-        self.optimizer = optimizer
-    def capture_snapshot(self):
-        return {
-            "epoch": self.epoch,
-            "best_acc1": self.best_acc1,
-            "arch": self.arch,
-            "state_dict": self.model.state_dict(),
-            "optimizer": self.optimizer.state_dict(),
-        }
-    def apply_snapshot(self, obj):
-        self.epoch = obj["epoch"]
-        self.best_acc1 = obj["best_acc1"]
-        self.state_dict = obj["state_dict"]
-        self.model.load_state_dict(obj["state_dict"])
-        self.optimizer.load_state_dict(obj["optimizer"])
-    def save(self, f):
-        torch.save(self.capture_snapshot(), f)
-    def load(self, f):
-        snapshot = torch.load(f)
-        self.apply_snapshot(snapshot)
-def load_checkpoint(checkpoint_file: str,arch: str,model: DistributedDataParallel,optimizer,) -> State:
-    state = State(arch, model, optimizer)
-    if os.path.isfile(checkpoint_file):
-        print(f"=> loading checkpoint file: {checkpoint_file}")
-        state.load(checkpoint_file)
-        print(f"=> loaded checkpoint file: {checkpoint_file}")
-    # logic below is unnecessary when the checkpoint is visible on all nodes! create a temporary cpu pg to broadcast most up-to-date checkpoint
-    ...
-    print(f"=> done restoring from previous checkpoint")
-    return state
-def save_checkpoint(state: State, filename: str):
-    checkpoint_dir = os.path.dirname(filename)
-    os.makedirs(checkpoint_dir, exist_ok=True)
-    # save to tmp, then commit by moving the file in case the job
-    # gets interrupted while writing the checkpoint
-    tmp_filename = filename + ".tmp"
-    torch.save(state.capture_snapshot(), tmp_filename)
-    os.rename(tmp_filename, filename)
-    print(f"=> saved checkpoint for epoch {state.epoch} at {filename}")
-```
-
-checkpoint 的保存 pytorch-lightning 库 [SAVING AND LOADING WEIGHTS](https://pytorch-lightning.readthedocs.io/en/latest/common/weights_loading.html ) 提供了一些参考，但没有 与worker group 其它worker 同步查找最新 checkpoint 的功能。
-
-
-## 实现原理 run.py
+## train_script 的守护者elastic agent
 
 以下内容来自  `python3.9/site-packages/torch/distributed/run.py` 注释
 
@@ -267,29 +263,9 @@ checkpoint 的保存 pytorch-lightning 库 [SAVING AND LOADING WEIGHTS](https://
 1. run.py 负责启动 elastic agent
 2. elastic agent 负责启动 train_script.py， 并给train_script.py 传递必要的参数（环境变量或参数形式，由脚本的获取方式决定）。
 
-### 概念
-
 ![](/public/upload/machine/torchelastic_diagram.jpeg)
 
-1. ``Node`` - A physical instance or a container; maps to the unit that the job manager works with.
-2. ``Worker`` - A worker in the context of distributed training.
-3. ``WorkerGroup`` - The set of workers that execute the same function (e.g. trainers).
-4. ``LocalWorkerGroup`` - A subset of the workers in the worker group running on the same node.
-5. ``RANK`` - The rank of the worker within a worker group.
-6. ``WORLD_SIZE`` - The total number of workers in a worker group.
-7. ``LOCAL_RANK`` - The rank of the worker within a local worker group.
-8. ``LOCAL_WORLD_SIZE`` - The size of the local worker group.
-9. ``rdzv_id`` - A user-defined id that uniquely identifies the worker group for a job. This id is
-   used by each node to join as a member of a particular worker group.
-9. ``rdzv_backend`` - The backend of the rendezvous (e.g. ``c10d``). This is typically a strongly
-   consistent key-value store.
-10. ``rdzv_endpoint`` - The rendezvous backend endpoint; usually in form ``<host>:<port>``.
-A ``Node`` runs ``LOCAL_WORLD_SIZE`` workers which comprise a ``LocalWorkerGroup``. The union of
-all ``LocalWorkerGroups`` in the nodes in the job comprise the ``WorkerGroup``.
-
-### run.py 启动参数
-
-`python -m  torch.distributed.run [args] training_script [training_script_args]`
+run.py 启动命令，`python -m  torch.distributed.run [args] training_script [training_script_args]`，包含以下参数
 
 关于workGroup 的布局
 1. `--nnodes`
@@ -311,64 +287,56 @@ User-code launch related arguments.
 13. `--master_addr`
 14. `--master_port`
 
-### train_script 启动参数或环境变量
-
-train_script 不需要 依赖第三方库，仅由run.py 启动即可。 
-```python
-python -m torchelastic.distributed.run --nproc_per_node=NUM_GPUS_ON_NODE
-    --nnodes=1:4
-    --rdzv_id=JOB_ID
-    --rdzv_backend=etcd
-    --rdzv_endpoint=ETCD_HOST:ETCD_PORT
-    TRAINING_SCRIPT.py (... train script args ...)
-```
-
-如果单独启动 `python train_script.py` 需要传以下变量， 使用run.py 启动train_script之后，这些信息会由 run.py spawn worker 进程时传给worker。The following environment variables are made available to you in your script:
-
-1. ``LOCAL_RANK`` -  The local rank.
-2. ``RANK`` -  The global rank.
-3. ``GROUP_RANK`` - The rank of the worker group. A number between 0 and ``max_nnodes``. When
-   running a single worker group per node, this is the rank of the node.
-4. ``ROLE_RANK`` -  The rank of the worker across all the workers that have the same role. The role
-   of the worker is specified in the ``WorkerSpec``.
-5. ``LOCAL_WORLD_SIZE`` - The local world size (e.g. number of workers running locally); equals to
-   ``--nproc_per_node`` specified on ``torchrun``.
-6. ``WORLD_SIZE`` - The world size (total number of workers in the job).
-7. ``ROLE_WORLD_SIZE`` - The total number of workers that was launched with the same role specified
-   in ``WorkerSpec``.
-8. ``MASTER_ADDR`` - The FQDN of the host that is running worker with rank 0; used to initialize
-   the Torch Distributed backend.
-9. ``MASTER_PORT`` - The port on the ``MASTER_ADDR`` that can be used to host the C10d TCP store.
-10. ``TORCHELASTIC_RESTART_COUNT`` - The number of worker group restarts so far.
-11. ``TORCHELASTIC_MAX_RESTARTS`` - The configured maximum number of restarts.
-12. ``TORCHELASTIC_RUN_ID`` - Equal to the rendezvous ``run_id`` (e.g. unique job id).
-
-### rendezvous/集会机制
+### worker 如何发现？——rendezvous/集会机制
 
 [Elastic Introduction](https://github.com/pytorch/elastic/blob/master/design/torchelastic/0.2.0/design_doc.md) 
-[Elastic Agent 的设计：如何管理多个 worker 进程](https://mp.weixin.qq.com/s/hlOYLKSHFDZWN21AsUn6bg)rendezvous核心工作是： **如何在不同的节点间确定 RANK**
+[Elastic Agent 的设计：如何管理多个 worker 进程](https://mp.weixin.qq.com/s/hlOYLKSHFDZWN21AsUn6bg) 不同的 elastic agent 
 
-**Membership Changes:**
-1. Node departure (scale-down): The agent is notified of the departure, all existing workers are
-   stopped, a new ``WorkerGroup`` is formed, and all workers are started with a new ``RANK`` and
-   ``WORLD_SIZE``.
-2. Node arrival (scale-up): The new node is admitted to the job, all existing workers are stopped,
-   a new ``WorkerGroup`` is formed, and all workers are started with a new ``RANK`` and
-   ``WORLD_SIZE``.
+Elastic Agent  通过 rendezvous 进行 worker 之间的相互发现，以便在不同的节点间确定 RANK。 需要一个类似配置中心的东西 etcd 或自带的c10d，对应有一个 Store 抽象（有EtcdStore 和 TcpStore），在此基础上封装了  RendezvousHandler 来管理 rendezvous（在etcd 上对应一个 带version 的path） 。PS： RendezvousHandler 和 Store 的协作很迷，在Store 基础上封装了 barrier 协调步调的函数，**代码上看 etcd 系列的会清晰一下**。
+    ```python
+    class RendezvousHandler(ABC):
+        def get_backend(self) -> str
+        def next_rendezvous(self,) -> Tuple[Store, rank, world_size]
+        def is_closed(self) -> bool
+        def set_closed(self)
+        def num_nodes_waiting(self) -> int
+        def get_run_id(self) -> str
+        def shutdown(self) -> bool
+    class Store(__pybind11_builtins.pybind11_object):
+        def add(self, arg0, arg1)
+        def compare_set(self, arg0, arg1, arg2)
+        def delete_key(self, arg0)
+        def get(self, arg0)
+        def num_keys(self)
+        def set(self, arg0, arg1)
+        def set_timeout(self, arg0)
+        def wait(self, *args, **kwargs)
+    ```
+当一个worker 挂了之后，其它所有的worker 也都会挂掉。<font color="red">存在疑问<font>： 一个worker 不管是自己运行失败、还是被外力杀死，其它worker 怎么知道的？
+1. 可能是 rendezvous 缺了一个worker ，其它worker 交换不了梯度了，也就报错了，进而被各自的elastic agent 监听到。 
+2. 可能是 elastic agent 通知了 注册中心 ，其它elastic agent 监听到了这个信息，进而陆续关停自己的worker。
+    1. 被外力干死，此时 elastic agent 注册了 `signal.signal(signal.SIGTERM, _terminate_process_handler)`  之后 引起 `rdzv_handler.shutdown()`（可能变更了rendezvous state，etcd 和 c10d 处理方式不同）。
+    2. worker 运行失败，elastic agent 周期性 _monitor_workers 发现 worker 失败，通知了注册中心/store，继而被其它node 的elastic agent 感知到。
+但第二种猜测没有找到代码支持，并且etcd 和c10d 的逻辑也非常不一样。
 
-The application writer is responsible for loading and restarting from an existing checkpoint file is available. PyTorch Elastic Trainer  does not mandate how checkpoints are managed. 开发者要对  checkpoing 的保存、加载、加载时机负责。run.py 不关心checkpoint 的管理（大部分只有rank=0 才进行checkpoint 处理）。
-
-When a worker process fails, the corresponding elastic agent managing it kills all the workers on that node, establishes rendezvous with the other agents and restarts workers with the new rendezvous information. However, when an agent exits with a non-zero error code, it is up to a higher-level orchestrator such as Kubernetes to restart the agent (which in turn will restart all the workers it is responsible for). The same recovery mechanism holds for node-level failures. An orchestrator such as Kubernetes will schedule a job such that a minimum replicas of the elastic agent are running and each agent will in turn orchestrate the user's training script. 当一个worker 挂掉时，Elastic agent 将干掉节点上的worker(属于同一个local work group) 并通知其它agent。当Elastic agent 挂掉时， 则需要 更高层级比如k8s 来重启Elastic agent 。
+When a worker process fails, the corresponding elastic agent managing it kills all the workers on that node, establishes rendezvous with the other agents and restarts workers with the new rendezvous information. However, when an agent exits with a non-zero error code, it is up to a higher-level orchestrator such as Kubernetes to restart the agent (which in turn will restart all the workers it is responsible for). The same recovery mechanism holds for node-level failures. An orchestrator such as Kubernetes will schedule a job such that a minimum replicas of the elastic agent are running and each agent will in turn orchestrate the user's training script. 当一个worker 挂掉时，Elastic agent 将干掉节点上的worker(属于同一个local work group) 并通知其它agent。**当Elastic agent 挂掉时， 则需要 更高层级比如k8s 来重启Elastic agent**。
 
 ![](/public/upload/machine/torchelastic_agent_diagram.jpeg)
 
-机会成员 的注册发现需要一个“注册中心”，可以是c10d/etcd，使用不同的“注册中心”有不同的问题
+新的processgroup 被k8s 拉起来之后，关键问题就是两个
+1. worker 发现，有几个？ rank=0 是谁？ rendezvous 的技能。
+2. checkpoint 加载，防止之前 训练的浪费了。
+
+”注册中心“可以是c10d/etcd，使用不同的“注册中心”有不同的问题
 1. c10d 运行在rank0 节点， 因此使用c10d时，非rank0 节点挂掉ok，rank0 节点挂掉会导致训练任务失败
 2. 使用etcd时，非rank0 节点挂掉ok，rank0 节点挂掉后 其它节点会作为rank0节点，可能会有问题：有些框架喜欢在rank0 做一些特殊工作
 
 ## elastic agent 源码
 
-`python3.9/site-packages/torch/distributed/run.py` ==> ` main()` ==> `run(args)` ==>  `elastic_launch(config=config,entrypoint=cmd,)(*cmd_args)` ==> `__call__(*args)` ==> launch_agent
+elastic agent 的可扩展性非常好，在 1.9.0 版本中，一共有三个 Agent，分别是 ElasticAgent、SimpleElasticAgent 和 LocalElasticAgent。
+其中 ElasticAgent 是一个 Abstract Class，SimpleElasticAgent 对其中的某些函数进行了实现（半成品），而 LocalElasticAgent 则实现了管理单机上所有 worker 进程的 elastic agent。
+
+`python3.9/site-packages/torch/distributed/run.py` ==> ` main()` ==> `run(args)` ==>  `elastic_launch(config=config,entrypoint=cmd,)(*cmd_args)` ==> `__call__(*args)` ==> launch_agent ==> agent.run ==> SimpleElasticAgent._invoke_run
 
 ```python
 # /python3.9/site-packages/torch/distributed/launcher/api.py
@@ -397,10 +365,11 @@ def launch_agent(config: LaunchConfig,entrypoint: Union[Callable, str, None],arg
     except Exception:
         ...
     finally:
-        rdzv_handler.shutdown()
+        rdzv_handler.shutdown() # 以 EtcdRendezvousHandler 为例，EtcdRendezvousHandler.shutdown 会在 etcd 上记录 本次rendezvous closed。
 ```
-elastic agent 的可扩展性非常好，在 1.9.0 版本中，一共有三个 Agent，分别是 ElasticAgent、SimpleElasticAgent 和 LocalElasticAgent。
-其中 ElasticAgent 是一个 Abstract Class，SimpleElasticAgent 对其中的某些函数进行了实现（半成品），而 LocalElasticAgent 则实现了管理单机上所有 worker 进程的 elastic agent。
+
+elastic agent 周期性 _monitor_workers ，判断worker SUCCEEDED/FAILED/HEALTHY，如果发现失败的 worker ，主动stop worker
+
 ```python
 # python3.9/site-packages/torch/distributed/elastic/agent/server/api.py
 class SimpleElasticAgent(ElasticAgent):
@@ -416,40 +385,29 @@ class SimpleElasticAgent(ElasticAgent):
         self._initialize_workers(self._worker_group)    ## 启动worker
         while True:
             time.sleep(monitor_interval)    ## 每隔  monitor_interval 查看下 worker 的状态
-            run_result = self._monitor_workers(self._worker_group)
+            run_result = self._monitor_workers(self._worker_group)  #对workers 的运行状态进行监控。并且根据不同的状态进行不同的处理
             state = run_result.state
             self._worker_group.state = state
-            if state == WorkerState.SUCCEEDED:
-                self._exit_barrier()
-                return run_result
-            elif state in {WorkerState.UNHEALTHY, WorkerState.FAILED}:
-                if self._remaining_restarts > 0:
-                    self._remaining_restarts -= 1
-                    self._restart_workers(self._worker_group)
-                else:
-                    self._stop_workers(self._worker_group)
-                    self._worker_group.state = WorkerState.FAILED
-                    self._exit_barrier()
-                    return run_result
-            elif state == WorkerState.HEALTHY:
-                # membership changes do not count as retries
-                num_nodes_waiting = rdzv_handler.num_nodes_waiting()
-                group_rank = self._worker_group.group_rank
-                if num_nodes_waiting > 0:
-                    self._restart_workers(self._worker_group)
-            else:
-                raise Exception(f"[{role}] Worker group in {state.name} state")
-    def _initialize_workers(self, worker_group: WorkerGroup) -> None:
-        role = worker_group.spec.role
-        self._rendezvous(worker_group)  # 启动前先集会获取下数据
-        log.info(f"[{role}] Starting worker group")
-        worker_ids = self._start_workers(worker_group)  # 启动worker
-        for local_rank, w_id in worker_ids.items():
-            worker = worker_group.workers[local_rank]
-            worker.id = w_id
-        worker_group.state = WorkerState.HEALTHY
+            if   state == WorkerState.SUCCEEDED: exit...
+            elif state in {WorkerState.UNHEALTHY, WorkerState.FAILED}: _restart_workers/_stop_workers...
+            elif state == WorkerState.HEALTHY: ...
+            else: raise Exception(f"[{role}] Worker group in {state.name} state")
 ```
-LocalElasticAgent 实现了 `_start_workers`
+_initialize_workers 执行了大部分初始化的工作，其中包括为每个 worker 分配 RANK 等。
+
+```python
+class SimpleElasticAgent(ElasticAgent):
+    def _initialize_workers(self, worker_group: WorkerGroup) -> None:
+    role = worker_group.spec.role
+    self._rendezvous(worker_group)                  # 启动前先集会获取下数据
+    log.info(f"[{role}] Starting worker group")
+    worker_ids = self._start_workers(worker_group)  # 启动worker
+    for local_rank, w_id in worker_ids.items():
+        worker = worker_group.workers[local_rank]
+        worker.id = w_id
+    worker_group.state = WorkerState.HEALTHY
+```
+LocalElasticAgent 实现了 `_start_workers`，关键就是为 worker 准备环境 变量和参数
 ```python
 # python3.9/site-packages/torch/distributed/elastic/agent/server/local_elastic_agent.py
 class LocalElasticAgent(SimpleElasticAgent):
@@ -480,50 +438,42 @@ class LocalElasticAgent(SimpleElasticAgent):
         return self._pcontext.pids()
 ```
 start_processes ==> PContext.start ==> `SubprocessContext._start` ==> `SubprocessHandler.__init__` ==> `SubprocessHandler._popen` ==> subprocess.Popen
-```python
-# python3.9/site-packages/torch/distributed/elastic/multiprocessing/__init__.py
-def start_processes(name: str,entrypoint: Union[Callable, str],args: Dict[int, Tuple],envs: Dict[int, Dict[str, str]],...
-) -> PContext:
-    context = SubprocessContext(
-        name=name,
-        entrypoint=entrypoint,
-        args=args,
-        envs=envs,...
-    )
-    try:
-        context.start()
-        return context
-    except Exception:
-        context.close()
-        raise
-# python3.9/site-packages/torch/distributed/elastic/multiprocessing/api.py
-class PContext(abc.ABC):
-    def start(self) -> None:
-        signal.signal(signal.SIGTERM, _terminate_process_handler)
-        signal.signal(signal.SIGINT, _terminate_process_handler)
-        self._start()
-        self._stdout_tail.start()
-        self._stderr_tail.start()
-class SubprocessContext(PContext):
-    def _start(self):
-        self.subprocess_handlers = {
-            local_rank: SubprocessHandler(entrypoint=...,args=self.args[local_rank],env=self.envs[local_rank],...)
-            for local_rank in range(self.nprocs)
-        }
-class SubprocessHandler:
-    def __init__(self,entrypoint: str,args: Tuple,env: Dict[str, str],stdout: str,stderr: str,):
-        self._stdout = open(stdout, "w") if stdout else None
-        self._stderr = open(stderr, "w") if stderr else None
-        # inherit parent environment vars
-        env_vars = os.environ.copy()
-        env_vars.update(env)
-        args_str = (entrypoint, *[str(e) for e in args])
-        self.proc: subprocess.Popen = self._popen(args_str, env_vars)
-    def _popen(self, args: Tuple, env: Dict[str, str]) -> subprocess.Popen:
-        return subprocess.Popen(    # python 中用subprocess.Popen 来启动子进程
-            args=args,
-            env=env,
-            stdout=self._stdout,
-            stderr=self._stderr,
-        )
-```
+
+## checkpoint
+
+一般来说，用户可以使用torch.save和torch.load作为checkpoints，以便从检查点恢复训练。checkpoint 可以保存在共享文件系统上，由rank=0 负责保存，其它rank 进程只负责加载，此时要确保在保存完成之前所有进程都不会开始加载 （涉及到使用  `dist.barrier()`）。
+
+有几个关键点
+1. checkpoint 保存了什么。 取决于 load checkpoint 之后 是 恢复训练（还是老样本，从中断处开始） 还是增量训练（样本变了）
+    1. model 数据
+    2. 优化器数据，学习率等可能因为 错误率而变化
+    3. epoch，当前训练到了第几轮
+2. 如何封装checkpoint 
+    1. 定一个class state , `save_checkpoint(state: State, filename: str)`  `load_checkpoint(checkpoint_file: str, ...) -> State`
+    2. 直接 对保存的数据 save_checkpoint 和 load_checkpoint
+
+[pytorch：模型的保存与加载](https://zhuanlan.zhihu.com/p/269143428) 保存时，有保存参数和保存模型的分别。
+
+在支持弹性训练之前，save/load checkpoint 是一个可选工作，**支持弹性之后，save/load checkpoint 就是必须的了**。The application writer is responsible for loading and restarting from an existing checkpoint file is available. PyTorch Elastic Trainer  does not mandate how checkpoints are managed. 开发者要对  checkpoing 的保存、加载、加载时机负责。run.py 不关心checkpoint 的管理（大部分只有rank=0 才进行checkpoint 处理）。
+
+## 其它
+
+### 概念
+
+来自run.py 代码注释
+
+1. ``Node`` - A physical instance or a container; maps to the unit that the job manager works with.
+2. ``Worker`` - A worker in the context of distributed training.
+3. ``WorkerGroup`` - The set of workers that execute the same function (e.g. trainers).
+4. ``LocalWorkerGroup`` - A subset of the workers in the worker group running on the same node.
+5. ``RANK`` - The rank of the worker within a worker group.
+6. ``WORLD_SIZE`` - The total number of workers in a worker group.
+7. ``LOCAL_RANK`` - The rank of the worker within a local worker group.
+8. ``LOCAL_WORLD_SIZE`` - The size of the local worker group.
+9. ``rdzv_id`` - A user-defined id that uniquely identifies the worker group for a job. This id is
+   used by each node to join as a member of a particular worker group.
+9. ``rdzv_backend`` - The backend of the rendezvous (e.g. ``c10d``). This is typically a strongly
+   consistent key-value store.
+10. ``rdzv_endpoint`` - The rendezvous backend endpoint; usually in form ``<host>:<port>``.
+A ``Node`` runs ``LOCAL_WORLD_SIZE`` workers which comprise a ``LocalWorkerGroup``. The union of
+all ``LocalWorkerGroups`` in the nodes in the job comprise the ``WorkerGroup``.

@@ -143,6 +143,8 @@ devops基本理念：
 1. 在整个请求的调用链中，请求会一直携带 traceid（由客户端或网关生成） 往下游服务传递，每个服务内部也会生成自己的 spanid 用于生成自己的内部调用视图，并和traceid一起传递给下游服务。traceid 在请求的整个调用链中始终保持不变，所以在日志中可以通过 traceid 查询到整个请求期间系统记录下来的所有日志。
 2. 请求到达每个服务后，服务都会为请求生成spanid，而随请求一起从上游传过来的上游服务的 spanid 会被记录成parent-spanid或者叫 pspanid。当前服务生成的 spanid 随着请求一起再传到下游服务时，这个spanid 又会被下游服务当做 pspanid 记录。
 
+在 A->B->C->D 的情况下，在整个调用链中，正常情况下会产生 3 个 Span，分别是 Span1（A->B）、Span2（B->C）、Span3（C->D），这时 Span3 的父 Span 就是 Span2，而 Span2 的父 Span 就是 Span1。
+
 ## 其它
 
 [做出让人爱不释手的基础软件：可观测性和可交互性](https://mp.weixin.qq.com/s/WEO1y8vg21CXlix8wO28hw) 个人理解: 尽可能多的监控，之后就是尽量串起来
