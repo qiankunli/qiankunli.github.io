@@ -22,6 +22,9 @@ keywords:  pytorch distributed elastic 弹性
 2. 假设 有两台机子，每台8张显卡，那就是2x8=16个进程，并行数是16。DDP 推荐每个进程一张卡，在16张显卡，16的并行数下，DDP会同时启动16个进程。rank表示当前进程的序号（0~16），用于进程间通讯。local_rank 表示每台机子上的进程的序号（0~7），**也用来指定机器上的gpu 序号**。用起来 就是一行代码，`model = DDP(model, device_ids=[local_rank], output_device=local_rank)`，**后续的模型关于前向传播、后向传播的用法，和单机单卡完全一致**。[DDP系列第二篇：实现原理与源代码解析](https://zhuanlan.zhihu.com/p/187610959)
 3. 每个进程跑的是同一份代码，进程从外界（比如环境变量）获取 rank/master_addr/master_port 等参数，rank = 0 的进程为 master 进程
 
+
+[[源码解析] PyTorch 分布式(8) -------- DistributedDataParallel 之 论文篇](https://mp.weixin.qq.com/s/5EL3yb_-8t02GLdZ6qsclw)应用程序开发通常从本地模型开始，然后在必要时扩展。所以需要有一个从本地模型开始，修改代码以适应分布式的过程。为了避免这个从本地模型到分布式模型的过渡期间太过麻烦，API在应用程序代码中是非侵入性的。
+
 ## 单机单卡
 
 [Pytorch分布式训练](https://mp.weixin.qq.com/s/G-uLl3HXzFJOW03nA7etig)
@@ -218,48 +221,7 @@ worker 交流梯度
 1. 启动的时候，参与训练的 节点数不确定了。
 2. 训练过程中，可能会有新的节点 或节点挂掉，要能容错，继续训练。
 
-### 如何启动 train_script 
 
-train_script 启动方式有以下几种
-1. 直接 python 启动 需要以下参数（来自run.py 代码注释），比较重要的是local_rank,world_size,master_host,master_port, backend
-    1. ``LOCAL_RANK`` -  The local rank.
-    2. ``RANK`` -  The global rank.
-    3. ``GROUP_RANK`` - The rank of the worker group. A number between 0 and ``max_nnodes``. When
-    running a single worker group per node, this is the rank of the node.
-    4. ``ROLE_RANK`` -  The rank of the worker across all the workers that have the same role. The role
-    of the worker is specified in the ``WorkerSpec``.
-    5. ``LOCAL_WORLD_SIZE`` - The local world size (e.g. number of workers running locally); equals to
-    ``--nproc_per_node`` specified on ``torchrun``.
-    6. ``WORLD_SIZE`` - The world size (total number of workers in the job).
-    7. ``ROLE_WORLD_SIZE`` - The total number of workers that was launched with the same role specified
-    in ``WorkerSpec``.
-    8. ``MASTER_ADDR`` - The FQDN of the host that is running worker with rank 0; used to initialize
-    the Torch Distributed backend.
-    9. ``MASTER_PORT`` - The port on the ``MASTER_ADDR`` that can be used to host the C10d TCP store.
-    10. ``TORCHELASTIC_RESTART_COUNT`` - The number of worker group restarts so far.
-    11. ``TORCHELASTIC_MAX_RESTARTS`` - The configured maximum number of restarts.
-    12. ``TORCHELASTIC_RUN_ID`` - Equal to the rendezvous ``run_id`` (e.g. unique job id).
-2. 由 launch.py 启动，大部分参数直接 传给 train_script.py，只是根据 nnodes 和 nproc_per_node 算了一下 local_rank 和 world_size 传给train_script
-3. 由 run.py 启动，**参数 都是给 rendezvous 用的**， 由rendezvous 协商出 train_script 需要的参数，由 run.py spawn worker 进程时传给worker/传给train_script。
-
-后两种 仅仅是为启动 train_script 方便，该给 train_script 传的参数还是要传。PS：train_script 是算法写的，在train_script 内使用的库 具备分布式、弹性 能力之前，能力扩充 主要通过 加壳子的方式来解决。
-
-```python
-# 老的
-python -m torch.distributed.launch 
-    --nnodes=2
-    --nproc_per_node=xx
-    --master_addr=xx 
-    --master_port=xx
-# 新的
-python -m torchelastic.distributed.run 
-    --nnodes=1:4
-    --nproc_per_node=xx
-    --rdzv_id=JOB_ID
-    --rdzv_backend=etcd
-    --rdzv_endpoint=ETCD_HOST:ETCD_PORT
-    TRAINING_SCRIPT.py (... train script args ...)
-```
 
 ## train_script 的守护者elastic agent
 
@@ -298,7 +260,7 @@ User-code launch related arguments.
 [Elastic Introduction](https://github.com/pytorch/elastic/blob/master/design/torchelastic/0.2.0/design_doc.md) 
 [Elastic Agent 的设计：如何管理多个 worker 进程](https://mp.weixin.qq.com/s/hlOYLKSHFDZWN21AsUn6bg) 不同的 elastic agent 
 
-Elastic Agent  通过 rendezvous 进行 worker 之间的相互发现，以便在不同的节点间确定 RANK。 需要一个类似配置中心的东西 etcd 或自带的c10d，对应有一个 Store 抽象（有EtcdStore 和 TcpStore），在此基础上封装了  RendezvousHandler 来管理 rendezvous（在etcd 上对应一个 带version 的path） 。PS： RendezvousHandler 和 Store 的协作很迷，在Store 基础上封装了 barrier 协调步调的函数，**代码上看 etcd 系列的会清晰一下**。
+Elastic Agent  通过 rendezvous 进行 worker 之间的相互发现，以便在不同的节点间确定 RANK。 需要一个类似配置中心的东西 etcd 或自带的c10d，对应有一个 Store 抽象（有EtcdStore 和 TcpStore），在此基础上封装了  RendezvousHandler 来管理 rendezvous（在etcd 上对应一个 带version 的path） 。实际运行发现 rdzv_endpoint 中指定的port 由 `python -m torch.distributed.run train_script.py` 进程监听，也就是 **c10d 运行在 elastic agent 上**。。PS： RendezvousHandler 和 Store 的协作很迷，在Store 基础上封装了 barrier 协调步调的函数，**代码上看 etcd 系列的会清晰一下**。
     ```python
     class RendezvousHandler(ABC):
         def get_backend(self) -> str
@@ -483,3 +445,43 @@ start_processes ==> PContext.start ==> `SubprocessContext._start` ==> `Subproces
 10. ``rdzv_endpoint`` - The rendezvous backend endpoint; usually in form ``<host>:<port>``.
 A ``Node`` runs ``LOCAL_WORLD_SIZE`` workers which comprise a ``LocalWorkerGroup``. The union of
 all ``LocalWorkerGroups`` in the nodes in the job comprise the ``WorkerGroup``.
+
+### 如何启动 train_script 
+
+train_script 启动方式有以下几种
+1. 直接 python 启动 需要以下参数（来自run.py 代码注释），比较重要的是local_rank,world_size,master_host,master_port, backend
+    1. ``LOCAL_RANK`` -  The local rank.
+    2. ``RANK`` -  The global rank.
+    3. ``GROUP_RANK`` - The rank of the worker group. A number between 0 and ``max_nnodes``. When
+    running a single worker group per node, this is the rank of the node.
+    4. ``ROLE_RANK`` -  The rank of the worker across all the workers that have the same role. The role
+    of the worker is specified in the ``WorkerSpec``.
+    5. ``LOCAL_WORLD_SIZE`` - The local world size (e.g. number of workers running locally); equals to
+    ``--nproc_per_node`` specified on ``torchrun``.
+    6. ``WORLD_SIZE`` - The world size (total number of workers in the job).
+    7. ``ROLE_WORLD_SIZE`` - The total number of workers that was launched with the same role specified
+    in ``WorkerSpec``.
+    8. ``MASTER_ADDR`` - The FQDN of the host that is running worker with rank 0; used to initialize
+    the Torch Distributed backend.
+    9. ``MASTER_PORT`` - The port on the ``MASTER_ADDR`` that can be used to host the C10d TCP store.
+    10. ``TORCHELASTIC_RESTART_COUNT`` - The number of worker group restarts so far.
+    11. ``TORCHELASTIC_MAX_RESTARTS`` - The configured maximum number of restarts.
+    12. ``TORCHELASTIC_RUN_ID`` - Equal to the rendezvous ``run_id`` (e.g. unique job id).
+2. 由 launch.py 启动，大部分参数直接 传给 train_script.py，launch根据 nnodes 和 nproc_per_node 算了一下 local_rank 和 world_size 传给train_script。 `python -m torch.distributed.launch --nnodes=2 --nproc_per_node=xx --master_addr=xx  --master_port=xx TRAINING_SCRIPT.py (... train script args ...)`
+3. 由 run.py 启动，**参数 都是给 rendezvous 用的**， 由rendezvous 协商出 train_script 需要的参数，由 run.py spawn worker 进程时传给worker/传给train_script。 `python -m torchelastic.distributed.run --nnodes=1:4 --nproc_per_node=xx --rdzv_id=JOB_ID --rdzv_backend=etcd --rdzv_endpoint=ETCD_HOST:ETCD_PORT TRAINING_SCRIPT.py (... train script args ...)`
+
+
+||train_script裸奔|使用launch|使用run|
+|---|---|---|---|
+|单机单卡/单机多卡|WORLD_SIZE<br>NPROC_PER_NODE|||
+|多机多卡|WORLD_SIZE<br>NPROC_PER_NODE<br>RANK<br>MASTER_ADDR<br>MASTER_PORT|NNODES<br>NPROC_PER_NODE<br>MASTER_ADDR<br>MASTER_PORT||
+|多机多卡+弹性|WORLD_SIZE<br>NPROC_PER_NODE<br>RANK<br>MASTER_ADDR<br>MASTER_PORT||NNODES<br>NPROC_PER_NODE<br>RDZV_ID
+<br>RDZV_BACKEND<br>RDZV_ENDPOINT|
+
+train_script 正常运行需要知道
+1. WORLD_SIZE,  数据分几份
+2. RANK,         自己是第几份，自己是不是master（rank=0 是master）
+2. NPROC_PER_NODE,  `RANK / NPROC_PER_NODE` 可以推算 多卡里用哪一张卡
+4. MASTER_ADDR:MASTER_PORT,     如何发现其它成员，组建process_group时需要
+
+launch 和 run 仅仅是为启动 train_script 方便，该给 train_script 传的参数还是要传。PS：train_script 是算法写的，在train_script 内使用的库 具备分布式、弹性 能力之前，能力扩充 主要通过 加壳子的方式来解决。

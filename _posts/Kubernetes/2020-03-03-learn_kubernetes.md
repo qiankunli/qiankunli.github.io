@@ -101,6 +101,8 @@ cd $GOPATH/src/k8s.io/kubernetes
 
 这个印象在openkruise 推出ImagePullJob 之后产生了动摇，这个crd的作用是将 image 下发到指定个规则的node上。[面对不可避免的故障，我们造了一个“上帝视角”的控制台](https://mp.weixin.qq.com/s/QxTMLqf8VspXWy4N4AIFuQ) 中chaosblade 的crd 则支持向某个进程注入一个故障。chaosblade  本身首先是一个故障注入平台，然后才是支持在k8s 平台上支持故障注入（物理机也是支持的）。
 
+另一个例子是自动扩缩容，其实并不复杂，直接api 变更replicas 即可。 但hpa 提供一个 平台化的能力来 做这件事（metric + 策略 + 控制器），是很值得思考的一个点。
+
 当然这个观点在 [面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA) 被认为是错误的。几个错误思维：
 1. 一切设计皆 YAML；
 2. 一切皆合一；

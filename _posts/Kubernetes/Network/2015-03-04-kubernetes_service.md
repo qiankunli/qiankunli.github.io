@@ -16,6 +16,8 @@ keywords: Kubernetes Service
 
 [深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)在 kubernetes 中，您可以将应用程序定义为 Service。Service 是一种抽象，它定义了一组 Pods 的逻辑集和访问它们的策略。
 
+在对应用进行横向扩容时，会在 Pod 网络中加入新的 Pod，新 Pod 自然也伴随着新的 IP 地址；如果对应用进行缩容，旧的 Pod 及其 IP 会被删除。应用的滚动更新和撤回也存在同样的情形——加入新版本的新 Pod，或者移除旧版本的旧 Pod。新 Pod 会加入新 IP 到 Pod 网络中，被终结的旧 Pod 会删除其现存 IP。如果没有其它因素，**每个应用服务都需要对网络进行监控，并管理一个健康 Pod 的列表**。这个过程会非常痛苦，另外在每个应用中编写这个逻辑也是很低效的。幸运的是，Kubernetes 用一个对象完成了这个过程——Service。
+
 本文均在“访问Pod 必须通过 Service的范畴”
 
 ![](/public/upload/kubernetes/kubernetes_service_access.png)
@@ -118,7 +120,7 @@ KUBE-SVC-NWV5X2332I4OT4T3 规则实际上是一组随机模式（–mode random�
 
 iptables与IPVS都是基于Netfilter实现的，但因为定位不同，二者有着本质的差别：iptables是为防火墙而设计的；IPVS则专门用于高性能负载均衡，并使用更高效的数据结构（Hash表），允许几乎无限的规模扩张。
 
-IPVS在Kubernetes1.11中升级为GA稳定版。在IPVS模式下，使用iptables的扩展ipset，而不是直接调用iptables来生成规则链。iptables规则链是一个线性的数据结构，ipset则引入了带索引的数据结构，因此当规则很多时，也可以很高效地查找和匹配。可以将ipset简单理解为一个IP（段）的集合，这个集合的内容可以是IP地址、IP网段、端口等，iptables可以直接添加规则对这个“可变的集合”进行操作，这样做的好处在于可以大大减少iptables规则的数量，从而减少性能损耗。
+**IPVS在Kubernetes1.11中升级为GA稳定版**。在IPVS模式下，使用iptables的扩展ipset，而不是直接调用iptables来生成规则链。iptables规则链是一个线性的数据结构，ipset则引入了带索引的数据结构，因此当规则很多时，也可以很高效地查找和匹配。可以将ipset简单理解为一个IP（段）的集合，这个集合的内容可以是IP地址、IP网段、端口等，iptables可以直接添加规则对这个“可变的集合”进行操作，这样做的好处在于可以大大减少iptables规则的数量，从而减少性能损耗。
 
 ## Service 的特别形式
 
@@ -129,6 +131,7 @@ K8S 中定义了 4种 Service 类型:
 2. NodePort: 通过 NodeIP:NodePort 访问 Service，这意味着该端口将保留在集群内的所有节点上
 3. ExternalIP: 与 ClusterIP 相同，但是这个 VIP 可以从这个集群之外访问
 4. LoadBalancer
+3. headless service， 设置了selector，但将 spec.clusterIP 设置成 None。因为没有ClusterIP，kube-proxy 并不处理此类服务，因为没有load balancing或 proxy 代理设置，在访问服务的时候回返回后端的全部的Pods IP地址。 如果servicename 与pod name一致且一对一，则可以起到 通过podname 访问另一个pod的效果。适合用于一些stateful 的workload 彼此间相互访问（stateful workload pod 间一般角色确定）
 
 
 ### LoadBalancer

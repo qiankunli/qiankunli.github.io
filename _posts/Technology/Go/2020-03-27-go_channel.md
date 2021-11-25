@@ -305,6 +305,13 @@ func selectgo(cas0 *scase, order0 *uint16, ncases int) (int, bool){
     2. 传递信号，比如用 channel 充当一个 “ready” 的信号，用来指示某个“过程”准备好了，可以接收结果了
 2. 临时创建，就像java 中的future 一样[Go channel 的妙用](https://mp.weixin.qq.com/s/jAUfqu-5nbs8hcua_F7ueQ)
 
+空结构体类型变量的内存占用为 0。基于空结构体类型内存零开销这样的特性，我们在日常 Go 开发中会经常使用空结构体类型元素，作为一种“事件”信息进行 Goroutine 之间的通信
+
+```go
+var c = make(chan struct{}) // 声明一个元素类型为Empty的channel
+c<-struct{}               	// 向channel写入一个“事件”
+```
+
 ### 广播channel
 
 channels在多个writer，一个reader的模型下面工作的很好，但是却不能很容易的处理多个reader等待获取一个writer发送的数据的情况。处理这样的情况，可能的一个go api原型如下：
