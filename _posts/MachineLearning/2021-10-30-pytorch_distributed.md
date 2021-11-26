@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: pytorch分布式训练
+title: pytorch弹性分布式训练
 category: 架构
 tags: MachineLearning
 keywords:  pytorch distributed elastic 弹性
@@ -218,10 +218,10 @@ worker 交流梯度
 ## 弹性分布式训练 
 
 关键就是
-1. 启动的时候，参与训练的 节点数不确定了。
+1. 启动的时候，参与训练的 节点数不确定了，rank=0也不确定了。**pytorch 层面**要能支持 互相发现worker（依赖注册中心） 以及协商各自的rank
 2. 训练过程中，可能会有新的节点 或节点挂掉，要能容错，继续训练。
-
-
+3. 代码层面 要能随时 save 和load checkpoint
+4. 资源调度层面  为pytorch 启动pod 时，要提供注册中心地址信息。
 
 ## train_script 的守护者elastic agent
 
@@ -449,39 +449,34 @@ all ``LocalWorkerGroups`` in the nodes in the job comprise the ``WorkerGroup``.
 ### 如何启动 train_script 
 
 train_script 启动方式有以下几种
-1. 直接 python 启动 需要以下参数（来自run.py 代码注释），比较重要的是local_rank,world_size,master_host,master_port, backend
-    1. ``LOCAL_RANK`` -  The local rank.
-    2. ``RANK`` -  The global rank.
-    3. ``GROUP_RANK`` - The rank of the worker group. A number between 0 and ``max_nnodes``. When
-    running a single worker group per node, this is the rank of the node.
-    4. ``ROLE_RANK`` -  The rank of the worker across all the workers that have the same role. The role
-    of the worker is specified in the ``WorkerSpec``.
-    5. ``LOCAL_WORLD_SIZE`` - The local world size (e.g. number of workers running locally); equals to
-    ``--nproc_per_node`` specified on ``torchrun``.
-    6. ``WORLD_SIZE`` - The world size (total number of workers in the job).
-    7. ``ROLE_WORLD_SIZE`` - The total number of workers that was launched with the same role specified
-    in ``WorkerSpec``.
-    8. ``MASTER_ADDR`` - The FQDN of the host that is running worker with rank 0; used to initialize
-    the Torch Distributed backend.
-    9. ``MASTER_PORT`` - The port on the ``MASTER_ADDR`` that can be used to host the C10d TCP store.
-    10. ``TORCHELASTIC_RESTART_COUNT`` - The number of worker group restarts so far.
-    11. ``TORCHELASTIC_MAX_RESTARTS`` - The configured maximum number of restarts.
-    12. ``TORCHELASTIC_RUN_ID`` - Equal to the rendezvous ``run_id`` (e.g. unique job id).
-2. 由 launch.py 启动，大部分参数直接 传给 train_script.py，launch根据 nnodes 和 nproc_per_node 算了一下 local_rank 和 world_size 传给train_script。 `python -m torch.distributed.launch --nnodes=2 --nproc_per_node=xx --master_addr=xx  --master_port=xx TRAINING_SCRIPT.py (... train script args ...)`
+1. 直接 python 启动 比较重要的参数是local_rank,world_size,master_host,master_port, backend
+    1. WORLD_SIZE,  数据分几份
+    2. RANK,         自己是第几份，自己是不是master（rank=0 是master）
+    2. NPROC_PER_NODE,  `RANK / NPROC_PER_NODE` 可以推算 多卡里用哪一张卡
+    4. MASTER_ADDR:MASTER_PORT,     如何发现其它成员，组建process_group时需要
+2. 由 launch.py 启动，大部分参数直接 传给 train_script.py，launch根据 nnodes 和 nproc_per_node 算了一下 local_rank 和 world_size 传给train_script。 `python -m torch.distributed.launch --nnodes=2 --node_rank=xx --nproc_per_node=xx --master_addr=xx  --master_port=xx TRAINING_SCRIPT.py (... train script args ...)`。 **这个方法已经淘汰**，并且在不同的时期 launch.py 的实现有变化。
 3. 由 run.py 启动，**参数 都是给 rendezvous 用的**， 由rendezvous 协商出 train_script 需要的参数，由 run.py spawn worker 进程时传给worker/传给train_script。 `python -m torchelastic.distributed.run --nnodes=1:4 --nproc_per_node=xx --rdzv_id=JOB_ID --rdzv_backend=etcd --rdzv_endpoint=ETCD_HOST:ETCD_PORT TRAINING_SCRIPT.py (... train script args ...)`
 
+launch 和 run 仅仅是为启动 train_script 方便，该给 train_script 传的参数还是要传，不传参数用环境变量也行，传参或传环境变量需要的参数是一致的，可以到launch.py 或 run.py 源码下查看其启动需要哪些参数。PS：train_script 是算法写的，在train_script 内使用的库 具备分布式、弹性 能力之前，能力扩充 主要通过 加壳子的方式来解决。
 
-||train_script裸奔|使用launch|使用run|
-|---|---|---|---|
-|单机单卡/单机多卡|WORLD_SIZE<br>NPROC_PER_NODE|||
-|多机多卡|WORLD_SIZE<br>NPROC_PER_NODE<br>RANK<br>MASTER_ADDR<br>MASTER_PORT|NNODES<br>NPROC_PER_NODE<br>MASTER_ADDR<br>MASTER_PORT||
-|多机多卡+弹性|WORLD_SIZE<br>NPROC_PER_NODE<br>RANK<br>MASTER_ADDR<br>MASTER_PORT||NNODES<br>NPROC_PER_NODE<br>RDZV_ID
-<br>RDZV_BACKEND<br>RDZV_ENDPOINT|
+直接 python 启动 需要以下参数（来自run.py 代码注释）
+1. ``LOCAL_RANK`` -  The local rank.
+2. ``RANK`` -  The global rank.
+3. ``GROUP_RANK`` - The rank of the worker group. A number between 0 and ``max_nnodes``. When
+running a single worker group per node, this is the rank of the node.
+4. ``ROLE_RANK`` -  The rank of the worker across all the workers that have the same role. The role
+of the worker is specified in the ``WorkerSpec``.
+5. ``LOCAL_WORLD_SIZE`` - The local world size (e.g. number of workers running locally); equals to
+``--nproc_per_node`` specified on ``torchrun``.
+6. ``WORLD_SIZE`` - The world size (total number of workers in the job).
+7. ``ROLE_WORLD_SIZE`` - The total number of workers that was launched with the same role specified
+in ``WorkerSpec``.
+8. ``MASTER_ADDR`` - The FQDN of the host that is running worker with rank 0; used to initialize
+the Torch Distributed backend.
+9. ``MASTER_PORT`` - The port on the ``MASTER_ADDR`` that can be used to host the C10d TCP store.
+10. ``TORCHELASTIC_RESTART_COUNT`` - The number of worker group restarts so far.
+11. ``TORCHELASTIC_MAX_RESTARTS`` - The configured maximum number of restarts.
+12. ``TORCHELASTIC_RUN_ID`` - Equal to the rendezvous ``run_id`` (e.g. unique job id).
 
-train_script 正常运行需要知道
-1. WORLD_SIZE,  数据分几份
-2. RANK,         自己是第几份，自己是不是master（rank=0 是master）
-2. NPROC_PER_NODE,  `RANK / NPROC_PER_NODE` 可以推算 多卡里用哪一张卡
-4. MASTER_ADDR:MASTER_PORT,     如何发现其它成员，组建process_group时需要
 
-launch 和 run 仅仅是为启动 train_script 方便，该给 train_script 传的参数还是要传。PS：train_script 是算法写的，在train_script 内使用的库 具备分布式、弹性 能力之前，能力扩充 主要通过 加壳子的方式来解决。
+

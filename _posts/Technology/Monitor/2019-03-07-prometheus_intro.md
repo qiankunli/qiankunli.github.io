@@ -119,7 +119,10 @@ scrape_configs:
     - job_name: 'kubernetes-cadvisor'
       kubernetes_sd_configs:
       - api_server: 'http://localhost:8080';
-        role: node
+        role: node/service/ingress/pod/endpoints
+        tls_config:
+          ca_file: xx
+        bearer_token_file: xx
     ```
 
 [服务发现与Relabel](https://yunlzheng.gitbook.io/prometheus-book/part-ii-prometheus-jin-jie/sd/service-discovery-with-relabel)
