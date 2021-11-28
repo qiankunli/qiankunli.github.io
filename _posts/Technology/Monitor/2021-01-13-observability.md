@@ -56,6 +56,8 @@ keywords: observability
 
 [vivo统一告警平台建设与实践](https://mp.weixin.qq.com/s/PBClxfy6VE06LubszdOHYA)
 
+[阿里可观测性数据引擎的技术实践](https://mp.weixin.qq.com/s/0aVgtVCmBmtAgZE_oQkcPw) 统一存储引擎，统一分析引擎，数据编排。
+
 ### 监控的几个反模式
 
 1. 事后监控，没有把监控作为系统的核心功能

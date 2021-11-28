@@ -54,9 +54,11 @@ keywords: mysql transaction isolation mvcc
 
 ![](/public/upload/storage/db_2pl.png)
 
-Scheduler对冲突的判断还需要配合Lock Table，如下图所示是一个可能得Lock Table信息示意，每一个被访问的数据库对象都会在Lock Table中有对应的表项，其中记录了当前最高的持有锁的模式、是否有事务在Delay、以及持有或等待对应锁的事务链表；同时对链表中的每个事务记录其事务ID，请求锁的模式以及是否已经持有该锁。Scheduler会在加锁请求到来时，通过查找Lock Table判断能否加锁或是Delay，如果Delay需要插入到链表中。对应的当事务Commit或Abort后需要对其持有的锁进行释放，并按照不同的策略唤醒等待队列中Delay的事务。PS：java 是将锁信息附着在对象header 上，但feel 是一样的
+Scheduler对冲突的判断还需要配合Lock Table，如下图所示是一个可能得Lock Table信息示意，**每一个被访问的数据库对象都会在Lock Table中有对应的表项**，其中记录了当前最高的持有锁的模式、是否有事务在Delay、以及持有或等待对应锁的事务链表；同时对链表中的每个事务记录其事务ID，请求锁的模式以及是否已经持有该锁。Scheduler会在加锁请求到来时，通过查找Lock Table判断能否加锁或是Delay，如果Delay需要插入到链表中。对应的当事务Commit或Abort后需要对其持有的锁进行释放，并按照不同的策略唤醒等待队列中Delay的事务。PS：java 是将锁信息附着在对象header 上，但feel 是一样的
 
 ![](/public/upload/storage/db_lock.png)
+
+[MYSQL 中锁的各种模式与类型](https://mp.weixin.qq.com/s/uK75yD-ZK0ynM_eSgHs0Iw)
 
 ### 具体细节
 

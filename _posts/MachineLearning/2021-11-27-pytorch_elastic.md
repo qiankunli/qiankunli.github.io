@@ -62,6 +62,8 @@ pytorch 封装了  RendezvousHandler 来管理 rendezvous（在etcd 上对应一
     2. 被外力干死。elastic agent 注册了 `signal.signal(signal.SIGTERM, _terminate_process_handler)`  之后 引起 `rdzv_handler.shutdown()`
 
 ```python
+# /pytorch/torch/distributed/elastic/rendezvous/api.py
+# rdzv backend: etcd/etcd-v2/c10d/static
 class RendezvousHandler(ABC):
     def get_backend(self) -> str
     def next_rendezvous(self,) -> Tuple[Store, rank, world_size]  # 建立 rendezvous 时 agent 获取 rank 和world_size
@@ -70,7 +72,19 @@ class RendezvousHandler(ABC):
     def num_nodes_waiting(self) -> int
     def get_run_id(self) -> str
     def shutdown(self) -> bool  # 监听worker 失效后关闭 本轮rendezvous
+
 ```
+pytoch 针对 RendezvousHandler 维护了一个 RendezvousHandlerRegistry，各种类型的  backend 注册了 RendezvousHandler 实现
+```python
+# /pytorch/torch/distributed/elastic/rendezvous/api.py
+class RendezvousHandlerRegistry:
+    _registry: Dict[str, RendezvousHandlerCreator]
+    def register(self, backend: str, creator: RendezvousHandlerCreator) -> None:
+    def create_handler(self, params: RendezvousParameters) -> RendezvousHandler:
+rendezvous_handler_registry = RendezvousHandlerRegistry()
+```
+
+launch_agent ==> `rdzv_handler = rdzv_registry.get_rendezvous_handler(rdzv_parameters)` 首先 根据backend 确定类型，再根据 rdzv_parameters 对 rendezvous_handler 初始化。
 
 实际运行发现 rdzv_endpoint 中指定的port 由 `python -m torch.distributed.run train_script.py` 进程监听，也就是 **c10d 运行在 elastic agent 上**。PS： **代码上看 etcd 系列的会清晰一下**。
 

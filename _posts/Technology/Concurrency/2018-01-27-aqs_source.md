@@ -26,7 +26,7 @@ AbstractQueuedSynchronizer的java类介绍：
 Provides a framework for implementing blocking locks and related synchronizers (semaphores, events, etc) that rely on first-in-first-out (FIFO) wait queues.  This class is designed to be a useful basis for most kinds of synchronizers that rely on a single atomic value to represent state. Subclasses must define the protected methods that change this state, and which define what that state means in terms of this object being acquired or released.  Given these, the other methods in this class carry out all queuing and blocking mechanics. Subclasses can maintain other state fields, but only the atomically updated value manipulated using methods , and is tracked with respect to synchronization.
 
 
-可以看到，AbstractQueuedSynchronizer并没有包办一切（否则就不会以Abstract开头了），而是通过继承的方式将同步器的工作划分成两个部分，在父类和子类中分别完成。
+可以看到，AbstractQueuedSynchronizer并没有包办一切（否则就不会以Abstract开头了），而是通过 template 模式将同步器的工作划分成两个部分，在父类和子类中分别完成。
 
 共享变量的值，对于不同的子类意味着不同的状态
 
@@ -58,26 +58,30 @@ AbstractQueuedSynchronizer留给子类实现的方法，一般以try开头，父
 
 在AQS框架下，我们可以自定义一个锁的实现
 
-    public class Mutex{
-    	private final Sync sync = new Sync();
-    	public void signal(){sync.releaseShared(0);}
-    	public void await() throws InterruptedException{
-    		sync.acquireShared(0);
-    	}
-    	private class Sync extends AbstractQueuedSynchronizer{
-    		protected int tryAcquireShared(int ignored){
-    		    // 共享变量为1表示锁空闲，为0表示锁被占用
-    			return (getState() == 1) ? 1 : -1;
-    		}
-    		protected boolean tryReleaseShared(int ignored){
-    			setState(1);
-    			return true;
-    		}
-    	}
+```java
+public class Mutex{
+    private final Sync sync = new Sync();
+    public void signal(){sync.releaseShared(0);}
+    public void await() throws InterruptedException{
+        sync.acquireShared(0);
     }
+    private class Sync extends AbstractQueuedSynchronizer{
+        protected int tryAcquireShared(int ignored){
+            // 共享变量为1表示锁空闲，为0表示锁被占用
+            return (getState() == 1) ? 1 : -1;
+        }
+        protected boolean tryReleaseShared(int ignored){
+            setState(1);
+            return true;
+        }
+    }
+}
+```
       
 
 Mutex是面向用户的，用户使用Mutext时只需`mutex.await`和`mutex.signal`即可。同步器面向的是线程访问和资源控制，使用时除调用acquire和release方法外，还要设置具体的参数值，**为数据的变化赋予意义**（Mutex中参数是没用的）。
+
+AQS中最重要的一个字段就是state，锁和同步器的实现都是围绕着这个字段的修改展开的。AQS可以实现各种不同的锁和同步器的原因之一就是，不同的锁或同步器按照自己的需要可以对同步状态的含义有不同的定义，并重写对应的tryAcquire, tryRelease或tryAcquireshared, tryReleaseShared等方法来操作同步状态。
 
 
 ## AQS架构
@@ -95,20 +99,22 @@ Mutex是面向用户的，用户使用Mutext时只需`mutex.await`和`mutex.sign
 
 AQS中的队列（并且是一个双向队列，头结点为虚结点）采用链表作为存储结构，通过节点中的next指针维护队列的完整。AbstractQueuedSynchronizer关于队列操作的部分如下：
 
-    public abstract class AbstractQueuedSynchronizer{
-        private transient volatile Node head;
-        private transient volatile Node tail;
-        Node {
-           int waitStatus;  
-           Node prev;
-           Node next;
-           Node nextWaiter;
-           Thread thread;
-        }
-        // 在队列尾部插入节点，中间一些操作用到CAS以保证原子性
-         private Node addWaiter(Node mode){}  
-        // 将一个Node的相关指向置为空，并不再让其它节点指向它，即可（GC）释放该节点
+```java
+public abstract class AbstractQueuedSynchronizer{
+    private transient volatile Node head;
+    private transient volatile Node tail;
+    Node {
+        int waitStatus;  
+        Node prev;
+        Node next;
+        Node nextWaiter;
+        Thread thread;
     }
+    // 在队列尾部插入节点，中间一些操作用到CAS以保证原子性
+        private Node addWaiter(Node mode){}  
+    // 将一个Node的相关指向置为空，并不再让其它节点指向它，即可（GC）释放该节点
+}
+```
 
 AQS实际上通过头尾指针来管理同步队列，实现包括获取锁失败的线程进行入队，释放锁时unpark 队首节点/线程等核心逻辑
 

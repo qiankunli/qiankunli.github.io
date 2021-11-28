@@ -47,10 +47,9 @@ putInt/Byte/Object/Char/Float
 Unsafe unsafe = getUnsafe();
 Field f = guard.getClass().getDeclaredField("field_name");
 unsafe.putInt(guard, unsafe.objectFieldOffset(f), 42); // memory corruption
-````
+```
 	
 	
-
 
 如果知道 某个对象某个属性的内存地址，那么连对象的引用都不需要，可以直接设置值
 
@@ -154,12 +153,30 @@ unsafe.putInt(guard, unsafe.objectFieldOffset(f), 42); // memory corruption
 
 [Understanding Java and native thread details](https://www.ibm.com/support/knowledgecenter/en/SSB23S_1.1.0.15/com.ibm.java.vm.80.doc/docs/javadump_tags_javaandnative_thread_detail.html) A Java thread runs on a native thread, java thread 和native thread 有一个Attach 和Unattach 的过程。native thread 驱动 java thread 代码序列
 
-[Java的LockSupport.park()实现分析](https://blog.csdn.net/hengyunabc/article/details/28126139)
+[打通JAVA与内核系列之一ReentrantLock锁的实现原理](https://mp.weixin.qq.com/s/224pnAA6e8LvFcbJNHpWug)每个java线程都有一个Parker实例 Unsafe.park ==> `thread->parker()->park(isAbsolute != 0, time);` 即 获取java线程的parker对象，然后执行它的park方法。parker内部有个关键字段_counter, 这个counter用来记录所谓的“permit”，当_counter大于0时，意味着有permit，然后就可以把_counter设置为0，就算是获得了permit，可以继续运行后面的代码。如果_counter=0，则把线程的状态设置成_thread_in_vm并且_thread_blocked。_thread_in_vm 表示线程当前在JVM中执行，_thread_blocked表示线程当前阻塞了。拿到mutex之后，再次检查_counter是不是>0，如果是，则把_counter设置为0，unlock mutex并返回。如果_counter还是不大于0，调用相应的pthread_cond_wait系列函数进行等待，如果等待返回（即有人进行unpark，则pthread_cond_signal来通知），则把_counter设置为0，unlock mutex并返回。本质上来讲，LockSupport.park 是通过pthread库的条件变量pthread_cond_t来实现的。无论是pthread_cond_wait还是pthread_cond_signal 都必须得先pthread_mutex_lock。pthread_mutex_lock使用了称为Futex(快速用户空间互斥锁的简称)的系统，futex的解决思路是：在无竞争的情况下操作完全在user space进行，不需要系统调用，仅在发生竞争的时候进入内核去完成相应的处理(wait 或者 wake up)。所以说，futex是一种user mode和kernel mode混合的同步机制。
 
 
-[Java锁的那些事儿](https://mp.weixin.qq.com/s/dwpTgeVXyH9F7-dklk7Iag)park和unpark底层是借助系统层（Linux下）方法 pthread_mutex和 pthread_cond来实现的，通过 pthread_cond_wait函数可以对一个线程进行阻塞操作，在这之前，必须先获取 pthread_mutex，通过 pthread_cond_signal函数对一个线程进行唤醒操作。
-
-Java在语言层面实现了自己的线程管理机制（阻塞、唤醒、排队等），每个Thread实例都有一个独立的 pthread_mutex和 pthread_cond（系统层面的/C语言层面），在Java语言层面上对单个线程进行独立唤醒操作。
+```c++
+class Parker : public os::PlatformParker {
+private:
+  volatile int _counter ;
+  ...
+public:
+  void park(bool isAbsolute, jlong time);
+  void unpark();
+  ...
+}
+class PlatformParker : public CHeapObj<mtInternal> {
+  protected:
+    enum {
+        REL_INDEX = 0,
+        ABS_INDEX = 1
+    };
+    int _cur_index;  // which cond is in use: -1, 0, 1
+    pthread_mutex_t _mutex [1] ;
+    pthread_cond_t  _cond  [2] ; // one for relative times and one for abs.
+}
+```
 
 ### 其它
 

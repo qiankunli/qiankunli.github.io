@@ -261,20 +261,47 @@ self.module.state_dict() = {OrderedDict: 4}
  'net2.bias' = {Tensor: 5} tensor([0.1488, 0.0791, 0.1667, 0.1449, 0.0545])
 ```
 
-
-### ProcessGroup
+## ProcessGroup
 
 [PyTorch 分布式(7) ----- DistributedDataParallel 之进程组](https://mp.weixin.qq.com/s/XPzLC7nuXDkQKtmZgTFalQ)
 
-如何让 worker 在建立进程组之前发现彼此？
+### 如何让 worker 在建立ProcessGroup之前发现彼此？
+
 1. init_method，开始的前提：如何联系到其它机器上的进程。
     1. Shared file-system initialization：init_method='file:///mnt/nfs/sharedfile'
     1. dist.init_process_group(backend, init_method='tcp://10.1.1.20:23456',ank=args.rank, world_size=4)
     2. dist.init_process_group(backend, init_method='env://',ank=args.rank, world_size=4) 这个进程会自动读取环境变量 MASTER_ADDR/MASTER_PORT/WORLD_SIZE/RANK
-4. store ，有TcpStore 和EtcdStore 可以发挥etcd 用来发挥的作用：服务发现及分布式键值存储
+4. store ，有TcpStore 和EtcdStore 可以发挥类似 etcd 用来发挥的作用：服务发现及分布式键值存储
 
-store 和 init_method 是互斥的。**store 先于 ProcessGroup 创建和初始化**。
+store 和 init_method 是互斥的。**store 先于 ProcessGroup 创建和初始化**。PS： 随着版本的迭代，变动较大，不纠结了
 
+init_process_group ==> ` rendezvous_iterator = rendezvous(init_method, rank, world_size, timeout=timeout)` 使用了rendezvous 机制，与elastic agent 共用 TcpStore（默认是共用的，也可以不共用）， 此处的 rendezvous_handler 是一个函数（返回store/rank/world_size），与elastic agent 使用的 RendezvousHandler 不同。
+
+```python
+# /pytorch/torch/distributed/rendezvous.py
+def rendezvous(url: str, rank: int = -1, world_size: int = -1, **kwargs) -> (store, rank, world_size):
+    ...
+    return _rendezvous_handlers[result.scheme](url, **kwargs)
+# 如果 env TORCHELASTIC_USE_AGENT_STORE=true，则此处创建的 是 TCPStore client
+def _create_c10d_store(hostname, port, rank, world_size, timeout) -> Store:
+def _file_rendezvous_handler(url: str, **kwargs):
+    ...
+    store = FileStore(path, world_size)
+    ...
+def _tcp_rendezvous_handler(url: str, timeout: timedelta = default_pg_timeout, **kwargs):
+    ...
+    _create_c10d_store(hostname, port, rank, world_size, timeout) -> Store:
+    ...
+def _env_rendezvous_handler(url: str, timeout: timedelta = default_pg_timeout, **kwargs):
+    ...
+    _create_c10d_store(hostname, port, rank, world_size, timeout) -> Store:
+    ...
+def register_rendezvous_handler(scheme, handler):
+register_rendezvous_handler("tcp", _tcp_rendezvous_handler)
+register_rendezvous_handler("env", _env_rendezvous_handler)
+register_rendezvous_handler("file", _file_rendezvous_handler)
+```
+### ProcessGroup 如何被使用
 
 抛开概念，从代码看其本质。processgroup 就是给每一个训练的 process 建立一个Communication thread。主线程（Computation thread）在前台进行训练，这个Communication thread 在后台做通信（比如交流梯度）。
 
