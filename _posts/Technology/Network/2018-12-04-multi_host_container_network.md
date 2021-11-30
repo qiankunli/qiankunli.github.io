@@ -13,8 +13,9 @@ keywords: container network
 * TOC
 {:toc}
 
-容器的一个诉求：To make a VM mobile you want to be able to move it's physical location without changing it's apparent network location.
+[一文理解 K8s 容器网络虚拟化](https://mp.weixin.qq.com/s/rVf2_0yefEgAyLgJgq5-kw)
 
+容器的一个诉求：To make a VM mobile you want to be able to move it's physical location without changing it's apparent network location.
 |网络方案|网络上跑的什么包|辅助机制|优缺点|
 |---|---|---|---|
 |基于docker单机|NAT包/目的ip变为物理机|

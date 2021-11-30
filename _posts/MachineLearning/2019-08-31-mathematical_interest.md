@@ -131,8 +131,6 @@ $$\frac{d_f}{d_z}=3z^2$$
 
    $$MSE(\theta)=MSE(X,h_\theta)=\frac{1}{m}\sum\_{i=1}^m(\theta^T.x^i-y^i)^2$$
     
-    
-
 3. 指数损失函数
 4. Hinge损失函数
 5. 0-1损失函数
@@ -145,6 +143,7 @@ $$\frac{d_f}{d_z}=3z^2$$
 https://zhuanlan.zhihu.com/p/46928319
 
 [对线性回归，logistic回归和一般回归的认识](https://www.cnblogs.com/jerrylead/archive/2011/03/05/1971867.html)
+[深度学习领域最常用的10个激活函数，一文详解数学原理及优缺点](https://mp.weixin.qq.com/s/bleTRzA_1X3umR5UXSpuHg)
 
 ## 从自动微分法来理解线性回归
 

@@ -4,7 +4,7 @@ layout: post
 title: 虚拟网络
 category: 技术
 tags: Network
-keywords: Docker
+keywords: virtual network
 
 ---
 
@@ -14,7 +14,9 @@ keywords: Docker
 * TOC
 {:toc}
 
-建议看下前文 [程序猿视角看网络](http://qiankunli.github.io/2018/03/08/network.html)
+[一文理解 K8s 容器网络虚拟化](https://mp.weixin.qq.com/s/rVf2_0yefEgAyLgJgq5-kw)网络虚拟化作为 SDN（Software Defined Network，软件定义网络）的一种实现，无非就是虚拟出 vNIC（虚拟网卡）、vSwitch（虚拟交换机）、vRouter（虚拟路由器）等设备，配置相应的数据包流转规则而已。其对外的接口必然也是符合其所在的物理网络协议规范的，比如 Ethernet 和 TCP/IP 协议族。
+
+![](/public/upload/network/virtual_network_overview.png)
 
 不仅数据协议上要有相关字段的体现，操作系统（具体说是网络驱动）和交换机也都要一定的配合。
 
@@ -24,7 +26,7 @@ keywords: Docker
 2. 默认情况下，network namespace 是不能和主机网络，或者其他 network namespace 通信的。可以使用 Linux 提供的veth pair来完成通信，veth pair你可以理解为使用网线连接好的两个接口，把两个端口放到两个namespace中，那么这两个namespace就能打通。
 3. 虽然veth pair可以实现两个 Network Namespace 之间的通信，但 veth pair 有一个明显的缺陷，就是只能实现两个网络接口之间的通信。如果多个network namespace需要进行通信，则需要借助bridge。
 
-将vlan 理解为网络协议的多路复用，vxlan 理解为mesh，网络路由、交换设备理解为支持某种协议的进程，feel 会很不一样。
+将vlan 理解为网络协议的多路复用，vxlan 理解为mesh，网络路由、交换设备理解为支持某种协议的进程，feel 会很不一样。
 
 ## vlan
 
@@ -246,7 +248,6 @@ static int veth_forward_skb(struct net_device *dev, struct sk_buff *skb,
 ![](/public/upload/network/bridge_tun.png)
 
 ![](/public/upload/network/bridge_veth.png)
-
 
 [Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)In linux bridge implementation, VMs or Containers will connect to bridge and bridge will connect to outside world. For external connectivity, we would need to use NAT. container 光靠 bridge 无法直接访问外网。
 

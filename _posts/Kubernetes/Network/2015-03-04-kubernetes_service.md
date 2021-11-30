@@ -12,6 +12,8 @@ keywords: Kubernetes Service
 * TOC
 {:toc}
 
+
+
 [服务发现技术选型那点事儿](https://mp.weixin.qq.com/s/boh5smQ6ApTwScKYyhuD-Q)常规的“服务发现”是“客户端的服务发现（client-side service discovery）”，假设订单系统运行在四个节点上，每个节点有不同的 IP 地址，那我们的调用者在发起 RPC 或者 HTTP 请求前，是必须要清楚到底要调用个节点的。在微服务世界，我们很希望每个服务都是独立且完整的，就像面向对象编程一样，细节应该被隐藏到模块内部。比如对于一个订单服务，在外来看它就应该是“一个服务”，它内部的几个节点是否可用并不是调用者需要关心的，这些细节我们并不想关心。按照这种想法，服务端的服务发现（server-side serivce discovery）会更具有优势，其实我们对这种模式并不陌生，在使用 NGINX 进行负载均衡的代理时，我们就在实践这种模式，一旦流量到了 proxy，由 proxy 决定下发至哪个节点，而 proxy 可以通过 healthcheck 来判断哪个节点是否健康。
 
 [深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)在 kubernetes 中，您可以将应用程序定义为 Service。Service 是一种抽象，它定义了一组 Pods 的逻辑集和访问它们的策略。
@@ -26,9 +28,7 @@ keywords: Kubernetes Service
 
 Kubernetes 之所以需要 Service，一方面是因为 Pod 的 IP 不是固定的，另一方面则是因为一组 Pod 实例之间总会有负载均衡的需求。
 
-不管是 iptables 还是 ipvs 转发模式，Kubernetes 中访问 Service 都会进行 DNAT，将原本访问 `ClusterIP:Port`的数据包 DNAT 成 Service 的某个 Endpoint (`PodIP:Port`)，然后内核将连接信息插入 conntrack 表以记录连接，目的端回包的时候内核从 conntrack 表匹配连接并反向 NAT，这样原路返回形成一个完整的连接链路。
-
-kube-proxy运行在所有节点上，iptables模式（1.2）下的kube-proxy核心功能：通过API Server的Watch接口实时跟踪Service与Endpoint的变更信息，并更新对应的iptables规则，Client的请求流量则通过iptables的NAT机制“直接路由”到目标Pod。
+一句话概括 Service 的原理就是：**Service = kube-proxy + iptables 规则**。当一个 Service 创建时，K8s 会为其分配一个 Cluster IP 地址。这个地址其实是个 VIP，并没有一个真实的网络对象存在。这个 IP 只会存在于 iptables 规则里，对这个 VIP:VPort 的访问使用 iptables 的随机模式规则指向了一个或者多个真实存在的 Pod 地址（DNAT，将原本访问 `ClusterIP:Port`的数据包 DNAT 成 Service 的某个 Endpoint (`PodIP:Port`)，然后内核将连接信息插入 conntrack 表以记录连接，目的端回包的时候内核从 conntrack 表匹配连接并反向 NAT，这样原路返回形成一个完整的连接链路），这个是 Service 最基本的工作原理。那 kube-proxy 做什么？kube-proxy 监听 Pod 的变化，负责在宿主机上生成这些 NAT 规则。这个模式下 kube-proxy 不转发流量，kube-proxy 只是负责疏通管道。
 
 ### How do they work?——基于iptables实现
 
@@ -124,9 +124,7 @@ iptables与IPVS都是基于Netfilter实现的，但因为定位不同，二者�
 
 ## Service 的特别形式
 
-在yaml 配置层面 LoadBalancer/NodePort/ExternalName 的kind 都是 Service
-
-K8S 中定义了 4种 Service 类型:
+iptables 和 ipvs 只是解决了负载均衡的问题，还没提到**服务透出**。K8s 服务透出的方式主要有 NodePort、LoadBalancer 类型的 Service。K8S 中定义了 4种 Service 类型:
 1. ClusterIP: 通过 VIP 访问 Service，但该 VIP 只能在此集群内访问
 2. NodePort: 通过 NodeIP:NodePort 访问 Service，这意味着该端口将保留在集群内的所有节点上
 3. ExternalIP: 与 ClusterIP 相同，但是这个 VIP 可以从这个集群之外访问

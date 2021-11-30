@@ -15,8 +15,10 @@ keywords:  pytorch distributed elastic 弹性
 
 ## 弹性分布式训练 
 
+
+
 关键就是
-1. pytorch 层面，启动的时候，参与训练的 节点数不确定了，rank=0也不确定了。要能支持 互相发现worker（依赖注册中心） 以及协商各自的rank
+1. pytorch 层面，启动的时候，参与训练的 节点数不确定了，rank=0也不确定了。要能支持 互相发现worker（依赖注册中心） 以及协商各自的rank。 训练job 的每个worker 本质是相互协作的（尤其用了allreduce 来交换梯度），这个跟一般微服务多实例 仅仅是分担一下流量区别很大。扩缩容意味着 所有worker 都要重启。
 2. 资源调度层面，为pytorch 启动pod 时，要提供注册中心地址信息。
 3. 代码层面 要能随时 save 和load checkpoint，训练过程中，可能会有新的节点 或节点挂掉，要能容错，继续训练。
 

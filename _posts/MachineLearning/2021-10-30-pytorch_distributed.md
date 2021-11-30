@@ -234,7 +234,7 @@ class Module:
 2. Constuctor
     1. rank=0 进程会引用本地模块，把模型state_dict()参数广播到所有进程之中，这样可以保证所有进程使用同样初始化数值和模型副本进行训练。
     2. 每个 DDP 进程创建一个 local Reducer，为了提高通信效率，Reducer将参数梯度组织成桶，一次reduce一个桶。Reducer还在构造期间注册 autograd 钩子，每个参数一个钩子。当梯度准备好时，将在向后传递期间触发这些钩子。
-3. Forward Pass:
+3. Forward Pass: [[源码解析] PyTorch 分布式(12)-----DistributedDataParallel 之 前向传播](https://mp.weixin.qq.com/s/vr0OuN-ADSVrmaOEFUOQKA)
     1. 每个进程读去自己的训练数据，DistributedSampler确保每个进程读到的数据不同。
     2. DDP 获取输入并将其传递给本地模型。模型进行前向计算，结果设置为 out。模型网络输出不需要gather到 rank 0进程了，这与 DP不同。
 4. Backward Pass:

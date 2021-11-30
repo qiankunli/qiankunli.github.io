@@ -59,7 +59,7 @@ ip link add link DEVICE [ name ] NAME
 
 ## iptables
 
-[从零认识 iptables](https://mp.weixin.qq.com/s/pdX5z5LL-wHGhkqLavMW5w)iptables 并不是也不依赖于守护进程，它只是利用Linux内核提供的功能。
+[从零认识 iptables](https://mp.weixin.qq.com/s/pdX5z5LL-wHGhkqLavMW5w)iptables 并不是也不依赖于守护进程，它只是利用Linux内核提供的功能。iptables 所能做的不仅仅是对包的过滤（Filter Table），还支持对包进行网络地址转换（NAT Table）以及修改包的字段（Mangle Table）。
 
 ### netfilter 
 
