@@ -77,6 +77,9 @@ keywords: Product thinking
 3. 行动后发现，全量的客户有限，根本没有增量空间，这就是没有价值
 4. 时机不对，比如手机处理视频特效的功能，提出这个想法的时候，当时的手机配置还不足以支撑这个功能。
 
+《邱岳的产品实践》在设计最小可用产品（MVP）之前，一定要想清楚自己想验证的问题，要收集哪些数据项，还有这些数据项可能出现的结果，以及不同结果代表的结论。这个事情有点像软件工程中的 TDD（测试驱动开发），先把想要得到的结果列出来，再反推设计，以免设计逻辑不清楚，或者漏掉数据打点，反倒浪费了资源。比如我前面举的那个数据分析功能，我也是在推演的时候才发现需要多做一些数据功能，否则如果功能本身太简陋导致使用率高留存低的情况，就会难以辨别哪里出了问题。
+
+
 ## 产品哲学
 
 [阿里巴巴资深技术专家无相：我们能从 InteliJ IDEA 中学到什么？](https://mp.weixin.qq.com/s/4MzUns7TW8Rtej1_hjqaZw) Every aspect of IntelliJ IDEA is designed with ergonomics in mind. IntelliJ IDEA is built around the idea that every minute a developer spends in the flow is a good minute, and things that break developers out of flow are bad things. Every design and implementation decision considers the possibility of interrupting developer’s flow and seeks to eliminate or minimize it. “Creative Flow” or just “Flow” is a state of mind where you feel evenly attuned, and focused on the task at hand. 当用户使用你的产品时，尽量减少中断用户使用的东西，使其沉浸其中。比如我比较喜欢idea的一点是，idea 直接集成了命令行
