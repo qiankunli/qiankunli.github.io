@@ -18,7 +18,9 @@ keywords:  pytorch distributed
 ![](/public/upload/machine/data_parallel_train.png)
 
 [DDP系列第一篇：入门教程](https://zhuanlan.zhihu.com/p/178402798)多机多卡 
-1. 分布式训练的几个选择：模型并行 vs 数据并行，PS 模型 vs Ring-Allreduce ，pytorch 单机多卡（DP）用PS 模型，多机多卡（DDP）用Ring-Allreduce
+1. 分布式训练的几个选择：
+    1. 模型并行 vs 数据并行
+    2. PS 模型 vs Ring-Allreduce 。 Allreduce operation can not start until all processes join, it is considered to be a synchronized communication, as opposed to the P2P communication used in parameter servers. 
 2. 假设 有两台机子，每台8张显卡，那就是2x8=16个进程，并行数是16。DDP 推荐每个进程一张卡，在16张显卡，16的并行数下，DDP会同时启动16个进程。rank表示当前进程的序号（0~16），用于进程间通讯。local_rank 表示每台机子上的进程的序号（0~7），**也用来指定机器上的gpu 序号**。用起来 就是一行代码，`model = DDP(model, device_ids=[local_rank], output_device=local_rank)`，**后续的模型关于前向传播、后向传播的用法，和单机单卡完全一致**。[DDP系列第二篇：实现原理与源代码解析](https://zhuanlan.zhihu.com/p/187610959)
 3. 每个进程跑的是同一份代码，进程从外界（比如环境变量）获取 rank/master_addr/master_port 等参数，rank = 0 的进程为 master 进程
 
@@ -81,10 +83,11 @@ if __name__ == "__main__":
 
 ## 分布式训练
 
+pytorch ddp论文：During distributed training, each pro- cess has its own local model replica and local optimizer. In terms of correctness, distributed data parallel training and local training must be mathematically equivalent. DDP guarantees the correctness by making sure that all model replicas start from the exact same model state, and see the same parameter gradients after every backward pass. Therefore, even though optimizers from different processes are all independent, they should be able to bring their local model replicas to the same state at the end of every iteration. 
+
 [ PyTorch 分布式(5) ------ DistributedDataParallel 总述&如何使用](https://mp.weixin.qq.com/s/WdLpHfWLRvDLLxeanFduxA)
 
 ![](/public/upload/machine/data_distributed_parallel.png)
-
 
 1. 加载模型阶段。每个GPU都拥有模型的一个副本，所以不需要拷贝模型。rank为0的进程会将网络初始化参数broadcast到其它每个进程中，确保每个进程中的模型都拥有一样的初始化值。
 2. 加载数据阶段。**DDP 不需要广播数据，而是使用多进程并行加载数据**。在 host 之上，每个worker进程都会把自己负责的数据从硬盘加载到 page-locked memory。DistributedSampler 保证每个进程加载到的数据是彼此不重叠的。
@@ -199,7 +202,9 @@ if __name__ == "__main__":
 
 ## DDP 总体实现
 
-本地模型 Module 定义如下，经过 DDP 的封装，便成为一个有分布式能力的模型了。
+DDP implementation lives in both Python and C++ files, with Python exposing the API and composing non-performance-critical components, and C++ serving the core gradient reduction algorithm. The Python API calls into C++ core through Pybind11.  
+
+本地模型 Module 定义如下，经过 DDP 的封装，便成为一个有分布式能力的Module了。
 
 ```python
 class Module:
@@ -215,7 +220,7 @@ class Module:
         torch._C._log_api_usage_once("python.nn_module")
         self.training = True
         self._parameters = OrderedDict()            # 在训练过程中会随着 BP 而更新的参数
-        self._buffers = OrderedDict()               # 在训练过程中不会随着 BP 而更新的参数
+        self._buffers = OrderedDict()               # 在训练过程中不会随着 BP 而更新的参数, running variance,running mean etc
         self._non_persistent_buffers_set = set()
         self._backward_hooks = OrderedDict()
         self._is_full_backward_hook = None
@@ -262,6 +267,12 @@ self.module.state_dict() = {OrderedDict: 4}
 ```
 
 ## ProcessGroup
+
+有一个专门的名词叫 Collective communication,  including multicast and reduction communications.
+1. data movement
+2. collective computation and synchronisation, For example, the often used MPI barrier (comm.barrier()) makes every task hold until all tasks in the communicator comm have called it.
+
+多个process 组成一个process_group，比如每个group 持有一个tensor，想计算tensor的和，可以借助p2p先汇总到一个 process 上求和再广播（如果tensor很大呢？），但其实可以边communication边computation，来挖掘性能和节约带宽。
 
 [PyTorch 分布式(7) ----- DistributedDataParallel 之进程组](https://mp.weixin.qq.com/s/XPzLC7nuXDkQKtmZgTFalQ)
 

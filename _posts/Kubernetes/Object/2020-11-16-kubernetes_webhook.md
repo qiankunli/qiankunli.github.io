@@ -4,7 +4,7 @@ layout: post
 title: Kubernetes webhook
 category: 架构
 tags: Kubernetes
-keywords:  Kubernetes event
+keywords:  Kubernetes webhook
 
 ---
 

@@ -125,7 +125,7 @@ type Request interface {
 
 这个阶段面对的输入是http request context中的各种属性，包括：user、group、request path（比如：/api/v1、/healthz、/version等）、request verb(比如：get、list、create等)。APIServer会将这些属性值与事先配置好的访问策略(access policy）相比较。APIServer支持多种authorization mode，包括AlwaysAllow、AlwaysDeny、ABAC、RBAC和Webhook。APIServer启动时，可以指定一种或多种authorization mode，和认证一样，只要有一种鉴权模块通过，即可返回资源。
 
-1. RBAC， Kubernetes提供ClusterRole、Role资源，分别对应集群维度、Namespace维度角色权限管控，用户可以自定义相应的ClusterRole、Role资源，绑定到已经认证的User之上。下例中 通过认证模块到达授权模块的requestInfo中userInfo信息是alex的请求，在授权模块中走到RBAC授权模块时，则会进行查询集群的ClusterRole/ClusterRoleBinding信息。进行判断是否拥有context相应操作的权限。
+1. RBAC， Kubernetes提供ClusterRole、Role资源，分别对应集群维度、Namespace维度角色权限管控，用户可以自定义相应的ClusterRole、Role资源，绑定到已经认证的User之上。下例中 通过认证模块到达授权模块的requestInfo中userInfo信息是alex的请求，在授权模块中走到RBAC授权模块时，则会进行查询集群的Role/RoleBinding、ClusterRole/ClusterRoleBinding信息。进行判断是否拥有context相应操作的权限。
 
     ```yaml
     apiVersion: rbac.authorization.k8s.io/v1
