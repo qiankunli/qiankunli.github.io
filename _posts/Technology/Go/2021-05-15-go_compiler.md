@@ -114,6 +114,17 @@ func main() {
 
 1. 在函数返回、产生恐慌或者 runtime.Goexit 时被调用
 2. 直觉上看， defer 应该由编译器直接将需要的函数调用插入到该调用的地方，似乎是一个编译期特性， 不应该存在运行时性能问题。但实际情况是，由于 defer 并没有与其依赖资源挂钩，也允许在条件、循环语句中出现，**无法在编译期决定存在多少个 defer 调用**。
+
+defer 使用的几个注意事项
+1. 对于有返回值的自定义函数或方法，返回值会在 deferred 函数被调度执行的时候被自动丢弃。
+2. Go 语言中除了自定义函数 / 方法，还有 Go 语言内置的 / 预定义的函数。append、cap、len、make、new、imag 等内置函数都是不能直接作为 deferred 函数的，而 close、copy、delete、print、recover 等内置函数则可以直接被 defer 设置为 deferred 函数。对于那些不能直接作为 deferred 函数的内置函数，我们可以使用一个包裹它的匿名函数来间接满足要求，以 append 为例是这样的：
+	```go
+	defer func() {
+	_ = append(sl, 11)
+	}()
+	```
+3. defer 关键字后面的表达式，是在将 deferred 函数注册到 deferred 函数栈的时候进行求值的。
+
 三种实现方案
 
 
@@ -227,6 +238,13 @@ $ go run main.go
 ```
 
 ## panic /recover
+
+panic 指的是 Go 程序在运行时出现的一个异常情况。如果异常出现了，但没有被捕获并恢复，Go 程序的执行就会被终止，即便出现异常的位置不在主 Goroutine 中也会这样。在 Go 中，panic 主要有两类来源，一类是来自 Go 运行时，另一类则是 Go 开发人员通过 panic 函数主动触发的。无论是哪种，一旦 panic 被触发，后续 Go 程序的执行过程都是一样的，这个过程被 Go 语言称为 panicking。
+
+recover 是 Go 内置的专门用于恢复 panic 的函数，它必须被放在一个 defer 函数中才能生效。如果 recover 捕捉到 panic，它就会返回以 panic 的具体内容为错误上下文信息的error值。如果没有 panic 发生，那么 recover 将返回 nil。而且，如果 panic 被 recover 捕捉到，panic 引发的 panicking 过程就会停止。
+
+Java 中对checked exception处理的本质是错误处理，虽然它的名字用了带有“异常”的字样。Go 中的 panic 呢，更接近于 Java 的RuntimeException+Error。
+
 [Go 的 panic 的秘密都在这](https://mp.weixin.qq.com/s/pxWf762ODDkcYO-xCGMm2g)
 ```go
 func main() {
@@ -310,18 +328,3 @@ func gopanic(e interface{}) {
 
 首先是确定 panic 是否可恢复（一系列条件），对可恢复panic，创建一个 _panic 实例，保存在 goroutine 链表中先前的 panic 链表，接下来开始逐一调用当前 goroutine 的 defer 方法， 检查用户态代码是否需要对 panic 进行恢复，如果某个包含了 recover 的调用（即 gorecover 调用）被执行，这时 _panic 实例 p.recovered 会被标记为 true， 从而会通过 mcall 的方式来执行 recovery 函数来重新进入调度循环，如果所有的 defer 都没有指明显式的 recover，那么这时候则直接在运行时抛出 panic 信息
 
-## error
-
-「错误」一词在不同编程语言中存在着不同的理解和诠释。 在 Go 语言里，错误被视普普通通的 —— 值。PS： 不像java 单独把Exception 拎出来说事儿。错误 error 在 Go 中表现为一个内建的接口类型，任何实现了 Error() string 方法的类型都能作为 error 类型进行传递，成为错误值：
-
-```go
-type error interface {
-	Error() string
-}
-```
-
-常见的策略包含哨兵错误、自定义错误以及隐式错误三种。
-
-1. 哨兵错误，通过特定值表示成功和不同错误，依靠调用方对错误进行检查`if err === ErrSomething { return errors.New("EOF") }`，这种错误处理的方式引入了上下层代码的依赖，如果被调用方的错误类型发生了变化， 则调用方也需要对代码进行修改。为了安全起见，变量错误类型可以修改为常量错误
-2. 自定义错误，`if err, ok := err.(SomeErrorType); ok { ... }`， 这类错误处理的方式通过自定义的错误类型来表示特定的错误，同样依赖上层代码对错误值进行检查， 不同的是需要使用类型断言进行检查。好处在于，可以将错误包装起来，提供更多的上下文信息， 但错误的实现方必须向上层公开实现的错误类型，不可避免的同样需要产生依赖关系。
-3. 隐式错误，`if err != nil { return err }`，直接返回错误的任何细节，直接将错误进一步报告给上层。这种情况下， 错误在当前调用方这里完全没有进行任何加工，与没有进行处理几乎是等价的， 这会产生的一个致命问题在于：丢失调用的上下文信息，如果某个错误连续向上层传播了多次， 那么上层代码可能在输出某个错误时，根本无法判断该错误的错误信息究竟从哪儿传播而来。 

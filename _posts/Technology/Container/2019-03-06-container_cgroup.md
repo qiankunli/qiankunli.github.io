@@ -99,6 +99,8 @@ NICE_0_LOAD = 1024
 
 具体逻辑比较复杂，有兴趣可以看[CPU bandwidth control for CFS](https://storage.googleapis.com/pub-tools-public-publication-data/pdf/36669.pdf)
 
+[崩溃，K8s 使用 CPU Limit 后，服务响应变成龟速...](https://mp.weixin.qq.com/s/QYJycJCaxB42xdEo3qHHHA)
+
 ## 容器 与 CFS
 
 `/sys/fs/cgroup/cpu`
@@ -155,6 +157,8 @@ cpu requests and cpu limits are implemented using two separate control systems.*
 |---|---|---|
 |request=50m|cpu-shares=51|cpu.shares|
 |limit=100m|cpu-period=100000,cpu-quota=10000|cpu.cfs_period_us,cpu.cfs_quota_us|
+
+[深入理解 Kubernetes CPU Mangager](https://cloud.tencent.com/developer/article/1402119)
 
 ### request
 
