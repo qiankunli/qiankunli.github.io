@@ -347,6 +347,8 @@ class GenericService {
 
 ### 服务编排
 
+[开源微服务编排框架：Netflix Conductor](https://mp.weixin.qq.com/s/N8kUNMsvZ5db5BC7jGivAQ)
+
 [从MVC到云原生：CBU研发体系演进之路](https://mp.weixin.qq.com/s/lntc_7Ip-3GX1RhOW_fUqA)
 
 [SOFAArk Project](https://github.com/sofastack/sofa-ark)

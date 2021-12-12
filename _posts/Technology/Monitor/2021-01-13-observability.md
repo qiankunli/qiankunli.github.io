@@ -141,6 +141,8 @@ devops基本理念：
     3. 灵活的权限分配方式。
     4. 丰富的可扩展能力。基于钉钉建设的 ChatOps 能力
 
+[从 “香农熵” 到 “告警降噪” ，如何提升告警精度？](https://mp.weixin.qq.com/s/lP03aES69hySgRACNU_azA)
+
 ## trace
 
 [分布式链路跟踪中的traceid和spanid代表什么？](https://mp.weixin.qq.com/s/eKbFYwnH4vwgWm6_5sWs3w)在分布式链路跟踪中有两个重要的概念：跟踪（trace）和 跨度（ span）。trace 是请求在分布式系统中的整个链路视图，span 则代表整个链路中不同服务内部的视图，span 组合在一起就是整个 trace 的视图。

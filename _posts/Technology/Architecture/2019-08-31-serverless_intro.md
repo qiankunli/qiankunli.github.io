@@ -159,6 +159,8 @@ FaaS 与应用托管 PaaS（**应用托管平台**） 平台对比，**最大的
 
 关于 FaaS 的 3 层结构，你可以这么想象：容器层就像是 Windows 操作系统；Runtime 就像是 Windows 里面的播放器暴风影音；你的代码就像是放在 U 盘里的电影。
 
+[阿里云 FaaS 架构设计与创新实践](https://mp.weixin.qq.com/s/MQzdC1UT5w42oHYY4TwYEQ) 未读
+
 ## 其它
 
 Serverless 架构和之前的架构相比，最大的差异是：业务服务不再是固定的常驻进程，而是真正按需启动和关闭的服务实例。
