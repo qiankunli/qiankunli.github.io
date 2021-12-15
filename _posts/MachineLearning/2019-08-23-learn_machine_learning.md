@@ -112,7 +112,7 @@ keywords: 深度学习
 
 最终目标就是，缩短算法工程师训练一个模型的时间。
 
-
+[淘系端智能技术体系概述](https://mp.weixin.qq.com/s/GhS88dAjlIJFmrfrRv7vzw)
 ## 自动编码器
 
 如何学习特征，用到了自编码器。参考文章

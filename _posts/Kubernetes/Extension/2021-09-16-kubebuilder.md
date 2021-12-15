@@ -25,12 +25,29 @@ Kubernetes 这样的分布式操作系统对外提供服务是通过 API 的形�
 
 ## 从 code-generator开始
 
-client-go 只提供了rest api和 dynamic client来操作第三方资源，需要自己实现反序列化等功能（client-go内置informer 只针对k8s 内置object）。**建立好自己的crd struct后**（在types.go中），code-generator提供了以下工具为kubernetes中的资源生成代码:
+client-go 只提供了rest api和 dynamic client来操作第三方资源，需要自己实现反序列化等功能（client-go内置informer 只针对k8s 内置object）。**建立好自己的crd struct后**（在types.go中），code-generator提供了以下工具为kubernetes中的资源生成代码（还有一些未列出）:
 1. deepcopy-gen: 生成深度拷贝方法,避免性能开销
 2. client-gen: 为资源生成标准的操作方法(get,list,create,update,patch,delete,deleteCollection,watch)
 3. informer-gen: 生成informer,提供事件机制来相应kubernetes的event
 4. lister-gen: 为get和list方法提供只读缓存层
-code-generator还专门整合了这些gen,形成了generate-groups.sh和generate-internal-groups.sh这两个脚本.
+5. conversion-gen是用于自动生成在内部和外部类型之间转换的函数的工具
+6. defaulter-gen 用于生产Defaulter函数
+7. openapi-gen  生成openAPI定义
+code-generator还专门整合了这些gen，形成了generate-groups.sh和generate-internal-groups.sh这两个脚本。 PS：原来client/informer/lister 这些代码都是自动生成的
+
+一般带有crd 项目会有 hack 目录 包含 update-codegen.sh  脚本文件（执行code-generator）
+
+```
+crd-project
+    /hack
+        /update-codegen.sh  
+    /pkg
+        /apis/xx/v1
+            /types.go
+            /zz_generated.deepcopy.go
+            /zz_generated.defaults.go
+```
+
 
 ## 和controller-runtime 的关系
 

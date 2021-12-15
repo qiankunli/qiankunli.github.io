@@ -21,6 +21,8 @@ keywords: system design principle
 
 系统已经平稳运行了一段时间，来了一个新需求，有点别扭但加点ifelse 也能支持， 这个时候是“兼容” 还是“重新设计”？ 我倾向于重新设计，即：假设系统一行代码都没写，基于已有的经验和新需求，重新构思系统的设计，使系统尽量保持在理想状态。不断调整 系统的高层概念，这样做的一个基本假设是：以对系统高层抽象的冲击来说， 量变的需求比质变的需求要多。 
 
+![](/public/upload/practice/business_develop.png)
+
 ## KISS（Keep It Simple, Stupid）
 
 |参与系统建设的相关角色|描述|如何看待Simple和 Stupid|

@@ -13,6 +13,8 @@ keywords: container network
 * TOC
 {:toc}
 
+[调试Kubernetes集群中的网络停顿问题](https://mp.weixin.qq.com/s/u5aEQhZTDtLrVdC8AO_ogQ)顶级文章，建议多次拜读。
+
 [一文理解 K8s 容器网络虚拟化](https://mp.weixin.qq.com/s/rVf2_0yefEgAyLgJgq5-kw)
 
 容器的一个诉求：To make a VM mobile you want to be able to move it's physical location without changing it's apparent network location.

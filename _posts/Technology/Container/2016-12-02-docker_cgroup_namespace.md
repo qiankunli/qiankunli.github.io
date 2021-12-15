@@ -117,6 +117,8 @@ network namespace 倒是没有根， 但docker 创建 veth pair，root namespace
 
 ## cgroups
 
+[彻底搞懂容器技术的基石： cgroup](https://mp.weixin.qq.com/s/6Ts6-aZDr8qOdnaNUqwTFQ)
+
 ### V1 和 V2
 
 ![](/public/upload/container/cgroup_v1.jpeg)

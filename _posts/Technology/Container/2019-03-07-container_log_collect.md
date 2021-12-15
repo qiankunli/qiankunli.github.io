@@ -37,6 +37,7 @@ keywords: container log collect
 1. fluentd，CNCF社区
 2. filebeat，来自Elastic
 3. flume
+4. [阿里千万实例可观测采集器-iLogtail正式开源](https://mp.weixin.qq.com/s/hcCYBZ0qvs8q4Wp1zFt-lg)
 
 ## Stdout VS 文件
 

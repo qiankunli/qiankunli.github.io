@@ -101,6 +101,12 @@ NICE_0_LOAD = 1024
 
 [崩溃，K8s 使用 CPU Limit 后，服务响应变成龟速...](https://mp.weixin.qq.com/s/QYJycJCaxB42xdEo3qHHHA)
 
+[让容器跑得更快：CPU Burst 技术实践](https://mp.weixin.qq.com/s/UdiQbpJZWQzRC2EFk3G-PQ) Bandwidth Controller 适用于 CFS 任务，用 period 和 quota 管理 cgroup 的 CPU 时间消耗。若 cgroup 的 period 是 100ms quota 是 50ms，cgroup 的进程每 100ms 周期内最多使用 50ms CPU 时间。当 100ms 周期的 CPU 使用超过 50ms 时进程会被限流，cgroup 的 CPU 使用被限制到 50%。CPU 利用率是一段时间内 CPU 使用的平均，以较粗的粒度统计 CPU 的使用需求，CPU 利用率趋向稳定；当观察的粒度变细，CPU 使用的突发特征更明显。以 1s 粒度和 100ms 粒度同时观测容器负载运行，当观测粒度是 1s 时 CPU 利用率的秒级平均在 250% 左右，而在 Bandwidth Controller 工作的 100ms 级别观测 CPU 利用率的峰值已经突破 400% 。
+
+![](/public/upload/container/cpu_burst.png)
+
+我们用 CPU Burst 技术来满足这种细粒度 CPU 突发需求，在传统的 CPU Bandwidth Controller quota 和 period 基础上引入 burst 的概念。当容器的 CPU 使用低于 quota 时，可用于突发的 burst 资源累积下来；当容器的 CPU 使用超过 quota，允许使用累积的 burst 资源。最终达到的效果是将容器更长时间的平均 CPU 消耗限制在 quota 范围内，允许短时间内的 CPU 使用超过其 quota。如果用 Bandwidth Controller 算法来管理休假，假期管理的周期（period）是一年，一年里假期的额度是 quota ，有了 CPU Burst 技术之后今年修不完的假期可以放到以后来休了。
+
 ## 容器 与 CFS
 
 `/sys/fs/cgroup/cpu`
