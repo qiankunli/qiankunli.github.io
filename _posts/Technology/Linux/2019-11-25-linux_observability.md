@@ -77,7 +77,26 @@ CPU 使用率是单位时间内 CPU 繁忙程度的统计。而平均负载不�
 
 Linux**Load Average= 可运行队列进程平均数 + 休眠队列中不可打断的进程平均数**
 
+[一文说清linux system load](https://mp.weixin.qq.com/s/DQrsdroZUAFvtZ9bdPiPTA)load衡量的是task（linux 内核中用于描述一个进程或者线程）对系统的需求（CPU、内存、IO等等），system load average由内核负载计算并记录在/proc/loadavg 文件中， 用户态的工具（比如uptime，top等等）读的都是这个文件。内核是怎么计算load average的？ 指数加权移动平均法：`a1 = a0 * factor + a * (1 - factor)`，其中a0是上一时刻的值，a1是当前时刻的值，factor是一个系数，取值范围是`[0,1]`，a是当前时刻的某个指标采样值。
+
+我们一般认为：
+
+1. 如果load接近0，意味着系统处于空闲状态；
+2. 如果 1min 平均值高于 5min 或 15min 平均值，则负载正在增加；
+3. 如果 1min 平均值低于 5min 或 15min 平均值，则负载正在减少；
+4. 如果它们高于系统 CPU 的数量，那么系统很可能遇到了性能问题（视情况而定）。
+
 ### 如何排查用户态 CPU 使用率高？
+
+[一文说清linux system load](https://mp.weixin.qq.com/s/DQrsdroZUAFvtZ9bdPiPTA)导致load 飙高的原因，说简单也简单，无非就是runnable 或者 uninterruptible 的task 增多了。但是说复杂也复杂，因为导致task进入uninterruptible状态的路径非常多（粗略统计，可能有400-500条路径）。PS：
+1. 周期性飙高
+2.  IO原因
+3. 内存原因，比如task 在申请内存的时候，可能会触发内存回收，如果触发的是直接内存回收，那对性能的伤害很大。
+3. 锁，比如采用mutex_lock进行并发控制的路径上，一旦有task 拿着lock 不释放，其他的task 就会以TASK_UNINTERRUPTIBLE的状态等待，也会引起load飙高。
+5. user CPU，有些情况下load飙高是业务的正常表现，此时一般表现为user cpu 飙高
+
+迟分析需要深入内核内部，在内核路径上埋点取数。所以这类工具的本质是内核probe，包括systemtap，kprobe，ebpf等等。但是probe 技术必须结合知识和经验才能打造成一个实用的工具。**阿里自研的ali-diagnose可以进行各种delay分析**，irq_delay, sys_delay, sched_delay, io_delay, load-monitor。
+
 
 如果想定位消耗 CPU 最多的 Java 代码，可以遵循如下思路：
 

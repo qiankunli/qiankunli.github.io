@@ -68,10 +68,22 @@ func xx(p interface){
 }
 ```
 
-## 值接收者和指针接收者
+## 方法接收者
+
+### 接收者的本质
 
 方法带不带指针：`(p *Person)` refers to a pointer to the created instance of the Person struct. it is like using the keyword `this` in Java or `self` in Python when referring to the pointing object.
-`(p Person)` is a copy of the value of Person ia passed to the function. any change that you make in  p if you pass it by value won't be reflected in source `p`.
+`(p Person)` is a copy of the value of Person ia passed to the function. any change that you make in  p if you pass it by value won't be reflected in source `p`. C++ 中的对象在调用方法时，编译器会自动传入指向对象自身的 this 指针作为方法的第一个参数。Go 语言中的方法的本质就是，**一个以方法的 receiver 参数作为第一个参数的普通函数**。这种等价转换是由 Go 编译器在编译和生成代码时自动完成的。
+
+在一些框架代码中，会将指针接收者命名为 this，很有感觉
+
+```go
+func (this *Person)GetFullName() string{
+    return fmt.Println("%s %s",this.Name,this.Surname)
+}
+```
+
+### 值接收者和指针接收者
 
 结构体方法是要将接收器定义成值，还是指针。**这本质上与函数参数应该是值还是指针是同一个问题**。
 ```go
@@ -96,17 +108,9 @@ func GetFullName(p Person) string{
 1. 如果类型具备“原始的本质”，也就是说它的成员都是由 Go 语言里内置的原始类型，如字符串，整型值等，那就定义值接收者类型的方法。像内置的引用类型，如 slice，map，interface，channel，这些类型比较特殊，声明他们的时候，实际上是创建了一个 header， 对于他们也是直接定义值接收者类型的方法。这样，调用函数时，是直接 copy 了这些类型的 header，而 header 本身就是为复制设计的。
 2. 如果类型具备非原始的本质，不能被安全地复制，这种类型总是应该被共享，那就定义指针接收者的方法。比如 go 源码里的文件结构体（struct File）就不应该被复制，应该只有一份实体。
 
-在一些框架代码中，会将指针接收者命名为 this，很有感觉
 
-```go
-func (this *Person)GetFullName() string{
-    return fmt.Println("%s %s",this.Name,this.Surname)
-}
-```
 
-[从栈上理解 Go 语言函数调用](https://mp.weixin.qq.com/s/-xn2i2depcN4uWT3wV63Pw)
-1. 调用者 caller 会将参数值写入到栈上，调用函数 callee 实际上操作的是调用者 caller 栈帧上的参数值。
-2. 在进行调用指针接收者(pointer receiver)方法调用的时候，实际上是先复制了结构体的指针到栈中，然后在方法调用中全都是基于指针的操作。
+
 
 ## interface 底层实现
 

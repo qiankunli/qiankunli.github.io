@@ -127,7 +127,8 @@ net = torch.nn.parallel.DistributedDataParallel(net)
     2. 这个调用是阻塞的，必须等待所有进程来同步，如果任何一个进程出错，就会失败。
 1. 数据侧，我们nn.utils.data.DistributedSampler来给各个进程切分数据，只需要在dataloader中使用这个sampler就好
     1. 使用 DDP 时，不再是从主 GPU 分发数据到其他 GPU 上，而是各 GPU 从自己的硬盘上读取属于自己的那份数据。
-    1. 训练循环过程的每个epoch开始时调用train_sampler.set_epoch(epoch)，（主要是为了保证每个epoch的划分是不同的）其它的训练代码都保持不变。
+    2. 训练循环过程的每个epoch开始时调用train_sampler.set_epoch(epoch)，（主要是为了保证每个epoch的划分是不同的）其它的训练代码都保持不变。
+    3. 举个例子：假设10w 数据，10个实例。单机训练任务一般采用batch 梯度下降，比如batch=100。分布式后，10个实例每个训练1w，这个时候每个实例 batch 是100 还是 10 呢？是100，batch 的大小取决于 每个实例 GPU 显存能放下多少数据。
 1. 模型侧，我们只需要用DistributedDataParallel包装一下原来的model
 
 pytorch 中的任何 net 都 是 `torch.nn.Module` 的子类，DistributedDataParallel 也是 `torch.nn.Module` 子类，任何 `torch.nn.Module` 子类 都可以覆盖 `__init__` 和  `forward`方法 ，DistributedDataParallel 可以从  net 拿到模型数据（以及 在哪个gpu 卡上运行） ，也可以 从指定或默认的 process_group 获取信息。最后在`__init__`  和 forward 中加入 同步梯度的逻辑，**完美的将 同步梯度的逻辑 隐藏了起来**。
