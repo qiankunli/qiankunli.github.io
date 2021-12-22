@@ -13,14 +13,22 @@ keywords:  pytorch distributed elastic 弹性
 * TOC
 {:toc}
 
+
+
 ## 弹性分布式训练 
 
+实现弹性训练需要面对哪些挑战和难点
+1. 需要一个节点/进程之间彼此发现的机制。
+2. 如何处理成员变更
+3. 如何捕获单个进程训练失败，如何在单个节点上管理所有训练进程。
+4. 如何与现有训练代码集成。
 
-
-关键就是
+从各个层面来划分
 1. pytorch 层面，启动的时候，参与训练的 节点数不确定了，rank=0也不确定了。要能支持 互相发现worker（依赖注册中心） 以及协商各自的rank。 训练job 的每个worker 本质是相互协作的（尤其用了allreduce 来交换梯度），这个跟一般微服务多实例 仅仅是分担一下流量区别很大。扩缩容意味着 所有worker 都要重启。
-2. 资源调度层面，为pytorch 启动pod 时，要提供注册中心地址信息。
+2. 资源调度层面，算力感知和动态训练扩缩容机制。为pytorch 启动pod 时，要提供注册中心地址信息。
 3. 代码层面 要能随时 save 和load checkpoint，训练过程中，可能会有新的节点 或节点挂掉，要能容错，继续训练。
+
+
 
 ## train_script 的守护者elastic agent
 
@@ -31,6 +39,14 @@ keywords:  pytorch distributed elastic 弹性
 elastic agent 是一个独立的进程，负责管理其下的 workers。它起到了类似进程管理系统 supervisor 的作用，会在启动的时候确保每个 worker 的启动参数（比如 WORLD_SIZE 和 RANK）正确，worker 的失效也是由 elastic agent 负责捕获处理。
 
 ![](/public/upload/machine/torchelastic_diagram.jpeg)
+
+[PyTorch 分布式之弹性训练(1) --- 总体思路](https://mp.weixin.qq.com/s/aKrdbvncrfxLMWoWTNqcDQ)PyTorch Elastic Trainer (PET) 提供了一个可以用容错和弹性方式跨集群来训练模型的框架。PS： 还与Horovod 进行了对比。
+1. PET 使用了一个名为elastic-agent的新进程，每个节点有一个独立的elastic-agent。每个代理进程只负责管理该节点的一组本地工作进程，并与本作业其他节点上的弹性代理一起协调来确定进程组成员身份的变化。
+2. 成员变更的处理方式如下：
+    1. 当一个工作进程失败时，管理它的弹性代理会杀死该节点上的所有worker，然后与其他代理建立一个集合操作（rendezvous），并使用新的集合信息来重启worker。
+    2. 当代理以非零错误代码退出时，应该由上层调度模块（例如 Kubernetes）来重新启动代理（同理，此代理将重新启动它负责的所有worker）。
+    3. 相同的恢复机制也适用于节点级故障。编排工具（诸如 Kubernetes ）会调度作业以便job可以使用最小数目的代理副本运行，然后每个代理将依次编排用户的训练脚本。
+3. PET 尝试维护工作进程的数量，使它们保持在作业所需的 `[min,max]` 范围内。一旦发生故障或成员变更，所有幸存的worker将立即被杀掉。所以用户需要手动地处理 checkpoint，定期保存你的工作进度，来保证重启后训练能够继续下去。PET不强制指定如何管理checkpoints。应用编写者可以任意使用torch.save 和 torch.load 或更高层次的框架如PyTorch Lightening 进行处理，checkpoint的频率应取决于用户job对于失败的容忍度。
 
 ### worker 如何发现？—— Store
 

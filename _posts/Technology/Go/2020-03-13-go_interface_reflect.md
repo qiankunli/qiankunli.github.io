@@ -68,49 +68,17 @@ func xx(p interface){
 }
 ```
 
-## 方法接收者
+## 类型嵌入
 
-### 接收者的本质
-
-方法带不带指针：`(p *Person)` refers to a pointer to the created instance of the Person struct. it is like using the keyword `this` in Java or `self` in Python when referring to the pointing object.
-`(p Person)` is a copy of the value of Person ia passed to the function. any change that you make in  p if you pass it by value won't be reflected in source `p`. C++ 中的对象在调用方法时，编译器会自动传入指向对象自身的 this 指针作为方法的第一个参数。Go 语言中的方法的本质就是，**一个以方法的 receiver 参数作为第一个参数的普通函数**。这种等价转换是由 Go 编译器在编译和生成代码时自动完成的。
-
-在一些框架代码中，会将指针接收者命名为 this，很有感觉
+类型嵌入的本质，就是嵌入类型的方法集合并入到新接口类型的**方法集合**中，并且，接口类型只能嵌入接口类型。可以是任意自定义类型或接口类型。结构体类型可以嵌入任意自定义类型或接口类型。
 
 ```go
-func (this *Person)GetFullName() string{
-    return fmt.Println("%s %s",this.Name,this.Surname)
+type S struct { 
+	io.Reader
 }
 ```
 
-### 值接收者和指针接收者
-
-结构体方法是要将接收器定义成值，还是指针。**这本质上与函数参数应该是值还是指针是同一个问题**。
-```go
-func (p *Person)GetFullName() string{
-    return fmt.Println("%s %s",p.Name,p.Surname)
-}
-func (p Person)GetFullName() string{
-    return fmt.Println("%s %s",p.Name,p.Surname)
-}
-func GetFullName(p *Person) string{
-    return fmt.Println("%s %s",p.Name,p.Surname)
-}
-func GetFullName(p Person) string{
-    return fmt.Println("%s %s",p.Name,p.Surname)
-}
-```
-
-[深度解密Go语言之关于 interface 的 10 个问题](https://mp.weixin.qq.com/s/EbxkBokYBajkCR-MazL0ZA)如果实现了接收者是值类型的方法，会隐含地也实现了接收者是指针类型的方法。
-
-是使用值接收者还是指针接收者，不是由该方法是否修改了调用者（也就是接收者）来决定，而是应该基于该类型的本质。
-
-1. 如果类型具备“原始的本质”，也就是说它的成员都是由 Go 语言里内置的原始类型，如字符串，整型值等，那就定义值接收者类型的方法。像内置的引用类型，如 slice，map，interface，channel，这些类型比较特殊，声明他们的时候，实际上是创建了一个 header， 对于他们也是直接定义值接收者类型的方法。这样，调用函数时，是直接 copy 了这些类型的 header，而 header 本身就是为复制设计的。
-2. 如果类型具备非原始的本质，不能被安全地复制，这种类型总是应该被共享，那就定义指针接收者的方法。比如 go 源码里的文件结构体（struct File）就不应该被复制，应该只有一份实体。
-
-
-
-
+类型嵌入这种看似“继承”的机制，实际上是一种组合的思想。更具体点，它是一种组合中的代理（delegate）模式，S 只是一个代理（delegate），对外它提供了它可以代理的所有方法，如例子中的 Read 方法。当外界发起对 S 的 Read 方法的调用后，Go 会首先查看结构体自身是否实现了该方法，如果实现了，Go 就会优先使用结构体自己实现的方法。如果没有实现，那么 Go 就会查找结构体中的嵌入字段的方法集合中，是否包含了这个方法。将该调用委派给它内部的 Reader 实例来实际执行 Read 方法。
 
 ## interface 底层实现
 

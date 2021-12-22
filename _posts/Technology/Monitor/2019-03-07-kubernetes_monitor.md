@@ -26,6 +26,16 @@ keywords: Kubernetes monitor
 
 [通过Kubernetes监控探索应用架构，发现预期外的流量](https://mp.weixin.qq.com/s/RasRiNYo8OyTTselaSwHKA) 是一个系列文章，阿里已经将应用 ==> k8s ==> 内核监控打通。构建拓扑图 ==>  发现异常流量、阈值报警（拓扑图的边黄色或红色）==> 异常流量上下游各种信息。
 
+[ Kubernetes Pod状态异常九大场景盘点](https://mp.weixin.qq.com/s/xcLy9W6diO8yzZGd-QD5CQ) 列出了9个场景，并列出对应的监控来回答9个场景的问题
+1. Kubernetes 监控的 Pod 详情页包含了 
+  1. Pod 相关的 Kubernetes 信息，比如事件、Conditions、获取 YAML 能力，日志界面以及终端能力
+  2. Pod 作为服务端的性能监控，可以快速发现错慢趋势。对于错慢请求，我们存储了明细，包含了请求和响应信息、整体耗时，以及请求接收，请求处理和请求响应的分段耗时
+  3.  Pod 的资源消耗以及特定容器的资源申请失败监控，可以看到哪些容器资源消耗得多，后续我们将会加上 profiling 能力，回答哪个方法占用 CPU 比较多，哪个对象占用内存比较多，与此同时详情页还包含了关联 Node 的资源消耗情况
+2. Kubernetes 监控的拓扑页面
+  1. 会展示集群节点到外部服务以及集群节点之间的请求关系，点击请求关系，可以快速查看特定节点到特定外部服务的请求性能，可以快速定位下游问题。
+  2. 会展示集群节点到外部服务以及集群节点之间的网络关系，点击网络关系，可以快速查看特定节点到特定外部服务的网络
+
+
 ## 容器监控与常规监控的差异
 
 [基于Prometheus的云原生监控系统架构演进](https://mp.weixin.qq.com/s/SBqYGeWDMQwmente8JBaHA)

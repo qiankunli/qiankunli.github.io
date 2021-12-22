@@ -58,4 +58,6 @@ On the other hand, ACID’s consistency refers to data integrity guarantees that
 
 上述的各种机制 在mysql、postgresql、tidb 中都有体现，实现一个机制有多种策略，有些策略只能单机用，有些策略可以推广到分布式上。分布式可以有coordinator ，也可以消灭coordinator， 通过不断地 探察本质，逐步逼近实现一个分布式ACID 的原子能力是什么？ 
 
+## 数据平台
 
+[爱奇艺基础数据平台演进](https://mp.weixin.qq.com/s/zKZ8jJ1pzNlZ2s3jpeFvJA)

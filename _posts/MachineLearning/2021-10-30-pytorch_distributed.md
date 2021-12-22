@@ -201,6 +201,12 @@ if __name__ == "__main__":
 
 每条命令表示一个进程。若已开启的进程未达到 word_size 的数量，则所有进程会一直等待
 
+### 对训练的影响
+
+假设10w 数据，单机训练任务一般采用batch 梯度下降，比如batch=100。分布式后10个实例，每个实例训练1w。
+1. 如果每个实例 batch 是100 ，根据pytorch 数据并行的原理，每个实例每次batch 训练后向传播会交换一次梯度，得到的梯度是每个实例上梯度的均值，也就是说你有10个实例，这个梯度均值就是1000个样本的梯度均值。学习率一般也要相应调整。
+2. 一般 每个实例的batch  = 单机batch / world_size
+
 ## DDP 总体实现
 
 DDP implementation lives in both Python and C++ files, with Python exposing the API and composing non-performance-critical components, and C++ serving the core gradient reduction algorithm. The Python API calls into C++ core through Pybind11.  
@@ -249,23 +255,45 @@ class Module:
     3. 不需要像 DP 那样每次迭代之后还要广播参数。但是 Buffers 还是需要在每次迭代由 rank 0 进程广播到其他进程之上。
 5. Optimizer Step: 从优化器的角度来看，它正在优化本地模型。
 
-DDP 在启动时 将 rank=0 的`state_dict()` 广播到其他worker，以**保证所有worker的模型初始状态相同**。需要广播的 state_dict 是什么？pytorch 的 state_dict 是一个字典对象，其将模型的每一层与它的对应参数建立映射关系，比如 model 每一层的weights及偏置等等。只有那些参数可以训练的层（比如卷积层，线性层等）才会被保存到模型的state_dict中，池化层、BN层这些本身没有参数的层就不会保存在 state_dict 之中，比如针对下面模型。
+
+单机场景下，pytorch 封装了torch.autograd包，torch.autograd is PyTorch’s automatic differentiation engine that powers neural network training.torch.autograd 封装了前向后向传播逻辑（实现自动微分），**所谓分布式首先是 autograd engine的分布式**。[PyTorch 分布式 Autograd (1) ---- 设计](https://mp.weixin.qq.com/s/Z6s5MohZkDJwP6kxRb6n-g)
+1. 分布式RPC框架
+2. 前向传播期间的 Autograd 记录
+3. 分布式 Autograd 上下文
+4. 分布式反向传播
+4. 分布式优化器
+
+[PyTorch 分布式 Autograd (2) ---- RPC基础](https://mp.weixin.qq.com/s/VoC7HTLFB6Xn-tZzx0TXqw) 是一个系列文章，有兴趣可以细读下， 比较有价值的点就是 有很多low leve api 代码示例，可以看下较为原汁原味的 分布式前后向传播过程。比如
+
 ```python
-class ToyModel(nn.Module):
-    def __init__(self):
-        super(ToyModel, self).__init__()
-        self.net1 = nn.Linear(10, 10)
-        self.relu = nn.ReLU()
-        self.net2 = nn.Linear(10, 5)
+# 代码目的是让两个 worker 之间就通过 RPC 进行协作。
+def my_add(t1, t2):
+  return torch.add(t1, t2)
+def worker0():
+    # On worker 0:
+    # Setup the autograd context. Computations that take
+    # part in the distributed backward pass must be within
+    # the distributed autograd context manager.
+    with dist_autograd.context() as context_id:
+      t1 = torch.rand((3, 3), requires_grad=True)
+      t2 = torch.rand((3, 3), requires_grad=True)
+      # 第一阶段：RPC操作，构建依赖基础
+      # Perform some computation remotely.
+      t3 = rpc.rpc_sync("worker1", my_add, args=(t1, t2))
+      # Perform some computation locally based on remote result.
+      t4 = torch.rand((3, 3), requires_grad=True)
+      t5 = torch.mul(t3, t4)
+      # Compute some loss.
+      loss = t5.sum()
+
+      # 第二阶段，执行后向传播
+      # Run the backward pass.
+      dist_autograd.backward(context_id, [loss])
+      # Retrieve the gradients from the context.
+      dist_autograd.get_gradients(context_id)
+      print(loss)  
 ```
-state_dict 如下：
-```
-self.module.state_dict() = {OrderedDict: 4} 
- 'net1.weight' = {Tensor: 10} tensor([[ 0.2687,  0.0840, -0.1032,  0.3079,  0.0385, -0.0495, -0.3068, -0.1271,\n         -0.1067, -0.1966],\n        [-0.1203,  0.1789,  0.0666,  0.1882,  0.1335,  0.1921, -0.1145, -0.1781,\n          0.0661, -0.2339],\n        [ 0.1865, -0.2076,  0.2071,  0
- 'net1.bias' = {Tensor: 10} tensor([ 0.2146, -0.1599,  0.2350, -0.2843, -0.0773, -0.2151,  0.1864, -0.3068,\n        -0.2093,  0.1365])
- 'net2.weight' = {Tensor: 5} tensor([[ 0.1922, -0.0148, -0.1884,  0.2124, -0.1361,  0.0172, -0.2371,  0.1946,\n          0.2047, -0.2697],\n        [-0.2690,  0.1372,  0.2269,  0.0436, -0.1353, -0.2054, -0.2418, -0.2300,\n          0.1987,  0.0007],\n        [ 0.0995, -0.2659, -0.2374, -0
- 'net2.bias' = {Tensor: 5} tensor([0.1488, 0.0791, 0.1667, 0.1449, 0.0545])
-```
+
 
 ## ProcessGroup
 
@@ -315,6 +343,34 @@ register_rendezvous_handler("file", _file_rendezvous_handler)
 ```
 ### ProcessGroup 如何被使用
 
+[Collective functions](https://alband.github.io/doc_view/distributed.html)if the system we use for distributed training has 2 nodes, each of which has 8 GPUs. On each of the 16 GPUs, there is a tensor that we would like to all-reduce. The following code can serve as a reference: 
+```python
+# Code running on Node 0
+import torch
+import torch.distributed as dist
+dist.init_process_group(backend="nccl",
+                        init_method="file:///distributed_test",
+                        world_size=2,
+                        rank=0)
+tensor_list = []
+for dev_idx in range(torch.cuda.device_count()):
+    tensor_list.append(torch.FloatTensor([1]).cuda(dev_idx))
+
+dist.all_reduce_multigpu(tensor_list)
+# Code running on Node 1
+import torch
+import torch.distributed as dist
+dist.init_process_group(backend="nccl",
+                        init_method="file:///distributed_test",
+                        world_size=2,
+                        rank=1)
+tensor_list = []
+for dev_idx in range(torch.cuda.device_count()):
+    tensor_list.append(torch.FloatTensor([1]).cuda(dev_idx))
+dist.all_reduce_multigpu(tensor_list)
+```
+After the call, all 16 tensors on the two nodes will have the all-reduced value of 16
+
 抛开概念，从代码看其本质。processgroup 就是给每一个训练的 process 建立一个Communication thread。主线程（Computation thread）在前台进行训练，这个Communication thread 在后台做通信（比如交流梯度）。
 
 ![](/public/upload/machine/pytorch_process_group.png)
@@ -355,5 +411,24 @@ backend 是一个**逻辑上**的概念。本质上后端是一种IPC通信机�
 
 ![](/public/upload/machine/pytorch_distributed_backend.jpeg)
 
+## 其它
+
+DDP 在启动时 将 rank=0 的`state_dict()` 广播到其他worker，以**保证所有worker的模型初始状态相同**。需要广播的 state_dict 是什么？pytorch 的 state_dict 是一个字典对象，其将模型的每一层与它的对应参数建立映射关系，比如 model 每一层的weights及偏置等等。只有那些参数可以训练的层（比如卷积层，线性层等）才会被保存到模型的state_dict中，池化层、BN层这些本身没有参数的层就不会保存在 state_dict 之中，比如针对下面模型。
+```python
+class ToyModel(nn.Module):
+    def __init__(self):
+        super(ToyModel, self).__init__()
+        self.net1 = nn.Linear(10, 10)
+        self.relu = nn.ReLU()
+        self.net2 = nn.Linear(10, 5)
+```
+state_dict 如下：
+```
+self.module.state_dict() = {OrderedDict: 4} 
+ 'net1.weight' = {Tensor: 10} tensor([[ 0.2687,  0.0840, -0.1032,  0.3079,  0.0385, -0.0495, -0.3068, -0.1271,\n         -0.1067, -0.1966],\n        [-0.1203,  0.1789,  0.0666,  0.1882,  0.1335,  0.1921, -0.1145, -0.1781,\n          0.0661, -0.2339],\n        [ 0.1865, -0.2076,  0.2071,  0
+ 'net1.bias' = {Tensor: 10} tensor([ 0.2146, -0.1599,  0.2350, -0.2843, -0.0773, -0.2151,  0.1864, -0.3068,\n        -0.2093,  0.1365])
+ 'net2.weight' = {Tensor: 5} tensor([[ 0.1922, -0.0148, -0.1884,  0.2124, -0.1361,  0.0172, -0.2371,  0.1946,\n          0.2047, -0.2697],\n        [-0.2690,  0.1372,  0.2269,  0.0436, -0.1353, -0.2054, -0.2418, -0.2300,\n          0.1987,  0.0007],\n        [ 0.0995, -0.2659, -0.2374, -0
+ 'net2.bias' = {Tensor: 5} tensor([0.1488, 0.0791, 0.1667, 0.1449, 0.0545])
+```
 
 
