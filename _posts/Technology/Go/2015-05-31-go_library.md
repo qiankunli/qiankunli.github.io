@@ -20,8 +20,9 @@ keywords: Go library
 [用 GODEBUG 看调度跟踪](https://eddycjy.gitbook.io/golang/di-9-ke-gong-ju/godebug-sched) 未读
 [用 GODEBUG 看GC](https://eddycjy.gitbook.io/golang/di-9-ke-gong-ju/godebug-gc) 未读
 
-
 ## klog
+
+[logr](https://github.com/go-logr/logr) logr offers an(other) opinion on how Go programs and libraries can do logging without becoming coupled to a particular logging implementation. This is not an implementation of logging - it is an API. 用户使用Logger type，Log提供方实现 LogSink interface. This decoupling allows application and library developers to write code in terms of logr.Logger (which has very low dependency fan-out) while the implementation of logging is managed "up stack" (e.g. in or near main().) Application developers can then switch out implementations as necessary. 
 
 klog是著名google开源C++日志库glog的golang版本
 1. 支持四种日志等级INFO < WARING < ERROR < FATAL，不支持DEBUG等级。

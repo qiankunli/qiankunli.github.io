@@ -61,6 +61,10 @@ Events 量非常大，只能存在一个很短的时间，很有必要将它们e
 
 ![](/public/upload/kubernetes/aliyun_k8s_event_center.png)
 
+[如何用Loki来分析Kubernetes事件](https://mp.weixin.qq.com/s/WxWH3UbRqfc3UnBjQ7KrUA)
+1. Kubernetes中关于Node的事件不多，对于节点上更多偏向底层的状态（如内核死锁、容器运行时无响应等）并不能通过事件的方式通知出来。Node Problem Detector作为一个很好的补充，它可以将node上更细节的事件以NodeCondition和Event方式上报给Kubernetes。
+2. 作者把基于Loki的Kubernetes事件分析面板贡献在了Grafana Lab上面，我们可以访问如下网站下载Dashboard。https://grafana.com/grafana/dashboards/14003
+
 ## 获取event 数据
 
 因为Event 一般会暂存在 apiserver，因此想要获取到 k8s 的event 数据，有多种方式

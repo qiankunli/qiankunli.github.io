@@ -8,7 +8,7 @@ keywords:  mpi
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -40,6 +40,45 @@ KubeDL-Morphling 组件实现了推理服务的自动规格调优，通过主动
 [携程AI推理性能的自动化优化实践](https://mp.weixin.qq.com/s/jVnNMQNo_MsX3uSFRDmevA)
 
 ## 基于镜像的模型管理
+
+[KubeDL 0.4.0 - Kubernetes AI 模型版本管理与追踪](https://mp.weixin.qq.com/s/65QAQDdRDsT8T47HmVdufw)
+
+1. 从训练到模型。训练完成后将模型文件输出到本地节点的 `/models/model-example-v1` 路径，当顺利运行结束后即触发模型镜像的构建，并自动创建出一个 ModelVersion 对象
+    ```yaml
+    apiVersion: "training.kubedl.io/v1alpha1"
+    kind: "TFJob"
+    metadata:
+    name: "tf-mnist-estimator"
+    spec:
+    cleanPodPolicy: None
+    # modelVersion defines the location where the model is stored.
+    modelVersion:
+        modelName: mnist-model-demo
+        # The dockerhub repo to push the generated image
+        imageRepo: simoncqk/models
+        storage:
+        localStorage:
+            path: /models/model-example-v1
+            mountPath: /kubedl-model
+            nodeName: kind-control-plane
+    tfReplicaSpecs:
+        Worker:
+        replicas: 3
+    ```
+2. 从模型到推理。Inference Controller 在创建 predictor 时会注入一个 Model Loader，它会拉取承载了模型文件的镜像到本地，并通过容器间共享 Volume 的方式把模型文件挂载到主容器中，实现模型的加载。
+    ```yaml
+    apiVersion: serving.kubedl.io/v1alpha1
+    kind: Inference
+    metadata:
+    name: hello-inference
+    spec:
+    framework: TFServing
+    predictors:
+    - name: model-predictor
+        # model built in previous stage.
+        modelVersion: mnist-model-demo-abcde
+        replicas: 3
+    ```
 
 ## 其它
 

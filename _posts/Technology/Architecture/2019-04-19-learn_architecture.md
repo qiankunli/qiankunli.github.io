@@ -137,6 +137,8 @@ WWW的发明人蒂姆.伯纳斯.李谈到设计原理时说过：简单性和模
 
 ![](/public/upload/architecture/high_availability.png)
 
+[陈皓：我做系统架构的原则](https://mp.weixin.qq.com/s/rx9dqv2tg1Bo0TPPc_hPzQ)
+
 ## 业务架构
 
 **业务的本质是模型**。如果我们能基于复杂业务场景抽象出领域模型或者基于复杂业务场景做流程编排，做好分层，不仅反映你对业务认知的深度，也反映了你的技术深度。

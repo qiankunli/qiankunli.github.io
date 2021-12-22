@@ -94,7 +94,7 @@ keywords: 深度学习
 [初学者如何从零开始征战Kaggle竞赛](https://mp.weixin.qq.com/s?__biz=MzI5ODQxMTk5MQ==&mid=2247489435&idx=1&sn=b9ebf571e145b25a33021f31a5f6270f&chksm=eca76523dbd0ec3543903843ee28af0f2dca11264b2b29d87b20c8575ea292d3ffb75f64d8a5&cur_album_id=1815350871241637891&scene=190#rd)
 [从技术到科学，中国AI向何处去？](https://mp.weixin.qq.com/s/GV0UFUvDtIiBong0ZAe0LA)
 
-
+《Approaching (Almost) Any Machine Learning Problem》未读
 
 ## 深度学习框架
 

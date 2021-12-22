@@ -151,6 +151,10 @@ devops基本理念：
 
 在 A->B->C->D 的情况下，在整个调用链中，正常情况下会产生 3 个 Span，分别是 Span1（A->B）、Span2（B->C）、Span3（C->D），这时 Span3 的父 Span 就是 Span2，而 Span2 的父 Span 就是 Span1。
 
+[深入剖析全链路灰度技术内幕](https://mp.weixin.qq.com/s/JklS0ZBNRCEBvLWUOo-UrQ) 未读
+
+[分布式链路追踪在字节跳动的实践](https://mp.weixin.qq.com/s/a0Pm26-8toNKz0brrRVG4Q) 未读
+
 ## 其它
 
 [做出让人爱不释手的基础软件：可观测性和可交互性](https://mp.weixin.qq.com/s/WEO1y8vg21CXlix8wO28hw) 个人理解: 尽可能多的监控，之后就是尽量串起来
