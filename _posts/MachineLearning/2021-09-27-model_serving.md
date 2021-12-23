@@ -66,6 +66,7 @@ KubeDL-Morphling 组件实现了推理服务的自动规格调优，通过主动
         replicas: 3
     ```
 2. 从模型到推理。Inference Controller 在创建 predictor 时会注入一个 Model Loader，它会拉取承载了模型文件的镜像到本地，并通过容器间共享 Volume 的方式把模型文件挂载到主容器中，实现模型的加载。
+
     ```yaml
     apiVersion: serving.kubedl.io/v1alpha1
     kind: Inference
@@ -78,6 +79,19 @@ KubeDL-Morphling 组件实现了推理服务的自动规格调优，通过主动
         # model built in previous stage.
         modelVersion: mnist-model-demo-abcde
         replicas: 3
+        template:
+        spec:
+            containers:
+            - name: tensorflow
+              image: tensorflow/serving:1.11.1
+              command:
+              - /usr/bin/tensorflow_model_server
+              args:
+              - --port=9000
+              - --rest_api_port=8500
+              - --model_name=mnist
+              - --model_base_path=/kubedl-model/
+
     ```
 
 ## 其它
