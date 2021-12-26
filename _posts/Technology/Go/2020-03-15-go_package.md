@@ -51,8 +51,6 @@ exe-layout
 
 ### 具体业务
 
-
-
 [使用 Go 语言开发的一些经验（含代码示例）](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651008064&idx=2&sn=cdc19d0db8decad85b671ba79fd2d1f5&chksm=bdbed4138ac95d05dbfd6672babba8e4d4a547d7845cd46b23fe3802dd5a1c49777b476fadd5&mpshare=1&scene=23&srcid=0708wchJyw4BGm9vtQxV8qaT%23rd) 要点如下
 
 1. 可见性和代码划分
@@ -75,6 +73,16 @@ github 也有一些demo 项目layout [golang-standards/project-layout](https://g
 
 并发中处理的内容才是关键，新启一个线程或者协程才是万里长城的第一步，如果其中的业务逻辑有10个分支，还要多次访问数据库并调用远程服务，那无论用什么语言都白搭。所以在业务逻辑复杂的情况下，语言的差异并不会太明显，至少在Java和Go的对比下不明显	
 [Organizing Go source code part 2](http://neurocline.github.io/dev/2016/02/01/organizing-go-source-code.html) 未读
+
+## import
+
+```go
+import(
+    // 第一部分 标准库
+    // 第二部分 第三方依赖
+    // 第三部分 自己的依赖
+)
+```
 
 ## 包管理
 

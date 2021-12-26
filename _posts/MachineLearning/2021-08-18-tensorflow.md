@@ -15,17 +15,47 @@ keywords:  tensorflow
 
 TensorFlow，这是个很形象的比喻，意思是 张量(Tensor)在神经网络中流动(Flow)。
 
-张量其实就是多维数组，所以不能叫做矩阵，矩阵只是二维的数组，张量所指的维度是没有限制的。张量这一概念的核心在于，它是一个数据容器。它包含的数据几乎总是数值数据，因此它是数字的容器。[线性代数/矩阵的几何意义](https://mp.weixin.qq.com/s/bi1gOmUK_GU_1cfiWQPF6Q) 未读完 
+在数学中，张量是一种几何实体，广义上可以表示任何形式的数据。在NumPy等数学计算库或TensorFlow等深度学习库中，我们通常使用多维数组来描述张量，所以不能叫做矩阵，矩阵只是二维的数组，张量所指的维度是没有限制的。张量这一概念的核心在于，它是一个**数据容器**。它包含的数据几乎总是数值数据，因此它是数字的容器。在物理实现时（TensorFlow）是一个句柄，它存储张量的元信息以及指向张量数据的内存缓冲区指针。 [线性代数/矩阵的几何意义](https://mp.weixin.qq.com/s/bi1gOmUK_GU_1cfiWQPF6Q) 未读完 
 
 
-
-TensorFlow 使用库模式（不是框架模式），工作形态是由用户编写主程序代码，调用python或其它语言函数库提供的接口实现计算逻辑。用户部署和使用TensorFlow 时，不需要启动专门的守护进程，也不需要调用特殊启动工具
+TensorFlow 使用库模式（不是框架模式），工作形态是由用户编写主程序代码，调用python或其它语言函数库提供的接口实现计算逻辑。用户部署和使用TensorFlow 时，不需要启动专门的守护进程，也不需要调用特殊启动工具，只需要像编写普通本地应用程序那样即可上手。
 
 ## 单机TensorFlow
 
 [TensorFlow on Kubernetes的架构与实践](https://mp.weixin.qq.com/s/xsrRZVnPp-ogj59ZCGqqsQ)
 
 ![](/public/upload/machine/single_tensorflow.jpeg)
+
+### 会话
+
+Session 提供求解张量和执行操作的运行环境，它是发送计算任务的客户端，所有计算任务都由它分发到其连接的执行引擎（进程内引擎）完成。
+
+```python
+import tensorflow as tf
+a = tf.constant(5.0)
+b = tf.constant(6.0)
+c = a * b
+sess = tf.Session()
+print(sess.run(c))
+```
+
+### demo
+
+```python
+import tensorflow as tf
+X = tf.placeholder(...)
+Y_ = tf.placeholder(...)
+w = tf.Variable(...)
+b = tf.Variable(...)
+Y = tf.matmul(X,w) + b
+loss = tf.reduce_mean(...)
+optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
+train_op = optimizer.minimize(loss,...)
+with tf.Session() as sess:
+  sess.run(tf.global_variables_initializer())
+  for step in xrange(max_train_steps):
+      sess.run(train_op,...)
+```
 
 ## 分布式
 

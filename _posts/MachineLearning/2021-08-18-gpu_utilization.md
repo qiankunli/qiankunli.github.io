@@ -50,6 +50,71 @@ keywords:  gpu
 
 ## gpu 监控
 
+GPU计算单元类似于CPU中的核，用来进行数值计算。衡量计算量的单位是flop：the number of floating-point multiplication-adds，浮点数先乘后加算一个flop。计算能力越强大，速度越快。衡量计算能力的单位是flops：每秒能执行的flop数量
+
+```
+1*2+3                  1 flop
+1*2 + 3*4 + 4*5        3 flop
+```
+
+### 显存
+
+[科普帖：深度学习中GPU和显存分析](https://mp.weixin.qq.com/s/K_Yl-MD0SN4ltlG3Gx_Tiw) 
+显存占用 = 模型显存占用（参数 + 梯度与动量 + 模型输出） + batch_size × 每个样本的显存占用
+
+### 单机
+
+`nvidia-smi` 查看某个节点的gpu 情况
+
+```
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 460.32.03    Driver Version: 460.32.03    CUDA Version: 11.2     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|===============================+======================+======================|
+|   0  GeForce RTX 208...  Off  | 00000000:3D:00.0 Off |                  N/A |
+| 23%   25C    P8    19W / 250W |      0MiB / 11019MiB |      0%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+|   1  GeForce RTX 208...  Off  | 00000000:41:00.0 Off |                  N/A |
+| 22%   24C    P8    14W / 250W |      0MiB / 11019MiB |      0%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+|   2  GeForce RTX 208...  Off  | 00000000:B1:00.0 Off |                  N/A |
+| 22%   24C    P8    13W / 250W |      0MiB / 11019MiB |      0%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+|   3  GeForce RTX 208...  Off  | 00000000:B5:00.0 Off |                  N/A |
+| 23%   26C    P8    13W / 250W |      0MiB / 11019MiB |      0%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|=============================================================================|
+|  No running processes found                                                 |
++-----------------------------------------------------------------------------+
+```
+1. 第一栏的Fan：从0到100%之间变动
+2. 第二栏的Temp：是温度，单位摄氏度。
+3. 第三栏的Perf：是性能状态，从P0到P12，P0表示最大性能，P12表示状态最小性能。
+3. 第四栏下方的Pwr：是能耗，上方的Persistence-M：是持续模式的状态，持续模式虽然耗能大，但是在新的GPU应用启动时，花费的时间更少，这里显示的是off的状态。
+5. 第五栏的Bus-Id是涉及GPU总线的东西，domain:bus:device.function
+6. 第六栏的Disp.A是Display Active，表示GPU的显示是否初始化。
+7. 第五第六栏下方的Memory Usage是显存使用率。
+8. 第七栏是浮动的GPU利用率。第八栏上方是关于ECC的东西。第八栏下方Compute M是计算模式。
+
+其它技巧：调用 watch -n 1 nvidia-smi  可以每一秒进行自动的刷新。nvidia-smi 也可以通过添加 --format=csv 以 CSV 格式输。在 CSV 格式中，可以通过添加 `--gpu-query=...` 参数来选择显示的指标。为了实时显示 CSV 格式并同时写入文件，我们可以将 nvidia-smi 的输出传输到 tee 命令中，`nvidia-smi --query-gpu=timestamp,pstate,temperature.gpu,utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv | tee gpu-log.csv`。这将写入我们选择的文件路径。
+
+gpustat,直接pip install gpustat即可安装，gpustat基于nvidia-smi，可以提供更美观简洁的展示，结合watch命令，可以动态实时监控GPU的使用情况。`watch --color -n1 gpustat -cpu`
+
+
+### exporter
+
 [NVIDIA GPU Operator分析四：DCGM Exporter安装](https://developer.aliyun.com/article/784152)[DCGM Exporter](https://github.com/NVIDIA/dcgm-exporter)是一个用golang编写的收集节点上GPU信息（比如GPU卡的利用率、卡温度、显存使用情况等）的工具，结合Prometheus和Grafana（提供dashboard template）可以提供丰富的仪表大盘。
 
 dcgm-exporter采集指标项以及含义:

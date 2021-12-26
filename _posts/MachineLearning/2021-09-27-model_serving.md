@@ -41,6 +41,10 @@ KubeDL-Morphling 组件实现了推理服务的自动规格调优，通过主动
 
 ## 基于镜像的模型管理
 
+在实践中还要考虑 模型的大小（有的模型几百G），是否动态加载（很多公司没做镜像层面的管理，而是serving 服务直接可以按版本动态加载模型）
+
+### KubeDL实践
+
 [KubeDL 0.4.0 - Kubernetes AI 模型版本管理与追踪](https://mp.weixin.qq.com/s/65QAQDdRDsT8T47HmVdufw)
 
 1. 从训练到模型。训练完成后将模型文件输出到本地节点的 `/models/model-example-v1` 路径，当顺利运行结束后即触发模型镜像的构建，并自动创建出一个 ModelVersion 对象
