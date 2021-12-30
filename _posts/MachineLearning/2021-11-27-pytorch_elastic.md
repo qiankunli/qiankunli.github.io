@@ -13,8 +13,6 @@ keywords:  pytorch distributed elastic 弹性
 * TOC
 {:toc}
 
-
-
 ## 弹性分布式训练 
 
 实现弹性训练需要面对哪些挑战和难点
@@ -28,15 +26,13 @@ keywords:  pytorch distributed elastic 弹性
 2. 资源调度层面，算力感知和动态训练扩缩容机制。为pytorch 启动pod 时，要提供注册中心地址信息。
 3. 代码层面 要能随时 save 和load checkpoint，训练过程中，可能会有新的节点 或节点挂掉，要能容错，继续训练。
 
-
-
 ## train_script 的守护者elastic agent
 
 `python -m torch.distributed.run train_script.py ` 对于每一个node 有两个角色
 1. run.py 负责启动 elastic agent
 2. elastic agent 负责启动 train_script.py， 并给train_script.py 传递必要的参数（环境变量或参数形式，由脚本的获取方式决定）。
 
-elastic agent 是一个独立的进程，负责管理其下的 workers。它起到了类似进程管理系统 supervisor 的作用，会在启动的时候确保每个 worker 的启动参数（比如 WORLD_SIZE 和 RANK）正确，worker 的失效也是由 elastic agent 负责捕获处理。
+Agent 是一个 worker manager，负责启动/管理 workers 进程，组成一个 worker group，监控 workers 运行状态，捕获失效 workers，如果有故障/新加入worker，则重启 worker group。Agent负责维护 WORLD_SIZE 以及 RANK 信息。用户不需要再手动提供，Agent会自动处理这些。
 
 ![](/public/upload/machine/torchelastic_diagram.jpeg)
 
@@ -48,30 +44,15 @@ elastic agent 是一个独立的进程，负责管理其下的 workers。它起�
     3. 相同的恢复机制也适用于节点级故障。编排工具（诸如 Kubernetes ）会调度作业以便job可以使用最小数目的代理副本运行，然后每个代理将依次编排用户的训练脚本。
 3. PET 尝试维护工作进程的数量，使它们保持在作业所需的 `[min,max]` 范围内。一旦发生故障或成员变更，所有幸存的worker将立即被杀掉。所以用户需要手动地处理 checkpoint，定期保存你的工作进度，来保证重启后训练能够继续下去。PET不强制指定如何管理checkpoints。应用编写者可以任意使用torch.save 和 torch.load 或更高层次的框架如PyTorch Lightening 进行处理，checkpoint的频率应取决于用户job对于失败的容忍度。
 
-### worker 如何发现？—— Store
-
-[Elastic Introduction](https://github.com/pytorch/elastic/blob/master/design/torchelastic/0.2.0/design_doc.md) 
-[Elastic Agent 的设计：如何管理多个 worker 进程](https://mp.weixin.qq.com/s/hlOYLKSHFDZWN21AsUn6bg) 
-
-Elastic Agent  通过 Store 进行 worker 之间的相互发现，以便在不同的节点间确定 RANK。 需要一个类似配置中心的东西 etcd 或自带的c10d，对应有一个 Store 抽象（有EtcdStore 和 TcpStore）
-
-```python
-class Store(__pybind11_builtins.pybind11_object):
-    def add(self, arg0, arg1)
-    def compare_set(self, arg0, arg1, arg2)
-    def delete_key(self, arg0)
-    def get(self, arg0)
-    def num_keys(self)
-    def set(self, arg0, arg1)
-    def set_timeout(self, arg0)
-    def wait(self, *args, **kwargs)
-```
-
-”注册中心“可以是c10d/etcd，使用不同的“注册中心”有不同的问题
-1. c10d 运行在rank0 节点， 因此使用c10d时，非rank0 节点挂掉ok，rank0 节点挂掉会导致训练任务失败
-2. 使用etcd时，非rank0 节点挂掉ok，rank0 节点挂掉后 其它节点会作为rank0节点，可能会有问题：有些框架喜欢在rank0 做一些特殊工作
-
 ### rendezvous/集会机制
+
+Agent 是具体节点上的后台进程，是独立个体。Agent自己无法实现整体上的弹性训练，所以需要一个机制来完成 worker 之间的相互发现，变更同步等等（WORLD_SIZE 和 RANK 这些信息其实也需要多个节点同步才能确定），这就是下面的 Rendezvous 概念。
+
+Rendezvous 负责集群逻辑，保证节点之间对于""有哪些节点参与训练"达成强一致共识。
+1. 每一个 Agent 内部包括一个 Rendezvous handler，这些 handler 总体上构成了一个 Rendezvous 集群，从而构成了一个 Agent 集群。
+2. Rendezvous 完成之后，会创建一个共享键值存储（shared key-value store），这个store实现了一个torch.distributed.Store API。此存储仅由已完成Rendezvous的成员共享，它旨在让Torch Distributed Elastic在初始化作业过程之中交换控制和数据信息。
+3. Rendezvous 负责在每个agent之上维护当前 group 所有相关信息。每个 agent 之上有一个 rendezvous，它们会互相通信，总体维护一套信息，这些信息存储在上面提到的Store 之中。
+4. Rendezvous 负责集群逻辑相关，比如新加入节点，移除节点，分配rank等等。
 
 pytorch 封装了  RendezvousHandler 来管理 rendezvous（在etcd 上对应一个 带version 的path） ，核心功能
 1. next_rendezvous， 如何在不同的节点间确定 RANK
@@ -111,7 +92,30 @@ launch_agent ==> `rdzv_handler = rdzv_registry.get_rendezvous_handler(rdzv_param
 2. 可能是 elastic agent 通知了 注册中心 
     1. 其它node 的 elastic agent 监听到了这个信息，进而陆续关停自己的worker。
     2. 其它node 的 worker 监听到了这个信息，自己退出
-理论上是第二种，但第二种没有找到 代码依据，第三种不知道是否成立。 
+
+
+### Store
+
+[Elastic Introduction](https://github.com/pytorch/elastic/blob/master/design/torchelastic/0.2.0/design_doc.md) 
+[Elastic Agent 的设计：如何管理多个 worker 进程](https://mp.weixin.qq.com/s/hlOYLKSHFDZWN21AsUn6bg) 
+
+Elastic 调用 rdzv_handler.next_rendezvous() 来处理成员关系变化，在 worker 被初始化，或者重启的时候，这一函数都会被调用。其会返回 world size，store等。会把 store 配置到 workgroup 之中，后续worker 之间就可以通过这个kvstore进行沟通。
+
+```python
+class Store(__pybind11_builtins.pybind11_object):
+    def add(self, arg0, arg1)
+    def compare_set(self, arg0, arg1, arg2)
+    def delete_key(self, arg0)
+    def get(self, arg0)
+    def num_keys(self)
+    def set(self, arg0, arg1)
+    def set_timeout(self, arg0)
+    def wait(self, *args, **kwargs)
+```
+
+”注册中心“可以是c10d/etcd，使用不同的“注册中心”有不同的问题
+1. c10d 运行在rank0 节点， 因此使用c10d时，非rank0 节点挂掉ok，rank0 节点挂掉会导致训练任务失败
+2. 使用etcd时，非rank0 节点挂掉ok，rank0 节点挂掉后 其它节点会作为rank0节点，可能会有问题：有些框架喜欢在rank0 做一些特殊工作
 
 ## 资源调度层
 
@@ -145,6 +149,8 @@ When a worker process fails, the corresponding elastic agent managing it kills a
 elastic agent 的可扩展性非常好，在 1.9.0 版本中，一共有三个 Agent，分别是 ElasticAgent、SimpleElasticAgent 和 LocalElasticAgent。
 其中 ElasticAgent 是一个 Abstract Class，SimpleElasticAgent 对其中的某些函数进行了实现（半成品），而 LocalElasticAgent 则实现了管理单机上所有 worker 进程的 elastic agent。
 
+### agent运行
+
 `python3.9/site-packages/torch/distributed/run.py` ==> ` main()` ==> `run(args)` ==>  `elastic_launch(config=config,entrypoint=cmd,)(*cmd_args)` ==> `__call__(*args)` ==> launch_agent ==> agent.run ==> SimpleElasticAgent._invoke_run
 
 ```python
@@ -177,7 +183,15 @@ def launch_agent(config: LaunchConfig,entrypoint: Union[Callable, str, None],arg
         rdzv_handler.shutdown() # 以 EtcdRendezvousHandler 为例，EtcdRendezvousHandler.shutdown 会在 etcd 上记录 本次rendezvous closed。
 ```
 
-elastic agent 周期性 _monitor_workers ，判断worker SUCCEEDED/FAILED/HEALTHY，如果发现失败的 worker ，主动stop worker
+启动 _initialize_workers，这里会使用 _rendezvous 构建一个 rendezvous，然后调用 _start_workers 启动 workers。
+
+### agent主循环
+
+[PyTorch 分布式之弹性训练(2)---启动&单节点流程](https://mp.weixin.qq.com/s/McKseYfSlG7DF4zHP9Bp0A)进入 while True 循环，在循环之中：通过 _monitor_workers 定期轮训用户程序运行情况 SUCCEEDED/FAILED/HEALTHY，得到客户进程运行结果，然后依据情况作出判断。
+
+1. 如果程序正常结束，则返回。
+2. 如果程序出错，则重试，即重启所有 workers，如果重试次数达到依然有问题，就结束所有workers。
+3. 如果节点成员关系有变化，比如scale up就会有新的节点在waiting，这时候就重启所有workers。
 
 ```python
 # python3.9/site-packages/torch/distributed/elastic/agent/server/api.py
@@ -205,6 +219,10 @@ class SimpleElasticAgent(ElasticAgent):
             else: raise Exception(f"[{role}] Worker group in {state.name} state")
 ```
 _initialize_workers 执行了大部分初始化的工作，其中包括为每个 worker 分配 RANK 等。
+
+### 启动 worker 进程
+
+[PyTorch 分布式之弹性训练(3)---代理](https://mp.weixin.qq.com/s/jiDHMfn-I4zsb9t_LQ5IhA)_start_workers 方法会调用 start_processes 来启动 worker 进程，默认_start_method 是 "spawn"。也就是启动了多个进程，并行执行用户程序。同时这些进程的运行结果会被监控。start_processes 参数之中，entrypoint和args 是用户命令和参数，entrypoint可以是函数或者字符串。_start_workers 把 start_processes 方法启动多线程的结果保存在 _pcontext 之中，后续就用 _pcontext 来继续控制，比如结束 worker 就是直接调用 _pcontext 的 close方法。
 
 ```python
 class SimpleElasticAgent(ElasticAgent):
@@ -248,8 +266,6 @@ class LocalElasticAgent(SimpleElasticAgent):
             start_method=self._start_method,...)
         return self._pcontext.pids()
 ```
-start_processes ==> PContext.start ==> `SubprocessContext._start` ==> `SubprocessHandler.__init__` ==> `SubprocessHandler._popen` ==> subprocess.Popen
-
 ## 其它
 
 ### run.py 启动命令

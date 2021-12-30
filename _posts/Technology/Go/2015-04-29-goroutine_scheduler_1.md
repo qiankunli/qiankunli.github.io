@@ -13,6 +13,9 @@ keywords: Go goroutine scheduler
 * TOC
 {:toc}
 
+
+[赵海平与张宏波谈编程语言](https://mp.weixin.qq.com/s/FI2WFOENBxgCbykvy9wBYQ)为什么 Google 要去做 Golang 呢？是因为我们在这个过去的五到十年里面，就发现了实际上绝大多数的公司在写什么呢？在写分布式计算。特别常见的情况是我调你、你调它，它调它。团队大了之后拆分 engineering task 拆分完了之后，我就要 RPC 调用对吧？很多的 application 就变成了所谓的 IO intensive 的这种形式，20 年前的话，很多的软件都是在做大量的计算对吧，没有太多的 RPC 因为都在一个机器上进行。 IO多了，问题就来了，你的线程模型是什么？一个io一个线程不行，最后就发现了一定要用比如说 epoll 这种模型，要搞 user thread ，让其他的人都能够很快的去跳到这个模型上，所以他才把 goroutine （协程）这个概念变成了 first classcitizen ，所以其实人家的本意是在这里。
+
 [The Go scheduler](https://morsmachine.dk/go-scheduler)为什么Go 运行时需要一个用户态的调度器？
 1. 线程调度成本高，比如context switch比如陷入内核执行，如创建一个 Goroutine 的栈内存消耗为 2 KB，而 thread 占用 1M 以上空间
 2. 操作系统在Go模型下不能做出好的调度决策。os 只能根据时间片做一些简单的调度。

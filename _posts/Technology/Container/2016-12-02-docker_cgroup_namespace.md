@@ -129,49 +129,16 @@ Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的�
 
 ### 整体实现（可能过时了）
 
-对于CPU Cgroup的配置会影响一个进程的task_struct作为调度单元的scheduled_entity，并影响在CPU上的调度。对于内存 Cgroup的配置起作用在进程申请内存的时候，也即当出现缺页，调用handle_pte_fault进而调用do_anonymous_page的时候，会查看是否超过了配置，超过了就分配失败，OOM。
+[cgroup 原理与实现](https://mp.weixin.qq.com/s/yXJxTR_sPdEMt56cf7JPhQ) 写的很清晰了
 
-[使用cgroups控制进程cpu配额](http://www.pchou.info/linux/2017/06/24/cgroups-cpu-quota.html)
+![](/public/upload/linux/cgroup_struct.png)
 
-从操作上看：
+1. 包含哪些数据结构
+2. CGroup 的挂载
+3. 向 CGroup 添加要进行资源控制的进程（写文件 ==> 数据结构间建立关联关系）
+4. 如何 限制 CGroup 的资源使用
 
-1. 可以创建一个目录（比如叫cgroup-test）， `mount -t cgroup -o none  cgroup-test ./cgroup-test` cgroup-test 便是一个hierarchy了，一个hierarchy 默认自动创建很多文件
-    ```
-    - cgroup.clone_children
-    - cgroup.procs
-    - notify_on_release
-    - tasks
-    ```
-
-你为其创建一个子文件`cgroup-test/	cgroup-1`，则目录变成
-    ```
-    - cgroup.clone_children
-    - cgroup.procs
-    - notify_on_release
-    - tasks
-    - cgroup-1
-        - cgroup.clone_children
-        - cgroup.procs
-        - notify_on_release
-        - tasks
-    ```
-
-往task 中写进程号，则标记该进程 属于某个cgroup。
-
-注意，mount时，`-o none` 为none。 若是  `mount -t cgroup -o cpu cgroup-test ./cgroup-test` 则表示为cgroup-test  hierarchy 挂载 cpu 子系统
-```
-- cgroup.event_control
-- notify_on_release
-- cgroup.procs
-- tasks
-- cpu.cfs_period_us
-- cpu.rt_period_us
-- cpu.shares
-- cpu.cfs_quota_us
-- cpu.rt_runtime_us
-- cpu.stat
-```	
-cpu 开头的都跟cpu 子系统有关。可以一次挂载多个子系统，比如`-o cpu,mem`
+![](/public/upload/linux/linux_cgroup_object.png)
 
 ### 从右向左 ==> 和docker run放在一起看 
 
@@ -217,31 +184,11 @@ struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p){
     return mem_cgroup_from_css(task_subsys_state(p, mem_cgroup_subsys_id));
 }
 ```
-### 整体
 
-![](/public/upload/linux/linux_cgroup_object.png)
 
-在系统运行之初，内核的主函数就会对root cgroups和css_set进行初始化，每次 task 进行 fork/exit 时，都会附加（attach）/ 分离（detach）对应的css_set。
 
-    struct cgroup { 
-        unsigned long flags; 
-        atomic_t count; 
-        struct list_head sibling; 
-        struct list_head children; 
-        struct cgroup *parent; 
-        struct dentry *dentry; 
-        struct cgroup_subsys_state *subsys[CGROUP_SUBSYS_COUNT]; 
-        struct cgroupfs_root *root;
-        struct cgroup *top_cgroup; 
-        struct list_head css_sets; 
-        struct list_head release_list; 
-        struct list_head pidlists;
-        struct mutex pidlist_mutex; 
-        struct rcu_head rcu_head; 
-        struct list_head event_list; 
-        spinlock_t event_list_lock; 
-    };
 
-sibling,children 和 parent 三个嵌入的 list_head 负责将统一层级的 cgroup 连接成一棵 cgroup 树。
+
+
 
 
