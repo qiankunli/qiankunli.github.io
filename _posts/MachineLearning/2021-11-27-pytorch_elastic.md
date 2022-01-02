@@ -63,6 +63,8 @@ Rendezvous 负责集群逻辑，保证节点之间对于""有哪些节点参与�
 
 ### RendezvousHandler
 
+RendezvousHandler = 类似rpc 框架中的注册中心 + 协商逻辑，必要时还要自己 启动注册中心（后面的TCPStore），层层抽象将注册中心的kv 操作 ==> state 操作（Backend） ==> 注册、发现、rank/world_size 协商。[PyTorch 分布式之弹性训练(5)---Rendezvous 引擎](https://mp.weixin.qq.com/s/Fmvp8oE41zqI-IG4sRHp0Q)
+
 Rendezvous 的支撑系统
 1. RendezvousParameters ，构建RendezvousHandler所需参数。
 2. RendezvousSettings ，用来存储rendezvous的配置，可以理解为静态元信息。
@@ -70,23 +72,20 @@ Rendezvous 的支撑系统
 4. _NodeDesc 是rendezvous的一个节点。
 5. backend， RendezvousBackend
 
-RendezvousHandler = 类似rpc 框架中的注册中心 + 协商逻辑，必要时还要自己 启动注册中心（后面的TCPStore），层层抽象将注册中心的kv 操作 ==> state 操作（Backend） ==> 注册、发现、rank/world_size 协商。[PyTorch 分布式之弹性训练(5)---Rendezvous 引擎](https://mp.weixin.qq.com/s/Fmvp8oE41zqI-IG4sRHp0Q)
-
 ```python
 # /pytorch/torch/distributed/elastic/rendezvous/api.py
 # rdzv backend: etcd/etcd-v2/c10d/static
 class RendezvousHandler(ABC):
-    def next_rendezvous(self,) -> Tuple[Store, rank, world_size]  # 建立 rendezvous 时 agent 获取 rank 和world_size
-    
+    def next_rendezvous(self,) -> Tuple[Store, rank, world_size]  # 注册、发现、协商都得用它
+
     def get_backend(self) -> str
     def is_closed(self) -> bool
     def set_closed(self)
     def num_nodes_waiting(self) -> int
     def get_run_id(self) -> str
     def shutdown(self) -> bool  # 监听worker 失效后关闭 本轮rendezvous
-
 ```
-pytoch 针对 RendezvousHandler（有多种实现） 维护了一个 RendezvousHandlerRegistry
+pytoch 针对 RendezvousHandler（有多种实现 DynamicRendezvousHandler/StaticTCPRendezvous等） 维护了一个 RendezvousHandlerRegistry，launch_agent ==> `rdzv_handler = rdzv_registry.get_rendezvous_handler(rdzv_parameters)` 首先 根据backend 确定类型，再根据 rdzv_parameters 对 rendezvous_handler 初始化。
 ```python
 # /pytorch/torch/distributed/elastic/rendezvous/api.py
 class RendezvousHandlerRegistry:
@@ -95,8 +94,6 @@ class RendezvousHandlerRegistry:
     def create_handler(self, params: RendezvousParameters) -> RendezvousHandler:
 rendezvous_handler_registry = RendezvousHandlerRegistry()
 ```
-
-launch_agent ==> `rdzv_handler = rdzv_registry.get_rendezvous_handler(rdzv_parameters)` 首先 根据backend 确定类型，再根据 rdzv_parameters 对 rendezvous_handler 初始化。
 
 实际运行发现 rdzv_endpoint 中指定的port 由 `python -m torch.distributed.run train_script.py` 进程监听，也就是 **c10dStore 运行在 elastic agent 上**。PS： **代码上看 etcd 系列的会清晰一下**。
 
