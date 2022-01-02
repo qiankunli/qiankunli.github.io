@@ -159,6 +159,7 @@ agent 总体逻辑如下
     1. 调用 _rendezvous，其内部：调用 next_rendezvous 处理成员关系变化，调用 _assign_worker_ranks 为 worker 建立 ranks。
     2. 调用 _start_workers 启动 workers。
 2. 调用 _monitor_workers 监控这些进程的运行结果。
+代码结构上，agent 实现了启动、停止、监控worker的逻辑，将rendezvous 逻辑抽象成/委托给 RendezvousHandler负责，agent 就是 worker 管理 与 RendezvousHandler 的协作。
 
 elastic agent 的可扩展性非常好，在 1.9.0 版本中，一共有三个 Agent，分别是 ElasticAgent、SimpleElasticAgent 和 LocalElasticAgent。
 其中 ElasticAgent 是一个 Abstract Class，SimpleElasticAgent 对其中的某些函数进行了实现（半成品），而 LocalElasticAgent 则实现了管理单机上所有 worker 进程的 elastic agent。
