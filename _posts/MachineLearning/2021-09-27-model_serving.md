@@ -17,6 +17,27 @@ keywords:  mpi
 1. 在线预测
 2. 批量预测
 
+## 以tensorflow 为例
+
+模型文件目录
+```
+/tmp/mnist
+    /1  # 表示模型版本号为1
+        /saved_model.pb
+        /variables
+            /variables.data-00000-of-00001
+            /variables.index
+```
+发布模型
+```
+tensoflow_model_server --port=9000 --model_name=mnist --model_base_path=/tmp/mnist
+```
+更新线上的模型服务，对于新旧版本的文件处于同一个目录的情况，ModelServer 默认会自动加载新版本的模型
+```
+python tensorflow_serving/example/mnist_saved_model.py --training_iteration=10000 --model_version=2 /tmp/mnist
+Exporting trained model to /tmp/mnist/2
+```
+
 ## 特点
 
 [Morphling：云原生部署 AI ， 如何把降本做到极致？](https://mp.weixin.qq.com/s/Kl4Bimy6YCfGLZbK12pGcg) 专门整了一个论文，推理业务相对于传统服务部署的配置有以下特性：

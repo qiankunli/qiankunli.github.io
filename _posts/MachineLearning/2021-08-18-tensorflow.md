@@ -48,14 +48,19 @@ Y_ = tf.placeholder(...)
 w = tf.Variable(...)
 b = tf.Variable(...)
 Y = tf.matmul(X,w) + b
+# 使用交叉熵作为损失值
 loss = tf.reduce_mean(...)
+# 创建梯度下降优化器
 optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
+# 定义单步训练操作
 train_op = optimizer.minimize(loss,...)
 with tf.Session() as sess:
   sess.run(tf.global_variables_initializer())
   for step in xrange(max_train_steps):
       sess.run(train_op,...)
 ```
+
+当我们调用 `sess.run(tf.global_variables_initializer())` 语句执行单步训练操作时，程序内部首先提取单步训练操作依赖的所有前置操作，这些操作的节点共同组成一幅子图。然后程序将子图中的计算节点、存储节点和数据节点按照各自的执行设备分类（可以在创建节点时指定执行该节点的设备），相同设备上的节点组成了一幅局部图。每个设备上的局部图在实际执行时，根据节点间的依赖关系将各个节点有序的加载到设备上执行。
 
 ## 分布式
 
@@ -97,7 +102,7 @@ with tf.device("/job:worker/task:7"):
 
 ps worker模型，  一般来说，基于TensorFlow 库写一个机器学习任务（read dataset，定义层， 确定loss）执行即可。
 
-TensorFlow 没有提供一次性启动整个集群的解决方案，所以用户需要在每台机器上逐个手动启动一个集群的所有ps 和worker 任务。
+TensorFlow 没有提供一次性启动整个集群的解决方案，所以用户需要在每台机器上逐个手动启动一个集群的所有ps 和worker 任务。为了能够以同一行代码启动不同的任务，我们需要将所有worker任务的主机名和端口、 所有ps任务的主机名和端口、当前任务的作业名称以及任务编号这4个集群配置项参数化。通过输入不同的命令行参数组合，用户就可以使用同一份代码启动每一个任务。
 
 ```sh
 // 在在参数服务器上执行

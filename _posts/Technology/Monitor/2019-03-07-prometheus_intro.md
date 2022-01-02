@@ -267,6 +267,8 @@ Time series Selectors 从time series 中选择需要的数据
 
 [Grafana 图形面板高级定制方法](https://mp.weixin.qq.com/s/4GHAr1gevw6leCYhuNWu4g)
 
+[光速入门Prometheus+Grafana](https://tkedocs.finops.cc/#/prome) 未读
+
 ## rules
 
 Prometheus uses rules to create new time series and to generate alerts. rule 分为两种类型：RecordingRule 和 AlertingRule
