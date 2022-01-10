@@ -130,41 +130,37 @@ Linux 提供了一个 vfs 接口，任何资源都是File， 提供Open/Close/Cr
 1. 找一个etcd image，组织一个pod，进而写一个 deployment.yaml，kubectl apply 一下
 2. 使用helm
 3. kubernetes operator [etcd Operator](https://coreos.com/operators/etcd/docs/latest/)。
-
-        apiVersion: etcd.database.coreos.com/v1beta2
-        kind: EtcdCluster
-        metadata:
-        name: example
-        spec:
-            size: 3
-            version: 3.2.13
+    ```yaml
+    apiVersion: etcd.database.coreos.com/v1beta2
+    kind: EtcdCluster
+    metadata:
+    name: example
+    spec:
+        size: 3
+        version: 3.2.13
+    ```
 
 使用etcd operator 有一个比较好玩的地方，仅需调整 size 和 version 配置，就可以控制etcd cluster 个数和版本，比第一种方法方便的多了。
 
 ### redis
 
-我们在看一个redis cluster 的部署过程，可以看到， **operator让你以更贴近redis的特质来部署reids**，而不是在部署deployment和拼装pod。
+[网易有道Redis云原生实战](https://mp.weixin.qq.com/s/wtRXzyl9GP9q6P0uYq2GVg) 在operator 中处理掉哨兵/集群模式、持久化、 节点故障、 迁移、扩缩容等问题。
 
-    apiVersion: app.redislabs.com/v1alpha1
-    kind: RedisEnterpriseCluster
-    metadata:
-    name: redis-enterprise
-    spec:
-    nodes: 3
-    persistentSpec:
-        enabled: 'true'
-        storageClassName: gp2
-    uiServiceType: LoadBalancer
-    username: admin@acme.com
-    redisEnterpriseNodeResources:
-        limits:
-        cpu: 400m
-        memory: 4 Gi
-        requests:
-        cpu: 400m
-        memory: 4 Gi
-    redisEnterpriseImageSpec:
-        imagePullPolicy: IfNotPresent
-        repository: redislabs/redis
-        versionTag: 5.4.0-19
-
+```yaml
+apiVersion: Redis.io/v1beta1
+kind: RedisCluster
+metadata:
+  name: my-release
+spec:
+  size: 3
+  imagePullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  config:
+    maxclients: "10000"
+```

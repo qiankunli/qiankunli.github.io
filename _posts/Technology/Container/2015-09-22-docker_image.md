@@ -16,6 +16,8 @@ keywords: Docker image Dockerfile
 
 [自下而上学习容器](https://mp.weixin.qq.com/s/1jpgYUU6J1W1brihJRnzKQ)对于熟悉 runc 是如何启动容器的人来说，他们都知道镜像并非是必需的。那我们为什么还要有容器镜像？当每一个容器都包含根文件系统的一个数兆字节那么大的拷贝副本时，所需的磁盘空间就会急剧增加。因此，镜像的存在是为了有效地解决存储和发行问题。
 
+[如何在golang代码里面解析容器镜像](https://mp.weixin.qq.com/s/viq9wJiHBH6AsLYLCtLpRA)
+
 ## 打包所有依赖
 
 代码分发：在物理机时代， springboot项目普遍都带了一个run.sh文件，不论项目本身的特点如何，开发和运维约定`run.sh start/stop`来启停应用

@@ -19,14 +19,17 @@ keywords: Go goroutine scheduler
 [The Go scheduler](https://morsmachine.dk/go-scheduler)为什么Go 运行时需要一个用户态的调度器？
 1. 线程调度成本高，比如context switch比如陷入内核执行，如创建一个 Goroutine 的栈内存消耗为 2 KB，而 thread 占用 1M 以上空间
 2. 操作系统在Go模型下不能做出好的调度决策。os 只能根据时间片做一些简单的调度。
+3. 协程的威力在于IO的处理，恰好这部分是线程的软肋
 
-[调度的本质](https://mp.weixin.qq.com/s/5E5V56wazp5gs9lrLvtopA)Go 调度的本质是一个生产-消费流程，生产端是正在运行的 goroutine 执行 go func(){}() 语句生产出 goroutine 并塞到三级队列中去（包含P的runnext），消费端则是 Go 进程中的 m 在不断地执行调度循环。运行时(runtime)能够将goroutine多路复用到一个小的线程池中。这个观点非常新颖，这种熟悉加意外的效果其实就是你成长的时机。
+[调度的本质](https://mp.weixin.qq.com/s/5E5V56wazp5gs9lrLvtopA)Go 调度的本质是一个生产-消费流程，生产端是正在运行的 goroutine 执行 `go func(){}()` 语句生产出 goroutine 并塞到三级队列中去（包含P的runnext），消费端则是 Go 进程中的 m 在不断地执行调度循环。运行时(runtime)能够将goroutine多路复用到一个小的线程池中。这个观点非常新颖，这种熟悉加意外的效果其实就是你成长的时机。
 
 ![](/public/upload/go/go_scheduler_overview.png)
 
 调度器的任务是给不同的工作线程 (worker thread) 分发可供运行的（ready-to-run）Goroutine。 
 
 [万字长文深入浅出 Golang Runtime](https://zhuanlan.zhihu.com/p/95056679)调度在计算机中是分配工作所需资源的方法，linux的调度为CPU找到可运行的线程，而Go的调度是为M（线程）找到P（内存、执行票据）和可运行的G。
+
+[谈谈协程的历史与现状](https://mp.weixin.qq.com/s/5H_ux7cYv03ponKlNnmfRg)IO密集型一直是提高CPU利用率的难点，在抢占式调度中也有对应的解决方案：异步+回调，但原来整体的逻辑被拆分为好几个部分，让整个程序的可读性非常差。随着网络技术的发展和高并发要求，**对IO型任务处理的低效逐渐受到重视**，终于协程的机会来了。go中的协程被称为goroutine，协程对操作系统而言是透明的，也就是操作系统无法直接调度协程，因此必须有个中间层来接管goroutine。goroutine仍然是基于线程来实现的，因为线程才是CPU调度的基本单位，在go语言内部维护了一组数据结构和N个线程，**协程的代码被放进队列中来由线程来实现调度执行**，这就是著名的GMP模型。
 
 ## 调度模型的演化
 

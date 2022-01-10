@@ -29,6 +29,8 @@ keywords: container network
 
 ## docker 单机
 
+[怎么从传统的Linux网络视角理解容器网络？](https://mp.weixin.qq.com/s/Y4Rgj_587q2lC4lctrqbqg)单主机容器网络是已知的Linux功能的简单组合，并且不需要任何代码就可以让这样的网络魔法发生。
+
 ![](/public/upload/network/container_network_host.png)
 
 [Kubernetes 网络模型进阶](https://mp.weixin.qq.com/s/QZYpV7ks2xxNvtqWUiS7QQ)容器网络发端于 Docker 的网络。Docker 使用了一个比较简单的网络模型，即内部的网桥加内部的保留 IP。这种设计的好处在于容器的网络和外部世界是解耦的，无需占用宿主机的 IP 或者宿主机的资源，完全是虚拟的。

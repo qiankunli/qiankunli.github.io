@@ -4,7 +4,7 @@ layout: post
 title: Linux可观测性
 category: 技术
 tags: Linux
-keywords: debug
+keywords: 可观测性
 
 ---
 

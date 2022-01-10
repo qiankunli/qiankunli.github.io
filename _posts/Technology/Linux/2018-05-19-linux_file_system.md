@@ -4,7 +4,7 @@ layout: post
 title: linux vfs轮廓
 category: 技术
 tags: Linux
-keywords: network 
+keywords: vfs file system
 
 ---
 

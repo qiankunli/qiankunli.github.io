@@ -375,12 +375,11 @@ After the call, all 16 tensors on the two nodes will have the all-reduced value 
 
 ![](/public/upload/machine/pytorch_process_group.png)
 
-可以看下 ProcessGroup 的接口定义
+可以看下 ProcessGroup 的接口定义（从理论上，Ring AllReduce 分为Split/ScatterReudce/AllGather 三个步骤，不同框架命名会有差异）
 
 ```python
 # torch/_C/_distributed_c10d.py
 class ProcessGroup(__pybind11_builtins.pybind11_object):
-    # no doc
     def allgather(self, *args, **kwargs): 
     def allgather_coalesced(self, output_lists, *args, **kwargs): 
     def allreduce(self, *args, **kwargs): 
