@@ -70,6 +70,8 @@ Actor 可以创建新的 Actor，这些 Actor 最终会呈现出一个树状结�
 
 ## CSP 模型
 
+Tony Hoare提出的 CSP（Communicationing Sequential Processes，通信顺序进程）并发模型。在 Tony Hoare 眼中，一个符合 CSP 模型的并发程序应该是一组通过输入输出原语连接起来的 P 的集合。从这个角度来看，CSP 理论不仅是一个并发参考模型，也是一种并发程序的程序组织方法。
+
 Golang 中协程之间通信推荐的是使用 channel，channel 你可以形象地理解为现实世界里的管道。需要注意的是 Golang 中 channel 的容量可以是 0，容量为 0 的 channel 在 Golang 中被称为无缓冲的 channel，容量大于 0 的则被称为有缓冲的 channel。无缓冲的 channel 类似于 Java 中提供的 SynchronousQueue
 
 ```go

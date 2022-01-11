@@ -75,6 +75,8 @@ G1正在M上执行，还有 3 个 Goroutine 在 LRQ 上等待执行
 
 ![](/public/upload/go/go_scheduler_async_systemcall_3.png)
 
+梳理：如果 G 被阻塞在某个 channel 操作或网络 I/O 操作上时，G 会被放置到某个等待（wait）队列中，而 M 会尝试运行 P 的下一个可运行的 G。如果这个时候 P 没有可运行的 G 供 M 运行，那么 M 将解绑 P，并进入挂起状态。当 I/O 操作完成或 channel 操作完成，在等待队列中的 G 会被唤醒，标记为可运行（runnable），并被放入到某 P 的队列中，绑定一个 M 后继续执行。
+
 ### 同步系统调用
 
 G1将进行同步系统调用以阻塞M1
@@ -89,20 +91,54 @@ G1将进行同步系统调用以阻塞M1
 
 ![](/public/upload/go/go_scheduler_sync_systemcall_3.png)
 
+梳理：如果 G 被阻塞在某个系统调用（system call）上，那么不光 G 会阻塞，执行这个 G 的 M 也会解绑 P，与 G 一起进入挂起状态。如果此时有空闲的 M，那么 P 就会和它绑定，并继续执行其他 G；如果没有空闲的 M，但仍然有其他 G 要去执行，那么 Go 运行时就会创建一个新 M（线程）。当系统调用返回后，阻塞在这个系统调用上的 G 会尝试获取一个可用的 P，如果没有可用的 P，那么 G 会被标记为 runnable，之前的那个挂起的 M 将再次进入挂起状态。
 
 ## sysmon 协程
+
+Go 程序启动时，运行时会去启动一个名为 sysmon 的 M（一般称为监控线程），这个 M 的特殊之处在于它不需要绑定 P 就可以运行（以 g0 这个 G 的形式）。
+
+```go
+// $GOROOT/src/runtime/proc.go
+// The main goroutine.
+func main() {
+     ... ...
+    systemstack(func() {
+        newm(sysmon, nil)
+    })
+    .... ...
+}
+// Always runs without a P, so write barriers are not allowed.
+// go:nowritebarrierrec
+func sysmon() {
+    // If a heap span goes unused for 5 minutes after a garbage collection,
+    // we hand it back to the operating system.
+    scavengelimit := int64(5 * 60 * 1e9)
+    ... ...
+    if  .... {
+        ... ...
+        // retake P's blocked in syscalls and preempt long running G's
+        if retake(now) != 0 {
+            idle = 0
+        } else {
+            idle++
+        }
+       ... ...
+    }
+}
+```
 
 ![](/public/upload/go/go_scheduler_sysmon.jpg)
 
 在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.在 go 运行时中也有类似的协程 sysmon. sysmon 运行在 M，且不需要 P。它会每隔一段时间**检查 Go 语言runtime**，确保程序没有进入异常状态。
 
 
-系统监控的触发时间就会稳定在 10ms，功能比较多: 
+sysmon 每 20us~10ms 启动一次，功能比较多: 
 
 1. 检查死锁runtime.checkdead 
 2. 运行计时器 — 获取下一个需要被触发的计时器；
-3. 定时从 netpoll 中获取 ready 的协程
-4. [Go 的抢占式调度](https://mp.weixin.qq.com/s/d7FdGBc0S0V3S4aRL4EByA)当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中，当 G 进行函数调用时，G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。由于它的工作方式（函数调用触发），在 `for{}` 的情况下并不会发生抢占，如果没有函数调用，即使设置了抢占标志，也不会进行该标志的检查。Go1.14 引入抢占式调度（使用信号的异步抢占机制），sysmon 仍然会检测到运行了 10ms 以上的 G（goroutine）。然后，sysmon 向运行 G 的 P 发送信号（SIGURG）。Go 的信号处理程序会调用P上的一个叫作 gsignal 的 goroutine 来处理该信号，将其映射到 M 而不是 G，并使其检查该信号。gsignal 看到抢占信号，停止正在运行的 G。
-5. 在满足条件时触发垃圾收集回收内存；
+3. 将长时间未处理的 netpoll 结果添加到任务队列；
+4. 向长时间运行的 G 任务发出抢占调度（retake 方法）；[Go 的抢占式调度](https://mp.weixin.qq.com/s/d7FdGBc0S0V3S4aRL4EByA)当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中，当 G 进行函数调用时，G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。由于它的工作方式（函数调用触发），在 `for{}` 的情况下并不会发生抢占，如果没有函数调用，即使设置了抢占标志，也不会进行该标志的检查。Go1.14 引入抢占式调度（使用信号的异步抢占机制），sysmon 仍然会检测到运行了 10ms 以上的 G（goroutine）。然后，sysmon 向运行 G 的 P 发送信号（SIGURG）。Go 的信号处理程序会调用P上的一个叫作 gsignal 的 goroutine 来处理该信号，将其映射到 M 而不是 G，并使其检查该信号。gsignal 看到抢占信号，停止正在运行的 G。
 6. 打印调度信息,归还内存等定时任务.
+7. 释放闲置超过 5 分钟的 span 内存；如果超过 2 分钟没有垃圾回收，强制执行；
+7. 收回因 syscall 长时间阻塞的 P；
 

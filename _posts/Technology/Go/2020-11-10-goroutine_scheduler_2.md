@@ -324,7 +324,9 @@ func main() {
 }
 ```
 
-### 调度循环
+### “M的”调度循环
+
+M 是 Go 代码运行的真实载体，包括 Goroutine 调度器自身的逻辑也是在 M 中运行的。M在绑定有效的 P 后，进入一个调度循环，而调度循环的机制大致是从 P 的本地运行队列以及全局队列中获取 G，切换到 G 的执行栈上并执行 G 的函数，调用 goexit 做清理工作并回到 M，如此反复。
 
 伪代码
 ```go
@@ -339,7 +341,7 @@ func schedule(){
     }
 }
 ```
-m 拿到 goroutine 并运行它的过程就是一个消费过程
+m 拿到 goroutine 并运行它的过程就是一个消费者消费队列的过程
 ```
 schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexit0()->schedule()
 ```
@@ -352,7 +354,8 @@ schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexi
 
 [Go 的抢占式调度](https://mp.weixin.qq.com/s/d7FdGBc0S0V3S4aRL4EByA)有两种主要的多任务调度方法：“协作”和“抢占”。协作式多任务处理也称为“非抢占”。在协作式多任务处理中，程序的切换方式取决于程序本身。“协作”一词是指这样一个事实：程序应设计为可互操作的，并且它们必须彼此“协作”。在抢占式多任务处理中，程序的切换交给操作系统。调度是基于某种算法的，例如基于优先级，FCSV，轮询等。
 
-那么现在，goroutine 的调度是协作式还是抢占式的？至少在 Go1.13 之前，它是协作式的。当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中，**当 G 进行函数调用时**（os 中断是指令完毕时，进而执行中断处理程序，重新拿到cpu使用权），G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。
+那么现在，goroutine 的调度是协作式还是抢占式的？至少在 Go1.13 之前，它是协作式的。当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中（Go 编译器在每个函数或方法的入口处加上了一段额外的代码 runtime.morestack_noctxt），**当 G 进行函数调用时**，G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。
+
 ```go
 func main() {
     go fmt.Println("hi")
@@ -362,7 +365,7 @@ func main() {
 }
 ```
 
-Go1.14 引入抢占式调度（使用信号的异步抢占机制），sysmon 仍然会检测到运行了 10ms 以上的 G（goroutine）。然后，sysmon 向运行 G 的 P 发送信号（SIGURG）。Go 的信号处理程序会调用P上的一个叫作 gsignal 的 goroutine 来处理该信号，将其映射到 M 而不是 G，并使其检查该信号。gsignal 看到抢占信号，停止正在运行的 G。
+Go1.14 引入抢占式调度（使用信号的异步抢占机制），sysmon 会检测到运行了 10ms 以上的 G（goroutine）。然后，sysmon 向运行 G 的 P 发送信号（SIGURG）。Go 的信号处理程序会调用P上的一个叫作 gsignal 的 goroutine 来处理该信号，将其映射到 M 而不是 G，并使其检查该信号。gsignal 看到抢占信号，停止正在运行的 G。PS： os 中断是指令完毕时，进而执行中断处理程序，重新拿到cpu使用权
 
 因进入系统调用时间过长而发生的抢占调度。而对于系统调用执行时间过长的goroutine，调度器并没有暂停其执行，只是剥夺了正在执行系统调用的工作线程所绑定的p，要等到工作线程从系统调用返回之后绑定p失败的情况下该goroutine才会真正被暂停运行。
 

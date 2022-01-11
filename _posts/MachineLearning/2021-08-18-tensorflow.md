@@ -52,7 +52,7 @@ print(z)
 ```
 可以看到，在tensorflow1.0 静态图场景下，z 输出为空。`z = tf.strings.join([x,y],separator=" ")` **没有真正运行**（我们发明一个叫tensorflow的deep learning dsl，并且提供python api，让用户在python中通过元编程编写tensorflow代码），只有运行`session.run(z)` z 才会真正有值。在TensorFlow1.0时代，采用的是静态计算图，需要先使用TensorFlow的各种算子创建计算图，然后再开启一个会话Session，显式执行计算图。**模型搭建和训练分为两个阶段**，由两种语言分别实现编程接口和核心运行时，还涉及到计算图的序列化及跨组件传输。而在TensorFlow2.0时代，采用的是动态计算图，**模型的搭建和训练放在一个过程中**，即每使用一个算子后，该算子会被动态加入到隐含的默认计算图中立即执行得到结果，不需要使用Session了，像原始的Python语法一样自然。
 
-从数据流图中取数据、给数据流图加载数据等 一定要通过session.run 的方式执行，没有在session 中执行之前，整个数据流图只是一个壳。 **python 是一门语言，而tensorflow 的python api 并不是python** ，而是一种领域特定语言，没有跟python 解释器打通， 也因此tensorflow python中不要使用逻辑控制，“python代码”都会send 到一个执行引擎来跑。
+从数据流图中取数据、给数据流图加载数据等 一定要通过session.run 的方式执行，没有在session 中执行之前，整个数据流图只是一个壳。 **python 是一门语言，而tensorflow 的python api 并不是python** ，而是一种领域特定语言，负责描述 TensorFlow的前端，没有跟python 解释器打通， 也因此tensorflow python中不要使用逻辑控制，“python代码”都会send 到一个执行引擎来跑。除了TensorFlow 自身外，keras（更高层api） 也可以作为TensorFlow 的前端。
 
 数据流图上节点的执行顺序的实现参考了拓扑排序的设计思想
 1. 以节点名称作为关键字，入度作为值，创建一张散列表，并将此数据流图上的所有节点放入散列表中。
@@ -107,6 +107,35 @@ with tf.Session() as sess:
 当我们调用 `sess.run(train_op)` 语句执行训练操作时，程序内部首先提取单步训练操作依赖的所有前置操作，这些操作的节点共同组成一幅子图。然后程序将子图中的计算节点、存储节点和数据节点按照各自的执行设备分类（可以在创建节点时指定执行该节点的设备），相同设备上的节点组成了一幅局部图。每个设备上的局部图在实际执行时，根据节点间的依赖关系将各个节点有序的加载到设备上执行。
 
 ![](/public/upload/machine/tensorflow_graph.png)
+
+### keras
+
+[聊聊Keras的特点及其与其他框架的关系](https://mp.weixin.qq.com/s/fgG95qqbrV07EgAqLXuFAg)
+
+```python
+# 声明个模型
+model = models.Sequential()
+# 把部件像乐高那样拼起来
+model.add(keras.layers.Dense(512, activation=keras.activations.relu, input_dim=28*28))
+model.add(keras.layers.Dense(10, activation=keras.activations.softmax))
+# 编译模型
+model.compile(loss='categorical_crossentropy',optimizer='sgd',metrics=['accuracy'])
+## 训练
+model.fit(X_train,Y_train,nb_epoch=5,batch_size=32)
+# 预估
+model.evaluate(X_test,Y_test,batch_size=32)
+# 预测
+classes = model.predict_classes(X_test,batch_size=32)
+```
+
+和 TensorFlow session 的关系：Keras doesn't directly have a session because it supports multiple backends. Assuming you use TF as backend, you can get the global session as:
+
+```
+from keras import backend as K
+sess = K.get_session()
+```
+
+If, on the other hand, yo already have an open Session and want to set it as the session Keras should use, you can do so via: `K.set_session(sess)`
 
 ## 分布式训练
 
