@@ -52,7 +52,7 @@ print(z)
 ```
 可以看到，在tensorflow1.0 静态图场景下，z 输出为空。`z = tf.strings.join([x,y],separator=" ")` **没有真正运行**（我们发明一个叫tensorflow的deep learning dsl，并且提供python api，让用户在python中通过元编程编写tensorflow代码），只有运行`session.run(z)` z 才会真正有值。在TensorFlow1.0时代，采用的是静态计算图，需要先使用TensorFlow的各种算子创建计算图，然后再开启一个会话Session，显式执行计算图。**模型搭建和训练分为两个阶段**，由两种语言分别实现编程接口和核心运行时，还涉及到计算图的序列化及跨组件传输。而在TensorFlow2.0时代，采用的是动态计算图，**模型的搭建和训练放在一个过程中**，即每使用一个算子后，该算子会被动态加入到隐含的默认计算图中立即执行得到结果，不需要使用Session了，像原始的Python语法一样自然。
 
-从数据流图中取数据、给数据流图加载数据等 一定要通过session.run 的方式执行，没有在session 中执行之前，整个数据流图只是一个壳。 **python 是一门语言，而tensorflow 的python api 并不是python** ，而是一种领域特定语言，负责描述 TensorFlow的前端，没有跟python 解释器打通， 也因此tensorflow python中不要使用逻辑控制，“python代码”都会send 到一个执行引擎来跑。除了TensorFlow 自身外，keras（更高层api） 也可以作为TensorFlow 的前端。
+从数据流图中取数据、给数据流图加载数据等 一定要通过session.run 的方式执行，没有在session 中执行之前，整个数据流图只是一个壳（符号）。 **python 是一门语言，而tensorflow 的python api 并不是python** ，而是一种领域特定语言，负责描述 TensorFlow的前端，没有跟python 解释器打通， 也因此tensorflow python中不要使用逻辑控制，“python代码”都会send 到一个执行引擎来跑。除了TensorFlow 自身外，keras（更高层api） 也可以作为TensorFlow 的前端。
 
 数据流图上节点的执行顺序的实现参考了拓扑排序的设计思想
 1. 以节点名称作为关键字，入度作为值，创建一张散列表，并将此数据流图上的所有节点放入散列表中。
@@ -86,152 +86,61 @@ print(sess.run(c))
 ### demo
 
 ```python
-import tensorflow as tf
-X = tf.placeholder(...)
-Y_ = tf.placeholder(...)
-w = tf.Variable(...)
-b = tf.Variable(...)
-Y = tf.matmul(X,w) + b
-# 使用交叉熵作为损失值
-loss = tf.reduce_mean(...)
-# 创建梯度下降优化器
-optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.01)
-# 定义单步训练操作
-train_op = optimizer.minimize(loss,...)
+# model parameters
+W = tf.Variable(0.3,  tf.float32)
+b = tf.Variable(-0.3, tf.float32)
+# model inputs & outputs
+x = tf.placeholder(tf.float32)
+y = tf.placeholder(tf.float32)
+# the model
+out = W * x + b
+# loss function
+loss = tf.reduce_sum(tf.square(out - y))
+# optimizer
+optimizer = tf.train.GradientDescentOptimizer(0.001)
+train = optimizer.minimize(loss)
+# training data
+x_train = np.random.random_sample((100,)).astype(np.float32)
+y_train = np.random.random_sample((100,)).astype(np.float32)
+# training
+init = tf.global_variables_initializer()
 with tf.Session() as sess:
-  sess.run(tf.global_variables_initializer())
-  for step in xrange(max_train_steps):
-      sess.run(train_op,...)
+    sess.run(init)
+    for i in range(1000):
+        sess.run(train, {x:x_train, y:y_train})
+        current_loss = sess.run(loss, {x:x_train, y:y_train})
+        print("iter step %d training loss %f" % (i, current_loss))
+    print(sess.run(W))
+    print(sess.run(b))
 ```
 
 当我们调用 `sess.run(train_op)` 语句执行训练操作时，程序内部首先提取单步训练操作依赖的所有前置操作，这些操作的节点共同组成一幅子图。然后程序将子图中的计算节点、存储节点和数据节点按照各自的执行设备分类（可以在创建节点时指定执行该节点的设备），相同设备上的节点组成了一幅局部图。每个设备上的局部图在实际执行时，根据节点间的依赖关系将各个节点有序的加载到设备上执行。
 
 ![](/public/upload/machine/tensorflow_graph.png)
 
-### keras
-
-[聊聊Keras的特点及其与其他框架的关系](https://mp.weixin.qq.com/s/fgG95qqbrV07EgAqLXuFAg)
-
-```python
-# 声明个模型
-model = models.Sequential()
-# 把部件像乐高那样拼起来
-model.add(keras.layers.Dense(512, activation=keras.activations.relu, input_dim=28*28))
-model.add(keras.layers.Dense(10, activation=keras.activations.softmax))
-# 编译模型
-model.compile(loss='categorical_crossentropy',optimizer='sgd',metrics=['accuracy'])
-## 训练
-model.fit(X_train,Y_train,nb_epoch=5,batch_size=32)
-# 预估
-model.evaluate(X_test,Y_test,batch_size=32)
-# 预测
-classes = model.predict_classes(X_test,batch_size=32)
-```
-
-和 TensorFlow session 的关系：Keras doesn't directly have a session because it supports multiple backends. Assuming you use TF as backend, you can get the global session as:
-
-```
-from keras import backend as K
-sess = K.get_session()
-```
-
-If, on the other hand, yo already have an open Session and want to set it as the session Keras should use, you can do so via: `K.set_session(sess)`
-
-## 分布式训练
-
-分布式训练的本质是分布式计算。
-
-### 基本理念
-
-分布式TensorFlow入门教程 https://zhuanlan.zhihu.com/p/35083779
-
-[炼丹师的工程修养之四： TensorFlow的分布式训练和K8S](https://zhuanlan.zhihu.com/p/56699786)无论是TensorFlow还是其他的几种机器学习框架，分布式训练的基本原理是相同的。大致可以从以下五个不同的角度来分类。
-
-1. 并行模式， 对于机器学习的训练任务，原来的“大”问题主要表现在两个方面。一是模型太大，我们需要把模型“拆”成多个小模型分布到不同的Worker机器上；二是数据太大，我们需要把数据“拆”成多个更小的数据分布到不同Worker上。
-2. 架构模式，通过模型并行或数据并行解决了“大问题”的可行性，接下来考虑“正确性”。以数据并行为例，当集群中的每台机器只看到1/N的数据的时候，我们需要一种机制在多个机器之间同步信息（梯度），来保证分布式训练的效果与非分布式是一致的（N * 1/N == N）。相对成熟的做法主要有基于参数服务器（ParameterServer）和基于规约（Reduce）两种模式。Tensorflow 既有 PS 模式又有对等模式，PyTorch 以支持对等模式为主，而 MXNET 以支持 KVStore 和 PS-Lite 的 PS 模式为主。 [ 快手八卦 --- 机器学习分布式训练新思路(1)](https://mp.weixin.qq.com/s/CYJzTP-wU3pmyR1lPCSsvg)
-3. 同步范式， 在梯度同步时还要考虑“木桶”效应，即集群中的某些Worker比其他的更慢的时候，导致计算快的Worker需要等待慢的Worker，整个集群的速度上限受限于最慢机器的速度。因此梯度的更新一般有**同步(Sync)、异步(Async)和混合**三种范式。
-  1. 同步模式中，在每一次迭代过程中，所有工作节点都需要进行通信，并且下一步迭代必须等待当前迭代的通信完成才能开始。
-  2. 反之，异步式分布算法 则不需要等待时间：当某个节点完成计算后就可直接传递本地梯度，进行模型更新。
-4. 物理架构，这里主要指基于GPU的部署架构，基本上分为两种：单机多卡和多机多卡
-5. 通信技术，要讨论分布式条件下多进程、多Worker间如何通信，常见的技术有MPI，NCCL，GRPC，RDMA等
+### 数据读取
 
 
-![](/public/upload/machine/distribute_tensorflow.png)
+TFRecord是Tensorflow训练和推断标准的数据存储格式之一，将数据存储为二进制文件（二进制存储具有占用空间少，拷贝和读取（from disk）更加高效的特点），而且不需要单独的标签文件了，其本质是一行行字节字符串构成的样本数据。一条TFRecord数据代表一个Example，一个Example就是一个样本数据，每个Example内部由一个字典构成，每个key对应一个Feature，key为字段名，Feature为字段名所对应的数据，Feature有三种数据类型：ByteList、FloatList，Int64List。TFRecord并不是一个self-describing的格式，也就是说，tfrecord的write和read都需要额外指明schema。
 
-### 架构模式
+1. 小规模生成TFRecord： python 代码将图像、文本等写入tfrecords文件需要建立一个writer对象，创建这个对象的是函数 `tf.python_io.TFRecordWriter`
+2. 大规模生成TFRecord：如何大规模地把HDFS中的数据直接喂到Tensorflow中呢？Tensorflow提供了一种解决方法：spark-tensorflow-connector，支持将spark DataFrame格式数据直接保存为TFRecords格式数据。
 
-1. 模型并行，从不同视角看
-  1. 网络拆分为层：深度学习模型一般包含很多层，如果要采用模型并行策略，一般需要将不同的层运行在不同的设备上，但是实际上层与层之间的运行是存在约束的：前向运算时，后面的层需要等待前面层的输出作为输入，而在反向传播时，前面的层又要受限于后面层的计算结果。所以除非模型本身很大，一般不会采用模型并行，因为模型层与层之间存在串行逻辑。但是如果模型本身存在一些可以并行的单元，那么也是可以利用模型并行来提升训练速度，比如GoogLeNet的Inception模块。
-  2. 计算图拆分为子图： 就是把计算图分成多个最小依赖子图，然后放置到不同的机器上，同时在上游子图和下游子图之间自动插入数据发送和数据接收节点，并做好网络拓扑结构的配置，各个机器上的子图通过进程间通信实现互联。
-2. 数据并行（主要方案）：因为训练费时的一个重要原因是训练数据量很大。数据并行就是在很多设备上放置相同的模型，并且各个设备采用不同的训练样本对模型训练。训练深度学习模型常采用的是batch SGD方法，采用数据并行，可以每个设备都训练不同的batch，然后收集这些梯度用于模型参数更新。所有worker共享ps 上的模型参数，并按照相同拓扑结构的数据流图进行计算。
 
-《用python实现深度学习框架》给出的ps/worker 模型的grpc 通信api定义
-```
-service ParameterService{
-  # ps 接收从各个worker 发送过来的请求，拿到各个节点的梯度，并根据节点名称累加到相应的缓存中
-  rpc Push(ParameterPushReq) returns (ParameterPushResq){}
-  rpc Push(ParameterPushReq) returns (ParameterPushResq){}
-  rpc VariableWeightsInit(VariableWeightsReqResp) returns(VariableWeightsInit){}
-}
-# ps server 实现
-class ParameterService(xxx):
-  def Push(self,push_req...):
-    node_with_gradients,acc_no = self._deserialize_push_req(push_req)
-    if self.sync:
-      self._push_sync(node_with_gradients,acc_no)
-    else:
-      self._push_async(node_with_gradients,acc_no)
-  def _push_sync(self,node_with_gradients,acc_no):
-    if self.cond.accquire():
-      # 等待上一轮所有worker 等下拉完成
-      while self.cur_pull_num != self.worker_num:
-        self.cond.wait()
-      # 记录上传次数
-      self.cur_push_num +=1
-      # 把梯度更新到缓存
-      self._update_gradients_cache(node_with_gradients)
-      # 累计梯度数量
-      self.acc_no += acc_no
-      if self.cur_push_num >= self.worker_num:
-        self.cur_pull_num = 0
-        self.cond.notify_all()
-      self.cond.release()
-    else
-      self.cond.wait()
-# main 实现
-def train(worker_index):
-  ...
-if __name__ == '__main__':
-  # 解析参数
-  if role == 'ps':
-    server = ps.ParameterServiceServer(...)
-    server.serve()
-  else:
-    worker_index = args.worker_index
-    train(worker_index)
-```
+Tensorflow封装了一组API来处理数据的读入，它们都属于模块 tf.data
+1. 从磁盘/内存中获取源数据，比如直接读取特定目录的下的 xx.png 文件，使用 dataset.map 将输入数据转为 dataset 要求
+2. 读入TFrecords数据集，`dataset = tf.data.Dataset.TFRecordDataset("dataset.tfrecords")`
+3. 训练机器学习模型的时候，会将数据集遍历多轮（epoch），每一轮遍历都以mini-batch的形式送入模型（batch），数据遍历应该随机进行（shuffle）。
+  ```python
+  dataset = dataset.repeat(10) # 10 epoches
+  dataset = dataset.batch(64) # batch_size: 64
+  dataset = dataset.shuffle(buffer_size=10000)
+  iterator = dataset.make_one_shot_iterator()
+  next_element = iterator.get_next()
+  # next_element只是一个“符号”，需要用Session运行才能真正得到数据。
+  ```
 
-Ring AllReduce 分为Split/ScatterReudce/AllGather 三个步骤(《用python实现深度学习框架》配图解释的非常好)，对于每个worker 来说，它既是右邻居的client，要把自身的梯度发送出去，又是左邻居的server，接收来自左邻居的梯度。AllReduce 的gprc 定义
-```
-service RingAllReduceService{
-  rpc Receive(RingAllReduceReq) returns (RingAllReduceResp){}
-  rpc VariableWeightsInit(VariableWeightsReqResp) returns(VariableWeightsInit){}
-}
-message RingAllReduceReq{
-  enum Stage{
-    INIT = 0;
-    Scatter = 1;
-    Gather = 2;
-  }
-  Stage stage = 1;
-  NodeGradients node_gradients = 2;
-}
-```
-
-VariableWeightsInit 在单机训练的场景下，各变量节点的值是随机初始化的，但是分布式训练场景下，如果多个worker节点也各自随机初始化自己的变量节点，则会导致模型参数在多个worker 节点上不一致。其实从理论上说，随机甚至还是好事，不过从编程来说，还得加上这个保证。
-
-PS：训练是可以拆的，既然可以拆，一个机器多个卡，跟跑在多个机器上就区别不大了，如同把cluster里面的设备当成本机设备一样使用。
-
+## 使用GPU 
 ```py
 // with tf.device 语句来指定某一行代码作用域对应的目标设备
 with tf.device("/job:ps/task:0"):
@@ -250,7 +159,58 @@ with tf.device("/job:worker/task:7"):
   train_op = ...
 ```
 
-### tensorflow启动示例
+## keras
+Keras 是开源 Python 包，由于 Keras 的独立性，Keras 具有自己的图形数据结构，用于定义计算图形：它不依靠底层后端框架的图形数据结构。PS： 所有有一个model.compile 动作？
+[聊聊Keras的特点及其与其他框架的关系](https://mp.weixin.qq.com/s/fgG95qqbrV07EgAqLXuFAg)
+
+### 示例demo
+```python
+# 声明个模型
+model = models.Sequential()
+# 把部件像乐高那样拼起来
+model.add(keras.layers.Dense(512, activation=keras.activations.relu, input_dim=28*28))
+model.add(keras.layers.Dense(10, activation=keras.activations.softmax))
+# 编译模型
+model.compile(loss='categorical_crossentropy',optimizer='sgd',metrics=['accuracy'])
+## 训练
+model.fit(X_train,Y_train,nb_epoch=5,batch_size=32)
+# 预估
+model.evaluate(X_test,Y_test,batch_size=32)
+# 预测
+classes = model.predict_classes(X_test,batch_size=32)
+```
+
+### 和session 的关系
+和 TensorFlow session 的关系：Keras doesn't directly have a session because it supports multiple backends. Assuming you use TF as backend, you can get the global session as:
+
+```
+from keras import backend as K
+sess = K.get_session()
+```
+
+If, on the other hand, yo already have an open Session and want to set it as the session Keras should use, you can do so via: `K.set_session(sess)`
+
+### callback
+
+callbacks能在fit、evaluate和predict过程中加入伴随着模型的生命周期运行，目前tensorflow.keras已经构建了许多种callbacks供用户使用，用于防止过拟合、可视化训练过程、纠错、保存模型checkpoints和生成TensorBoard等。
+
+callback 的关键是实现一系列 on_xx方法，callback与 训练流程的协作伪代码
+
+```python
+callbacks.on_train_begin(...)
+for epoch in range(EPOCHS):
+    callbacks.on_epoch_begin(epoch)
+    for i, data in dataset.enumerate():
+        callbacks.on_train_batch_begin(i)
+        batch_logs = model.train_step(data)
+        callbacks.on_train_batch_end(i, batch_logs)
+    epoch_logs = ...
+    callbacks.on_epoch_end(epoch, epoch_logs)
+final_logs=...
+callbacks.on_train_end(final_logs)
+```
+
+## tensorflow启动示例
 
 TensorFlow 没有提供一次性启动整个集群的解决方案，所以用户需要在每台机器上逐个手动启动一个集群的所有ps 和worker 任务。为了能够以同一行代码启动不同的任务，我们需要将所有worker任务的主机名和端口、 所有ps任务的主机名和端口、当前任务的作业名称以及任务编号这4个集群配置项参数化。通过输入不同的命令行参数组合，用户就可以使用同一份代码启动每一个任务。
 

@@ -297,9 +297,7 @@ def worker0():
 
 ## ProcessGroup
 
-有一个专门的名词叫 Collective communication,  including multicast and reduction communications.
-1. data movement
-2. collective computation and synchronisation, For example, the often used MPI barrier (comm.barrier()) makes every task hold until all tasks in the communicator comm have called it.
+Collective communication包含多个sender和多个receiver，一般的通信原语包括 broadcast，gather,all-gather，scatter，reduce，all-reduce，reduce-scatter，all-to-all等。再对照 ProcessGroup python 定义，ProcessGroup可以看做对 Collective Communication Library 的封装。
 
 多个process 组成一个process_group，比如每个group 持有一个tensor，想计算tensor的和，可以借助p2p先汇总到一个 process 上求和再广播（如果tensor很大呢？），但其实可以边communication边computation，来挖掘性能和节约带宽。
 
@@ -409,6 +407,56 @@ ddp 初始化时 对模型参数进行广播 会调用到 `process_group->broadc
 backend 是一个**逻辑上**的概念。本质上后端是一种IPC通信机制。对于用户来说，就是采用那种方式来进行集合通信，从代码上看，就是走什么流程（一系列流程），以及后端使用 ProcessGroupMPI 还是  ProcessGroupGloo …..。各主机之间需要进行通信。因此，需要指定通信的协议架构等。torch.distributed 对其进行了封装。提供了分布式通信原语
 
 ![](/public/upload/machine/pytorch_distributed_backend.jpeg)
+
+## 与horovod 对比
+
+[深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
+
+`horovodrun -np 2 -H localhost:4 --gloo python /horovod/examples/tensorflow2/tensorflow2_mnist.py`
+，`-np` 指的是进程的数量，`localhost:4`表示localhost节点上4个GPU。会启动4个进程执行 `python tensorflow2_mnist.py`（底层使用ssh进行命令分发），使用的是allreduce 模型，rank/local_rank/world_size，Rendezvous 这些概念也都有，数据也要分片。
+
+horovodrun ==> run_commandline ==> _run ==> _run_static ==> _launch_job ==> run_controller ==> gloo_run ==> launch_gloo
+
+1. 建立 RendezvousServer，这个会被底层 Gloo C++ 环境使用到；
+    1. Horovod 在进行容错 AllReduce 训练时，除了启动 worker 进程外，还会启动一个 driver 进程。这个 driver 进程用于帮助 worker 调用 gloo 构造 AllReduce 通信环。
+    2. driver 进程中会创建一个带有 KVStore 的 RendezvousServer，driver 会将参与通信的 worker 的 ip 等信息存入 KVstore 中。
+    3. 然后 worker 就可以调用 gloo 来访问 RendezvousServer 构造通信环了。
+2. host_alloc_plan = get_host_assignments 来根据host进行分配slot，就是horovod的哪个rank应该在哪个host上的哪个slot之上运行；
+3. get_run_command 获取到可执行命令；
+4. slot_info_to_command_fn 来得到在slot之上可执行的 slot command；
+5. 依据 slot_info_to_command_fn 构建 args_list，这个 list 之中，每一个arg就是一个 slot command；
+6. 多线程执行，在每一个 exec_command 之上执行每一个 arg（slot command）；
+
+```python
+def launch_gloo(command, exec_command, settings, nics, env, server_ip):
+    # Make the output directory if it does not exist
+    if settings.output_filename:
+        _mkdir_p(settings.output_filename)
+    # start global rendezvous server and get port that it is listening on
+    # 建立 RendezvousServer，这个会被底层 Gloo C++ 环境使用到
+    rendezvous = RendezvousServer(settings.verbose)
+    # allocate processes into slots
+    # 来根据host进行分配slot，就是horovod的哪个rank应该在哪个host上的哪个slot之上运行
+    hosts = parse_hosts(settings.hosts)
+    host_alloc_plan = get_host_assignments(hosts, settings.num_proc)
+    # start global rendezvous server and get port that it is listening on
+    global_rendezv_port = rendezvous.start()
+    rendezvous.init(host_alloc_plan)
+    # 获取到可执行命令
+    run_command = get_run_command(command, server_ip, nics, global_rendezv_port)
+    # 得到在slot之上可执行的 slot command
+    slot_info_to_command = _slot_info_to_command_fn(run_command, env)
+    event = register_shutdown_event()
+    # 依据 slot_info_to_command_fn 构建 args_list，这个 list 之中，每一个arg就是一个 slot command
+    args_list = [[slot_info_to_command(slot_info), slot_info, [event]]
+                 for slot_info in host_alloc_plan]
+    # If an error occurs in one thread, entire process will be terminated.
+    # Otherwise, threads will keep running.
+    # 多线程执行，在每一个 exec_command 之上执行每一个 arg（slot command）
+    res = threads.execute_function_multithreaded(exec_command,args_list,block_until_all_done=True)
+    for name, value in sorted(res.items(), key=lambda item: item[1][1]):
+        exit_code, timestamp = value
+```
 
 ## 其它
 

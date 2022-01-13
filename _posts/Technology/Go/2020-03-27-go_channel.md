@@ -13,6 +13,8 @@ keywords: Go defer
 * TOC
 {:toc}
 
+Go 对并发的原生支持可不是仅仅停留在口号上的，Go 在语法层面将并发原语 channel 作为一等公民对待。这意味着我们可以像使用普通变量那样使用 channel，比如，定义 channel 类型变量、给 channel 变量赋值、将 channel 作为参数传递给函数 / 方法、将 channel 作为返回值从函数 / 方法中返回，甚至将 channel 发送到其他 channel 中。这就大大简化了 channel 原语的使用，提升了我们开发者在做并发设计和实现时的体验。
+
 [通信原语](https://golang.design/under-the-hood/zh-cn/part1basic/ch03lang/chan/)Go 语言中 Channel 与 Select 语句受到 1978 年 CSP 原始理论的启发。 语言设计中，Goroutine 就是 CSP 理论中的并发实体， 而 Channel 则对应 CSP 中输入输出指令的消息信道，**Select 语句则是 CSP 中守卫和选择指令的组合**。Channel 与 Select 是 Go 语言中提供的语言级的、基于消息传递的同步原语。
 
 ## 背景知识
@@ -41,6 +43,17 @@ func releaseSudog(s *sudog) {}
 gopark 将当前的 goroutine 修改成等待状态，然后等待被唤醒。goready 函数用来唤醒一个 goroutine，它将 goroutine 的状态修改为可运行状态，随后会被调度器运行。当被调度时，对应的 gopark 函数返回。
 
 ## channel
+
+和切片、结构体、map 等一样，channel 也是一种复合数据类型。也就是说，我们在声明一个 channel 类型变量时，必须给出其具体的元素类型，比如`var ch chan int`。 使用操作符<-，我们还可以声明只发送 channel 类型（send-only）和只接收 channel 类型（recv-only）
+
+使用操作符<-，我们还可以声明只发送 channel 类型（send-only）和只接收 channel 类型（recv-only）
+
+```go
+ch1 := make(chan<- int, 1) // 只发送channel类型
+ch2 := make(<-chan int, 1) // 只接收channel类型
+<-ch1       // invalid operation: <-ch1 (receive from send-only type chan<- int)
+ch2 <- 13   // invalid operation: ch2 <- 13 (send to receive-only type <-chan int)
+```
 
 ### 数据结构
 
@@ -133,8 +146,9 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 ### 接收数据
 
 ```go
-i <- ch
-i, ok <- ch
+i <- ch 						// 当ch被关闭后，n将被赋值为ch元素类型的零值, 无法判定从 ch 返回的元素类型零值，究竟是不是因为 channel 被关闭后才返回的。
+i, ok <- ch						// 当ch被关闭后，m将被赋值为ch元素类型的零值, ok值为false
+for v := range ch { ... ...}	// 当ch被关闭后，for range循环结束
 ```
 不同的接收方式会被转换成 `runtime.chanrecv1` 和 `runtime.chanrecv2` 两种不同函数的调用，但是这两个函数最终还是会调用 `runtime.chanrecv`。
 
@@ -205,6 +219,8 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 
 ## select
 
+当涉及**同时对多个 channel** 进行发送 / 接收操作时， Go 为 CSP 并发模型提供的另外一个原语 select一起使用。
+
 ```go
 func fibonacci(c, quit chan int) {
 	x, y := 0, 1
@@ -225,6 +241,33 @@ func fibonacci(c, quit chan int) {
 1. select 是一种与 switch 相似的控制结构，与 switch 不同的是，select 中虽然也有多个 case，但是这些 case 中的表达式必须都是 Channel 的收发操作。
 2. 上述控制结构会等待 `c <- x` 或者 `<-quit` 两个表达式中任意一个的返回。无论哪一个表达式返回都会立刻执行 case 中的代码，当 select 中的两个 case 同时被触发时，就会随机选择一个 case 执行。
 3. 非阻塞的 Channel ：比如，我们只是想看看 Channel 的可读或者可写状态，不希望Channel收发阻塞当前 Goroutine。此时可以为select 添加default 分支，当某次循环 不存在可以收发的 Channel 时，会直接执行 default 中的代码并返回
+4. 实现超时机制
+	```go
+	func worker() {
+		select {
+		case <-c:
+			// ... do some stuff
+		case <-time.After(30 *time.Second):
+			return
+		}
+	}
+	```
+5. 实现心跳
+	```go
+	func worker() {
+		heartbeat := time.NewTicker(30 * time.Second)
+		defer heartbeat.Stop()
+		for {
+			select {
+			case <-c:
+			// ... do some stuff
+			case <- heartbeat.C:
+			//... do heartbeat stuff
+			}
+		}
+	}
+	```
+
 
 ### 数据结构
 
@@ -310,6 +353,49 @@ func selectgo(cas0 *scase, order0 *uint16, ncases int) (int, bool){
 ```go
 var c = make(chan struct{}) // 声明一个元素类型为Empty的channel
 c<-struct{}               	// 向channel写入一个“事件”
+```
+
+带缓冲 channel 的惯用法
+1. 用作消息队列
+2. 用作计数信号量
+
+### 使用无缓冲 channel 替代锁
+
+这种并发设计逻辑更符合 Go 语言所倡导的“不要通过共享内存来通信，而是通过通信来共享内存”的原则。PS： 好像没有使用锁好懂
+
+```go
+type counter struct {
+    c chan int
+    i int
+}
+func NewCounter() *counter {
+    cter := &counter{
+        c: make(chan int),
+    }
+    go func() {	// 计数生产者
+        for {
+            cter.i++
+            cter.c <- cter.i
+        }
+    }()
+    return cter
+}
+func (cter *counter) Increase() int {
+    return <-cter.c
+}
+func main() {
+    cter := NewCounter()
+    var wg sync.WaitGroup
+    for i := 0; i < 10; i++ {
+        wg.Add(1)
+        go func(i int) {
+            v := cter.Increase()
+            fmt.Printf("goroutine-%d: current counter value is %d\n", i, v)
+            wg.Done()
+        }(i)
+    }
+    wg.Wait()
+}
 ```
 
 ### 广播channel

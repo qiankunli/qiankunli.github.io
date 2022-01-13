@@ -45,6 +45,8 @@ Agent 是具体节点上的后台进程，是独立个体。需要一个机制�
 
 ![](/public/upload/machine/torchelastic_agent_diagram.jpeg)
 
+[深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)Gloo 机制工作时，需要从env 中获取到 RendezvousServer 信息以便进行 Collective communication
+
 ### 设计
 
 Rendezvous 负责集群逻辑，保证节点之间对于""有哪些节点参与训练"达成强一致共识。
@@ -393,6 +395,10 @@ PContext 就是一个抽象类，有两个派生类：MultiprocessContext 和 Su
 9. 调用 _restart_workers 重启进程组。
 
 节点级容错： elastic agent 注册了 `signal.signal(signal.SIGTERM, _terminate_process_handler)`  之后 引起 `rdzv_handler.shutdown()`
+
+## 与horovod 对比
+
+
 
 ## 其它
 

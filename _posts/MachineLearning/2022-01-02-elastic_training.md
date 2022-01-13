@@ -129,3 +129,5 @@ pytorchjob
 在推进过程中，感受到了社区的巨大力量，除了整体方案外，我只进行了vocalno弹性调度的开发，对pytorch-operator 提了一些想法和bug，感谢腾讯的pytorch-operator 开发者高策、张望的对pytorch controller elastic 模式的开发支持，感谢华为的volcano社区的吴雷、王雷博的支持。
 
 
+
+
