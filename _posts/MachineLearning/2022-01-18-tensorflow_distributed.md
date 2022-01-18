@@ -21,7 +21,7 @@ with tf.Session() as sess:
     sess.run(train_op)
 ```
 
-TensorFlow的分布式框架是基于ps/worker 模式的，与单机代码差距比较大，相对来说，horovod 支持的allreduce 模式性能更好些，对单机代码的改动也小一些。
+TensorFlow的分布式框架是基于ps/worker 模式的，与单机代码差距比较大，相对来说，horovod 支持的allreduce 模式性能更好些，对单机代码的改动也小一些。TensorFlow高中低api，单机与分布式，ps与allreduce 代码长得完全不一样
 
 ## 基本概念
 

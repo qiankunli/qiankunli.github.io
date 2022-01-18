@@ -29,8 +29,6 @@ TensorFlow 使用库模式（不是框架模式），工作形态是由用户编
 
 [TensorFlow on Kubernetes的架构与实践](https://mp.weixin.qq.com/s/xsrRZVnPp-ogj59ZCGqqsQ)
 
-![](/public/upload/machine/single_tensorflow.jpeg)
-
 ### 数据节点
 
 Tensorflow底层最核心的概念是张量，计算图以及自动微分。
