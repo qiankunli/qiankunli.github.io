@@ -25,20 +25,23 @@ TensorFlow 使用库模式（不是框架模式），工作形态是由用户编
 ![](/public/upload/machine/tensorflow_overview.png)
 
 
-## 单机TensorFlow
+## 核心概念
 
 [TensorFlow on Kubernetes的架构与实践](https://mp.weixin.qq.com/s/xsrRZVnPp-ogj59ZCGqqsQ)
 
 ![](/public/upload/machine/single_tensorflow.jpeg)
 
-### 概念
+### 数据节点
 
 Tensorflow底层最核心的概念是张量，计算图以及自动微分。
 
 1. Tensor
-2. Variable，特殊的张量， 维护特定节点的状态。**tf.Variable 方法是操作**，返回时是变量。与Tensor 不同在于
+2. Variable，特殊的张量， 维护特定节点的状态。**tf.Variable 方法是操作**，返回时是变量。与`session.run(tf.global_variables_initializer())` 配合使用 进行真正的初始化。与Tensor 不同在于
   1. 普通Tensor 的生命周期通常随依赖的计算完成而结束，内存也随即释放。
   2. 变量常驻内存， 在每一步训练时不断更新其值，以实现模型参数的更新。
+3. placeholder 占位符，使用 `session.run(...,feed_dict={xx:xx})` 为占位符赋值
+
+### 计算图
 
 [动态图与静态图的浅显理解](https://mp.weixin.qq.com/s/7IyaIij9sE7tm7wmL0ti3g) PS： 笔者个人的学习路径是先 pytorch 后tensorflow
 
@@ -58,12 +61,13 @@ Session 提供求解张量和执行操作的运行环境，它是发送计算任
 
 ```python
 # 创建会话 target =会话连接的执行引擎（默认是进程内那个），graph= 会话加载的数据流图，config= 会话启动时的配置项
-sess = tf.session(target=...,grah=...,config=...)
+sess = tf.session(target=...,graph=...,config=...)
 # 估算张量或执行操作。 Tensor.eval 和 Operation.run 底层都是 sess.run
 sess.run(...)
 # 关闭会话
 sess.close()
 ```
+使用示例
 
 ```python
 import tensorflow as tf
@@ -143,6 +147,7 @@ TensorFlow 记录每个运算符的依赖，根据依赖进行调度计算。数
 2. 为此数据流图创建一个可执行节点队列，将散列表中入度为0的节点加入到该队列，并从散列表中删除这些节点
 3. 依次执行该队列中的每一个节点，执行成功后将此节点输出指向的节点的入度值减1，更新散列表中对应节点的入度值
 4. 重复2和3，知道可执行节点队列变为空。
+**这也导致了 运算符执行顺序可能和 代码顺序不同**。
 
 ```python
 var = tf.Variable(...)
@@ -162,25 +167,6 @@ out = top + bot
 
 条件分支 `tf.cond(a < b,lambda: tf.add(3,3),lambda:tf.sqaure(3))`
 
-
-## 使用GPU 
-```py
-// with tf.device 语句来指定某一行代码作用域对应的目标设备
-with tf.device("/job:ps/task:0"):
-  weights_1 = tf.Variable(...)
-  biases_1 = tf.Variable(...)
-
-with tf.device("/job:ps/task:1"):
-  weights_2 = tf.Variable(...)
-  biases_2 = tf.Variable(...)
-
-with tf.device("/job:worker/task:7"):
-  input, labels = ...
-  layer_1 = tf.nn.relu(tf.matmul(input, weights_1) + biases_1)
-  logits = tf.nn.relu(tf.matmul(layer_1, weights_2) + biases_2)
-  # ...
-  train_op = ...
-```
 
 ## 自定义算子
 
@@ -203,7 +189,7 @@ with tf.Session():
 
 ## 引擎
 
-Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时tf.train.Optimizer.minimize()做了两件事：
+Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
 
 1. 计算梯度。即调用`compute_gradients (loss, var_list …)` 计算loss对指定val_list的梯度，返回元组列表 `list(zip(grads, var_list))`。
 2. 用计算得到的梯度来更新对应权重。即调用 `apply_gradients(grads_and_vars, global_step=global_step, name=None)` 将 `compute_gradients (loss, var_list …)` 的返回值作为输入对权重变量进行更新；
@@ -212,6 +198,7 @@ Tensorflow的底层结构是由张量组成的计算图。计算图就是底层�
 ## keras
 Keras 是开源 Python 包，由于 Keras 的独立性，Keras 具有自己的图形数据结构，用于定义计算图形：它不依靠底层后端框架的图形数据结构。PS： 所有有一个model.compile 动作？
 [聊聊Keras的特点及其与其他框架的关系](https://mp.weixin.qq.com/s/fgG95qqbrV07EgAqLXuFAg)
+
 
 ### 示例demo
 ```python
@@ -259,25 +246,4 @@ for epoch in range(EPOCHS):
 final_logs=...
 callbacks.on_train_end(final_logs)
 ```
-
-## tensorflow启动示例
-
-### 常规启动
-
-TensorFlow 没有提供一次性启动整个集群的解决方案，所以用户需要在每台机器上逐个手动启动一个集群的所有ps 和worker 任务。为了能够以同一行代码启动不同的任务，我们需要将所有worker任务的主机名和端口、 所有ps任务的主机名和端口、当前任务的作业名称以及任务编号这4个集群配置项参数化。通过输入不同的命令行参数组合，用户就可以使用同一份代码启动每一个任务。
-
-```sh
-// 在在参数服务器上执行
-python mnist_dist_test_k8s.py --ps_hosts=10.244.2.140:2222 --worker_hosts=10.244.1.134:2222,10.244.2.141:2222 --job_name="ps" --task_index=0
-// 在第一个worker节点上执行
-python mnist_dist_test_k8s.py --ps_hosts=10.244.2.140:2222 --worker_hosts=10.244.1.134:2222,10.244.2.141:2222 --job_name="worker" --task_index=0
-// 在第二个worker节点上执行
-python mnist_dist_test_k8s.py --ps_hosts=10.244.2.140:2222 --worker_hosts=10.244.1.134:2222,10.244.2.141:2222 --job_name="worker" --task_index=1
-```
-
-### 与k8s 整合
-
-[深度学习分布式训练框架 horovod (18) --- kubeflow tf-operator](https://mp.weixin.qq.com/s/ecpGB1ZLfu7G3Q3xCnuaeg)
-[深度学习分布式训练框架 horovod (19) --- kubeflow MPI-operator](https://mp.weixin.qq.com/s/83_5FKrGFy1oupMIkulJhg)
-
 

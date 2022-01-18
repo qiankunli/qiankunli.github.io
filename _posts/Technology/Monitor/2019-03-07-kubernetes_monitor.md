@@ -35,6 +35,7 @@ keywords: Kubernetes monitor
   1. 会展示集群节点到外部服务以及集群节点之间的请求关系，点击请求关系，可以快速查看特定节点到特定外部服务的请求性能，可以快速定位下游问题。
   2. 会展示集群节点到外部服务以及集群节点之间的网络关系，点击网络关系，可以快速查看特定节点到特定外部服务的网络
 
+抓取间隔也是一个很重要的问题，很多异常现象只是瞬间发生，有可能因为抓取间隔的原因而没有被发现。
 
 ## 容器监控与常规监控的差异
 
@@ -292,7 +293,7 @@ cAdvisor中提供的内存指标是从node_exporter公开的43个内存指标的
 3. container_memory_swap-容器交换使用量（以字节为单位）。
 4. container_memory_usage_bytes-当前内存使用情况（以字节为单位,包括所有内存，无论何时访问。) 包括了文件系统缓存
 5. container_memory_max_usage_bytes- 以字节为单位记录的最大内存使用量。
-6. container_memory_working_set_bytes-当前工作集（以字节为单位）。
+6. container_memory_working_set_bytes-当前工作集（以字节为单位）。简称 wss，**k8s使用wss作为oom kill的依据**
 7. container_memory_failcnt-内存使用次数达到限制。
 8. container_memory_failures_total-内存 分配失败的累积计数。
 

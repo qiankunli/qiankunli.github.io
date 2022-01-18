@@ -125,87 +125,7 @@ message RingAllReduceReq{
 
 VariableWeightsInit 在单机训练的场景下，各变量节点的值是随机初始化的，但是分布式训练场景下，如果多个worker节点也各自随机初始化自己的变量节点，则会导致模型参数在多个worker 节点上不一致。其实从理论上说，随机甚至还是好事，不过从编程来说，还得加上这个保证。
 
-## 代码实现
-《用python实现深度学习框架》
-```python
-class Trainer(object):
-  def train_and_eval(self,train_x,train_y,test_x=None,test_y=None):
-    # 初始化权重变量
-    self._vaiable_weights_init()
-    # 开始模型训练
-    ##  第一层循环，迭代epoches轮
-    for self.epoch in range(self.epoches):
-      ## 模型训练
-      self.train(train_x,train_y)
-      ## 模型评估
-      if self.eval_on_train:
-        ...
-  def train(self,train_x,train_y):
-    # 遍历训练数据集
-    for i in range(len(list(train_x.values())[0])):
-      self.one_step(self._get_input_values(train_x,i),train_y[i])
-      if (i+1) % self.batch_size == 0:
-        self._optimizer_update()
-  # 执行一次前向传播和一次反向传播
-  def one_step(self, data_x,data_y,is_eval=False):
-    ## 根据输入节点的名称，从输入数据dict中找到对应数据
-    for i in range(len(self.inputs)):
-      input_value = data_x.get(self.inputs[i].name)
-      self.inputs[i].set_value(np.mat(input_value).T)
-    ## 标签赋值给标签节点
-    self.input_y.set_value(np.mat(data_y).T)
-    ## 只有在训练阶段才执行优化器
-    if not is_eval:
-      self.optimizer.one_step()
-    @abc.abstractmethod
-    def _variable_weights_init(self):
-      raise NotImplementedError()
-    @abc.abstractmethod
-    def _optimizer_update(self):
-      raise NotImplementedError()
-```
 
-《用python实现深度学习框架》在分布式场景下，以ps 模式为例，只要定义一个 DistributedTrainer 实现_variable_weights_init 和 _optimizer_update 方法即可实现一个针对PS 架构的训练器。PS：allreduce 机制也大致类似
-```python
-class DistTrainerParameterServer(Trainer):
-  def __init__(self,*args,**kargs):
-    Trainer.__init__(self,*args,**kargs)
-    cluster_conf = kargs['cluster_conf']
-    ps_host = cluster_conf['ps'][0]
-    self.ps_client = ps.ParameterServiceClient(ps_host)
-  def _variable_weights_init(self):
-    var_weight_dict = dict()
-    for node in default_graph.nodes:
-      if isinstance(node,Variable) and node.trainable:
-        var_weight_dict[node.name] = node.value
-    # 把自己的初始值发给ps
-    duplicated_var_weight_dict = self.ps_client.variable_weights_init(var_weights_dict)
-    # 使用ps返回的初始值，重新初始化本地参数
-    for var_name,weights in duplicated_var_weight_dict.items():
-      update_node_value_in_graph(var_name,weights)
-    print('[INIT] worker variable weights initialized')
-  def _optimizer_update(self):
-    # 把当前梯度上传到ps 上，此操作可能会block，直到所有节点都上传完成
-    acc_gradient = self.optimizer.acc_gradient
-    self.ps_client.push_gradients(acc_gradient,self.optimizer.acc_no)
-    # 从ps那里把所有节点的平均梯度都拉回来，此操作可能会block，直到所有节点都下拉完成
-    node_gradient_dict = self.ps_client.pull_gradients()
-    # 使用得到的平均梯度，利用优化器的优化算法，更新本地变量
-    self.optimizer.update(node_gradient_dict)
-```
-分布式机制如何与框架融合？
-1. 如何实现一个大统一的分布式通信框架？实现allreduce, allgather等collective operations通信工作。如果tensor在显存中，那么它会使用NCCL库执行。而如果是在内存中，则会使用MPI或者Gloo执行。
-2. Horovod是一个库，怎么嵌入到各种深度学习框架之中？比如怎么嵌入到Tensorflow，PyTorch，MXNet，Keras？
-3. 如何将梯度的同步通信完全抽象为框架无关的架构？
-
-[深度学习分布式训练框架 horovod (7) --- DistributedOptimizer](https://mp.weixin.qq.com/s/0doWry-c1mEya18_7w9Jyw)Horovod 要求开发者使用Horovod自己定义的 hvd.DistributedOptimizer 代替 TensorFlow 官方的 optimizer，从而可以在优化模型阶段得到梯度。hvd.DistributedOptimizer继承keras Optimizer，然后hvd.DistributedOptimizer在其重载的get_gradients中把获取到的梯度传给`hvd.allreduce(gradients, …)`，从而实现整个horovod集群的梯度集体归并。具体计算梯度的逻辑是：
-1. TF 调用 hvd.DistributedOptimizer 的 compute_gradients 方法：
-  1. hvd.DistributedOptimizer 首先会利用 TF 官方 optimizer.compute_gradients 计算出本地梯度；
-  2. 然后利用 AllReduce 来得到各个进程平均后的梯度；
-  3. compute_gradients 返回一个(梯度，权值)对的列表。由apply_gradients使用；
-2. TF 调用 hvd.DistributedOptimizer 的 apply_gradients 方法：
-  1. 调用 TF 官方 optimizer.apply_gradients 对传入的参数进行处理，返回一个更新权值的op。TF 可以用这个返回值进行后续处理；
-对于 TF2.x，每行代码顺序执行，不需要构建图，所以 Horovod 梯度更新部分的实现并不是基于计算图的实现
 
 ## 通信技术
 
@@ -279,6 +199,90 @@ Gloo 支持集体通信（collective Communication），并对其进行了优化
 
 Horovod 在单机的多个 GPU 之上采用 NCCL 来通信，在多机（CPU或者GPU）之间通过 Ring AllReduce 算法进行通信。
 
+## 分布式代码实现
+分布式机制如何与框架融合？
+1. 如何实现一个大统一的分布式通信框架？实现allreduce, allgather等collective operations通信工作。如果tensor在显存中，那么它会使用NCCL库执行。而如果是在内存中，则会使用MPI或者Gloo执行。
+2. Horovod是一个库，怎么嵌入到各种深度学习框架之中？比如怎么嵌入到Tensorflow，PyTorch，MXNet，Keras？
+3. 如何将梯度的同步通信完全抽象为框架无关的架构？
+
+
+《用python实现深度学习框架》
+```python
+class Trainer(object):
+  def train_and_eval(self,train_x,train_y,test_x=None,test_y=None):
+    # 初始化权重变量
+    self._vaiable_weights_init()
+    # 开始模型训练
+    ##  第一层循环，迭代epoches轮
+    for self.epoch in range(self.epoches):
+      ## 模型训练
+      self.train(train_x,train_y)
+      ## 模型评估
+      if self.eval_on_train:
+        ...
+  def train(self,train_x,train_y):
+    # 遍历训练数据集
+    for i in range(len(list(train_x.values())[0])):
+      self.one_step(self._get_input_values(train_x,i),train_y[i])
+      if (i+1) % self.batch_size == 0:
+        self._optimizer_update()
+  # 执行一次前向传播和一次反向传播
+  def one_step(self, data_x,data_y,is_eval=False):
+    ## 根据输入节点的名称，从输入数据dict中找到对应数据
+    for i in range(len(self.inputs)):
+      input_value = data_x.get(self.inputs[i].name)
+      self.inputs[i].set_value(np.mat(input_value).T)
+    ## 标签赋值给标签节点
+    self.input_y.set_value(np.mat(data_y).T)
+    ## 只有在训练阶段才执行优化器
+    if not is_eval:
+      self.optimizer.one_step()
+    @abc.abstractmethod
+    def _variable_weights_init(self):
+      raise NotImplementedError()
+    @abc.abstractmethod
+    def _optimizer_update(self):
+      raise NotImplementedError()
+```
+
+《用python实现深度学习框架》在分布式场景下，以ps 模式为例，只要定义一个 DistributedTrainer 实现_variable_weights_init 和 _optimizer_update 方法即可实现一个针对PS 架构的训练器。PS：allreduce 机制也大致类似
+```python
+class DistTrainerParameterServer(Trainer):
+  def __init__(self,*args,**kargs):
+    Trainer.__init__(self,*args,**kargs)
+    cluster_conf = kargs['cluster_conf']
+    ps_host = cluster_conf['ps'][0]
+    self.ps_client = ps.ParameterServiceClient(ps_host)
+  def _variable_weights_init(self):
+    var_weight_dict = dict()
+    for node in default_graph.nodes:
+      if isinstance(node,Variable) and node.trainable:
+        var_weight_dict[node.name] = node.value
+    # 把自己的初始值发给ps
+    duplicated_var_weight_dict = self.ps_client.variable_weights_init(var_weights_dict)
+    # 使用ps返回的初始值，重新初始化本地参数
+    for var_name,weights in duplicated_var_weight_dict.items():
+      update_node_value_in_graph(var_name,weights)
+    print('[INIT] worker variable weights initialized')
+  def _optimizer_update(self):
+    # 把当前梯度上传到ps 上，此操作可能会block，直到所有节点都上传完成
+    acc_gradient = self.optimizer.acc_gradient
+    self.ps_client.push_gradients(acc_gradient,self.optimizer.acc_no)
+    # 从ps那里把所有节点的平均梯度都拉回来，此操作可能会block，直到所有节点都下拉完成
+    node_gradient_dict = self.ps_client.pull_gradients()
+    # 使用得到的平均梯度，利用优化器的优化算法，更新本地变量
+    self.optimizer.update(node_gradient_dict)
+```
+
+
+[深度学习分布式训练框架 horovod (7) --- DistributedOptimizer](https://mp.weixin.qq.com/s/0doWry-c1mEya18_7w9Jyw)Horovod 要求开发者使用Horovod自己定义的 hvd.DistributedOptimizer 代替 TensorFlow 官方的 optimizer，从而可以在优化模型阶段得到梯度。hvd.DistributedOptimizer继承keras Optimizer，然后hvd.DistributedOptimizer在其重载的get_gradients中把获取到的梯度传给`hvd.allreduce(gradients, …)`，从而实现整个horovod集群的梯度集体归并。具体计算梯度的逻辑是：
+1. TF 调用 hvd.DistributedOptimizer 的 compute_gradients 方法：
+  1. hvd.DistributedOptimizer 首先会利用 TF 官方 optimizer.compute_gradients 计算出本地梯度；
+  2. 然后利用 AllReduce 来得到各个进程平均后的梯度；
+  3. compute_gradients 返回一个(梯度，权值)对的列表。由apply_gradients使用；
+2. TF 调用 hvd.DistributedOptimizer 的 apply_gradients 方法：
+  1. 调用 TF 官方 optimizer.apply_gradients 对传入的参数进行处理，返回一个更新权值的op。TF 可以用这个返回值进行后续处理；
+对于 TF2.x，每行代码顺序执行，不需要构建图，所以 Horovod 梯度更新部分的实现并不是基于计算图的实现
 
 ## horovod 
 
@@ -337,7 +341,9 @@ def launch_gloo(command, exec_command, settings, nics, env, server_ip):
         exit_code, timestamp = value
 ```
 
-## python 使用c
+### 其它
+
+### python 使用c
 
 很多机器学习框架都会采用如下套路：shell脚本（可选），python端 和 C++端。
 
