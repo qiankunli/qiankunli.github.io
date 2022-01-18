@@ -52,15 +52,6 @@ print(z)
 ```
 可以看到，在tensorflow1.0 静态图场景下，z 输出为空。`z = tf.strings.join([x,y],separator=" ")` **没有真正运行**（我们发明一个叫tensorflow的deep learning dsl，并且提供python api，让用户在python中通过元编程编写tensorflow代码），只有运行`session.run(z)` z 才会真正有值。在TensorFlow1.0时代，采用的是静态计算图，需要先使用TensorFlow的各种算子创建计算图，然后再开启一个会话Session，显式执行计算图。**模型搭建和训练分为两个阶段**，由两种语言分别实现编程接口和核心运行时，还涉及到计算图的序列化及跨组件传输。而在TensorFlow2.0时代，采用的是动态计算图，**模型的搭建和训练放在一个过程中**，即每使用一个算子后，该算子会被动态加入到隐含的默认计算图中立即执行得到结果，不需要使用Session了，像原始的Python语法一样自然。
 
-从数据流图中取数据、给数据流图加载数据等 一定要通过session.run 的方式执行，没有在session 中执行之前，整个数据流图只是一个壳（符号）。 **python 是一门语言，而tensorflow 的python api 并不是python** ，而是一种领域特定语言，负责描述 TensorFlow的前端，没有跟python 解释器打通， 也因此tensorflow python中不要使用逻辑控制，“python代码”都会send 到一个执行引擎来跑。除了TensorFlow 自身外，keras（更高层api） 也可以作为TensorFlow 的前端。
-
-数据流图上节点的执行顺序的实现参考了拓扑排序的设计思想
-1. 以节点名称作为关键字，入度作为值，创建一张散列表，并将此数据流图上的所有节点放入散列表中。
-2. 为此数据流图创建一个可执行节点队列，将散列表中入度为0的节点加入到该队列，并从散列表中删除这些节点
-3. 依次执行该队列中的每一个节点，执行成功后将此节点输出指向的节点的入度值减1，更新散列表中对应节点的入度值
-4. 重复2和3，知道可执行节点队列变为空。
-
-
 ### 会话
 
 Session 提供求解张量和执行操作的运行环境，它是发送计算任务的客户端，所有计算任务都由它分发到其连接的执行引擎（进程内引擎）完成。
@@ -140,6 +131,38 @@ Tensorflow封装了一组API来处理数据的读入，它们都属于模块 tf.
   # next_element只是一个“符号”，需要用Session运行才能真正得到数据。
   ```
 
+
+### 控制流
+
+[TensorFlow 中的 Control Flow](https://mp.weixin.qq.com/s/6uVeEHcQeaPN_qEhHvcEoA)
+
+从数据流图中取数据、给数据流图加载数据等 一定要通过session.run 的方式执行（全部或部分），没有在session 中执行之前，整个数据流图只是一个壳（符号）。 **python 是一门语言，而tensorflow 的python api 并不是python** ，而是一种领域特定语言/符号式编程框架，负责描述 TensorFlow的前端，没有跟python 解释器打通， 也因此tensorflow python中不能直接使用if 等（而是使用tf.cond, tf.case, tf.while_loop），“python代码”都会send 到一个执行引擎来跑。除了TensorFlow 自身外，keras（更高层api） 也可以作为TensorFlow 的前端。
+
+TensorFlow 记录每个运算符的依赖，根据依赖进行调度计算。数据流图上节点的执行顺序的实现参考了拓扑排序的设计思想
+1. 以节点名称作为关键字，入度作为值，创建一张散列表，并将此数据流图上的所有节点放入散列表中。
+2. 为此数据流图创建一个可执行节点队列，将散列表中入度为0的节点加入到该队列，并从散列表中删除这些节点
+3. 依次执行该队列中的每一个节点，执行成功后将此节点输出指向的节点的入度值减1，更新散列表中对应节点的入度值
+4. 重复2和3，知道可执行节点队列变为空。
+
+```python
+var = tf.Variable(...)
+top = var * 2
+bot = var.assign_add(2)
+out = top + bot
+```
+其中 var 为一个变量，在对 bot 求值时，var 本身自增 2，然后将自增后的值返回。这时 top 语句执行顺序就会对 out 结果产生不同影响，结果不可预知。为此需要增加依赖关系
+
+```python
+var = tf.Variable(...)
+top = var * 2
+with tf.control_dependencies([top]):
+  bot = var.assign_add(2)
+out = top + bot
+```
+
+条件分支 `tf.cond(a < b,lambda: tf.add(3,3),lambda:tf.sqaure(3))`
+
+
 ## 使用GPU 
 ```py
 // with tf.device 语句来指定某一行代码作用域对应的目标设备
@@ -158,6 +181,33 @@ with tf.device("/job:worker/task:7"):
   # ...
   train_op = ...
 ```
+
+## 自定义算子
+
+对于 TensorFlow，可以自定义 Operation，即如果现有的库没有涵盖你想要的操作, 你可以自己定制一个。为了使定制的 Op 能够兼容原有的库，你必须做以下工作:
+
+1. 在一个 C++ 文件中注册新 Op. Op 的注册与实现是相互独立的. 在其注册时描述了 Op 该如何执行. 例如, 注册 Op 时定义了 Op 的名字, 并指定了它的输入和输出.
+2. 使用 C++ 实现 Op. 每一个实现称之为一个 "kernel", 可以存在多个 kernel, 以适配不同的架构 (CPU, GPU 等)或不同的输入/输出类型.
+3. 创建一个 Python 包装器（wrapper）. 这个包装器是创建 Op 的公开 API. 当注册 Op 时, 会自动生成一个默认 默认的包装器. 既可以直接使用默认包装器, 也可以添加一个新的包装器.
+4. (可选) 写一个函数计算 Op 的梯度.
+5. (可选) 写一个函数, 描述 Op 的输入和输出 shape. 该函数能够允许从 Op 推断 shape.
+6. 测试 Op, 通常使用 Pyhton。如果你定义了梯度，你可以使用Python的GradientChecker来测试它。
+
+示例参考 [TensorFlow 增加自定义运算符](https://mp.weixin.qq.com/s/G7BAWaPL5Lh3_q5EplNJBQ) c++ 部分编译完成后得到一个so 文件
+```python
+import tensorflow as tf
+zero_out_op = tf.load_op_library('zero_out.so')
+with tf.Session():
+  print(zero_out_op.zero_out([1,2,3,4,5])).eval()
+```
+
+## 引擎
+
+Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时tf.train.Optimizer.minimize()做了两件事：
+
+1. 计算梯度。即调用`compute_gradients (loss, var_list …)` 计算loss对指定val_list的梯度，返回元组列表 `list(zip(grads, var_list))`。
+2. 用计算得到的梯度来更新对应权重。即调用 `apply_gradients(grads_and_vars, global_step=global_step, name=None)` 将 `compute_gradients (loss, var_list …)` 的返回值作为输入对权重变量进行更新；
+将minimize()分成两个步骤的原因是：可以在某种情况下对梯度进行修正，防止梯度消失或者梯度爆炸。
 
 ## keras
 Keras 是开源 Python 包，由于 Keras 的独立性，Keras 具有自己的图形数据结构，用于定义计算图形：它不依靠底层后端框架的图形数据结构。PS： 所有有一个model.compile 动作？
@@ -212,6 +262,8 @@ callbacks.on_train_end(final_logs)
 
 ## tensorflow启动示例
 
+### 常规启动
+
 TensorFlow 没有提供一次性启动整个集群的解决方案，所以用户需要在每台机器上逐个手动启动一个集群的所有ps 和worker 任务。为了能够以同一行代码启动不同的任务，我们需要将所有worker任务的主机名和端口、 所有ps任务的主机名和端口、当前任务的作业名称以及任务编号这4个集群配置项参数化。通过输入不同的命令行参数组合，用户就可以使用同一份代码启动每一个任务。
 
 ```sh
@@ -223,6 +275,9 @@ python mnist_dist_test_k8s.py --ps_hosts=10.244.2.140:2222 --worker_hosts=10.244
 python mnist_dist_test_k8s.py --ps_hosts=10.244.2.140:2222 --worker_hosts=10.244.1.134:2222,10.244.2.141:2222 --job_name="worker" --task_index=1
 ```
 
+### 与k8s 整合
 
+[深度学习分布式训练框架 horovod (18) --- kubeflow tf-operator](https://mp.weixin.qq.com/s/ecpGB1ZLfu7G3Q3xCnuaeg)
+[深度学习分布式训练框架 horovod (19) --- kubeflow MPI-operator](https://mp.weixin.qq.com/s/83_5FKrGFy1oupMIkulJhg)
 
 

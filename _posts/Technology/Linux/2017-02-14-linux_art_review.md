@@ -10,7 +10,7 @@ keywords: linux kernel
 
 ## 简介
 
-《Linux内核设计的艺术》基于linux0.11内核，借助简单明了的代码，很直接的阐述了现代操作系统的一些基本思想。
+《Linux内核设计的艺术》基于linux0.11内核，借助简单明了的代码，很直接的阐述了现代操作系统的一些基本思想。一位大佬对 linux 解读也非常不错 [sunym1993/flash-linux0.11-talk](https://github.com/sunym1993/flash-linux0.11-talk)
 
 其在前言中写道：对于理解和掌握操作系统而言，真正有价值的是整体，是体系，而不是局部。
 

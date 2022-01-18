@@ -408,56 +408,6 @@ backend 是一个**逻辑上**的概念。本质上后端是一种IPC通信机�
 
 ![](/public/upload/machine/pytorch_distributed_backend.jpeg)
 
-## 与horovod 对比
-
-[深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
-
-`horovodrun -np 2 -H localhost:4 --gloo python /horovod/examples/tensorflow2/tensorflow2_mnist.py`
-，`-np` 指的是进程的数量，`localhost:4`表示localhost节点上4个GPU。会启动4个进程执行 `python tensorflow2_mnist.py`（底层使用ssh进行命令分发），使用的是allreduce 模型，rank/local_rank/world_size，Rendezvous 这些概念也都有，数据也要分片。
-
-horovodrun ==> run_commandline ==> _run ==> _run_static ==> _launch_job ==> run_controller ==> gloo_run ==> launch_gloo
-
-1. 建立 RendezvousServer，这个会被底层 Gloo C++ 环境使用到；
-    1. Horovod 在进行容错 AllReduce 训练时，除了启动 worker 进程外，还会启动一个 driver 进程。这个 driver 进程用于帮助 worker 调用 gloo 构造 AllReduce 通信环。
-    2. driver 进程中会创建一个带有 KVStore 的 RendezvousServer，driver 会将参与通信的 worker 的 ip 等信息存入 KVstore 中。
-    3. 然后 worker 就可以调用 gloo 来访问 RendezvousServer 构造通信环了。
-2. host_alloc_plan = get_host_assignments 来根据host进行分配slot，就是horovod的哪个rank应该在哪个host上的哪个slot之上运行；
-3. get_run_command 获取到可执行命令；
-4. slot_info_to_command_fn 来得到在slot之上可执行的 slot command；
-5. 依据 slot_info_to_command_fn 构建 args_list，这个 list 之中，每一个arg就是一个 slot command；
-6. 多线程执行，在每一个 exec_command 之上执行每一个 arg（slot command）；
-
-```python
-def launch_gloo(command, exec_command, settings, nics, env, server_ip):
-    # Make the output directory if it does not exist
-    if settings.output_filename:
-        _mkdir_p(settings.output_filename)
-    # start global rendezvous server and get port that it is listening on
-    # 建立 RendezvousServer，这个会被底层 Gloo C++ 环境使用到
-    rendezvous = RendezvousServer(settings.verbose)
-    # allocate processes into slots
-    # 来根据host进行分配slot，就是horovod的哪个rank应该在哪个host上的哪个slot之上运行
-    hosts = parse_hosts(settings.hosts)
-    host_alloc_plan = get_host_assignments(hosts, settings.num_proc)
-    # start global rendezvous server and get port that it is listening on
-    global_rendezv_port = rendezvous.start()
-    rendezvous.init(host_alloc_plan)
-    # 获取到可执行命令
-    run_command = get_run_command(command, server_ip, nics, global_rendezv_port)
-    # 得到在slot之上可执行的 slot command
-    slot_info_to_command = _slot_info_to_command_fn(run_command, env)
-    event = register_shutdown_event()
-    # 依据 slot_info_to_command_fn 构建 args_list，这个 list 之中，每一个arg就是一个 slot command
-    args_list = [[slot_info_to_command(slot_info), slot_info, [event]]
-                 for slot_info in host_alloc_plan]
-    # If an error occurs in one thread, entire process will be terminated.
-    # Otherwise, threads will keep running.
-    # 多线程执行，在每一个 exec_command 之上执行每一个 arg（slot command）
-    res = threads.execute_function_multithreaded(exec_command,args_list,block_until_all_done=True)
-    for name, value in sorted(res.items(), key=lambda item: item[1][1]):
-        exit_code, timestamp = value
-```
-
 ## 其它
 
 DDP 在启动时 将 rank=0 的`state_dict()` 广播到其他worker，以**保证所有worker的模型初始状态相同**。需要广播的 state_dict 是什么？pytorch 的 state_dict 是一个字典对象，其将模型的每一层与它的对应参数建立映射关系，比如 model 每一层的weights及偏置等等。只有那些参数可以训练的层（比如卷积层，线性层等）才会被保存到模型的state_dict中，池化层、BN层这些本身没有参数的层就不会保存在 state_dict 之中，比如针对下面模型。

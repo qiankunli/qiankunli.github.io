@@ -186,6 +186,9 @@ https://zhuanlan.zhihu.com/p/46928319
 
 pytorch 封装了torch.autograd包，torch.autograd is PyTorch’s automatic differentiation engine that powers neural network training.   封装了前向后向传播逻辑（实现自动微分）
 
+[深度学习利器之自动微分(1)](https://mp.weixin.qq.com/s/TMxsmvkAghV9aNk0L-Oqtw)
+[深度学习利器之自动微分(2)](https://mp.weixin.qq.com/s/TMxsmvkAghV9aNk0L-Oqtw)
+
 
 ## 逻辑回归
 

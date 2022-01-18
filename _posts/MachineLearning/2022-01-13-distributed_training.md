@@ -19,6 +19,8 @@ keywords:  distributed training
 1. TensorFlow从设计之初就在考虑超大的模型分布式训练的场景，设想这个框架需要能够从规模上很好支持分布式，能够很好的扩展到任意大的深度模型的框架。很自然会把模型的开发过程分成构图和执行两个阶段。构图的时候只是生成一个逻辑执行计划，然后通过显式方式的提交（或者execute），系统再根据用户指定的或者系统智能的决定的placement进行分图，并在这些分图中添加合适的Send-Recv的Op从而构成一个分布式的执行计划。但是这样的设计理念也会带来一些困恼，我们在模型训练时候有时候有些类似控制图的部分，在这种设计理念下，我们必须要把这些控制流图的代码也op化，然后把这些op也整体串联在Tensor的Flow执行图中。但是这种方式会使得一些习惯单机开发的研究人员觉得比较晦涩。
 2. 框架的另外一派是算法派，特别是感知类模型（图像，语音，语言类）训练，因为这类训练一般都是同步训练，且是数据并行，这样我们就可以利用MPI的AllReduce的通讯源语来进行梯度的汇集计算。因为面向是数据并行的场景，这样话在神经网络部分其实都是**单机程序**，从而可以利用任何python的语法糖去构建任何的动态的训练控制逻辑（大家也把这种称作动态图）。对于算法研究人员来讲，这种方式写代码比较随性也方便debug，所以在研究界pytorch得到大量的关注和使用。
 
+[利用多 GPU 加速深度学习模型训练](https://mp.weixin.qq.com/s/wiqOHIVfL2gKnRUhY62EBA) 从GPU 说到 horovod，很不错的文章
+
 ## 基本理念
 
 分布式TensorFlow入门教程 https://zhuanlan.zhihu.com/p/35083779
@@ -123,18 +125,217 @@ message RingAllReduceReq{
 
 VariableWeightsInit 在单机训练的场景下，各变量节点的值是随机初始化的，但是分布式训练场景下，如果多个worker节点也各自随机初始化自己的变量节点，则会导致模型参数在多个worker 节点上不一致。其实从理论上说，随机甚至还是好事，不过从编程来说，还得加上这个保证。
 
+## 代码实现
+《用python实现深度学习框架》
+```python
+class Trainer(object):
+  def train_and_eval(self,train_x,train_y,test_x=None,test_y=None):
+    # 初始化权重变量
+    self._vaiable_weights_init()
+    # 开始模型训练
+    ##  第一层循环，迭代epoches轮
+    for self.epoch in range(self.epoches):
+      ## 模型训练
+      self.train(train_x,train_y)
+      ## 模型评估
+      if self.eval_on_train:
+        ...
+  def train(self,train_x,train_y):
+    # 遍历训练数据集
+    for i in range(len(list(train_x.values())[0])):
+      self.one_step(self._get_input_values(train_x,i),train_y[i])
+      if (i+1) % self.batch_size == 0:
+        self._optimizer_update()
+  # 执行一次前向传播和一次反向传播
+  def one_step(self, data_x,data_y,is_eval=False):
+    ## 根据输入节点的名称，从输入数据dict中找到对应数据
+    for i in range(len(self.inputs)):
+      input_value = data_x.get(self.inputs[i].name)
+      self.inputs[i].set_value(np.mat(input_value).T)
+    ## 标签赋值给标签节点
+    self.input_y.set_value(np.mat(data_y).T)
+    ## 只有在训练阶段才执行优化器
+    if not is_eval:
+      self.optimizer.one_step()
+    @abc.abstractmethod
+    def _variable_weights_init(self):
+      raise NotImplementedError()
+    @abc.abstractmethod
+    def _optimizer_update(self):
+      raise NotImplementedError()
+```
+
+《用python实现深度学习框架》在分布式场景下，以ps 模式为例，只要定义一个 DistributedTrainer 实现_variable_weights_init 和 _optimizer_update 方法即可实现一个针对PS 架构的训练器。PS：allreduce 机制也大致类似
+```python
+class DistTrainerParameterServer(Trainer):
+  def __init__(self,*args,**kargs):
+    Trainer.__init__(self,*args,**kargs)
+    cluster_conf = kargs['cluster_conf']
+    ps_host = cluster_conf['ps'][0]
+    self.ps_client = ps.ParameterServiceClient(ps_host)
+  def _variable_weights_init(self):
+    var_weight_dict = dict()
+    for node in default_graph.nodes:
+      if isinstance(node,Variable) and node.trainable:
+        var_weight_dict[node.name] = node.value
+    # 把自己的初始值发给ps
+    duplicated_var_weight_dict = self.ps_client.variable_weights_init(var_weights_dict)
+    # 使用ps返回的初始值，重新初始化本地参数
+    for var_name,weights in duplicated_var_weight_dict.items():
+      update_node_value_in_graph(var_name,weights)
+    print('[INIT] worker variable weights initialized')
+  def _optimizer_update(self):
+    # 把当前梯度上传到ps 上，此操作可能会block，直到所有节点都上传完成
+    acc_gradient = self.optimizer.acc_gradient
+    self.ps_client.push_gradients(acc_gradient,self.optimizer.acc_no)
+    # 从ps那里把所有节点的平均梯度都拉回来，此操作可能会block，直到所有节点都下拉完成
+    node_gradient_dict = self.ps_client.pull_gradients()
+    # 使用得到的平均梯度，利用优化器的优化算法，更新本地变量
+    self.optimizer.update(node_gradient_dict)
+```
+分布式机制如何与框架融合？
+1. 如何实现一个大统一的分布式通信框架？实现allreduce, allgather等collective operations通信工作。如果tensor在显存中，那么它会使用NCCL库执行。而如果是在内存中，则会使用MPI或者Gloo执行。
+2. Horovod是一个库，怎么嵌入到各种深度学习框架之中？比如怎么嵌入到Tensorflow，PyTorch，MXNet，Keras？
+3. 如何将梯度的同步通信完全抽象为框架无关的架构？
+
+[深度学习分布式训练框架 horovod (7) --- DistributedOptimizer](https://mp.weixin.qq.com/s/0doWry-c1mEya18_7w9Jyw)Horovod 要求开发者使用Horovod自己定义的 hvd.DistributedOptimizer 代替 TensorFlow 官方的 optimizer，从而可以在优化模型阶段得到梯度。hvd.DistributedOptimizer继承keras Optimizer，然后hvd.DistributedOptimizer在其重载的get_gradients中把获取到的梯度传给`hvd.allreduce(gradients, …)`，从而实现整个horovod集群的梯度集体归并。具体计算梯度的逻辑是：
+1. TF 调用 hvd.DistributedOptimizer 的 compute_gradients 方法：
+  1. hvd.DistributedOptimizer 首先会利用 TF 官方 optimizer.compute_gradients 计算出本地梯度；
+  2. 然后利用 AllReduce 来得到各个进程平均后的梯度；
+  3. compute_gradients 返回一个(梯度，权值)对的列表。由apply_gradients使用；
+2. TF 调用 hvd.DistributedOptimizer 的 apply_gradients 方法：
+  1. 调用 TF 官方 optimizer.apply_gradients 对传入的参数进行处理，返回一个更新权值的op。TF 可以用这个返回值进行后续处理；
+对于 TF2.x，每行代码顺序执行，不需要构建图，所以 Horovod 梯度更新部分的实现并不是基于计算图的实现
 
 ## 通信技术
-[深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
-Collective communication包含多个sender和多个receiver，一般的通信原语包括 broadcast，gather,all-gather，scatter，reduce，all-reduce，reduce-scatter，all-to-all等。具体实现
-1. The NVIDIA Collective Communication Library (NCCL) implements multi-GPU and multi-node communication primitives optimized for NVIDIA GPUs and Networking. NCCL provides routines such as all-gather, all-reduce, broadcast, reduce, reduce-scatter as well as point-to-point send and receive that are optimized to achieve high bandwidth and low latency over PCIe and NVLink high-speed interconnects within a node and over NVIDIA Mellanox Network across nodes.
-2. Gloo is a collective communications library. It comes with a number of collective algorithms useful for machine learning applications. These include a barrier, broadcast, and allreduce.
 
-集合通信库的主要特征是：大体上会遵照 MPI 提供的接口规定，实现了包括点对点通信（SEND,RECV等），集合通信（ REDUCE，BROADCAST，ALLREDUCE等）等相关接口，然后根据自己硬件或者是系统的需要，在底层实现上进行了相应的改动，保证接口的稳定和性能。
+[深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
+Collective communication包含多个sender和多个receiver，一般的通信原语包括 broadcast，gather,all-gather，scatter，reduce，all-reduce，reduce-scatter，all-to-all等。
+
+![](/public/upload/machine/gpu_communication.png)
+
+### NCCL 
+
+The NVIDIA Collective Communication Library (NCCL) implements multi-GPU and multi-node communication primitives optimized for NVIDIA GPUs and Networking. NCCL provides routines such as all-gather, all-reduce, broadcast, reduce, reduce-scatter as well as point-to-point send and receive that are optimized to achieve high bandwidth and low latency over PCIe and NVLink high-speed interconnects within a node and over NVIDIA Mellanox Network across nodes.
+```c
+// nccl/src/nccl.h.in
+ncclResult_t  ncclGroupStart();
+ncclResult_t  ncclGroupEnd();
+// peer to peer
+ncclResult_t  ncclSend(const void* sendbuff, size_t count, ncclDataType_t datatype, int peer,
+  ncclComm_t comm, cudaStream_t stream);
+ncclResult_t  ncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, int peer,
+  ncclComm_t comm, cudaStream_t stream);
+// Collective Communication 
+ncclResult_t  ncclAllGather(const void* sendbuff, void* recvbuff, size_t sendcount,
+  ncclDataType_t datatype, ncclComm_t comm, cudaStream_t stream);
+ncclResult_t  ncclReduceScatter(const void* sendbuff, void* recvbuff,
+  size_t recvcount, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm,
+  cudaStream_t stream);
+...
+// 初始化
+ncclResult_t  ncclCommInitAll(ncclComm_t* comm, int ndev, const int* devlist);
+struct ncclComm {
+  struct ncclChannel channels[MAXCHANNELS];
+  ... 
+  // Bitmasks for ncclTransportP2pSetup
+  int connect;
+  uint32_t* connectSend;
+  uint32_t* connectRecv;
+
+  int rank;    // my rank in the communicator
+  int nRanks;  // number of GPUs in communicator
+  int cudaDev; // my cuda device index
+  int64_t busId;   // my PCI bus ID in int format
+
+  int node;
+  int nNodes;
+  int localRanks;
+
+  // Intra-process sync
+  int intraRank;
+  int intraRanks;
+  int* intraBarrier;
+  int intraPhase;
+  ....
+};
+```
+
+
+NCCL 最初只支持单机多 GPU 通信，从 NCCL2 开始支持多机多 GPU 通信。
+
+### Gloo
+Gloo is a collective communications library. It comes with a number of collective algorithms useful for machine learning applications. These include a barrier, broadcast, and allreduce.
 
 Gloo 为CPU和GPU提供了集合通信程序的优化实现。它特别适用于GPU，因为它可以执行通信而无需使用GPUDirect 将数据传输到CPU的内存。它还能够使用 NCCL 执行快速的节点内通信，并实现其自己的节点间例程算。你不需要考虑内存数据的拷贝，只需要实现逻辑就可以。
 
 Gloo 支持集体通信（collective Communication），并对其进行了优化。由于 GPU 之间可以直接进行数据交换，而无需经过 CPU 和内存，因此，在 GPU 上使用 gloo后端速度更快。
+
+### MPI 与 NCCL/GLOO
+
+[利用多 GPU 加速深度学习模型训练](https://mp.weixin.qq.com/s/wiqOHIVfL2gKnRUhY62EBA)多机软件设计一般采用 MPI（Message Passing Interface）实现数据交互。MPI 是一种消息传递库接口描述标准，规定了点对点消息传递、协作通信、组和通讯员概念、进程拓扑、环境管理等各项内容，支持 C 和 Fortran 语言。MPI 同样提供了前面提到的各种通信原语如 Reduce、Scatter、Broadcast 等，对应的 API 与 NCCL 十分相似。**事实上，NCCL 出现得更晚一些，参考并兼容了 MPI 已有 API**。NCCL 更多考虑了 GPU 的特性，例如**任意两块 GPU 之间的通信开销是有区别的**，跨 QPI 情况与同一 PCIe Switch 情况，以及有 NVLink/ 无 NVLink 情况就有明显差异，但 MPI 认为两种情况下 GPU 与 GPU 都是等同的，甚至 **MPI 认为跨机器的 GPU 也是等同的**，这对于多 GPU 通信效率会有影响。MPI 可以和 NCCL 结合，实现**层次化的**并行通信机制，即同一台机器上的不同 GPU 之间采用 NCCL 通信，而不同机器上的 GPU 之间采用 MPI 辅助通信。
+
+集合通信库的主要特征是：大体上会遵照 MPI 提供的接口规定，实现了包括点对点通信（SEND,RECV等），集合通信（ REDUCE，BROADCAST，ALLREDUCE等）等相关接口，然后根据自己硬件或者是系统的需要，在底层实现上进行了相应的改动，保证接口的稳定和性能。
+
+Horovod 在单机的多个 GPU 之上采用 NCCL 来通信，在多机（CPU或者GPU）之间通过 Ring AllReduce 算法进行通信。
+
+
+## horovod 
+
+[深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
+
+单机多 GPU 训练 `horovodrun -np 2 -H localhost:4 --gloo python /horovod/examples/tensorflow2/tensorflow2_mnist.py`
+，`-np` 指的是进程的数量，`localhost:4`表示localhost节点上4个GPU。会启动4个进程执行 `python tensorflow2_mnist.py`（底层使用ssh进行命令分发），使用的是allreduce 模型，rank/local_rank/world_size，Rendezvous 这些概念也都有，数据也要分片。
+
+多机多 GPU 分布式训练，这里使用 4 个服务器，每个服务器使用 4 块 GPU：`horovodrun -np 16 -H server1:4,server2:4,server3:4,server4:4 python train.py`
+
+horovodrun ==> run_commandline ==> _run ==> _run_static ==> _launch_job ==> run_controller ==> gloo_run ==> launch_gloo
+
+1. 建立 RendezvousServer，这个会被底层 Gloo C++ 环境使用到；
+    1. Horovod 在进行容错 AllReduce 训练时，除了启动 worker 进程外，还会启动一个 driver 进程。这个 driver 进程用于帮助 worker 调用 gloo 构造 AllReduce 通信环。
+    2. Driver 进程需要给 Gloo 创建一个带有 KVStore 的 RendezvousServer，其中 KVStore 用于存储通信域内每个节点的 host 和 其在逻辑通信环分配的序号 rank 等信息。
+    3. 这个 RendezvousServer 运行在 Horovod 的 driver 进程里。driver 进程拿到所有 worker 进程节点的地址和 GPU 卡数信息后，会将其写入RendezvousServer 的 KVStore 中，然后 worker 就可以调用 gloo 来访问 RendezvousServer 构造通信环。
+2. host_alloc_plan = get_host_assignments 来根据host进行分配slot，就是horovod的哪个rank应该在哪个host上的哪个slot之上运行；
+3. get_run_command 获取到可执行命令；
+4. slot_info_to_command_fn 来得到在slot之上可执行的 slot command；
+5. 依据 slot_info_to_command_fn 构建 args_list，这个 list 之中，每一个arg就是一个 slot command；
+6. 多线程执行，在每一个 exec_command 之上执行每一个 arg（slot command）；
+
+worker 负责训练和模型迭代。
+
+1. 每个 worker 节点会向 RendezvousServer 发起请求来得到自己的邻居节点信息，从而构造通信环。
+2. 在这个通信环之中，每个 worker 节点有一个左邻居和一个右邻居，在通信过程中，每个 worker 只会向它的右邻居发送数据，只会从左邻居接受数据。
+
+```python
+def launch_gloo(command, exec_command, settings, nics, env, server_ip):
+    # Make the output directory if it does not exist
+    if settings.output_filename:
+        _mkdir_p(settings.output_filename)
+    # start global rendezvous server and get port that it is listening on
+    # 建立 RendezvousServer，这个会被底层 Gloo C++ 环境使用到
+    rendezvous = RendezvousServer(settings.verbose)
+    # allocate processes into slots
+    # 来根据host进行分配slot，就是horovod的哪个rank应该在哪个host上的哪个slot之上运行
+    hosts = parse_hosts(settings.hosts)
+    host_alloc_plan = get_host_assignments(hosts, settings.num_proc)
+    # start global rendezvous server and get port that it is listening on
+    global_rendezv_port = rendezvous.start()
+    rendezvous.init(host_alloc_plan)
+    # 获取到可执行命令
+    run_command = get_run_command(command, server_ip, nics, global_rendezv_port)
+    # 得到在slot之上可执行的 slot command
+    slot_info_to_command = _slot_info_to_command_fn(run_command, env)
+    event = register_shutdown_event()
+    # 依据 slot_info_to_command_fn 构建 args_list，这个 list 之中，每一个arg就是一个 slot command
+    args_list = [[slot_info_to_command(slot_info), slot_info, [event]]
+                 for slot_info in host_alloc_plan]
+    # If an error occurs in one thread, entire process will be terminated.
+    # Otherwise, threads will keep running.
+    # 多线程执行，在每一个 exec_command 之上执行每一个 arg（slot command）
+    res = threads.execute_function_multithreaded(exec_command,args_list,block_until_all_done=True)
+    for name, value in sorted(res.items(), key=lambda item: item[1][1]):
+        exit_code, timestamp = value
+```
 
 ## python 使用c
 
@@ -143,7 +344,6 @@ Gloo 支持集体通信（collective Communication），并对其进行了优化
 1. Shell脚本是启动运行的入口，负责解析参数，确认并且调用训练程序；
 2. Python是用户的接口，引入了C++库，封装了API，负责运行时和底层C++交互；
 3. C++实现底层训练逻辑；
-
 
 [深度学习分布式训练框架 horovod (2) --- 从使用者角度切入](https://mp.weixin.qq.com/s/so6rsNt161F4TeR-LvU6hQ)
 
