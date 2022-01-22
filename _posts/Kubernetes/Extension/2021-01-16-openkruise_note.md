@@ -26,7 +26,7 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 事实上，平台构建者之所以要基于 Kubernetes 进一步构建上层平台，其根本动机无非来自两个诉求：
 1. 更高的抽象维度：比如，用户希望操作的概念是“应用”和“灰度发布”，而不是“容器”和“Pod”；大家为 Kubernetes 构建的各种 Dashboard，其实就是一种“抽象”的实现方式：这些 Dashboard 本质上是在 Kubernetes API 对象的基础上暴露出了一组允许用户填写的字段，从而实现了‘’简化用户使用心智、提升用户体验‘’的目的
-2. 更多的扩展能力：比如，用户希望的应用灰度发布策略是基于“双 Deployment + Istio” 的金丝雀发布，而不是 Kubernetes 默认的 Pod 线性滚动升级。这些增强或者扩展能力，在 Kubernetes 中一般是以 CRD + Controller 的插件方式来实现的。
+2. 更多的扩展能力：比如，用户希望的应用灰度发布策略是基于“双 Deployment + Istio” 的金丝雀发布，而不是 Kubernetes 默认的 Pod 线性滚动升级。这些增强或者扩展能力，在 Kubernetes 中一般是以 CRD + Controller 的插件方式来实现的。Kubernetes将下层的容器运行时（Container Runtime）封装得太严实。Runtime 层的容器创建只有一个 Pod 资源，此外没有任何接口可以让用户能够通过 Kubernetes API 层面来执行一些 Runtime 相关操作，比如拉取镜像、重启容器等，但这些都是来自业务场景的现实诉求。
 
 在云原生与 Kubernetes 项目极大程度的统一与标准化了基础设施层抽象之后，如何进一步帮助平台团队在此之上快速、轻松、可复制的构建上层平台，正在成为业界开始积极思考的一条关键路径。
 
