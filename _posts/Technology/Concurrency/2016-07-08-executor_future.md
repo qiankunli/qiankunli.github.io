@@ -13,49 +13,16 @@ keywords: future
 * TOC
 {:toc}
 
-建议先对[不同层面的异步](http://qiankunli.github.io/2017/05/16/async_program.html) 有一点感觉
 
-从本文内容可以看到，任何业务逻辑都可以用全异步代码来完成，其本质是**业务逻辑分拆在多个线程中**，Executor 和Future 封装了业务逻辑的分拆和中间结果的组合。PS：有种分布式任务处理的感觉。
+Runnable + Thread 实现了 logic 和 runner 的分离，runner 又进一步扩展为 executor 以便线程复用（控制并发度）。代码交给另一个线程执行，还有一个好处，就是保护调用者线程。在一个项目中，不同的线程的重要性是不同的，比如tomcat 线程池中的线程、mq 消费者线程、netty 的事件驱动线程等，它们是驱动 代码执行的源动力。假设tomcat 线程池一共10个线程，当中有一个任务处理较慢，一个线程被占用较长的时间，会严重限制tomcat的吞吐量。但总有各种耗时的任务，此时，一个重要方法是将 任务交给另一个 线程执行。调用线程 持有 future 对象，可以主动选择 等、不等或者等多长时间。这一点 可以在hystrix 看到。
 
-## 百花齐放的Executor 
-
-Runnable + Thread 实现了 logic 和 runner 的分离，runner 又进一步扩展为 executor 
-
-![](/public/upload/java/various_executor.png)
+## Executor
 
 Executor provides a way of decoupling task submission from the mechanics of how each task will be run, including details of thread use, scheduling, etc. **Executor 是一个如此成功的抽象，就像linux的File 接口一样**。 任务的提交与执行相分离。 PS：有点类似于Spring IOC，Bean的创建与使用相分离。
 
 Executor 框架为并发编程提供了一个完善的架构体系，不仅包括了线程池的管理，还提供了线程工厂、队列（类似于操作系统中的task_struct 数组）以及拒绝策略等，**将线程的调度和管理设置在了用户态**。
 
-Executes the given command at some time in the future.  The command may execute in a new thread, in a pooled thread, or in the calling thread, at the discretion of the **Executor** implementation.Executor接口的职责并不是提供一个线程池的接口，而是提供一个“将来执行命令”的接口。真正能代表线程池意义的，是ThreadPoolExecutor类。
-
-### 谁来处理task
-
-1. 任务被caller’s thread 执行，此时是同步操作。the Executor interface does not strictly require that execution be asynchronous. 比如上图的DirectExecutor
-
-    ```java
-    class DirectExecutor implements Executor {
-        public void execute(Runnable r) {
-            r.run();
-        }
-    }
-    ```
-
-2. ThreadPerTask，PS： 有点类似Kubernetes 中的ip-per-pod
-
-    ```java
-    class ThreadPerTaskExecutor implements Executor {
-        public void execute(Runnable r) {
-            new Thread(r).start();
-        }
-    }
-    ```
-
-3. 最常用的还是 ThreadPoolExecutor 这种，executes each submitted task using one of possibly several pooled threads，**线程复用，这也是logic 和 runner 分离的好处**
-
-**同步方法有参数和返回值，异步方法也有参数和返回值，只是异步方法的返回值 统一为Future 抽象。我们可以直接对同步方法的返回值进行处理，而java 也在不断地对Future进行扩展以对异步结果进行处理**。
-
-
+![](/public/upload/concurrency/executor_overview.png)
 
 ## 线程复用——ThreadPoolExecutor
 
@@ -126,12 +93,14 @@ private Thread addThread(Runnable firstTask) {
 
 ## 对Executor 的扩展
 
+![](/public/upload/java/various_executor.png)
+
 对Executor 的扩展 主要体现在几个方面
 
 1. 规范 作业线程的管理，比如ExecutorService
-2. 提供 更丰富的 异步处理返回值 ，比如guava 的ListeningExecutorService
+2. 提供 更丰富的 异步处理返回值，帮忙执行下回调，比如guava 的ListeningExecutorService
 3. 优化特定场景，比如netty的SingleThreadEventExecutor，只有一个作业线程
-3. 针对特定业务场景，更改作业线程的处理逻辑。比如netty的EventLoopGroup，其作业线程逻辑为 io + task ，并可以根据ioRatio 调整io 与task的cpu 占比。
+3. 针对特定业务场景，更改作业线程的处理逻辑（不单纯执行Runnable.run）。比如netty的EventLoopGroup，其作业线程逻辑为 io + task ，并可以根据ioRatio 调整io 与task的cpu 占比。
 
 在 ExecutorService 中，正如其名字暗示的一样，定义了一个服务，定义了完整的线程池的行为，可以接受提交任务、执行任务、关闭服务。抽象类 AbstractExecutorService 类实现了 ExecutorService 接口，也实现了接口定义的默认行为。
 
@@ -151,11 +120,13 @@ f.addListener(new FutureListener<?> {
 ...
 ```
 
-## Executor的使用
+Executor的使用
 
 ![](/public/upload/java/use_executor.png)
 
 ## 百花齐放的Future
+
+**同步方法有参数和返回值，异步方法也有参数和返回值，只是异步方法的返回值 统一为Future 抽象。我们可以直接对同步方法的返回值进行处理，而java 也在不断地对Future进行扩展以对异步结果进行处理**。
 
 [Chaining async calls using Java Futures](https://techweek.ro/2019/chaining-async-calls-using-java-futures/)
 
@@ -330,12 +301,5 @@ public abstract class AbstractExecutorService implements ExecutorService{
 
 ListenableFuture所具备的addListener方法则是任务挂在一个地方，当run方法执行完毕后，执行这些任务。（不同的guava版本实现代码有很大不同）
 
-## 保护调用者/驱动线程
-
-代码交给另一个线程执行，还有一个好处，就是保护调用者线程。
-
-在一个项目中，不同的线程的重要性是不同的，比如tomcat 线程池中的线程、mq 消费者线程、netty 的事件驱动线程等，它们是驱动 代码执行的源动力。假设tomcat 线程池一共10个线程，当中有一个任务处理较慢，一个线程被占用较长的时间，会严重限制tomcat的吞吐量。
-
-但总有各种耗时的任务，此时，一个重要方法是将 任务交给另一个 线程执行。调用线程 持有 future 对象，可以主动选择 等、不等或者等多长时间。这一点 可以在hystrix 看到。
 
 

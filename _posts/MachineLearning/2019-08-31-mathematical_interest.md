@@ -108,7 +108,7 @@ $$\frac{d_f}{d_z}=3z^2$$
 
 1. 首先对(w1,w2,b)赋值，这个值可以是随机的，也可以让(w1,w2,b)是一个全零的向量
 2. 改变(w1,w2,b)的值，使得J(w1,w2,b)按梯度下降的方向进行减少，梯度方向由J(w1,w2,b)对(w1,w2,b)的偏导数确定。PS：**求梯度 就是求损失值对每个参数的偏导数**。
-3. $w1=w1+\sigma d_{w1}$ 依次得到 w1,w2,b 的新值，$\sigma$为学习率
+3. $w1=w1+\sigma d_{w1}$ 依次得到 w1,w2,b 的新值，$\sigma$为学习率。 在代码上经常表示为 $w1=w1+\sigma * grad(w1)$ 
 
 [AI初识：为了围剿SGD大家这些年想过的那十几招](https://mp.weixin.qq.com/s/jR2V4Ho4EzTZ0MiUzXT3vw)
 
@@ -184,7 +184,7 @@ https://zhuanlan.zhihu.com/p/46928319
 
 引申：可微分编程是一个比较新的概念，是反向传播和weight-tying的延伸。用户仅指定了函数的结构以及其调用顺序，函数程序实际上被编译成类似于反向传播所需的计算图。图的各个组成部分也必须是可微的，可微分编程把实现/部署的细节留给优化器——语言会使用反向传播根据整个程序的目标自动学习细节，基于梯度进行优化，就像优化深度学习中的权重一样。
 
-pytorch 封装了torch.autograd包，torch.autograd is PyTorch’s automatic differentiation engine that powers neural network training.   封装了前向后向传播逻辑（实现自动微分）
+早期 Pytorch≈Numpy+AutoGrad，pytorch 封装了torch.autograd包，torch.autograd is PyTorch’s automatic differentiation engine that powers neural network training.   封装了前向后向传播逻辑（实现自动微分）
 
 [深度学习利器之自动微分(1)](https://mp.weixin.qq.com/s/TMxsmvkAghV9aNk0L-Oqtw)
 [深度学习利器之自动微分(2)](https://mp.weixin.qq.com/s/TMxsmvkAghV9aNk0L-Oqtw)

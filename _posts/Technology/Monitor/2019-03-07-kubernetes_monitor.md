@@ -13,18 +13,14 @@ keywords: Kubernetes monitor
 * TOC
 {:toc}
 
-![](/public/upload/go/prometheus_k8s.png)
+[Kubernetes监控在小米的落地](https://mp.weixin.qq.com/s/ewwD6A3-ClbotdfFmYY3KA) 为了更方便的管理容器，Kubernetes对Container进行了封装，拥有了Pod、Deployment、Namespace、Service等众多概念。与传统集群相比，Kubernetes集群监控更加复杂：
 
-[容器监控实践—K8S常用指标分析](http://www.xuyasong.com/?p=1717)
+1. 监控维度更多，除了传统物理集群的监控，还包括核心服务监控（apiserver，etcd等）、容器监控、Pod监控、Namespace监控等。
+2. 监控对象动态可变，在集群中容器的销毁创建十分频繁，无法提前预置。
+3. 监控指标随着容器规模爆炸式增长，如何处理及展示大量监控数据。
+4. 随着集群动态增长，监控系统必须具备动态扩缩的能力。
 
-[Kubernetes 稳定性保障手册 -- 极简版](https://mp.weixin.qq.com/s/kZmi2gK16qe2yMYMRS3Etg)未细读
-[KubeNode：阿里巴巴云原生容器基础设施运维实践](https://mp.weixin.qq.com/s/Fm_Pbz0ltu2mpFlDP74_fw) 仅仅是一个kubelet 是不够用的。
-
-[KubeEye：Kubernetes 集群自动巡检工具](https://segmentfault.com/a/1190000039173086)
-
-[报警的哲学](https://mp.weixin.qq.com/s/lJRPt7I0SeUwZ4HhVZn8AQ)追踪所有收到的报警。如果收到了报警，而人们只是说 "我看了，没有什么问题"，这是一个相当强烈的信号，你需要删除报警规则，或者降级，或者以其他方式收集数据。准确率低于 50% 报警是不能使用的；即使是那些 10% 的假阳性警报，也值得多加考虑是否对齐进行修改。
-
-[通过Kubernetes监控探索应用架构，发现预期外的流量](https://mp.weixin.qq.com/s/RasRiNYo8OyTTselaSwHKA) 是一个系列文章，阿里已经将应用 ==> k8s ==> 内核监控打通。构建拓扑图 ==>  发现异常流量、阈值报警（拓扑图的边黄色或红色）==> 异常流量上下游各种信息。
+## 能搞到哪些metric
 
 [ Kubernetes Pod状态异常九大场景盘点](https://mp.weixin.qq.com/s/xcLy9W6diO8yzZGd-QD5CQ) 列出了9个场景，并列出对应的监控来回答9个场景的问题
 1. Kubernetes 监控的 Pod 详情页包含了 
@@ -35,20 +31,7 @@ keywords: Kubernetes monitor
   1. 会展示集群节点到外部服务以及集群节点之间的请求关系，点击请求关系，可以快速查看特定节点到特定外部服务的请求性能，可以快速定位下游问题。
   2. 会展示集群节点到外部服务以及集群节点之间的网络关系，点击网络关系，可以快速查看特定节点到特定外部服务的网络
 
-抓取间隔也是一个很重要的问题，很多异常现象只是瞬间发生，有可能因为抓取间隔的原因而没有被发现。
-
-## 容器监控与常规监控的差异
-
-[基于Prometheus的云原生监控系统架构演进](https://mp.weixin.qq.com/s/SBqYGeWDMQwmente8JBaHA)
-
-[Kubernetes监控在小米的落地](https://mp.weixin.qq.com/s/ewwD6A3-ClbotdfFmYY3KA) 为了更方便的管理容器，Kubernetes对Container进行了封装，拥有了Pod、Deployment、Namespace、Service等众多概念。与传统集群相比，Kubernetes集群监控更加复杂：
-
-1. 监控维度更多，除了传统物理集群的监控，还包括核心服务监控（apiserver，etcd等）、容器监控、Pod监控、Namespace监控等。
-2. 监控对象动态可变，在集群中容器的销毁创建十分频繁，无法提前预置。
-3. 监控指标随着容器规模爆炸式增长，如何处理及展示大量监控数据。
-4. 随着集群动态增长，监控系统必须具备动态扩缩的能力。
-
-## 能搞到哪些metric
+![](/public/upload/go/prometheus_k8s.png)
 
 在Kubernetes从1.10版本后采用Metrics Server作为默认的性能数据采集和监控，主要用于提供核心指标（Core Metrics），包括Node、Pod的CPU和内存使用指标。对其他自定义指标（Custom Metrics）的监控则由Prometheus等组件来完成。
 
@@ -60,7 +43,6 @@ k8s 社区对k8s 监控的表述 [Kubernetes monitoring architecture](https://gi
 ![](/public/upload/go/kubernetes_metric.png)
 
 [prometheus使用missing-container-metrics监控pod oomkill](https://mp.weixin.qq.com/s/IDmuoPOcYsGISrYb1n9aKw)
-
 
 ### node-exporter
 
@@ -298,21 +280,16 @@ cAdvisor中提供的内存指标是从node_exporter公开的43个内存指标的
 8. container_memory_failures_total-内存 分配失败的累积计数。
 
 
-## 需要哪些 alert rule
+## 监控平台设计
 
-[monitoring.mixin](https://monitoring.mixins.dev) 列出了各个组件建议配置的alert 规则。
+[基于Prometheus的云原生监控系统架构演进](https://mp.weixin.qq.com/s/SBqYGeWDMQwmente8JBaHA)
 
-指导原则：宁缺毋滥。其实有十几个报警就不少了，再多也处理不过来。 可以参照《Prometheus 监控实战》中提到的对Prometheus 的报警规则。
-
-## 制作哪些dashboard
-
-Grafana 官方有一个 [dashboard 市场](https://grafana.com/grafana/dashboards)，可以针对各个组件找到 全面丰富的dashboard 
+[Kubernetes 稳定性保障手册 -- 极简版](https://mp.weixin.qq.com/s/kZmi2gK16qe2yMYMRS3Etg)未细读
+[KubeNode：阿里巴巴云原生容器基础设施运维实践](https://mp.weixin.qq.com/s/Fm_Pbz0ltu2mpFlDP74_fw) 仅仅是一个kubelet 是不够用的。
 
 [KubeEye：Kubernetes 集群自动巡检工具](https://segmentfault.com/a/1190000039173086)
 
-## 其它
-
-![](/public/upload/kubernetes/kubernetes_monitor.png)
+[通过Kubernetes监控探索应用架构，发现预期外的流量](https://mp.weixin.qq.com/s/RasRiNYo8OyTTselaSwHKA) 是一个系列文章，阿里已经将应用 ==> k8s ==> 内核监控打通。构建拓扑图 ==>  发现异常流量、阈值报警（拓扑图的边黄色或红色）==> 异常流量上下游各种信息。
 
 [当容器应用越发广泛，我们又该如何监测容器？](https://mp.weixin.qq.com/s/i_OpJyCJQR5ZbyorDppisg)阿里云推出 Kubernetes 监测服务
 1. 代码无侵入：通过旁路技术，无需代码埋点，即可获取到网络性能数据。
@@ -332,4 +309,71 @@ Grafana 官方有一个 [dashboard 市场](https://grafana.com/grafana/dashboard
 3. 最后，用一张拓扑将指标、Trace、事件汇总起来、串联起来，形成一张拓扑图，用来做架构感知分析、上下游分析。
 4. 但我们不应该就此停止前进的脚步，加入这个异常下次再来，那么我们这些工作得重来一遍，最好的办法是针对这类异常配置对应的告警，自动化地管理起来。
 个人理解： 服务（web/rpc/mq/db等）是点，调用关系（网络通信）是边，根据trace 连接点和边（建立拓扑），配置报警规则为点和边着色。
+
+抓取间隔也是一个很重要的问题，很多异常现象只是瞬间发生，有可能因为抓取间隔的原因而没有被发现。
+
+### 需要哪些 alert rule
+
+[monitoring.mixin](https://monitoring.mixins.dev) 列出了各个组件建议配置的alert 规则。
+
+指导原则：宁缺毋滥。其实有十几个报警就不少了，再多也处理不过来。 可以参照《Prometheus 监控实战》中提到的对Prometheus 的报警规则。
+
+[报警的哲学](https://mp.weixin.qq.com/s/lJRPt7I0SeUwZ4HhVZn8AQ)追踪所有收到的报警。如果收到了报警，而人们只是说 "我看了，没有什么问题"，这是一个相当强烈的信号，你需要删除报警规则，或者降级，或者以其他方式收集数据。准确率低于 50% 报警是不能使用的；即使是那些 10% 的假阳性警报，也值得多加考虑是否对齐进行修改。
+
+### 制作哪些dashboard
+
+Grafana 官方有一个 [dashboard 市场](https://grafana.com/grafana/dashboards)，可以针对各个组件找到 全面丰富的dashboard 
+
+[KubeEye：Kubernetes 集群自动巡检工具](https://segmentfault.com/a/1190000039173086)
+
+## 理解监控
+
+[容器监控实践—K8S常用指标分析](http://www.xuyasong.com/?p=1717)
+
+[监控 Pod 时，我们在监控什么](https://mp.weixin.qq.com/s/ggeSvRbsfEKCS5Sa6WgTtQ)Kubernetes 和 KVM 的区别在不同组件存在区别：
+1. CPU 区别最大，这是 Kubernetes 技术本质决定的
+2. 内存有一定区别，但是基本可以和 KVM 技术栈统一
+3. 网络、磁盘区别不大，基本没有额外的理解成本
+
+### 物理机
+
+对于一个独立的 CPU core，它的时间被分成了三份：
+
+1. 执行用户代码时间
+2. 执行内核代码时间
+3. 空闲时间（对于 x86 体系而言，此时会执行 HLT 指令）
+
+KVM 环境下计算 CPU 使用率很直接：（执行用户代码时间 + 执行内核代码时间）/ 总时间。
+
+CPU load 用于衡量当前系统的负载情况， Linux 系统使用当前处于可运行状态的线程数来标识，包括：
+1. 处于 running 状态的线程，这个是最正常的情况，获得 CPU 分片，执行用户态或者内核态代码的线程
+2. 处于 uninterruptible sleep 状态的线程，这个是特殊的情况，表明这个线程在进行 I/O 操作
+因此
+1. CPU load 高，CPU 使用率低，一般表明性能瓶颈出现在磁盘 I/O 上
+2. CPU 使用率高，CPU load 远高于 CPU 核数，表示当前 CPU 资源严重不足
+
+在KVM场景中，内存的具体使用量并没有一个非常清晰的标准，cache/buffer/slab 内存对于应用性能的影响和应用本身的特点有关，没有统一的计算方案，综合各种因素，监控使用 total - available 作为内存使用
+
+### pod
+
+对于 Kubernetes Pod 而言，它不再享有独立的 CPU core，因此这个公式不再成立。在 Kubernetes 语境下，CPU 的资源总量/使用量是通过时间表示的。由于 Kubernetes 对 CPU Limit 的实现粒度有限，同时考虑到统计的误差，因此在压测等极限场景中 CPU 使用率会出现高于 100% 的”毛刺“。Kubernetes 虽然也提供了 cpu_load 指标，却只包含了处于 running 状态的线程，这个指标也失去了判断系统性能瓶颈是否出现在 I/O 的作用。
+
+Kubernetes 通过 Completely Fair Scheduler (CFS) Cgroup bandwidth control 限制 Pod 的 CPU 使用：
+1. 首先，我们将 1s 分成多个 period，每个 period 持续时间为 0.1s
+2. 在每个 peroid 中，Pod 需要向 CFS 申请时间片，CFS 通过 Limit 参数判断这个申请是否达到这个 Pod 的资源限制
+3. 如果达到了 Pod 的资源限制，”限流时间“ 指标会记录限流的时间
+因此，当一个 Pod 的”限流时间“非常高时，意味着这个 Pod CPU 资源严重不足，需要增加更多的资源了。
+
+Kubernetes 对于内存使用暴露了不同的值：
+
+1. MemUsed：和 Linux 的 used 一样，包含了 cache 值
+2. WorkingSet：比 memUsed 小一些，移除了一些“冷数据”，即长期没有访问的 cache 内存
+3. RSS：移除了 cache 的内存
+一般情况下，我们认为 WorkingSet 是比较合理的内存使用量指标
+
+## 其它
+
+![](/public/upload/kubernetes/kubernetes_monitor.png)
+
+
 

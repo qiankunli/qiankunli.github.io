@@ -205,13 +205,13 @@ model = models.Sequential()
 # 把部件像乐高那样拼起来
 model.add(keras.layers.Dense(512, activation=keras.activations.relu, input_dim=28*28))
 model.add(keras.layers.Dense(10, activation=keras.activations.softmax))
-# 编译模型
+# 配置学习过程
 model.compile(loss='categorical_crossentropy',optimizer='sgd',metrics=['accuracy'])
-## 训练
+# 在训练数据上进行迭代
 model.fit(X_train,Y_train,nb_epoch=5,batch_size=32)
-# 预估
+# 评估模型性能
 model.evaluate(X_test,Y_test,batch_size=32)
-# 预测
+# 对新的数据生成预测
 classes = model.predict_classes(X_test,batch_size=32)
 ```
 
@@ -245,3 +245,35 @@ final_logs=...
 callbacks.on_train_end(final_logs)
 ```
 
+### 函数式 API
+
+[Keras 高级用法：函数式 API 7.1（一）](https://mp.weixin.qq.com/s/XBkU_QnQ5OZzRLpz5yywmg)有些神经网络模型有多个独立的输入，而另一些又要求有多个输出。一些神经网络模型有 layer 之间的交叉分支，模型结构看起来像图（ graph ），而不是线性堆叠的 layer 。它们不能用Sequential 模型类实现，而要使用Keras更灵活的函数式 API ( functional API)。
+
+函数式 API 可以直接操作张量，你可以将layers 模块**作为函数**使用，传入张量返回张量。下面来一个简单的例子，让你清晰的区别 Sequential 模型和其等效的函数式 API。
+
+```python
+from keras.models import Sequential, Model
+from keras import layers
+from keras import Input
+# Sequential model, which you already know about
+seq_model = Sequential()
+seq_model.add(layers.Dense(32, activation='relu', input_shape=(64,))) 
+seq_model.add(layers.Dense(32, activation='relu')) seq_model.add(layers.Dense(10, activation='softmax'))
+# Its functional equivalent
+input_tensor = Input(shape=(64,))
+x = layers.Dense(32, activation='relu')(input_tensor)
+x = layers.Dense(32, activation='relu')(x)
+output_tensor = layers.Dense(10, activation='softmax')(x)
+## The Model class turns an input tensor and output tensor into a model.
+model = Model(input_tensor, output_tensor) 
+```
+用一个输入张量和输出张量实例化了一个 Model 对象，在幕后，Keras从 input_tensor 到 output_tensor 检索每个 layer，将它们合并成一个有向无环图数据结构：一个 Model 对象。当然，这些可以运行的原因是输出张量output_tensor是从输入张量input_tensor不断转化得到的。
+
+创建Model 对象后，可以 model.complile + model.fit 进行模型训练，也可以与tensorflow 原有api 结合，将Model 作为函数使用。
+
+```python
+y_hat = model(input)
+loss = loss(y_hat,y)
+train_op = optrimizer(loss)
+train_op.minimize()
+```

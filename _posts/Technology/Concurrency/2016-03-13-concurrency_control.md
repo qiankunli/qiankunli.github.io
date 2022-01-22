@@ -14,7 +14,7 @@ keywords: concurrency control
 {:toc}
 
 
-线程同步出现的根本原因是访问公共资源需要多个操作，而这多个操作的执行过程不具备原子性，**被任务调度器分开了**，而其他线程会破坏共享资源，所以需要在临界区做线程的同步，这里我们先明确一个概念，就是临界区，临界区是指多个任务访问共享资源如内存或文件时候的指令，**临界区是指令并不是受访问的资源**。
+线程同步出现的根本原因是访问公共资源需要多个操作，而这多个操作的执行过程不具备原子性，**被任务调度器分开了**，而其他线程会破坏共享资源，所以需要在临界区做线程的同步。
 
 有两个核心点，一个是原子操作，另一个则是中断；并发安全有以下几个办法（防中断，防其它执行体）：
 1. 原子操作，x86中带lock 前缀的指令，lock 前缀表示锁定总线（中断是不能打断这个操作的），仅适用单体变量。PS： 可以认为lock 指令本身有锁总线的功能，然后因为锁总线的功能导致前后指令无法乱序，进而编译器和cpu 碰到lock 也不会乱序执行，进而用lock 锁总线之外附赠一个禁止乱序执行的效果（内存屏障）。java 或go 的 atomic 包会被编译带lock 的指令码。
@@ -24,7 +24,14 @@ keywords: concurrency control
 
 ## 硬件对并发控制的支持
 
-原子变量的实现
+### 原子操作
+
+a++ 这行语句需要 3 条普通机器指令来完成变量 a 的自增：
+1. LOAD：将变量从内存加载到 CPU 寄存器；
+2. ADD：执行加法指令；
+3. STORE：将结果存储回原内存地址中。
+
+这 3 条普通指令在执行过程中是可以被中断的。而原子操作的指令是不可中断的，原子操作由底层硬件直接提供支持，是一种硬件实现的指令级的“事务”。
 
 ```c
 // 常用的32位的原子变量类型
@@ -47,52 +54,97 @@ static __always_inline void arch_atomic_sub(int i, atomic_t *v){
 
 LOCK_PREFIX 是一个宏，根据需要展开成“lock;”或者空串。单核心 CPU 是不需要 lock 前缀的，只要在多核心 CPU 下才需要加上 lock 前缀。Linux 定义了 __READ_ONCE，__WRITE_ONCE 这两个宏，是对代码封装并利用 GCC 的特性对代码进行检查，把让错误显现在编译阶段。其中的“volatile int *”是为了提醒编译器：这是对内存地址读写，不要有优化动作，每次都必须强制写入内存或从内存读取。
 
+### 内存屏障
+
+[剖析Disruptor:为什么会这么快？(三)揭秘内存屏障](http://ifeve.com/disruptor-memory-barrier/)
+
+什么是内存屏障？它是一个CPU指令
+
+1. 插入一个内存屏障，相当于告诉CPU和编译器先于这个命令的必须先执行，后于这个命令的必须后执行
+2. 强制更新一次不同CPU的缓存。例如，一个写屏障会把这个屏障前写入的数据刷新到缓存，这样任何试图读取该数据的线程将得到最新值
+
+volatile，有 volatile 修饰的变量，赋值后多执行了一个`lock addl $0x0,(%esp)`操作，这个操作相当于一个内存屏障，指令`addl $0x0,(%esp)`显然是一个空操作，关键在于 lock 前缀，查询 IA32 手册，它的作用是使得本 CPU 的 Cache 写入了内存，该写入动作也会引起别的 CPU invalidate 其 Cache。所以通过这样一个空操作，可让前面 volatile 变量的修改对其他 CPU 立即可见。说白了，这是除cas 之外，又一个暴露在 java 层面的指令。
+
+volatile 也是有成本的 [剖析Disruptor:为什么会这么快？（二）神奇的缓存行填充](http://ifeve.com/disruptor-cacheline-padding/)
+
+|从CPU到|大约需要的 CPU 周期|大约需要的时间|
+|---|---|---|
+|主存||约60-80纳秒|
+|QPI 总线传输(between sockets, not drawn)||约20ns|
+|L3 cache|约40-45 cycles|约15ns|
+|L2 cache|约10 cycles|约3ns|
+|L1 cache|约3-4 cycles|约1ns|
+| 寄存器 |1 cycle||
+
+[聊聊并发（一）深入分析Volatile的实现原理](http://ifeve.com/volatile/)
 	
 ## 操作系统对并发控制的支持
 
-我们常见的各种锁是有层级的，**最底层的两种锁就是互斥锁和自旋锁，其他锁都是基于它们实现的**。
+### 自旋锁
 
 spinlock_t 以及操作函数spin_lock 和spin_unlock
 
 ```c
-//最底层的自旋锁数据结构
+// 最底层的自旋锁数据结构
 typedef struct{
-    // 真正的锁值变量，用volatile标识
-    volatile unsigned long lock;
+    volatile unsigned long lock;        // 真正的锁值变量，用volatile标识
 }spinlock_t;
-#define spin_unlock_string 
-    \ "movb $1,%0" \ //写入1表示解锁 
-    :"=m" (lock->lock) : : "memory"
-#define spin_lock_string \ 
-    "\n1:\t" \ "lock ; decb %0\n\t" \ //原子减1 
-    "js 2f\n" \ //当结果小于0则跳转到标号2处，表示加锁失败 
-    ".section .text.lock,\"ax\"\n" \ //重新定义一个代码段，这是优化技术，避免后面的代码填充cache，因为大部分情况会加锁成功，链接器会处理好这个代码段的 
-    "2:\t" \ 
-    "cmpb $0,%0\n\t" \ //和0比较 
-    "rep;nop\n\t" \ //空指令 
-    "jle 2b\n\t" \ //小于或等于0跳转到标号2 
-    "jmp 1b\n" \ //跳转到标号1 
-    ".previous"//获取自旋锁
-static inline void spin_lock(spinlock_t*lock){ 
-    __asm__ __volatile__( 
-    spin_lock_string 
-    :"=m"(lock->lock)::"memory" 
-    );
-}
-//释放自旋锁
+void spin_lock_bh(spinlock_t *lock)     // 禁止CPU软中断，获取锁
+void spin_unlock_bh(spinlock_t *lock)
+int spin_trylock(spinlock_t *lock)      // 尝试获取锁，失败返回0
+void spin_lock_irq(spinlock_t *lock)    // 禁止本地中断，获取锁
+void spin_unlock_irq(spinlock_t *lock)spin_lock_irqsave(lock, flags)    // 保存本地中断状态，禁止本地中断，获取锁
+void spin_unlock_irqrestore(spinlock_t *lock, unsigned long flags)int spin_is_locked(spinlock_t *lock) //判断锁的状态
+// 释放自旋锁
 static inline void spin_unlock(spinlock_t*lock){
     __asm__ __volatile__( spin_unlock_string );
 }
 ```
 
-信号量 semaphore 及接口函数 down和up
+
+当取不到锁时，互斥锁用“线程切换”来面对，自旋锁则用“忙等待”来面对。这是两种最基本的处理方式，更高级别的锁都会选择其中一种来实现，比如读写锁就既可以基于互斥锁实现，也可以基于自旋锁实现。
+
+### 互斥锁
+
+```c
+// 结构
+struct mutex {
+	atomic_long_t		owner;  // 指向占用锁的线程
+	spinlock_t		    wait_lock;
+    #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
+        struct optimistic_spin_queue osq; /* Spinner MCS lock */
+    #endif
+        struct list_head	wait_list;
+    #ifdef CONFIG_DEBUG_MUTEXES
+        void			*magic;
+    #endif
+    #ifdef CONFIG_DEBUG_LOCK_ALLOC
+        struct lockdep_map	dep_map;
+    #endif
+};
+mutex_init（struct mutex* lock）    // 定义互斥锁lock
+mutex_lock(struct mutex *lock)     // 获取
+mutex_unlock(struct mutex *lock)   // 释放
+```
+
+### 信号量 
+
+信号量使得 多个线程可以进入临界区，semaphore 及接口函数 down和up
 
 ```c
 struct semaphore{
-    raw_spinlock_t lock;//保护信号量自身的自旋锁
-    unsigned int count;//信号量值
-    struct list_head wait_list;//挂载睡眠等待进程的链表
+    raw_spinlock_t lock;            // 保护信号量自身的自旋锁
+    unsigned int count;             // 可以同时进入临界区的线程数量
+    struct list_head wait_list;     // 挂载睡眠等待进程的链表
 };
+void down(struct semaphore *sem);   //废弃
+// 信号量的获取操作
+int down_trylock(struct semaphore *sem);
+int down_interruptible(struct semaphore *sem);
+void up(struct semaphore *sem)；    // 信号量的释放操作
+```
+
+```c
 #define down_console_sem() do { \
     down(&console_sem);\
 } while (0)
@@ -197,39 +249,7 @@ void up(struct semaphore *sem)
 
 [大话Linux内核中锁机制之完成量、互斥量](http://blog.sina.com.cn/s/blog_6d7fa49b01014q9b.html)
 
-### 内存屏障
-
-[剖析Disruptor:为什么会这么快？(三)揭秘内存屏障](http://ifeve.com/disruptor-memory-barrier/)
-
-什么是内存屏障？它是一个CPU指令
-
-1. 插入一个内存屏障，相当于告诉CPU和编译器先于这个命令的必须先执行，后于这个命令的必须后执行
-2. 强制更新一次不同CPU的缓存。例如，一个写屏障会把这个屏障前写入的数据刷新到缓存，这样任何试图读取该数据的线程将得到最新值
-
-volatile，有 volatile 修饰的变量，赋值后多执行了一个`lock addl $0x0,(%esp)`操作，这个操作相当于一个内存屏障，指令`addl $0x0,(%esp)`显然是一个空操作，关键在于 lock 前缀，查询 IA32 手册，它的作用是使得本 CPU 的 Cache 写入了内存，该写入动作也会引起别的 CPU invalidate 其 Cache。所以通过这样一个空操作，可让前面 volatile 变量的修改对其他 CPU 立即可见。
-
-说白了，这是除cas 之外，又一个暴露在 java 层面的指令。
-
-volatile 也是有成本的 [剖析Disruptor:为什么会这么快？（二）神奇的缓存行填充](http://ifeve.com/disruptor-cacheline-padding/)
-
-|从CPU到|大约需要的 CPU 周期|大约需要的时间|
-|---|---|---|
-|主存||约60-80纳秒|
-|QPI 总线传输(between sockets, not drawn)||约20ns|
-|L3 cache|约40-45 cycles|约15ns|
-|L2 cache|约10 cycles|约3ns|
-|L1 cache|约3-4 cycles|约1ns|
-| 寄存器 |1 cycle||
-
-[聊聊并发（一）深入分析Volatile的实现原理](http://ifeve.com/volatile/)
-
-## 分布式锁
-
-[如何使用Redis实现分布式锁？](https://time.geekbang.org/column/article/301092)为了避免 Redis 实例故障而导致的锁无法工作的问题，Redis 的开发者 Antirez 提出了分布式锁算法 Redlock。基本思路是让客户端和多个独立的 Redis 实例依次请求加锁，如果客户端能够和半数以上的实例成功地完成加锁操作，就认为客户端成功地获得分布式锁了，否则加锁失败。
-
-[并发场景下的幂等问题——分布式锁详解](https://mp.weixin.qq.com/s/uupgv50JN7AGWp2VjsCRuQ)
-		
-##  linux 线程
+###  linux 线程
 
 [Understanding Linux Process States](https://access.redhat.com/sites/default/files/attachments/processstates_20120831.pdf)
 
@@ -250,6 +270,12 @@ volatile 也是有成本的 [剖析Disruptor:为什么会这么快？（二）�
 
 反过来说，无锁的代码仅仅是不需要显式的Mutex来完成，但是存在数据竞争（Data Races）的情况下也会涉及到同步（Synchronization）的问题。从某种意义上来讲，所谓的无锁，仅仅只是颗粒度特别小的“锁”罢了，从代码层面上逐渐降低级别到CPU的指令级别而已，总会在某个层级上付出等待的代价，除非逻辑上彼此完全无关
 
+## 分布式锁
+
+[如何使用Redis实现分布式锁？](https://time.geekbang.org/column/article/301092)为了避免 Redis 实例故障而导致的锁无法工作的问题，Redis 的开发者 Antirez 提出了分布式锁算法 Redlock。基本思路是让客户端和多个独立的 Redis 实例依次请求加锁，如果客户端能够和半数以上的实例成功地完成加锁操作，就认为客户端成功地获得分布式锁了，否则加锁失败。
+
+[并发场景下的幂等问题——分布式锁详解](https://mp.weixin.qq.com/s/uupgv50JN7AGWp2VjsCRuQ)
+		
 ## 一个博客系列的整理
 
 [[并发系列-0] 引子](http://kexianda.info/page/2/)
@@ -278,7 +304,7 @@ volatile 也是有成本的 [剖析Disruptor:为什么会这么快？（二）�
 
 ## 其它
 
-[如何使用Redis实现分布式锁？](https://time.geekbang.org/column/article/301092)我们通常说的线程调用加锁和释放锁的操作，到底是啥意思呢？我来解释一下。实际上，一个线程调用加锁操作，其实就是检查锁变量值是否为 0。如果是 0，就把锁的变量值设置为 1，表示获取到锁，如果不是 0，就返回错误信息，表示加锁失败，已经有别的线程获取到锁了。而一个线程调用释放锁操作，其实就是将锁变量的值置为 0，以便其它线程可以来获取锁。
+[如何使用Redis实现分布式锁？](https://time.geekbang.org/column/article/301092)我们通常说的线程调用加锁和释放锁的操作，到底是啥意思呢？实际上，一个线程调用加锁操作，其实就是检查锁变量值是否为 0。如果是 0，就把锁的变量值设置为 1，表示获取到锁，如果不是 0，就返回错误信息，表示加锁失败，已经有别的线程获取到锁了。而一个线程调用释放锁操作，其实就是将锁变量的值置为 0，以便其它线程可以来获取锁。
 
 当你无法判断锁住的代码会执行多久时，应该首选互斥锁，互斥锁是一种独占锁。当 A 线程取到锁后，互斥锁将被 A 线程独自占有，当 A 没有释放这把锁时，其他线程的取锁代码都会被阻塞。**阻塞是如何实现的呢？**对于 99% 的线程级互斥锁而言，阻塞都是由操作系统内核实现的（比如 Linux 下它通常由内核提供的信号量实现）。当获取锁失败时，内核会将线程置为休眠状态，等到锁被释放后，内核会在合适的时机唤醒线程，而这个线程成功拿到锁后才能继续执行。**互斥锁通过内核帮忙切换线程，简化了业务代码使用锁的难度**。但是，线程获取锁失败时，增加了两次上下文切换的成本：从运行中切换为休眠，以及锁释放时从休眠状态切换为运行中。上下文切换耗时在几十纳秒到几微秒之间，或许这段时间比锁住的代码段执行时间还长。
 
@@ -286,7 +312,6 @@ volatile 也是有成本的 [剖析Disruptor:为什么会这么快？（二）�
 
 多线程竞争锁的时候，加锁失败的线程会“忙等待”，直到它拿到锁。什么叫“忙等待”呢？它并不意味着一直执行 CAS 函数，生产级的自旋锁在“忙等待”时，会与 CPU 紧密配合 ，它通过 CPU 提供的 PAUSE 指令，减少循环等待时的耗电量；对于单核 CPU，忙等待并没有意义，此时它会主动把线程休眠。
 
-当取不到锁时，互斥锁用“线程切换”来面对，自旋锁则用“忙等待”来面对。这是两种最基本的处理方式，更高级别的锁都会选择其中一种来实现，比如读写锁就既可以基于互斥锁实现，也可以基于自旋锁实现。
 
 并发控制的基本手段（没有好不好，只有合适不合适）
 

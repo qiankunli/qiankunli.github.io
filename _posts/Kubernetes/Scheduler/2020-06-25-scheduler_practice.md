@@ -63,7 +63,7 @@ spec:
 
 Node affinity, described [here](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity-beta-feature), is a property of pods that attracts them to a set of nodes (either as a preference or a hard requirement). Taints are the opposite – they allow a node to repel（击退） a set of pods.
 
-[Taints and Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/)
+[Taints and Tolerations](https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/) [Kubernetes污点和容忍度](https://mp.weixin.qq.com/s/XoBeoqJHZMrhCQN-JyOYMA)
 
 给节点加Taints`kubectl taint nodes node1 key=value:NoSchedule`
 

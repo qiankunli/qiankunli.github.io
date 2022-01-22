@@ -233,7 +233,80 @@ python mnist_dist_test_k8s.py --ps_hosts=10.244.2.140:2222 --worker_hosts=10.244
 
 ### 与k8s 整合
 
-[Kubeflow实战系列: 利用TFJob运行分布式TensorFlow](https://mp.weixin.qq.com/s/PmAU0MrPkKh6YiWpFXTRFg) 未读
+[Kubeflow实战系列: 利用TFJob运行分布式TensorFlow](https://mp.weixin.qq.com/s/PmAU0MrPkKh6YiWpFXTRFg) TFJob 的核心是构建ClusterSpec。
+
+tf_operator的工作就是创建对应的5个Pod, 并且将环境变量TF_CONFIG传入到每个Pod中，TF_CONFIG包含三部分的内容，当前集群ClusterSpec， 该节点的角色类型，以及id。比如该Pod为worker0，它所收到的环境变量TF_CONFIG为:
+
+```json
+{
+  "cluster":{
+    "master":[],   // tfjob 加的一个概念，可以当做worker 
+    "ps":[],
+    "worker":[]
+  },
+  "task":{
+    "type":"worker",
+    "index":0
+  },
+  "environment":"cloud"
+}
+```
+
+对于使用者来说，他只需要在这里代码中使用通过获取环境变量TF_CONFIG中的上下文。
+
+```python
+def main(unused_argv):
+  # 从环境变量 TF_CONFIG 中读取json 格式数据 反序列化成python 对象
+  tf_config = json.loads(os.environ.get('TF_CONFIG') or '{}')
+  task_config = tf_config.get('task', {})
+  task_type = task_config.get('type')
+  task_index = task_config.get('index')
+
+  FLAGS.job_name = task_type
+  FLAGS.task_index = task_index
+
+  # 构建ClusterSpec
+  cluster_config = tf_config.get('cluster', {})
+  ps_hosts = cluster_config.get('ps')
+  worker_hosts = cluster_config.get('worker')
+  ps_spec = FLAGS.ps_hosts.split(",")
+  worker_spec = FLAGS.worker_hosts.split(",")
+  cluster = tf.train.ClusterSpec({"ps": ps_spec, "worker": worker_spec})
+
+  # 创建Server 对象
+  server = tf.train.Server(cluster, job_name=FLAGS.job_name, task_index=FLAGS.task_index)
+  if FLAGS.job_name == "ps":
+    server.join()
+
+  is_chief = (FLAGS.task_index == 0)
+  # 创建 worker_device
+  if FLAGS.num_gpus > 0:
+    gpu = (FLAGS.task_index % FLAGS.num_gpus)
+    worker_device = "/job:worker/task:%d/gpu:%d" % (FLAGS.task_index, gpu)
+  elif FLAGS.num_gpus == 0:
+    cpu = 0
+    worker_device = "/job:worker/task:%d/cpu:%d" % (FLAGS.task_index, cpu)
+  with tf.device(tf.train.replica_device_setter(worker_device=worker_device,ps_device="/job:ps/cpu:0",cluster=cluster)):
+    ...
+```
+
+这里面可以看到 一个代码风格是 训练代码是模板化的，无论在哪来运行，要做的就是 赋值 FLAGS.job_name/FLAGS.task_index/ps_spec/worker_spec/worker_device
+
+```python
+def main(unused_argv):
+  FLAGS.job_name = ...
+  FLAGS.task_index = ...
+  ps_spec = ...
+  worker_spec = ...
+  cluster = tf.train.ClusterSpec({"ps": ps_spec, "worker": worker_spec})
+  server = tf.train.Server(cluster, job_name=FLAGS.job_name, task_index=FLAGS.task_index)
+  if FLAGS.job_name == "ps":
+    server.join()
+  is_chief = (FLAGS.task_index == 0)
+  worker_device = ...
+  with tf.device(tf.train.replica_device_setter(worker_device=worker_device,ps_device="/job:ps/cpu:0",cluster=cluster)):
+    ...
+```
 
 ## horovod
 

@@ -105,7 +105,7 @@ NICE_0_LOAD = 1024
 
 ![](/public/upload/container/cpu_burst.png)
 
-我们用 CPU Burst 技术来满足这种细粒度 CPU 突发需求，在传统的 CPU Bandwidth Controller quota 和 period 基础上引入 burst 的概念。当容器的 CPU 使用低于 quota 时，可用于突发的 burst 资源累积下来；当容器的 CPU 使用超过 quota，允许使用累积的 burst 资源。最终达到的效果是将容器更长时间的平均 CPU 消耗限制在 quota 范围内，允许短时间内的 CPU 使用超过其 quota。如果用 Bandwidth Controller 算法来管理休假，假期管理的周期（period）是一年，一年里假期的额度是 quota ，有了 CPU Burst 技术之后今年修不完的假期可以放到以后来休了。
+我们用 CPU Burst 技术来满足这种细粒度 CPU 突发需求，在传统的 CPU Bandwidth Controller quota 和 period 基础上引入 burst 的概念。当容器的 CPU 使用低于 quota 时，可用于突发的 burst 资源累积下来；当容器的 CPU 使用超过 quota，允许使用累积的 burst 资源。最终达到的效果是将容器**更长时间的平均 CPU 消耗限制在 quota 范围内，允许短时间内的 CPU 使用超过其 quota**。如果用 Bandwidth Controller 算法来管理休假，假期管理的周期（period）是一年，一年里假期的额度是 quota ，有了 CPU Burst 技术之后今年修不完的假期可以放到以后来休了。
 
 ## 容器 与 CFS
 
