@@ -105,11 +105,98 @@ out of that.
 [存储之道 - 51CTO技术博客 中的《一个IO的传奇一生》](http://alanwu.blog.51cto.com/3652632/d-8)
 
 
-## 单个文件系统设计
+## 实现文件系统
 
-来自彭东《操作系统实战》
+### 基于FUSE
 
-### 设计——块、文件和目录
+[自制文件系统 — 02 FUSE 框架，开发者的福音](https://mp.weixin.qq.com/s/HvbMxNiVudjNPRgYC8nXyg)
+
+![](/public/upload/linux/fuse_overview.png)
+
+该图表达的意思有以下几个：
+
+1. 背景：一个用户态文件系统，挂载点为 /tmp/fuse ，用户二进制程序文件为 ./hello ；
+2. 当执行 ls -l /tmp/fuse 命令的时候，流程如下：
+    1. IO 请求先进内核，经 vfs 传递给内核 FUSE 文件系统模块；
+    2. 内核 FUSE 模块把请求发给到用户态，由 ./hello 程序接收并且处理。处理完成之后，响应原路返回；
+内核 fuse.ko 用于承接 vfs 下来的 io 请求，然后封装成 FUSE 数据包，通过 /dev/fuse 这个管道传递到用户态。守护进程监听这个管道，看到有消息出来之后，立马读出来，然后利用 libfuse 库解析协议。PS： 听起来跟一个rpc 协议差不多
+
+以实现一个 hellofs 为例
+```go
+func main() {
+    var mountpoint string
+    flag.StringVar(&mountpoint, "mountpoint", "", "mount point(dir)?")
+    flag.Parse()
+
+    if mountpoint == "" {
+        log.Fatal("please input invalid mount point\n")
+    }
+    // 建立一个负责解析和封装 FUSE 请求监听通道对象；
+    c, err := fuse.Mount(mountpoint, fuse.FSName("helloworld"), fuse.Subtype("hellofs"))
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer c.Close()
+
+    // 把 FS 结构体注册到 server，以便可以回调处理请求
+    err = fs.Serve(c, FS{})
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+
+// hellofs 文件系统的主体
+type FS struct{}
+
+func (FS) Root() (fs.Node, error) {
+    return Dir{}, nil
+}
+
+// hellofs 文件系统中，Dir 是目录操作的主体
+type Dir struct{}
+func (Dir) Attr(ctx context.Context, a *fuse.Attr) error {
+    a.Inode = 20210601
+    a.Mode = os.ModeDir | 0555
+    return nil
+}
+
+// 当 ls 目录的时候，触发的是 ReadDirAll 调用，这里返回指定内容，表明只有一个 hello 的文件；
+func (Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
+    // 只处理一个叫做 hello 的 entry 文件，其他的统统返回 not exist
+    if name == "hello" {
+        return File{}, nil
+    }
+    return nil, syscall.ENOENT
+}
+
+// 定义 Readdir 的行为，固定返回了一个 inode:2 name 叫做 hello 的文件。对应用户的行为一般是 ls 这个目录。
+func (Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+    var dirDirs = []fuse.Dirent{{Inode: 2, Name: "hello", Type: fuse.DT_File}}
+    return dirDirs, nil
+}
+
+// hellofs 文件系统中，File 结构体实现了文件系统中关于文件的调用实现
+type File struct{}
+
+const fileContent = "hello, world\n"
+
+// 当 stat 这个文件的时候，返回 inode 为 2，mode 为 444
+func (File) Attr(ctx context.Context, a *fuse.Attr) error {
+    a.Inode = 20210606
+    a.Mode = 0444
+    a.Size = uint64(len(fileContent))
+    return nil
+}
+
+// 当 cat 这个文件的时候，文件内容返回 hello，world
+func (File) ReadAll(ctx context.Context) ([]byte, error) {
+    return []byte(fileContent), nil
+}
+```
+
+FUSE 能做什么？FUSE 能够转运 vfs 下来的 io 请求到用户态，用户程序处理之后，经由 FUSE 框架回应给用户。从而就可以把文件系统的实现全部放到用户态实现了。但是请注意，文件系统要实现对具体的设备的操作的话必须要使用设备驱动提供的接口，而设备驱动位于内核空间，这时可以直接读写块设备文件，就相当于只把文件系统摘到用户态，用户直接管理块设备空间。实现了 FUSE 的用户态文件系统有非常多的例子，比如，GlusterFS，SSHFS，CephFS，Lustre，GmailFS，EncFS，S3FS等等
+
+### 彭东《操作系统实战》
 
 **文件系统只是一个设备**，文件系统一定要有储存设备，HD 机械硬盘、SSD 固态硬盘、U 盘、各种 TF 卡等都属于存储设备，这些设备上的文件储存格式都不相同，甚至同一个硬盘上不同的分区的储存格式也不同。这个储存格式就是相应文件系统在储存设备上组织储存文件的方式。不难发现让文件系统成为 Cosmos 内核中一部分，是个非常愚蠢的想法。因此：文件系统组件是独立的与内核分开的；第二，操作系统需要动态加载和删除不同的文件系统组件。
 
@@ -117,7 +204,7 @@ out of that.
 
 现在 PC 机上的文件数量都已经上十万的数量级了，如果把十万个文件顺序地排列在一起，要找出其中一个文件，那是非常困难的，所以，需要一个叫文件目录或者叫文件夹的东西，我们习惯称其为目录。这样我们就可以用不同的目录来归纳不同的文件。可以看出，整个文件层次结构就像是一棵倒挂的树。
 
-### 实现
+
 ```c
 // 文件系统的超级块或者文件系统描述块
 typedef struct s_RFSSUBLK

@@ -13,6 +13,8 @@ keywords: network communication protocol
 * TOC
 {:toc}
 
+只要是数据协议，就有一个特点：和具体语言无关。数据协议格式只不过是对字节流的分析方式而已
+
 [Dubbo 3.0 前瞻之：常用协议对比及 RPC 协议新形态探索](https://mp.weixin.qq.com/s/8zgvuwdNrT3GOhZZZTfEaQ)一个简单的协议需要定义数据交换格式，协议格式和请求方式
 1. 数据交换格式，在 RPC 中也叫做序列化格式，评价序列化优劣一般从三个维度：
     1. 序列化后的字节数组大小
