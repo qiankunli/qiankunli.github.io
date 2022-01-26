@@ -111,30 +111,115 @@ with tf.Session() as sess:
 
 ![](/public/upload/machine/tensorflow_graph.png)
 
-### 数据读取
+## 数据读取
 
+1. 数据源：  csv/TFRecord/Tensor/numpy/dataFrame/自定义格式
+2. 读取方式：批量，多线程
+3. 读取的数据如何给到模型使用： 作为 tensor 给feed_dict；新的Dataset  `y_hat = model(x)`。 
+
+读取的 X/Y 更多是作为 符号引用，描述了数据来源 及方式（batch_size、线程数等），只有session.run 后才会真正有值。
+
+
+### feed_dict 读取csv
+
+```python
+file_queue = tf.train.string_input_producer(["xx.csv"])
+reader = tf.TextLineReader()
+_, value = reader.read(file_queue)
+record_defaults=[["1.0"], ["1"],["2.0"]]
+column1, column2, column3 = tf.decode_csv(content, record_defaults)
+# column1_batch, column2_batch, column3_batch = tf.train.batch([column1, column2], batch_size=9, num_threads=1, capacity=9)
+features = tf.stack([column1, column2])
+...
+with tf.Session() as sess:
+  sess.run(...,feed_dict = {X = features, Y = column3})
+```
+
+### Dataset
+
+feed-dict 被吐槽太慢了 ，[如何在TensorFlow上高效地使用Dataset](https://mp.weixin.qq.com/s/umXx2o_J8OpsRfq-p9ssxg)
+
+Tensorflow封装了一组API来处理数据的读入，它们都属于模块 tf.data
+1. 从numpy 读取  
+
+  ```
+  # create a random vector of shape (100,2)
+  x = np.random.sample((100,2))
+  # make a dataset from a numpy array
+  dataset = tf.data.Dataset.from_tensor_slices(x) 
+  ```
+2. 从磁盘/内存中获取源数据，比如直接读取特定目录的下的 xx.png 文件，使用 dataset.map 将输入数据转为 dataset 要求
+3. 读入TFrecords数据集，`dataset = tf.data.Dataset.TFRecordDataset("dataset.tfrecords")`
+
+```python
+features, labels = (np.random.sample((100,2)), np.random.sample((100,1)))
+dataset = tf.data.Dataset.from_tensor_slices((features,labels)) 
+# 描述 了数据的来源 batch size 等
+dataset = tf.data.Dataset.from_tensor_slices((features,labels)).repeat().batch(BATCH_SIZE)
+iter = dataset.make_one_shot_iterator()
+x, y = iter.get_next() 
+# 定义模型
+net = tf.layers.dense(x, 8, activation=tf.tanh) # pass the first value 
+net = tf.layers.dense(net, 8, activation=tf.tanh)
+prediction = tf.layers.dense(net, 1, activation=tf.tanh)
+loss = tf.losses.mean_squared_error(prediction, y)
+train_op = tf.train.AdamOptimizer().minimize(loss)
+with tf.Session() as sess:
+    sess.run(tf.global_variables_initializer())
+    for i in range(EPOCHS):
+        _, loss_value = sess.run([train_op, loss])
+```
+
+训练机器学习模型的时候，会将数据集遍历多轮（epoch），每一轮遍历都以mini-batch的形式送入模型（batch），数据遍历应该随机进行（shuffle）。
+
+### TFRecord 文件
 
 TFRecord是Tensorflow训练和推断标准的数据存储格式之一，将数据存储为二进制文件（二进制存储具有占用空间少，拷贝和读取（from disk）更加高效的特点），而且不需要单独的标签文件了，其本质是一行行字节字符串构成的样本数据。一条TFRecord数据代表一个Example，一个Example就是一个样本数据，每个Example内部由一个字典构成，每个key对应一个Feature，key为字段名，Feature为字段名所对应的数据，Feature有三种数据类型：ByteList、FloatList，Int64List。TFRecord并不是一个self-describing的格式，也就是说，tfrecord的write和read都需要额外指明schema。
 
 1. 小规模生成TFRecord： python 代码将图像、文本等写入tfrecords文件需要建立一个writer对象，创建这个对象的是函数 `tf.python_io.TFRecordWriter`
 2. 大规模生成TFRecord：如何大规模地把HDFS中的数据直接喂到Tensorflow中呢？Tensorflow提供了一种解决方法：spark-tensorflow-connector，支持将spark DataFrame格式数据直接保存为TFRecords格式数据。
 
+[TensorFlow 指南：读取自定义文件和记录格式](https://mp.weixin.qq.com/s/t9byJ620U7VoSeH81_dAiQ)
 
-Tensorflow封装了一组API来处理数据的读入，它们都属于模块 tf.data
-1. 从磁盘/内存中获取源数据，比如直接读取特定目录的下的 xx.png 文件，使用 dataset.map 将输入数据转为 dataset 要求
-2. 读入TFrecords数据集，`dataset = tf.data.Dataset.TFRecordDataset("dataset.tfrecords")`
-3. 训练机器学习模型的时候，会将数据集遍历多轮（epoch），每一轮遍历都以mini-batch的形式送入模型（batch），数据遍历应该随机进行（shuffle）。
-  ```python
-  dataset = dataset.repeat(10) # 10 epoches
-  dataset = dataset.batch(64) # batch_size: 64
-  dataset = dataset.shuffle(buffer_size=10000)
-  iterator = dataset.make_one_shot_iterator()
-  next_element = iterator.get_next()
-  # next_element只是一个“符号”，需要用Session运行才能真正得到数据。
-  ```
+### 房价预测
 
+```
+df = pd.read_csv('data.csv',names=['square', 'bedrooms', 'price'])
+ones = pd.DataFrame({'ones': np.ones(len(df))})# ones是n行1列的数据框，表示x0恒为1
+df = pd.concat([ones, df], axis=1)  # 根据列合并数据
+```
+|	|ones|	square|	bedrooms|	price|
+|---|---|---|---|---|
+|0|	1.0|	0.130010|	-0.223675|	0.475747|
+|1|	1.0|	-0.504190|	-0.223675|	-0.084074|
 
-### 控制流
+特征 + batch 组成一个矩阵， 其shape 和  计算图 X_data 的shape 一致。
+
+```
+X_data = np.array(df[df.columns[0:3]])
+y_data = np.array(df[df.columns[-1]]).reshape(len(df), 1)
+# 输入 X，形状[47, 3]
+X = tf.placeholder(tf.float32, X_data.shape)
+# 输出 y，形状[47, 1]
+y = tf.placeholder(tf.float32, y_data.shape)
+# 权重变量 W，形状[3,1]
+W = tf.get_variable("weights", (X_data.shape[1], 1), initializer=tf.constant_initializer())
+# 假设函数 h(x) = w0*x0+w1*x1+w2*x2, 其中x0恒为1
+# 推理值 y_pred  形状[47,1]
+y_pred = tf.matmul(X, W)
+# 损失函数采用最小二乘法，y_pred - y 是形如[47, 1]的向量。
+loss_op = 1 / (2 * len(X_data)) * tf.matmul((y_pred - y), (y_pred - y), transpose_a=True)
+opt = tf.train.GradientDescentOptimizer(learning_rate=alpha)
+train_op = opt.minimize(loss_op)
+with tf.Session() as sess:
+    # 初始化全局变量
+    sess.run(tf.global_variables_initializer())
+    # 开始训练模型，
+    # 因为训练集较小，所以每轮都使用全量数据训练
+    for e in range(1, epoch + 1):
+        sess.run(train_op, feed_dict={X: X_data, y: y_data})
+```
+## 控制流
 
 [TensorFlow 中的 Control Flow](https://mp.weixin.qq.com/s/6uVeEHcQeaPN_qEhHvcEoA)
 
@@ -166,6 +251,17 @@ out = top + bot
 条件分支 `tf.cond(a < b,lambda: tf.add(3,3),lambda:tf.sqaure(3))`
 
 
+
+
+## 引擎
+
+Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
+
+1. 计算梯度。即调用`compute_gradients (loss, var_list …)` 计算loss对指定val_list的梯度，返回元组列表 `list(zip(grads, var_list))`。
+2. 用计算得到的梯度来更新对应权重。即调用 `apply_gradients(grads_and_vars, global_step=global_step, name=None)` 将 `compute_gradients (loss, var_list …)` 的返回值作为输入对权重变量进行更新；
+将minimize()分成两个步骤的原因是：可以在某种情况下对梯度进行修正，防止梯度消失或者梯度爆炸。
+
+
 ## 自定义算子
 
 对于 TensorFlow，可以自定义 Operation，即如果现有的库没有涵盖你想要的操作, 你可以自己定制一个。为了使定制的 Op 能够兼容原有的库，你必须做以下工作:
@@ -183,97 +279,4 @@ import tensorflow as tf
 zero_out_op = tf.load_op_library('zero_out.so')
 with tf.Session():
   print(zero_out_op.zero_out([1,2,3,4,5])).eval()
-```
-
-## 引擎
-
-Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
-
-1. 计算梯度。即调用`compute_gradients (loss, var_list …)` 计算loss对指定val_list的梯度，返回元组列表 `list(zip(grads, var_list))`。
-2. 用计算得到的梯度来更新对应权重。即调用 `apply_gradients(grads_and_vars, global_step=global_step, name=None)` 将 `compute_gradients (loss, var_list …)` 的返回值作为输入对权重变量进行更新；
-将minimize()分成两个步骤的原因是：可以在某种情况下对梯度进行修正，防止梯度消失或者梯度爆炸。
-
-## keras
-Keras 是开源 Python 包，由于 Keras 的独立性，Keras 具有自己的图形数据结构，用于定义计算图形：它不依靠底层后端框架的图形数据结构。PS： 所有有一个model.compile 动作？
-[聊聊Keras的特点及其与其他框架的关系](https://mp.weixin.qq.com/s/fgG95qqbrV07EgAqLXuFAg)
-
-
-### 示例demo
-```python
-# 声明个模型
-model = models.Sequential()
-# 把部件像乐高那样拼起来
-model.add(keras.layers.Dense(512, activation=keras.activations.relu, input_dim=28*28))
-model.add(keras.layers.Dense(10, activation=keras.activations.softmax))
-# 配置学习过程
-model.compile(loss='categorical_crossentropy',optimizer='sgd',metrics=['accuracy'])
-# 在训练数据上进行迭代
-model.fit(X_train,Y_train,nb_epoch=5,batch_size=32)
-# 评估模型性能
-model.evaluate(X_test,Y_test,batch_size=32)
-# 对新的数据生成预测
-classes = model.predict_classes(X_test,batch_size=32)
-```
-
-### 和session 的关系
-和 TensorFlow session 的关系：Keras doesn't directly have a session because it supports multiple backends. Assuming you use TF as backend, you can get the global session as:
-
-```
-from keras import backend as K
-sess = K.get_session()
-```
-
-If, on the other hand, yo already have an open Session and want to set it as the session Keras should use, you can do so via: `K.set_session(sess)`
-
-### callback
-
-callbacks能在fit、evaluate和predict过程中加入伴随着模型的生命周期运行，目前tensorflow.keras已经构建了许多种callbacks供用户使用，用于防止过拟合、可视化训练过程、纠错、保存模型checkpoints和生成TensorBoard等。
-
-callback 的关键是实现一系列 on_xx方法，callback与 训练流程的协作伪代码
-
-```python
-callbacks.on_train_begin(...)
-for epoch in range(EPOCHS):
-    callbacks.on_epoch_begin(epoch)
-    for i, data in dataset.enumerate():
-        callbacks.on_train_batch_begin(i)
-        batch_logs = model.train_step(data)
-        callbacks.on_train_batch_end(i, batch_logs)
-    epoch_logs = ...
-    callbacks.on_epoch_end(epoch, epoch_logs)
-final_logs=...
-callbacks.on_train_end(final_logs)
-```
-
-### 函数式 API
-
-[Keras 高级用法：函数式 API 7.1（一）](https://mp.weixin.qq.com/s/XBkU_QnQ5OZzRLpz5yywmg)有些神经网络模型有多个独立的输入，而另一些又要求有多个输出。一些神经网络模型有 layer 之间的交叉分支，模型结构看起来像图（ graph ），而不是线性堆叠的 layer 。它们不能用Sequential 模型类实现，而要使用Keras更灵活的函数式 API ( functional API)。
-
-函数式 API 可以直接操作张量，你可以将layers 模块**作为函数**使用，传入张量返回张量。下面来一个简单的例子，让你清晰的区别 Sequential 模型和其等效的函数式 API。
-
-```python
-from keras.models import Sequential, Model
-from keras import layers
-from keras import Input
-# Sequential model, which you already know about
-seq_model = Sequential()
-seq_model.add(layers.Dense(32, activation='relu', input_shape=(64,))) 
-seq_model.add(layers.Dense(32, activation='relu')) seq_model.add(layers.Dense(10, activation='softmax'))
-# Its functional equivalent
-input_tensor = Input(shape=(64,))
-x = layers.Dense(32, activation='relu')(input_tensor)
-x = layers.Dense(32, activation='relu')(x)
-output_tensor = layers.Dense(10, activation='softmax')(x)
-## The Model class turns an input tensor and output tensor into a model.
-model = Model(input_tensor, output_tensor) 
-```
-用一个输入张量和输出张量实例化了一个 Model 对象，在幕后，Keras从 input_tensor 到 output_tensor 检索每个 layer，将它们合并成一个有向无环图数据结构：一个 Model 对象。当然，这些可以运行的原因是输出张量output_tensor是从输入张量input_tensor不断转化得到的。
-
-创建Model 对象后，可以 model.complile + model.fit 进行模型训练，也可以与tensorflow 原有api 结合，将Model 作为函数使用。
-
-```python
-y_hat = model(input)
-loss = loss(y_hat,y)
-train_op = optrimizer(loss)
-train_op.minimize()
 ```

@@ -121,6 +121,7 @@ Prometheus 本身自带了监控自己的许多指标，比如
 2. top10的 metric 数量： 按 metric 名字分 `topk(10, count by (__name__)({__name__=~".+"}))`
 3. top10的 metric 数量： 按 job 名字分 `topk(10, count by (__name__, job)({__name__=~".+"}))`
 
+[vivo AI计算平台的监控高可用方案](https://mp.weixin.qq.com/s/fu_e4SPKrJNhigXbgEsSSg)
 ### 可靠性
 
 1. **Prometheus推荐的容错解决方案**是并 行运行两个配置相同的Prometheus服务器，并且这两个服务器同时处于活动状态。该配置生成的重复警报可以交由上游 Alertmanager 使用其分组 (及抑制)功能进行处 理 。一个推荐的方法是尽可能使上游Alertmanager高度容错 ，而不是关注Prometheus服务器的容错能力。Alertmanager包含由HashiCorp Memberlist库提供的集群功能。Memberlist是一个Go语言库，使

@@ -148,6 +148,14 @@ Note that it is generally better to rely on Dependency Injection("push" configur
 3. 如何对 BeanFactory 施加影响？BeanPostProcessor，**Factory hook** that allows for custom modification of new bean instances,e.g. checking for marker interfaces or wrapping them with proxies.
 
 
+实际使用
+```java
+AutowireCapableBeanFactory factory = new ...
+xxBean xx = new xxBean();
+factory.autowireBean(xxBean);
+factory.initializeBean(xxBean, ...);
+```
+
 ### ApplicationContext
 
 ![](/public/upload/spring/application_context_class_diagram.png)

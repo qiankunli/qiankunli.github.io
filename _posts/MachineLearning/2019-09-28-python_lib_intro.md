@@ -118,7 +118,7 @@ Pandas 有两种自己独有的基本数据结构：Series 和 DataFrame，其�
 
 ### DataFrame
 
-假设有一个学生表，想知道是女生多还是男生多，用sql 来表示就是`select sex,count(*) from student group by sex`。那么给定一个数据集/csv文件等，如何用python 做类似的分析呢？[pandas与sql 对比,持续更新...](https://blog.csdn.net/weixin_39791387/article/details/81391621)
+DataFrame 是一个二维带标记的数据结构，**每column 数据类型可以不同**。假设有一个学生表，想知道是女生多还是男生多，用sql 来表示就是`select sex,count(*) from student group by sex`。那么给定一个数据集/csv文件等，如何用python 做类似的分析呢？[pandas与sql 对比,持续更新...](https://blog.csdn.net/weixin_39791387/article/details/81391621)
 
 
 [Pandas DataFrame: A lightweight Intro](https://towardsdatascience.com/pandas-dataframe-a-lightweight-intro-680e3a212b96)Pandas DataFrame is nothing but an in-memory representation of an excel sheet via Python programming language
