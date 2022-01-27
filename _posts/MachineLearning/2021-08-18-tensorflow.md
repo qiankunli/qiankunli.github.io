@@ -250,9 +250,6 @@ out = top + bot
 
 条件分支 `tf.cond(a < b,lambda: tf.add(3,3),lambda:tf.sqaure(3))`
 
-
-
-
 ## 引擎
 
 Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
@@ -280,3 +277,6 @@ zero_out_op = tf.load_op_library('zero_out.so')
 with tf.Session():
   print(zero_out_op.zero_out([1,2,3,4,5])).eval()
 ```
+
+## 可视化
+

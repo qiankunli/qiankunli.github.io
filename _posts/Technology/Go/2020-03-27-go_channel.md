@@ -15,7 +15,7 @@ keywords: Go defer
 
 Go 对并发的原生支持可不是仅仅停留在口号上的，Go 在语法层面将并发原语 channel 作为一等公民对待。这意味着我们可以像使用普通变量那样使用 channel，比如，定义 channel 类型变量、给 channel 变量赋值、将 channel 作为参数传递给函数 / 方法、将 channel 作为返回值从函数 / 方法中返回，甚至将 channel 发送到其他 channel 中。这就大大简化了 channel 原语的使用，提升了我们开发者在做并发设计和实现时的体验。
 
-[通信原语](https://golang.design/under-the-hood/zh-cn/part1basic/ch03lang/chan/)Go 语言中 Channel 与 Select 语句受到 1978 年 CSP 原始理论的启发。 语言设计中，Goroutine 就是 CSP 理论中的并发实体， 而 Channel 则对应 CSP 中输入输出指令的消息信道，**Select 语句则是 CSP 中守卫和选择指令的组合**。Channel 与 Select 是 Go 语言中提供的语言级的、基于消息传递的同步原语。
+[通信原语](https://golang.design/under-the-hood/zh-cn/part1basic/ch03lang/chan/)Go 语言中 Channel 与 Select 语句受到 1978 年 CSP 原始理论的启发。 语言设计中，Goroutine 就是 CSP 理论中的并发实体， 而 Channel 则对应 CSP 中输入输出指令的消息信道，**Select 语句则是 CSP 中守卫和选择指令的组合**。Channel 与 Select 是 Go 语言中提供的**语言级的**、基于消息传递的同步原语。
 
 ## 背景知识
 
@@ -57,7 +57,7 @@ ch2 <- 13   // invalid operation: ch2 <- 13 (send to receive-only type <-chan in
 
 ### 数据结构
 
-[Go 语言设计与实现-Channel](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-channel/)Channel 在运行时的内部表示是 runtime.hchan，本质上就是一个 mutex 锁加上一个环状缓存、 一个发送方队列和一个接收方队列。社区有一些无锁Channel 的提案，但还在不停的优化中。PS：**本质上还是共享内存**
+[Go 语言设计与实现-Channel](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-channel/)Channel 在运行时的内部表示是 runtime.hchan，本质上就是一个 mutex 锁加上一个环状缓存、 一个发送方队列和一个接收方队列。社区有一些无锁Channel 的提案，但还在不停的优化中。PS：**本质上是有锁队列，还是共享内存**
 
 ```go
 // src/runtime/chan.go

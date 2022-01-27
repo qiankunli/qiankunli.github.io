@@ -214,8 +214,9 @@ top:
     }
     // 尝试从其他处理器上取出一部分 Goroutine，如果没有可执行的任务就会阻塞直到条件满足；
     if gp == nil {
-        gp, inheritTime = findrunnable() // blocks until work is available
+        gp, inheritTime = findrunnable()  // 阻塞地查找可用G
     }
+    // 执行G任务函数
     execute(gp, inheritTime)
 }
 ```
@@ -228,6 +229,7 @@ func execute(gp *g, inheritTime bool) {
     // 将 g 正式切换为 _Grunning 状态
     casgstatus(gp, _Grunnable, _Grunning)
     gp.waitsince = 0
+    // 抢占信号
     gp.preempt = false
     gp.stackguard0 = gp.stack.lo + _StackGuard
     if !inheritTime {
@@ -236,6 +238,7 @@ func execute(gp *g, inheritTime bool) {
     // 与线程 M 建立起双向的关系
     _g_.m.curg = gp
     gp.m = _g_.m
+    // gogo完成从g0到gp的切换
     gogo(&gp.sched)
 }
 ```
@@ -259,11 +262,33 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
     JMP	BX
 ```
 
-这个函数会从 gobuf 中取出 Goroutine 指针、栈指针、返回值、上下文以及程序计数器并将通过 JMP 指令跳转至 Goroutine 应该继续执行代码的位置。PS：就切换几个寄存器，所以协程的切换成本更低
-
-runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器和待执行函数的程序计数器，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**。runtime.goexit ==> runtime·goexit1 ==> mcall(goexit0) ==> goexit0，goexit0 会对 G 进行复位操作，解绑 M 和 G 的关联关系，将其 放入 gfree 链表中等待其他的 go 语句创建新的 g。在最后，goexit0 会重新调用 schedule触发新一轮的调度。
+runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器和待执行函数的程序计数器，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**(所以goroutine 没有返回值)。runtime.goexit ==> runtime·goexit1 ==> mcall(goexit0) ==> goexit0，goexit0 会对 G 进行复位操作，解绑 M 和 G 的关联关系，将其 放入 gfree 链表中等待其他的 go 语句创建新的 g。在最后，goexit0 会重新调用 schedule触发新一轮的调度。PS：就切换几个寄存器，所以协程的切换成本更低
 
 ![](/public/upload/go/routine_switch_after.jpg)
+
+```go
+func goexit0(gp *g) {
+    _g_ := getg()
+    // 设置当前G状态为_Gdead
+    casgstatus(gp, _Grunning, _Gdead) 
+    // 清理G
+    gp.m = nil
+    ...
+    gp.writebuf = nil
+    gp.waitreason = 0
+    gp.param = nil
+    gp.labels = nil
+    gp.timer = nil
+    
+    // 解绑M和G
+    dropg() 
+    ...
+    // 将G扔进gfree链表中等待复用
+    gfput(_g_.m.p.ptr(), gp)
+    // 再次进行调度
+    schedule()
+}
+```
 
 ## 图解
 
