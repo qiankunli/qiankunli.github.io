@@ -70,6 +70,11 @@ python tensorflow_serving/example/mnist_saved_model.py --training_iteration=1000
 Exporting trained model to /tmp/mnist/2
 ```
 
+预估 url `http://localhost:9000/v1/tmp/mnist:predict`
+
+
+
+
 ## 部署实践
 
 在实践中还要考虑 模型的大小（有的模型几百G），是否动态加载（很多公司没做镜像层面的管理，而是serving 服务直接可以按版本动态加载模型）
