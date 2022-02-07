@@ -13,6 +13,8 @@ keywords:  概率论
 * TOC
 {:toc}
 
+机器学习模型本质上就是用模型表达的概率分布去刻画真实世界的概率分布。
+
 ## 概率论
 
 ![](/public/upload/machine/probability_theory.png)

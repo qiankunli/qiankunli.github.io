@@ -328,3 +328,30 @@ func gopanic(e interface{}) {
 
 首先是确定 panic 是否可恢复（一系列条件），对可恢复panic，创建一个 _panic 实例，保存在 goroutine 链表中先前的 panic 链表，接下来开始逐一调用当前 goroutine 的 defer 方法， 检查用户态代码是否需要对 panic 进行恢复，如果某个包含了 recover 的调用（即 gorecover 调用）被执行，这时 _panic 实例 p.recovered 会被标记为 true， 从而会通过 mcall 的方式来执行 recovery 函数来重新进入调度循环，如果所有的 defer 都没有指明显式的 recover，那么这时候则直接在运行时抛出 panic 信息
 
+## pprof
+
+```go
+import (
+    ... ...
+    "net/http"
+    _ "net/http/pprof"
+    ... ...
+)
+... ...
+func main() {
+    go func() {
+        http.ListenAndServe(":6060", nil)
+    }()
+    ... ...
+}
+
+```
+以空导入的方式导入 net/http/pprof 包，并在一个单独的 goroutine 中启动一个标准的 http 服务，就可以实现对 pprof 性能剖析的支持。pprof 工具可以通过 6060 端口采样到我们的 Go 程序的运行时数据。
+```sh
+// 192.168.10.18为服务端的主机地址
+$go tool pprof -http=:9090 http://192.168.10.18:6060/debug/pprof/profile
+Fetching profile over HTTP from http://192.168.10.18:6060/debug/pprof/profile
+Saved profile in /Users/tonybai/pprof/pprof.server.samples.cpu.004.pb.gz
+Serving web UI on http://localhost:9090
+```
+debug/pprof/profile 提供的是 CPU 的性能采样数据。CPU 类型采样数据是性能剖析中最常见的采样数据类型。一旦启用 CPU 数据采样，Go 运行时会每隔一段短暂的时间（10ms）就中断一次（由 SIGPROF 信号引发），并记录当前所有 goroutine 的函数栈信息。它能帮助我们识别出代码关键路径上出现次数最多的函数，而往往这个函数就是程序的一个瓶颈。

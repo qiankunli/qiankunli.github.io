@@ -170,6 +170,17 @@ Go Modules 提供了统一的依赖包管理工具 go mod
 1. 语义导入版本：如果同一个包的新旧版本是兼容的，那么它们的包导入路径应该是相同的。如果新旧两个包不兼容，那么我们就应该采用不同的导入路径。将包主版本号引入到包导入路径中，我们可以像下面这样导入 logrus v2.0.0 版本依赖包：`import "github.com/sirupsen/logrus/v2"`
 2. 最小版本选择原则：主流编程语言，以及 Go Module 出现之前的很多 Go 包依赖管理工具都会选择依赖项的“最新最大 (Latest Greatest) 版本”，Go 会在该项目依赖项的所有版本中，选出符合项目整体要求的“最小版本”。
 
+如果这个仓库下的布局是这样的：
+```
+./srsm
+├── go.mod
+├── go.sum
+├── pkg1/
+│   └── pkg1.go
+└── pkg2/
+    └── pkg2.go
+```
+module 的使用者可以很轻松地确定 pkg1 和 pkg2 两个包的导入路径，一个是 `github.com/bigwhite/srsm/pkg1`，另一个则是 `github.com/bigwhite/srsm/pkg2`。如果 module 演进到了 v2.x.x 版本，那么以 pkg1 包为例，它的包的导入路径就变成了 `github.com/bigwhite/srsm/v2/pkg1`。
 ### go.mod
 ```
 $GOPATH/pkg/mod/k8s.io
