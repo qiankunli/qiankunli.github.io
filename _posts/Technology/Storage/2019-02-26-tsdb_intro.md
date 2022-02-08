@@ -74,3 +74,4 @@ Prometheus 官网有个专门的对比 [Prometheus COMPARISON TO ALTERNATIVES](h
 
 RedisTimeSeries 是 Redis 的一个扩展模块。它专门面向时间序列数据提供了数据类型和访问接口，并且支持在 Redis 实例上直接对数据进行按时间范围的聚合计算。
 
+阿里基于OceanBase 开发了一个商用版 CeresDB [Prometheus on CeresDB 演进之路](https://mp.weixin.qq.com/s/zrxDgBjutbdvROQRYa3zrQ)

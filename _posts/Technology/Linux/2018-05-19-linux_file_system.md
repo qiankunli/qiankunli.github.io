@@ -121,7 +121,7 @@ out of that.
     2. 内核 FUSE 模块把请求发给到用户态，由 ./hello 程序接收并且处理。处理完成之后，响应原路返回；
 内核 fuse.ko 用于承接 vfs 下来的 io 请求，然后封装成 FUSE 数据包，通过 /dev/fuse 这个管道传递到用户态。守护进程监听这个管道，看到有消息出来之后，立马读出来，然后利用 libfuse 库解析协议。PS： 听起来跟一个rpc 协议差不多
 
-以实现一个 hellofs 为例
+以实现一个 hellofs 为例。PS： 把实现文件系统整的跟web 开发一样
 ```go
 func main() {
     var mountpoint string

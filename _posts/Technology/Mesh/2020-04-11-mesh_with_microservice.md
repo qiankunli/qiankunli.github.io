@@ -33,10 +33,12 @@ keywords: mesh microservice
 
     1. 发现 处在容器环境，并有sidecar 运行。则将请求 导向sidecar 的ip和port。
     2. 否则，访问注册中心，执行路由选择策略等， 选中一个server 节点，建连，发起请求。 
-2. server 注册服务 
+2. server 注册服务 的几种方式
 
     1. 直接向注册中心注册服务。注册代码在sdk里，如果后续更换注册中心、注册中心地址变更 或 注册逻辑，仍然需要升级sdk。
-    2. 通过 sidecar 向注册中心注册服务。mosn 0.13.0 开始支持dubbo 的注册逻辑。 
+    2. 通过 sidecar 向注册中心注册服务。mosn 0.13.0 开始支持dubbo 的注册逻辑。  [Service Mesh 在中国工商银行的探索与实践](https://mp.weixin.qq.com/s/1fSxNvdPRwEpUFlEPFxpgQ)
+
+        ![](/public/upload/mesh/sidecar_register.png)
     2. 通过 k8s 注册服务。这要求所有的服务 都运行在 k8s 集群
     3. 通过 发布系统 向注册中心注册服务
 
@@ -48,6 +50,7 @@ keywords: mesh microservice
 在 Istio 控制面中，Pilot 组件负责管理服务网格内部的服务和流量策略。Pilot 将服务信息和路由策略转换为 xDS 接口的标准数据结构，下发到数据面的 Envoy。Pilot 自身并不负责网格中的服务注册，而是通过集成其他服务注册表来获取网格中管理的服务。除此以外，Istio 还支持通过 API 向网格中添加注册表之外的独立服务。
 
 [如何将第三方服务注册集成到 Istio ？](https://mp.weixin.qq.com/s/EJMk0tcJ457iKNMFbmi3jQ)
+
 ### 支持自定义RPC 协议
 
 

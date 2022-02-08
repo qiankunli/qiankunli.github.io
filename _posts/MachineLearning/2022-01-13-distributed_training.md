@@ -129,6 +129,35 @@ VariableWeightsInit 在单机训练的场景下，各变量节点的值是随机
 
 ## 通信技术
 
+### ps-worker
+
+进程内通信主要实现内存数据的跨设备复制（本地CPU和GPU内存之间、多个GPU内存之间）， 进程间通信主要实现数据流和控制流基于网络协议的传输。Tensorflow 的运行时框架会根据应用代码中的集群和设备配置，在数据流图构建时自动插入通信操作，并在数据流图执行过程中动态调度这些操作。
+
+![](/public/upload/machine/ps_worker_communication.png)
+
+1. 对于逻辑上具有数据传输语义，但物理上通信的源和目标位于同一设备、同一地址空间的进程内通信，只传输数据指针，不传输数据本身。
+2. 对于cpu 和gpu 内存间的设备通信，本质是跨设备内存的数据复制，尽量使用底层设备接口实现（比如DMA机制），而不是用面向应用层的API
+3. 涉及GPU的内存传输一般需要经过CPU 内存中转，除非使用支持RDMA 协议的高性能网络。
+4. 尽量做到 计算与通信过程重叠，很多通信函数采用异步模式及多线程并发执行
+
+在TensorFlow 的实现中，Tensor对象及内部 TensorBuffer 对象本身始终保存在 CPU 内存上，TensorBuffer 内部指针指向的缓冲区有可能位于CPU 或GPU 内存，Tensor 的跨设备复制主要指 内部缓冲区的复制过程
+1. CPU 内存间的复制无需使用特殊函数，对于TensorBuffer 指向的缓冲区不做完整复制，只需复制指针并增加引用计数。
+2. CPU 与GPU 内存之间的数据复制 函数 需要不同GPU 设备的DeviceContext 子类重写。
+
+Tensorflow使用gRPC 实现进程间通信，分布式模式中的每个进程具有一个 GrpcServer 实例（也包含客户端对象），包含GrpcMasterService 和 GrpcWorkerService 两个服务
+
+||GrpcMasterService主要用于会话相关操作|GrpcWorkerService 主要用于数据流图相关操作|
+|---|---|---|
+|控制接口|CreateSession,ExtendSession,...|GetStatus,RunGraph|
+|数据通信接口||RecvTensor|
+
+1. 服务端均以异步模式实现，master 服务的客户端调用多为同步模式，worker 服务的客户端调用多为异步模式
+2. 对于同一进程内的 grpc 调用，均有可能直接访问本地对象
+3. RecvTensor 有一定特殊性，Tensor 的大小可能很大，自定义了消息传输与解析格式（没有用grpc 自带的），客户端调用的生命周期管理也有所不同
+3. 为进一步提高进程间数据通信性能，在保留gRPC 通信的同时，利用TensorFlow 的扩展机制，支持RDMA 特性的InfiniBand 协议栈，上层使用与grpc 接口一致，只需开启相关配置即可。
+
+### all-reduce
+
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
 Collective communication包含多个sender和多个receiver，一般的通信原语包括 broadcast，gather,all-gather，scatter，reduce，all-reduce，reduce-scatter，all-to-all等。
 

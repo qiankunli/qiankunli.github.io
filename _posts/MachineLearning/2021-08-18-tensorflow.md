@@ -24,7 +24,6 @@ TensorFlow 使用库模式（不是框架模式），工作形态是由用户编
 
 ![](/public/upload/machine/tensorflow_overview.png)
 
-
 ## 核心概念
 
 [TensorFlow on Kubernetes的架构与实践](https://mp.weixin.qq.com/s/xsrRZVnPp-ogj59ZCGqqsQ)
@@ -53,6 +52,8 @@ print(z)
 ```
 可以看到，在tensorflow1.0 静态图场景下，z 输出为空。`z = tf.strings.join([x,y],separator=" ")` **没有真正运行**（我们发明一个叫tensorflow的deep learning dsl，并且提供python api，让用户在python中通过元编程编写tensorflow代码），只有运行`session.run(z)` z 才会真正有值。在TensorFlow1.0时代，采用的是静态计算图，需要先使用TensorFlow的各种算子创建计算图，然后再开启一个会话Session，显式执行计算图。**模型搭建和训练分为两个阶段**，由两种语言分别实现编程接口和核心运行时，还涉及到计算图的序列化及跨组件传输。而在TensorFlow2.0时代，采用的是动态计算图，**模型的搭建和训练放在一个过程中**，即每使用一个算子后，该算子会被动态加入到隐含的默认计算图中立即执行得到结果，不需要使用Session了，像原始的Python语法一样自然。
 
+
+
 ### 会话
 
 Session 提供求解张量和执行操作的运行环境，它是发送计算任务的客户端，所有计算任务都由它分发到其连接的执行引擎（进程内引擎）完成。
@@ -76,7 +77,7 @@ sess = tf.Session()
 print(sess.run(c))
 ```
 
-### demo
+## demo
 
 ```python
 # model parameters
@@ -109,7 +110,7 @@ with tf.Session() as sess:
 
 当我们调用 `sess.run(train_op)` 语句执行训练操作时，程序内部首先提取单步训练操作依赖的所有前置操作，这些操作的节点共同组成一幅子图。然后程序将子图中的计算节点、存储节点和数据节点按照各自的执行设备分类（可以在创建节点时指定执行该节点的设备），相同设备上的节点组成了一幅局部图。每个设备上的局部图在实际执行时，根据节点间的依赖关系将各个节点有序的加载到设备上执行。
 
-![](/public/upload/machine/tensorflow_graph.png)
+
 
 ## 数据读取
 
@@ -219,7 +220,7 @@ with tf.Session() as sess:
     for e in range(1, epoch + 1):
         sess.run(train_op, feed_dict={X: X_data, y: y_data})
 ```
-## 控制流
+## 为计算图加入控制逻辑
 
 [TensorFlow 中的 Control Flow](https://mp.weixin.qq.com/s/6uVeEHcQeaPN_qEhHvcEoA)
 
@@ -250,33 +251,24 @@ out = top + bot
 
 条件分支 `tf.cond(a < b,lambda: tf.add(3,3),lambda:tf.sqaure(3))`
 
-## 引擎
-
-Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
-
-1. 计算梯度。即调用`compute_gradients (loss, var_list …)` 计算loss对指定val_list的梯度，返回元组列表 `list(zip(grads, var_list))`。
-2. 用计算得到的梯度来更新对应权重。即调用 `apply_gradients(grads_and_vars, global_step=global_step, name=None)` 将 `compute_gradients (loss, var_list …)` 的返回值作为输入对权重变量进行更新；
-将minimize()分成两个步骤的原因是：可以在某种情况下对梯度进行修正，防止梯度消失或者梯度爆炸。
-
-
-## 自定义算子
-
-对于 TensorFlow，可以自定义 Operation，即如果现有的库没有涵盖你想要的操作, 你可以自己定制一个。为了使定制的 Op 能够兼容原有的库，你必须做以下工作:
-
-1. 在一个 C++ 文件中注册新 Op. Op 的注册与实现是相互独立的. 在其注册时描述了 Op 该如何执行. 例如, 注册 Op 时定义了 Op 的名字, 并指定了它的输入和输出.
-2. 使用 C++ 实现 Op. 每一个实现称之为一个 "kernel", 可以存在多个 kernel, 以适配不同的架构 (CPU, GPU 等)或不同的输入/输出类型.
-3. 创建一个 Python 包装器（wrapper）. 这个包装器是创建 Op 的公开 API. 当注册 Op 时, 会自动生成一个默认 默认的包装器. 既可以直接使用默认包装器, 也可以添加一个新的包装器.
-4. (可选) 写一个函数计算 Op 的梯度.
-5. (可选) 写一个函数, 描述 Op 的输入和输出 shape. 该函数能够允许从 Op 推断 shape.
-6. 测试 Op, 通常使用 Pyhton。如果你定义了梯度，你可以使用Python的GradientChecker来测试它。
-
-示例参考 [TensorFlow 增加自定义运算符](https://mp.weixin.qq.com/s/G7BAWaPL5Lh3_q5EplNJBQ) c++ 部分编译完成后得到一个so 文件
-```python
-import tensorflow as tf
-zero_out_op = tf.load_op_library('zero_out.so')
-with tf.Session():
-  print(zero_out_op.zero_out([1,2,3,4,5])).eval()
-```
-
 ## 可视化
 
+1. 可视化数据流图
+  ```
+  sess = xx
+  writer = tf.summary.FileWriter("/tmp/summary/xx",sess.graph)
+  ...
+  writer.close() 
+  ```
+2. 可视化度量指标和模型参数
+  ```
+  tf.summary.scalar('name','tensor')
+
+  for i in range(FLAGs.max_step):
+    summary, acc = sess.run(...)
+    writer.add_summary(summary,i)
+  ```
+3. 可视化图形和音频数据
+4. 可视化高维数据，用于展示高维embedding 数据的分布情况
+
+用户需要在程序中使用 tf.summary 模块提供的工具，输出必要的序列化数据,FileWriter 保存到事件文件，然后启动 Tensorboard 加载事件文件，从而在各个面板中展示对应的可视化对象。
