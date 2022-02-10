@@ -35,6 +35,9 @@ keywords: model
 
 模型结构不存在最优，只要你的数据、业务特点和阿里不一样，就不能假设这个模型在你的场景下具有同样的效果，所以根据自己的数据特点来改进模型才最重要。
 
+[广告推荐中大规模分布式模型](https://zhuanlan.zhihu.com/p/161972813)
+![](/public/upload/machine/recsys_model.png)
+
 
 ## why deep
 

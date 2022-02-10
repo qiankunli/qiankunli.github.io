@@ -13,12 +13,22 @@ keywords: Kubernetes monitor
 * TOC
 {:toc}
 
+## 监控平台的整体设计
+
 [Kubernetes监控在小米的落地](https://mp.weixin.qq.com/s/ewwD6A3-ClbotdfFmYY3KA) 为了更方便的管理容器，Kubernetes对Container进行了封装，拥有了Pod、Deployment、Namespace、Service等众多概念。与传统集群相比，Kubernetes集群监控更加复杂：
 
 1. 监控维度更多，除了传统物理集群的监控，还包括核心服务监控（apiserver，etcd等）、容器监控、Pod监控、Namespace监控等。
 2. 监控对象动态可变，在集群中容器的销毁创建十分频繁，无法提前预置。
 3. 监控指标随着容器规模爆炸式增长，如何处理及展示大量监控数据。
 4. 随着集群动态增长，监控系统必须具备动态扩缩的能力。
+
+[基于 eBPF 的 Kubernetes 一站式可观测性系统](https://mp.weixin.qq.com/s/npQg0lOjFVrIpEtu90ycZQ)
+1. 复杂度是永恒的，我们只能找到方法来管理它，无法消除它，云原生技术的引入虽然减少了业务应用的复杂度，但是在整个软件栈中，他只是将复杂度下移到容器虚拟化层，并没有消除。
+  ![](/public/upload/monitor/k8s_monitor.png)
+2. 我们以容器为核心，采集关联的 Kubernetes 可观测数据，与此同时，**向下**采集容器相关进程的系统和网络可观测数据，**向上**采集容器相关应用的性能数据，**通过关联关系将其串联起来，完成端到端可观测数据的覆盖**。
+3. 我们的数据类型包含了指标，日志和链路，采用了 open telemetry collector 方案支持统一的数据传输。背靠 ARMS 已有的基础设施，指标通过 ARMS Prometheus 进行存储，日志/链路通过 XTRACE 进行存储。PS： 应该是一个agent 支持采集日志、metrics、trace
+4. 使用路径：核心场景上支持架构感知、错慢请求分析、资源消耗分析、DNS 解析性能分析、外部性能分析、服务连通性分析和网络流量分析。支持这些场景的基础是产品在设计上遵循了从整体到个体的原则：**先从全局视图入手，发现异常的服务个体**，如某个 Service，定位到这个 Service 后查看这个 Service 的黄金指标、关联信息、Trace等进行进一步关联分析。
+5. datadog 的 CEO 在一次采访中直言 datadog 的产品策略不是支持越多功能越好，而是思考怎样在不同团队和成员之间架起桥梁，尽可能把信息放在同一个页面中（to bridge the gap between the teams and get everything on the same page）
 
 ## 能搞到哪些metric
 
@@ -125,7 +135,6 @@ etcd服务器指标以 `etcd_*` 为前缀，分为几个主要类别：
 2. 请求已提交/已应用/正在等待/失败, `etcd_server_proposals_*`
 3. 磁盘写入性能 , `etcd_disk_*`
 4. 入站gRPC统计信息，集群内gRPC统计信息, `etcd_grpc_*`
-
 
 ### k8s object metric/kube-state-metrics
 

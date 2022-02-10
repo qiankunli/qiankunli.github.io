@@ -110,79 +110,7 @@ with tf.Session() as sess:
 
 当我们调用 `sess.run(train_op)` 语句执行训练操作时，程序内部首先提取单步训练操作依赖的所有前置操作，这些操作的节点共同组成一幅子图。然后程序将子图中的计算节点、存储节点和数据节点按照各自的执行设备分类（可以在创建节点时指定执行该节点的设备），相同设备上的节点组成了一幅局部图。每个设备上的局部图在实际执行时，根据节点间的依赖关系将各个节点有序的加载到设备上执行。
 
-
-
-## 数据读取
-
-1. 数据源：  csv/TFRecord/Tensor/numpy/dataFrame/自定义格式
-2. 读取方式：批量，多线程
-3. 读取的数据如何给到模型使用： 作为 tensor 给feed_dict；新的Dataset  `y_hat = model(x)`。 
-
-读取的 X/Y 更多是作为 符号引用，描述了数据来源 及方式（batch_size、线程数等），只有session.run 后才会真正有值。
-
-
-### feed_dict 读取csv
-
-```python
-file_queue = tf.train.string_input_producer(["xx.csv"])
-reader = tf.TextLineReader()
-_, value = reader.read(file_queue)
-record_defaults=[["1.0"], ["1"],["2.0"]]
-column1, column2, column3 = tf.decode_csv(content, record_defaults)
-# column1_batch, column2_batch, column3_batch = tf.train.batch([column1, column2], batch_size=9, num_threads=1, capacity=9)
-features = tf.stack([column1, column2])
-...
-with tf.Session() as sess:
-  sess.run(...,feed_dict = {X = features, Y = column3})
-```
-
-### Dataset
-
-feed-dict 被吐槽太慢了 ，[如何在TensorFlow上高效地使用Dataset](https://mp.weixin.qq.com/s/umXx2o_J8OpsRfq-p9ssxg)
-
-Tensorflow封装了一组API来处理数据的读入，它们都属于模块 tf.data
-1. 从numpy 读取  
-
-  ```
-  # create a random vector of shape (100,2)
-  x = np.random.sample((100,2))
-  # make a dataset from a numpy array
-  dataset = tf.data.Dataset.from_tensor_slices(x) 
-  ```
-2. 从磁盘/内存中获取源数据，比如直接读取特定目录的下的 xx.png 文件，使用 dataset.map 将输入数据转为 dataset 要求
-3. 读入TFrecords数据集，`dataset = tf.data.Dataset.TFRecordDataset("dataset.tfrecords")`
-
-```python
-features, labels = (np.random.sample((100,2)), np.random.sample((100,1)))
-dataset = tf.data.Dataset.from_tensor_slices((features,labels)) 
-# 描述 了数据的来源 batch size 等
-dataset = tf.data.Dataset.from_tensor_slices((features,labels)).repeat().batch(BATCH_SIZE)
-iter = dataset.make_one_shot_iterator()
-x, y = iter.get_next() 
-# 定义模型
-net = tf.layers.dense(x, 8, activation=tf.tanh) # pass the first value 
-net = tf.layers.dense(net, 8, activation=tf.tanh)
-prediction = tf.layers.dense(net, 1, activation=tf.tanh)
-loss = tf.losses.mean_squared_error(prediction, y)
-train_op = tf.train.AdamOptimizer().minimize(loss)
-with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    for i in range(EPOCHS):
-        _, loss_value = sess.run([train_op, loss])
-```
-
-训练机器学习模型的时候，会将数据集遍历多轮（epoch），每一轮遍历都以mini-batch的形式送入模型（batch），数据遍历应该随机进行（shuffle）。
-
-### TFRecord 文件
-
-TFRecord是Tensorflow训练和推断标准的数据存储格式之一，将数据存储为二进制文件（二进制存储具有占用空间少，拷贝和读取（from disk）更加高效的特点），而且不需要单独的标签文件了，其本质是一行行字节字符串构成的样本数据。一条TFRecord数据代表一个Example，一个Example就是一个样本数据，每个Example内部由一个字典构成，每个key对应一个Feature，key为字段名，Feature为字段名所对应的数据，Feature有三种数据类型：ByteList、FloatList，Int64List。TFRecord并不是一个self-describing的格式，也就是说，tfrecord的write和read都需要额外指明schema。
-
-1. 小规模生成TFRecord： python 代码将图像、文本等写入tfrecords文件需要建立一个writer对象，创建这个对象的是函数 `tf.python_io.TFRecordWriter`
-2. 大规模生成TFRecord：如何大规模地把HDFS中的数据直接喂到Tensorflow中呢？Tensorflow提供了一种解决方法：spark-tensorflow-connector，支持将spark DataFrame格式数据直接保存为TFRecords格式数据。
-
-[TensorFlow 指南：读取自定义文件和记录格式](https://mp.weixin.qq.com/s/t9byJ620U7VoSeH81_dAiQ)
-
-### 房价预测
+房价预测
 
 ```
 df = pd.read_csv('data.csv',names=['square', 'bedrooms', 'price'])
@@ -220,6 +148,83 @@ with tf.Session() as sess:
     for e in range(1, epoch + 1):
         sess.run(train_op, feed_dict={X: X_data, y: y_data})
 ```
+
+## 数据读取
+
+1. 数据源：  csv/TFRecord/Tensor/numpy/dataFrame/自定义格式
+2. 读取方式：批量，多线程
+3. 读取的数据如何给到模型使用： 作为 tensor 给feed_dict；新的Dataset  `y_hat = model(x)`。 
+
+读取的 X/Y 更多是作为 符号引用，描述了数据来源 及方式（batch_size、线程数等），只有session.run 后才会真正有值。
+
+![](/public/upload/machine/tf_data.png)
+
+### feed_dict 读取csv
+
+```python
+file_queue = tf.train.string_input_producer(["xx.csv"])
+reader = tf.TextLineReader()
+_, value = reader.read(file_queue)
+record_defaults=[["1.0"], ["1"],["2.0"]]
+column1, column2, column3 = tf.decode_csv(content, record_defaults)
+# column1_batch, column2_batch, column3_batch = tf.train.batch([column1, column2], batch_size=9, num_threads=1, capacity=9)
+features = tf.stack([column1, column2])
+...
+with tf.Session() as sess:
+  sess.run(...,feed_dict = {X = features, Y = column3})
+```
+
+### Dataset
+
+feed-dict 被吐槽太慢了 ，[如何在TensorFlow上高效地使用Dataset](https://mp.weixin.qq.com/s/umXx2o_J8OpsRfq-p9ssxg)推荐使用dataset API的原因在于，他提供了一套构建数据Pipeline的操作，包括以下三部分
+
+1. 从数据源构造dataset（支持TFRecordDataset，TextLineDataset, CsvDataset等方式)
+2. 数据处理操作 (通过map操作进行转化，tfrecord格式需要对Example进行解析)
+3. 迭代数据 （包括batch, shuffle, repeat, cache等操作）
+
+Tensorflow封装了一组API来处理数据的读入，它们都属于模块 tf.data
+1. 从numpy 读取  
+
+  ```
+  # create a random vector of shape (100,2)
+  x = np.random.sample((100,2))
+  # make a dataset from a numpy array
+  dataset = tf.data.Dataset.from_tensor_slices(x) 
+  ```
+2. 从磁盘/内存中获取源数据，比如直接读取特定目录的下的 xx.png 文件，使用 dataset.map 将输入数据转为 dataset 要求
+3. 读入TFrecords数据集，`dataset = tf.data.Dataset.TFRecordDataset("dataset.tfrecords")`
+
+```python
+features, labels = (np.random.sample((100,2)), np.random.sample((100,1)))
+dataset = tf.data.Dataset.from_tensor_slices((features,labels)) 
+# 描述 了数据的来源 batch size 等
+dataset = tf.data.Dataset.from_tensor_slices((features,labels)).repeat().batch(BATCH_SIZE)
+iter = dataset.make_one_shot_iterator()
+x, y = iter.get_next() 
+# 定义模型
+net = tf.layers.dense(x, 8, activation=tf.tanh) # pass the first value 
+net = tf.layers.dense(net, 8, activation=tf.tanh)
+prediction = tf.layers.dense(net, 1, activation=tf.tanh)
+loss = tf.losses.mean_squared_error(prediction, y)
+train_op = tf.train.AdamOptimizer().minimize(loss)
+with tf.Session() as sess:
+    sess.run(tf.global_variables_initializer())
+    for i in range(EPOCHS):
+        _, loss_value = sess.run([train_op, loss])
+```
+
+训练机器学习模型的时候，会将数据集遍历多轮（epoch），每一轮遍历都以mini-batch的形式送入模型（batch），数据遍历应该随机进行（shuffle）。
+
+### TFRecord 文件
+
+TFRecord是Tensorflow训练和推断标准的数据存储格式之一，将数据存储为二进制文件（二进制存储具有占用空间少，拷贝和读取（from disk）更加高效的特点），而且不需要单独的标签文件了，其本质是一行行字节字符串构成的样本数据。一条TFRecord数据代表一个Example，一个Example就是一个样本数据，每个Example内部由一个字典构成`<key,Feature>`，key为字段名，Feature为字段名所对应的数据，Feature有三种数据类型：ByteList、FloatList，Int64List。**TFRecord并不是一个self-describing的格式**，也就是说，tfrecord的write和read都需要额外指明schema。
+
+1. 小规模生成TFRecord： python 代码将图像、文本等写入tfrecords文件需要建立一个writer对象，创建这个对象的是函数 `tf.python_io.TFRecordWriter`
+2. 大规模生成TFRecord：如何大规模地把HDFS中的数据直接喂到Tensorflow中呢？Tensorflow提供了一种解决方法：spark-tensorflow-connector，支持将spark DataFrame格式数据直接保存为TFRecords格式数据。
+
+[TensorFlow 指南：读取自定义文件和记录格式](https://mp.weixin.qq.com/s/t9byJ620U7VoSeH81_dAiQ)
+
+
 ## 为计算图加入控制逻辑
 
 [TensorFlow 中的 Control Flow](https://mp.weixin.qq.com/s/6uVeEHcQeaPN_qEhHvcEoA)
@@ -253,15 +258,23 @@ out = top + bot
 
 ## 可视化
 
+用户需要在程序中使用 tf.summary 模块提供的工具，输出必要的序列化数据，FileWriter 保存到事件文件，然后启动 Tensorboard 加载事件文件，从而在各个面板中展示对应的可视化对象。
+1. summary，在定义计算图时，在适当位置加上一些summary 操作。 summary 操作输入输出也是张量，只是输出是汇总数据。
+2. merge，在训练时可能加入了 多个summary 操作，此时需要使用 tf.summary.merge_all 将这些summary 操作 合成一个操纵
+3. run，执行session.run 时，需要通过 tf.summary.FileWrite() 指定一个目录告诉程序把产生的文件放到指定位置，然后使用`add_summary()` 将某一步summary 数据记录到文件中
+4. `tensorboard --logdir=path/to/log-directory` 启动tensorboard 然后在浏览器打开页面
+
+可以记录和展示的数据形式
+
 1. 可视化数据流图
-  ```
+  ```python
   sess = xx
   writer = tf.summary.FileWriter("/tmp/summary/xx",sess.graph)
   ...
   writer.close() 
   ```
 2. 可视化度量指标和模型参数
-  ```
+  ```python
   tf.summary.scalar('name','tensor')
 
   for i in range(FLAGs.max_step):
@@ -270,5 +283,19 @@ out = top + bot
   ```
 3. 可视化图形和音频数据
 4. 可视化高维数据，用于展示高维embedding 数据的分布情况
+5. 可视化性能与资源占用 [使用 Profiler 优化 TensorFlow 性能](https://tensorflow.google.cn/guide/profiler#best_practices_for_optimal_model_performance)。 除了跟TensorBoard 一起使用外， profiler 也可以单独 执行和分析 [tensorflow Profile分析神经网络性能](https://asphelzhn.github.io/2019/03/26/tensor_06_profile/)。 
+  1. 使用 tf.profiler Function API 的编程模式
+    ```python
+    tf.profiler.experimental.start('logdir') # 会保存为json 格式文件
+    # Train the model here
+    tf.profiler.experimental.stop()
+    ```
+  2. 使用 TensorBoard Keras 回调 (tf.keras.callbacks.TensorBoard) 的编程模式
+    ```python
+    # Profile from batches 10 to 15
+    tb_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir,profile_batch='10, 15')
+    # Train the model and use the TensorBoard Keras callback to collect performance profiling data
+    model.fit(train_data,steps_per_epoch=20,epochs=5,callbacks=[tb_callback])
+    ```
 
-用户需要在程序中使用 tf.summary 模块提供的工具，输出必要的序列化数据,FileWriter 保存到事件文件，然后启动 Tensorboard 加载事件文件，从而在各个面板中展示对应的可视化对象。
+

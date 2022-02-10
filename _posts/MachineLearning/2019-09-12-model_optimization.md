@@ -12,6 +12,8 @@ keywords: 深度学习
 
 ## 前言
 
+[通俗易懂讲解梯度下降法！](https://mp.weixin.qq.com/s/YhEGL2LT3qv0oBXteb8IpA) 蛮不错的一篇文章。
+
 ## 梯度下降法的实现方式
 
 1. batch gradient descent
@@ -145,17 +147,7 @@ $$
 
 ### dropout 正则化
 
-## 特征工程
 
-[机器学习之 特征工程](https://juejin.im/post/5b569edff265da0f7b2f6c65) 是一个系列
-
-特征： 是指数据中抽取出来的对结果预测有用的信息，也就是数据的相关属性。
-
-特征工程：使用专业背景知识和技巧处理数据，使得 特征能在机器学习算法上发挥更好的作用的过程
-
-![](/public/upload/machine/feature_enginering.png)
-
-数据经过整理变成信息，信息能解决某个问题就是知识，知识通过反复实践形成才能，才能融会贯通就是智慧。 
 
 
 

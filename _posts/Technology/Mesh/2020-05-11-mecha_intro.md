@@ -3,7 +3,7 @@
 layout: post
 title: mecha 架构学习
 category: 架构
-tags: Architecture
+tags: Mesh
 keywords: mecha
 
 ---
@@ -186,4 +186,10 @@ Dapr 项目给我们最大的启示在于，它定义了应用跟基础设施之
 1. 单体 ==> 按业务功能拆分 ==> SOA ==> 微服务( 富sdk ==> service mesh) ==> 统一编程平面/应用运行时（比如dapr） ==> Serverless。回顾整个历史的发展，应用被不断拆分的越来越细，且从前期的横向拆分到后面的 sidecar 等方式的纵向单节点内的拆分
 2. 如果将来统一编程平面成了后端开发者的编程标准，那么将彻底屏蔽所有中间件以及基础设施和服务调用的差异，开发者的所有业务逻辑都将由标准 api 来组合完成，就像内核接口和系统调用一样，**底层基础设施就变成了这个"庞大操作系统的内核"**。
 3. 云原生编程语言：既然 Serverless 目的是让业务不再关注服务器等基础设施的细节，那么能不能直接从编程语言下手，细到每一个对象的 new ，每一行语句的执行都能被整个集群内分布式的调度(比函数级别更细)，而开发者方编程的时候只需要把这个集群都当成一个巨大的单机机器即可
+
+[知乎是怎么落地Istio的？](https://mp.weixin.qq.com/s/U0NS1zIm56JNhNsP-eqhyg)我们将为业务：
+1. 提供缓存能力⽽不是 Redis、Memcached ……
+2. 提供异步通信⽽不是 Kafka、Pulsar ……
+3. 提供存储能⼒⽽不是 MySQL、TiDB ……
+4. 提供同步通信⽽不是 Dubbo、Spring Cloud、go-micro
 
