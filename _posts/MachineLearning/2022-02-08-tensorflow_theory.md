@@ -43,7 +43,10 @@ keywords: tensorflow
 
 分布式会话运行，ps-worker相比单机来说 除了图按进程切分为局部图 和分到到worker 之外，worker 每次执行完子图之后会执行一个回调，在回调中进行grpc 通信（张量传输等），针对grpc 通信效率低的问题 又引入RDMA 等机制。
 
+汇合点机制：在具体实现上，Tensorflow实现了Recv-Driven的数据交换模式，如上图所示，位于DeviceA和DeviceB的两张计算图会异步并发的执行，位于DeviceB的Recv执行时会发起一条RPC请求发往DeviceA，DeviceA收到请求后，会将请求路由到Rendezvous中，如果在当中发现所需要的数据已经生产好，并被Send算子注册了进来，那么就地获取数据，返回给DeviceB；如果此时数据还没有生产好，则将来自于DeviceB的Recv请求注册在Rendezvous中，等待后续DeviceA生产好后，由Send算子发送过来，找到注册的Recv，触发回调，返回数据给DeviceB。
+
 ### 操作节点执行
+
 操作节点执行 过程本质是 节点对应的核函数的执行过程。会话运行时，ExecutorImpl::Initialize 会对数据流图上每个操作节点 调用create_kernel 函数，这时创建的 核函数对象 是对应 操作在特定设备上的特化版本。
 
 ## 梯度计算

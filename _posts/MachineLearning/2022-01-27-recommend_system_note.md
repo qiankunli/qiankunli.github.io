@@ -98,6 +98,11 @@ Word2vec 是生成对“词”的向量表达的模型，其中，Word2vec 的�
 
 Embedding这块，spark MLlib 和 机器学习库 都提供了处理函数。利用Tensorboard很容易将embedding进行可视化，不过既然是可视化，最高只能“可视”三维空间，所以高维向量需要被投影到三维（或二维空间）。不过不用担心细节，Tensorboard做了足够高质量的封装。
 
+[一文梳理推荐系统中Embedding应用实践](https://mp.weixin.qq.com/s/9vnCX4IuHsA3hUi6t0Y0KQ)
+1. 端到端的方法是将Embedding层作为神经网络的一部分，在进行BP更新每一层参数的时候同时更新Embedding，这种方法的好处是让Embedding的训练成为一个有监督的方式，可以很好的与最终的目标产生联系，使得Embedding与最终目标处于同一意义空间。但这样做的缺点同样显而易见的，由于Embedding层输入向量的维度甚大，Embedding层的加入会拖慢整个神经网络的收敛速度。**大部分的训练时间和计算开销都被Embedding层所占据。**正因为这个原因，「对于那些时间要求较为苛刻的场景，Embedding最好采用非端到端，也就是预训练的方式完成。」
+2. 非端到端（预训练），在一些时间要求比较高的场景下，Embedding的训练往往独立于深度学习网络进行，在得到稀疏特征的稠密表达之后，再与其他特征一起输入神经网络进行训练。在做任务时，将训练集中的词替换成事先训练好的向量表示放到网络中。Word2Vec，Doc2Vec，Item2Vec都是典型的非端到端的方法
+
+**在自然语言中，非端到端很常见**，因为学到一个好的的词向量表示，就能很好地挖掘出词之间的潜在关系，那么在其他语料训练集和自然语言任务中，也能很好地表征这些词的内在联系，预训练的方式得到的Embedding并不会对最终的任务和模型造成太大影响，但却能够「提高效率节省时间」，这也是预训练的一大好处。但是**在推荐场景下，根据不同目标构造出的序列不同，那么训练得到的Embedding挖掘出的关联信息也不同**。所以，「在推荐中要想用预训练的方式，必须保证Embedding的预训练和最终任务目标处于同一意义空间」，否则就会造成预训练得到Embedding的意义和最终目标完全不一致。比如做召回阶段的深度模型的目标是衡量两个商品之间的相似性，但是CTR做的是预测用户点击商品的概率，初始化一个不相关的 Embedding 会给模型带来更大的负担，更慢地收敛。
 
 ## 整体设计
 
@@ -151,6 +156,8 @@ val samplesWithUserFeatures = addUserFeatures(samplesWithMovieFeatures)
 ## 模型
 
 [推荐场景下融合多模态信息的内容召回模型](https://mp.weixin.qq.com/s/HqL-F7_2oCf2Cg8zL-6YDA) 未读
+深度学习推荐模型的演化关系图
+![](/public/upload/machine/recsys_model_develop.png)
 
 ### 以Embedding+MLP 模型为例
 

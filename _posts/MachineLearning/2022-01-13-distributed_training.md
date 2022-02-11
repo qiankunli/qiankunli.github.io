@@ -48,17 +48,55 @@ keywords:  distributed training
 3. 流水并行，本质是解决模型并行（模型较后部分的计算必须等前面计算完成）后 效率低的问题 [所有人都能用的超大规模模型训练工具](https://mp.weixin.qq.com/s/3VU_9lednIkuD4dj_4NTZA)
 
 
-## 架构模式
+## 数据并行架构模式
 
-### 区别
+[深度学习分布式训练框架——基础知识](https://mp.weixin.qq.com/s/djGvx3fNJfKCXmjwTfJ-CA)只要单卡放的下，ps 或allreduce 都行，allreduce 通信成本小一些，若是规模变大
+1. 稀疏模型
+  1.  使用ps，加上一些稀疏tensor 的优化，且将 embedding  存储和更新 负担转嫁到 ps
+  2.  使用allreduce，想办法解决 洗漱tensor 的存储、通信成本
+2.  稠密模型，单卡无论如何也放不下了，就只能采取模型并行 及附属的一些优化方案
 
-[深度学习分布式训练框架——基础知识](https://mp.weixin.qq.com/s/djGvx3fNJfKCXmjwTfJ-CA)在中等规模模型情况下，all-reduce 更适合。当规模巨大时候则应该使用参数服务器。
+参数服务器适合的是高纬稀疏模型训练，它利用的是维度稀疏的特点，每次 pull or push 只更新有效的值。但是深度学习模型是典型的dense场景，embedding做的就是把稀疏变成稠密。所以这种 pull or push 的不太适合。而网络通信上更优化的 all-reduce 适合中等规模的深度学习。又比如由于推荐搜索领域模型的 Embedding 层规模庞大以及训练数据样本长度不固定等原因，导致容易出现显存不足和卡间同步时间耗费等问题，所以 all-reduce 架构很少被用于搜索推荐领域。
 
-参数服务器 适合的是高纬稀疏模型训练，它利用的是维度稀疏的特点，每次 pull or push 只更新有效的值。但是深度学习模型是典型的dense场景，embedding做的就是把稀疏变成稠密。所以这种 pull or push 的不太适合。而 网络通信上更优化的 all-reduce 适合中等规模的深度学习。
+### 单机模式
 
-又比如由于推荐搜索领域模型的 Embedding 层规模庞大以及训练数据样本长度不固定等原因，导致容易出现显存不足和卡间同步时间耗费等问题，所以 all-reduce 架构很少被用于搜索推荐领域。
+[Paddle计算图拆分与优化](https://fleet-x.readthedocs.io/en/latest/paddle_fleet_rst/parameter_server/performance/graph.html)
+深度学习网络中有两个基本元素：Operator（比如加减/FC/Embedding查表） 和 Variable（分为稠密参数和稀疏参数）
+单机的计算图执行流程：
 
-### 代码示例
+1. 计算图拿到参数的值(Var)之后，会首先执行前向OP(FF OP)，OP可能会执行在不同的设备上，如CPU/GPU/Kunlun 或其他AI芯片，我们用XPU代指。
+2. 前向OP计算完成后，得到loss，会继续计算反向OP(BP OP)，得到各个参数的梯度(Var_Grad)
+3. 指定SGD/Adam等优化器，利用参数的梯度（Var_Grad）更新原始参数（Var）
+4. 重复以上流程，迭代参数的更新，实现深度学习网络的训练
+
+![](/public/upload/machine/paddle_host.png)
+
+1. Worker(Trainer)在计算得到参数的梯度(Var_Grad)后，会通过RPC发送给PServer
+2. PServer监听通信端口，将收到的不同参数分别通过不同的Oprimizer OP完成更新
+3. Worker在下一个迭代时，请求PServer上最新的参数
+4. 重复以上流程，迭代参数的更新，实现分布式参数服务器的训练
+
+
+### ps-worker
+
+[Paddle计算图拆分与优化](https://fleet-x.readthedocs.io/en/latest/paddle_fleet_rst/parameter_server/performance/graph.html)参数服务器模式下，所有参数的全局真值都被分片保存在各个Pserver上，**PServer执行Optimizer OP**（另一种选择是 ps 只是汇总梯度，weight还是worker 更新的），执行参数的更新。以PS-CPU异步模式的计算图介绍PServer的计算图
+
+![](/public/upload/machine/paddle_ps.png)
+
+进程内通信主要实现内存数据的跨设备复制（本地CPU和GPU内存之间、多个GPU内存之间）， 进程间通信主要实现数据流和控制流基于网络协议的传输。Tensorflow 的运行时框架会根据应用代码中的集群和设备配置，在数据流图构建时自动插入通信操作，并在数据流图执行过程中动态调度这些操作。
+
+![](/public/upload/machine/ps_worker_communication.png)
+
+1. 对于逻辑上具有数据传输语义，但物理上通信的源和目标位于同一设备、同一地址空间的进程内通信，只传输数据指针，不传输数据本身。
+2. 对于cpu 和gpu 内存间的设备通信，本质是跨设备内存的数据复制，尽量使用底层设备接口实现（比如DMA机制），而不是用面向应用层的API
+3. 涉及GPU的内存传输一般需要经过CPU 内存中转，除非使用支持RDMA 协议的高性能网络。
+4. 尽量做到 计算与通信过程重叠，很多通信函数采用异步模式及多线程并发执行
+
+### all-reduce
+
+[Ring AllReduce简介](https://mp.weixin.qq.com/s/K8l7H2zCUr9sGzYehizFMA) 各种配图都比较详细了。
+
+### api 代码示例
 
 《用python实现深度学习框架》给出的ps/worker 模型的grpc 通信api定义
 ```
@@ -126,44 +164,42 @@ message RingAllReduceReq{
 VariableWeightsInit 在单机训练的场景下，各变量节点的值是随机初始化的，但是分布式训练场景下，如果多个worker节点也各自随机初始化自己的变量节点，则会导致模型参数在多个worker 节点上不一致。其实从理论上说，随机甚至还是好事，不过从编程来说，还得加上这个保证。
 
 
-
 ## 通信技术
 
-### ps-worker
+训练框架面临的是 单机CPU与GPU 之间、单机多GPU之间、多机CPU 之间、多机GPU 之间的通信问题，有各种优化方案，但要对上层提供统一通信接口，并进一步结合机器学习的特点提供 collective Communication 接口。
 
-进程内通信主要实现内存数据的跨设备复制（本地CPU和GPU内存之间、多个GPU内存之间）， 进程间通信主要实现数据流和控制流基于网络协议的传输。Tensorflow 的运行时框架会根据应用代码中的集群和设备配置，在数据流图构建时自动插入通信操作，并在数据流图执行过程中动态调度这些操作。
+### 协议层
 
-![](/public/upload/machine/ps_worker_communication.png)
+[海思专家如何看待RDMA技术？](https://mp.weixin.qq.com/s/UqSydz8hJCFcX5CF30gXSw) 比较好的一篇文章
 
-1. 对于逻辑上具有数据传输语义，但物理上通信的源和目标位于同一设备、同一地址空间的进程内通信，只传输数据指针，不传输数据本身。
-2. 对于cpu 和gpu 内存间的设备通信，本质是跨设备内存的数据复制，尽量使用底层设备接口实现（比如DMA机制），而不是用面向应用层的API
-3. 涉及GPU的内存传输一般需要经过CPU 内存中转，除非使用支持RDMA 协议的高性能网络。
-4. 尽量做到 计算与通信过程重叠，很多通信函数采用异步模式及多线程并发执行
+DMA全称为Direct Memory Access，即直接内存访问。意思是外设对内存的读写过程可以不用CPU参与而直接进行。
+![](/public/upload/machine/dma.png)
 
-在TensorFlow 的实现中，Tensor对象及内部 TensorBuffer 对象本身始终保存在 CPU 内存上，TensorBuffer 内部指针指向的缓冲区有可能位于CPU 或GPU 内存，Tensor 的跨设备复制主要指 内部缓冲区的复制过程
-1. CPU 内存间的复制无需使用特殊函数，对于TensorBuffer 指向的缓冲区不做完整复制，只需复制指针并增加引用计数。
-2. CPU 与GPU 内存之间的数据复制 函数 需要不同GPU 设备的DeviceContext 子类重写。
+CPU的最主要工作是计算，而不是进行数据复制。可以看到总线上又挂了一个DMA控制器，它是专门用来读写内存的设备。有了它以后，当我们的网卡想要从内存中拷贝数据时，除了一些必要的控制命令外，整个数据复制过程都是由DMA控制器完成的。过程跟CPU复制是一样的，只不过这次是把内存中的数据通过总线复制到DMA控制器内部的寄存器中，再复制到I/O设备的存储空间中。CPU除了关注一下这个过程的开始和结束以外，其他时间可以去做其他事情。**DMA控制器一般是和I/O设备在一起的**，也就是说一块网卡中既有负责数据收发的模块，也有DMA模块。
 
-Tensorflow使用gRPC 实现进程间通信，分布式模式中的每个进程具有一个 GrpcServer 实例（也包含客户端对象），包含GrpcMasterService 和 GrpcWorkerService 两个服务
+![](/public/upload/machine/rdma.png)
 
-||GrpcMasterService主要用于会话相关操作|GrpcWorkerService 主要用于数据流图相关操作|
+rdma 即remote dma。同样是把本端内存中的一段数据，复制到对端内存中，在使用了RDMA技术时，两端的CPU几乎不用参与数据传输过程（只参与控制面）。本端的网卡直接从内存的用户空间DMA拷贝数据到内部存储空间，然后硬件进行各层报文的组装后，通过物理链路发送到对端网卡。对端的RDMA网卡收到数据后，剥离各层报文头和校验码，通过DMA将数据直接拷贝到用户空间内存中。PS：RDMA 网卡一般很贵。 
+
+RDMA本身指的是一种技术，具体协议层面，包含Infiniband（IB），RDMA over Converged Ethernet（RoCE）和internet Wide Area RDMA Protocol（iWARP）。三种协议都符合RDMA标准，使用相同的上层接口，在不同层次上有一些差别。上述几种协议都需要专门的硬件（网卡）支持。
+1. Infiniband规定了一整套完整的链路层到传输层（非传统OSI七层模型的传输层，而是位于其之上）规范，但是其无法兼容现有以太网，除了需要支持IB的网卡之外，企业如果想部署的话还要重新购买配套的交换设备。
+2. RoCE从英文全称就可以看出它是基于以太网链路层的协议，v1版本网络层仍然使用了IB规范，而v2使用了UDP+IP作为网络层，使得数据包也可以被路由。
+3. iWARP协议是IETF基于TCP提出的
+
+||tcp/ip|rdma|
 |---|---|---|
-|控制接口|CreateSession,ExtendSession,...|GetStatus,RunGraph|
-|数据通信接口||RecvTensor|
+|硬件|以太网卡|RDMA 网卡|
+|驱动||rdma-core|
+|接口|socket|libibverbs|
 
-1. 服务端均以异步模式实现，master 服务的客户端调用多为同步模式，worker 服务的客户端调用多为异步模式
-2. 对于同一进程内的 grpc 调用，均有可能直接访问本地对象
-3. RecvTensor 有一定特殊性，Tensor 的大小可能很大，自定义了消息传输与解析格式（没有用grpc 自带的），客户端调用的生命周期管理也有所不同
-3. 为进一步提高进程间数据通信性能，在保留gRPC 通信的同时，利用TensorFlow 的扩展机制，支持RDMA 特性的InfiniBand 协议栈，上层使用与grpc 接口一致，只需开启相关配置即可。
-
-### all-reduce
+### GPU 卡间通信
 
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
 Collective communication包含多个sender和多个receiver，一般的通信原语包括 broadcast，gather,all-gather，scatter，reduce，all-reduce，reduce-scatter，all-to-all等。
 
 ![](/public/upload/machine/gpu_communication.png)
 
-### NCCL 
+#### NCCL 
 
 The NVIDIA Collective Communication Library (NCCL) implements multi-GPU and multi-node communication primitives optimized for NVIDIA GPUs and Networking. NCCL provides routines such as all-gather, all-reduce, broadcast, reduce, reduce-scatter as well as point-to-point send and receive that are optimized to achieve high bandwidth and low latency over PCIe and NVLink high-speed interconnects within a node and over NVIDIA Mellanox Network across nodes.
 ```c
@@ -213,14 +249,14 @@ struct ncclComm {
 
 NCCL 最初只支持单机多 GPU 通信，从 NCCL2 开始支持多机多 GPU 通信。
 
-### Gloo
+#### Gloo
 Gloo is a collective communications library. It comes with a number of collective algorithms useful for machine learning applications. These include a barrier, broadcast, and allreduce.
 
 Gloo 为CPU和GPU提供了集合通信程序的优化实现。它特别适用于GPU，因为它可以执行通信而无需使用GPUDirect 将数据传输到CPU的内存。它还能够使用 NCCL 执行快速的节点内通信，并实现其自己的节点间例程算。你不需要考虑内存数据的拷贝，只需要实现逻辑就可以。
 
 Gloo 支持集体通信（collective Communication），并对其进行了优化。由于 GPU 之间可以直接进行数据交换，而无需经过 CPU 和内存，因此，在 GPU 上使用 gloo后端速度更快。
 
-### MPI 与 NCCL/GLOO
+#### MPI 与 NCCL/GLOO
 
 [利用多 GPU 加速深度学习模型训练](https://mp.weixin.qq.com/s/wiqOHIVfL2gKnRUhY62EBA)多机软件设计一般采用 MPI（Message Passing Interface）实现数据交互。MPI 是一种消息传递库接口描述标准，规定了点对点消息传递、协作通信、组和通讯员概念、进程拓扑、环境管理等各项内容，支持 C 和 Fortran 语言。MPI 同样提供了前面提到的各种通信原语如 Reduce、Scatter、Broadcast 等，对应的 API 与 NCCL 十分相似。**事实上，NCCL 出现得更晚一些，参考并兼容了 MPI 已有 API**。NCCL 更多考虑了 GPU 的特性，例如**任意两块 GPU 之间的通信开销是有区别的**，跨 QPI 情况与同一 PCIe Switch 情况，以及有 NVLink/ 无 NVLink 情况就有明显差异，但 MPI 认为两种情况下 GPU 与 GPU 都是等同的，甚至 **MPI 认为跨机器的 GPU 也是等同的**，这对于多 GPU 通信效率会有影响。MPI 可以和 NCCL 结合，实现**层次化的**并行通信机制，即同一台机器上的不同 GPU 之间采用 NCCL 通信，而不同机器上的 GPU 之间采用 MPI 辅助通信。
 
@@ -229,11 +265,13 @@ Gloo 支持集体通信（collective Communication），并对其进行了优化
 Horovod 在单机的多个 GPU 之上采用 NCCL 来通信，在多机（CPU或者GPU）之间通过 Ring AllReduce 算法进行通信。
 
 ## 分布式代码实现
+
 分布式机制如何与框架融合？
 1. 如何实现一个大统一的分布式通信框架？实现allreduce, allgather等collective operations通信工作。如果tensor在显存中，那么它会使用NCCL库执行。而如果是在内存中，则会使用MPI或者Gloo执行。
 2. Horovod是一个库，怎么嵌入到各种深度学习框架之中？比如怎么嵌入到Tensorflow，PyTorch，MXNet，Keras？
 3. 如何将梯度的同步通信完全抽象为框架无关的架构？
 
+### ps
 
 《用python实现深度学习框架》
 ```python
@@ -274,7 +312,7 @@ class Trainer(object):
       raise NotImplementedError()
 ```
 
-《用python实现深度学习框架》在分布式场景下，以ps 模式为例，只要定义一个 DistributedTrainer 实现_variable_weights_init 和 _optimizer_update 方法即可实现一个针对PS 架构的训练器。PS：allreduce 机制也大致类似
+《用python实现深度学习框架》在分布式场景下，以ps 模式为例，只要定义一个 DistributedTrainer 实现_variable_weights_init 和 _optimizer_update 方法即可实现一个针对PS 架构的训练器。PS：allreduce 机制也大致类似，可以查看书中示例
 ```python
 class DistTrainerParameterServer(Trainer):
   def __init__(self,*args,**kargs):
@@ -287,7 +325,7 @@ class DistTrainerParameterServer(Trainer):
     for node in default_graph.nodes:
       if isinstance(node,Variable) and node.trainable:
         var_weight_dict[node.name] = node.value
-    # 把自己的初始值发给ps
+    # 把自己的weight 初始值发给ps
     duplicated_var_weight_dict = self.ps_client.variable_weights_init(var_weights_dict)
     # 使用ps返回的初始值，重新初始化本地参数
     for var_name,weights in duplicated_var_weight_dict.items():
@@ -303,17 +341,25 @@ class DistTrainerParameterServer(Trainer):
     self.optimizer.update(node_gradient_dict)
 ```
 
+### ps tensorflow实现
 
-[深度学习分布式训练框架 horovod (7) --- DistributedOptimizer](https://mp.weixin.qq.com/s/0doWry-c1mEya18_7w9Jyw)Horovod 要求开发者使用Horovod自己定义的 hvd.DistributedOptimizer 代替 TensorFlow 官方的 optimizer，从而可以在优化模型阶段得到梯度。hvd.DistributedOptimizer继承keras Optimizer，然后hvd.DistributedOptimizer在其重载的get_gradients中把获取到的梯度传给`hvd.allreduce(gradients, …)`，从而实现整个horovod集群的梯度集体归并。具体计算梯度的逻辑是：
-1. TF 调用 hvd.DistributedOptimizer 的 compute_gradients 方法：
-  1. hvd.DistributedOptimizer 首先会利用 TF 官方 optimizer.compute_gradients 计算出本地梯度；
-  2. 然后利用 AllReduce 来得到各个进程平均后的梯度；
-  3. compute_gradients 返回一个(梯度，权值)对的列表。由apply_gradients使用；
-2. TF 调用 hvd.DistributedOptimizer 的 apply_gradients 方法：
-  1. 调用 TF 官方 optimizer.apply_gradients 对传入的参数进行处理，返回一个更新权值的op。TF 可以用这个返回值进行后续处理；
-对于 TF2.x，每行代码顺序执行，不需要构建图，所以 Horovod 梯度更新部分的实现并不是基于计算图的实现
+在TensorFlow 的实现中，Tensor对象及内部 TensorBuffer 对象本身始终保存在 CPU 内存上，TensorBuffer 内部指针指向的缓冲区有可能位于CPU 或GPU 内存，Tensor 的跨设备复制主要指 内部缓冲区的复制过程
+1. CPU 内存间的复制无需使用特殊函数，对于TensorBuffer 指向的缓冲区不做完整复制，只需复制指针并增加引用计数。
+2. CPU 与GPU 内存之间的数据复制 函数 需要不同GPU 设备的DeviceContext 子类重写。
 
-## horovod 
+Tensorflow使用gRPC 实现进程间通信，分布式模式中的每个进程具有一个 GrpcServer 实例（也包含客户端对象），包含GrpcMasterService 和 GrpcWorkerService 两个服务
+
+||GrpcMasterService主要用于会话相关操作|GrpcWorkerService 主要用于数据流图相关操作|
+|---|---|---|
+|控制接口|CreateSession,ExtendSession,...|GetStatus,RunGraph|
+|数据通信接口||RecvTensor|
+
+1. 服务端均以异步模式实现，master 服务的客户端调用多为同步模式，worker 服务的客户端调用多为异步模式
+2. 对于同一进程内的 grpc 调用，均有可能直接访问本地对象
+3. RecvTensor 有一定特殊性，Tensor 的大小可能很大，自定义了消息传输与解析格式（没有用grpc 自带的），客户端调用的生命周期管理也有所不同
+3. 为进一步提高进程间数据通信性能，在保留gRPC 通信的同时，利用TensorFlow 的扩展机制，支持RDMA 特性的InfiniBand 协议栈，上层使用与grpc 接口一致，只需开启相关配置即可。
+
+### horovod/allreduce 
 
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
 
@@ -370,7 +416,16 @@ def launch_gloo(command, exec_command, settings, nics, env, server_ip):
         exit_code, timestamp = value
 ```
 
-### 其它
+[深度学习分布式训练框架 horovod (7) --- DistributedOptimizer](https://mp.weixin.qq.com/s/0doWry-c1mEya18_7w9Jyw)Horovod 要求开发者使用Horovod自己定义的 hvd.DistributedOptimizer 代替 TensorFlow 官方的 optimizer，从而可以在优化模型阶段得到梯度。hvd.DistributedOptimizer继承keras Optimizer，然后hvd.DistributedOptimizer在其重载的get_gradients中把获取到的梯度传给`hvd.allreduce(gradients, …)`，从而实现整个horovod集群的梯度集体归并。具体计算梯度的逻辑是：
+1. TF 调用 hvd.DistributedOptimizer 的 compute_gradients 方法：
+  1. hvd.DistributedOptimizer 首先会利用 TF 官方 optimizer.compute_gradients 计算出本地梯度；
+  2. 然后利用 AllReduce 来得到各个进程平均后的梯度；
+  3. compute_gradients 返回一个(梯度，权值)对的列表。由apply_gradients使用；
+2. TF 调用 hvd.DistributedOptimizer 的 apply_gradients 方法：
+  1. 调用 TF 官方 optimizer.apply_gradients 对传入的参数进行处理，返回一个更新权值的op。TF 可以用这个返回值进行后续处理；
+对于 TF2.x，每行代码顺序执行，不需要构建图，所以 Horovod 梯度更新部分的实现并不是基于计算图的实现
+
+## 其它
 
 ### python 使用c
 
