@@ -10,6 +10,12 @@ keywords: feature engineering
 
 ## 简介
 
+只要单卡放的下，走数据并行，ps 或allreduce 都行，allreduce 通信成本小一些。若规模变大
+1.  稀疏模型，稀疏参数特殊处理
+  1.  使用ps，加上一些稀疏tensor 的优化，且将 embedding  存储和更新 负担转嫁到 ps
+  2.  稠密参数allreduce，想办法解决 稀疏tensor 的存储、通信成本。 比如 [HybridBackend](https://github.com/alibaba/HybridBackend)架构中参数放在 worker 上：稠密参数 replication 存放，每个 worker 都有副本，梯度更新时进行 allreduce；稀疏参数 partition 存放，每个 worker 只有部分分片，梯度更新时进行 alltoall。allreduce 和 alltoall 都会使用 nccl 进行同步通信，效率较高。hb 进行 alltoall 时，通信的是稀疏梯度，而不是完整的参数，通信量上和 ps 是一致的，但是通信效率会更高。
+2.  稠密模型，单卡无论如何也放不下了，就只能采取模型并行 及附属的一些优化方案
+
 ## 什么是大模型
 
 [TensorFlow在推荐系统中的分布式训练优化实践](https://mp.weixin.qq.com/s/LjdHBEyQhJq3ptMj8XVT-w)随着美团业务的发展，推荐系统模型的规模和复杂度也在快速增长，具体表现如下：
@@ -81,7 +87,7 @@ ps server 并不是只有一个master 来分发所有参数，而是存在一个
 
 [ps-lite 笔记一](https://mp.weixin.qq.com/s/w9PTGAjkpFaCcTf3KQGihw)       ps server 都迭代了三代了，还搞出来一个 ps-lite 库
 
-[ps-lite 笔记二](https://mp.weixin.qq.com/s/ZXi1SObzIvwpQIc-fluoKA) 			parameter server 中，参数都是可以被表示成(key, value)的集合，比如一个最小化损失函数的问题，key就是feature ID，而value就是它的权值。对于稀疏参数，不存在的key，就可以认为是0.  把参数表示成k-v， 形式更自然，易于理解，更易于编程解；且在0值较多的稀疏情况下，占用的通讯带宽也更小。
+[ps-lite 笔记二](https://mp.weixin.qq.com/s/ZXi1SObzIvwpQIc-fluoKA) [Parameter Server详解](https://mp.weixin.qq.com/s/yLg_90Sm3PmwM5vMkdUgyA)			parameter server 中，参数都是可以被表示成(key, value)的集合，比如一个最小化损失函数的问题，key就是feature ID，而value就是它的权值。对于稀疏参数，不存在的key，就可以认为是0.  把参数表示成k-v， 形式更自然，易于理解，更易于编程解；且在0值较多的稀疏情况下，占用的通讯带宽也更小。
 
 ### embedding/稀疏场景优化
 
