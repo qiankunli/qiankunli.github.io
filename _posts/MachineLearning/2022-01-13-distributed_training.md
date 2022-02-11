@@ -50,10 +50,11 @@ keywords:  distributed training
 
 ## 数据并行架构模式
 
-[深度学习分布式训练框架——基础知识](https://mp.weixin.qq.com/s/djGvx3fNJfKCXmjwTfJ-CA)只要单卡放的下，ps 或allreduce 都行，allreduce 通信成本小一些，若是规模变大
-1. 稀疏模型
+[深度学习分布式训练框架——基础知识](https://mp.weixin.qq.com/s/djGvx3fNJfKCXmjwTfJ-CA)只要单卡放的下，走数据并行，ps 或allreduce 都行，allreduce 通信成本小一些
+规模变大
+1.  稀疏模型，稀疏参数特殊处理
   1.  使用ps，加上一些稀疏tensor 的优化，且将 embedding  存储和更新 负担转嫁到 ps
-  2.  使用allreduce，想办法解决 洗漱tensor 的存储、通信成本
+  2.  稠密参数allreduce，想办法解决 稀疏tensor 的存储、通信成本。 比如 [HybridBackend](https://github.com/alibaba/HybridBackend)架构中参数放在 worker 上：稠密参数 replication 存放，每个 worker 都有副本，梯度更新时进行 allreduce；稀疏参数 partition 存放，每个 worker 只有部分分片，梯度更新时进行 alltoall。allreduce 和 alltoall 都会使用 nccl 进行同步通信，效率较高。hb 进行 alltoall 时，通信的是稀疏梯度，而不是完整的参数，通信量上和 ps 是一致的，但是通信效率会更高。
 2.  稠密模型，单卡无论如何也放不下了，就只能采取模型并行 及附属的一些优化方案
 
 参数服务器适合的是高纬稀疏模型训练，它利用的是维度稀疏的特点，每次 pull or push 只更新有效的值。但是深度学习模型是典型的dense场景，embedding做的就是把稀疏变成稠密。所以这种 pull or push 的不太适合。而网络通信上更优化的 all-reduce 适合中等规模的深度学习。又比如由于推荐搜索领域模型的 Embedding 层规模庞大以及训练数据样本长度不固定等原因，导致容易出现显存不足和卡间同步时间耗费等问题，所以 all-reduce 架构很少被用于搜索推荐领域。
@@ -97,8 +98,7 @@ keywords:  distributed training
 [Ring AllReduce简介](https://mp.weixin.qq.com/s/K8l7H2zCUr9sGzYehizFMA) 各种配图都比较详细了。
 
 ### api 代码示例
-
-《用python实现深度学习框架》给出的ps/worker 模型的grpc 通信api定义
+ps 架构的参数放在 ps 节点上，**worker和ps直接通过 rpc 进行push/pull**。《用python实现深度学习框架》给出的ps/worker 模型的grpc 通信api定义
 ```
 service ParameterService{
   # ps 接收从各个worker 发送过来的请求，拿到各个节点的梯度，并根据节点名称累加到相应的缓存中

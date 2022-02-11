@@ -121,12 +121,17 @@ user_emb_col = tf.feature_column.embedding_column(user_col, 10)
 2. 上述Embedding向量被Worker拉回进行后续训练，并通过反向传播计算出这部分参数的梯度，这些梯度进一步被位于PS端的优化器拉回。
 3. PS端的优化器首先调用Find算子，从HashTable获取到梯度对应的原始稀疏参数向量和相应的优化器参数，最终通过优化算法，完成对Embedding向量和优化器参数的更新计算，再通过Insert算子插入HashTable中。
 
+[HybridBackend](https://github.com/alibaba/HybridBackend)架构中参数放在 worker 上：
+1. 稠密参数 replication 存放，每个 worker 都有副本，梯度更新时进行 allreduce；
+2. 稀疏参数 partition 存放，每个 worker 只有部分分片，梯度更新时进行 alltoall。
+
+allreduce 和 alltoall 都会使用 nccl 进行同步通信，效率较高。hb 进行 alltoall 时，通信的是稀疏梯度，而不是完整的参数，通信量上和 ps 是一致的，但是通信效率会更高。
+
 ### 异步更新
 
-[参数量卷到一百万亿！华人团队开源史上最大的推荐训练系统Persia](https://mp.weixin.qq.com/s/N1C-GVVxs2Hm6-xVWNvnzg)在不考虑模型结构的时候，肯定全异步的硬件效率最高，但在实际情况中，全异步优化会降低模型的性能，目前业界对神经网络的异步分布式训练主要有两个观察结论：
-1. 异步更新（Asynchronous update）对于稀疏访问（sparse access）来说是有效的。例如SGD每次更新只会影响到模型参数的一小部分，所以就算并行SGD优化，参数覆盖（overwrite）情况也是很少见的，几乎对模型不会产生影响。
-2. 滞后性（staleness）限制了异步SGD的可扩展性和收敛。对于稠密的（dense）的神经网络，SGD覆盖更新的情况下可能会非常多，对模型的最终效果有影响。
+[浅谈工业界分布式训练（一）](https://mp.weixin.qq.com/s/hErbnqv49xTqjJANtL-G0Q)同步更新虽然可以保证Consistency，但由于各节点计算能力不均衡无法保证性能，而异步更新或者半同步更新并没有理论上的收敛性证明，Hogwild!算法证明了异步梯度下降在凸优化问题上按概率收敛，而深度学习问题一般面对的是非凸问题，所以无论异步和半同步算法都无收敛性的理论保障。所以**只是根据经验，大部分算法在异步更新是可以收敛**，求得最优或者次优解（其实现在无论是学术界和工业界，深度学习只要效果好就行）。当然目前比较好的方式针对针对SparseNet部分( 低IO pressure, 但高memory consumption)，DenseNet部分 (高IO pressure，但低memory consumption)的特点，对sparsenet进行异步更新（因为Embedding Lookuptable的更新是稀疏的，冲突概率低），DenseNet采用同步更新的方式尽量逼近同步训练的效果。
 
+hogwild 一般特指 parameter server 最常见的用法：完全无锁的异步训练。hogwild 这个术语本身在学术界用的更多，工程上用的比较少了。
 
 ## 其它
 
