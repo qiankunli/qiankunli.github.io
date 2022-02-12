@@ -33,10 +33,10 @@ TensorFlow 使用库模式（不是框架模式），工作形态是由用户编
 Tensorflow底层最核心的概念是张量，计算图以及自动微分。
 
 1. Tensor
-2. Variable，特殊的张量， 维护特定节点的状态。**tf.Variable 方法是操作**，返回时是变量。与`session.run(tf.global_variables_initializer())` 配合使用 进行真正的初始化。与Tensor 不同在于
+2. Variable，特殊的张量， 维护特定节点的状态，一般对应w、b。**tf.Variable 方法是操作**，返回时是变量。与`session.run(tf.global_variables_initializer())` 配合使用 进行真正的初始化。与Tensor 不同在于
   1. 普通Tensor 的生命周期通常随依赖的计算完成而结束，内存也随即释放。
   2. 变量常驻内存， 在每一步训练时不断更新其值，以实现模型参数的更新。
-3. placeholder 占位符，使用 `session.run(...,feed_dict={xx:xx})` 为占位符赋值
+3. placeholder 占位符，一般对应 x、 y_hat、需要变化的超参数等，使用 `session.run(...,feed_dict={xx:xx})` 为占位符赋值
 
 ### 计算图
 

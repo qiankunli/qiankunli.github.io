@@ -68,7 +68,7 @@ keywords:  distributed training
 ![](/public/upload/machine/paddle_host.png)
 
 1. Worker(Trainer)在计算得到参数的梯度(Var_Grad)后，会通过RPC发送给PServer
-2. PServer监听通信端口，将收到的不同参数分别通过不同的Oprimizer OP完成更新
+2. PServer监听通信端口，将收到的不同参数分别通过不同的Oprimizer OP完成更新。 PS： **参数更新放在ps的问题是** 添加新的优化算法必须修改 PS 的实现
 3. Worker在下一个迭代时，请求PServer上最新的参数
 4. 重复以上流程，迭代参数的更新，实现分布式参数服务器的训练
 
@@ -337,6 +337,8 @@ class DistTrainerParameterServer(Trainer):
 ```
 
 ### ps tensorflow实现
+
+![](/public/upload/machine/tf_ps.png)
 
 在TensorFlow 的实现中，Tensor对象及内部 TensorBuffer 对象本身始终保存在 CPU 内存上，TensorBuffer 内部指针指向的缓冲区有可能位于CPU 或GPU 内存，Tensor 的跨设备复制主要指 内部缓冲区的复制过程
 1. CPU 内存间的复制无需使用特殊函数，对于TensorBuffer 指向的缓冲区不做完整复制，只需复制指针并增加引用计数。
