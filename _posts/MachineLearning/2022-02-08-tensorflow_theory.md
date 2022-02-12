@@ -10,9 +10,10 @@ keywords: tensorflow
 
 ## 简介
 
-本文内容主要来自 《深入理解Tensorflow》 和 《Tensorflow内核剖析》
+* TOC
+{:toc}
 
-![](/public/upload/machine/tensorflow_graph.png)
+本文内容主要来自 《深入理解Tensorflow》 和 《Tensorflow内核剖析》
 
 神经网络在 视觉上 是一层一层的，表达式上是张量计算，执行上是数据流图。
 
@@ -34,8 +35,8 @@ TensorFlow 使用数据流图表达计算过程和共享状态，使用节点表
 《深入理解Tensorflow》数据流图计算粗略的分为 应用程序逻辑、 会话生命周期和算法核函数执行 这3个层次
 1. 在应用程序逻辑中，用户使用Python 等应用层API 及高层抽象编写算法 模型，无需关心图切分、进程间通信等底层实现逻辑。算法涉及的计算逻辑和输入数据**绑定到图抽象中**，计算迭代控制语义体现在会话运行前后（即session.run）的控制代码上。
 2. 在会话生命周期层次，单机会话与分布式会话具有不同的设计。 
-  1. 单机会话采用相对简单的会话层次和图封装结构，它将图切分、优化之后，把操作节点和张量数据提交给底层执行器
-  2. 分布式会话分为 client、master和worker 三层组件，它们对计算任务进行分解和分发，并通过添加通信操作 来确保计算逻辑的完整性。
+    1. 单机会话采用相对简单的会话层次和图封装结构，它将图切分、优化之后，把操作节点和张量数据提交给底层执行器
+    2. 分布式会话分为 client、master和worker 三层组件，它们对计算任务进行分解和分发，并通过添加通信操作 来确保计算逻辑的完整性。
 3. 在算法核函数执行层次， 执行器抽象将会话传入的核函数加载到各个计算设备上有序执行。为充分利用多核硬件的并发计算能力，这一层次提供线程池调度机制；为实现众多并发操作的异步执行和分布式协同， 这一层次引入了通信会合点机制。
 
 ### client-master-worker
@@ -53,24 +54,13 @@ TensorFlow 使用数据流图表达计算过程和共享状态，使用节点表
 2. 对注册的 Graph Partition 按照本地计算设备集实施二次分裂 (SplitByDevice)，并通知各个计算设备并发执行各个 Graph Partition;
 3. 按照**拓扑排序算法**在某个计算设备上执行本地子图，并调度 OP 的 Kernel 实现; 
 4. 协同任务之间的数据通信。Worker 要负责将 OP 运算的结果发送到其他的 Worker 上去，或者接受来自 其他 Worker 发送给它的运算结果，以便实现 Worker 之间的数据交互。TensorFlow 特化实 现了源设备和目标设备间的 Send/Recv。
-  1. 本地 CPU 与 GPU 之间，使用 cudaMemcpyAsync 实现异步拷贝;
-  2. 本地 GPU 之间，使用端到端的 DMA 操作，避免主机端 CPU 的拷贝。
-  3. 对于任务间的通信，TensorFlow 支持多种通信协议。1. gRPC over TCP;2. RDMA over Converged Ethernet。并支持 cuNCCL 库，用于改善多 GPU 间的通信。
+    1. 本地 CPU 与 GPU 之间，使用 cudaMemcpyAsync 实现异步拷贝;
+    2. 本地 GPU 之间，使用端到端的 DMA 操作，避免主机端 CPU 的拷贝。
+    3. 对于任务间的通信，TensorFlow 支持多种通信协议。1. gRPC over TCP;2. RDMA over Converged Ethernet。并支持 cuNCCL 库，用于改善多 GPU 间的通信。
 
 Kernel 是 OP 在某种硬件设备的特定实现，它负责执行 OP 的具体运算。目前， TensorFlow 系统中包含 200 多个标准的 OP，包括数值计算，多维数组操作，控制流，状 态管理等。
 
 ## 数据流图的创建
-
-### 《深入理解Tensorflow》
-
-1. 全图构造
-2. 子图提取
-3. 图切分，将一幅子图按照其 操作节点放置的设备，切分为若干局部数据流图的过程，切分生成的每幅局部图仅在一个设备上运行，通信操作节点（SendOp,RecvOp）被插入局部图，以确保执行子图的逻辑语义同切分之前一致。
-4. 图优化
-
-![](/public/upload/machine/create_graph.jpeg)
-
-### 《Tensorflow内核剖析》
 
 假如存在一个简单的分布式环境:1 PS + 1 Worker
 
@@ -110,13 +100,13 @@ CreateSessionResponse 返回给 Client。
 4. 运行子图：
 Master 完成子图注册后，将广播所有 Worker 并发执行所有子图。这个过程是通过 Master 发送 RunGraphRequest 消息给 Worker 完成的。其中，消息中携带 (session_handle, graph_handle, step_id) 三元组的标识信息，用于 Worker 索引相应的子图。
 Worker 收到消息 RunGraphRequest 消息后，Worker 根据 graph_handle 索引相应的子 图。最终，Worker 启动本地所有计算设备并发执行所有子图。其中，每个子图放置在单独 的 Executor 中执行，Executor 将按照拓扑排序算法完成子图片段的计算。上述算法可以形 式化地描述为如下代码。
-  ```python
-     def run_partitions(rendezvous, executors_and_partitions, inputs, outputs):
-       rendezvous.send(inputs)
-       for (executor, partition) in executors_and_partitions:
-         executor.run(partition)
-       rendezvous.recv(outputs)
-  ```
+    ```python
+    def run_partitions(rendezvous, executors_and_partitions, inputs, outputs):
+      rendezvous.send(inputs)
+      for (executor, partition) in executors_and_partitions:
+        executor.run(partition)
+      rendezvous.recv(outputs)
+    ```
 5. 关闭会话：当计算完成后，Client 向 Master 发送 CloseSessionReq 消息。Master 收到消息后，开 始释放 MasterSession 所持有的所有资源。
 
 ![](/public/upload/machine/tf_run_graph_seq.png)
@@ -210,8 +200,7 @@ service WorkerService {
 ```
 
 在分布式模式中，Client 负责计算图的构造，然后通过调用 Session.run，启动计算图
-的执行过程。
-Master 进程收到计算图执行的消息后，启动计算图的剪枝，分裂，优化等操作;最终
+的执行过程。Master 进程收到计算图执行的消息后，启动计算图的剪枝，分裂，优化等操作;最终
 将子图分发注册到各个 Worker 进程上，然后触发各个 Worker 进程并发执行子图。
 Worker 进程收到子图注册的消息后，根据本地计算设备资源，再将计算子图实施二 次分裂，将子图分配在各个计算设备上，最后启动各个计算设备并发地执行子图;如果 Worker 之间存在数据交换，可以通过进程间通信完成交互。其中，在分布式运行时，图分裂经历了两级分裂过程。
 1. 一级分裂:由 MasterSession 完成，按照 SplitByWorker 或 SplitByTask 完成图 分裂过程;

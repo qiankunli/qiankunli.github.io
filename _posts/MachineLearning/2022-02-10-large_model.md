@@ -10,10 +10,13 @@ keywords: feature engineering
 
 ## 简介
 
+* TOC
+{:toc}
+
 只要单卡放的下，走数据并行，ps 或allreduce 都行，allreduce 通信成本小一些。若规模变大
 1.  稀疏模型，稀疏参数特殊处理
-  1.  使用ps，加上一些稀疏tensor 的优化，且将 embedding  存储和更新 负担转嫁到 ps
-  2.  稠密参数allreduce，想办法解决 稀疏tensor 的存储、通信成本。 比如 [HybridBackend](https://github.com/alibaba/HybridBackend)架构中参数放在 worker 上：稠密参数 replication 存放，每个 worker 都有副本，梯度更新时进行 allreduce；稀疏参数 partition 存放，每个 worker 只有部分分片，梯度更新时进行 alltoall。allreduce 和 alltoall 都会使用 nccl 进行同步通信，效率较高。hb 进行 alltoall 时，通信的是稀疏梯度，而不是完整的参数，通信量上和 ps 是一致的，但是通信效率会更高。
+    1.  使用ps，加上一些稀疏tensor 的优化，且将 embedding  存储和更新 负担转嫁到 ps
+    2.  稠密参数allreduce，想办法解决 稀疏tensor 的存储、通信成本。 比如 [HybridBackend](https://github.com/alibaba/HybridBackend)架构中参数放在 worker 上：稠密参数 replication 存放，每个 worker 都有副本，梯度更新时进行 allreduce；稀疏参数 partition 存放，每个 worker 只有部分分片，梯度更新时进行 alltoall。allreduce 和 alltoall 都会使用 nccl 进行同步通信，效率较高。hb 进行 alltoall 时，通信的是稀疏梯度，而不是完整的参数，通信量上和 ps 是一致的，但是通信效率会更高。
 2.  稠密模型，单卡无论如何也放不下了，就只能采取模型并行 及附属的一些优化方案
 
 ## 什么是大模型
