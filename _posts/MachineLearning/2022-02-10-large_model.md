@@ -13,6 +13,8 @@ keywords: feature engineering
 * TOC
 {:toc}
 
+大模型：id 化导致模型变大，模型变大需要更多的数据才能收敛。
+
 只要单卡放的下，走数据并行，ps 或allreduce 都行，allreduce 通信成本小一些。若规模变大
 1.  稀疏模型，稀疏参数特殊处理
     1.  使用ps，加上一些稀疏tensor 的优化，且将 embedding  存储和更新 负担转嫁到 ps
@@ -91,6 +93,10 @@ ps server 并不是只有一个master 来分发所有参数，而是存在一个
 [ps-lite 笔记一](https://mp.weixin.qq.com/s/w9PTGAjkpFaCcTf3KQGihw)       ps server 都迭代了三代了，还搞出来一个 ps-lite 库
 
 [ps-lite 笔记二](https://mp.weixin.qq.com/s/ZXi1SObzIvwpQIc-fluoKA) [Parameter Server详解](https://mp.weixin.qq.com/s/yLg_90Sm3PmwM5vMkdUgyA)			parameter server 中，参数都是可以被表示成(key, value)的集合，比如一个最小化损失函数的问题，key就是feature ID，而value就是它的权值。对于稀疏参数，不存在的key，就可以认为是0.  把参数表示成k-v， 形式更自然，易于理解，更易于编程解；且在0值较多的稀疏情况下，占用的通讯带宽也更小。
+
+[机器学习参数服务器ps-lite (1) ----- PostOffice](https://mp.weixin.qq.com/s/4scg6j0ae8IxyGHEOAXHcg)
+1. 参数服务器是机器学习领域的分布式内存数据库，其作用是存储模型和更新模型。
+2. 在参数服务器之前，大部分分布式机器学习算法是通过定期同步来实现的，比如集合通信的all-reduce，或者 map-reduce类系统的reduce步骤。当async sgd出现之后，就有人提出了参数服务器。
 
 ### embedding/稀疏场景优化
 

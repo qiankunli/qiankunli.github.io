@@ -168,6 +168,8 @@ devops基本理念：
 
 [分布式链路追踪在字节跳动的实践](https://mp.weixin.qq.com/s/a0Pm26-8toNKz0brrRVG4Q) 未读
 
+[企业如何从 0 到 1 构建整套全链路追踪体系](https://mp.weixin.qq.com/s/wzf3J3dljfESg4X9hS8UKQ)
+
 ## 其它
 
 [做出让人爱不释手的基础软件：可观测性和可交互性](https://mp.weixin.qq.com/s/WEO1y8vg21CXlix8wO28hw) 个人理解: 尽可能多的监控，之后就是尽量串起来

@@ -352,11 +352,11 @@ class Optimizer(object):
     """Add operations to minimize loss by updating var_list.
     """
     grads_and_vars = self.compute_gradients(loss, var_list=var_list)
-    return self.apply_gradients(grads_and_vars,
-      global_step=global_step)
+    # 将梯度apply到变量上，具体梯度如何更新到变量，由 _apply_dense、_resource_apply_dense、_apply_sparse、_resource_apply_spars这四个方法实现。
+    return self.apply_gradients(grads_and_vars,global_step=global_step)
 ```
 
-compute_gradients 将根据 loss 的值，求解 var_list=[v1, v2, ..., vn] 的梯度，最终 返回的结果为:[(grad_v1, v1), (grad_v2, v2), ..., (grad_vn, vn)]。其中，compute_gradients 将调用 gradients 方法，构造反向传播的子图，可以形式化地描述为
+compute_gradients 将根据 loss 的值，求解 var_list=[v1, v2, ..., vn] 的梯度，如果不传入var_list，那么默认就是所有trainable的variable。最终 返回的结果为:[(grad_v1, v1), (grad_v2, v2), ..., (grad_vn, vn)]。其中，compute_gradients 将调用 gradients 方法，构造反向传播的子图，可以形式化地描述为
 
 ``` python
 def compute_gradients(loss, grad=I):
@@ -392,7 +392,14 @@ def op_grad_func(op, grad)
 
 一个简单的总结，当调用 Optimizer.minimize 方法时，使用 compute_gradients 方法，实现反向计算图的构造;使用 apply_gradients 方法，实现参数更新的子图构造。参数更新子图以 grads_and_vars 为输入，执行梯度下降的更新算法;最后，通 过 train_op 完成 global_step 值加 1，至此一轮 Step 执行完成。
 
-## 自定义算子
+[从论文源码学习 之 embedding层如何自动更新](https://mp.weixin.qq.com/s/v0K_9Y6aWAyHj7N1bIGvBw) 讲的也而非常细、好。
+1. 前向求导关注的是输入是怎么影响到每一层的，反向求导则是关注于每一层是怎么影响到最终的输出结果的。自动求导就是每一个op/layer自己依据自己的输入和输出做前向计算/反向求导，而框架则负责组装调度这些op/layer，表现出来就是你通过框架去定义网络/计算图，框架自动前向计算并自动求导。TensorFlow的求导，实际上是先提供每一个op求导的数学实现，然后使用链式法则求出整个表达式的导数。
+2. 当你定义好了一个神经网络，常见的深度学习框架将其解释为一个dag（有向无环图），dag里每个节点就是op，从loss function这个节点开始，通过链式法则一步一步从后往前计算每一层神经网络的梯度，整个dag梯度计算的最小粒度就是op的 backward 函数（这里是手动的），而链式法则则是自动的。
+3. 构图的时候只需要写完前向的数据流图部分，TensorFlow 的做法是每一个 Op 在建图的时候就同时包含了它的梯度计算公式，构成前向计算图的时候会自动建立反向部分的计算图，前向计算出来的输入输出会保留下来，留到后向计算的时候用完了才删除。
+
+## 其它
+
+### 自定义算子
 
 一个Op可以接收一个或者多个输入Tensor，然后产生零个或者多个输出Tensor，分别利用Input和Output定义。在注册一个Op之后，就需要继承OpKernel，实现他的计算过程Compute函数，在Compute函数中，我们可以通过访问OpKernelContext来获得输入和输出信息。当我们需要申请新的内存地址时，可以通过OpKernelContext去申请TempTensor或者PersistentTensor。一般Tensorflow的Op都采用Eigen来操作Tensor
 
@@ -411,4 +418,37 @@ import tensorflow as tf
 zero_out_op = tf.load_op_library('zero_out.so')
 with tf.Session():
   print(zero_out_op.zero_out([1,2,3,4,5])).eval()
+```
+
+### C API
+
+1. 在 pywrap_tensorflow_internal.cc 的实现中，静 态注册了一个函数符号表，实现了 Python 函数名到 C 函数名的二元关系。
+2. _pywrap_tensorflow_internal.so 包 含了整个 TensorFlow 运行时的所有符号。
+3. pywrap_tensorflow_internal.py 模块首次被导入时，自动地加载 _pywrap_tensorflow_internal.so 的动态链接库
+4. 在运行时，按 照 Python 的函数名称，匹配找到对应的 C 函数实现，最终实现 Python 到 c_api.c 具体 实现的调用关系。c_api.h 是 TensorFlow 的后端执行系统面向前端开放的公共 API 接口。
+
+Client 存在部分 C++ 实现，即 tensorflow::Session。其中，tf.Session 实例直接持有 tensorflow::Session 实例的句柄。一般地，用户使用的是 tf.Session 实施编程
+
+![](/public/upload/machine/tf_client.png)
+
+### 变量
+
+Variable 是一个特殊的 OP，它拥有状态 (Stateful)。从实现技术探究，Variable 的 Kernel 实现直接持有一个 Tensor 实例，其生命周期与变量一致。相对于普通的 Tensor 实例，其生命周期仅对本次迭代 (Step) 有效；而 Variable 对多个迭代都有效，甚至可以存储到文件系统，或从文件系统中恢复。
+1. 从设计角度看，Variable 可以看做 Tensor 的包装器，Tensor 所支持的所有操作都被Variable 重载实现。也就是说，Variable 可以出现在 Tensor 的所有地方。
+2. 存在几个操作 Variable 的特殊 OP 用于修改变量的值，例如 Assign, AssignAdd 等。Variable 所持有的 Tensor 以引用的方式输入到 Assign 中，Assign 根据初始值 (Initial Value)或新值，就地修改 Tensor 内部的值，最后以引用的方式输出该 Tensor。
+
+`W = tf.Variable(tf.zeros([784,10]), name='W')` ，TensorFlow 设计了一个精巧的变量初始化模型。
+1. 初始值，tf.zeros 称为 Variable 的初始值，，它确定了 Variable 的类型为 int32，且 Shape为 [784, 10]。
+2. 初始化器，，变量通过初始化器 (Initializer) 在初始化期间，将初始化值赋予 Variable 内部所持有 Tensor，完成 Variable 的就地修改。W.initializer 实际上为 Assign的 OP，这是 Variable 默认的初始化器。更为常见的是，通过调用 tf.global_variables_initializer() 将所有变量的初始化器进行汇总，然后启动 Session 运行该 OP。
+3. 事实上，搜集所有全局变量的初始化器的 OP 是一个 NoOp，即不存在输入，也不存在输出。所有变量的初始化器通过控制依赖边与该 NoOp 相连，保证所有的全局变量被初始化。
+
+```
+class Variable(object):
+  def __init__(self, initial_value=None, trainable=True,collections=None, name=None, dtype=None):
+    with ops.name_scope(name, "Variable", [initial_value]) as name:
+      self._cons_initial_value(initial_value, dtype) # 构造初始值
+      self._cons_variable(name)   # 构造变量 OP
+      self._cons_initializer()    # 构造初始化器
+      self._cons_snapshot()       # 构造快照
+    self._cons_collections(trainable, collections)
 ```
