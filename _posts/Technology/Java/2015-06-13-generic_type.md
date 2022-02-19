@@ -110,6 +110,37 @@ Java的泛型是伪泛型。在编译期间，所有的泛型信息都会被擦�
     }
     
 可见，两个类的字节码文件基本一摸一样。
+
+```java
+
+import java.util.ArrayList;
+class Playground {
+    public static void main(String[ ] args) {
+        ArrayList<Integer> int_list = new ArrayList<Integer>();
+        ArrayList<String> str_list = new ArrayList<String>();
+        System.out.println(int_list.getClass() == str_list.getClass());
+    }
+}
+```
+关于 C++ 泛型的实现，ArrayList 和 ArrayList 应该是不同的两种类型。java这段代码的输出是 true。
+```java
+import java.util.ArrayList;
+class Playground {
+    public static void main(String[ ] args) {
+        System.out.println("Hello World");
+    }
+    public static void sayHello(ArrayList<String> list) {}
+    public static void sayHello(ArrayList<Integer> list) {}
+}
+```
+我们知道，方法的重载的基本条件是两个同名方法的参数列表并不相同。但是当我们尝试编译上述程序的时候，却会得到这样的错误提示：
+```
+Playground.java:12: error: name clash: sayHello(ArrayList<Integer>) and sayHello(ArrayList<String>) have the same erasure
+    public static void sayHello(ArrayList<Integer> list) {
+                       ^
+1 error
+```
+这是因为当对泛型进行擦除以后，两个 sayHello 方法的参数类型都变成了 ArrayList，从而变成了同名方法，所以就会出现命名冲突报错。
     
 ## 引用
 

@@ -77,6 +77,10 @@ ClassLoader源码注释：The ClassLoader class uses a delegation model to searc
 2. 代码加密。基于java开发编译产生的jar包是由.class字节码组成，由于字节码的文件格式是有明确规范的。因此对于字节码进行反编译，就很容易知道其源码实现了。jar包加密的本质，还是对字节码文件进行加密操作。但是JVM虚拟机加载class的规范是统一的，因此在加载class文件之前通过自定义classloader先进行反向的解密操作，然后再按照标准的class文件标准进行加载
 4. 依赖冲突。阿里 pandora(潘多拉）通过自定义类加载器，为每个中间件自定义一个加载器来 解决依赖冲突
 
+[为什么 Tomcat 会破坏双亲委派机制？](https://mp.weixin.qq.com/s/8Yk0R1iHtaPBL6sa_MDgig)
+1. 只要自定义个ClassLoader，重写loadClass方法（不依照往上开始寻找类加载器），那就算是打破双亲委派机制了。
+1. 把war包放到tomcat的webapp下，这意味着一个tomcat可以运行多个Web应用程序，那假设我现在有两个Web应用程序，它们都有一个类，叫做User，并且它们的类全限定名都一样，比如都是com.yyy.User。但是他们的具体实现是不一样的，那么Tomcat是如何保证它们是不会冲突的呢？Tomcat给每个 Web 应用创建一个类加载器实例（WebAppClassLoader），该加载器重写了loadClass方法，优先加载当前应用目录下的类，如果当前找不到了，才一层一层往上找。
+
 ### 延迟加载
 
     class X{

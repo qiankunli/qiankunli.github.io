@@ -38,6 +38,12 @@ keywords: feature engineering
 
 有了embedding后，剩下的工作就简单了，设计后续layer来适配不同的任务。通常只占据整个模型的0.1%，无需大内存，主要是一些计算密集型的工作。
 
+在实现上
+1. 推理服务在运行时 也会访问ps ，根据 ID feature 查询对应的 embedding 向量。当然，有的框架直接将 ps 组件的功能内嵌到各个worker 上了
+2. 针对 大模型 包含 embedding layer的场景，input 层和 embedding 层之间不是全连接的，而是一个 embedding_lookup 的Op
+3. 常规的dense 模型，input是一个一维向量。 针对多个id feature，为了 确保与模型的input 层对齐，input 实际变成了一个 `map<string,tensor>`，key 为id feature 名字，value 为id feature 值对应的 tensor。
+
+
 ## 大了难在哪
 
 [搞定大模型训练](https://mp.weixin.qq.com/s/xAnfeR4hhR6bFiRMe8rS4A)
@@ -78,27 +84,256 @@ keywords: feature engineering
 
 分布式常用的2种模式有ParameterServer 和 AllReduce/RingAllReduce。随着开源框架的火热迭代，再者 GPU 显存也越来越大，AllReduce 模式研究的更多一点。毕竟大多数研究的还是 dense 模型，就算上百层的网络，参数也大不到哪去。所以很多训练都是数据并行，每个节点可以存储完整的模型参数。但是像 CTR 这类用到大规模离散特征的，本质也是一个大规模离散模型，一般称为 sparse 模型。几百 G 的模型很常见，一个节点也不太可能放的下。这时候 parameter Server 模型更加适用一些。
 
-### ps server
-
-[广告推荐中大规模分布式模型](https://zhuanlan.zhihu.com/p/161972813) ps server 上存储的参数格式是`<key, value>`对。每个 worker 读入一个 batch 数据后，会向 server 执行 pull 操作，获取当前计算需要的参数的最新的值。比如稀疏参数的获取，发现样本中，location 这一维特征有北京，上海，南京3个sign，那么则将这3个当做 key 去请求 server 获得当前的最新 embedding 向量。计算前向和梯度，也是需要 dense 模型参数的，所以也会 pull DNN 网络的参数。
+### 异步
 
 每个worker 互相不干扰，各自 pull 参数，然后计算梯度后，再通过 push 将梯度值回传给 server。server 再汇总所有 worker 的梯度结果后一起更新最终参数。这里有2个问题
 1. 一个是有同步更新还是异步更新，虽然各有利弊，但一般都是采取异步。
 2. 另一个问题是pull-计算-push 这个操作太频繁，通信有压力，拖慢计算。所以可以采取时效性不那么高的方法，就是不必每次都 pull 和 push，比如可以隔3次 pull 一下，隔5次 push 一下。经过多轮训练后，模型的参数就训练完了。
 
-ps server 并不是只有一个master 来分发所有参数，而是存在一个 Server group，即多个 server 机器，每个机器只负责存一部分参数就行。这样就避免唯一 master 不停广播的通信代价问题。前面说了，server 存的是`<key,value>`，每个 server 上这个 key 的范围就是通多一致性哈希来分配的。这样设计有个好处，就是加入一个新节点，或者丢失删除一个节点后，参数可以通过环形只在相邻的节点上调整即可，避免节点频繁大规模的参数变动。
-
-![](/public/upload/machine/multi_ps.png)
-
-[ps-lite 笔记一](https://mp.weixin.qq.com/s/w9PTGAjkpFaCcTf3KQGihw)       ps server 都迭代了三代了，还搞出来一个 ps-lite 库
-
-[ps-lite 笔记二](https://mp.weixin.qq.com/s/ZXi1SObzIvwpQIc-fluoKA) [Parameter Server详解](https://mp.weixin.qq.com/s/yLg_90Sm3PmwM5vMkdUgyA)			parameter server 中，参数都是可以被表示成(key, value)的集合，比如一个最小化损失函数的问题，key就是feature ID，而value就是它的权值。对于稀疏参数，不存在的key，就可以认为是0.  把参数表示成k-v， 形式更自然，易于理解，更易于编程解；且在0值较多的稀疏情况下，占用的通讯带宽也更小。
-
 [机器学习参数服务器ps-lite (1) ----- PostOffice](https://mp.weixin.qq.com/s/4scg6j0ae8IxyGHEOAXHcg)
 1. 参数服务器是机器学习领域的分布式内存数据库，其作用是存储模型和更新模型。
 2. 在参数服务器之前，大部分分布式机器学习算法是通过定期同步来实现的，比如集合通信的all-reduce，或者 map-reduce类系统的reduce步骤。当async sgd出现之后，就有人提出了参数服务器。
 
-### embedding/稀疏场景优化
+[浅谈工业界分布式训练（一）](https://mp.weixin.qq.com/s/hErbnqv49xTqjJANtL-G0Q)同步更新虽然可以保证Consistency，但由于各节点计算能力不均衡无法保证性能，而异步更新或者半同步更新并没有理论上的收敛性证明，Hogwild!算法证明了异步梯度下降在凸优化问题上按概率收敛，而深度学习问题一般面对的是非凸问题，所以无论异步和半同步算法都无收敛性的理论保障。所以**只是根据经验，大部分算法在异步更新是可以收敛**，求得最优或者次优解（其实现在无论是学术界和工业界，深度学习只要效果好就行）。当然目前比较好的方式针对针对SparseNet部分( 低IO pressure, 但高memory consumption)，DenseNet部分 (高IO pressure，但低memory consumption)的特点，对sparsenet进行异步更新（因为Embedding Lookuptable的更新是稀疏的，冲突概率低），DenseNet采用同步更新的方式尽量逼近同步训练的效果。
+
+hogwild 一般特指 parameter server 最常见的用法：完全无锁的异步训练。hogwild 这个术语本身在学术界用的更多，工程上用的比较少了。
+
+### 分布式
+
+ps server 并不是只有一个master 来分发所有参数，而是存在一个 Server group，即多个 server 机器，每个机器只负责存一部分参数就行。这样就避免唯一 master 不停广播的通信代价问题。前面说了，server 存的是`<key,value>`，每个 server 上这个 key 的范围就是通多一致性哈希来分配的。这样设计有个好处，就是加入一个新节点，或者丢失删除一个节点后，参数可以通过环形只在相邻的节点上调整即可，避免节点频繁大规模的参数变动。
+
+![](/public/upload/machine/multi_ps.png)
+
+[ElasticDL Parameter Server Design](https://aiqianji.com/frankiegu/elasticdl/src/d727d3d8ee4cf8254f18a5f9a001b5471587864c/docs/designs/parameter_server.md)
+
+1. 可以存的更多。models could be large and overrun the memory space of a single PS instance. In such case, we need to partition the model and store different partitions in different PS instances. 
+2. 分担通信负担。distributes the model parameter communication from workers among PS instances. 
+
+### 存储两类数据
+
+[广告推荐中大规模分布式模型](https://zhuanlan.zhihu.com/p/161972813) ps server 上存储的参数格式是`<key, value>`对。每个 worker 读入一个 batch 数据后，会向 server 执行 pull 操作，获取当前计算需要的参数的最新的值。比如稀疏参数的获取，发现样本中，location 这一维特征有北京，上海，南京3个sign，那么则将这3个当做 key 去请求 server 获得当前的最新 embedding 向量。计算前向和梯度，也是需要 dense 模型参数的，所以也会 pull DNN 网络的参数。
+
+Each PS node has a dictionary-based data structure to store its partition of model parameters.We consider two kinds of model parameters:
+
+1. non-embedding parameters，一般不大，不分区，存在一个ps 上，tf.Variable name 作为key，tf.Variable 作为value。可以使用 `hash(p_name) % N` 选择存储的ps 
+2. embedding tables，Each embedding layer has an embedding table which maps a discrete ID i to an embedding vector vᵢ. Embedding tables could be huge, especially in some recommending and ranking models. Thus, we partition each embedding table and store every partition in an unique PS pod. For an embedding vector vᵢ, we select the (i mod N)-th parameter server to store it. **To store an embedding vector**, We use its corresponding embedding layer name and discrete ID as the key, and a 1-D numpy.ndarry as the value.
+
+||non-embedding parameters|embedding tables|
+|---|---|---|
+|是否分区|不分区，存在一个unique ps<br>hash(p_name) % N|分区， we partition each embedding table and store every partition in an unique PS pod|
+|kv|key=parameter name<br>value = tf.Variable|key=embedding layer name+discrete ID<br>value =1-D numpy.ndarry|
+|service PServer|pull_variable|pull_embedding_vector|
+
+
+初始化：We use lazy initialization for model parameters in PS. PS does not have the model definition. Thus **workers are responsible for initializing parameters** and push the initialized parameters to corresponding PS pods. Each PS pod has a parameter initialization status, which is False after the PS pod launch. 
+1. When a worker tries to get non-embedding parameters from the PS pod through a RPC call pull_variable, the PS pod tells the worker that the parameter initialization status is False in response. If the worker has already initialized non-embedding parameters, it sends non-embedding parameter values to the PS pod by a gRPC call push_model. When the PS pod receives non-embedding parameters in its first RPC service for push_model, it initializes non-embedding parameters and sets the parameter initialization status as True.PS: 这也是为什么 ps 挂了没事
+2. For an embedding vector, the corresponding PS pod will initialize it in the first pull_embedding_vector service that contains this embedding vector. The PS pod needs the embedding vector size and the initialization method for the initialization. The embedding vector size and the initialization method are in the model definition and workers can send them in push_model to PS pods together with non-embedding parameter values.
+
+参数更新：
+1. A worker computes gradients in each training iteration, which contain gradients for non-embedding parameters and some embedding vectors if applicable. The worker partitions these gradients using their corresponding parameter names or discrete IDs for embedding vectors. Then the worker sends gradient partitions to their corresponding PS pods by RPC calls push_gradient.When a PS pod receives gradients in push_gradient, it uses a TensorFlow optimizer to apply gradients to non-embedding parameters.
+1. We have already implemented an OptimizeWrapper to sparsely update embedding vectors. **OptimizeWrapper uses corresponding embedding vectors to form a temporary variable**, applies gradients to this temporary variable, and writes results back to these embedding vectors. The PS pod can use this OptimizeWrapper directly to update embedding vectors. 
+
+故障恢复：The model may contain one or more embedding layers with embedding tables as their parameters. If so, a minibatch of training data in a worker contains some embedding IDs, which correspond to a subset of embedding tables. The worker pulls all non-embedding parameters and only a subset of embedding tables from PS pods in the training. Thus, the PS pod can recover non-embedding parameters from workers but not embedding tables.
+1. For non-embedding parameters, the PS pod can recover them from workers in the same way as the parameter initialization by setting its parameter initialization status as False.
+1. For embedding tables, PS creates replicas to support fault-tolerance. For each PS pod PSᵢ, it can store M replicas of its embedding table partitions in M PS pods indexed from (i+1) mod N to (i+M) mod N. The relaunched PS pod can recover embedding tables from one of its replicas. PS 一个ps 存了两份 replica，还周期性的同步呢
+
+
+
+### 一种实现
+
+Message Definition
+```
+message Tensor {
+    enum DataType {
+        BOOL = 0;
+        INT16 = 1;
+        INT32 = 2;
+        INT64 = 3;
+        FP16 = 4;
+        FP32 = 5;
+        FP64 = 6;
+    }
+    string name = 1;
+    DataType data_type = 2;
+    repeated int64 dim = 3;
+    bytes content = 4;
+    repeated int64 indices = 5;
+}
+message EmbeddingTableInfo{
+    string name = 1;
+    repeated int64 dim = 2;
+    string initializer = 3;
+}
+message Model {
+    int64 version = 1;
+    # repeated 则表示数组
+    repeated Tensor variables = 2;
+    repeated EmbeddingTableInfo embedding_table_info = 3;
+}
+message PullVariableRequest{
+    int64 version = 1;
+}
+message PullVariableResponse{
+    bool model_init_status = 1;
+    Model model = 2;
+}
+message PushGradientRequest{
+    int32 model_version = 1;
+    repeated Tensor gradients = 2;
+}
+message PushGradientResponse{
+    bool accepted = 1;
+    int32 model_version = 2;
+}
+message PullEmbeddingVectorRequest{
+    string name = 1;
+    repeated int64 ids = 2;
+}
+message SynchronizeEmbeddingRequest {
+    int32 replica_index = 1;
+}
+message SynchronizeEmbeddingResponse {
+    repeated Tensor embedding_vectors = 1;
+}
+```
+RPC Definition
+```
+service PServer{
+    # pull trainable tensorflow variables created by Keras layers
+    rpc pull_variable(PullVariableRequest) returns (PullVariableResponse);
+
+    # pull embedding vectors in ElasticDL embedding layers
+    # Do we need to create a new message `PullEmbeddingVectorRequest` rather than use `Tensor`?
+    rpc pull_embedding_vector(PullEmbeddingVectorRequest) returns (Tensor);
+
+    # push trainable tensorflow variables and meta info for ElasticDL embedding layers
+    rpc push_model(Model) returns (google.protobuf.Empty);
+
+    rpc push_gradient(PushGradientRequest) returns (PushGradientResponse);
+
+    # PS to recover embedding vectors after relaunch
+    rpc get_replica(SynchronizeEmbeddingRequest) returns (SynchronizeEmbeddingResponse);
+
+    # PS replica synchronization
+    rpc synchronize_embedding(SynchronizeEmbeddingRequest) returns (SynchronizeEmbeddingResponse);
+}
+```
+
+Data Structure
+
+```python
+class Tensor(object):
+    def __init__(self, name=None, value=None, indices=None):
+        self.name = name
+        self.value = value
+        self.indices = indices
+    @classmethod
+    def from_tensor_pb(cls, tensor_pb):
+        """Create an ElasticDL Tensor object from tensor protocol buffer.
+        Return the created tensor object.
+        """
+        pass
+    def to_tensor_pb(self):
+        pass
+    def to_tf_tensor(self):
+        pass
+    def to_ndarray(self):
+        pass
+
+def serialize_to_pb(tensor, pb):
+    """Serialize ElasticDL Tensor to tensor protocol buffer."""
+    pass
+def deserialize_from_pb(pb, tensor):
+    """Deserialize tensor protocol buffer to ElasticDL Tensor."""
+    pass
+def tensor_pb_to_ndarray(tensor):
+    """Deserialize tensor protocol buffer and return a numpy ndarray."""
+    pass
+def tensor_pb_to_tf_tensor(tensor):
+    """Deserialize tensor protocol buffer and return a TensorFlow tensor."""
+    pass
+# In `Parameters`, interfaces `set_*_param` have two arguments, `value` and `name` (or `layer_name`).If `value` is a ElasticDL `Tensor` instance, `name` can be None.Otherwise `value` is a numpy ndarray, and `name` must be specified.
+class Parameters(object):
+    def __init__(self):
+        # Parameter initialization status
+        self.parameter_init_status = False
+        # Non-embedding parameter dict, maps parameter name to tf.Variable instance
+        self.non_embedding_params = {}
+        # Embedding table dict, maps embedding layer name to `EmbeddingTable` instance
+        self.embedding_params = {}
+
+    @property
+    def non_embedding_params(self):
+        return self._non_embedding_params
+    def set_embedding_param(self, value, layer_name=None):
+        pass
+    def get_embedding_param(self, layer_name, ids):
+        return self._embedding_params.get(layer_name).get(ids)
+    def set_non_embedding_param(self, value, name=None):
+        pass
+    def init_non_embedding_param(self, value, name=None):
+        pass
+    def set_meta_info(self, layer_name, dim, initializer):
+        pass
+
+class EmbeddingTable(object):
+    def __init__(self, dim, initializer):
+        # Embedding vector dict, maps ID to 1-D numpy.ndarray
+        self._embedding_vectors = {}
+        # the dimension of embedding vectors
+        self._dim = dim
+        # the initializer name for initializing embedding vectors
+        self._initializer = initializer
+
+    def get(self, ids):
+        values = []
+        for id in ids:
+            if id not self._embedding_vectors:
+                val = initialize_embedding_vector(self._dim, self._initializer)
+            else:
+                val = self._embedding_vectors.get(id)
+            values.append(val)
+        return np.concatenate(values).reshape(len(ids), -1)
+
+    def set(self, ids, values):
+        pass
+```
+
+Here is the pseudocode for a worker to pull variable from the PS. If the non-embedding variables are not initialized, the PS will tell the worker to initialize them and report to the PS.
+```python
+class PServer(elasticdl_pb2_grpc.PServerServicer):
+    ...
+    def pull_variable(self, request):
+        res = PullModelResponse()
+        if self._need_initialize_model:
+            res.model_init_status = True
+            return res
+        res.model_init_status = False
+        res.model = self._get_model() # get model in this PS instance
+        return res
+
+    def push_model(self, request):
+        model = request.model
+        ... # initialize model in this PS instance
+
+class Worker(object):
+    ...
+    def pull_variable(self):
+        # for-loop should be implemented in multithread
+        for ps_index in range(self._ps_node_num):
+            req = PullModelRequest() # create request code keeps the same with current code
+            res = self._stub[ps_index].pull_variable() # pull variable from PS
+            if res.model_init_status:
+                # worker initializes its model here if needed
+                model = serialize_model_to_pb()
+                self._stub[ps_index].push_model(model) # get model in this worker
+            req = PullModelRequest() # create request code keeps the same with current code
+            res = self._stub[ps_index].pull_variable() # pull variable from PS
+            if res.model_init_status:
+                raise Error or try a pre-defined constant times
+```
+
+## embedding/稀疏场景优化
 
 [一文梳理推荐系统中Embedding应用实践](https://mp.weixin.qq.com/s/9vnCX4IuHsA3hUi6t0Y0KQ)**在自然语言中，非端到端很常见**，因为学到一个好的的词向量表示，就能很好地挖掘出词之间的潜在关系，那么在其他语料训练集和自然语言任务中，也能很好地表征这些词的内在联系，预训练的方式得到的Embedding并不会对最终的任务和模型造成太大影响，但却能够「提高效率节省时间」，这也是预训练的一大好处。但是**在推荐场景下，根据不同目标构造出的序列不同，那么训练得到的Embedding挖掘出的关联信息也不同**。所以，「在推荐中要想用预训练的方式，必须保证Embedding的预训练和最终任务目标处于同一意义空间」，否则就会造成预训练得到Embedding的意义和最终目标完全不一致。比如做召回阶段的深度模型的目标是衡量两个商品之间的相似性，但是CTR做的是预测用户点击商品的概率，初始化一个不相关的 Embedding 会给模型带来更大的负担，更慢地收敛。
 
@@ -142,11 +377,7 @@ user_emb_col = tf.feature_column.embedding_column(user_col, 10)
 
 allreduce 和 alltoall 都会使用 nccl 进行同步通信，效率较高。hb 进行 alltoall 时，通信的是稀疏梯度，而不是完整的参数，通信量上和 ps 是一致的，但是通信效率会更高。
 
-### 异步更新
 
-[浅谈工业界分布式训练（一）](https://mp.weixin.qq.com/s/hErbnqv49xTqjJANtL-G0Q)同步更新虽然可以保证Consistency，但由于各节点计算能力不均衡无法保证性能，而异步更新或者半同步更新并没有理论上的收敛性证明，Hogwild!算法证明了异步梯度下降在凸优化问题上按概率收敛，而深度学习问题一般面对的是非凸问题，所以无论异步和半同步算法都无收敛性的理论保障。所以**只是根据经验，大部分算法在异步更新是可以收敛**，求得最优或者次优解（其实现在无论是学术界和工业界，深度学习只要效果好就行）。当然目前比较好的方式针对针对SparseNet部分( 低IO pressure, 但高memory consumption)，DenseNet部分 (高IO pressure，但低memory consumption)的特点，对sparsenet进行异步更新（因为Embedding Lookuptable的更新是稀疏的，冲突概率低），DenseNet采用同步更新的方式尽量逼近同步训练的效果。
-
-hogwild 一般特指 parameter server 最常见的用法：完全无锁的异步训练。hogwild 这个术语本身在学术界用的更多，工程上用的比较少了。
 
 ## 其它
 

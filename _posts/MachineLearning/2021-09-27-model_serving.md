@@ -48,6 +48,23 @@ keywords:  mpi
 
 模型预测：先找到输入/输出节点，把待预测的样本赋给输入节点，然后调用输出节点的forward 方法执行前向传播，计算出输出节点的值。
 
+serving 服务一个示例c 接口如下
+```c
+// model_entry: 默认置空
+// model_config：从配置文件中读取的json内容，包括模型文件路径、cpu、线程数等配置
+// state返回给框架的状态
+void* initialize(const char* model_entry, const char* model_config, int* state)
+// model_buf：initialize的返回值
+// input_data/input_size：输入request的指针以及大小，格式见pb文件， input_size是序列化之后的长度
+// output_data/output_size：输出response的指针以及大小，格式见pb文件，output_data是processor分配内存，返回给用户的，output_size指示output_data长度
+int process(void* model_buf, const void* input_data, int input_size, void** output_data, int* output_size);
+```
+input_data 是 tensor 的 proto 格式表述，假设存在一个tensor`[0,0,1,0,1,0]`，用struct 可以表示为 
+```
+dtype = int
+shape = [6]
+intVal = [0,0,1,0,1,0]
+```
 
 ## 以tensorflow 为例
 
