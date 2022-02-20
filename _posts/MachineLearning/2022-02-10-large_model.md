@@ -25,7 +25,7 @@ keywords: feature engineering
 
 [TensorFlow在推荐系统中的分布式训练优化实践](https://mp.weixin.qq.com/s/LjdHBEyQhJq3ptMj8XVT-w)随着美团业务的发展，推荐系统模型的规模和复杂度也在快速增长，具体表现如下：
 1. 训练数据：训练样本从到百亿增长到千亿，增长了近10倍。
-2. 稀疏参数：个数从几百到几千，也增长了近10倍；总参数量从几亿增长到百亿，增长了10~20倍。
+2. 稀疏参数：个数从几百到几千，也增长了近10倍；总参数量（也就是tf.Variable）从几亿增长到百亿，增长了10~20倍。
 3. 模型复杂度：越来越复杂，模型单步计算时间增长10倍以上。
 对于大流量业务，一次训练实验，从几个小时增长到了几天，而此场景**一次实验保持在1天之内是基本的需求**。
 
@@ -39,7 +39,7 @@ keywords: feature engineering
 有了embedding后，剩下的工作就简单了，设计后续layer来适配不同的任务。通常只占据整个模型的0.1%，无需大内存，主要是一些计算密集型的工作。
 
 在实现上
-1. 推理服务在运行时 也会访问ps ，根据 ID feature 查询对应的 embedding 向量。当然，有的框架直接将 ps 组件的功能内嵌到各个worker 上了
+1. 推理服务在运行时 也会访问ps （distributed inference），根据 ID feature 查询对应的 embedding 向量。当然，有的框架直接将 ps 组件的功能内嵌到各个worker 上了。
 2. 针对 大模型 包含 embedding layer的场景，input 层和 embedding 层之间不是全连接的，而是一个 embedding_lookup 的Op
 3. 常规的dense 模型，input是一个一维向量。 针对多个id feature，为了 确保与模型的input 层对齐，input 实际变成了一个 `map<string,tensor>`，key 为id feature 名字，value 为id feature 值对应的 tensor。
 
@@ -82,6 +82,8 @@ keywords: feature engineering
 
 ## ps server 优化
 
+第一手的材料 就是李沐大神的 论文[Scaling Distributed Machine Learning with the Parameter Server](https://web.eecs.umich.edu/~mosharaf/Readings/Parameter-Server.pdf) **巨大的模型其实就是巨大的参数**。以及一个大神的简单 c实现 [Superjomn/SwiftSnails](https://github.com/Superjomn/SwiftSnails)
+
 分布式常用的2种模式有ParameterServer 和 AllReduce/RingAllReduce。随着开源框架的火热迭代，再者 GPU 显存也越来越大，AllReduce 模式研究的更多一点。毕竟大多数研究的还是 dense 模型，就算上百层的网络，参数也大不到哪去。所以很多训练都是数据并行，每个节点可以存储完整的模型参数。但是像 CTR 这类用到大规模离散特征的，本质也是一个大规模离散模型，一般称为 sparse 模型。几百 G 的模型很常见，一个节点也不太可能放的下。这时候 parameter Server 模型更加适用一些。
 
 ### 异步
@@ -98,6 +100,7 @@ keywords: feature engineering
 
 hogwild 一般特指 parameter server 最常见的用法：完全无锁的异步训练。hogwild 这个术语本身在学术界用的更多，工程上用的比较少了。
 
+
 ### 分布式
 
 ps server 并不是只有一个master 来分发所有参数，而是存在一个 Server group，即多个 server 机器，每个机器只负责存一部分参数就行。这样就避免唯一 master 不停广播的通信代价问题。前面说了，server 存的是`<key,value>`，每个 server 上这个 key 的范围就是通多一致性哈希来分配的。这样设计有个好处，就是加入一个新节点，或者丢失删除一个节点后，参数可以通过环形只在相邻的节点上调整即可，避免节点频繁大规模的参数变动。
@@ -109,24 +112,20 @@ ps server 并不是只有一个master 来分发所有参数，而是存在一个
 1. 可以存的更多。models could be large and overrun the memory space of a single PS instance. In such case, we need to partition the model and store different partitions in different PS instances. 
 2. 分担通信负担。distributes the model parameter communication from workers among PS instances. 
 
+优化点：每个kv都是都是很小的值，如果对每个key都发送一次请求，那么服务器会不堪重负。为了解决这个问题，可以考虑利用机器学习算法中参数的数学特点（即参数一般为矩阵或者向量），将很多参数打包到一起进行更新。
+
 ### 存储两类数据
 
-[广告推荐中大规模分布式模型](https://zhuanlan.zhihu.com/p/161972813) ps server 上存储的参数格式是`<key, value>`对。每个 worker 读入一个 batch 数据后，会向 server 执行 pull 操作，获取当前计算需要的参数的最新的值。比如稀疏参数的获取，发现样本中，location 这一维特征有北京，上海，南京3个sign，那么则将这3个当做 key 去请求 server 获得当前的最新 embedding 向量。计算前向和梯度，也是需要 dense 模型参数的，所以也会 pull DNN 网络的参数。
+[广告推荐中大规模分布式模型](https://zhuanlan.zhihu.com/p/161972813) ps server 上存储的参数格式是`<key, value>`对，支持set/get/update 以及自定义函数。每个 worker 读入一个 batch 数据后，会向 server 执行 pull 操作，获取当前计算需要的参数的最新的值。比如稀疏参数的获取，发现样本中，location 这一维特征有北京，上海，南京3个sign，那么则将这3个当做 key 去请求 server 获得当前的最新 embedding 向量。计算前向和梯度，也是需要 dense 模型参数的，所以也会 pull DNN 网络的参数。
 
 Each PS node has a dictionary-based data structure to store its partition of model parameters.We consider two kinds of model parameters:
 
 1. non-embedding parameters，一般不大，不分区，存在一个ps 上，tf.Variable name 作为key，tf.Variable 作为value。可以使用 `hash(p_name) % N` 选择存储的ps 
-2. embedding tables，Each embedding layer has an embedding table which maps a discrete ID i to an embedding vector vᵢ. Embedding tables could be huge, especially in some recommending and ranking models. Thus, we partition each embedding table and store every partition in an unique PS pod. For an embedding vector vᵢ, we select the (i mod N)-th parameter server to store it. **To store an embedding vector**, We use its corresponding embedding layer name and discrete ID as the key, and a 1-D numpy.ndarry as the value.
-
-||non-embedding parameters|embedding tables|
-|---|---|---|
-|是否分区|不分区，存在一个unique ps<br>hash(p_name) % N|分区， we partition each embedding table and store every partition in an unique PS pod|
-|kv|key=parameter name<br>value = tf.Variable|key=embedding layer name+discrete ID<br>value =1-D numpy.ndarry|
-|service PServer|pull_variable|pull_embedding_vector|
+2. **embedding tables**，Each embedding layer has an embedding table which maps a discrete ID i to an embedding vector vᵢ. Embedding tables could be huge, especially in some recommending and ranking models. Thus, we partition each embedding table and store every partition in an unique PS pod. For an embedding vector vᵢ, we select the (i mod N)-th parameter server to store it. **To store an embedding vector**, We use its corresponding embedding layer name and discrete ID as the key, and a 1-D numpy.ndarry as the value.
 
 
 初始化：We use lazy initialization for model parameters in PS. PS does not have the model definition. Thus **workers are responsible for initializing parameters** and push the initialized parameters to corresponding PS pods. Each PS pod has a parameter initialization status, which is False after the PS pod launch. 
-1. When a worker tries to get non-embedding parameters from the PS pod through a RPC call pull_variable, the PS pod tells the worker that the parameter initialization status is False in response. If the worker has already initialized non-embedding parameters, it sends non-embedding parameter values to the PS pod by a gRPC call push_model. When the PS pod receives non-embedding parameters in its first RPC service for push_model, it initializes non-embedding parameters and sets the parameter initialization status as True.PS: 这也是为什么 ps 挂了没事
+1. When a worker tries to get non-embedding parameters from the PS pod through a RPC call pull_variable, the PS pod tells the worker that the parameter initialization status is False in response. If the worker has already initialized non-embedding parameters, it sends non-embedding parameter values to the PS pod by a gRPC call push_model. When the PS pod receives non-embedding parameters in its first RPC service for push_model, it initializes non-embedding parameters and sets the parameter initialization status as True.PS: 这也是为什么 ps 挂了没事，worker 会push
 2. For an embedding vector, the corresponding PS pod will initialize it in the first pull_embedding_vector service that contains this embedding vector. The PS pod needs the embedding vector size and the initialization method for the initialization. The embedding vector size and the initialization method are in the model definition and workers can send them in push_model to PS pods together with non-embedding parameter values.
 
 参数更新：
@@ -135,7 +134,10 @@ Each PS node has a dictionary-based data structure to store its partition of mod
 
 故障恢复：The model may contain one or more embedding layers with embedding tables as their parameters. If so, a minibatch of training data in a worker contains some embedding IDs, which correspond to a subset of embedding tables. The worker pulls all non-embedding parameters and only a subset of embedding tables from PS pods in the training. Thus, the PS pod can recover non-embedding parameters from workers but not embedding tables.
 1. For non-embedding parameters, the PS pod can recover them from workers in the same way as the parameter initialization by setting its parameter initialization status as False.
-1. For embedding tables, PS creates replicas to support fault-tolerance. For each PS pod PSᵢ, it can store M replicas of its embedding table partitions in M PS pods indexed from (i+1) mod N to (i+M) mod N. The relaunched PS pod can recover embedding tables from one of its replicas. PS 一个ps 存了两份 replica，还周期性的同步呢
+1. For embedding tables, PS creates replicas to support fault-tolerance. For each PS pod PSᵢ, it can store M replicas of its embedding table partitions in M PS pods indexed from (i+1) mod N to (i+M) mod N. The relaunched PS pod can recover embedding tables from one of its replicas. PS: 一个ps 存了两份 replica，还周期性的同步呢。
+
+Live replication of parameters between servers supports hot failover. Failover and selfrepair in turn support dynamic scaling by treating machine removal or addition as failure or repair respectively. PS：多副本 ==> 容错 ==> 弹性。每个参数会在PS集群中有三个副本，存储在不同的节点上来实现冗余。其中一个节点会被选为primary，来提供针对某个参数的服务。当这个节点失效时，另外两个副本中会被挑选出一个作为新的primary，来继续此参数的服务。因而，参数服务器也是需要调度的。
+
 
 
 
