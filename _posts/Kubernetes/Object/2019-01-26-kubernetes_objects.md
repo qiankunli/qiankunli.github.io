@@ -25,10 +25,12 @@ Kubernetes API是一个HTTP形式的API，主要有三种形式
 2. named groups API（在对应的/apis/$NAME/$VERSION路径下）
 3. system-wide API（比如/metrics,/healthz）。
 
+![](/public/upload/kubernetes/k8s_api_group.png)
+
 出于可扩展性原因考虑，Kubernetes可支持多个API版本，通过不同的API路径的方式区分。
 
 1. Domain
-2. API group, 在逻辑上相关的一组 Kind 集合。如 Job 和 ScheduledJob 都在 batch API group 里。同一资源的不同版本的 API，会放到一个 group 里面
+2. API group, 在逻辑上相关的一组 Kind 集合。如 Job 和 ScheduledJob 都在 batch API group 里。同一资源的不同版本的 API，会放到一个 group 里面。一开始 所有资源都在一条 `/apis/$VERSION/` 路径下，用户很难使用不同版本的资源并保持控制器之间的兼容性。
 3. Version, 标示 API group 的版本更新， API group 会有多个版本 (version)。v1alpha1: 初次引入 ==> v1beta1: 升级改进 ==> v1: 开发完成毕业。 group  + domain + version 在url 上经常体现为`$group_$domain/version` 比如 `batch.tutorial.kubebuilder.io/v1`
 4. Kind, 表示实体的类型。直接对应一个Golang的类型，会持久化存储在etcd 中
 5. Resource, 通常是小写的复数词，Kind 的小写形式（例如，pods），用于标识一组 HTTP 端点（路径），来对外暴露 CURD 操作。每个 Kind 和 Resource 都存在于一个APIGroupVersion 下，分别通过 GroupVersionKind 和 GroupVersionResource 标识。关联GVK 到GVR （资源存储与http path）的映射过程称作 REST mapping。

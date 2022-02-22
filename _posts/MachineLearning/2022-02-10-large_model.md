@@ -142,6 +142,7 @@ Live replication of parameters between servers supports hot failover. Failover a
 
 
 ### 一种实现
+[ElasticDL Parameter Server Design](https://aiqianji.com/frankiegu/elasticdl/src/d727d3d8ee4cf8254f18a5f9a001b5471587864c/docs/designs/parameter_server.md)
 
 Message Definition
 ```
@@ -338,6 +339,7 @@ class Worker(object):
 ## embedding/稀疏场景优化
 
 [一文梳理推荐系统中Embedding应用实践](https://mp.weixin.qq.com/s/9vnCX4IuHsA3hUi6t0Y0KQ)**在自然语言中，非端到端很常见**，因为学到一个好的的词向量表示，就能很好地挖掘出词之间的潜在关系，那么在其他语料训练集和自然语言任务中，也能很好地表征这些词的内在联系，预训练的方式得到的Embedding并不会对最终的任务和模型造成太大影响，但却能够「提高效率节省时间」，这也是预训练的一大好处。但是**在推荐场景下，根据不同目标构造出的序列不同，那么训练得到的Embedding挖掘出的关联信息也不同**。所以，「在推荐中要想用预训练的方式，必须保证Embedding的预训练和最终任务目标处于同一意义空间」，否则就会造成预训练得到Embedding的意义和最终目标完全不一致。比如做召回阶段的深度模型的目标是衡量两个商品之间的相似性，但是CTR做的是预测用户点击商品的概率，初始化一个不相关的 Embedding 会给模型带来更大的负担，更慢地收敛。
+
 
 
 [TensorNet——基于TensorFlow的大规模稀疏特征模型分布式训练框架](https://mp.weixin.qq.com/s/v8HqeR7UYFs4Ex5p5tFyVQ)对于最简单的wide&deep模型，如果在一个广告系统中有3亿用户，那么就需要定义一个维度为3亿的embedding矩阵，在训练模型时需要在这个3亿维的矩阵上做embedding_lookup得到当前batch内的用户的embedding信息，近而在embedding之上做更加复杂的操作。

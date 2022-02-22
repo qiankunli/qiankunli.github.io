@@ -401,6 +401,10 @@ def op_grad_func(op, grad)
 
 ### 自定义算子
 
+**扩展tf，要么就是完全改写tf 的core ，要么就是 通过op的方式扩展，就这两种方式**。
+
+[tensorflow：自定义op简单介绍](https://blog.csdn.net/u012436149/article/details/73737299)
+
 一个Op可以接收一个或者多个输入Tensor，然后产生零个或者多个输出Tensor，分别利用Input和Output定义。在注册一个Op之后，就需要继承OpKernel，实现他的计算过程Compute函数，在Compute函数中，我们可以通过访问OpKernelContext来获得输入和输出信息。当我们需要申请新的内存地址时，可以通过OpKernelContext去申请TempTensor或者PersistentTensor。一般Tensorflow的Op都采用Eigen来操作Tensor
 
 对于 TensorFlow，可以自定义 Operation，即如果现有的库没有涵盖你想要的操作, 你可以自己定制一个。为了使定制的 Op 能够兼容原有的库，你必须做以下工作:
@@ -418,6 +422,20 @@ import tensorflow as tf
 zero_out_op = tf.load_op_library('zero_out.so')
 with tf.Session():
   print(zero_out_op.zero_out([1,2,3,4,5])).eval()
+```
+或者封装到 类里
+```py
+import tensorflow as tf
+class ZeroOutTest(tf.test.TestCase):
+  def testZeroOut(self):
+    zero_out_module = tf.load_op_library('./zero_out.so')
+    with self.test_session():
+      result = zero_out_module.zero_out([5, 4, 3, 2, 1])
+      self.assertAllEqual(result.eval(), [5, 0, 0, 0, 0])
+
+if __name__ == "__main__":
+  tf.test.main()
+
 ```
 
 ### C API

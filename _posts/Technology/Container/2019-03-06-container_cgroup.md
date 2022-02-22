@@ -288,6 +288,8 @@ OverlayFS 自己没有专门的特性，可以限制文件数据写入量。可�
 
 Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的限制只能在子系统中发生。比如pid可以分别属于 memory Cgroup 和 blkio Cgroup。但是在 blkio Cgroup 对进程 pid 做磁盘 I/O 做限制的时候，blkio 子系统是不会去关心 pid 用了哪些内存，这些内存是不是属于 Page Cache，而这些 Page Cache 的页面在刷入磁盘的时候，产生的 I/O 也不会被计算到进程 pid 上面。**Cgroup v2 相比 Cgroup v1 做的最大的变动就是一个进程属于一个控制组，而每个控制组里可以定义自己需要的多个子系统**。Cgroup v2 对进程 pid 的磁盘 I/O 做限制的时候，就可以考虑到进程 pid 写入到 Page Cache 内存的页面了，这样 buffered I/O 的磁盘限速就实现了。但带来的问题是：在对容器做 Memory Cgroup 限制内存大小的时候，如果仅考虑容器中进程实际使用的内存量，未考虑容器中程序 I/O 的量，则写数据到 Page Cache 的时候，需要不断地去释放原有的页面，造成容器中 Buffered I/O write() 不稳定。
 
+[Linux Disk Quota实践](https://mp.weixin.qq.com/s/c5tbrSEinYVNl9anIvyMTg)
+
 ## 网络
 
 Network Namespace 隔离了哪些资源
