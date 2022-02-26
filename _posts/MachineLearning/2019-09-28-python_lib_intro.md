@@ -118,6 +118,8 @@ Pandas 有两种自己独有的基本数据结构：Series 和 DataFrame，其�
 
 ### DataFrame
 
+DataFrame 的需求来源于把数据看成矩阵和表。但是，矩阵中只包含一种数据类型，未免过于受限；同时，关系表要求数据必须要首先定义 schema。对于 DataFrame 来说，它的列类型可以在运行时推断，并不需要提前知晓，也不要求所有列都是一个类型。因此，DataFrame 可以理解成是关系系统、矩阵、甚至是电子表格程序（典型如 Excel）的合体。
+
 DataFrame 是一个二维带标记的数据结构，**每column 数据类型可以不同**。假设有一个学生表，想知道是女生多还是男生多，用sql 来表示就是`select sex,count(*) from student group by sex`。那么给定一个数据集/csv文件等，如何用python 做类似的分析呢？[pandas与sql 对比,持续更新...](https://blog.csdn.net/weixin_39791387/article/details/81391621)
 
 
@@ -125,31 +127,39 @@ DataFrame 是一个二维带标记的数据结构，**每column 数据类型可�
 
 创建DataFrame
 
-    my_dict = { 
-        'name' : ["a", "b", "c", "d", "e","f", "g"],
-        'age' : [20,27, 35, 55, 18, 21, 35],
-        'designation': ["VP", "CEO", "CFO", "VP", "VP", "CEO", "MD"]
-    }
-    df = pd.DataFrame(my_dict)
-    my_list = [[1,2,3,4],
-            [5,6,7,8],
-            [9,10,11,12],
-            [13,14,15,16],
-            [17,18,19,20]]
-    df = pd.DataFrame(my_list)
+```
+my_dict = { 
+    'name' : ["a", "b", "c", "d", "e","f", "g"],
+    'age' : [20,27, 35, 55, 18, 21, 35],
+    'designation': ["VP", "CEO", "CFO", "VP", "VP", "CEO", "MD"]
+}
+df = pd.DataFrame(my_dict)
+my_list = [[1,2,3,4],
+        [5,6,7,8],
+        [9,10,11,12],
+        [13,14,15,16],
+        [17,18,19,20]]
+df = pd.DataFrame(my_list)
+```
 
 DataFrame 操作
 
-    df.head()   # Displays 1st Five Rows
-    df.head(2)   # Displays 1st two Rows
-    df.tail()    # Displays last Five Rows
-    df.tail(7)     # Displays last 7 Rows
-    df.drop('age',1)  # Delete Column "age"   1表示列0表示行
-    df.drop(3,0)      # Delete the Row with Index "3"
-    df * df
-    df * 10
-    df + 100
-    df & 0
+```
+df.head()   # Displays 1st Five Rows
+df.head(2)   # Displays 1st two Rows
+df.tail()    # Displays last Five Rows
+df.tail(7)     # Displays last 7 Rows
+df.drop('age',1)  # Delete Column "age"   1表示列0表示行
+df.drop(3,0)      # Delete the Row with Index "3"
+df * df
+df * 10
+df + 100
+df & 0
+```
+    
+![](/public/upload/machine/dataframe_structure.png)
+
+DataFrame 由二维混合类型的数组、行标签、列标签、以及类型（types 或者 domains）组成。在每列上，这个类型是可选的，可以在运行时推断。从行上看，可以把 DataFrame 看做行标签到行的映射，且行之间保证顺序；从列上看，可以看做列类型到列标签到列的映射，同样，列间同样保证顺序。行标签和列标签的存在，让选择数据时非常方便。
 
 ### Series
 

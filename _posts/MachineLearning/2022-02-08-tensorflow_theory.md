@@ -26,7 +26,198 @@ keywords: tensorflow
 |网络层|通信|grpc/RDMA|
 |设备层|硬件|CPU/GPU|
 
-## 数据流图的整体执行
+## 先看下高层抽象——以tinynn为例
+[手把手教你如何自己设计实现一个深度学习框架（附代码实现）](https://mp.weixin.qq.com/s/LKhxaX9_qRNzb6UMZyhmiA) 对机器学习在工程上的实现和抽象说的比较透。[tinynn](https://github.com/borgwang/tinynn) 只是一个「玩具」版本的深度学习框架，一个成熟的深度学习框架至少还需要：支持自动求导、高运算效率（静态语言加速、支持 GPU 加速）、提供丰富的算法实现、提供易用的接口和详细的文档等等。
+
+### 组件抽象
+
+神经网络运算主要包含训练 training 和预测 predict （或 inference） 两个阶段，训练的基本流程是：输入数据 -> 网络层前向传播 -> 计算损失 -> 网络层反向传播梯度 -> 更新参数，预测的基本流程是 输入数据 -> 网络层前向传播 -> 输出结果。从运算的角度看，主要可以分为三种类型的计算：
+
+1. 数据在网络层之间的流动：前向传播和反向传播可以看做是张量 Tensor（多维数组）在网络层之间的流动（前向传播流动的是输入输出，反向传播流动的是梯度），每个网络层会进行一定的运算，然后将结果输入给下一层
+2. 计算损失：衔接前向和反向传播的中间过程，定义了模型的输出与真实值之间的差异，用来后续提供反向传播所需的信息
+3. 参数更新：使用计算得到的梯度对网络参数进行更新的一类计算
+
+基于这个三种类型，我们可以对网络的基本组件做一个抽象
+
+1. tensor 张量，这个是神经网络中数据的基本单位
+2. layer 网络层，负责接收上一层的输入，进行该层的运算，将结果输出给下一层，由于 tensor 的流动有前向和反向两个方向，因此对于每种类型网络层我们都需要同时实现 forward 和 backward 两种运算
+3. loss 损失，在给定模型预测值与真实值之后，该组件输出损失值以及关于最后一层的梯度（用于梯度回传）
+4. optimizer 优化器，负责使用梯度更新模型的参数
+然后我们还需要一些组件把上面这个 4 种基本组件整合到一起，形成一个 pipeline
+
+1. net 组件负责管理 tensor 在 layers 之间的前向和反向传播，同时能提供获取参数、设置参数、获取梯度的接口
+2. model 组件负责整合所有组件，形成整个 pipeline。即 net 组件进行前向传播 -> losses 组件计算损失和梯度 -> net 组件将梯度反向传播 -> optimizer 组件将梯度更新到参数。
+
+基本的框架图如下图
+
+
+![](/public/upload/machine/ml_framework_overview.png)
+
+### 组件实现
+
+按照上面的抽象，我们可以写出整个流程代码如下。PS：一个架构设计的典型案例
+
+```python
+# define model
+net = Net([layer1, layer2, ...])
+model = Model(net, loss_fn, optimizer)
+# training，将 net、loss、optimizer 一起传给 model，model 实现了 forward、backward 和 apply_grad 三个接口分别对应前向传播、反向传播和参数更新三个功能
+pred = model.forward(train_X)
+loss, grads = model.backward(pred, train_Y)
+model.apply_grad(grads)
+# inference
+test_pred = model.forward(test_X)
+```
+
+tensor 张量是神经网络中基本的数据单位，我们这里直接使用 numpy.ndarray 类作为 tensor 类的实现。
+layer需要有提供 forward 和 backward 接口进行对应的运算。同时还应该将该层的参数和梯度记录下来。先实现一个基类如下
+```python
+class Layer(object):
+  def __init__(self, name):
+      self.name = name
+      self.params, self.grads = None, None
+  def forward(self, inputs):
+      raise NotImplementedError
+  def backward(self, grad):
+      raise NotImplementedError
+```
+最基础的一种网络层是全连接网络层
+```python
+class Dense(Layer):
+  def __init__(self, num_in, num_out,w_init=XavierUniformInit(),b_init=ZerosInit()):
+      super().__init__("Linear")
+      self.params = {
+          "w": w_init([num_in, num_out]),
+          "b": b_init([1, num_out])}
+      self.inputs = None
+  # forward 方法接收上层的输入 inputs，实现  的运算
+  def forward(self, inputs):
+      self.inputs = inputs
+      return inputs @ self.params["w"] + self.params["b"]
+  # backward 的方法接收来自上层的梯度，计算关于参数  和输入的梯度，然后返回关于输入的梯度
+  def backward(self, grad):
+      self.grads["w"] = self.inputs.T @ grad
+      self.grads["b"] = np.sum(grad, axis=0)
+      return grad @ self.params["w"].T
+```
+激活函数可以看做是一种网络层
+```python
+class Activation(Layer):
+  """Base activation layer"""
+  def __init__(self, name):
+      super().__init__(name)
+      self.inputs = None
+  def forward(self, inputs):
+      self.inputs = inputs
+      return self.func(inputs)
+  def backward(self, grad):
+      return self.derivative_func(self.inputs) * grad
+  def func(self, x):
+      raise NotImplementedError
+  def derivative_func(self, x):
+      raise NotImplementedError
+```
+
+net 类负责管理 tensor 在 layers 之间的前向和反向传播
+
+```python
+class Net(object):
+  def __init__(self, layers):
+      self.layers = layers
+  # 按顺序遍历所有层，每层计算的输出作为下一层的输入
+  def forward(self, inputs):
+      for layer in self.layers:
+          inputs = layer.forward(inputs)
+      return inputs
+  # 逆序遍历所有层，将每层的梯度作为下一层的输入
+  def backward(self, grad):
+      all_grads = [] # 将每个网络层参数的梯度保存下来返回，后面参数更新需要用到
+      for layer in reversed(self.layers):
+          grad = layer.backward(grad)
+          all_grads.append(layer.grads)
+      return all_grads[::-1]
+
+  def get_params_and_grads(self):
+      for layer in self.layers:
+          yield layer.params, layer.grads
+  def get_parameters(self):
+      return [layer.params for layer in self.layers]
+  def set_parameters(self, params):
+      for i, layer in enumerate(self.layers):
+          for key in layer.params.keys():
+              layer.params[key] = params[i][key]
+```
+ losses 组件需要做两件事情
+```python
+class BaseLoss(object):
+    # 计算损失值
+    def loss(self, predicted, actual):
+        raise NotImplementedError
+    # 计算损失值和关于预测值的梯度
+    def grad(self, predicted, actual):
+        raise NotImplementedError
+```
+
+optimizer 主要实现一个接口 compute_step，这个方法根据当前的梯度，计算返回实际优化时每个参数改变的步长。
+
+```python
+class BaseOptimizer(object):
+    def __init__(self, lr, weight_decay):
+        self.lr = lr
+        self.weight_decay = weight_decay
+    def compute_step(self, grads, params):
+        step = list()
+        # flatten all gradients
+        flatten_grads = np.concatenate([np.ravel(v) for grad in grads for v in grad.values()])
+        # compute step
+        flatten_step = self._compute_step(flatten_grads)
+        # reshape gradients
+        p = 0
+        for param in params:
+            layer = dict()
+            for k, v in param.items():
+                block = np.prod(v.shape)
+                _step = flatten_step[p:p+block].reshape(v.shape)
+                _step -= self.weight_decay * v
+                layer[k] = _step
+                p += block
+            step.append(layer)
+        return step
+
+    def _compute_step(self, grad):
+        raise NotImplementedError
+```
+
+model 类实现了我们一开始设计的三个接口 forward、backward 和 apply_grad 
+
+```python
+class Model(object):
+  def __init__(self, net, loss, optimizer):
+      self.net = net
+      self.loss = loss
+      self.optimizer = optimizer
+
+  def forward(self, inputs):
+      return self.net.forward(inputs)
+
+  def backward(self, preds, targets):
+      loss = self.loss.loss(preds, targets)
+      grad = self.loss.grad(preds, targets)
+      grads = self.net.backward(grad)
+      params = self.net.get_parameters()
+      step = self.optimizer.compute_step(grads, params)
+      return loss, step
+
+  def apply_grad(self, grads):
+    for grad, (param, _) in zip(grads, self.net.get_params_and_grads()):
+      for k, v in param.items():
+          param[k] += grad[k]
+```
+
+
+## 底层实现/数据流图的整体执行
+
+上面的抽象组件这么热闹，到真正的实现就又是另一幅天地了，可以好好品味 上层model 抽象与底层数据流图的gap，layer1 ==> layer2 ==> ...layern 被**展开**成了 op，tenor 在layer 之间的流动 转换为了 dag op 间的流动。
 
 TensorFlow 使用数据流图表达计算过程和共享状态，使用节点表示抽象计算，使用边 表示数据流。如下图，展示了 MNIST 手写识别应用的数据流图。在该模型 中，前向子图使用了 2 层全连接网络，分别为 ReLU 层和 Softmax 层。随后，使用 SGD 的 优化算法，构建了与前向子图对应的反向子图，用于计算训练参数的梯度。最后，根据参数 更新法则，**构造训练参数的更新子图**，完成训练参数的迭代更新。
 
@@ -407,21 +598,41 @@ def op_grad_func(op, grad)
 
 一个Op可以接收一个或者多个输入Tensor，然后产生零个或者多个输出Tensor，分别利用Input和Output定义。在注册一个Op之后，就需要继承OpKernel，实现他的计算过程Compute函数，在Compute函数中，我们可以通过访问OpKernelContext来获得输入和输出信息。当我们需要申请新的内存地址时，可以通过OpKernelContext去申请TempTensor或者PersistentTensor。一般Tensorflow的Op都采用Eigen来操作Tensor
 
-对于 TensorFlow，可以自定义 Operation，即如果现有的库没有涵盖你想要的操作, 你可以自己定制一个。为了使定制的 Op 能够兼容原有的库，你必须做以下工作:
+[Adding a New Op](https://chromium.googlesource.com/external/github.com/tensorflow/tensorflow/+/r0.10/tensorflow/g3doc/how_tos/adding_an_op/index.md)对于 TensorFlow，可以自定义 Operation，即如果现有的库没有涵盖你想要的操作, 你可以自己定制一个。为了使定制的 Op 能够兼容原有的库，你必须做以下工作:
 
 1. 在一个 C++ 文件中注册新 Op. Op 的注册与实现是相互独立的. 在其注册时描述了 Op 该如何执行. 例如, 注册 Op 时定义了 Op 的名字, 并指定了它的输入和输出.
 2. 使用 C++ 实现 Op. 每一个实现称之为一个 "kernel", 可以存在多个 kernel, 以适配不同的架构 (CPU, GPU 等)或不同的输入/输出类型.
-3. 创建一个 Python 包装器（wrapper）. 这个包装器是创建 Op 的公开 API. 当注册 Op 时, 会自动生成一个默认 默认的包装器. 既可以直接使用默认包装器, 也可以添加一个新的包装器.
+3. bazel（tf编译工具） 会检索所有op 并（不确定）创建一个 Python wrapper（与操作 GraphDef 有关）. 这个wrapper是创建 Op 的公开 API. 当注册 Op 时, 会自动生成一个默认 默认的包装器. 既可以直接使用默认包装器, 也可以添加一个新的包装器.
 4. (可选) 写一个函数计算 Op 的梯度.
 5. (可选) 写一个函数, 描述 Op 的输入和输出 shape. 该函数能够允许从 Op 推断 shape.
 6. 测试 Op, 通常使用 Pyhton。如果你定义了梯度，你可以使用Python的GradientChecker来测试它。
 
-示例参考 [TensorFlow 增加自定义运算符](https://mp.weixin.qq.com/s/G7BAWaPL5Lh3_q5EplNJBQ) c++ 部分编译完成后得到一个so 文件
+There are two main mechanisms for op and kernel registration:
+
+1. Static linking into the core TensorFlow library, and static initialization.
+2. Dynamic linking at runtime, using the tf.load_op_library() function. 读取op 对应的 python wrapper文件 作为python module 注册到python module中
+
+参考 [TensorFlow 增加自定义运算符](https://mp.weixin.qq.com/s/G7BAWaPL5Lh3_q5EplNJBQ) c++ 部分编译完成后得到一个so 文件
+
+```
+tensorflow_zero_out
+  cc
+    kernels
+      zero_out_kernels.cc # op kenel 实现
+    ops
+      zero_out_ops.cc     # REGISTER_OP
+  python                  # 测试用
+    ops
+      zero_out_ops.py
+```
+
 ```python
 import tensorflow as tf
-zero_out_op = tf.load_op_library('zero_out.so')
+# 返回一个 A python module, containing the (op对应的)Python wrappers for Ops defined in the plugin.
+# Python Module，是一个 Python 文件，以 .py 结尾，包含了 Python 对象定义和Python语句
+zero_out_module = tf.load_op_library('zero_out.so')
 with tf.Session():
-  print(zero_out_op.zero_out([1,2,3,4,5])).eval()
+  print(zero_out_module.zero_out([1,2,3,4,5])).eval() # eval 底层执行 session.run
 ```
 或者封装到 类里
 ```py
@@ -435,8 +646,9 @@ class ZeroOutTest(tf.test.TestCase):
 
 if __name__ == "__main__":
   tf.test.main()
-
 ```
+
+[TensorFlow 模型准实时更新上线的设计与实现](https://mp.weixin.qq.com/s/JGbELXp0aLn9n7JE1wQXvA)定制好 op 后，如何替换模型计算图中原生的 op 呢？TensorFlow 在模型保存时，会生成 meta_graph_def 文件，文件内容是采用类似 json 的格式描述计算图的结构关系。当加载此文件时，TensorFlow 会根据文件中描述的结构信息构建出计算图。可以修改模型保存的 meta_graph_def 文件，将其中的 op 替换为我们定制的 op，同时修改每个 node 的 input 和 output 关系，以修改 op 之间的依赖关系。PS： 当然这里说的替换原有的op
 
 ### C API
 

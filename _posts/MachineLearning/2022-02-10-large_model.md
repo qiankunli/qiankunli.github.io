@@ -21,6 +21,8 @@ keywords: feature engineering
     2.  稠密参数allreduce，想办法解决 稀疏tensor 的存储、通信成本。 比如 [HybridBackend](https://github.com/alibaba/HybridBackend)架构中参数放在 worker 上：稠密参数 replication 存放，每个 worker 都有副本，梯度更新时进行 allreduce；稀疏参数 partition 存放，每个 worker 只有部分分片，梯度更新时进行 alltoall。allreduce 和 alltoall 都会使用 nccl 进行同步通信，效率较高。hb 进行 alltoall 时，通信的是稀疏梯度，而不是完整的参数，通信量上和 ps 是一致的，但是通信效率会更高。
 2.  稠密模型，单卡无论如何也放不下了，就只能采取模型并行 及附属的一些优化方案
 
+[基于tensorflow做扩展支持大模型的做法](https://zhuanlan.zhihu.com/p/396804900)
+
 ## 什么是大模型
 
 [TensorFlow在推荐系统中的分布式训练优化实践](https://mp.weixin.qq.com/s/LjdHBEyQhJq3ptMj8XVT-w)随着美团业务的发展，推荐系统模型的规模和复杂度也在快速增长，具体表现如下：
@@ -86,6 +88,10 @@ keywords: feature engineering
 
 分布式常用的2种模式有ParameterServer 和 AllReduce/RingAllReduce。随着开源框架的火热迭代，再者 GPU 显存也越来越大，AllReduce 模式研究的更多一点。毕竟大多数研究的还是 dense 模型，就算上百层的网络，参数也大不到哪去。所以很多训练都是数据并行，每个节点可以存储完整的模型参数。但是像 CTR 这类用到大规模离散特征的，本质也是一个大规模离散模型，一般称为 sparse 模型。几百 G 的模型很常见，一个节点也不太可能放的下。这时候 parameter Server 模型更加适用一些。
 
+两点设计使ps能够克服Master/Slave架构应用于大规模分布式训练时的困难：
+1. 所有参数不再存储于单一的master节点，而是由一群ps server节点负责存储、读写；
+2. 得益于推荐系统的特征是超级特征的特点，一个batch的训练数据所包含的feature数目是有限的，因此，我们没必要训练每个batch时都将整个模型（i.e., 上亿的embedding）在server/worker之间传来传去，而只传递当前batch所涵盖的有限几个参数就可以了。
+
 ### 异步
 
 每个worker 互相不干扰，各自 pull 参数，然后计算梯度后，再通过 push 将梯度值回传给 server。server 再汇总所有 worker 的梯度结果后一起更新最终参数。这里有2个问题
@@ -96,7 +102,9 @@ keywords: feature engineering
 1. 参数服务器是机器学习领域的分布式内存数据库，其作用是存储模型和更新模型。
 2. 在参数服务器之前，大部分分布式机器学习算法是通过定期同步来实现的，比如集合通信的all-reduce，或者 map-reduce类系统的reduce步骤。当async sgd出现之后，就有人提出了参数服务器。
 
-[浅谈工业界分布式训练（一）](https://mp.weixin.qq.com/s/hErbnqv49xTqjJANtL-G0Q)同步更新虽然可以保证Consistency，但由于各节点计算能力不均衡无法保证性能，而异步更新或者半同步更新并没有理论上的收敛性证明，Hogwild!算法证明了异步梯度下降在凸优化问题上按概率收敛，而深度学习问题一般面对的是非凸问题，所以无论异步和半同步算法都无收敛性的理论保障。所以**只是根据经验，大部分算法在异步更新是可以收敛**，求得最优或者次优解（其实现在无论是学术界和工业界，深度学习只要效果好就行）。当然目前比较好的方式针对针对SparseNet部分( 低IO pressure, 但高memory consumption)，DenseNet部分 (高IO pressure，但低memory consumption)的特点，对sparsenet进行异步更新（因为Embedding Lookuptable的更新是稀疏的，冲突概率低），DenseNet采用同步更新的方式尽量逼近同步训练的效果。
+[重温经典之ps-lite源码解析(1)：基础](https://zhuanlan.zhihu.com/p/467650462)在纯异步的ASP模式中，每台worker在发送完自己的梯度后，不用等其他worker，就可以开始训练下一个batch的数据。由于无须同步，ASP的性能优势比较明显。但是，的确存在可能性，一个非常慢的worker基于老参数计算出过时梯度，传到server端会覆盖一些参数的最新进展。但是在实际场景下，由于推荐系统的特征空间是超级稀疏的，因此两个worker同时读写同一feature造成冲突的可能性还是较低的，因此纯异步ASP模式的应用还是比较普遍的。
+
+[浅谈工业界分布式训练（一）](https://mp.weixin.qq.com/s/hErbnqv49xTqjJANtL-G0Q)同步更新虽然可以保证Consistency，但由于各节点计算能力不均衡无法保证性能，而异步更新或者半同步更新并没有理论上的收敛性证明，Hogwild!算法证明了异步梯度下降在凸优化问题上按概率收敛，而深度学习问题一般面对的是非凸问题，所以无论异步和半同步算法都无收敛性的理论保障。所以**只是根据经验，大部分算法在异步更新是可以收敛**，求得最优或者次优解（其实现在无论是学术界和工业界，深度学习只要效果好就行）。当然目前比较好的方式针对针对SparseNet部分( 低IO pressure, 但高memory consumption)，DenseNet部分 (高IO pressure，但低memory consumption)的特点，对sparsenet进行异步更新（因为Embedding Lookuptable的更新是稀疏的，冲突概率低），DenseNet采用同步更新/AllReduce的方式尽量逼近同步训练的效果。
 
 hogwild 一般特指 parameter server 最常见的用法：完全无锁的异步训练。hogwild 这个术语本身在学术界用的更多，工程上用的比较少了。
 
@@ -121,7 +129,7 @@ ps server 并不是只有一个master 来分发所有参数，而是存在一个
 Each PS node has a dictionary-based data structure to store its partition of model parameters.We consider two kinds of model parameters:
 
 1. non-embedding parameters，一般不大，不分区，存在一个ps 上，tf.Variable name 作为key，tf.Variable 作为value。可以使用 `hash(p_name) % N` 选择存储的ps 
-2. **embedding tables**，Each embedding layer has an embedding table which maps a discrete ID i to an embedding vector vᵢ. Embedding tables could be huge, especially in some recommending and ranking models. Thus, we partition each embedding table and store every partition in an unique PS pod. For an embedding vector vᵢ, we select the (i mod N)-th parameter server to store it. **To store an embedding vector**, We use its corresponding embedding layer name and discrete ID as the key, and a 1-D numpy.ndarry as the value.
+2. **embedding tables**，Each embedding layer has an embedding table which maps a discrete ID i to an embedding vector vᵢ. Embedding tables could be huge, especially in some recommending and ranking models. Thus, we partition each embedding table and store every partition in an unique PS pod. For an embedding vector vᵢ, we select the (i mod N)-th parameter server to store it. **To store an embedding vector**, We use its corresponding embedding layer name and discrete ID as the key, and a 1-D numpy.ndarry as the value.  PS：例如一个形状为 [m, n, l, k]  的 tensor 可以按切片的数量保存为 m 个形状为 [n, l, k] 的 KV 数据，key 为 tensor_name 和 m 维度序号组合的唯一命名。 [针对大规模 Embedding 参数的定制处理](https://mp.weixin.qq.com/s/JGbELXp0aLn9n7JE1wQXvA)
 
 
 初始化：We use lazy initialization for model parameters in PS. PS does not have the model definition. Thus **workers are responsible for initializing parameters** and push the initialized parameters to corresponding PS pods. Each PS pod has a parameter initialization status, which is False after the PS pod launch. 
