@@ -19,10 +19,7 @@ keywords: feature engineering
 
 特征工程：使用专业背景知识和技巧处理数据，使得 特征能在机器学习算法上发挥更好的作用的过程。把原始数据转变为 模型的训练数据的过程。
 
-![](/public/upload/machine/feature_enginering.png)
-
 数据经过整理变成信息，信息能解决某个问题就是知识，知识通过反复实践形成才能，才能融会贯通就是智慧。 
-
 
 [机器学习-特征工程.pptx](https://mp.weixin.qq.com/s/k9DCuocCL44Dzv5Tn9i7Hw)
 
@@ -233,7 +230,11 @@ Embedding 优化
 1. 把嵌入层分布在多个 GPU 和多个节点上
 3. Embedding 层模型并行，dense 层数据并行。
 
-## 训练框架实现
+
+## 其它
+
+![](/public/upload/machine/feature_enginering.png)
+
 
 [推理性能提升一倍，TensorFlow Feature Column性能优化实践](https://mp.weixin.qq.com/s/2pV38VbvwCJkNA44HfcPuA) 未读
 [TensorFlow 指标列，嵌入列](https://mp.weixin.qq.com/s/rR0wfJyWzX36tQ9tGSao6A)
