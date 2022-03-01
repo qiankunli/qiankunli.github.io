@@ -118,10 +118,13 @@ the deep learning machine  is a rather complex mathematical function mapping inp
 7. tensor.device: 获取张量所在的设备
 
 涉及单个张量的函数运算，例如 对张量做四则运算、线性变换和激活、缩并、沿着某个维度求和、数据在设备之间移动。可以由张量自带的方法实现，也可以由torch包中的一些函数实现
+1. 一元运算（Unary），如sqrt、square、exp、abs等。
+2. 二元运算（Binary），如add，sub，mul，div等
+3. 选择运算（Selection），即if / else条件运算
+4. 归纳运算（Reduce），如reduce_sum， reduce_mean等
+5. 几何运算（Geometry），如reshape，slice，shuffle，chip，reverse，pad，concatenate，extract_patches，extract_image_patches等
+6. 张量积（Contract）和卷积运算（Convolve）是重点运算，后续会详细讲解。
 
-涉及多个张量的函数运算
-1. 比如，两个形状相同的张量之间逐个元素的四则运算（参与运算的两个元素的位置一一对应），既可以使用加、减、乘、除的运算符进行张量间的运算，也可以使用add、sub、mul和div方法来进行运算。同样，这些内置方法有原地操作版本add_、sub_、mul_/div_。
-2. 矩阵乘法（线性变换）
 
 ## 用张量验证 链式法则
 

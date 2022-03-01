@@ -192,6 +192,7 @@ https://zhuanlan.zhihu.com/p/46928319
 [深度学习利器之自动微分(2)](https://mp.weixin.qq.com/s/TMxsmvkAghV9aNk0L-Oqtw)
 
 
+[道理我都懂，但是神经网络反向传播时的梯度到底怎么求？](https://zhuanlan.zhihu.com/p/25202034) 大牛推荐
 ## 逻辑回归
 
 逻辑回归是线性回归的一种特例，激活函数使用 Sigmoid，损失函数使用 log对数损失函数

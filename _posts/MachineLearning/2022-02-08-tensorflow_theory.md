@@ -13,16 +13,16 @@ keywords: tensorflow
 * TOC
 {:toc}
 
-本文内容主要来自 《深入理解Tensorflow》 和 《Tensorflow内核剖析》
+本文内容主要来自 《深入理解Tensorflow》 和 《Tensorflow内核剖析》 
 
 神经网络在 视觉上 是一层一层的，表达式上是张量计算，执行上是数据流图。
 
 ||||
-|---|---|---|
+|---|---|---|---|
 |视图层|可视化|TensorBoard|
 |工作流层|数据集准备、存储、加载|Keras|
-|计算图层|图构造/操作/优化/执行/前向计算/后向传播|TensorFlow Core|
-|数值计算层|Kernel实现/矩阵乘法/卷积计算|Eigen/cuBLAS/cuDNN|
+|计算图层|Graph构造/操作/优化/执行/前向计算/后向传播|TensorFlow Core|Graph中每个节点都是OpKernels类型|
+|数值计算层|opKernel实现/矩阵乘法/卷积计算|Eigen/cuBLAS/cuDNN|OpKernels以Tensor为处理对象，依赖网络通信和设备内存分配，实现了各种Tensor操作或计算|
 |网络层|通信|grpc/RDMA|
 |设备层|硬件|CPU/GPU|
 
@@ -214,12 +214,68 @@ class Model(object):
           param[k] += grad[k]
 ```
 
+## 数据结构
+上面的抽象组件这么热闹，到真正的实现就又是另一幅天地了，可以好好品味 上层model 抽象与底层数据流图的gap，layer1 ==> layer2 ==> ...layern 被**展开**成了 op，tenor 在layer 之间的流动 转换为了 dag op 间的流动。
+[TensorFlow 源码大坑](https://zhuanlan.zhihu.com/p/39772050)
+### GraphDef
+```python
+// tensorflow/python/framework/ops.py
+class Graph(object):
+  def __init__(self):
+    self._nodes_by_name = dict() 
+  def _add_op(self, op):
+    with self._lock:
+        self._nodes_by_name[op.name] = op
+  def as_graph_def(self, from_version=None, add_shapes=False):
+```
+```proto
+// tensorflow/core/framework/graph.proto
+message GraphDef {
+  repeated NodeDef node = 1;
+  VersionDef versions = 4;
+```
+### OpDef
+[TensorFlow架构与设计：OP本质论](https://www.jianshu.com/p/236335897b30)
+```proto
+message OpDef{
+  string name = 1;
+  repeated ArgDef input_org = 2;
+  repeated ArgDef output_org = 3;
+  repeated AttrDef attr = 4;    // 用于描述OP输入输出的类型，大小，默认值，约束，及其其他OP的特征
+  string summary = 5;
+  string description = 6;
+  //options
+  ...
+}
+```
+以下划线开头的OP被系统内部实现保留。例如，_Send, _Recv，它们用于设备间通信的OP；_Source, _Sink标识计算图的开始节点和结束节点。
+
+[Tensorflow代码解析（三）](https://zhuanlan.zhihu.com/p/25929909)
+python 部分
+```python
+# 在Python脚本中定义matmul运算
+tf.manual(a,b)
+# 根据Ops名称MatMul从Ops库中找出对应Ops类型
+_op_def_lib.apply_op('MatMul',a=a,b=b,...)
+# ops/op_def_library.py
+# 创建ops节点
+graph.create_op(op_type_name,inputs,output_types,...)
+# framework/ops.py
+# 创建ops节点并指定相关属性和设备分配
+node_def = _NodeDef(op_type,name,device=None,attrs=attrs)
+ret = Operation(node_def,self,inputs=inputs,...)
+```
+
+c++ 部分
+```c++
+// public/tensor_c_api.h
+// 调用TF_NewNode函数生成节点
+TF_NodeDescription* TF_NewNode(TF_Graph* graph,const char* op_type,const char* node_name)
+```
 
 ## 底层实现/数据流图的整体执行
 
-上面的抽象组件这么热闹，到真正的实现就又是另一幅天地了，可以好好品味 上层model 抽象与底层数据流图的gap，layer1 ==> layer2 ==> ...layern 被**展开**成了 op，tenor 在layer 之间的流动 转换为了 dag op 间的流动。
-
-TensorFlow 使用数据流图表达计算过程和共享状态，使用节点表示抽象计算，使用边 表示数据流。如下图，展示了 MNIST 手写识别应用的数据流图。在该模型 中，前向子图使用了 2 层全连接网络，分别为 ReLU 层和 Softmax 层。随后，使用 SGD 的 优化算法，构建了与前向子图对应的反向子图，用于计算训练参数的梯度。最后，根据参数 更新法则，**构造训练参数的更新子图**，完成训练参数的迭代更新。
+符号式编程将计算过程抽象为计算图。TensorFlow 使用数据流图表达计算过程和共享状态，使用节点表示抽象计算，使用边 表示数据流。如下图，展示了 MNIST 手写识别应用的数据流图。在该模型 中，前向子图使用了 2 层全连接网络，分别为 ReLU 层和 Softmax 层。随后，使用 SGD 的 优化算法，构建了与前向子图对应的反向子图，用于计算训练参数的梯度。最后，根据参数 更新法则，**构造训练参数的更新子图**，完成训练参数的迭代更新。
 
 ![](/public/upload/machine/tf_mnist.png)
 
@@ -234,7 +290,7 @@ TensorFlow 使用数据流图表达计算过程和共享状态，使用节点表
 
 ![](/public/upload/machine/run_graph.png)
 
-应用层数据流图 表示为Python API 中的tensoflow.Graph 类，通信时表示为 基于Protocol Buffers 文件定义的GraphDef (以 Session 为桥梁，建立 Client 与 Master 之间的通道，并将 Protobuf 格式的 GraphDef 序列 化后传递给 Master)，运行时的数据流图 表示为C++ 代码中的Graph 类及其成员类型。
+应用层数据流图 表示为Python API 中的tensoflow.Graph 类，通信时表示为 基于Protocol Buffers 文件定义的GraphDef (以 Session 为桥梁，建立 Client 与 Master 之间的通道，并将 Protobuf 格式的 GraphDef 序列 化后传递给 Master)，运行时的数据流图 表示为C++ 代码中的Graph 类及其成员类型。**GraphDef是描述计算图的知识模型，整个TensorFlow的计算过程都是围绕GraphDef所展开的**。
 
 在分布式的运行时环境中，Client 执行 Session.run 时，传递整个计算图给后端的 Master。此时，计算图是完整的，常称为 Full Graph。随后，Master 根据 Session.run 传 递给它的 fetches, feeds 参数列表，反向遍历 Full Graph，并按照依赖关系，对其实施剪 枝，最终计算得到最小的依赖子图，常称为 Client Graph。
 接着，Master 负责将 Client Graph 按照任务的名称分裂 (SplitByTask) 为多个 Graph Partition;其中，每个 Worker 对应一个 Graph Partition。随后，Master 将 Graph Partition 分别注册到相应的 Worker 上，以便在不同的 Worker 上并发执行这些 Graph Partition。最 后，Master 将通知所有 Work 启动相应 Graph Partition 的执行过程。
@@ -283,7 +339,7 @@ Kernel 是 OP 在某种硬件设备的特定实现，它负责执行 OP 的具�
 
 ### 会话生命周期与图控制
 
-《Tensorflow内核剖析》
+《Tensorflow内核剖析》 调用一次 run 是执行一遍数据流图
 1. 创建会话：Client 首次执行 tf.Session.run 时，会将整个图序列化后，通过 gRPC 发送CreateSessionRequest 消息，将图传递给 Master。随后，Master 创建一个 MasterSession 实例，并用全局唯一的 handle 标识，最终通过
 CreateSessionResponse 返回给 Client。 
 2. 迭代运行：随后，Client 会启动迭代执行的过程，并称每次迭代为一次 Step。此时，Client 发送 RunStepRequest 消息给 Master，消息携带 handle 标识，用于 Master 索引相应的 MasterSession 实例。
@@ -588,6 +644,8 @@ def op_grad_func(op, grad)
 2. 当你定义好了一个神经网络，常见的深度学习框架将其解释为一个dag（有向无环图），dag里每个节点就是op，从loss function这个节点开始，通过链式法则一步一步从后往前计算每一层神经网络的梯度，整个dag梯度计算的最小粒度就是op的 backward 函数（这里是手动的），而链式法则则是自动的。
 3. 构图的时候只需要写完前向的数据流图部分，TensorFlow 的做法是每一个 Op 在建图的时候就同时包含了它的梯度计算公式，构成前向计算图的时候会自动建立反向部分的计算图，前向计算出来的输入输出会保留下来，留到后向计算的时候用完了才删除。
 
+[Tensorflow代码解析（一）](https://zhuanlan.zhihu.com/p/25646408)反向计算限制了符号编程中内存空间复用的优势，因为在正向计算中的计算数据在反向计算中也可能要用到。从这一点上讲，粗粒度的计算节点比细粒度的计算节点更有优势，而TF大部分为细粒度操作，虽然灵活性很强，但细粒度操作涉及到更多的优化方案，在工程实现上开销较大，不及粗粒度简单直接。在神经网络模型中，TF将逐步侧重粗粒度运算。
+
 ## 其它
 
 ### 自定义算子
@@ -601,9 +659,23 @@ def op_grad_func(op, grad)
 [Adding a New Op](https://chromium.googlesource.com/external/github.com/tensorflow/tensorflow/+/r0.10/tensorflow/g3doc/how_tos/adding_an_op/index.md)对于 TensorFlow，可以自定义 Operation，即如果现有的库没有涵盖你想要的操作, 你可以自己定制一个。为了使定制的 Op 能够兼容原有的库，你必须做以下工作:
 
 1. 在一个 C++ 文件中注册新 Op. Op 的注册与实现是相互独立的. 在其注册时描述了 Op 该如何执行. 例如, 注册 Op 时定义了 Op 的名字, 并指定了它的输入和输出.
+  ```c
+  REGISTER_OP("ZeroOut")
+    .Input("to_zero: int32")
+    .Output("zeroed: int32")
+    .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) {
+      c->set_output(0, c->input(0));
+      return Status::OK();
+    });
+  ```
 2. 使用 C++ 实现 Op. 每一个实现称之为一个 "kernel", 可以存在多个 kernel, 以适配不同的架构 (CPU, GPU 等)或不同的输入/输出类型.
-3. bazel（tf编译工具） 会检索所有op 并（不确定）创建一个 Python wrapper（与操作 GraphDef 有关）. 这个wrapper是创建 Op 的公开 API. 当注册 Op 时, 会自动生成一个默认 默认的包装器. 既可以直接使用默认包装器, 也可以添加一个新的包装器.
-4. (可选) 写一个函数计算 Op 的梯度.
+3. bazel（tf编译工具） 会检索所有op 并（不确定）创建一个 Python wrapper. 这个wrapper是创建 Op 的公开 API. 当注册 Op 时, 会自动生成一个默认 默认的包装器. 既可以直接使用默认包装器, 也可以添加一个新的包装器.
+4. (可选) 写一个函数计算 Op 的梯度，在Python 中注册.
+  ```python
+  @ops.RegisterGradient("ZeroOut")
+def _zero_out_grad(op, grad):
+    xxxxxxxxx
+  ```
 5. (可选) 写一个函数, 描述 Op 的输入和输出 shape. 该函数能够允许从 Op 推断 shape.
 6. 测试 Op, 通常使用 Pyhton。如果你定义了梯度，你可以使用Python的GradientChecker来测试它。
 
@@ -632,6 +704,7 @@ import tensorflow as tf
 # Python Module，是一个 Python 文件，以 .py 结尾，包含了 Python 对象定义和Python语句
 zero_out_module = tf.load_op_library('zero_out.so')
 with tf.Session():
+  # zero_out_module.zero_out 会构建opDef，opDef 是GraphDef的组成部分，zero_out 的实现可以参考 tf.matmul 等实现
   print(zero_out_module.zero_out([1,2,3,4,5])).eval() # eval 底层执行 session.run
 ```
 或者封装到 类里
