@@ -17,6 +17,8 @@ keywords: model
 
 [一文回顾深度学习发展史上最重要经典模型](https://mp.weixin.qq.com/s/tqZZS3MTqVgHJ9vZDrsSrg)以历史顺序浏览论文也是了解当前技术的来历以及为什么会发明它们。换句话说，我会尽量呈现最小集的想法，最必要的基本知识，了解现代的深度学习研究核心发展历程。
 
+[一文梳理深度学习算法演进](https://mp.weixin.qq.com/s/_M4Z_JWH5j65IUxu9q5K_A) 未读
+
 ## 发展脉络
 
 以推荐系统深度学习模型为例

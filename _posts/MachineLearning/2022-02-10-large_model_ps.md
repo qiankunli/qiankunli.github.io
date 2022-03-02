@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 大模型训练
+title: 大模型训练和ps
 category: 架构
 tags: MachineLearning
 keywords: feature engineering
@@ -30,6 +30,10 @@ keywords: feature engineering
 2. 稀疏参数：个数从几百到几千，也增长了近10倍；总参数量（也就是tf.Variable）从几亿增长到百亿，增长了10~20倍。
 3. 模型复杂度：越来越复杂，模型单步计算时间增长10倍以上。
 对于大流量业务，一次训练实验，从几个小时增长到了几天，而此场景**一次实验保持在1天之内是基本的需求**。
+
+[深度学习分布式训练的现状及未来](https://zhuanlan.zhihu.com/p/466002243)大模型主要分为两类：
+1. 搜索、推荐、广告类任务，它的特点是海量样本及大规模稀疏参数（sparse embeddings），适合使用 CPU/GPU 参数服务器模式（PS）；参数服务器模式从第一代 Alex Smola 在 2010 年提出的 LDA（文本挖掘领域的隐狄利克雷分配模型），到第二代 Jeff Dean 提出的 DistBelief，接着到第三代李沐提出的相对成熟的现代 Parameter Server 架构，再到后来的百花齐放：Uber 的 Horvod，阿里的 XDL、PAI，Meta 的 DLRM，字节的 BytePs、美团基于 Tensorlow 做的各种适配等等。参数服务器的功能日趋完善，性能也越来越强，有纯 CPU、纯 GPU，也有异构模式。
+2. CV、NLP 任务，它的特点是常规样本数据及大规模稠密参数，它适合用纯 GPU 集合通信模式（Collective）。基于纯 GPU 的集合通信模式的分布式训练框架，伴随着 Nvidia 的技术迭代，特别是 GPU 通信技术（GPU Direct RDMA）的进步，性能也变得愈来愈强。
 
 [广告推荐中大规模分布式模型](https://zhuanlan.zhihu.com/p/161972813) 为啥一两百类的特征，我们却总是听说大规模特征？举个例子，用户 userid 这一维特征，比如系统中用户有1亿个，那么每个 id 实际上也可以当做一个独立的特征对待。这样一算，特征规模就上去了。这里就要重新理解 embedding 的概念了。对于模型而言，id 查了embedding表后得到向量，输入进来进行计算，是对数据进行抽特征。如果类比到图像分类，抽取 rgb 特征来分类 （一个值变成 3个255）
 
@@ -146,10 +150,8 @@ Each PS node has a dictionary-based data structure to store its partition of mod
 
 Live replication of parameters between servers supports hot failover. Failover and selfrepair in turn support dynamic scaling by treating machine removal or addition as failure or repair respectively. PS：多副本 ==> 容错 ==> 弹性。每个参数会在PS集群中有三个副本，存储在不同的节点上来实现冗余。其中一个节点会被选为primary，来提供针对某个参数的服务。当这个节点失效时，另外两个副本中会被挑选出一个作为新的primary，来继续此参数的服务。因而，参数服务器也是需要调度的。
 
+### 一种ps实现
 
-
-
-### 一种实现
 [ElasticDL Parameter Server Design](https://aiqianji.com/frankiegu/elasticdl/src/d727d3d8ee4cf8254f18a5f9a001b5471587864c/docs/designs/parameter_server.md)
 
 Message Definition
