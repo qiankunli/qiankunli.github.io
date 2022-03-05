@@ -189,7 +189,7 @@ public:
 
 ![](/public/upload/machine/tensornet_sparse_table.png)
 
-sparse 参数的活儿都让 SparseTable 干了。
+sparse 参数的活儿都让 SparseTable 干了。EmbeddingFeatures 是一个 Layer 实现。
 ```python
 # when this layer is been called, all the embedding data of `feature_columns` will be pulled from ps server and return as a tensor list.
 # tensornet/tensornet/layers/embedding_features.py
@@ -415,7 +415,7 @@ void SparseAdaGradValue::Apply(const AdaGrad* opt, SparseGradInfo& grad_info, in
 dense_opt = tn.core.Adam(learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8)
 model.compile(optimizer=tn.optimizer.Optimizer(dense_opt),loss='binary_crossentropy',metrics=['acc', "mse", "mae", 'mape',  tf.keras.metrics.AUC(),tn.metric.CTR(), tn.metric.PCTR(), tn.metric.COPC()])
 ```
-原版 Optimizer 使用 `opt.minimize(loss, var_list=[var1, var2])` 更新`var1, var2`。 计算梯度_compute_gradients 更新梯度 apply_gradients，分布式场景下 apply_gradients 会用到_distributed_apply，_distributed_apply 会用到 _resource_apply_sparse 和_resource_apply_dense
+原版 Optimizer 使用 `opt.minimize(loss, var_list=[var1, var2])` 更新`var1, var2`。 计算梯度_compute_gradients 更新梯度 apply_gradients，分布式场景下 apply_gradients 会用到_distributed_apply，_distributed_apply 会用到 _resource_apply_sparse 和_resource_apply_dense（由Optimizer 子类实现）。PS： 由此可见，tf层面sparse 和 dense 就支持分开处理了，并留了接口来扩展。
 ```python
 # tensorflow/python/keras/optimizer_v2/optimizer_v2.py
 # 实际使用的是其子类 tf.keras.optimizers.SGD`, `tf.keras.optimizers.Adam`
@@ -454,7 +454,7 @@ class Optimizer(optimizer_v2.OptimizerV2):
 gen_dense_table_ops.dense_table_push_pull ==> DenseTablePushPullKernel.ComputeAsync ==> DensePushPullCall.Start ==> PsServer.DensePushPullAsync ==>  SparseOptimizerKernel->Apply + SparseOptimizerKernel->GetWeight
 
 ## tn.model.Model都做了哪些工作
-原版Model.train_step 实现
+Model.fit ==> Model.train_step 原版Model.train_step 实现
 ```python
 # tensorflow/python/keras/engine/training.py
 class Model(base_layer.Layer, version_utils.ModelVersionSelector):
@@ -496,3 +496,6 @@ class Model(tf.keras.Model):
             ...
 ```
 
+Model.backwards ==> layer/EmbeddingFeatures.backwards ==> StateManagerImpl.push ==> gen_sparse_table_ops.spare_table_push就到了OP 的逻辑了。
+
+![](/public/upload/machine/tensornet_ps.png)

@@ -47,6 +47,12 @@ class Graph(object):
 message GraphDef {
   repeated NodeDef node = 1;
   VersionDef versions = 4;
+}
+// tensorflow/core/protobuf/worker_service.proto
+service WorkerService {
+  rpc RegisterGraph(RegisterGraphRequest) returns (RegisterGraphResponse);
+  rpc RunGraph(RunGraphRequest) returns (RunGraphResponse);
+}
 ```
 ### OpDef
 [TensorFlow架构与设计：OP本质论](https://www.jianshu.com/p/236335897b30)
