@@ -51,7 +51,7 @@ merged/upper/lower 也是linux UnionFS 官方的说法，可以在`/proc/mounts`
 - 容器间共享数据
 
 
-## docker volume
+## docker volume——物理机的一个目录
 
 Volume 挂载方式语法：`-v: src:dst:opts`
 
@@ -65,7 +65,7 @@ $ docker run -t -i -rm -volumes-from Volume_Container -name App_Container ubuntu
 docker run -rm --volumes-from DATA -v $(pwd):/backup busybox tar cvf /backup/backup.tar /data
 ```
 
-在默认方式下，volume就是在`/var/lib/docker/volumes`目录下创建一个文件夹，并将该文件夹挂载到容器的某个目录下（以UFS文件系统的方式挂载）。当然，我们也可以指定将主机的某个特定目录（该目录要显式指定）挂载到容器的目录中。
+在默认方式下，volume就是在`/var/lib/docker/volumes`目录下创建一个文件夹，并将该文件夹挂载到容器的某个目录下（以UFS文件系统的方式挂载）。当然，我们也可以指定volume为主机的某个特定目录（该目录要显式指定）挂载到容器的目录中。
 
 ```
 docker run -v /container/dir imagename command
@@ -82,7 +82,7 @@ docker run -v dir:/container/dir imagename command
 
 即使用以上两种命令，也只能删除没有容器连接的Volume。连接到用户指定主机目录的Volume永远不会被docker删除。bypasses the Union File System, independent of the container’s life cycle.Docker therefore never automatically deletes volumes when you remove a container, nor will it “garbage collect” volumes that are no longer referenced by a container. **Docker 有 Volume 的概念，但对它只有少量且松散的管理（没有生命周期的概念），Docker 较新版本才支持对基于本地磁盘的 Volume 的生存期进行管理**。
 
-## kubernetes volume
+## kubernetes volume——为容器提供外置存储能力
 
 A Volume is a directory, possibly with some data in it, which is accessible to a Container. Kubernetes Volumes are similar to but not the same as Docker Volumes.
 
@@ -133,7 +133,6 @@ spec:
 2. 网络存储：Ceph、Glusterfs、NFS、Iscsi 等类型，这些存储卷的特点是数据不在集群的某个节点上，而是在远端的存储服务上，使用存储卷时需要将存储服务挂载到本地使用；
 3. Secret/ConfigMap：这些存储卷类型，其数据是集群的一些对象信息，并不属于某个节点，使用时将对象数据以卷的形式挂载到节点上供应用使用；
 4. CSI/Flexvolume：这是两种数据卷扩容方式，可以理解为抽象的数据卷类型。每种扩展方式都可再细化成不同的存储类型；
-5. 一种数据卷定义方式，将数据卷抽象成一个独立于 pod 的对象，这个对象定义（关联）的存储信息即存储卷对应的真正存储信息，供 K8s 负载（也就是pod）挂载使用。
 
 因为 PVC 允许用户消耗抽象的存储资源，所以用户需要不同类型、属性和性能的 PV 就是一个比较常见的需求了，在这时我们可以通过 StorageClass 来提供不同种类的 PV 资源，上层用户就可以直接使用系统管理员提供好的存储类型。
 
