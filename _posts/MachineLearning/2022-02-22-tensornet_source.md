@@ -22,8 +22,8 @@ keywords: tensornet
 通过对 tensornet 的分析可以看到，机器学习框架中，python 调用c 有两种方式
 1. 一种方式是直接通过 pybind11 调用c++ 对应函数，调用时即立即执行
 2. 一种调用 自定义算子，由session.run 真正触发执行。 
-所以机器学习框架的执行，从编程语言角度看，python  ==> pybind11 c ==> python ==> pybind11 c ==> session.run  ==graphDef ==> c ==> python 返回最终结果。
-
+所以机器学习框架的执行，从编程语言角度看
+![](/public/upload/machine/tensornet_python_c.png)
 ## Wide&Deep模型Demo
 
 ```python
