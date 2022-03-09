@@ -288,6 +288,18 @@ sysstus_t krlsvetabl_time(uint_t inr, stkparame_t *stkparv)
 }
 ```
 
+[Linux拦截系统调用](https://mp.weixin.qq.com/s/a8gLkVQ-RKLbveEZUJGeWA)说白了，系统调用其实就是函数调用，只不过调用的是内核态的函数。但与普通的函数调用不同，系统调用不能使用 call 指令来调用，而是需要使用 软中断 来调用。在 Linux 系统中，系统调用一般使用 int 0x80 指令（x86）或者 syscall 指令（x64）来调用。
+1. 在 Linux 内核中，使用 sys_call_table 数组来保存所有系统调用，sys_call_table 数组每一个元素代表着一个系统调用的入口
+2. 当应用程序需要调用一个系统调用时，首先需要将要调用的系统调用号（也就是系统调用所在 sys_call_table 数组的索引）放置到 eax 寄存器中，然后通过使用 int 0x80 指令触发调用 0x80 号软中断服务。
+3. 0x80 号软中断服务，会通过以下代码来调用系统调用。PS： 经了软中断一手，还是调用了call
+    ```
+    ...
+    call *sys_call_table(,%eax,8)
+    ...
+    ```
+    
+![](/public/upload/linux/linux_system_call.png)
+
 ## 输入输出
 
 ### cpu 如何和设备打交道

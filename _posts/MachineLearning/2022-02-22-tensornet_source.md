@@ -24,6 +24,7 @@ keywords: tensornet
 2. 一种调用 自定义算子，由session.run 真正触发执行。 
 
 所以机器学习框架的执行，从编程语言角度看
+
 ![](/public/upload/machine/tensornet_python_c.png)
 ## Wide&Deep模型Demo
 
@@ -121,6 +122,14 @@ tensornet
         /kernels    // op kernel 实现
             /xx.cc
         /ops        // 为每个op kernel REGISTER_OP
+        /ps         // 从中可以观察一个ps 的构成
+            /optimizer          // 因为ps 是存储tf.Variable的，所以进行参数更新的优化器 自然也是 ps的一部分
+            /table              // 因为ps 是存储tf.Variable的，table 就是参数的存储结构，基于ml 特性优化的kv 存储
+            /ps_cluster.cc/ps_cluster.h
+            /ps_local_server.cc/ps_local_server.h
+            /ps_remote_server.cc/ps_remote_server.h
+            /ps_server_interface.h
+            /ps_service_impl.cc/ps_service_impl.h
         /BUILD      // 为每个op 生成so 及python wrapper
     tensornet       // python 部分
         /core       // op 对应的python wrapper，由 Bazel 生成
@@ -339,9 +348,11 @@ const PsServerInterface* PsCluster::GetServer(int shard_id) const {
 
 ### 底层存储
 
-SparseTable 底层 使用8个SparseKernelBlock，每个SparseKernelBlock 使用unordered_map 存储kv（ps就是一个kv嘛），key是id，value是一个封装的SparseXXValue结构体。
-1. SparseTable.Pull ==> SparseOptimizerKernel.GetWeight ==> SparseKernelBlock.GetWeight ==> SparseAdaGradValue.Weight
-2. SparseTable.Push ==> SparseOptimizerKernel.Apply ==> SparseKernelBlock.Apply ==> SparseAdaGradValue.Apply
+SparseTable 底层 使用8个SparseKernelBlock，每个SparseKernelBlock 使用unordered_map 存储kv（ps就是一个kv嘛），key是id，value是一个封装`float*`的SparseXXValue结构体。SparseKernelBlock 操作有mutex 保护，所以 SparseTable 弄8个SparseKernelBlock 的原因估计是 降低锁竞争。 
+1. PsLocalServer.pull ==> SparseTable.Pull ==> SparseOptimizerKernel.GetWeight ==> SparseKernelBlock.GetWeight ==> SparseAdaGradValue.Weight
+2. PsLocalServer.push ==> SparseTable.Push ==> SparseOptimizerKernel.Apply ==> SparseKernelBlock.Apply ==> SparseAdaGradValue.Apply
+
+
 
 ```c++
 // tensornet/core/ps/optimizer/optimizer_kernel.h
@@ -407,6 +418,83 @@ void SparseAdaGradValue::Apply(const AdaGrad* opt, SparseGradInfo& grad_info, in
     }
 }
 ```
+
+![](/public/upload/machine/tensornet_ps.png)
+
+从大的方面来说，DenseTable与SparseTable 类似，也有DenseOptimizerKernel、DenseKernelBlock 等概念，实际差异 DenseXXValue 和 SparseXXValue 上体现出来。以Adam为例（未完成）
+
+1. TensorNet将模型的所有dense参数合并后使用分布式数组切分到不同的机器上，每次pull和push参数的时候只有一次网络请求。相较于TensorFlow对每个tensor都有一次网络请求的方法极大的减少了网络请求的次数从而提升了模型训练的速度。
+2. TensorNet对sparse参数使用分布式哈希表按照哈希值均匀分布不同的节点上。这相较于TensorFlow需要让开发者根据自身情况将tensor分布在不同的ps节点上的方法更加灵活，这不仅减小了节点通信热点的概率，还减轻了开发者的工作量。
+
+```c++
+// tensornet/core/ps/optimizer/adam_kernel.h
+class DenseAdamValue {
+public:
+    void SetWeight(butil::IOBuf& w_buf);
+    const Eigen::ArrayXf& GetWeight() const {
+        return w_;
+    }
+    // tensornet/core/ps/optimizer/adam_kernel.cc
+    void Apply(const Adam* opt, const Eigen::ArrayXf& g) {
+        beta1_power_ *= opt->beta1;
+        beta2_power_ *= opt->beta2;
+
+        const float alpha = opt->learning_rate * Eigen::numext::sqrt(1.0 - beta2_power_) / (1.0 - beta1_power_);
+
+        m_ += (g - m_) * (1.0 - opt->beta1);
+        v_ += (g.square() - v_) * (1.0 - opt->beta2);
+        w_ -= (m_ * alpha) / (v_.sqrt() + opt->epsilon);
+    }
+private:
+    float beta1_power_ = 0;
+    float beta2_power_ = 0;
+    // ArrayXf  即 Array<float,Dynamic,1>  对应 Array<typename Scalar, int RowsAtCompileTime, int ColsAtCompileTime>
+    // Array类提供了更方便的元素级的操作，可以通过matrix() 转为Matrix，这种转换并不耗费运行时间（编译器优化了)
+    Eigen::ArrayXf w_;
+    Eigen::ArrayXf m_;
+    Eigen::ArrayXf v_;
+}
+class alignas(4) SparseAdamValue
+    : public SparseOptValue {
+public:
+    float* Weight() {
+        return data_;
+    }
+    const float* Weight() const {
+        return data_;
+    }
+    // tensornet/core/ps/optimizer/adam_kernel.cc
+    void Apply(const Adam* opt, SparseGradInfo& grad_info, int dim) {
+        delta_show_ += grad_info.batch_show;
+        
+        float* w = Weight();
+        float* m = M(dim);
+        float* v = V(dim);
+
+        for (int i = 0; i < dim; ++i) {
+            m[i] = opt->beta1 * m[i] + (1 - opt->beta1) * grad_info.grad[i];
+            v[i] = opt->beta2 * v[i] + (1 - opt->beta2) * grad_info.grad[i] * grad_info.grad[i];
+
+            w[i] -= opt->learning_rate * m[i] / (opt->epsilon + sqrt(v[i]));
+        }
+    }
+protected:
+    float* M(int dim) {
+        return data_ + dim * 1;
+    }
+    float* V(int dim) {
+        return data_ + dim * 2;
+    }
+private:
+    float data_[0];
+};
+// tensornet/core/ps/optimizer/data_struct.h
+struct SparseGradInfo {
+    float* grad;
+    int batch_show;
+};
+```
+
 ## tn.optimizer.Optimizer是如何实现梯度参数更新和自身参数存储的
 
 对Optimizer 的使用，可以看到 optimizer 主要是为了更新dense参数(全连接网络的参数)
@@ -498,4 +586,3 @@ class Model(tf.keras.Model):
 
 Model.backwards ==> layer/EmbeddingFeatures.backwards ==> StateManagerImpl.push ==> gen_sparse_table_ops.spare_table_push就到了OP 的逻辑了。
 
-![](/public/upload/machine/tensornet_ps.png)

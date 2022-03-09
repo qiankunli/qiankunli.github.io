@@ -54,6 +54,8 @@ Serverless 应用架构中，SFF（Serverless For Frontend）可以让前端同�
 
 如果我们把目光放到今天云的时代，那么就不能狭义地把 Serverless 仅仅理解成为不用关心服务器。云上的资源除了服务器所包含的基础计算、网络、存储资源之外，还包括各种类别的更上层的资源，例如数据库、缓存、消息等等。我们今天主流的使用云的方式不应该是未来我们使用云的方式。我认为 Serverless 的愿景应该是 Write locally, compile to the cloud，即代码只关心业务逻辑，由工具和云去管理资源。PS：这时候就又提到sql，代码就如同sql 只负责表达业务（描述做什么）而不关心怎么做。
 
+[云原生运行时的下一个五年：函数是不是下一站？](https://mp.weixin.qq.com/s/UXsOaSMar74nGk07ANAP2A) 非常不错。
+
 ### Serverfull vs Serverless
 
 Serverfull 就是服务端运维全由我们自己负责，Serverless 则是服务端运维较少由我们自己负责，大多数的运维工作交给自动化工具负责。

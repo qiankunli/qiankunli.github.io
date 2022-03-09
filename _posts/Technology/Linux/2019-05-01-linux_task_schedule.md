@@ -120,6 +120,8 @@ linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的�
 
 ![](/public/upload/linux/cpu_rq.png)
 
+[CPU明明8个核，网卡为啥拼命折腾一号核？](https://mp.weixin.qq.com/s/LFv3VYC1DIKtcEjjTfYoTQ)
+
 ### cpu 如何访问task_struct
 
 从CPU的视角，是如何访问task_struct结构的？进程的地址空间分为用户态和内核态，无论从哪个进程进入的内核态，进来后访问的是同一份，对应的也是物理内存中同一块空间。内核态 有一个数据结构 struct list_head tasks 维护了task_struct 列表。在处理器内部，有一个控制寄存器叫 CR3，存放着页目录的物理地址，故 CR3 又叫做页目录基址寄存器。
