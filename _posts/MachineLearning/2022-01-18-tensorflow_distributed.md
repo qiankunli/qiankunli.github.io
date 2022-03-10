@@ -308,6 +308,106 @@ def main(unused_argv):
     ...
 ```
 
+## 源码分析
+
+[分布式tensorflow源码解读2：MonitoredTrainingSession](https://zhuanlan.zhihu.com/p/91608555)
+1. 如果chief节点，负责session的初始化或者从已有checkpoint恢复session，并且创建一些用于保存checkpoint和summary的hooks。如果是非chief的worker节点，则需要依赖chief节点完成初始化或恢复session这些操作后才能设置属于自己的session。
+2. MonitoredTrainingSession可根据不同的角色去创建不同种类的Session，其中chief节点是由ChiefSessionCreator类去创建session，而非chief的worker节点是由WorkerSessionCreator类创建，特殊之处就是创建时调用的是wait_for_session()，大致意思是需要等待chief节点的session创建完成之后才去创建属于自己节点的session。
+3. 创建session都是属于SessionManager类的一个方法
+  ```python
+  class SessionManager(object):
+    # prepare_session函数的作用就是如果有checkpoint存在，就从checkpoint恢复session，如果不存在checkpoint就从传入的`init_op`和 调用`init_fn`函数去创建session。
+    def prepare_session(self,master,init_op=None,saver=None,checkpoint_dir=None,...,init_fn=None):
+      sess, is_loaded_from_checkpoint = self._restore_checkpoint(...)
+      if not is_loaded_from_checkpoint:
+        if init_op is None and not init_fn and self._local_init_op is None:
+          raise RuntimeError("Model is not initialized and no init_op or init_fn or local_init_op was given")
+        if init_op is not None:
+          sess.run(init_op, feed_dict=init_feed_dict)
+        if init_fn:
+          init_fn(sess)
+      return sess
+  ```
+原生的tf 根据 grad 的类型 来决定更新weight/ variable 的方法。Optimizer 实现了 梯度计算、更新的整体流程， 根据不同的梯度计算策略 对应不同的 Optimizer 子类，子类实现Optimizer 暴露的抽象方法即可。
+```python
+# tensorflow/tensorflow/python/training/optimizer.py
+class Optimizer(object):
+  def minimize(self, loss, global_step=None, var_list=None,...):
+    grads_and_vars = self.compute_gradients(loss, var_list=var_list, ...)
+    vars_with_grad = [v for g, v in grads_and_vars if g is not None]
+    return self.apply_gradients(grads_and_vars, global_step=gl
+  def compute_gradients(self, loss, var_list=None,...):
+      ...
+  def apply_gradients(self, grads_and_vars, global_step=None, name=None):
+    # 调用update_op
+  def _apply_dense(self, grad, var):
+      raise NotImplementedError()
+  def _apply_sparse_duplicate_indices(self, grad, var):
+    ...
+    return self._apply_sparse(gradient_no_duplicate_indices, var)
+  def _apply_sparse(self, grad, var):
+    raise NotImplementedError()
+class _RefVariableProcessor(_OptimizableVariable):
+  # g ==> 梯度, self._v ==> 待更新的variable
+  def update_op(self, optimizer, g):
+    if isinstance(g, ops.Tensor):
+      update_op = optimizer._apply_dense(g, self._v)
+      return update_op
+    else:
+      assert isinstance(g, ops.IndexedSlices), ("Gradient ", g, " is neither a tensor nor IndexedSlices.")
+      return optimizer._apply_sparse_duplicate_indices(g, self._v)
+```
+
+[tensorflow分布式源码解读4：AdamOptimizer](https://zhuanlan.zhihu.com/p/99071481)当传来的梯度是普通tensor时，调用_apply_dense方法去更新参数；当传来的梯度是IndexedSlices类型时，则去调用optimizer._apply_sparse_duplicate_indices函数。其中IndexedSlices类型是一种可以存储稀疏矩阵的数据结构，只需要存储对应的行号和相应的值即可。
+
+```python
+# tensorflow/tensorflow/python/framework/ops.py
+# This class is a simple wrapper for a pair of `Tensor` objects:
+class IndexedSlices(_TensorLike):
+    def __init__(self, values, indices, dense_shape=None):
+    """Creates an `IndexedSlices`."""
+    _get_graph_from_inputs([values, indices, dense_shape])
+    self._indices = indices         # 前向传播中取的那几个位置，也就是最后要更新的那几个位置
+    self._values = values           # 这些位置所对应的梯度值
+    self._dense_shape = dense_shape # 矩阵原本的形状
+# tensorflow/tensorflow/python/framework/sparse_tensor.py
+class SparseTensor(_TensorLike):
+    def __init__(self, indices, values, dense_shape):
+      ...
+      self._indices = indices
+      self._values = values
+      self._dense_shape = dense_shape
+```
+
+如果在前向传播过程中用了 lookup 之类的函数取了一个 Tensor 中的几行，那最后得出来的梯度就会是 IndexedSlices。这样存储有什么好处呢？比如我们的model里面的100000*10大小的embedding矩阵，当前来了个batch，lookup的index行号是[0, 201, 301]，那么在更新整个embedding参数的时候，其实只需更新这三行的参数即可。所以IndexedSlices其实只存储了index = [0, 201, 301]，和对应3*10大小的梯度。
+
+```python
+# grad ==> 梯度, var ==> 待更新的variable
+def _apply_sparse_duplicate_indices(self, grad, var):
+    # _deduplicate_indexed_slices 处理重复的index， 如果当前batch的行号是[0, 201, 201, 301]，有重复的index号怎么办呢？其实只需将重复位置的梯度加起来即可(_deduplicate_indexed_slices)。
+    summed_values, unique_indices = _deduplicate_indexed_slices(values=grad.values, indices=grad.indices)
+    gradient_no_duplicate_indices = ops.IndexedSlices(indices=unique_indices,values=summed_values,dense_shape=grad.dense_shape)
+    return self._apply_sparse(gradient_no_duplicate_indices, var)
+def _apply_sparse_shared(self, grad, var, indices, scatter_add):
+  # 就是将IndexedSlices 形式的 grad 应用到 要更新的 Variable var 
+  var_update = state_ops.assign_sub(var,lr * m_t / (v_sqrt + epsilon_t),use_locking=self._use_locking)
+```
+
+来看一下更简单点的梯度下降法（实现Optimizer 暴露的抽象方法即可）
+
+```python
+# tensorflow/python/training/gradient_descent.py
+class GradientDescentOptimizer(optimizer.Optimizer):
+  def __init__(self, learning_rate, use_locking=False, name="GradientDescent"):
+    super(GradientDescentOptimizer, self).__init__(use_locking, name)
+    self._learning_rate = learning_rate
+  def _apply_dense(self, grad, var):
+    return training_ops.apply_gradient_descent(var,math_ops.cast(self._learning_rate_tensor, var.dtype.base_dtype),grad,use_locking=self._use_locking).op
+  def _apply_sparse_duplicate_indices(self, grad, var):
+    delta = ops.IndexedSlices(grad.values * math_ops.cast(self._learning_rate_tensor, var.dtype.base_dtype),grad.indices, grad.dense_shape)
+    return var.scatter_sub(delta, use_locking=self._use_locking)
+```
+
 ## horovod
 
 因为 **TensorFlow的分布式框架是基于参数服务器的**，这种结构容易造成网络堵塞；并且开源版 TensorFlow 的跨机通信是通过 gRPC + Protocol Buffers 实现的，这种方案的问题是，首先 gRPC 本身的效率就比较差，其次使用 Protocol Buffers 序列化就意味着节点间的所有交互必须经过内存，无法使用 GPUDirect RDMA，限制了速度提升；

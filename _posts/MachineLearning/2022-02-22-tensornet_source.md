@@ -139,6 +139,8 @@ tensornet
 
 ## PsStrategy 相对 MultiWorkerMirroredStrategy 做了什么
 
+1. 从部署上看，传统的ps 模型是ps 和worker 分开部署，ps 是独立进程。tensornet 中 ps 和worker 在一个进程中，ps 是一个独立的服务，多个ps 服务组成PsCluster
+2. 从代码上看，PsCluster 持有一个 local_server 和 多个 remote_servers_，均实现了PsServerInterface，opKernel 通过持有PsCluster 实例来进行参数 访问和更新。
 
 ```python
 tn.distribute.PsStrategy()  # 执行 __init__
@@ -348,11 +350,11 @@ const PsServerInterface* PsCluster::GetServer(int shard_id) const {
 
 ### 底层存储
 
-SparseTable 底层 使用8个SparseKernelBlock，每个SparseKernelBlock 使用unordered_map 存储kv（ps就是一个kv嘛），key是id，value是一个封装`float*`的SparseXXValue结构体。SparseKernelBlock 操作有mutex 保护，所以 SparseTable 弄8个SparseKernelBlock 的原因估计是 降低锁竞争。 
+![](/public/upload/machine/tensornet_sparse_storage.png)
+
+SparseTable 对外提供的是 kv式（`<uint64_t,float*>`）的带有 ml意义的操作接口（Pull和Push 方法，Push grad 会更新W），底层 使用8个SparseKernelBlock，每个SparseKernelBlock 使用unordered_map 存储kv（ps就是一个kv嘛），key是uint64_t id，value是一个封装`float*`的SparseXXValue class。对于同一个key，复杂点的Optimizer 除了存储W 之外，还有其它数据，因此用一个class（这里的xxValue） 来封装它们，且Optimizer 策略与xxValue 有一一对应关系。SparseKernelBlock 操作有mutex 保护，所以 SparseTable 弄8个SparseKernelBlock 的原因估计是 降低锁竞争。 
 1. PsLocalServer.pull ==> SparseTable.Pull ==> SparseOptimizerKernel.GetWeight ==> SparseKernelBlock.GetWeight ==> SparseAdaGradValue.Weight
 2. PsLocalServer.push ==> SparseTable.Push ==> SparseOptimizerKernel.Apply ==> SparseKernelBlock.Apply ==> SparseAdaGradValue.Apply
-
-
 
 ```c++
 // tensornet/core/ps/optimizer/optimizer_kernel.h
@@ -497,7 +499,46 @@ struct SparseGradInfo {
 
 ## tn.optimizer.Optimizer是如何实现梯度参数更新和自身参数存储的
 
-对Optimizer 的使用，可以看到 optimizer 主要是为了更新dense参数(全连接网络的参数)
+原生的tf 根据 grad 的类型 来决定更新weight/ variable 的方法。Optimizer 实现了 梯度计算、更新的整体流程， 根据不同的梯度计算策略 对应不同的 Optimizer 子类，子类实现Optimizer 暴露的抽象方法即可。
+```python
+# tensorflow/tensorflow/python/training/optimizer.py
+class Optimizer(object):
+  def minimize(self, loss, global_step=None, var_list=None,...):
+    grads_and_vars = self.compute_gradients(loss, var_list=var_list, ...)
+    vars_with_grad = [v for g, v in grads_and_vars if g is not None]
+    return self.apply_gradients(grads_and_vars, global_step=gl
+  def compute_gradients(self, loss, var_list=None,...):
+      ...
+  def apply_gradients(self, grads_and_vars, global_step=None, name=None):
+    # 调用update_op
+  def _apply_dense(self, grad, var):
+      raise NotImplementedError()
+  def _apply_sparse_duplicate_indices(self, grad, var):
+    ...
+    return self._apply_sparse(gradient_no_duplicate_indices, var)
+  def _apply_sparse(self, grad, var):
+    raise NotImplementedError()
+class _RefVariableProcessor(_OptimizableVariable):
+  # g ==> 梯度, self._v ==> 待更新的variable
+  def update_op(self, optimizer, g):
+    if isinstance(g, ops.Tensor):
+      update_op = optimizer._apply_dense(g, self._v)
+      return update_op
+    else:
+      assert isinstance(g, ops.IndexedSlices), ("Gradient ", g, " is neither a tensor nor IndexedSlices.")
+      return optimizer._apply_sparse_duplicate_indices(g, self._v)
+# tensorflow/python/training/gradient_descent.py
+class GradientDescentOptimizer(optimizer.Optimizer):
+  def __init__(self, learning_rate, use_locking=False, name="GradientDescent"):
+    super(GradientDescentOptimizer, self).__init__(use_locking, name)
+    self._learning_rate = learning_rate
+  def _apply_dense(self, grad, var):
+    return training_ops.apply_gradient_descent(var,math_ops.cast(self._learning_rate_tensor, var.dtype.base_dtype),grad,use_locking=self._use_locking).op
+  def _apply_sparse_duplicate_indices(self, grad, var):
+    delta = ops.IndexedSlices(grad.values * math_ops.cast(self._learning_rate_tensor, var.dtype.base_dtype),grad.indices, grad.dense_shape)
+    return var.scatter_sub(delta, use_locking=self._use_locking)
+```
+tensornet 对Optimizer 的使用，可以看到 optimizer 主要是为了更新dense参数(全连接网络的参数)
 ```python 
 # tensornet/examples/main.py
 dense_opt = tn.core.Adam(learning_rate=0.001, beta1=0.9, beta2=0.999, epsilon=1e-8)

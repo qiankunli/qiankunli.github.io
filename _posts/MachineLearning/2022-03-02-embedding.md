@@ -49,7 +49,7 @@ Embedding这块，spark MLlib 和 机器学习库 都提供了处理函数。利
 
 ### 案例
 
-[从论文源码学习 之 embedding_lookup](https://mp.weixin.qq.com/s/FsqCNPtDPMdH0WGI0niELw) Embedding最重要的属性是：**越“相似”的实体，Embedding之间的距离越小。比如用one-hot编码来表示4个梁山好汉。
+[从论文源码学习 之 embedding_lookup](https://mp.weixin.qq.com/s/FsqCNPtDPMdH0WGI0niELw) Embedding最重要的属性是：**越“相似”的实体，Embedding之间的距离越小**。比如用one-hot编码来表示4个梁山好汉。
 ```
 李逵   [0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0]
 刘唐   [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
@@ -90,9 +90,12 @@ Embedding 权重矩阵可以是一个 [item_size, embedding_size] 的稠密矩�
 TensorFlow 的 embedding_lookup(params, ids) 函数的目的是按照ids从params这个矩阵中拿向量（行），所以ids就是这个矩阵索引（行号），需要int类型。即按照ids顺序返回params中的第ids行。比如说，ids=[1,3,2],就是返回params中第1,3,2行。返回结果为由params的1,3,2行组成的tensor。
 
 embedding_lookup是一种特殊的全连接层的实现方法，其针对 输入是超高维 one hot向量的情况。
-1. 神经网络处理不了onehot编码，Z = WX + b。由于X是One-Hot Encoding 的原因，WX 的矩阵乘法看起来就像是取了Weights矩阵中对应的一列，看起来就像是在查表，所以叫做 lookup。`embedding_lookup(W,X)`等于说进行了一次矩阵相乘运算，其实就是一次线性变换。
-2. 假设embedding权重矩阵是一个`[vocab_size, embed_size]`的稠密矩阵W，vocab_size是需要embed的所有item的个数（比如：所有词的个数，所有商品的个数），embed_size是映射后的向量长度。所谓embedding_lookup(W, id1)，可以想像成一个只在id1位为1的[1, vocab_size]的one_hot向量，与[vocab_size, embed_size]的W矩阵相乘，结果是一个[1, embed_size]的向量，它就是id1对应的embedding向量，实际上就是W矩阵的第id1行。但是，以上过程只是前代，因为W一般是随机初始化的，是待优化的变量。因此，embedding_lookup除了要完成以上矩阵相乘的过程（实现成“抽取id对应的行”），还要完成自动求导，以实现对W的更新。PS: 所以embedding_lookup 是一个op
+1. 神经网络处理不了onehot编码，Z = WX + b。由于X是One-Hot Encoding 的原因，WX 的矩阵乘法看起来就像是取了Weights矩阵中对应的一行，看起来就像是在查表，所以叫做 lookup。`embedding_lookup(W,X)`等于说进行了一次矩阵相乘运算，其实就是一次线性变换。
+2. 假设embedding权重矩阵是一个`[vocab_size, embed_size]`的稠密矩阵W，vocab_size是需要embed的所有item的个数（比如：所有词的个数，所有商品的个数），embed_size是映射后的向量长度。**所谓embedding_lookup(W, id1)，可以想像成一个只在id1位为1的[1, vocab_size]的one_hot向量，与[vocab_size, embed_size]的W矩阵相乘**，结果是一个[1, embed_size]的向量，它就是id1对应的embedding向量，实际上就是W矩阵的第id1行。但是，以上过程只是forward，因为W一般是随机初始化的，是待优化的变量。因此，embedding_lookup除了要完成以上矩阵相乘的过程（实现成“抽取id对应的行”），还要完成自动求导，以实现对W的更新。PS: **所以embedding_lookup 的底层是一个op**，在tensorflow r1.4 分支下，底层执行的是 `array_ops.gather`
 
+## tensorflow 实现
+
+一般在tensorflow中都会使用一个shape=[id_index_size, embedding_size]的Variable 矩阵做embedding参数，然后根据id特征的index去Variable矩阵中查表得到相应的embedding表示。这里需要注意的是：id_index_size的大小一般都不会等于对应id table的元素个数，因为有很多id元素不在原始的id table表中，比如新上架的一些商品等。此时需要将id_index_size设置的大一些，以留一些位置给那些不在id table表的元素使用。PS： **使用tf.Variable 作为 embedding参数**，底层（中间过程）可能用了 SparseTensor 或 IndexedSlices
 
 ```python
 import numpy as np
@@ -121,9 +124,9 @@ print(sess.run(input_embedding, feed_dict={input_ids: [4, 0, 2]}))
  [0 0 1 0 0 0]]
 ```
 
-简单来说是通过输入的input_ids查询上部的字典得到embedding后的值。而字典是可以由用户随意创建的，例中给出的是一个one-hot字典，还可以自由创建其他字典，例如使用正态分布或均匀分布产生（0，1）的随机数创建任意维度的embedding字典。
+[从论文源码学习 之 embedding层如何自动更新](https://mp.weixin.qq.com/s/v0K_9Y6aWAyHj7N1bIGvBw)`input_embedding = embedding * input_ids` 从效果上 可以把 input_ids 视为索引的作用，返回第4、0、2 行数据，**但 embedding_lookup 函数 也可以看做是一个 矩阵乘法（底层两种都支持，是一个策略参数）**，也因此 embedding层可以通过 optimizer 进行更新。
 
-[从论文源码学习 之 embedding层如何自动更新](https://mp.weixin.qq.com/s/v0K_9Y6aWAyHj7N1bIGvBw)`input_embedding = embedding * input_ids` 从效果上 可以把 input_ids 视为索引的作用，返回第4、0、2 行数据，**但 embedding_lookup 函数 也可以看做是一个 矩阵乘法**，也因此 embedding层可以通过 optimizer 进行更新。
+## 嵌入层的优化
 
 DL 推荐模型的嵌入层是比较特殊的：它们为模型贡献了大量参数，但几乎不需要计算，而计算密集型denser layers的参数数量则要少得多。所以对于推荐系统，嵌入层的优化十分重要。
 
