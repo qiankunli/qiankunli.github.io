@@ -13,13 +13,15 @@ keywords: infrastructure optimization
 * TOC
 {:toc}
 
+DMA 是一种外设**绕开CPU**独立直接访问内存的机制，零拷贝是一种绕开CPU 进行用户态和内核态之间数据拷贝的技术，包括mmap+write、sendfile、sendfile+DMA收集、splice等。
+
 ## 零拷贝
 
 把文件内容发送到网络。这个过程发生在用户空间，文件和网络socket属于硬件资源，读取磁盘或者操作网卡都由操作系统内核完成。在操作系统内部，整个过程为:
 
 ![](/public/upload/basic/copy_file_to_socket.jpg)
 
-在Linux Kernal 2.2之后出现了一种叫做“零拷贝(zero-copy)”系统调用机制，就是跳过“用户缓冲区”的拷贝，建立一个磁盘空间和内存空间的直接映射，数据不再复制到“用户态缓冲区”，系统上下文切换减少2次，可以提升一倍性能
+在Linux Kernal 2.2之后出现了一种叫做“零拷贝(zero-copy)”系统调用机制，就是跳过“用户缓冲区”的拷贝，建立一个磁盘空间和内存空间的直接映射，数据不再复制到“用户态缓冲区”，系统上下文切换减少2次，可以提升一倍性能。
 
 ![](/public/upload/basic/copy_file_to_socket_in_kernel.jpg)
 

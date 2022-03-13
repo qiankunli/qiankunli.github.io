@@ -30,6 +30,12 @@ keywords: Kubernetes monitor
 4. 使用路径：核心场景上支持架构感知、错慢请求分析、资源消耗分析、DNS 解析性能分析、外部性能分析、服务连通性分析和网络流量分析。支持这些场景的基础是产品在设计上遵循了从整体到个体的原则：**先从全局视图入手，发现异常的服务个体**，如某个 Service，定位到这个 Service 后查看这个 Service 的黄金指标、关联信息、Trace等进行进一步关联分析。
 5. datadog 的 CEO 在一次采访中直言 datadog 的产品策略不是支持越多功能越好，而是思考怎样在不同团队和成员之间架起桥梁，尽可能把信息放在同一个页面中（to bridge the gap between the teams and get everything on the same page）
 
+[在阿里巴巴，我们如何先于用户发现和定位 Kubernetes 集群问题？](https://mp.weixin.qq.com/s/MAgCortf5zXmWIAAIWjIow) 探测、巡检、根因分析。
+
+[基于 eBPF 的 Kubernetes 问题排查全景图](https://mp.weixin.qq.com/s/lK4yXuZOy6bS6qPe2pxD7A) 监测工具不是功能越多功能越好，而是要思考怎样在不同团队和成员之间架起桥梁，尽可能把信息放在同一个页面中。那么具体怎么关联呢？信息怎么组织呢？主要从两方面来看：
+1. 横向，端到端：展开说就是应用到应用，服务到服务，两者调用关系是关联的基础，因为调用才产生了联系。
+2. 纵向，以 Pod 为媒介，Kubernetes 层面关联 Workload、Service 等对象，基础设施层面可以关联节点、存储设备、网络等，应用层面关联日志、调用链路等。
+
 ## 能搞到哪些metric
 
 [ Kubernetes Pod状态异常九大场景盘点](https://mp.weixin.qq.com/s/xcLy9W6diO8yzZGd-QD5CQ) 列出了9个场景，并列出对应的监控来回答9个场景的问题

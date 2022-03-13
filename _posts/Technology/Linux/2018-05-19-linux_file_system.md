@@ -19,6 +19,14 @@ keywords: vfs file system
 
 文件系统以文件和树形目录的抽象逻辑概念代替了硬盘和光盘等物理设备中的数据块的概念，用户使用文件系统来保存数据时，只需要知道文件路径而不必关心数据实际保存在硬盘的数据块地址。设备上存储空间的分配和释放由文件系统自动完成，用户只需要记住数据被存入哪个文件即可。
 
+## IO 栈
+我们习惯了网络协议栈，但很少提io栈。[请描述一下文件的 io 栈？](https://mp.weixin.qq.com/s/IrZF9lWweEs1rhxuvMUCKA)
+1. IO 从用户态走系统调用进到内核，内核的路径：VFS → 文件系统 → 块层 → SCSI 层 。
+2. VFS （ Virtual File System 、Virtual FileSystem Switch ）层是 Linux **针对文件概念**封装的一层通用逻辑，它做的事情其实非常简单，就是把所有文件系统的共性的东西抽象出来，比如 file ，inode ，dentry 等结构体，**针对这些结构体抽象出通用的 api 接口**，然后具体的文件系统则只需要按照接口去实现这些接口即可，在 IO 下来的时候，VFS 层使用到文件所在的文件系统的对应接口。它的作用：为上层抽象统一的操作界面，在 IO 路径上切换不同的文件系统。
+3. 文件系统，**对上抽象一个文件的概念**，把数据按照策略存储到块设备上。文件系统管理的是一个线性的空间（分区，块设备），而用户看到的却是文件的概念，这一层的转化就是文件系统来做的。它负责把用户的数据按照自己制定的规则存储到块设备上。比如是按照 4K 切块存，还是按照 1M 切块存储，这些都是文件系统自己说了算。它这一层就是做了一层空间的映射转化，**文件的虚拟空间到实际线性设备的映射**。这层映射最关键的是 address_space 相关的接口来做。
+4. 块层，块层其实在真实的硬件之上又抽象了一层，屏蔽不同的硬件驱动，块设备看起来就是一个线性空间而已。**块层主要还是 IO 调度策略的实现**，尽可能收集批量 IO 聚合下发，让 IO 尽可能的顺序，合并 IO 请求减少 IO 次数等等；划重点：块层主要做的是 IO 调度策略的一些优化。比如最出名的电梯算法就是在这里。
+5. SCSI 层，SCSI 层这个就不用多说了，这个就是**硬件的驱动**而已，本质就是个翻译器。SCSI 层里面按照细分又会细分多层出来。它是给你的磁盘做最后一道程序，SCSI 层负责和磁盘硬件做转换，IO 交给它就能顺利的到达磁盘硬件。
+
 ## vfs 
 
 [从文件 I/O 看 Linux 的虚拟文件系统](https://www.ibm.com/developerworks/cn/linux/l-cn-vfs/index.html)
@@ -268,7 +276,37 @@ drvstus_t rfs_shutdown(device_t* devp,void* iopack){……}
 ```
 格式化操作并不是把设备上所有的空间都清零，而是在这个设备上重建了文件系统用于管理文件的那一整套数据结构。
 
+## Page Cache 
+[请描述一下文件的 io 栈？](https://mp.weixin.qq.com/s/IrZF9lWweEs1rhxuvMUCKA)**page cache 是发生在文件系统层**。通常我们确保数据落盘有两种方式：
+1. Writeback 回刷数据的方式：write 调用 + sync 调用；
+2. Direct IO 直刷数据的方式； 直接在用户路径上刷数据到磁盘，不走 PageCache 的逻辑，但并不是所有文件系统都会实现它。
 
+在文件系统这一层，当处理完了一些自己的逻辑之后，需要把数据写到块层去，无论是直刷还是回刷的方式，都是用到 address_space_operations 里面实现的方法：
+
+```c
+struct address_space_operations {
+    // 回刷的方式，走 Page Cache
+    int (*write_begin)(struct file *, struct address_space *mapping, loff_t pos, unsigned len, unsigned flags, struct page **pagep, void **fsdata);
+    int (*write_end)(struct file *, struct address_space *mapping, loff_t pos, unsigned len, unsigned copied, struct page *page, void *fsdata);
+    // 回刷的方式，走 Page Cache
+    int (*writepage)(struct page *page, struct writeback_control *wbc);
+    int (*readpage)(struct file *, struct page *);
+    int (*writepages)(struct address_space *, struct writeback_control *);
+    int (*readpages)(struct file *filp, struct address_space *mapping, struct list_head *pages, unsigned nr_pages);
+    void (*readahead)(struct readahead_control *);
+    // 直刷的方式
+    ssize_t (*direct_IO)(int, struct kiocb *, const struct iovec *iov, loff_t offset, unsigned long nr_segs);
+
+    // ...
+};
+```
+如果实现一个走 Page Cache 回刷功能的文件系统，那么至少要实现 .write_begin，.write_end，.write_page，.read_page 的接口。
+
+触发脏数据回刷的方式有多种：
+1. 时间久了，比如超过 30 秒的，那必须赶紧刷，因为夜长梦多；
+2. 量足够大了，比如脏页超过 100M 了，那必须赶紧刷，因为量越大，掉电丢数据的损失越大；
+3. 有人调用了 Sync ，那必须赶紧刷；
+刷这些脏数据，内核是作为任务交给了 kworker 的线程去做。简单来讲就是这是 kworker 会去挑选块设备对应的的一些脏“文件”，把这些对应的 page 内存刷到磁盘。回刷的实现是文件系统提供的 .write_page 或者 .write_pages 的接口。
 ## 挂载方式
 
 **如果将mount的过程理解为：inode被替代的过程。**除了将设备mount到rootfs上，根据被替代方式的不同，mount的花样可多了。

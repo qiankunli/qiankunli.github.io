@@ -13,7 +13,7 @@ keywords: serverless
 * TOC
 {:toc}
 
-一篇讲Serverless 的文章有一个留言：Serverless是在服务网格架构之后进行业务逻辑层的改造。
+一篇讲Serverless 的文章有一个留言：Serverless是在服务网格架构之后进行业务逻辑层的改造。Serverless 的核心理念是按需使用，自动弹性。**用户不需要容量规划**。
 
 ![](/public/upload/architecture/serverless_overview.png)
 

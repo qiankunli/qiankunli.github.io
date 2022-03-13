@@ -67,6 +67,10 @@ You can use these to implement different **recipes** that are required for clust
 
 ### etcd
 
+[深入剖析数据多版本 MVCC 机制](https://mp.weixin.qq.com/s/ObALUTMwHcl9H4B7oRAcTg)tcd 虽然有很多丰富的功能，也有它特殊的定位，但本质上也是一个存储系统。存储系统核心功能其实非常简单，聚焦三个操作：读写删。不过 etcd 有两个特色的功能：watch 机制和 MVCC 机制（ 数据多版本 ）。**MVCC 带来了什么？可靠的 watch 机制；简单的事务并发控制**。这两点其实非常容易理解，一个 key 的历史版本全部被记录，而不是覆盖更新，那这个对于 watch 就太友好了。毕竟历史都在这嘛，数据又安全读出来又方便。MVCC 的设计中，可以认为用户的删除都是标记删除，真正回收由一个叫做 compact 的操作来实现。
+
+[etcd原理剖析](https://mp.weixin.qq.com/s/ObALUTMwHcl9H4B7oRAcTg) 写的非常好。
+
 以ubuntu15.04 为例，用Systemd管理etcd，针对每个主机
 
 1. 下载文件  `https://github.com/coreos/etcd/releases`

@@ -135,7 +135,7 @@ Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组
 
 各个action 的主要逻辑
 
-1. Enqueue action 将`session.Jobs` 中符合条件的job 状态从pending 改为非pending（allocate 不处理pending状态的job） 。比如 一个job 申请的资源超过 所在queue 的capacity 则这个job 便在这个环节被过滤掉。PS： 按组调度的落地点
+1. Enqueue action 将`session.Jobs` 中符合条件的job 状态从pending 改为非pending（allocate 不处理pending状态的job，以免太多的pending task 进入处理逻辑，影响调度性能） 。比如 一个job 申请的资源超过 所在queue 的capacity 则这个job 便在这个环节被过滤掉。PS： 按组调度的落地点
 2. Allocate action负责通过一系列的预选和优选算法筛选出最适合的节点。
 3. Preempt action 为谁抢占? JobStarving 的job，主要是不够minAvailable 的job。谁来牺牲？preemptableFns， 用于同一个Queue中job之间的抢占。PS： 对应job 及task 的优先级字段，优先级也用于处理时的排队
 4. Reclaim action 为谁抢占？queue 配额还够但是 存在pending的task。谁来牺牲？reclaimableFns， 会尝试抢占其它Queue 已经running 的task。PS：对应queue.reclaimalble 配置。
