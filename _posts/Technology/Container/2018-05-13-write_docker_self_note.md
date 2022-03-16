@@ -120,7 +120,7 @@ docker 中这样做有两个场景：
 1. docker run	
 2. docker exec
 
-类似`docker ps` 本质就是到特定 位置读取文件数据，而command 可以看简单，也可以很复杂（比如tomcat等），此时就需要单独的进程来执行。更重要的是，`docker run` 要为command 创建独立的环境， `docker exec`要为 command 赋予 特定的环境。
+类似`docker ps` 本质就是到特定 位置读取文件数据，而command 可以看简单，也可以很复杂（比如tomcat等），此时就需要单独的进程来执行。更重要的是，`docker run` 要为command 创建独立的环境， `docker exec`要为 command 赋予 特定的环境。当你使用 `docker exec <existing-container><command>` 在现有容器中执行命令时，实际上是在运行（即 create 然后 start）一个全新的容器，该容器恰好重用了目标容器的所有命名空间
 
 ### 停止容器的本质是什么？
 

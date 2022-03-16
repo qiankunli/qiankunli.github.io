@@ -36,6 +36,15 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 随着我们对 K8s 的使用程度越来越深，会发现 K8s 面向 “工作负载” 的设计在一些场景下是需要提升的。围绕着这些问题的焦点，社区不断地在为 K8s 进行插件式的扩展。CNCF Landscape 中已有接近 400 个开源产品为 K8s 提供了额外能力，这些技术方向大致被分为了数据库、消息、应用定义和镜像构建等，产品数量仍然不断上升。
 
+## 对kubernetes 的扩展
+
+[如何基于 OpenKruise 打破原生 Kubernetes 中的容器运行时操作局限？](https://mp.weixin.qq.com/s/1nhtLc2ORBa2b0Z_ofNcSw)
+1. Kubernetes 的 API 层面限制了用户只能创建或删除 Pod ，除此之外，里面的容器只能做 Exec， Log 这样的操作。在 Kubernetes 接口层面，用户无法进行比如拉取镜像、重启容器等操作。
+2. CRI 的职责是对容器运行时以及对镜像做相关的管理，包括对容器的启停操作，对 Sandbox 容器的操作，容器 States 的数据采集，以及镜像的拉取和查询等操作。因此，CRI 提供了比较完善的容器接口
+3. Kubelet 目前没有提供任何 hook 解决 plugin 的这个操作，来让外层能去动态拓展 Kubelet 所做的事情。那是否可以加入一个与 Kubelet 类似的新组件，可以连接到 CRI API，来拓展 Kubernetes 容器进行时的操作呢？
+
+  ![](/public/upload/kubernetes/kubelet_cri_extend.png)
+
 ## 代码结构
 
 [Kruise 控制器分类指引](http://openkruise.io/zh-cn/blog/blog1.html)Controller 命名惯例

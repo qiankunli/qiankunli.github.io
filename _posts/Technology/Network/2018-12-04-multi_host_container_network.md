@@ -50,7 +50,9 @@ Kubernetes 网络大致分为两大类，使用不同的技术
 [深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)主机A上的实例(容器、VM等)如何与主机B上的另一个实例通信?有很多解决方案:
 
 1. 直接路由: BGP等
-2. 隧道: VxLAN, IPIP, GRE等
+2. 隧道: VxLAN, IPIP, GRE等。
+	1. ipip,gre: 主机互相维护对端的隧道地址
+	2. vxlan 通过主机的内核路由
 3. NAT: 例如docker的桥接网络模式
 4. 其它方式
 

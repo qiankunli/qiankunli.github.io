@@ -309,7 +309,7 @@ def main(unused_argv):
 ```
 
 ## 源码分析
-
+[[翻译] TensorFlow 分布式之论文篇 (1)](https://mp.weixin.qq.com/s/KHTFE3tinwwNEzDTnPJpXA)
 [分布式tensorflow源码解读2：MonitoredTrainingSession](https://zhuanlan.zhihu.com/p/91608555)
 1. 如果chief节点，负责session的初始化或者从已有checkpoint恢复session，并且创建一些用于保存checkpoint和summary的hooks。如果是非chief的worker节点，则需要依赖chief节点完成初始化或恢复session这些操作后才能设置属于自己的session。
 2. MonitoredTrainingSession可根据不同的角色去创建不同种类的Session，其中chief节点是由ChiefSessionCreator类去创建session，而非chief的worker节点是由WorkerSessionCreator类创建，特殊之处就是创建时调用的是wait_for_session()，大致意思是需要等待chief节点的session创建完成之后才去创建属于自己节点的session。

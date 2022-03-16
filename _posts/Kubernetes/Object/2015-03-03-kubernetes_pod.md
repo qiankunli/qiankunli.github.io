@@ -169,6 +169,27 @@ pause container 被称为 infrastructure container，中文有的文章简称 In
 
 **Pod 最重要的一个事实是：它只是一个逻辑概念。有了Pod，我们可以说Network Namespace和Volume 不是container A 的，也不是Container B的，而是Pod 的。**。[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)pause 容器作为同一个 Pod 中所有其他容器的基础容器，它为 Pod 中的每个业务容器提供了大量的 Pod 级别资源，这些资源都是 Linux 命名空间（包括网络命名空间，IPC 命名空间和 PID 命名空间）。
 
+## pod不只是一个概念
+
+[容器与Pod到底有什么区别和联系？](https://mp.weixin.qq.com/s/N5Vh5_AT_Pl0Und0W-Ljtg)Pod 的 cgroups 是什么样的？systemd-cgls 可以很好地可视化 cgroups 层次结构：
+```
+$ sudo systemd-cgls
+Control group /:
+-.slice
+├─kubepods
+│ ├─burstable
+│ │ ├─pod4a8d5c3e-3821-4727-9d20-965febbccfbb
+│ │ │ ├─f0e87a93304666766ab139d52f10ff2b8d4a1e6060fc18f74f28e2cb000da8b2
+│ │ │ │ └─4966 /pause
+│ │ │ ├─dfb1cd29ab750064ae89613cb28963353c3360c2df913995af582aebcc4e85d8
+│ │ │ │ ├─5001 /usr/bin/python3 /usr/local/bin/gunicorn -b 0.0.0.0:80 httpbin:app -k gevent
+│ │ │ │ └─5016 /usr/bin/python3 /usr/local/bin/gunicorn -b 0.0.0.0:80 httpbin:app -k gevent
+│ │ │ └─097d4fe8a7002d69d6c78899dcf6731d313ce8067ae3f736f252f387582e55ad
+│ │ │   └─5035 /bin/sleep 3650d
+...
+```
+所以，Pod 本身有一个cgroup父节点（Node），每个容器也可以单独调整。Pod 不仅仅是一组容器。Pod 是一个自给自足的高级构造。所有 Pod 的容器都运行在同一台机器（集群节点）上，它们的生命周期是同步的，并且通过削弱隔离性来简化容器间的通信。
+
 
 
 

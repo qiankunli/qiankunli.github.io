@@ -63,7 +63,7 @@ ip link add link DEVICE [ name ] NAME
 
 ### netfilter 
 
-[深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)Netfilter 是 Linux 内核内部的包过滤和处理框架。一些要点:
+[深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)Netfilter 是 Linux Kernel 的一种 hook 机制，可以理解成在数据包经过内核网络协议栈处理的过程中，需要经过很多的方法处理，在特定的方法中定义了 hook，所以这些 hook 会在内核方法执行前/执行后被调用和执行。Linux 提供了 5 个这样的 hook，分别是 pre-routing、input、forword、output、post-routing。处理数据包的能力主要包括修改、跟踪、打标签、过滤等。一些要点:
 1. 主机上的所有数据包都将通过 netfilter 框架
 2. 在 netfilter 框架中有5个钩子点: PRE_ROUTING, INPUT, FORWARD, OUTPUT, POST_ROUTING
 3. 命令行工具 iptables 可用于动态地将规则插入到钩子点中
