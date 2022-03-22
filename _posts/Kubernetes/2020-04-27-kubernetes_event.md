@@ -15,6 +15,7 @@ keywords:  Kubernetes event
 
 ## Kubernetes events 
 
+[彻底搞懂 Kubernetes 中的 Events](https://mp.weixin.qq.com/s/bgzZP6ZC0thePY_dltCRAg) 可以看一些细节。
 ### 是什么
 
 [Understanding Kubernetes cluster events](https://banzaicloud.com/blog/k8s-cluster-logging/)Kubernetes events are objects that show you what is happening inside a cluster, such as what decisions were made by the scheduler or why some pods were evicted from the node. All core components and extensions (operators) may create events through the API Server.

@@ -134,3 +134,5 @@ Embedding 优化
 1. 把嵌入层分布在多个 GPU 和多个节点上
 3. Embedding 层模型并行，dense 层数据并行。
 
+[阿里巴巴开源大规模稀疏模型训练/预测引擎DeepRec](https://mp.weixin.qq.com/s/aEi6ooG9wDL-GXVWcGWRCw)
+

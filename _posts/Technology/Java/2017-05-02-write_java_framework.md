@@ -32,6 +32,7 @@ xxx
 
 ## spi
 
+[阅读 Flink 源码前必知必会 - SPI 和 ClassLoader](https://mp.weixin.qq.com/s/PtmlneRo6AG4Fyb8y-Bvrw)在框架设计中，要遵循的原则是对扩展开放，对修改关闭，保证框架实现对于使用者来说是黑盒。因为框架不可能做好所有的事情，只能把共性的部分抽离出来进行流程化，然后留下一些扩展点让使用者去实现，这样不同的扩展就不用修改源代码或者对框架进行定制。
 
 ### 概念
 [JDK/Dubbo/Spring 三种 SPI 机制，谁更好？](https://mp.weixin.qq.com/s/6SU1BPvNTCv_fhnMx3GhLw) SPI 的本质是将接口实现类的全限定名配置在文件中，并由服务加载器读取配置文件，加载实现类。
@@ -66,6 +67,76 @@ public class ServiceBootstrap {
 
 `ServiceLoader.load(IUserService.class)`即可得到IUserService实例。
 
+```java
+public static <S> ServiceLoader<S> load(Class<S> service) {
+	// 获取当前线程的上下文类加载器。ContextClassLoader 是每个线程绑定的
+	ClassLoader cl = Thread.currentThread().getContextClassLoader();
+	return ServiceLoader.load(service, cl);
+}
+```
+Thread.currentThread().getContextClassLoader();  使用这个获取的类加载器是 AppClassLoader，会去加载 classpath 的类。 ServiceLoader 核心的逻辑就在nextService方法里
+
+```java
+private S nextService() {
+	if (!hasNextService())
+		throw new NoSuchElementException();
+	String cn = nextName;
+	nextName = null;
+	Class<?> c = null;
+	try {
+		// 加载这个类
+		c = Class.forName(cn, false, loader);
+	} catch (ClassNotFoundException x) {
+		fail(service,
+				"Provider " + cn + " not found");
+	}
+	if (!service.isAssignableFrom(c)) {
+		fail(service,
+				"Provider " + cn  + " not a subtype");
+	}
+	try {
+		// 初始化这个类
+		S p = service.cast(c.newInstance());
+		providers.put(cn, p);
+		return p;
+	} catch (Throwable x) {
+		fail(service,
+				"Provider " + cn + " could not be instantiated",
+				x);
+	}
+	throw new Error();          // This cannot happen
+}
+private boolean hasNextService() {
+	if (nextName != null) {
+		return true;
+	}
+	if (configs == null) {
+		try {
+			// 寻找 META-INF/services/类
+			String fullName = PREFIX + service.getName();
+			if (loader == null)
+				configs = ClassLoader.getSystemResources(fullName);
+			else
+				configs = loader.getResources(fullName);
+		} catch (IOException x) {
+			fail(service, "Error locating configuration files", x);
+		}
+	}
+	while ((pending == null) || !pending.hasNext()) {
+		if (!configs.hasMoreElements()) {
+			return false;
+		}
+		// 解析这个类文件的所有内容
+		pending = parse(service, configs.nextElement());
+	}
+	nextName = pending.next();
+	return true;
+}
+```
+
+JDK SPI 在查找扩展实现类的过程中，需要遍历 SPI 配置文件中定义的所有实现类（寻找 META-INF/services/类，解析类的内容，构造 Class），该过程中会将这些实现类全部实例化。PS: 本质上是 扩展了classloader的实现，**SPI 是classloader 的一种应用**。
+
+缺点：JDK SPI 在查找扩展实现类的过程中，需要遍历 SPI 配置文件中定义的所有实现类，该过程中会将这些实现类全部实例化。如果 SPI 配置文件中定义了多个实现类，而我们只需要使用其中一个实现类时，就会生成不必要的对象。
 
 ### 与api 对比
 

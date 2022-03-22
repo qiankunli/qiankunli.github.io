@@ -15,7 +15,7 @@ keywords:  mpi
 
 预测就是对样本执行前向传播的过程。
 
-1. 在线预测
+1. 在线预测。但一般也是批量请求，在推荐场景下，input 一般是`<uid,itemId>`，根据uid/itemId 查询各种特征，组成input tensor查询推理服务，output 是uid和itemId 评分，itemId 一般有多个。
 2. 批量预测
 
 ## 模型保存与加载
