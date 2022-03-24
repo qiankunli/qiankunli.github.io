@@ -118,7 +118,7 @@ Pandas 有两种自己独有的基本数据结构：Series 和 DataFrame，其�
 
 ### DataFrame
 
-DataFrame 的需求来源于把数据看成矩阵和表。但是，矩阵中只包含一种数据类型，未免过于受限；同时，关系表要求数据必须要首先定义 schema。对于 DataFrame 来说，它的列类型可以在运行时推断，并不需要提前知晓，也不要求所有列都是一个类型。因此，DataFrame 可以理解成是关系系统、矩阵、甚至是电子表格程序（典型如 Excel）的合体。
+DataFrame 的需求来源于把数据看成矩阵和表。但是，矩阵中只包含一种数据类型，未免过于受限；同时，关系表要求数据必须要首先定义 schema。对于 DataFrame 来说，它的列类型可以在运行时推断，并不需要提前知晓，也不要求所有列都是一个类型。因此，DataFrame 可以理解成是关系系统、矩阵、甚至是电子表格程序（典型如 Excel）的合体。PS: spark 中也有dataframe的概念
 
 DataFrame 是一个二维带标记的数据结构，**每column 数据类型可以不同**。假设有一个学生表，想知道是女生多还是男生多，用sql 来表示就是`select sex,count(*) from student group by sex`。那么给定一个数据集/csv文件等，如何用python 做类似的分析呢？[pandas与sql 对比,持续更新...](https://blog.csdn.net/weixin_39791387/article/details/81391621)
 

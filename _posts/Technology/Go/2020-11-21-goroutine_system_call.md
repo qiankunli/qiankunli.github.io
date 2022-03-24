@@ -15,7 +15,11 @@ keywords: Go goroutine scheduler
 
 Please remember that at the end of the day, all programs that work on UNIX machines end up using C system calls to communicate with the UNIX kernel and perform most of their tasks. 所有在 UNIX 系统上运行的程序最终都会通过 C 系统调用来和内核打交道。用其他语言编写程序进行系统调用，方法不外乎两个：一是自己封装，二是依赖 glibc、或者其他的运行库。Go 语言选择了前者，把系统调用都封装到了 syscall 包。封装时也同样得通过汇编实现。
 
-异步系统调用 G 会和MP分离（G挂到netpoller），同步系统调用 GM 会和P分离（P另寻M），生动的说明了GPM相对GM的精妙之处。
+当M一旦进入系统调用后，会脱离go runtime的控制。试想万一系统调用阻塞了呢，此时又无法进行抢占，是不是整个M也就罢工了。所以为了维持整个调度体系的高效运转，必然要在进入系统调用之前要做点什么以防患未然。
+1. 异步系统调用 G 会和MP分离（G挂到netpoller）
+2. 同步系统调用 MG 会和P分离（P另寻M），当M从系统调用返回时，不会继续执行，而是将G放到run queue。
+
+生动的说明了GPM相对GM的精妙之处。
 
 ## 阻塞
 
@@ -131,7 +135,6 @@ func sysmon() {
 
 在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.在 go 运行时中也有类似的协程 sysmon. sysmon 运行在 M，且不需要 P。它会每隔一段时间**检查 Go 语言runtime**，确保程序没有进入异常状态。
 
-
 sysmon 每 20us~10ms 启动一次，功能比较多: 
 
 1. 检查死锁runtime.checkdead 
@@ -141,4 +144,6 @@ sysmon 每 20us~10ms 启动一次，功能比较多:
 6. 打印调度信息,归还内存等定时任务.
 7. 释放闲置超过 5 分钟的 span 内存；如果超过 2 分钟没有垃圾回收，强制执行；
 7. 收回因 syscall 长时间阻塞的 P；
+
+
 

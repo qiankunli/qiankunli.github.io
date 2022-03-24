@@ -83,7 +83,7 @@ static void scheduler(void) {
 
 ![](/public/upload/go/go_scheduler_gm.jpg)
 
-在这个阶段，**goroutine 调度跟 java 的ThreadPool 是一样一样的，除了io操作会阻塞线程外，java Executor也可以视为一个用户态线程调度框架**。runnable 表示运行逻辑 提交到queue，ThreadPool 维持多个线程 从queue 中取出runnable 并执行。调度器本身（schedule 方法），在正常流程下，是不会返回的，也就是不会结束主流程。schedule 会不断地运行调度流程，GoroutineA 完成了，就开始寻找 GoroutineB，寻找到 B 了，就把已经完成的 A 的调度权交给 B，让 GoroutineB 开始被调度，一直继续下去。当然了，也有被正在阻塞（Blocked）的 G。假设 G 正在做一些系统、网络调用，那么就会导致 G 停滞。这时候 M（系统线程）就会被会重新放内核队列中，等待新的一轮唤醒。
+在这个阶段，**goroutine 调度跟 java 的ThreadPool 是一样一样的**，除了io操作会阻塞线程外，java Executor也可以视为一个用户态线程调度框架。runnable 表示运行逻辑 提交到queue，ThreadPool 维持多个线程 从queue 中取出runnable 并执行。调度器本身（schedule 方法），在正常流程下，是不会返回的，也就是不会结束主流程。schedule 会不断地运行调度流程，GoroutineA 完成了，就开始寻找 GoroutineB，寻找到 B 了，就把已经完成的 A 的调度权交给 B，让 GoroutineB 开始被调度，一直继续下去。当然了，也有被正在阻塞（Blocked）的 G。假设 G 正在做一些系统、网络调用，那么就会导致 G 停滞。这时候 M（系统线程）就会被会重新放内核队列中，等待新的一轮唤醒。
 
 ### GPM模型
 
@@ -105,18 +105,17 @@ static void schedule(void) {
 
 ![](/public/upload/go/go_scheduler_gpm.jpg)
  
- **为什么引入Processor 的概念？为什么把全局队列打散？** 它存在的意义在于实现工作窃取（work stealing）算法
- 1. 在没有 P 的情况下，所有的 G 只能放在一个全局的队列中。对全局队列的操作均需要竞争同一把锁，mutex 需要保护所有与 goroutine 相关的操作（创建、完成、重排等）， 导致伸缩性不好. 
- 2. GM 模型下一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。
+为什么引入Local Run Queue？它存在的意义在于实现工作窃取（work stealing）算法
+1. 在没有 P 的情况下，所有的 G 只能放在一个全局的队列中。对全局队列的操作均需要竞争同一把锁，mutex 需要保护所有与 goroutine 相关的操作（创建、完成、重排等）， 导致伸缩性不好. 
+2. GM 模型下一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。
 
- [The Go scheduler](https://morsmachine.dk/go-scheduler)为什么我们需要P？我们不能把任务队列直接挂载到M上而去掉P吗？就像linux 那样为每个cpu维护了一个 runqueue 结构
+[The Go scheduler](https://morsmachine.dk/go-scheduler)就像linux 那样为每个cpu维护了一个 runqueue 结构
 
- ![](/public/upload/linux/cpu_runqueue.jpg)
- 
- 答案是不行。如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行。将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行。对runq 及相关信息进行抽象 得到P，我们通过P把任务队列挂载到其它线程中。**M 并不保留 G 状态，这是 G 可以跨 M 调度的基础**。
- 
+![](/public/upload/linux/cpu_runqueue.jpg)
 
-[Go: Goroutine, OS Thread and CPU Management](https://medium.com/a-journey-with-go/go-goroutine-os-thread-and-cpu-management-2f5a5eaf518a) 来讲述GPM时，用到了 orchestration 这个词,   Go has its own scheduler to **distribute goroutines over the threads**. This scheduler defines three main concepts
+[从Golang调度器的作者视角探究其设计之道](https://mp.weixin.qq.com/s/mH23ola6B_n8N9PRc1kpPw)**为什么引入Processor 的概念？**计算（M）存储(P)分离。把Local Run Queue及相关存储资源都挪到P 上去。
+1. 存在 一个 Local Run Queue ，且 Local Run Queue 不能挂在 M 上。 如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行。将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行。对runq 及相关信息进行抽象 得到P，我们通过P把任务队列挂载到其它线程中。**M 并不保留 G 状态，这是 G 可以跨 M 调度的基础**。
+2. GM 模型 一些内存资源（比如malloc cache等）是绑定在线程上面的，会导致线程数量和资源占用规模紧耦合。当线程数量多的时候，资源消耗也会比较大。
 
 ## goroutine调度模型的四个抽象及其数据结构
 
@@ -285,6 +284,8 @@ g0  g                   // m0的g0，也就是m0.g0 = &g0
 此外 g0 has a fix and larger stack. This allows Go to perform operations where a bigger stack is needed. 比如 Goroutine creation, Defer functions allocations, Garbage collector operations
 
 除了每个M都拥有属于它自己的g0外，还存在一个runtime.g0。runtime.g0用于执行引导程序，它运行在Go程序拥有的第一个内核线程之中，这个线程也称为runtime.m0，runtime.m0的g0就是runtime.g0。
+
+Go runtime还会用Background thread来运行一些相对特别的G（如 Network Poller、Timer）
 
 ## 补充
 
