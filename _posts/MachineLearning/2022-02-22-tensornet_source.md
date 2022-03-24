@@ -8,10 +8,10 @@ keywords: tensornet
 
 ---
 
-## 简介
-
 * TOC
 {:toc}
+
+## 简介
 
 [tensorflow ML框架外接ps方案](https://mp.weixin.qq.com/s/lLI8JrWNQMPW3uSYf2bX7w) 可以看到一些扩展tf的思路
 
