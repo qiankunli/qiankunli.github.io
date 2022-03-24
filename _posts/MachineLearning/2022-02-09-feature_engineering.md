@@ -50,6 +50,13 @@ keywords: feature engineering
 2. 包裹式 Wrapper
 3. 嵌入式 embedding 
 
+## 特征准入和淘汰
+
+商业场景中，时时刻刻都会有新的样本产生，新的样本带来新的特征。有一些特征出现频次较低，如果全部加入到模型中，一方面对内存来说是个挑战，另外一方面，低频特征会带来过拟合。因此XDL针对这样的数据特点，提供了一些特征准入机制，包括基于概率进行过滤，布隆过滤器等。
+
+有一些特征长时间不更新会失效。为了缓解内存压力，提高模型的时效性，需要淘汰过时的特征，XDL支持算法开发者，通过写用户自定义函数(UDF)的方式，制定淘汰规则。
+
+
 ## tf 特征处理 feature column
 
 [TensorFlow Feature Column性能可以这样玩](https://mp.weixin.qq.com/s/9lu0WQZHLC0XvyfSjaEK4w)Feature Column是TensorFlow提供的用于处理结构化数据的工具，是将**样本特征**映射到用于**训练模型特征**的桥梁。[看Google如何实现Wide & Deep模型（2.1）](https://zhuanlan.zhihu.com/p/47965313)**Feature Column本身并不存储数据，而只是封装了一些预处理的逻辑**。

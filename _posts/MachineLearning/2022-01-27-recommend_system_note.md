@@ -136,7 +136,7 @@ val samplesWithUserFeatures = addUserFeatures(samplesWithMovieFeatures)
 
 ### 以Embedding+MLP 模型为例
 
-Embedding+MLP 模型：对于类别特征，先利用 Embedding 层进行特征稠密化，再利用 Stacking 层连接其他特征，输入 MLP 的多层结构，最后用 Scoring 层预估结果。
+Embedding+MLP 模型：对于类别特征，先利用 Embedding 层进行特征稠密化，再利用 Stacking 层连接其他特征，输入 MLP 的多层结构，最后用 Scoring 层预估结果。embedding部分通过训练学习到特征的表示，而MLP/DNN部分基于输入embedding来预估分数。
 
 ![](/public/upload/machine/recsys_embedding_mlp.png)
 

@@ -88,7 +88,16 @@ keywords: feature engineering
 
 ## ps server 优化
 
-第一手的材料 就是李沐大神的 论文[Scaling Distributed Machine Learning with the Parameter Server](https://web.eecs.umich.edu/~mosharaf/Readings/Parameter-Server.pdf) **巨大的模型其实就是巨大的参数**。以及一个大神的简单 c实现 [Superjomn/SwiftSnails](https://github.com/Superjomn/SwiftSnails)
+第一手的材料 就是李沐大神的 论文[Scaling Distributed Machine Learning with the Parameter Server](https://web.eecs.umich.edu/~mosharaf/Readings/Parameter-Server.pdf) **巨大的模型其实就是巨大的参数**。 [Parameter Server分布式训练概述(上篇)](https://zhuanlan.zhihu.com/p/263057468)
+
+以及一个大神的简单 c实现 [Superjomn/SwiftSnails](https://github.com/Superjomn/SwiftSnails)
+
+### 为什么弄一个ps server
+
+1. 分布式训练是一种特殊的分布式计算，反向传播时涉及到梯度的汇总与计算，相对于一般的spark/mapreduce 就复杂了不少
+2. 单节点的内存容量支持的模型大小有限。（embedding 的特点使得worker 每次只需要pull 部分weight， 一些optimizer 算法 可能要花费两三倍 weight的空间）。
+
+以往的分布式计算，比如mapreduce的原理，是将任务和数据分配到多个节点中做并行计算，来缩短任务的执行时间。对于分布式训练来说，同样是希望将训练任务部署到多个节点上并行计算，**但是因为反向传播涉及到梯度的汇总和权重的更新，相比之前的分布式计算更加复杂**。也有采用hadoop或者spark的分布式训练，用单个driver或者master节点来汇总梯度及更新权重，但是受限于单节点的内存容量，支持的模型大小有限。另外，集群中运行最慢的那个worker，会拖累整个训练的迭代速度。为了解决这些问题，Parameter Server做了新的设计。
 
 分布式常用的2种模式有ParameterServer 和 AllReduce/RingAllReduce。随着开源框架的火热迭代，再者 GPU 显存也越来越大，AllReduce 模式研究的更多一点。毕竟大多数研究的还是 dense 模型，就算上百层的网络，参数也大不到哪去。所以很多训练都是数据并行，每个节点可以存储完整的模型参数。但是像 CTR 这类用到大规模离散特征的，本质也是一个大规模离散模型，一般称为 sparse 模型。几百 G 的模型很常见，一个节点也不太可能放的下。这时候 parameter Server 模型更加适用一些。
 
@@ -98,9 +107,11 @@ keywords: feature engineering
 
 ### 异步
 
-每个worker 互相不干扰，各自 pull 参数，然后计算梯度后，再通过 push 将梯度值回传给 server。server 再汇总所有 worker 的梯度结果后一起更新最终参数。这里有2个问题
-1. 一个是有同步更新还是异步更新，虽然各有利弊，但一般都是采取异步。
-2. 另一个问题是pull-计算-push 这个操作太频繁，通信有压力，拖慢计算。所以可以采取时效性不那么高的方法，就是不必每次都 pull 和 push，比如可以隔3次 pull 一下，隔5次 push 一下。经过多轮训练后，模型的参数就训练完了。
+每个worker 互相不干扰，各自 pull 参数，然后计算梯度后，再通过 push 将梯度值回传给 server。server 再汇总所有 worker 的梯度结果后一起更新最终参数。这里的异步有2个方面
+1. optimizer 更新参数
+    1. 同步训练：每一轮迭代所有worker都要保持同步，每个worker只进行一次前向和后向计算，server收集所有worker的梯度求平均并更新参数，然后进行下一轮迭代。对于同步训练，每一次迭代的训练速度，取决于整个系统中最慢的worker和最慢的server。
+    2. 异步训练，每个worker各自进行前后向计算，不需要等待其他worker，持续地进行迭代。而在server侧， 只要有worker push新的梯度过来，就会更新参数。
+2. 另一个问题是pull-计算-push 这个操作太频繁，通信有压力，拖慢计算。所以可以采取时效性不那么高的方法，就是不必每次都 pull 和 push，比如worker计算出第10次迭代的梯度之后，立即进行第11次迭代，而不需要pull新的权重过来，没有等待时间，效率较高；
 
 [机器学习参数服务器ps-lite (1) ----- PostOffice](https://mp.weixin.qq.com/s/4scg6j0ae8IxyGHEOAXHcg)
 1. 参数服务器是机器学习领域的分布式内存数据库，其作用是存储模型和更新模型。
@@ -108,9 +119,7 @@ keywords: feature engineering
 
 [重温经典之ps-lite源码解析(1)：基础](https://zhuanlan.zhihu.com/p/467650462)在纯异步的ASP模式中，每台worker在发送完自己的梯度后，不用等其他worker，就可以开始训练下一个batch的数据。由于无须同步，ASP的性能优势比较明显。但是，的确存在可能性，一个非常慢的worker基于老参数计算出过时梯度，传到server端会覆盖一些参数的最新进展。但是在实际场景下，由于推荐系统的特征空间是超级稀疏的，因此两个worker同时读写同一feature造成冲突的可能性还是较低的，因此纯异步ASP模式的应用还是比较普遍的。
 
-[浅谈工业界分布式训练（一）](https://mp.weixin.qq.com/s/hErbnqv49xTqjJANtL-G0Q)同步更新虽然可以保证Consistency，但由于各节点计算能力不均衡无法保证性能，而异步更新或者半同步更新并没有理论上的收敛性证明，Hogwild!算法证明了异步梯度下降在凸优化问题上按概率收敛，而深度学习问题一般面对的是非凸问题，所以无论异步和半同步算法都无收敛性的理论保障。所以**只是根据经验，大部分算法在异步更新是可以收敛**，求得最优或者次优解（其实现在无论是学术界和工业界，深度学习只要效果好就行）。当然目前比较好的方式针对针对SparseNet部分( 低IO pressure, 但高memory consumption)，DenseNet部分 (高IO pressure，但低memory consumption)的特点，对sparsenet进行异步更新（因为Embedding Lookuptable的更新是稀疏的，冲突概率低），DenseNet采用同步更新/AllReduce的方式尽量逼近同步训练的效果。
-
-hogwild 一般特指 parameter server 最常见的用法：完全无锁的异步训练。hogwild 这个术语本身在学术界用的更多，工程上用的比较少了。
+[浅谈工业界分布式训练（一）](https://mp.weixin.qq.com/s/hErbnqv49xTqjJANtL-G0Q)同步更新虽然可以保证Consistency，但由于各节点计算能力不均衡无法保证性能，而异步更新或者半同步更新并没有理论上的收敛性证明，Hogwild!算法证明了异步梯度下降在凸优化问题上按概率收敛，而深度学习问题一般面对的是非凸问题，所以无论异步和半同步算法都无收敛性的理论保障。所以**只是根据经验，大部分算法在异步更新是可以收敛**，求得最优或者次优解（其实现在无论是学术界和工业界，深度学习只要效果好就行）。当然目前比较好的方式针对针对SparseNet部分( 低IO pressure, 但高memory consumption)，DenseNet部分 (高IO pressure，但低memory consumption)的特点，对sparsenet进行异步更新（因为Embedding Lookuptable的更新是稀疏的，每个worker更新不同的特征，冲突率较低），DenseNet采用同步更新/AllReduce的方式尽量逼近同步训练的效果。PS：为了防止模型不收敛，**一般框架同步异步都会支持**。hogwild 一般特指 parameter server 最常见的用法：完全无锁的异步训练。hogwild 这个术语本身在学术界用的更多，工程上用的比较少。
 
 
 ### 分布式
@@ -328,7 +337,9 @@ class PServer(elasticdl_pb2_grpc.PServerServicer):
     def push_model(self, request):
         model = request.model
         ... # initialize model in this PS instance
-
+```
+pull和push是ps中的重要操作。
+```python
 class Worker(object):
     ...
     def pull_variable(self):
@@ -350,22 +361,6 @@ class Worker(object):
 
 [一文梳理推荐系统中Embedding应用实践](https://mp.weixin.qq.com/s/9vnCX4IuHsA3hUi6t0Y0KQ)**在自然语言中，非端到端很常见**，因为学到一个好的的词向量表示，就能很好地挖掘出词之间的潜在关系，那么在其他语料训练集和自然语言任务中，也能很好地表征这些词的内在联系，预训练的方式得到的Embedding并不会对最终的任务和模型造成太大影响，但却能够「提高效率节省时间」，这也是预训练的一大好处。但是**在推荐场景下，根据不同目标构造出的序列不同，那么训练得到的Embedding挖掘出的关联信息也不同**。所以，「在推荐中要想用预训练的方式，必须保证Embedding的预训练和最终任务目标处于同一意义空间」，否则就会造成预训练得到Embedding的意义和最终目标完全不一致。比如做召回阶段的深度模型的目标是衡量两个商品之间的相似性，但是CTR做的是预测用户点击商品的概率，初始化一个不相关的 Embedding 会给模型带来更大的负担，更慢地收敛。
 
-
-
-[TensorNet——基于TensorFlow的大规模稀疏特征模型分布式训练框架](https://mp.weixin.qq.com/s/v8HqeR7UYFs4Ex5p5tFyVQ)对于最简单的wide&deep模型，如果在一个广告系统中有3亿用户，那么就需要定义一个维度为3亿的embedding矩阵，在训练模型时需要在这个3亿维的矩阵上做embedding_lookup得到当前batch内的用户的embedding信息，近而在embedding之上做更加复杂的操作。
-
-![](/public/upload/machine/ps_embedding.png)
-
-TensorNet使用一个较小的，可以容纳特征在一个batch内所有数据的embedding矩阵代替TensorFlow默认实现中需要定义的较大的embedding矩阵。
-
-TensorNet异步训练架构
-1. TensorNet将sparse参数和与dense参数分别使用不同的parameter server管理。
-2. TensorNet不设单独的parameter server节点。在每个worker中都会维护一个sparse paramter server和dense parameter server。这省去了开发人员管理ps节点和worker节点的不少麻烦。
-3. TensorNet将模型的所有dense参数合并后使用分布式数组切分到不同的机器上，每次pull和push参数的时候只有一次网络请求。相较于TensorFlow对每个tensor都有一次网络请求的方法极大的减少了网络请求的次数从而提升了模型训练的速度。
-
-TensorNet同步训练架构
-1. TensorNet使用单独的sparse parameter server节点保存所有sparse参数。通过parameter server可以解决TensorFlow支持的sparse特征维度不能太大的问题。
-2. TensorNet对sparse参数做了特殊的定制化的同步。TensorNet在训练时只同步当前训练的batch所关注的稀疏特征，相较于TensorFlow会将所有参数都同步的模式通信数据减少到了原来的万分之一，乃至十万分之一。
 
 [TensorFlow在推荐系统中的分布式训练优化实践](https://mp.weixin.qq.com/s/LjdHBEyQhJq3ptMj8XVT-w)在原生的TensorFlow中构建Embedding模块，用户需要首先创建一个足够装得下所有稀疏参数的Variable，然后在这个Variable上进行Embedding的学习。
 
@@ -392,11 +387,37 @@ user_emb_col = tf.feature_column.embedding_column(user_col, 10)
 allreduce 和 alltoall 都会使用 nccl 进行同步通信，效率较高。hb 进行 alltoall 时，通信的是稀疏梯度，而不是完整的参数，通信量上和 ps 是一致的，但是通信效率会更高。
 
 
+## 系统架构
 
-## 其它
+[Parameter Server分布式训练概述(下篇)](https://zhuanlan.zhihu.com/p/264828885)
+
+### XDL
+XDL 包含 server和worker两类节点，既可以是物理节点，即server和worker分别部署在不同的物理机上，**也可以是逻辑节点**，即server和worker以进程的方式部署在同一台物理机上。后者是目前ps的主流做法，好处是减少了跨物理机之间的通信。
+
+训练过程包括前向和后向计算。前向计算中，worker获取训练数据，给server发送特征ID请求，server查找对应的embedding向量并返回给worker，同时worker还要从server拉取最新的dense net，worker对embedding向量做pooling，例如求和或者平均，然后送入dense net进行计算。这部分还是worker的pull操作。后向计算，worker计算出sparse net和dense net的梯度之后发送给server，server收集到所有梯度之后，采用sgd/adagrad等各类优化算法对权重或参数做更新。这部分是worker的push操作。对于一些比较复杂的优化算法，例如，adagrad，adam等，训练过程需要累积梯度或者梯度平方项，这些累积项都存储在server中，server侧基于这些累积项和收集到的梯度，对模型权重做更新。PS： **对应的代码是哪块？ 有助于分析一些框架与tf的关系**
+
+对于sparse net来说，因为特征规模庞大，所以需要较大的存储空间，又由于特征稀疏的特点，所以每一次只需要查找少量的embedding向量。所以**sparse net具有存储大，但是I/O小**的特点。dense net占用的存储空间较小，但是每一次训练需要拉取全部的参数，所以**dense net对内存要求不大，但是对I/O要求很高**。XDL采用不同的方式对两种网络进行管理。对于sparse net，使用hashmap做key-value存储，并且将所有的embedding向量均匀分布在各个server节点中，这对于缓解单个server节点的存储压力和通信都有帮助。dense net同样也均匀分割到所有server节点中。
+
+在生产环境中容错是必不可少的，否则如果机器出现故障导致从头开始训练，会带来时间和资源的浪费。在训练过程中，server会保存模型的快照，可以理解为checkpoint。调度器会根据心跳来监控server的状态，如果检查到server出现异常，任务就会中断，等到server恢复正常后，调度器会通知server加载最近一次的快照继续训练。对于worker来说，训练过程中所有worker会把数据的读取状态上传到server中，如果worker失败之后恢复正常，worker会从server请求读取状态，在数据中断的地方继续训练，这样可以避免样本丢失，或者重复训练等问题。
+
+### tensornet
+
+参见 [tensornet源码分析](http://qiankunli.github.io/2022/02/22/tensornet_source.html)
+
+## 扩展tf
 
 [第一视角：深度学习框架这几年](https://mp.weixin.qq.com/s/MEy_aGOUeWPDcQnI9-M5Bg) 
 1. 推荐场景在电商，视频，资讯等众多头部互联网公司的火爆导致推荐系统对AI硬件的消耗在互联网公司超过了传统NLP，CV，语音等应用的总和。
 2. 无量一开始采用的是基于参数服务器的架构。对tf 的改造有两个方向
     1. 把TensorFlow作为一个本地执行的lib，在外围开发，TensorFlow被复用来提供Python API以及完成基础算子的执行。而参数服务器，分布式通信等方面则是自己开发，没有复用TensorFlow。
     2. 基于TensorFlow底层进行改造，研发难度会比较大，而且很可能与社区版TensorFlow走向不同的方向，进而导致TensorFlow版本难以升级。
+
+[阿里巴巴开源大规模稀疏模型训练/预测引擎DeepRec](https://mp.weixin.qq.com/s/aEi6ooG9wDL-GXVWcGWRCw)在TensorFlow引擎上支持大规模稀疏特征，业界有多种实现方式
+1. 最常见的方式是借鉴了ParameterServer的架构实现，在TensorFlow之外独立实现了一套ParameterServer和相关的优化器，同时在TensorFlow内部通过bridge的方式桥接了两个模块。
+2. TensorFlow是一个基于Graph的静态图训练引擎，在其架构上有相应的分层，比如最上层的API层、中间的图优化层和最下层的算子层。
+   1. 基于存储/计算解耦的设计原则在Graph层面引入EmbeddingVariable功能；
+   2. 基于Graph的特点实现了通信的算子融合。
+3. [TensorFlow 模型准实时更新上线的设计与实现](https://mp.weixin.qq.com/s/JGbELXp0aLn9n7JE1wQXvA) 针对已有算子 重新实现（比如tensor保存在第三方kv），然后将graphdef 中已有算子替换为自己实现的对应算子。
+
+有的时候，一些框架也不是在扩展tf，而是把 tf 当时一个库在用（用它的前向和反向）。扩展方式五花八门的，不像 k8s 有明确的csi cri cni 接口要遵守
+

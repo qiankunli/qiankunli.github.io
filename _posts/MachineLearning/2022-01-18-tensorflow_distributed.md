@@ -328,7 +328,7 @@ def main(unused_argv):
           init_fn(sess)
       return sess
   ```
-原生的tf 根据 grad 的类型 来决定更新weight/ variable 的方法。Optimizer 实现了 梯度计算、更新的整体流程， 根据不同的梯度计算策略 对应不同的 Optimizer 子类，子类实现Optimizer 暴露的抽象方法即可。
+Optimizer 实现了 梯度计算、更新的整体流程， 根据不同的梯度计算策略 对应不同的 Optimizer 子类，子类实现Optimizer 暴露的抽象方法即可。
 ```python
 # tensorflow/tensorflow/python/training/optimizer.py
 class Optimizer(object):
@@ -358,7 +358,7 @@ class _RefVariableProcessor(_OptimizableVariable):
       return optimizer._apply_sparse_duplicate_indices(g, self._v)
 ```
 
-[tensorflow分布式源码解读4：AdamOptimizer](https://zhuanlan.zhihu.com/p/99071481)当传来的梯度是普通tensor时，调用_apply_dense方法去更新参数；当传来的梯度是IndexedSlices类型时，则去调用optimizer._apply_sparse_duplicate_indices函数。其中IndexedSlices类型是一种可以存储稀疏矩阵的数据结构，只需要存储对应的行号和相应的值即可。
+[tensorflow分布式源码解读4：AdamOptimizer](https://zhuanlan.zhihu.com/p/99071481)原生的tf 根据 梯度/grad 的类型 来决定更新weight/ variable 的方法，当传来的梯度是普通tensor时，调用_apply_dense方法去更新参数；当传来的梯度是IndexedSlices类型时，则去调用optimizer._apply_sparse_duplicate_indices函数。Embedding 参数的梯度中包含每个 tensor 中发生变化的数据切片 IndexedSlices。IndexedSlices类型是一种可以存储稀疏矩阵的数据结构，只需要存储对应的行号和相应的值即可。
 
 ```python
 # tensorflow/tensorflow/python/framework/ops.py

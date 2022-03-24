@@ -161,11 +161,17 @@ root     32901 32794  0 00:01 pts/0    00:00:00 ps -ef
 
 ![](/public/upload/linux/perf_event.png)
 
-[perf](https://perf.wiki.kernel.org/index.php/Main_Page) began as a tool for using the performance counters subsystem in Linux, and has had various enhancements to add tracing capabilities. linux 有一个performance counters，perf 是这个子系统的外化。
+[perf](https://perf.wiki.kernel.org/index.php/Main_Page) began as a tool for using the performance counters subsystem in Linux, and has had various enhancements to add tracing capabilities. linux 有一个performance counters，perf 是这个子系统的外化。perf是性能分析的必备工具, 它最核心的能力是能访问硬件上的Performance Monitor Unit (PMU)。
 
 Performance counters are CPU hardware registers that count hardware events such as instructions executed, cache-misses suffered, or branches mispredicted. They form a basis for **profiling applications** to trace dynamic control flow and identify hotspots. perf provides rich generalized abstractions over hardware specific capabilities. Among others, it provides per task, per CPU and per-workload counters, sampling on top of these and source code event annotation.
 
 Tracepoints are instrumentation points placed at logical locations in code, such as for system calls, TCP/IP events, file system operations, etc. These have negligible(微不足道的) overhead when not in use, and can be enabled by the perf command to collect information including timestamps and stack traces. perf can also dynamically create tracepoints using the kprobes and uprobes frameworks, for kernel and userspace dynamic tracing. The possibilities with these are endless. 基于已有的或动态创建的tracepoints 跟踪数据 
+
+[系统性能分析从入门到进阶](https://mp.weixin.qq.com/s/beqzPadduGPSn6hw7oF4EQ)perf使用的时候一般会传入以下参数:
+
+1. 通过-e指定感兴趣的一个或多个event（perf list可以列出支持的event）
+2. 指定采样的范围, 比如进程级别 (-p), 线程级别 (-t), cpu级别 (-C), 系统级别 (-a)
+
 
 The userspace perf command present a simple to use interface with commands like:
 

@@ -425,8 +425,8 @@ void SparseAdaGradValue::Apply(const AdaGrad* opt, SparseGradInfo& grad_info, in
 
 从大的方面来说，DenseTable与SparseTable 类似，也有DenseOptimizerKernel、DenseKernelBlock 等概念，实际差异 DenseXXValue 和 SparseXXValue 上体现出来。以Adam为例（未完成）
 
-1. TensorNet将模型的所有dense参数合并后使用分布式数组切分到不同的机器上，每次pull和push参数的时候只有一次网络请求。相较于TensorFlow对每个tensor都有一次网络请求的方法极大的减少了网络请求的次数从而提升了模型训练的速度。
-2. TensorNet对sparse参数使用分布式哈希表按照哈希值均匀分布不同的节点上。这相较于TensorFlow需要让开发者根据自身情况将tensor分布在不同的ps节点上的方法更加灵活，这不仅减小了节点通信热点的概率，还减轻了开发者的工作量。
+1. TensorNet将模型的所有dense参数合并后使用**分布式数组**切分到不同的机器上，每次pull和push参数的时候只有一次网络请求。相较于TensorFlow对每个tensor都有一次网络请求的方法极大的减少了网络请求的次数从而提升了模型训练的速度。
+2. TensorNet对sparse参数使用**分布式hashmap**按照哈希值均匀分布不同的节点上。这相较于TensorFlow需要让开发者根据自身情况将tensor分布在不同的ps节点上的方法更加灵活，这不仅减小了节点通信热点的概率，还减轻了开发者的工作量。
 
 ```c++
 // tensornet/core/ps/optimizer/adam_kernel.h
@@ -627,3 +627,30 @@ class Model(tf.keras.Model):
 
 Model.backwards ==> layer/EmbeddingFeatures.backwards ==> StateManagerImpl.push ==> gen_sparse_table_ops.spare_table_push就到了OP 的逻辑了。
 
+## 一些设计
+
+[Parameter Server分布式训练概述(下篇)](https://zhuanlan.zhihu.com/p/264828885)
+
+### 临时embedding 矩阵
+
+[TensorNet——基于TensorFlow的大规模稀疏特征模型分布式训练框架](https://mp.weixin.qq.com/s/v8HqeR7UYFs4Ex5p5tFyVQ)对于最简单的wide&deep模型，如果在一个广告系统中有3亿用户，那么就需要定义一个维度为3亿的embedding矩阵，在训练模型时需要在这个3亿维的矩阵上做embedding_lookup得到当前batch内的用户的embedding信息，近而在embedding之上做更加复杂的操作。
+
+训练的batch_size=1024，在进行前向计算之前，TensorNet将每个batch的特征ID从0开始重新编排作为输入，这样输入特征的index分布在[0,1024)之间；同时**根据原始的特征ID**从server拉取对应的embedding向量，填充到tensorflow的embedding矩阵中，这样每个特征field/slot的embedding矩阵大小就只有1024 x 4(以下图中embedding_size=4为例)。对于tensorflow来说，每次迭代只需要在1024 x 4这样非常小的embedding矩阵中做查找。dense网络地计算则完全依赖tensorflow实现，可以基于tensorflow构造各种复杂的网络结构，例如Transformer/Attention/CNN/RNN等，保留了tensorflow设计网络结构的灵活性。PS: 相当于sparse 参数检索 不仅是只访问slot 了，根据当前 batch 构造的**临时的** embedding 矩阵还降低了检索空间
+
+下图以wide&deep模型为例，结合下图做进一步说明，我们从最下层往上看。最下面的sparse feature，输入的是原始的特征ID，从sparse feature到virtual sparse feature，将原始特征ID映射为新的index，范围在[0, 1024)。倒数第二层的parameter server节点，保存全部特征的embedding，TensorNet根据原始特征ID从server拉取对应的embedding，填充至倒数第四层的embedding矩阵中。通过这种方式，将图中从sparse feature到parameter server的查找，转换为从virtual sparse feature到embedding lookup这部分的查找，对tensorflow来说，相当于在一个1024 x 4的embedding矩阵上做查找。之后，从virtual sparse feature一直到最顶层的ctr预估，都由tensorflow来完成。
+
+![](/public/upload/machine/ps_embedding.png)
+
+### 训练
+
+TensorNet使用一个较小的，可以容纳特征在一个batch内所有数据的embedding矩阵代替TensorFlow默认实现中需要定义的较大的embedding矩阵。
+
+TensorNet异步训练架构
+1. TensorNet将sparse参数和与dense参数分别使用不同的parameter server管理。
+2. TensorNet不设单独的parameter server节点。在每个worker中都会维护一个sparse paramter server和dense parameter server。这省去了开发人员管理ps节点和worker节点的不少麻烦。
+3. TensorNet将模型的所有dense参数合并后使用分布式数组切分到不同的机器上，每次pull和push参数的时候只有一次网络请求。相较于TensorFlow对每个tensor都有一次网络请求的方法极大的减少了网络请求的次数从而提升了模型训练的速度。
+
+TensorNet同步训练架构
+1. TensorNet使用单独的sparse parameter server节点保存所有sparse参数。通过parameter server可以解决TensorFlow支持的sparse特征维度不能太大的问题。
+2. TensorNet对sparse参数做了特殊的定制化的同步。TensorNet在训练时只同步当前训练的batch所关注的稀疏特征，相较于TensorFlow会将所有参数都同步的模式通信数据减少到了原来的万分之一，乃至十万分之一。**sparse参数的梯度汇总是在worker上完成的，而不是在server上**，TensorNet采用**定制化的all-reduce**在worker上对sparse参数的梯度进行合并，之后再push到server上去。PS： 因为有临时embedding 矩阵，所以在梯度通信处理上跟 dense 参数差不多了
+3. dense参数存储在worker中，每个worker都有一份dense参数的完整副本，所以不需要dense ps server。每一次迭代，所有worker先计算dense参数的梯度，然后做all-reduce操作，worker之间相互交换数据，然后各自对梯度做汇总，再对权重或参数做更新。

@@ -126,13 +126,17 @@ print(sess.run(input_embedding, feed_dict={input_ids: [4, 0, 2]}))
 
 [从论文源码学习 之 embedding层如何自动更新](https://mp.weixin.qq.com/s/v0K_9Y6aWAyHj7N1bIGvBw)`input_embedding = embedding * input_ids` 从效果上 可以把 input_ids 视为索引的作用，返回第4、0、2 行数据，**但 embedding_lookup 函数 也可以看做是一个 矩阵乘法（底层两种都支持，是一个策略参数）**，也因此 embedding层可以通过 optimizer 进行更新。
 
+原生的tf optimizer 根据 梯度/grad 的类型 来决定更新weight/ variable 的方法，当传来的梯度是普通tensor时，调用_apply_dense方法去更新参数；当传来的梯度是IndexedSlices类型时，则去调用optimizer._apply_sparse_duplicate_indices函数。 Embedding 参数的梯度中包含每个 tensor 中发生变化的数据切片 IndexedSlices。IndexedSlices类型是一种可以存储稀疏矩阵的数据结构，只需要存储对应的行号和相应的值即可。可以认为是一种类似 SparseTensor 的思想，用元素数据和元素位置表示一个较大 tensor 。将 tensor 按第一维度切片，从而将一个较大的形状为  `[LARGE0, D1, .. , DN]` 的 tensor 表示为多个较小的形状为 `[D1, .. , DN]` 的 tensor。
+
+![](/public/upload/machine/tf_indexed_slices.png)
+
+**总结一下涉及到哪些问题**： 稀疏参数的表示、存储、通信（开始由Variable 表示 ，各种框架提供EmbeddingVariable 表示） 和 稀疏参数的梯度的表示、通信（由IndexedSlices 表示）
+
 ## 嵌入层的优化
 
 DL 推荐模型的嵌入层是比较特殊的：它们为模型贡献了大量参数，但几乎不需要计算，而计算密集型denser layers的参数数量则要少得多。所以对于推荐系统，嵌入层的优化十分重要。
 
-Embedding 优化
+embedding部分的难点在于存储和检索。DNN这部分主要是稠密计算。Embedding 优化
 1. 把嵌入层分布在多个 GPU 和多个节点上
 3. Embedding 层模型并行，dense 层数据并行。
-
-[阿里巴巴开源大规模稀疏模型训练/预测引擎DeepRec](https://mp.weixin.qq.com/s/aEi6ooG9wDL-GXVWcGWRCw)
 

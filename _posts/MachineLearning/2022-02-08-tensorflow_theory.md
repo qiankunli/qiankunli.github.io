@@ -95,6 +95,8 @@ TF_NodeDescription* TF_NewNode(TF_Graph* graph,const char* op_type,const char* n
 
 ## 底层实现/数据流图的整体执行
 
+[阿里巴巴开源大规模稀疏模型训练/预测引擎DeepRec](https://mp.weixin.qq.com/s/aEi6ooG9wDL-GXVWcGWRCw)TensorFlow是一个基于Graph的静态图训练引擎，在其架构上有相应的分层，比如最上层的API层、中间的图优化层和最下层的算子层。TensorFlow通过这三层的设计去支撑上层不同Workload的业务需求和性能优化需求。
+
 符号式编程将计算过程抽象为计算图（**所有函数操作都是在构造GraphDef**）。TensorFlow 使用数据流图表达计算过程和共享状态，使用节点表示抽象计算，使用边 表示数据流。如下图，展示了 MNIST 手写识别应用的数据流图。在该模型 中，前向子图使用了 2 层全连接网络，分别为 ReLU 层和 Softmax 层。随后，使用 SGD 的 优化算法，构建了与前向子图对应的反向子图，用于计算训练参数的梯度。最后，根据参数 更新法则，**构造训练参数的更新子图**，完成训练参数的迭代更新。
 
 ![](/public/upload/machine/tf_mnist.png)
@@ -107,6 +109,8 @@ TF_NodeDescription* TF_NewNode(TF_Graph* graph,const char* op_type,const char* n
 3. 在算法核函数执行层次， 执行器抽象将会话传入的核函数加载到各个计算设备上有序执行。为充分利用多核硬件的并发计算能力，这一层次提供线程池调度机制；为实现众多并发操作的异步执行和分布式协同， 这一层次引入了通信会合点机制。
 
 ### client-master-worker
+
+Master-Worker 架构是分布式系统之中非常常见的一种架构组织形式，此架构下，Master 通常维护集群元信息，调度任务，Workers 则负责具体计算或者维护具体数据分片。Client 利用这个分布式环境进行计算。
 
 ![](/public/upload/machine/run_graph.png)
 
@@ -154,7 +158,7 @@ Kernel 是 OP 在某种硬件设备的特定实现，它负责执行 OP 的具�
 
 ![](/public/upload/machine/tf_worker_run_graph.png)
 
-
+[TensorFlow 分布式环境_图操作角度](https://mp.weixin.qq.com/s/WGtHlQSMZ8p9MJzBDqukSQ)
 ## 会话管理
 
 ### 会话生命周期与图控制
