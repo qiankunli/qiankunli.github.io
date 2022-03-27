@@ -114,6 +114,29 @@ Combining features, better known as feature crosses, enables the model to learn 
 以上图为例,one of the categorical_column_with... functions maps the example string to a numerical categorical value. 
 1. As an indicator column. A function converts each numeric categorical value into an **81-element vector** (because our palette consists of 81 words), placing a 1 in the index of the categorical value (0, 32, 79, 80) and a 0 in all the other positions.
 2. As an embedding column. A function uses the numerical categorical values (0, 32, 79, 80) as indices to a lookup table. Each slot in that lookup table contains a **3-element vector**. **How do the values in the embeddings vectors magically get assigned?** Actually, the assignments happen during training. That is, the model learns the best way to map your input numeric categorical values to the embeddings vector value in order to solve your problem. Embedding columns increase your model's capabilities, since an embeddings vector learns new relationships between categories from the training data. Why is the embedding vector size 3 in our example? Well, the following "formula" provides a general rule of thumb about the number of embedding dimensions:`embedding_dimensions =  number_of_categories**0.25`
+### Estimator 方式
+
+花的识别，示例代码
+```python
+feature_names = ['SepalLength','SepalWidth','PetalLength','PetalWidth']
+def my_input_fn(...):
+    ...<code>...
+    return ({ 'SepalLength':[values], ..<etc>.., 'PetalWidth':[values] },
+            [IrisFlowerType])
+# Create the feature_columns, which specifies the input to our model.All our input features are numeric, so use numeric_column for each one.
+feature_columns = [tf.feature_column.numeric_column(k) for k in feature_names]
+# Create a deep neural network regression classifier.Use the DNNClassifier pre-made estimator
+classifier = tf.estimator.DNNClassifier(
+   feature_columns=feature_columns, # The input features to our model
+   hidden_units=[10, 10], # Two layers, each with 10 neurons
+   n_classes=3,
+   model_dir=PATH) # Path to where checkpoints etc are stored
+# Train our model, use the previously function my_input_fn Input to training is a file with training example Stop training after 8 iterations of train data (epochs)
+classifier.train(input_fn=lambda: my_input_fn(FILE_TRAIN, True, 8))
+# Evaluate our model using the examples contained in FILE_TEST 
+# Return value will contain evaluation_metrics such as: loss & average_loss
+evaluate_result = estimator.evaluate(input_fn=lambda: my_input_fn(FILE_TEST, False, 4)
+```
 
 ### 心脏病数据集/非 Estimator 方式
 

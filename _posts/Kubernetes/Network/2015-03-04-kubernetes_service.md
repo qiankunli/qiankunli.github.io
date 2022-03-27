@@ -112,6 +112,8 @@ KUBE-SVC-NWV5X2332I4OT4T3 规则实际上是一组随机模式（–mode random�
 
 当你的宿主机上有大量 Pod 的时候，成百上千条 iptables 规则不断地被刷新，会大量占用该宿主机的 CPU 资源，甚至会让宿主机“卡”在这个过程中。
 
+[一个请求如何从 Service 到达 Pod ？](https://mp.weixin.qq.com/s/XBmX2HjYjrdPIDKWDKa37Q) 配图特别好。
+
 ### ipvs 模式
 
 [Service服务负载均衡机制剖析](https://mp.weixin.qq.com/s/LC-vrb2aWAzwcJJHrz8Yrw) 配图不错。
