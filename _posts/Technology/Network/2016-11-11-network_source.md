@@ -251,6 +251,17 @@ tcp_protocol是为了从下到上的数据接收，其函数集主要是handler�
 2. 如何接收数据。由中断程序触发。接收数据的时候，可以得到device，从数据中可以取得协议数据，进而从ptype_base及inet_protocol_base执行相应的rcv
 3. 如何发送数据。通常不直接发送，先发到queue里。可以从socket初始化时拿到protocol类型（比如tcp）、目的ip，通过route等决定device，于是一路向下执行xx_write方法
 
+## 真正干活的ksoftirqd
+
+软中断有专门的内核线程 ksoftirqd处理。每个 CPU 都会绑定一个 ksoftirqd 内核线程，比如， 2 个 CPU 时，就会有 ksoftirqd/0 和 ksoftirqd/1 这两个内核线程。
+
+[聊聊 veth 数据流](https://mp.weixin.qq.com/s/3aoQCJywV00berRwbH0ocQ)数据包（data package）穿过TCP/IP不同层时叫法不同。在应用层叫做message，到了TCP层叫做segment、UDP层叫datagram，流到了IP层叫做datagram，而在链路层则称为frame，到了物理层就变成bitstream（比特流）
+
+![](/public/upload/linux/ksoftirqd.png)
+
+1. ksoftirqd首先是一个死循环。如果有网络设备挂在poll_list上面，只要满足条件，它就会从poll_list上面将其取下来，执行该设备驱动程序所注册的poll()。poll()不断地从net_device的RingBuffer里面取出数据包，转成skb格式，并沿着网络设备子系统 -> IP协议层 -> TCP层一路调用内核里面的函数来分析和处理这个skb。从上图可以看到**skb从RingBuffer被取出来，到最后落到位于TCP层的socket接收队列里，都是在ksoftirqd这个内核线程里完成的**。这个处理过程还包括iptables的处理，路由的查询等各种费时费力的工作。所以如果iptables设置得非常多的话，会导致ksoftirqd处理每一个skb的时间变长，进而导致消费RingBuffer的速度变慢，对外的表现就是机器的吞吐量降低。
+2. 当通过veth发送数据出去（此为发送端veth，相应的另外一个叫接收端veth）的时候，不会触发硬件中断，也没有RingBuffer参与这个过程。发送端的veth在网络设备层会将skb直接塞入一个叫input_pkt_queue里，和poll_list一样，它也是位于数据结构softnet_data中。接着触发软中断使得ksoftirqd开始消费input_pkt_queue里的skb，veth1是插在bridge上的，bridge的行为类似二层交换机。在网络设备层调用 __netif_receive_skb_core 函数时，skb不会进入协议栈，而是会进入网桥处理。
+
 ## 面向过程/对象/ioc
 
 ![](/public/upload/network/tcp_object.png)
@@ -273,4 +284,5 @@ tcp_protocol是为了从下到上的数据接收，其函数集主要是handler�
 
 无论 TCP 还是 UDP，端口号都只占 16 位，也就说其最大值也只有 65535。那是不是说，如果使用 TCP 协议，在单台机器、单个 IP 地址时，并发连接数最大也只有 65535 呢？对于这个问题，首先你要知道，Linux 协议栈，通过五元组来标志一个连接（即协议，源 IP、源端口、目的 IP、目的端口)。对客户端来说，每次发起 TCP 连接请求时，都需要分配一个空闲的本地端口，去连接远端的服务器。由于这个本地端口是独占的，所以客户端最多只能发起 65535 个连接。对服务器端来说，其通常监听在固定端口上（比如 80 端口），等待客户端的连接。根据五元组结构，我们知道，客户端的 IP 和端口都是可变的。如果不考虑 IP 地址分类以及资源限制，服务器端的理论最大连接数，可以达到 2 的 48 次方（IP 为 32 位，端口号为 16 位），远大于 65535。服务器端可支持的连接数是海量的，当然，由于 Linux 协议栈本身的性能，以及各种物理和软件的资源限制等，这么大的连接数，还是远远达不到的（实际上，C10M 就已经很难了）。
 
-软中断有专门的内核线程 ksoftirqd处理。每个 CPU 都会绑定一个 ksoftirqd 内核线程，比如， 2 个 CPU 时，就会有 ksoftirqd/0 和 ksoftirqd/1 这两个内核线程。
+
+

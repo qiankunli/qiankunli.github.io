@@ -214,6 +214,16 @@ There are two main ways they do it:
 
 ![](/public/upload/network/container_network_cloud.png)
 
+
+### 配图
+[第6课：Kubernetes网络架构原理深度剖析（上）](https://mp.weixin.qq.com/s/LC-vrb2aWAzwcJJHrz8Yrw)
+
+![](/public/upload/network/k8s_overlay.png)
+
+![](/public/upload/network/k8s_route.png)
+
+![](/public/upload/network/k8s_two_layer.png)
+
 ## 网络隔离
 
 Kubernetes 对 Pod 进行“隔离”的手段，即：NetworkPolicy，NetworkPolicy 实际上只是宿主机上的一系列 iptables 规则。在具体实现上，凡是支持 NetworkPolicy 的 CNI 网络插件，都维护着一个 NetworkPolicy Controller，通过控制循环的方式对 NetworkPolicy 对象的增删改查做出响应，然后在宿主机上完成 iptables 规则的配置工作。

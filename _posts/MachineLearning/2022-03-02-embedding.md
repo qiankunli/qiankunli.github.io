@@ -95,7 +95,9 @@ embedding_lookup是一种特殊的全连接层的实现方法，其针对 输入
 
 ## tensorflow 实现
 
-一般在tensorflow中都会使用一个shape=[id_index_size, embedding_size]的Variable 矩阵做embedding参数，然后根据id特征的index去Variable矩阵中查表得到相应的embedding表示。这里需要注意的是：id_index_size的大小一般都不会等于对应id table的元素个数，因为有很多id元素不在原始的id table表中，比如新上架的一些商品等。此时需要将id_index_size设置的大一些，以留一些位置给那些不在id table表的元素使用。PS： **使用tf.Variable 作为 embedding参数**，底层（中间过程）可能用了 SparseTensor 或 IndexedSlices
+一般在tensorflow中都会使用一个shape=[id_index_size, embedding_size]的Variable 矩阵做embedding参数，然后根据id特征的index去Variable矩阵中查表得到相应的embedding表示。这里需要注意的是：id_index_size的大小一般都不会等于对应id table的元素个数，因为有很多id元素不在原始的id table表中，比如新上架的一些商品等。此时需要将id_index_size设置的大一些，以留一些位置给那些不在id table表的元素使用。
+
+ **使用tf.Variable 作为 embedding参数**
 
 ```python
 import numpy as np
@@ -124,17 +126,46 @@ print(sess.run(input_embedding, feed_dict={input_ids: [4, 0, 2]}))
  [0 0 1 0 0 0]]
 ```
 
+使用get_embedding_variable接口
+
+
+```python
+var = tf.get_embedding_variable("var_0",embedding_dim=3,initializer=tf.ones_initializer(tf.float32),partitioner=tf.fixed_size_partitioner(num_shards=4))
+shape = [var1.total_count() for var1 in var]
+emb = tf.nn.embedding_lookup(var, tf.cast([0,1,2,5,6,7], tf.int64))
+...
+```
+
+使用categorical_column_with_embedding接口
+
+```python
+columns = tf.feature_column.categorical_column_with_embedding("col_emb", dtype=tf.dtypes.int64)
+W = tf.feature_column.embedding_column(categorical_column=columns,dimension=3,initializer=tf.ones_initializer(tf.dtypes.float32))
+ids={}
+ids["col_emb"] = tf.SparseTensor(indices=[[0,0],[1,1],[2,2],[3,3],[4,4]], values=tf.cast([1,2,3,4,5], tf.dtypes.int64), dense_shape=[5, 4])
+emb = tf.feature_column.input_layer(ids, [W])
+```
+
 [从论文源码学习 之 embedding层如何自动更新](https://mp.weixin.qq.com/s/v0K_9Y6aWAyHj7N1bIGvBw)`input_embedding = embedding * input_ids` 从效果上 可以把 input_ids 视为索引的作用，返回第4、0、2 行数据，**但 embedding_lookup 函数 也可以看做是一个 矩阵乘法（底层两种都支持，是一个策略参数）**，也因此 embedding层可以通过 optimizer 进行更新。
 
 原生的tf optimizer 根据 梯度/grad 的类型 来决定更新weight/ variable 的方法，当传来的梯度是普通tensor时，调用_apply_dense方法去更新参数；当传来的梯度是IndexedSlices类型时，则去调用optimizer._apply_sparse_duplicate_indices函数。 Embedding 参数的梯度中包含每个 tensor 中发生变化的数据切片 IndexedSlices。IndexedSlices类型是一种可以存储稀疏矩阵的数据结构，只需要存储对应的行号和相应的值即可。可以认为是一种类似 SparseTensor 的思想，用元素数据和元素位置表示一个较大 tensor 。将 tensor 按第一维度切片，从而将一个较大的形状为  `[LARGE0, D1, .. , DN]` 的 tensor 表示为多个较小的形状为 `[D1, .. , DN]` 的 tensor。
 
 ![](/public/upload/machine/tf_indexed_slices.png)
 
-**总结一下涉及到哪些问题**： 稀疏参数的表示、存储、通信（开始由Variable 表示 ，各种框架提供EmbeddingVariable 表示） 和 稀疏参数的梯度的表示、通信（由IndexedSlices 表示）
+**总结一下涉及到哪些问题**： 稀疏参数的表示（开始由Variable 表示 ，各种框架提供EmbeddingVariable 表示）、存储(ps，底层是分布式hashmap)、通信（只通信部分，数据存在gpu + gpu 直接通信）、优化（稀疏参数的优化器与稠密参数的优化器不兼容） 和 稀疏参数的梯度的表示、通信（由IndexedSlices 表示）、优化
 
 ## 嵌入层的优化
 
 DL 推荐模型的嵌入层是比较特殊的：它们为模型贡献了大量参数，但几乎不需要计算，而计算密集型denser layers的参数数量则要少得多。所以对于推荐系统，嵌入层的优化十分重要。
+
+### 原理上
+[TensorFlow在美团外卖推荐场景的GPU训练优化实践-参数规模的合理化](https://mp.weixin.qq.com/s/rEHhf32L09KXGJ9bbB2LEA)
+1. 去交叉特征
+2. 精简特征
+3. 压缩Embedding向量数
+4. 压缩Embedding向量维度
+5. 量化压缩
+### 工程上
 
 embedding部分的难点在于存储和检索。DNN这部分主要是稠密计算。Embedding 优化
 1. 把嵌入层分布在多个 GPU 和多个节点上

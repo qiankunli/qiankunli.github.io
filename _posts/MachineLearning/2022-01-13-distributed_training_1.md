@@ -79,28 +79,36 @@ RDMA本身指的是一种技术，具体协议层面，包含Infiniband（IB）�
 ### GPU 卡间通信
 
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
-Collective communication包含多个sender和多个receiver，一般的通信原语包括 broadcast，gather,all-gather，scatter，reduce，all-reduce，reduce-scatter，all-to-all等。
+Collective communication包含多个sender和多个receiver，一般的通信原语包括 broadcast，All-to-one (gather),all-gather，One-to-all (scatter)，reduce，all-reduce，reduce-scatter，all-to-all等。
 
 ![](/public/upload/machine/gpu_communication.png)
 
+Reduce：从多个sender那里接收数据，最终combine到一个节点上
+
+![](/public/upload/machine/gpu_reduce.png)
+
+All-reduce：从多个sender那里接收数据，最终combine到每一个节点上。
+
+![](/public/upload/machine/gpu_all_reduce.png)
+
+Allreduce在单机不同架构下的速度比较
+
+![](/public/upload/machine/gpu_all_reduce_speed.png)
+
 #### NCCL 
 
-The NVIDIA Collective Communication Library (NCCL) implements multi-GPU and multi-node communication primitives optimized for NVIDIA GPUs and Networking. NCCL provides routines such as all-gather, all-reduce, broadcast, reduce, reduce-scatter as well as point-to-point send and receive that are optimized to achieve high bandwidth and low latency over PCIe and NVLink high-speed interconnects within a node and over NVIDIA Mellanox Network across nodes.
+The NVIDIA Collective Communication Library (NCCL) implements multi-GPU and multi-node communication primitives optimized for NVIDIA GPUs and Networking. NCCL provides routines such as all-gather, all-reduce, broadcast, reduce, reduce-scatter as well as point-to-point send and receive that are optimized to achieve high bandwidth and low latency over PCIe and NVLink high-speed interconnects within a node and over NVIDIA Mellanox Network across nodes. [Point-to-point communication](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/p2p.html)One-to-all (scatter) ,All-to-one (gather) , All-to-all 都可以基于 ncclSend 和 ncclRecv 来实现。
+
 ```c
 // nccl/src/nccl.h.in
 ncclResult_t  ncclGroupStart();
 ncclResult_t  ncclGroupEnd();
 // peer to peer
-ncclResult_t  ncclSend(const void* sendbuff, size_t count, ncclDataType_t datatype, int peer,
-  ncclComm_t comm, cudaStream_t stream);
-ncclResult_t  ncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, int peer,
-  ncclComm_t comm, cudaStream_t stream);
+ncclResult_t  ncclSend(const void* sendbuff, size_t count, ncclDataType_t datatype, int peer,ncclComm_t comm, cudaStream_t stream);
+ncclResult_t  ncclRecv(void* recvbuff, size_t count, ncclDataType_t datatype, int peer,ncclComm_t comm, cudaStream_t stream);
 // Collective Communication 
-ncclResult_t  ncclAllGather(const void* sendbuff, void* recvbuff, size_t sendcount,
-  ncclDataType_t datatype, ncclComm_t comm, cudaStream_t stream);
-ncclResult_t  ncclReduceScatter(const void* sendbuff, void* recvbuff,
-  size_t recvcount, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm,
-  cudaStream_t stream);
+ncclResult_t  ncclAllGather(const void* sendbuff, void* recvbuff, size_t sendcount,ncclDataType_t datatype, ncclComm_t comm, cudaStream_t stream);
+ncclResult_t  ncclReduceScatter(const void* sendbuff, void* recvbuff,size_t recvcount, ncclDataType_t datatype, ncclRedOp_t op, ncclComm_t comm,cudaStream_t stream);
 ...
 // 初始化
 ncclResult_t  ncclCommInitAll(ncclComm_t* comm, int ndev, const int* devlist);
@@ -134,6 +142,7 @@ struct ncclComm {
 NCCL 最初只支持单机多 GPU 通信，从 NCCL2 开始支持多机多 GPU 通信。
 
 #### Gloo
+
 Gloo is a collective communications library. It comes with a number of collective algorithms useful for machine learning applications. These include a barrier, broadcast, and allreduce.
 
 Gloo 为CPU和GPU提供了集合通信程序的优化实现。它特别适用于GPU，因为它可以执行通信而无需使用GPUDirect 将数据传输到CPU的内存。它还能够使用 NCCL 执行快速的节点内通信，并实现其自己的节点间例程算。你不需要考虑内存数据的拷贝，只需要实现逻辑就可以。

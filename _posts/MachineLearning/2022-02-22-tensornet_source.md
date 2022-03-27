@@ -200,7 +200,7 @@ public:
 
 ![](/public/upload/machine/tensornet_sparse_table.png)
 
-sparse 参数的活儿都让 SparseTable 干了。EmbeddingFeatures 是一个 Layer 实现。
+sparse 参数的活儿都让 SparseTable 干了。EmbeddingFeatures 是一个 Layer 实现。根据传入的 feature_column 名字 _state_manager.pull 返回一个 tensor。
 ```python
 # when this layer is been called, all the embedding data of `feature_columns` will be pulled from ps server and return as a tensor list.
 # tensornet/tensornet/layers/embedding_features.py
@@ -223,6 +223,9 @@ class EmbeddingFeatures(Layer):
         return output_tensors
     def backwards(self, grads_and_vars):
         return self._state_manager.push(grads_and_vars, self.sparse_pulling_features)
+```
+_state_manager.pull 也就是  StateManagerImpl.pull ==> gen_sparse_table_ops.sparse_table_pull
+```python
 class StateManagerImpl(fc.StateManager):
     def __init__(self, layer, name, ...):
         self.sparse_table_handle = tn.core.create_sparse_table(sparse_opt, name if name else "", dimension)
@@ -256,6 +259,7 @@ class StateManagerImpl(fc.StateManager):
     def show_decay(self):
         return tn.core.show_decay(self.sparse_table_handle)
 ```
+
 StateManagerImpl 初始化时 返回了一个table Handle，传给op 时会携带table Handle(uint32_t)
 ```c++
 // tensornet/core/ps/table/sparse_table.cc

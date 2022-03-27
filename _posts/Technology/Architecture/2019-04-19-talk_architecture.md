@@ -93,3 +93,5 @@ keywords: 聊聊架构
 
 
 [如何设计一个复杂的业务系统?](https://mp.weixin.qq.com/s/IWgywVo64vcjCmYcmEM4-g)软件架构设计本身就是一个复杂的事情，但其实业界已有一个共识，那就是“通过组件化完成关注点的分离从而降低局部复杂度”。
+
+[一次关于架构的“嘴炮”](https://mp.weixin.qq.com/s/SJ6CNHo0CgiprbC1zQc9lg)
