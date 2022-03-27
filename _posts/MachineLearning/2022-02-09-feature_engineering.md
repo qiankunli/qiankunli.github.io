@@ -200,6 +200,7 @@ class DenseColumn(FeatureColumn):
     def get_dense_tensor(self, transformation_cache, state_manager):
 class NumericColumn(DenseColumn,...):
     def _transform_feature(self, inputs):
+        # input_tensor ==> output_tensor
         input_tensor = inputs.get(self.key)
         return self._transform_input_tensor(input_tensor)
     def get_dense_tensor(self, transformation_cache, state_manager):
@@ -226,9 +227,6 @@ class DenseFeatures(kfc._BaseFeaturesLayer):
 2. Generally a single example in training data is described with FeatureColumns. At the first layer of the model, this column-oriented data should be converted to a single `Tensor`.
 
 ## 其它
-
-![](/public/upload/machine/feature_enginering.png)
-
 
 [推理性能提升一倍，TensorFlow Feature Column性能优化实践](https://mp.weixin.qq.com/s/2pV38VbvwCJkNA44HfcPuA) 未读
 [TensorFlow 指标列，嵌入列](https://mp.weixin.qq.com/s/rR0wfJyWzX36tQ9tGSao6A)
