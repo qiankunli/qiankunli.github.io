@@ -68,16 +68,54 @@ evict_opt = tf.GlobalStepEvict(steps_to_live=4000)
 emb_var = tf.get_embedding_variable("var", embedding_dim = 16, ev_option=ev_opt)
 ```
 
+## 特征交叉/Feature crosses
+
+Combining features, better known as feature crosses, enables the model to learn separate weights specifically for whatever that feature combination means.
+
+[Introducing TensorFlow Feature Columns——Feature crosses](https://developers.googleblog.com/2017/11/introducing-tensorflow-feature-columns.html)
 
 ## tf 特征处理 feature column
 
-[TensorFlow Feature Column性能可以这样玩](https://mp.weixin.qq.com/s/9lu0WQZHLC0XvyfSjaEK4w)Feature Column是TensorFlow提供的用于处理结构化数据的工具，是将**样本特征**映射到用于**训练模型特征**的桥梁。[看Google如何实现Wide & Deep模型（2.1）](https://zhuanlan.zhihu.com/p/47965313)**Feature Column本身并不存储数据，而只是封装了一些预处理的逻辑**。
+[Introducing TensorFlow Feature Columns](https://developers.googleblog.com/2017/11/introducing-tensorflow-feature-columns.html) 必读文章
+
+### 起源
+    
+[TensorFlow Feature Column性能可以这样玩](https://mp.weixin.qq.com/s/9lu0WQZHLC0XvyfSjaEK4w)Feature Column是TensorFlow提供的用于处理结构化数据的工具，是将**样本特征**映射到用于**训练模型特征**的桥梁。原始的输入数据中既有连续特征也有离散特征，这就需要我给每个特征的定义处理逻辑，来完成原始数据向模型真正用于计算的输入数据的**数值化转换**。[看Google如何实现Wide & Deep模型（2.1）](https://zhuanlan.zhihu.com/p/47965313)**Feature Column本身并不存储数据，而只是封装了一些预处理的逻辑**。
 
 ![](/public/upload/machine/tf_feature_column.png)
 
 其中只有一个numeric_column是纯粹处理数值特征的，其余的都与处理categorical特征有关，从中可以印证：categorical特征才是推荐、搜索领域的一等公民。
 
-### 心脏病数据集
+**what kind of data can we actually feed into a deep neural network? The answer is, of course, numbers (for example, tf.float32)**. After all, every neuron in a neural network performs multiplication and addition operations on weights and input data. Real-life input data, however, often contains non-numerical (categorical) data. PS: feature_column 最开始是与Estimator 配合使用的，**任何input 都要转换为feature_column传给Estimator**， feature columns——a data structure describing the features that an Estimator requires for training and inference.
+1. Numeric Column
+2. Bucketized Column, Often, you don't want to feed a number directly into the model, but instead split its value into different categories based on numerical ranges. splits a single input number into a four-element vector. ==> 模型变大了，让model 能够学习不同年代的权重（相对只输入一个input year 来说）
+    
+    |Date Range|	 Represented as...|
+    |---|---|
+    |< 1960|	 [1, 0, 0, 0]|
+    |>= 1960 but < 1980| 	 [0, 1, 0, 0]|
+    |>= 1980 but < 2000| 	 [0, 0, 1, 0]|
+    |> 2000|	 [0, 0, 0, 1]|
+3. Categorical identity column, 用一个向量表示一个数字，意图与Bucketized Column 是在一致的，让模型可以学习每一个类别的权重
+    |类别|数字|	 Represented as...|
+    |---|---|---|
+    |kitchenware|0|	 [1, 0, 0, 0]|
+    |electronics|1| 	 [0, 1, 0, 0]|
+    |sport|2| 	 [0, 0, 1, 0]|
+    |history|3|	 [0, 0, 0, 1]|
+4. Categorical vocabulary column, We cannot input strings directly to a model. Instead, **we must first map strings to numeric or categorical value**s. Categorical vocabulary columns provide a good way to represent strings as a one-hot vector.
+5. indicator column, treats each category as an element in a one-hot vector, where the matching category has value 1 and the rest have 0
+5. embedding column, Instead of representing the data as a one-hot vector of many dimensions, an embedding column represents that data as a lower-dimensional, ordinary vector in which each cell can contain any number, not just 0 or 1. By permitting a richer palette of numbers for every cell
+
+一个脉络就是：除了数值数据，对于分类、 字符串数据，我们不是简单的将其转换为数值型，而是将其转换为了一个向量，目的是尽量学习每一个分类的weight，但是如果某个分类太多，用one-hot 表示太占内存，就需要考虑embedding
+
+![](/public/upload/machine/embedding_column.png)
+
+以上图为例,one of the categorical_column_with... functions maps the example string to a numerical categorical value. 
+1. As an indicator column. A function converts each numeric categorical value into an **81-element vector** (because our palette consists of 81 words), placing a 1 in the index of the categorical value (0, 32, 79, 80) and a 0 in all the other positions.
+2. As an embedding column. A function uses the numerical categorical values (0, 32, 79, 80) as indices to a lookup table. Each slot in that lookup table contains a **3-element vector**. **How do the values in the embeddings vectors magically get assigned?** Actually, the assignments happen during training. That is, the model learns the best way to map your input numeric categorical values to the embeddings vector value in order to solve your problem. Embedding columns increase your model's capabilities, since an embeddings vector learns new relationships between categories from the training data. Why is the embedding vector size 3 in our example? Well, the following "formula" provides a general rule of thumb about the number of embedding dimensions:`embedding_dimensions =  number_of_categories**0.25`
+
+### 心脏病数据集/非 Estimator 方式
 
 [对结构化数据进行分类](https://www.tensorflow.org/tutorials/structured_data/feature_columns)以心脏病数据集为例
 
@@ -128,9 +166,13 @@ model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy'],r
 model.fit(train_ds,validation_data=val_ds,epochs=5)
 ```
 
-### 实现
+### 非 Estimator 方式 实现
 
 ```python
+class _FeatureColumn(object):
+    # 将inputs 转为 tensor
+    @abc.abstractmethod
+    def _transform_feature(self, inputs):
 class DenseColumn(FeatureColumn):
     def get_dense_tensor(self, transformation_cache, state_manager):
 class NumericColumn(DenseColumn,...):
@@ -141,7 +183,7 @@ class NumericColumn(DenseColumn,...):
         return transformation_cache.get(self, state_manager)
 ```
 
-inputs dataset可以看成{feature_name: feature tensor}的dict，而每个feature column定义时需要指定一个名字，feature column与input就是通过这个名字联系在一起。
+inputs dataset 带有schema，而每个feature column定义时需要指定一个名字，feature column与input就是通过这个名字联系在一起。
 
 **基于 feature_columns 构造 DenseFeatures Layer，反过来说，DenseFeatures Layer 在前向传播时被调用，Layer._call/DenseFeatures.call ==> feature_column.get_dense_tensor ==> feature_column._transform_feature(inputs)**。
 

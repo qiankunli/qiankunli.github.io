@@ -196,11 +196,14 @@ Tensorflow封装了一组API来处理数据的读入，它们都属于模块 tf.
 2. 从磁盘/内存中获取源数据，比如直接读取特定目录的下的 xx.png 文件，使用 dataset.map 将输入数据转为 dataset 要求
 3. 读入TFrecords数据集，`dataset = tf.data.Dataset.TFRecordDataset("dataset.tfrecords")`
 
+**Iterator 是对应的Dataset迭代器**。如果 Dataset 是一个水池的话，那么它其中的数据就好比是水池中的水，Iterator 可以把它当成是一根水管。
+
 ```python
 features, labels = (np.random.sample((100,2)), np.random.sample((100,1)))
 dataset = tf.data.Dataset.from_tensor_slices((features,labels)) 
 # 描述 了数据的来源 batch size 等
 dataset = tf.data.Dataset.from_tensor_slices((features,labels)).repeat().batch(BATCH_SIZE)
+# 创建迭代器
 iter = dataset.make_one_shot_iterator()
 x, y = iter.get_next() 
 # 定义模型

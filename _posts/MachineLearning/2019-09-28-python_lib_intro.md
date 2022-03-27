@@ -29,64 +29,63 @@ pyhone 库安装命令：`python3 -m pip install xx`
 
 代码如下
 
-    import pandas as pd  ## 数据分析  
-    import numpy as np  ## 科学计算
-    import sklearn.preprocessing as preprocessing
-    from sklearn import linear_model
+```python
+import pandas as pd  ## 数据分析  
+import numpy as np  ## 科学计算
+import sklearn.preprocessing as preprocessing
+from sklearn import linear_model
 
 
-    data_train = pd.read_csv("train.csv")
-    # data_train.info()
-    ## 性别、年龄、Pclass
-    data_train = data_train.filter(regex='Survived|Age|Sex|Pclass')
-    ## 丢弃带有Nan 的行
-    data_train = data_train.dropna()
-    ## 将性别数值化
-    data_train['Sex'] = pd.factorize(data_train['Sex'])[0].astype(np.uint16)
-    ## 将年龄特征化到[-1,1]之内
-    scaler = preprocessing.StandardScaler()
-    age_scale_param = scaler.fit(data_train['Age'].values.reshape(-1, 1))
-    data_train['Age'] = scaler.fit_transform(data_train['Age'].values.reshape(-1, 1), age_scale_param)
+data_train = pd.read_csv("train.csv")
+# data_train.info()
+## 性别、年龄、Pclass
+data_train = data_train.filter(regex='Survived|Age|Sex|Pclass')
+## 丢弃带有Nan 的行
+data_train = data_train.dropna()
+## 将性别数值化
+data_train['Sex'] = pd.factorize(data_train['Sex'])[0].astype(np.uint16)
+## 将年龄特征化到[-1,1]之内
+scaler = preprocessing.StandardScaler()
+age_scale_param = scaler.fit(data_train['Age'].values.reshape(-1, 1))
+data_train['Age'] = scaler.fit_transform(data_train['Age'].values.reshape(-1, 1), age_scale_param)
 
-    print(data_train)
+print(data_train)
 
-    ## 进行逻辑回归
-    train_np = data_train.values
-    # y即Survival结果
-    y = train_np[:, 0]
-    # X即特征属性值
-    X = train_np[:, 1:]
-    clf = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
-    clf.fit(X, y)
-    ## 对测试集进行和训练集一样的数据处理
+## 进行逻辑回归
+train_np = data_train.values
+# y即Survival结果
+y = train_np[:, 0]
+# X即特征属性值
+X = train_np[:, 1:]
+clf = linear_model.LogisticRegression(C=1.0, penalty='l1', tol=1e-6)
+clf.fit(X, y)
+## 对测试集进行和训练集一样的数据处理
 
-    data_test = pd.read_csv("test.csv")
-    data_t = data_test.filter(regex='PassengerId|Age|Sex|Pclass')
-    data_t = data_t.dropna()
-    data_t['Sex'] = pd.factorize(data_t['Sex'])[0].astype(np.uint16)
-    data_t['Age'] = scaler.fit_transform(data_t['Age'].values.reshape(-1, 1), age_scale_param)
+data_test = pd.read_csv("test.csv")
+data_t = data_test.filter(regex='PassengerId|Age|Sex|Pclass')
+data_t = data_t.dropna()
+data_t['Sex'] = pd.factorize(data_t['Sex'])[0].astype(np.uint16)
+data_t['Age'] = scaler.fit_transform(data_t['Age'].values.reshape(-1, 1), age_scale_param)
 
-    ## 预测下
-    test_np = data_t.values
-    X_t = test_np[:, 1:]
-    predictions = clf.predict(X_t)
+## 预测下
+test_np = data_t.values
+X_t = test_np[:, 1:]
+predictions = clf.predict(X_t)
 
-    ## 处理结果
-    result = pd.DataFrame(
-        {'PassengerId': data_t['PassengerId'].values,
-        'Survived': predictions.astype(np.int32)
-        })
+## 处理结果
+result = pd.DataFrame(
+    {'PassengerId': data_t['PassengerId'].values,
+    'Survived': predictions.astype(np.int32)
+    })
 
-    df = pd.merge(data_test, result, how='left', on='PassengerId')
-    r = df.filter(regex='PassengerId|Survived')
-    ## NaN数据全部预测为Survived=0
-    r['Survived'] = r.Survived.fillna(0)
-    print(r)
-    r.to_csv("result.csv", index=False)
-
+df = pd.merge(data_test, result, how='left', on='PassengerId')
+r = df.filter(regex='PassengerId|Survived')
+## NaN数据全部预测为Survived=0
+r['Survived'] = r.Survived.fillna(0)
+print(r)
+r.to_csv("result.csv", index=False)
+```
 提交result.csv 到kaggle ，可能因为简化的太狠了，得了一个0分，尴尬
-
-
 
 ## Matplotlib
 
@@ -127,7 +126,7 @@ DataFrame 是一个二维带标记的数据结构，**每column 数据类型可�
 
 创建DataFrame
 
-```
+```python
 my_dict = { 
     'name' : ["a", "b", "c", "d", "e","f", "g"],
     'age' : [20,27, 35, 55, 18, 21, 35],
@@ -144,7 +143,7 @@ df = pd.DataFrame(my_list)
 
 DataFrame 操作
 
-```
+```python
 df.head()   # Displays 1st Five Rows
 df.head(2)   # Displays 1st two Rows
 df.tail()    # Displays last Five Rows

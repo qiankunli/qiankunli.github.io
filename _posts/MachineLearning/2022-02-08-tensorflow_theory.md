@@ -23,8 +23,30 @@ keywords: tensorflow
 |工作流层|数据集准备、存储、加载|Keras|
 |计算图层|Graph构造/操作/优化/执行/前向计算/后向传播|TensorFlow Core|Graph中每个节点都是OpKernels类型|
 |数值计算层|opKernel实现/矩阵乘法/卷积计算|Eigen/cuBLAS/cuDNN|OpKernels以Tensor为处理对象，依赖网络通信和设备内存分配，实现了各种Tensor操作或计算|
-|网络层|通信|grpc/RDMA|
+|网络层|组件间通信|grpc/RDMA|
 |设备层|硬件|CPU/GPU|
+
+
+```
+tensorflow
+  c
+  cc      // c++ 前端接口
+  java    // java 前端接口
+  python  // python 前端接口
+  stream_executor   // 运行时环境，对cuda和opencl进行统一封装，屏蔽他们的区别
+  compiler          // 运行时优化，分析计算图，对op 进行融合，提升运行效率，XLA技术
+  contrib           // 三方库，成熟后会移到core python中
+  core              // tf的核心，基本都是c++，包括运行时、图操作、op定义、kernel实现等
+    common_runtime          // 本地运行时
+    distributed_runtime     // 分布式运行时
+    framework               // 框架层
+    graph                   // 图，包括图的创建、分裂和执行等，tf的核心对象
+    kernels                 // 内核，包括op算子的实现
+    ops                     // op算子的定义
+    platform                // 平台相关
+    protobuf                // 数据格式定义，graph 就是通过这种格式在client 和master 间传递的
+    user_ops                // 用户自定义算子
+```
 
 ## 数据结构
 
@@ -93,7 +115,7 @@ c++ 部分
 TF_NodeDescription* TF_NewNode(TF_Graph* graph,const char* op_type,const char* node_name)
 ```
 
-## 底层实现/数据流图的整体执行
+## 数据流图的整体执行
 
 [阿里巴巴开源大规模稀疏模型训练/预测引擎DeepRec](https://mp.weixin.qq.com/s/aEi6ooG9wDL-GXVWcGWRCw)TensorFlow是一个基于Graph的静态图训练引擎，在其架构上有相应的分层，比如最上层的API层、中间的图优化层和最下层的算子层。TensorFlow通过这三层的设计去支撑上层不同Workload的业务需求和性能优化需求。
 
@@ -107,6 +129,15 @@ TF_NodeDescription* TF_NewNode(TF_Graph* graph,const char* op_type,const char* n
     1. 单机会话采用相对简单的会话层次和图封装结构，它将图切分、优化之后，把操作节点和张量数据提交给底层执行器
     2. 分布式会话分为 client、master和worker 三层组件，它们对计算任务进行分解和分发，并通过添加通信操作 来确保计算逻辑的完整性。
 3. 在算法核函数执行层次， 执行器抽象将会话传入的核函数加载到各个计算设备上有序执行。为充分利用多核硬件的并发计算能力，这一层次提供线程池调度机制；为实现众多并发操作的异步执行和分布式协同， 这一层次引入了通信会合点机制。
+
+模型构造和执行流程
+1. 图构建（Client）：用户在client中基于TensorFlow的多语言编程接口，添加算子，完成计算图的构造。
+2. 图传递（Client->Master）：client开启session，通过它建立和master之间的连接。执行session.run()时，将构造好的graph序列化为graphDef后，以protobuf的格式传递给master。
+3. 图剪枝（Master，Master->Worker）：master根据session.run()传递的fetches和feeds列表，反向遍历全图full graph，实施剪枝，得到最小依赖子图
+图分裂：master将最小子图分裂为多个Graph Partition，并注册到多个worker上。一个worker对应一个Graph Partition。
+4. （Worker）图二次分裂：worker根据当前可用硬件资源，如CPU GPU，将Graph Partition按照op算子设备约束规范（例如tf.device('/cpu:0')，二次分裂到不同设备上。每个计算设备对应一个Graph Partition。
+5. 图运行(Worker)：对于每一个计算设备，worker依照op在kernel中的实现，完成op的运算。设备间数据通信可以使用send/recv节点，而worker间通信，则使用GRPC或RDMA协议。
+
 
 ### client-master-worker
 

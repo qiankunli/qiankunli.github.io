@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: keras
+title: keras 和 Estimator
 category: 架构
 tags: MachineLearning
-keywords:  tensorflow keras
+keywords:  tensorflow keras Estimator
 
 ---
 
@@ -12,6 +12,15 @@ keywords:  tensorflow keras
 
 * TOC
 {:toc}
+
+
+![](/public/upload/machine/tensorflow_overview.png)
+
+1. 高层API (High level): 包括Estimators、Keras以及预构建好的Premade estimator(如线性回归、逻辑回归这些、推荐排序模型wide&deep)；
+2. 中层API (Mid level): 包括layers, datasets, loss和metrics等具有功能性的函数，例如网络层的定义，Loss Function，对结果的测量函数等；
+3. 底层API (Low level): 包括具体的加减乘除、具有解析式的数学函数、卷积、对Tensor属性的测量等。
+
+## keras
 
 Keras 是开源 Python 包，由于 Keras 的独立性，Keras 具有自己的图形数据结构，用于定义计算图形：它不依靠底层后端框架的图形数据结构。PS： 所有有一个model.compile 动作？
 [聊聊Keras的特点及其与其他框架的关系](https://mp.weixin.qq.com/s/fgG95qqbrV07EgAqLXuFAg)
@@ -24,7 +33,7 @@ keras 提供两种模型范式
 1. 顺序模型，keras.models.Sequential类，基于函数式模型实现，适用于单输出的线性神经网络模型
 2. 函数式模型，keras.models.Model类，灵活性更好，适用于多输入多输出神经网络模型。
 
-## 顺序模型
+### 顺序模型
 
 ```python
 # 声明个模型
@@ -42,7 +51,7 @@ model.evaluate(X_test,Y_test,batch_size=32)
 classes = model.predict_classes(X_test,batch_size=32)
 ```
 
-## 函数式模型
+### 函数式模型
 
 [Keras 高级用法：函数式 API 7.1（一）](https://mp.weixin.qq.com/s/XBkU_QnQ5OZzRLpz5yywmg)有些神经网络模型有多个独立的输入，而另一些又要求有多个输出。一些神经网络模型有 layer 之间的交叉分支，模型结构看起来像图（ graph ），而不是线性堆叠的 layer 。它们不能用Sequential 模型类实现，而要使用Keras更灵活的函数式 API ( functional API)。
 
@@ -78,7 +87,7 @@ train_op = optrimizer(loss)
 train_op.minimize()
 ```
 
-## 实现
+### 实现
 
 [Keras源码分析之基础框架](https://mp.weixin.qq.com/s/SA6VEyllWF645u1g42ATHg)
 
@@ -184,9 +193,9 @@ def _call(self, inputs):
 ```
 PS：**在高层是 layer/model 等概念，在底层，都是op 构成的数据流图，layer/model 隐藏了op**。
 
-## 其它
+### 其它
 
-### 和session 的关系
+#### 和session 的关系
 和 TensorFlow session 的关系：Keras doesn't directly have a session because it supports multiple backends. Assuming you use TF as backend, you can get the global session as:
 
 ```
@@ -196,7 +205,7 @@ sess = K.get_session()
 
 If, on the other hand, yo already have an open Session and want to set it as the session Keras should use, you can do so via: `K.set_session(sess)`
 
-### callback
+#### callback
 
 callbacks能在fit、evaluate和predict过程中加入伴随着模型的生命周期运行，目前tensorflow.keras已经构建了许多种callbacks供用户使用，用于防止过拟合、可视化训练过程、纠错、保存模型checkpoints和生成TensorBoard等。
 
@@ -216,3 +225,45 @@ final_logs=...
 callbacks.on_train_end(final_logs)
 ```
 
+## Estimator
+
+[Introduction to TensorFlow Datasets and Estimators](https://developers.googleblog.com/2017/09/introducing-tensorflow-datasets.html)
+
+![](/public/upload/machine/estimator.png)
+
+1. 创建一个或多个输入函数，即input_fn
+    ```python
+    # 第一个返回值 must be a dict in which each input feature is a key, and then a list of values for the training batch.
+    # 第二个返回值 is a list of labels for the training batch.
+    def input_fn(file_path,perform_shuffle,repeat_count):
+    ...
+    将输入 转为 Dataset 再转为 input_fn 要求的格式
+    ...
+    return ({ 'feature_name1':[values], ..<etc>.., 'feature_namen':[values] },
+            [label_value])
+    ```
+2. 定义模型的特征列,即feature_columns
+3. 实例化 Estimator，指定特征列和各种超参数。
+4. 在 Estimator 对象上调用一个或多个方法，传递适当的输入函数作为数据的来源。（train, evaluate, predict)
+
+花的识别，示例代码
+```python
+feature_names = ['SepalLength','SepalWidth','PetalLength','PetalWidth']
+def my_input_fn(...):
+    ...<code>...
+    return ({ 'SepalLength':[values], ..<etc>.., 'PetalWidth':[values] },
+            [IrisFlowerType])
+# Create the feature_columns, which specifies the input to our model.All our input features are numeric, so use numeric_column for each one.
+feature_columns = [tf.feature_column.numeric_column(k) for k in feature_names]
+# Create a deep neural network regression classifier.Use the DNNClassifier pre-made estimator
+classifier = tf.estimator.DNNClassifier(
+   feature_columns=feature_columns, # The input features to our model
+   hidden_units=[10, 10], # Two layers, each with 10 neurons
+   n_classes=3,
+   model_dir=PATH) # Path to where checkpoints etc are stored
+# Train our model, use the previously function my_input_fn Input to training is a file with training example Stop training after 8 iterations of train data (epochs)
+classifier.train(input_fn=lambda: my_input_fn(FILE_TRAIN, True, 8))
+# Evaluate our model using the examples contained in FILE_TEST 
+# Return value will contain evaluation_metrics such as: loss & average_loss
+evaluate_result = estimator.evaluate(input_fn=lambda: my_input_fn(FILE_TEST, False, 4)
+```
