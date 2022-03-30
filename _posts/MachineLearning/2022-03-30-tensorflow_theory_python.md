@@ -43,7 +43,7 @@ tensorflow
   core              // tf的核心，基本都是c++，包括运行时、图操作、op定义、kernel实现等
 ```
 
-结合tf 原生api（自己计算 output/loss/optimizer） 实际例子来看下
+结合tf 原生api（自己定义Variable 乘一乘，计算 output/loss/optimizer） 实际例子来看下
 
 ```python
 # 返回 _NumericColumn
@@ -218,14 +218,9 @@ class _StateManagerImpl(StateManager):
 ```
 ## Variable
 
-Variable 是一个特殊的 OP，它拥有状态 (Stateful)。从实现技术探究，Variable 的 Kernel 实现直接持有一个 Tensor 实例，其生命周期与变量一致。相对于普通的 Tensor 实例，其生命周期仅对本次迭代 (Step) 有效；而 Variable 对多个迭代都有效，甚至可以存储到文件系统，或从文件系统中恢复。
+Variable 是一个特殊的 OP，它拥有状态 (Stateful)。从实现技术探究，Variable 的 Kernel(c++层) 实现直接持有一个 Tensor 实例，其生命周期与变量一致。相对于普通的 Tensor 实例，其生命周期仅对本次迭代 (Step) 有效；而 Variable 对多个迭代都有效，甚至可以存储到文件系统，或从文件系统中恢复。
 1. 从设计角度看，Variable 可以看做 Tensor 的包装器，Tensor 所支持的所有操作都被Variable 重载实现。也就是说，Variable 可以出现在 Tensor 的所有地方。
 2. 存在几个操作 Variable 的特殊 OP 用于修改变量的值，例如 Assign, AssignAdd 等。Variable 所持有的 Tensor 以引用的方式输入到 Assign 中，Assign 根据初始值 (Initial Value)或新值，就地修改 Tensor 内部的值，最后以引用的方式输出该 Tensor。
-
-`W = tf.Variable(tf.zeros([784,10]), name='W')` ，TensorFlow 设计了一个精巧的变量初始化模型。
-1. 初始值，tf.zeros 称为 Variable 的初始值，，它确定了 Variable 的类型为 int32，且 Shape为 [784, 10]。
-2. 初始化器，，变量通过初始化器 (Initializer) 在初始化期间，将初始化值赋予 Variable 内部所持有 Tensor，完成 Variable 的就地修改。W.initializer 实际上为 Assign的 OP，这是 Variable 默认的初始化器。更为常见的是，通过调用 tf.global_variables_initializer() 将所有变量的初始化器进行汇总，然后启动 Session 运行该 OP。
-3. 事实上，搜集所有全局变量的初始化器的 OP 是一个 NoOp，即不存在输入，也不存在输出。所有变量的初始化器通过控制依赖边与该 NoOp 相连，保证所有的全局变量被初始化。
 
 ```python
 # tensorflow/tensorflow/python/ops/variables.py
@@ -245,8 +240,15 @@ class Variable(object):
         return state_ops.assign(self._variable, value, use_locking=use_locking)
     def assign_add(self, delta, use_locking=False):
         return state_ops.assign_add(self._variable, delta, use_locking=use_locking)
+    ...
 class PartitionedVariable(object):
+    ...
 ```
+
+`W = tf.Variable(tf.zeros([784,10]), name='W')` ，TensorFlow 设计了一个精巧的变量初始化模型。
+1. 初始值，tf.zeros 称为 Variable 的初始值，，它确定了 Variable 的类型为 int32，且 Shape为 [784, 10]。
+2. 初始化器，，变量通过初始化器 (Initializer) 在初始化期间，将初始化值赋予 Variable 内部所持有 Tensor，完成 Variable 的就地修改。W.initializer 实际上为 Assign的 OP，这是 Variable 默认的初始化器。更为常见的是，通过调用 tf.global_variables_initializer() 将所有变量的初始化器进行汇总，然后启动 Session 运行该 OP。
+3. 事实上，搜集所有全局变量的初始化器的 OP 是一个 NoOp，即不存在输入，也不存在输出。所有变量的初始化器通过控制依赖边与该 NoOp 相连，保证所有的全局变量被初始化。
 
 Variable 由_VariableStore 管理
  
@@ -281,7 +283,7 @@ class _VariableStore(object):
 
 ## Layer
 
-A layer is a class implementing common neural networks operations, such as convolution, batch norm, etc. These operations require managing variables,losses, and updates, as well as applying TensorFlow ops to input tensors.  Users will just instantiate it and then treat it as a callable.
+A layer is a class implementing common neural networks operations, such as convolution, batch norm, etc. These operations require managing variables,losses, and updates, as well as applying TensorFlow ops to input tensors.  Users will just instantiate it and then treat it as a callable. tf 自己定义几个 variable 乘一乘，然后直接用就行了，但对常用模型来说，这些都是重复工作。
 
 ```python
 # tensorflow/tensorflow/python/layers/base.py
