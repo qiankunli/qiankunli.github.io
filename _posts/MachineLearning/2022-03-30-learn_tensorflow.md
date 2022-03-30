@@ -29,16 +29,16 @@ tensorflow 如此复杂，以至于如何学习tensorflow 也是门学问，根�
     2. k8s 单机原理：又分为python 层（feature_column/layer/optimizer 如何转换为算子、计算图）和 core 层（计算图的切分和执行）
     3. 分布式原理：Client-Master-Worker
 3. 工程层面
-    1. 分布式训练：ps/allreduce（基本原理、api）; collective communication
+    1. 分布式训练：ps/allreduce（基本原理、api、适用场景比如大模型等）; collective communication比如NCCL；
     2. embedding：基本原理；tf原生支持代码；各公司二次开发框架优化
     3. 弹性训练：框架、operator、调度器volcano的相关支持
     4. k8s：对应的operator；共享存储pv/pvc；日志采集
     5. 推理：镜像管理、灰度、ab等
     6. 资源利用率：gpu的基本原理；分时复用；更优化的框架
 3. 扩展tf
-    1. 扩展的基本方向 embedding ；通信
+    1. 扩展的基本方向：embedding ；通信
     2. 扩展的基本手段：自定义算子，底层能力形成c api ==> python 层函数
-    1. 知道推荐系统模型的特性
+    1. 知道推荐系统模型（大模型）的特性及优化方向、常见优化手段
     2. python调用c
     3. 自定义算子
 
