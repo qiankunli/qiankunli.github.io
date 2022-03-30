@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: 大模型训练和ps
+title: 大模型训练
 category: 架构
 tags: MachineLearning
-keywords: feature engineering
+keywords: large model
 
 ---
 

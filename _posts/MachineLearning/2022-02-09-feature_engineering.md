@@ -189,6 +189,8 @@ model.compile(optimizer='adam',loss='binary_crossentropy',metrics=['accuracy'],r
 model.fit(train_ds,validation_data=val_ds,epochs=5)
 ```
 
+也可以 `tensor = tf.feature_column.input_layer(features, feature_columns)` 将输入 的features 数据转换为 (input)tensor。
+
 ### 非 Estimator 方式 实现
 
 ```python

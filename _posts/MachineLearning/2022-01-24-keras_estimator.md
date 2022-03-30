@@ -20,6 +20,40 @@ keywords:  tensorflow keras Estimator
 2. 中层API (Mid level): 包括layers, datasets, loss和metrics等具有功能性的函数，例如网络层的定义，Loss Function，对结果的测量函数等；
 3. 底层API (Low level): 包括具体的加减乘除、具有解析式的数学函数、卷积、对Tensor属性的测量等。
 
+
+## 原生api
+
+用tf 原生api 写的代码 需要自己写 output/loss/optimizer等，比如
+
+```python
+# model parameters
+W = tf.Variable(0.3,  tf.float32)
+b = tf.Variable(-0.3, tf.float32)
+# model inputs & outputs
+x = tf.placeholder(tf.float32)
+y = tf.placeholder(tf.float32)
+# the model
+out = W * x + b
+# loss function
+loss = tf.reduce_sum(tf.square(out - y))
+# optimizer
+optimizer = tf.train.GradientDescentOptimizer(0.001)
+train = optimizer.minimize(loss)
+# training data
+x_train = np.random.random_sample((100,)).astype(np.float32)
+y_train = np.random.random_sample((100,)).astype(np.float32)
+# training
+init = tf.global_variables_initializer()
+with tf.Session() as sess:
+    sess.run(init)
+    for i in range(1000):
+        sess.run(train, {x:x_train, y:y_train})
+        current_loss = sess.run(loss, {x:x_train, y:y_train})
+        print("iter step %d training loss %f" % (i, current_loss))
+    print(sess.run(W))
+    print(sess.run(b))
+```
+
 ## keras
 
 Keras 是开源 Python 包，由于 Keras 的独立性，Keras 具有自己的图形数据结构，用于定义计算图形：它不依靠底层后端框架的图形数据结构。PS： 所有有一个model.compile 动作？
@@ -227,7 +261,7 @@ callbacks.on_train_end(final_logs)
 
 ## Estimator
 
-[Introduction to TensorFlow Datasets and Estimators](https://developers.googleblog.com/2017/09/introducing-tensorflow-datasets.html)
+[Introduction to TensorFlow Datasets and Estimators](https://developers.googleblog.com/2017/09/introducing-tensorflow-datasets.html) 它最大的特点在于兼容分布式和单机两种场景，工程师可以在同一套代码结构下即实现单机训练也可以实现分布式训练。 PS： 没有了 Session、Strategy 这些概念，这些概念 单机和分布式都不一样。 
 
 ![](/public/upload/machine/estimator.png)
 

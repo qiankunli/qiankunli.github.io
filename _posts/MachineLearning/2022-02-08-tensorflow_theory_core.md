@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: tensorflow原理
+title: tensorflow原理——core层分析
 category: 架构
 tags: MachineLearning
 keywords: tensorflow
@@ -25,7 +25,6 @@ keywords: tensorflow
 |数值计算层|opKernel实现/矩阵乘法/卷积计算|Eigen/cuBLAS/cuDNN|OpKernels以Tensor为处理对象，依赖网络通信和设备内存分配，实现了各种Tensor操作或计算|
 |网络层|组件间通信|grpc/RDMA|
 |设备层|硬件|CPU/GPU|
-
 
 ```
 tensorflow
@@ -551,25 +550,3 @@ def op_grad_func(op, grad)
 Client 存在部分 C++ 实现，即 tensorflow::Session。其中，tf.Session 实例直接持有 tensorflow::Session 实例的句柄。一般地，用户使用的是 tf.Session 实施编程
 
 ![](/public/upload/machine/tf_client.png)
-
-### 变量
-
-Variable 是一个特殊的 OP，它拥有状态 (Stateful)。从实现技术探究，Variable 的 Kernel 实现直接持有一个 Tensor 实例，其生命周期与变量一致。相对于普通的 Tensor 实例，其生命周期仅对本次迭代 (Step) 有效；而 Variable 对多个迭代都有效，甚至可以存储到文件系统，或从文件系统中恢复。
-1. 从设计角度看，Variable 可以看做 Tensor 的包装器，Tensor 所支持的所有操作都被Variable 重载实现。也就是说，Variable 可以出现在 Tensor 的所有地方。
-2. 存在几个操作 Variable 的特殊 OP 用于修改变量的值，例如 Assign, AssignAdd 等。Variable 所持有的 Tensor 以引用的方式输入到 Assign 中，Assign 根据初始值 (Initial Value)或新值，就地修改 Tensor 内部的值，最后以引用的方式输出该 Tensor。
-
-`W = tf.Variable(tf.zeros([784,10]), name='W')` ，TensorFlow 设计了一个精巧的变量初始化模型。
-1. 初始值，tf.zeros 称为 Variable 的初始值，，它确定了 Variable 的类型为 int32，且 Shape为 [784, 10]。
-2. 初始化器，，变量通过初始化器 (Initializer) 在初始化期间，将初始化值赋予 Variable 内部所持有 Tensor，完成 Variable 的就地修改。W.initializer 实际上为 Assign的 OP，这是 Variable 默认的初始化器。更为常见的是，通过调用 tf.global_variables_initializer() 将所有变量的初始化器进行汇总，然后启动 Session 运行该 OP。
-3. 事实上，搜集所有全局变量的初始化器的 OP 是一个 NoOp，即不存在输入，也不存在输出。所有变量的初始化器通过控制依赖边与该 NoOp 相连，保证所有的全局变量被初始化。
-
-```
-class Variable(object):
-  def __init__(self, initial_value=None, trainable=True,collections=None, name=None, dtype=None):
-    with ops.name_scope(name, "Variable", [initial_value]) as name:
-      self._cons_initial_value(initial_value, dtype) # 构造初始值
-      self._cons_variable(name)   # 构造变量 OP
-      self._cons_initializer()    # 构造初始化器
-      self._cons_snapshot()       # 构造快照
-    self._cons_collections(trainable, collections)
-```

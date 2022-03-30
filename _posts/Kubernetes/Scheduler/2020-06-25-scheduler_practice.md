@@ -75,8 +75,11 @@ operator: "Equal"
 value: "value"
 effect: "NoSchedule"
 ```
-NoSchedule 是一个effect. This means that no pod will be able to schedule onto node1 unless it has a matching toleration.
 
+effect 类型
+2. NoSchedule, This means that no pod will be able to schedule onto node1 unless it has a matching toleration.
+1. PreferNoSchedule, 软性 NoSchedule
+3. NoExecute, 除了NoSchedule 的效果外，已经运行的pod 也会被驱逐。 
 
 ## 集群节点负载不均衡的问题
 
