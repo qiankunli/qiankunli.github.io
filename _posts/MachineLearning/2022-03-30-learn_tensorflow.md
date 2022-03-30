@@ -25,8 +25,8 @@ tensorflow 如此复杂，以至于如何学习tensorflow 也是门学问，根�
     1. 高层api 使用：抽象层度比较高， 优先 estimator（单机和分布式代码一致） ，kearas 也可以学一下
     2. 中层api ：tf 原生api，自己定义几个 variable 乘一乘，计算y_label，loss，执行Optimizer
 2. 原理层面
-    1. 机器学习框架的基本思路，Model/Layer抽象、前向后向，可以先参考纯python 代码实现 降低难度
-    2. k8s 单机原理：又分为python 层（feature_column/layer/optimizer 如何转换为算子、计算图）和 core 层（计算图的切分和执行）
+    1. 机器学习框架的基本思路，Model/Layer抽象、前向后向，可以先参考纯python 代码实现 降低难度，推荐《用python实现深度学习框架》
+    2. k8s 单机原理：又分为python 层（feature_column/layer/optimizer 等概念如何转换为算子、计算图）和 core 层（计算图的切分和执行）
     3. 分布式原理：Client-Master-Worker
 3. 工程层面
     1. 分布式训练：ps/allreduce（基本原理、api、适用场景比如大模型等）; collective communication比如NCCL；
