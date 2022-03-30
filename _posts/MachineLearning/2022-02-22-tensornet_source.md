@@ -23,9 +23,6 @@ keywords: tensornet
 1. 一种方式是直接通过 pybind11 调用c++ 对应函数，调用时即立即执行
 2. 一种调用 自定义算子，由session.run 真正触发执行。 
 
-所以机器学习框架的执行，从编程语言角度看
-
-![](/public/upload/machine/tensornet_python_c.png)
 ## Wide&Deep模型Demo
 
 ```python
