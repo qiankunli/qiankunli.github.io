@@ -19,6 +19,8 @@ keywords: tensorflow python
 3. tensor 转换（也就是op调用）构成layer / feature_column
 4. op 调用 实质是 构建GraphDef。PS： 就好比 client rpc 的方法调用 实质是 socket.write
 
+本文主要来自 tf r1.4 分支的代码
+
 源码结构
 
 ```
@@ -40,7 +42,6 @@ tensorflow
   contrib           // 三方库，成熟后会移到core python中
   core              // tf的核心，基本都是c++，包括运行时、图操作、op定义、kernel实现等
 ```
-
 
 结合tf 原生api（自己计算 output/loss/optimizer） 实际例子来看下
 
@@ -144,6 +145,8 @@ class _NumericColumn(_DenseColumn,
         return math_ops.to_float(input_tensor)
 ```
 
+
+
 ### EmbeddingColumn
 
 为了计算 `[batch_size, vocab_size] * [vocab_size, embed_size] = [batch_size, embed_size]`
@@ -192,6 +195,27 @@ def _safe_embedding_lookup_sparse(embedding_weights,sparse_ids,sparse_weights=No
         _safe_embedding_lookup_sparse
     ```
     
+### StateManager
+在较新版本的tf中，Some `FeatureColumn`s（比如EmbeddingColumn） create variables or resources to assist their computation. The `StateManager` is responsible for creating and storing these objects since `FeatureColumn`s are supposed to be stateless configurationonly.  
+
+```python
+# tensorflow/python/feature_column/feature_column_v2.py
+class StateManager(object):
+	def create_variable(self,feature_column,name,...)
+	def add_variable(self, feature_column, var):
+	def get_variable(self, feature_column, name):
+    def add_resource(self, feature_column, name, resource):
+	def has_resource(self, feature_column, name):
+	def get_resource(self, feature_column, name):
+class _StateManagerImpl(StateManager):
+    def __init__(self, layer, trainable):
+        self._trainable = trainable
+        self._layer = layer
+        if self._layer is not None and not hasattr(self._layer, '_resources'):
+            self._layer._resources = data_structures.Mapping()  # pylint: disable=protected-access
+        self._cols_to_vars_map = collections.defaultdict(lambda: {})
+        self._cols_to_resources_map = collections.defaultdict(lambda: {})
+```
 ## Variable
 
 Variable 是一个特殊的 OP，它拥有状态 (Stateful)。从实现技术探究，Variable 的 Kernel 实现直接持有一个 Tensor 实例，其生命周期与变量一致。相对于普通的 Tensor 实例，其生命周期仅对本次迭代 (Step) 有效；而 Variable 对多个迭代都有效，甚至可以存储到文件系统，或从文件系统中恢复。

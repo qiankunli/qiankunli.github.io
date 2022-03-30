@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 分布式训练——基本概念
+title: 分布式训练的一些问题
 category: 架构
 tags: MachineLearning
 keywords:  distributed training
@@ -157,4 +157,16 @@ Gloo 支持集体通信（collective Communication），并对其进行了优化
 
 Horovod 在单机的多个 GPU 之上采用 NCCL 来通信，在多机（CPU或者GPU）之间通过 Ring AllReduce 算法进行通信。
 
+## 数据并行ps/allreduce
 
+[深度学习分布式训练框架——基础知识](https://mp.weixin.qq.com/s/djGvx3fNJfKCXmjwTfJ-CA)
+1. 中心化分布式，存在一个中心节点，它的作用是汇总并分发其他计算节点的计算结果，更进一步，中心节点可以采用同步更新策略（Synchronous updating），也可以采用异步更新策略（Asynchronous updating）
+2. 去中心化分布式
+
+参数服务器适合的是高纬稀疏模型训练，它利用的是维度稀疏的特点，每次 pull or push 只更新有效的值。但是深度学习模型是典型的dense场景，embedding做的就是把稀疏变成稠密。所以这种 pull or push 的不太适合。而网络通信上更优化的 all-reduce 适合中等规模的深度学习。又比如由于推荐搜索领域模型的 Embedding 层规模庞大以及训练数据样本长度不固定等原因，导致容易出现显存不足和卡间同步时间耗费等问题，所以 all-reduce 架构很少被用于搜索推荐领域。
+
+
+分布式机制如何与框架融合？
+1. 如何实现一个大统一的分布式通信框架？实现allreduce, allgather等collective operations通信工作。如果tensor在显存中，那么它会使用NCCL库执行。而如果是在内存中，则会使用MPI或者Gloo执行。
+2. Horovod是一个库，怎么嵌入到各种深度学习框架之中？比如怎么嵌入到Tensorflow，PyTorch，MXNet，Keras？
+3. 如何将梯度的同步通信完全抽象为框架无关的架构？
