@@ -15,7 +15,7 @@ keywords: tensorflow
 
 本文内容主要来自 《深入理解Tensorflow》 和 《Tensorflow内核剖析》 
 
-神经网络在 视觉上 是一层一层的，表达式上是张量计算，执行上是数据流图。
+神经网络**在视觉上是一层一层的，表达式上是张量计算，执行上是数据流图**。当今的软件开发基本都是分层化和模块化的，应用层开发会基于框架层。比如开发Linux Driver会基于Linux kernel，开发Android app会基于Android Framework。深度学习也不例外，框架层为上层模型开发提供了强大的多语言接口、稳定的运行时、高效的算子，以及完备的通信层和设备层管理层。学习Tensorflow框架内核，可以理解前端接口语言的支持，session生命周期，graph的构建、分裂和执行，operation的注册和运行，模块间数据通信，本地运行和分布式运行模式，以及CPU GPU TPU等异构设备的封装支持等。学习这些，对于模型的压缩 加速 优化等都是大有裨益的。
 
 ||||
 |---|---|---|---|
@@ -24,7 +24,7 @@ keywords: tensorflow
 |计算图层|Graph构造/操作/优化/执行/前向计算/后向传播|TensorFlow Core|Graph中每个节点都是OpKernels类型|
 |数值计算层|opKernel实现/矩阵乘法/卷积计算|Eigen/cuBLAS/cuDNN|OpKernels以Tensor为处理对象，依赖网络通信和设备内存分配，实现了各种Tensor操作或计算|
 |网络层|组件间通信|grpc/RDMA|
-|设备层|硬件|CPU/GPU|
+|设备层|硬件|CPU/GPU/TPU/FPGA|
 
 ```
 tensorflow
@@ -47,22 +47,13 @@ tensorflow
     user_ops                // 用户自定义算子
 ```
 
-## 数据结构
+## 以Graph为中心的视角
 
 [深度学习分布式训练的现状及未来](https://zhuanlan.zhihu.com/p/466002243)AI 模型训练任务流程：初始化模型参数 -> 逐条读取训练样本 -> 前向、反向、参数更新 -> 读取下一条样本 -> 前向、反向、参数更新 -> ... 循环，直至收敛。在软件层面的体现就是计算机按顺序运行一个个 OP。
 
 [TensorFlow 源码大坑](https://zhuanlan.zhihu.com/p/39772050)
-### GraphDef
-```python
-// tensorflow/python/framework/ops.py
-class Graph(object):
-  def __init__(self):
-    self._nodes_by_name = dict() 
-  def _add_op(self, op):
-    with self._lock:
-        self._nodes_by_name[op.name] = op
-  def as_graph_def(self, from_version=None, add_shapes=False):
-```
+
+### proto 定义
 ```proto
 // tensorflow/core/framework/graph.proto
 message GraphDef {
@@ -75,7 +66,6 @@ service WorkerService {
   rpc RunGraph(RunGraphRequest) returns (RunGraphResponse);
 }
 ```
-### OpDef
 [TensorFlow架构与设计：OP本质论](https://www.jianshu.com/p/236335897b30)
 ```proto
 message OpDef{
@@ -91,30 +81,50 @@ message OpDef{
 ```
 以下划线开头的OP被系统内部实现保留。例如，_Send, _Recv，它们用于设备间通信的OP；_Source, _Sink标识计算图的开始节点和结束节点。
 
-[Tensorflow代码解析（三）](https://zhuanlan.zhihu.com/p/25929909)
-python 部分
-```python
-# 在Python脚本中定义matmul运算
-tf.manual(a,b)
-# 根据Ops名称MatMul从Ops库中找出对应Ops类型
-_op_def_lib.apply_op('MatMul',a=a,b=b,...)
-# ops/op_def_library.py
-# 创建ops节点
-graph.create_op(op_type_name,inputs,output_types,...)
-# framework/ops.py
-# 创建ops节点并指定相关属性和设备分配
-node_def = _NodeDef(op_type,name,device=None,attrs=attrs)
-ret = Operation(node_def,self,inputs=inputs,...)
-```
+### C++定义
 
-c++ 部分
 ```c++
-// public/tensor_c_api.h
-// 调用TF_NewNode函数生成节点
-TF_NodeDescription* TF_NewNode(TF_Graph* graph,const char* op_type,const char* node_name)
-```
+// 后端中的Graph主要成员也是节点node和边edge
+class Graph {
+    private:
+      FunctionLibraryDefinition ops_;   // 所有已知的op计算函数的注册表
+      const std::unique_ptr&lt;VersionDef&gt; versions_;    // GraphDef版本号
+      std::vector&lt;Node*&gt; nodes_;  // 节点node列表，通过id来访问
+      int64 num_nodes_ = 0;             // node个数
+      std::vector&lt;Edge*&gt; edges_;  // 边edge列表，通过id来访问
+      int num_edges_ = 0;               // graph中非空edge的数目
 
-## 数据流图的整体执行
+      // 已分配了内存，但还没使用的node和edge
+      std::vector&lt;Node*&gt; free_nodes_;
+      std::vector&lt;Edge*&gt; free_edges_;
+}
+// Edge既可以承载tensor数据，提供给节点Operation进行运算，也可以用来表示节点之间有依赖关系
+class Edge {
+  private:
+      Edge() {}
+      friend class EdgeSetTest;
+      friend class Graph;
+      
+      Node* src_;       // 源节点, 边的数据就来源于源节点的计算。源节点是边的生产者
+      Node* dst_;       // 目标节点，边的数据提供给目标节点进行计算。目标节点是边的消费者
+
+      int id_;          // 边id，也就是边的标识符
+      int src_output_;  // 表示当前边为源节点的第src_output_条边。源节点可能会有多条输出边  
+      int dst_input_;   // 表示当前边为目标节点的第dst_input_条边。目标节点可能会有多条输入边。
+};
+class Node {
+  public:
+    const NodeDef def() const;    // NodeDef,节点算子Operation的信息，比如op分配到哪个设备上了，op的名字等，运行时有可能变化。
+    const OpDef op_def() const;   // OpDef, 节点算子Operation的元数据，不会变的。比如Operation的入参列表，出参列表等
+ private:
+    
+    EdgeSet in_edges_;      // 输入边，传递数据给节点。可能有多条
+    EdgeSet out_edges_;     // 输出边，节点计算后得到的数据。可能有多条
+}
+```
+系统中存在默认的Graph，初始化Graph时，会添加一个Source节点和Sink节点。Source表示Graph的起始节点，Sink为终止节点。Source的id为0，Sink的id为1，其他节点id均大于1。
+
+### 数据流图的整体执行
 
 [阿里巴巴开源大规模稀疏模型训练/预测引擎DeepRec](https://mp.weixin.qq.com/s/aEi6ooG9wDL-GXVWcGWRCw)TensorFlow是一个基于Graph的静态图训练引擎，在其架构上有相应的分层，比如最上层的API层、中间的图优化层和最下层的算子层。TensorFlow通过这三层的设计去支撑上层不同Workload的业务需求和性能优化需求。
 
@@ -138,30 +148,7 @@ TF_NodeDescription* TF_NewNode(TF_Graph* graph,const char* op_type,const char* n
 5. 图运行(Worker)：对于每一个计算设备，worker依照op在kernel中的实现，完成op的运算。设备间数据通信可以使用send/recv节点，而worker间通信，则使用GRPC或RDMA协议。
 
 
-### client-master-worker
-
-Master-Worker 架构是分布式系统之中非常常见的一种架构组织形式，此架构下，Master 通常维护集群元信息，调度任务，Workers 则负责具体计算或者维护具体数据分片。Client 利用这个分布式环境进行计算。
-
-![](/public/upload/machine/run_graph.png)
-
-应用层数据流图 表示为Python API 中的tensoflow.Graph 类，通信时表示为 基于Protocol Buffers 文件定义的GraphDef (以 Session 为桥梁，建立 Client 与 Master 之间的通道，并将 Protobuf 格式的 GraphDef 序列 化后传递给 Master)，运行时的数据流图 表示为C++ 代码中的Graph 类及其成员类型。**GraphDef是描述计算图的知识模型，整个TensorFlow的计算过程都是围绕GraphDef所展开的**。
-
-在分布式的运行时环境中，Client 执行 Session.run 时，传递整个计算图给后端的 Master。此时，计算图是完整的，常称为 Full Graph。随后，Master 根据 Session.run 传 递给它的 fetches, feeds 参数列表，反向遍历 Full Graph，并按照依赖关系，对其实施剪 枝，最终计算得到最小的依赖子图，常称为 Client Graph。
-接着，Master 负责将 Client Graph 按照任务的名称分裂 (SplitByTask) 为多个 Graph Partition;其中，每个 Worker 对应一个 Graph Partition。随后，Master 将 Graph Partition 分别注册到相应的 Worker 上，以便在不同的 Worker 上并发执行这些 Graph Partition。最 后，Master 将通知所有 Work 启动相应 Graph Partition 的执行过程。
-其中，Work 之间可能存在数据依赖关系，Master 并不参与两者之间的数据交换，它们 两两之间互相通信，独立地完成交换数据，直至完成所有计算。
-
-对于每一个任务，TensorFlow 都将启动一个 Worker 实例。Worker 主要负责如下 3 个 方面的职责:
-1. 处理来自 Master 的请求;
-2. 对注册的 Graph Partition 按照本地计算设备集实施二次分裂 (SplitByDevice)，并通知各个计算设备并发执行各个 Graph Partition;
-3. 按照**拓扑排序算法**在某个计算设备上执行本地子图，并调度 OP 的 Kernel 实现; 
-4. 协同任务之间的数据通信。Worker 要负责将 OP 运算的结果发送到其他的 Worker 上去，或者接受来自 其他 Worker 发送给它的运算结果，以便实现 Worker 之间的数据交互。TensorFlow 特化实 现了源设备和目标设备间的 Send/Recv。
-    1. 本地 CPU 与 GPU 之间，使用 cudaMemcpyAsync 实现异步拷贝;
-    2. 本地 GPU 之间，使用端到端的 DMA 操作，避免主机端 CPU 的拷贝。
-    3. 对于任务间的通信，TensorFlow 支持多种通信协议。1. gRPC over TCP;2. RDMA over Converged Ethernet。并支持 cuNCCL 库，用于改善多 GPU 间的通信。
-
-Kernel 是 OP 在某种硬件设备的特定实现，它负责执行 OP 的具体运算。目前， TensorFlow 系统中包含 200 多个标准的 OP，包括数值计算，多维数组操作，控制流，状 态管理等。
-
-## 数据流图的创建
+### 结合分布式环境
 
 假如存在一个简单的分布式环境:1 PS + 1 Worker
 
@@ -189,7 +176,34 @@ Kernel 是 OP 在某种硬件设备的特定实现，它负责执行 OP 的具�
 ![](/public/upload/machine/tf_worker_run_graph.png)
 
 [TensorFlow 分布式环境_图操作角度](https://mp.weixin.qq.com/s/WGtHlQSMZ8p9MJzBDqukSQ)
+
+## client-master-worker
+
+Master-Worker 架构是分布式系统之中非常常见的一种架构组织形式，此架构下，Master 通常维护集群元信息，调度任务，Workers 则负责具体计算或者维护具体数据分片。Client 利用这个分布式环境进行计算。
+
+![](/public/upload/machine/run_graph.png)
+
+应用层数据流图 表示为Python API 中的tensoflow.Graph 类，通信时表示为 基于Protocol Buffers 文件定义的GraphDef (以 Session 为桥梁，建立 Client 与 Master 之间的通道，并将 Protobuf 格式的 GraphDef 序列 化后传递给 Master)，运行时的数据流图 表示为C++ 代码中的Graph 类及其成员类型。**GraphDef是描述计算图的知识模型，整个TensorFlow的计算过程都是围绕GraphDef所展开的**。
+
+在分布式的运行时环境中，Client 执行 Session.run 时，传递整个计算图给后端的 Master。此时，计算图是完整的，常称为 Full Graph。随后，Master 根据 Session.run 传 递给它的 fetches, feeds 参数列表，反向遍历 Full Graph，并按照依赖关系，对其实施剪 枝，最终计算得到最小的依赖子图，常称为 Client Graph。
+接着，Master 负责将 Client Graph 按照任务的名称分裂 (SplitByTask) 为多个 Graph Partition;其中，每个 Worker 对应一个 Graph Partition。随后，Master 将 Graph Partition 分别注册到相应的 Worker 上，以便在不同的 Worker 上并发执行这些 Graph Partition。最 后，Master 将通知所有 Work 启动相应 Graph Partition 的执行过程。
+其中，Work 之间可能存在数据依赖关系，Master 并不参与两者之间的数据交换，它们 两两之间互相通信，独立地完成交换数据，直至完成所有计算。
+
+对于每一个任务，TensorFlow 都将启动一个 Worker 实例。Worker 主要负责如下 3 个 方面的职责:
+1. 处理来自 Master 的请求;
+2. 对注册的 Graph Partition 按照本地计算设备集实施二次分裂 (SplitByDevice)，并通知各个计算设备并发执行各个 Graph Partition;
+3. 按照**拓扑排序算法**在某个计算设备上执行本地子图，并调度 OP 的 Kernel 实现; 
+4. 协同任务之间的数据通信。Worker 要负责将 OP 运算的结果发送到其他的 Worker 上去，或者接受来自 其他 Worker 发送给它的运算结果，以便实现 Worker 之间的数据交互。TensorFlow 特化实 现了源设备和目标设备间的 Send/Recv。
+    1. 本地 CPU 与 GPU 之间，使用 cudaMemcpyAsync 实现异步拷贝;
+    2. 本地 GPU 之间，使用端到端的 DMA 操作，避免主机端 CPU 的拷贝。
+    3. 对于任务间的通信，TensorFlow 支持多种通信协议。1. gRPC over TCP;2. RDMA over Converged Ethernet。并支持 cuNCCL 库，用于改善多 GPU 间的通信。
+
+Kernel 是 OP 在某种硬件设备的特定实现，它负责执行 OP 的具体运算。目前， TensorFlow 系统中包含 200 多个标准的 OP，包括数值计算，多维数组操作，控制流，状 态管理等。
+
+
 ## 会话管理
+
+Session是TensorFlow的client和master连接的桥梁（Client 是tf.Session，Master 是Session），client任何运算（create run close和del）均由Python前端开始，最终调用到C层后端实现。在client端，**The default session/graph is a property of the current thread**. 有点像java threadlocal的意思，以便client 的各个操作都可以方便获取session/graph。
 
 ### 会话生命周期与图控制
 
@@ -214,15 +228,15 @@ Worker 收到消息 RunGraphRequest 消息后，Worker 根据 graph_handle 索�
 
 PS：tf 运行时 很像一个c++ 写的grpc server 程序。
 
-### 单机会话运行 
+### 单机会话运行 DirectSession.run
 
-读入数据流图的待执行子图以及必要的输入张量，依据图中定义的依赖关系，将每个节点对应的操作核函数有序的加载到各个计算设备上并发执行，并将计算结果作为后续节点的输入。会话的生命周期 最终完成子图上定义的所有计算语义，将输出结果以张量形式返回给创建会话的应用程序。ps：跟一个dag 流程编排软件的执行逻辑差不多。 
+[Tensorflow源码解析6 -- TensorFlow本地运行时](https://zhuanlan.zhihu.com/p/180044755)本地运行时，client master和worker都在本地机器的同一进程内，均通过DirectSession类来描述（由 DirectSession 同时扮演这三个角色）。由于在同一进程内，三者间可以共享内存，通过DirectSession的相关函数实现调用。client前端直接面向用户，负责session的创建，计算图Graph的构造。并通过session.run()将Graph序列化后传递给master。master收到后，先反序列化得到Graph，然后根据反向依赖关系，得到几个最小依赖子图，这一步称为剪枝。之后master根据可运行的设备情况，将子图分裂到不同设备上，从而可以并发执行，这一步称为分裂。最后，由每个设备上的worker并行执行分裂后的子图，得到计算结果后返回。最终完成子图上定义的所有计算语义，将输出结果以张量形式返回给创建会话的应用程序。ps：跟一个dag 流程编排软件的执行逻辑差不多。 
 
 ![](/public/upload/machine/execute_graph.png)
 
-在本地模式下，Client, Master, Worker 部署在同一台机器同 一进程内，并由 DirectSession 同时扮演这三个角色。
+Graph经过master剪枝和分裂后，就可以在本地的各CPU GPU设备上执行了（这个过程的管理者叫worker）。各CPU GPU设备间可能需要数据通信，通过创建send/recv节点来解决。数据发送方创建send节点，将数据放在send节点内，不阻塞。数据接收方创建recv节点，从recv节点中取出数据，recv节点中如果没有数据则阻塞。这是一个典型的生产者-消费者关系。
 
-Tensorflow 的关键路径为 run_step，用python 简化描述一下
+**运行时是围绕计算图Graph来进行的：图从GraphDef 反序列化为Graph，剪枝和分裂，将分裂后的子图发送给多个worker**。Tensorflow 的关键路径为 run_step，用python 简化描述一下
 
 ```python
 def run_step(devices, full_graph, inputs, outputs):
@@ -246,6 +260,8 @@ def do_run_partitions(executors_and_partitions):
 
 ### 分布式会话运行
 
+在分布式模式中，可能存在多个 Client 同时接入一个 Master， Master 为其每个接入的 Client 创建一个 MasterSession 实例。Worker 也可能同时为多个 Master 提供计算服务，Worker 为其每个请求计算的 Master 创建一个 WorkerSession 实例。 为了区分不同的 Client 的计算服务，使用不同的 session_handle 区分。PS： client-master-worker 属于不同的角色、实现不同的功能，执行还是要由进程驱动。
+
 ```
 tf.train.ClusterSpec({
   "worker": [
@@ -253,13 +269,13 @@ tf.train.ClusterSpec({
     "worker1:2222",  # /job:worker/task:1
     "worker2:2222"   # /job:worker/task:2
   ],
-  "ps": [
+  "ps": [           
     "ps0:2222",      # /job:ps/task:0
     "ps1:2222"       # /job:ps/task:0
 ]})
 ```
 
-一般地，在分布式运行时中，Task (比如 `/job:worker/task:0`) 运行在独立的进程中，并在其上运行一个 tf.train.Server 实例。Server 表示 Task 的服务进程，它对外提供 MasterService 和 WorkerService 服务(grpc)。也 就是说，Server 可以同时扮演 Master 和 Worker 两种角色。
+一般地，在分布式运行时中，Task (比如 `/job:worker/task:0`) 运行在独立的进程中（cluster/job/task 都是对进程的一种划分），并在其上运行一个 tf.train.Server 实例。Server 表示 Task 的服务进程，它对外提供 MasterService 和 WorkerService 服务(grpc)。也 就是说，Server 可以同时扮演 Master 和 Worker 两种角色。
 
 ```
 service MasterService {
@@ -300,10 +316,11 @@ service WorkerService {
       returns (TracingResponse);
 ```
 
-在分布式模式中，Client 负责计算图的构造，然后通过调用 Session.run，启动计算图
-的执行过程。Master 进程收到计算图执行的消息后，启动计算图的剪枝，分裂，优化等操作;最终
-将子图分发注册到各个 Worker 进程上，然后触发各个 Worker 进程并发执行子图。
-Worker 进程收到子图注册的消息后，根据本地计算设备资源，再将计算子图实施二 次分裂，将子图分配在各个计算设备上，最后启动各个计算设备并发地执行子图;如果 Worker 之间存在数据交换，可以通过进程间通信完成交互。其中，在分布式运行时，图分裂经历了两级分裂过程。
+在分布式模式中，Client 负责计算图的构造，然后通过调用 Session.run，启动计算图的执行过程。
+1. Master 进程收到计算图执行的消息后，启动计算图的剪枝，分裂，优化等操作;最终将子图分发注册到各个 Worker 进程上，然后触发各个 Worker 进程并发执行子图。
+2. Worker 进程收到子图注册的消息后，根据本地计算设备资源，再将计算子图实施二 次分裂，将子图分配在各个计算设备上，最后启动各个计算设备并发地执行子图;如果 Worker 之间存在数据交换，可以通过进程间通信完成交互。
+
+其中，在分布式运行时，图分裂经历了两级分裂过程。
 1. 一级分裂:由 MasterSession 完成，按照 SplitByWorker 或 SplitByTask 完成图 分裂过程;
 2. 二级分裂:由 WorkerSession 完成，按照 SplitByDevice 完成图分裂过程。
 
@@ -331,9 +348,9 @@ def recv_outputs(remote_rendezvous, outputs):
     remote_rendezvous.recv(key, tensor)
 ```
 
-在分布式模式中，可能存在多个 Client 同时接入一个 Master， Master 为其每个接入的 Client 创建一个 MasterSession 实例。Worker 也可能同时为多个 Master 提供计算服务，Worker 为其每个请求计算的 Master 创建一个 WorkerSession 实例。 为了区分不同的 Client 的计算服务，使用不同的 session_handle 区分。
-
 ## 汇合点机制 / 设备间通信
+
+本地/分布式运行时存在跨设备的数据依赖。对于跨设备的数据边，将其分裂，在发送方插入send节点，接收方插入recv节点。如果二者跨进程通信（比如两台不同的服务器），则通过GrpcRemoteRendezvous进行数据交换。如果二者是进程内通信（比如同一台服务器的CPU0和CPU1），则通过IntraProcessRendezvous进行数据交换。
 
 ### 使用
 
@@ -367,6 +384,7 @@ struct RecvOp : AsyncOpKernel {
 }
 ```
 ### 实现
+
 [TensorFlow中的通信机制——Rendezvous（一）本地传输](https://www.cnblogs.com/deep-learning-stacks/p/10354258.html)最基本的Rendezvous类被定义在了tensorflow/core/framework/rendezvous.h文件中，它对外提供了最基本的Send、Recv和RecvAsync接口和实现。
 ```c
 // ParsedKey 消息传输的唯一标识符，用于建立 send 和 recv的对应关系
@@ -404,7 +422,7 @@ RemoteRendezvous需要支持不同的通信协议，因此派生了各种各样�
 2. 序列化根本没有对数据做任何压缩，这是因为Tensor都是稠密的，所以序列化没有意义；
 3. 不能支持RDMA和GPU Direct。虽然这依赖于硬件，但是gRPC在软件层面也并没有做这些适配。
 
-## 操作节点执行
+## Worker的执行
 
 在某个设备上，PartitionGraph 的起始节点为 Arg 节点，结束节点为 RetVal 节点。整 个过程可以看成函数调用过程，Arg 用于传递函数参数，RetVal 用于返回函数值。
 更确切地说，Arg 完成 PartitionGraph 的输入，RetVal 完成 PartitionGraph 的输出。 对于 Arg 节点，其调用时序为:set_arg -> get_arg。其中，前者由 DirectSession 在启动 Executor 列表之前，通过调用 FunctionCallFrame.SetArgs(feeds)，传递输入参数列表的 值;后者由 Arg 的 Kernel 实现调用。
@@ -475,73 +493,12 @@ void ExecutorState::Process(TaggedNode tagged_node, int64 scheduled_usec) {
 
 操作节点执行 过程本质是 节点对应的核函数的执行过程。会话运行时，ExecutorImpl::Initialize 会对数据流图上每个操作节点 调用create_kernel 函数，这时创建的 核函数对象 是对应 操作在特定设备上的特化版本。
 
-## BP阶段/梯度计算
-
-Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
-
-1. 计算梯度。即调用`compute_gradients (loss, var_list …)` 计算loss对指定val_list的梯度，返回元组列表 `list(zip(grads, var_list))`。
-2. 用计算得到的梯度来更新对应权重。即调用 `apply_gradients(grads_and_vars, global_step=global_step, name=None)` 将 `compute_gradients (loss, var_list …)` 的返回值作为输入对权重变量进行更新；
-将minimize()分成两个步骤的原因是：可以在某种情况下对梯度进行修正，防止梯度消失或者梯度爆炸。
-
-《Tensorflow内核剖析》
-
-```python
-class Optimizer(object):
-  def minimize(self, loss, var_list=None, global_step=None):
-    """Add operations to minimize loss by updating var_list.
-    """
-    grads_and_vars = self.compute_gradients(loss, var_list=var_list)
-    # 将梯度apply到变量上，具体梯度如何更新到变量，由 _apply_dense、_resource_apply_dense、_apply_sparse、_resource_apply_spars这四个方法实现。
-    return self.apply_gradients(grads_and_vars,global_step=global_step)
-```
-
-compute_gradients 将根据 loss 的值，求解 var_list=[v1, v2, ..., vn] 的梯度，如果不传入var_list，那么默认就是所有trainable的variable。最终 返回的结果为:[(grad_v1, v1), (grad_v2, v2), ..., (grad_vn, vn)]。其中，compute_gradients 将调用 gradients 方法，构造反向传播的子图，可以形式化地描述为
-
-``` python
-def compute_gradients(loss, grad=I):
-  vrg = build_virtual_reversed_graph(loss)
-  for op in vrg.topological_sort():
-    # 对每个正 向子图中的 OP 寻找其「梯度函数」
-    grad_fn = ops.get_gradient_function(op)
-    # 调用该梯度函数，该梯度函数将构造该 OP 对 应的反向的局部子图。
-    grad = grad_fn(op, grad)
-def apply_gradients(grads_and_vars, learning_rate):
-    for (grad, var) in grads_and_vars:
-      # 对于每个 (grad_vi, vi)，构造一个更 新 vi 的子图
-      apply_gradient_descent(learning_rate, grad, var)
-```
-综上述，正向的一个 OP 对应反向的一个局部子图，并由该 OP 的梯度函数负责构造。 一般地，梯度函数满足如下原型:
-
-```python
-@ops.RegisterGradient("op_name")
-def op_grad_func(op, grad)
-```
-对于一个梯度函数，第一个参数 op 表示正向计算的 OP，根据它可以获取正向计算时 OP 的输入和输出;第二个参数 grad，是反向子图中上游节点传递过来的梯度，它是一个 已经计算好的梯度值 (初始梯度值全为 1)。一般地，正向子图中的一个 OP，对应反向子图中的一个局部子图。因为，正向 OP 的 梯度函数实现，可能需要多个 OP 才能完成相应的梯度计算。例如，Square 的 OP，对应梯 度函数构造了包含两个 2 个乘法 OP。
-
-```
-@ops.RegisterGradient("Square")
-    def SquareGrad(op, grad):
-      x = op.inputs[0]
-      with ops.control_dependencies([grad.op]):
-        x = math_ops.conj(x)
-        return grad * (2.0 * x)
-```
-
-![](/public/upload/machine/tf_bp_grad.png)
-
-一个简单的总结，当调用 Optimizer.minimize 方法时，使用 compute_gradients 方法，实现反向计算图的构造;使用 apply_gradients 方法，实现参数更新的子图构造。参数更新子图以 grads_and_vars 为输入，执行梯度下降的更新算法;最后，通 过 train_op 完成 global_step 值加 1，至此一轮 Step 执行完成。
-
-[从论文源码学习 之 embedding层如何自动更新](https://mp.weixin.qq.com/s/v0K_9Y6aWAyHj7N1bIGvBw) 讲的也而非常细、好。
-1. 前向求导关注的是输入是怎么影响到每一层的，反向求导则是关注于每一层是怎么影响到最终的输出结果的。自动求导就是每一个op/layer自己依据自己的输入和输出做前向计算/反向求导，而框架则负责组装调度这些op/layer，表现出来就是你通过框架去定义网络/计算图，框架自动前向计算并自动求导。TensorFlow的求导，实际上是先提供每一个op求导的数学实现，然后使用链式法则求出整个表达式的导数。
-2. 当你定义好了一个神经网络，常见的深度学习框架将其解释为一个dag（有向无环图），dag里每个节点就是op，从loss function这个节点开始，通过链式法则一步一步从后往前计算每一层神经网络的梯度，整个dag梯度计算的最小粒度就是op的 backward 函数（这里是手动的），而链式法则则是自动的。
-3. 构图的时候只需要写完前向的数据流图部分，TensorFlow 的做法是每一个 Op 在建图的时候就同时包含了它的梯度计算公式，构成前向计算图的时候会自动建立反向部分的计算图，前向计算出来的输入输出会保留下来，留到后向计算的时候用完了才删除。
-
-[Tensorflow代码解析（一）](https://zhuanlan.zhihu.com/p/25646408)反向计算限制了符号编程中内存空间复用的优势，因为在正向计算中的计算数据在反向计算中也可能要用到。从这一点上讲，粗粒度的计算节点比细粒度的计算节点更有优势，而TF大部分为细粒度操作，虽然灵活性很强，但细粒度操作涉及到更多的优化方案，在工程实现上开销较大，不及粗粒度简单直接。在神经网络模型中，TF将逐步侧重粗粒度运算。
 
 ## 其它
 
 ### C API
 
+tf 早期通过swig 实现python 调用c
 1. 在 pywrap_tensorflow_internal.cc 的实现中，静 态注册了一个函数符号表，实现了 Python 函数名到 C 函数名的二元关系。
 2. _pywrap_tensorflow_internal.so 包 含了整个 TensorFlow 运行时的所有符号。
 3. pywrap_tensorflow_internal.py 模块首次被导入时，自动地加载 _pywrap_tensorflow_internal.so 的动态链接库

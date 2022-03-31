@@ -31,7 +31,7 @@ tensorflow
   python  // python 前端接口
     layers              // layer组件
     feature_column      // 特征列组件
-    training            // 包括optimizer/saver 等组件
+    training            // 包括optimizer/saver/checkpoint 等组件
     keras
     estimator
     client
@@ -230,6 +230,9 @@ class Variable(object):
         self._init_from_args(initial_value=initial_value,trainable=trainable,...)
     def _init_from_args(self,initial_value=None,...):
         ...
+        # initial_value: 初始值，为一个tensor，或者可以被包装为tensor的值
+        # trainable：是否可以训练，如果为false，则训练时不会改变
+        # collections：变量要加入哪个集合中，有全局变量集合、本地变量集合、可训练变量集合等。默认加入全局变量集合中
         self._variable = state_ops.variable_op_v2(shape,self._initial_value.dtype.base_dtype,name=name)
         self._initializer_op = state_ops.assign(self._variable,self._build_initializer_expr(self._initial_value),...)  
     def read_value(self):
@@ -246,7 +249,7 @@ class PartitionedVariable(object):
 ```
 
 `W = tf.Variable(tf.zeros([784,10]), name='W')` ，TensorFlow 设计了一个精巧的变量初始化模型。
-1. 初始值，tf.zeros 称为 Variable 的初始值，，它确定了 Variable 的类型为 int32，且 Shape为 [784, 10]。
+1. 初始值，tf.zeros返回一个Tensor（**并未承载数据，仅表示Operation输出的一个符号句柄**），初始化时将initial_value初始值赋予Variable内部持有的Tensor，它确定了 Variable 的类型为 int32，且 Shape为 [784, 10]。
 2. 初始化器，，变量通过初始化器 (Initializer) 在初始化期间，将初始化值赋予 Variable 内部所持有 Tensor，完成 Variable 的就地修改。W.initializer 实际上为 Assign的 OP，这是 Variable 默认的初始化器。更为常见的是，通过调用 tf.global_variables_initializer() 将所有变量的初始化器进行汇总，然后启动 Session 运行该 OP。
 3. 事实上，搜集所有全局变量的初始化器的 OP 是一个 NoOp，即不存在输入，也不存在输出。所有变量的初始化器通过控制依赖边与该 NoOp 相连，保证所有的全局变量被初始化。
 
@@ -280,6 +283,11 @@ class _VariableStore(object):
         self._vars[name] = v
         return v
 ```
+
+Variable被划分到不同的集合中，方便后续操作。常见的集合有
+1. 全局变量：全局变量可以在不同进程中共享，可运用在分布式环境中。变量默认会加入到全局变量集合中。通过tf.global_variables()可以查询全局变量集合。其op标示为GraphKeys.GLOBAL_VARIABLES
+2. 运行在进程内的变量，不能跨进程共享。通常用来保存临时变量，如训练迭代次数epoches。通过tf.local_variables()可以查询本地变量集合。其op标示为GraphKeys.LOCAL_VARIABLES
+3. 可训练变量：一般模型参数会放到可训练变量集合中，训练时，做这些变量会得到改变。不在这个集合中的变量则不会得到改变。默认会放到此集合中。通过tf.trainable_variables()可以查询。其op标示为GraphKeys.TRAINABLE_VARIABLES
 
 ## Layer
 
@@ -363,6 +371,13 @@ def dense(inputs, units,activation=None,...):
 
 [tensorflow optimizer源码阅读笔记](https://zhuanlan.zhihu.com/p/87348147)
 
+### 整体实现
+
+Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
+
+1. 计算梯度。即调用`compute_gradients (loss, var_list …)` 计算loss对指定val_list的梯度，返回元组列表 `list(zip(grads, var_list))`。
+2. 用计算得到的梯度来更新对应权重。即调用 `apply_gradients(grads_and_vars, global_step=global_step, name=None)` 将 `compute_gradients (loss, var_list …)` 的返回值作为输入对权重变量进行更新；
+将minimize()分成两个步骤的原因是：可以在某种情况下对梯度进行修正，防止梯度消失或者梯度爆炸。
 
 ```python
 # tensorflow/tensorflow/python/training/optimizer.py
@@ -468,6 +483,8 @@ class SparseTensor(_TensorLike):
 
 如果在前向传播过程中用了 lookup 之类的函数取了一个 Tensor 中的几行，那最后得出来的梯度就会是 IndexedSlices。这样存储有什么好处呢？比如我们的model里面的100000*10大小的embedding矩阵，当前来了个batch，lookup的index行号是[0, 201, 301]，那么在更新整个embedding参数的时候，其实只需更新这三行的参数即可。所以IndexedSlices其实只存储了index = [0, 201, 301]，和对应3*10大小的梯度。
 
+### GradientDescentOptimizer
+
 来看一下更简单点的梯度下降法（实现Optimizer 暴露的抽象方法即可）
 
 ```python
@@ -498,3 +515,165 @@ class GradientDescentOptimizer(optimizer.Optimizer):
   def _prepare(self):
     self._learning_rate_tensor = ops.convert_to_tensor(self._learning_rate,name="learning_rate")
 ```
+
+
+### BP阶段/梯度计算
+
+《Tensorflow内核剖析》
+
+```python
+class Optimizer(object):
+  def minimize(self, loss, var_list=None, global_step=None):
+    """Add operations to minimize loss by updating var_list.
+    """
+    grads_and_vars = self.compute_gradients(loss, var_list=var_list)
+    # 将梯度apply到变量上，具体梯度如何更新到变量，由 _apply_dense、_resource_apply_dense、_apply_sparse、_resource_apply_spars这四个方法实现。
+    return self.apply_gradients(grads_and_vars,global_step=global_step)
+```
+
+compute_gradients 将根据 loss 的值，求解 var_list=[v1, v2, ..., vn] 的梯度，如果不传入var_list，那么默认就是所有trainable的variable。最终 返回的结果为:[(grad_v1, v1), (grad_v2, v2), ..., (grad_vn, vn)]。其中，compute_gradients 将调用 gradients 方法，构造反向传播的子图，可以形式化地描述为
+
+``` python
+def compute_gradients(loss, grad=I):
+  vrg = build_virtual_reversed_graph(loss)
+  for op in vrg.topological_sort():
+    # 对每个正 向子图中的 OP 寻找其「梯度函数」
+    grad_fn = ops.get_gradient_function(op)
+    # 调用该梯度函数，该梯度函数将构造该 OP 对 应的反向的局部子图。
+    grad = grad_fn(op, grad)
+def apply_gradients(grads_and_vars, learning_rate):
+    for (grad, var) in grads_and_vars:
+      # 对于每个 (grad_vi, vi)，构造一个更 新 vi 的子图
+      apply_gradient_descent(learning_rate, grad, var)
+```
+综上述，正向的一个 OP 对应反向的一个局部子图，并由该 OP 的梯度函数负责构造。 一般地，梯度函数满足如下原型:
+
+```python
+@ops.RegisterGradient("op_name")
+def op_grad_func(op, grad)
+```
+对于一个梯度函数，第一个参数 op 表示正向计算的 OP，根据它可以获取正向计算时 OP 的输入和输出;第二个参数 grad，是反向子图中上游节点传递过来的梯度，它是一个 已经计算好的梯度值 (初始梯度值全为 1)。一般地，正向子图中的一个 OP，对应反向子图中的一个局部子图。因为，正向 OP 的 梯度函数实现，可能需要多个 OP 才能完成相应的梯度计算。例如，Square 的 OP，对应梯 度函数构造了包含两个 2 个乘法 OP。
+
+```
+@ops.RegisterGradient("Square")
+    def SquareGrad(op, grad):
+      x = op.inputs[0]
+      with ops.control_dependencies([grad.op]):
+        x = math_ops.conj(x)
+        return grad * (2.0 * x)
+```
+
+![](/public/upload/machine/tf_bp_grad.png)
+
+一个简单的总结，当调用 Optimizer.minimize 方法时，使用 compute_gradients 方法，实现反向计算图的构造;使用 apply_gradients 方法，实现参数更新的子图构造。参数更新子图以 grads_and_vars 为输入，执行梯度下降的更新算法;最后，通 过 train_op 完成 global_step 值加 1，至此一轮 Step 执行完成。
+
+[从论文源码学习 之 embedding层如何自动更新](https://mp.weixin.qq.com/s/v0K_9Y6aWAyHj7N1bIGvBw) 讲的也而非常细、好。
+1. 前向求导关注的是输入是怎么影响到每一层的，反向求导则是关注于每一层是怎么影响到最终的输出结果的。自动求导就是每一个op/layer自己依据自己的输入和输出做前向计算/反向求导，而框架则负责组装调度这些op/layer，表现出来就是你通过框架去定义网络/计算图，框架自动前向计算并自动求导。TensorFlow的求导，实际上是先提供每一个op求导的数学实现，然后使用链式法则求出整个表达式的导数。
+2. 当你定义好了一个神经网络，常见的深度学习框架将其解释为一个dag（有向无环图），dag里每个节点就是op，从loss function这个节点开始，通过链式法则一步一步从后往前计算每一层神经网络的梯度，整个dag梯度计算的最小粒度就是op的 backward 函数（这里是手动的），而链式法则则是自动的。
+3. 构图的时候只需要写完前向的数据流图部分，TensorFlow 的做法是每一个 Op 在建图的时候就同时包含了它的梯度计算公式，构成前向计算图的时候会自动建立反向部分的计算图，前向计算出来的输入输出会保留下来，留到后向计算的时候用完了才删除。
+
+[Tensorflow代码解析（一）](https://zhuanlan.zhihu.com/p/25646408)反向计算限制了符号编程中内存空间复用的优势，因为在正向计算中的计算数据在反向计算中也可能要用到。从这一点上讲，粗粒度的计算节点比细粒度的计算节点更有优势，而TF大部分为细粒度操作，虽然灵活性很强，但细粒度操作涉及到更多的优化方案，在工程实现上开销较大，不及粗粒度简单直接。在神经网络模型中，TF将逐步侧重粗粒度运算。
+
+## Graph数据结构
+
+[Tensorflow源码解析3 -- TensorFlow核心对象 - Graph](https://zhuanlan.zhihu.com/p/179986902) 在Python前端中，Operation表示Graph的节点，Tensor表示Graph的边。
+```python
+# tensorflow/tensorflow/python/framework/ops.py
+class Graph(object):
+    def __init__(self):
+        self._lock = threading.Lock()   # 加线程锁，使得注册op时，不会有其他线程注册op到graph中，从而保证共享graph是线程安全的
+        # op相关数据。
+        # 为graph的每个op分配一个id，通过id可以快速索引到相关op。故创建了_nodes_by_id字典
+        self._nodes_by_id = dict()      # GUARDED_BY(self._lock)
+        self._next_id_counter = 0       # GUARDED_BY(self._lock)
+        # 同时也可以通过name来快速索引op，故创建了_nodes_by_name字典
+        self._nodes_by_name = dict()    # GUARDED_BY(self._lock)
+        self._version = 0               # GUARDED_BY(self._lock)
+        
+        # tensor相关数据。
+        self._handle_feeders = {}   # 处理tensor的placeholder
+        self._handle_readers = {}   # 处理tensor的read操作
+        self._handle_movers = {}    # 处理tensor的move操作
+        self._handle_deleters = {}  # 处理tensor的delete操作
+    # graph添加op
+    def _add_op(self, op):
+        self._check_not_finalized()     # graph被设置为final后，就是只读的了，不能添加op了。
+        with self._lock:                # 保证共享graph的线程安全
+            # 将op以id和name分别构建字典，添加到_nodes_by_id和_nodes_by_name字典中，方便后续快速索引
+            self._nodes_by_id[op._id] = op
+            self._nodes_by_name[op.name] = op
+            self._version = max(self._version, op._id)
+```
+
+每个Operation节点都有一个特定的标签，从而实现节点的分类。相同标签的节点归为一类，放到同一个Collection中。标签是一个唯一的GraphKey
+
+```python
+class Operation(object):
+  def __init__(self,node_def,g,inputs=None,...):
+    self._graph = g        # graph引用，通过它可以拿到Operation所注册到的Graph
+    
+    # inputs
+    if inputs is None:
+      inputs = []
+    #  input types
+    if input_types is None:
+      input_types = [i.dtype.base_dtype for i in inputs]
+
+    control_input_ops = []
+    
+    # node_def和op_def是两个最关键的成员
+    if not self._graph._c_graph:
+      self._inputs_val = list(inputs)  # Defensive copy.
+      self._input_types_val = input_types
+      self._control_inputs_val = control_input_ops
+
+      # NodeDef，深复制
+      self._node_def_val = copy.deepcopy(node_def)
+      # OpDef
+      self._op_def_val = op_def
+    # outputs输出
+    self._outputs = [
+        Tensor(self, i, output_type)
+        for i, output_type in enumerate(output_types)
+    ]
+  def name(self):
+    return self._node_def_val.name
+  def _id(self):
+    return self._id_value
+  def device(self):
+    return self._node_def_val.device
+  def node_def(self):   # NodeDef成员，获取Operation的动态属性信息，例如Operation分配到的设备信息，Operation的name等
+    return self._node_def_val
+  def op_def(self):     # OpDef，获取Operation的静态属性信息，例如Operation入参列表，出参列表等
+    return self._op_def_val
+```
+Tensor中主要包含两类信息，一个是Graph结构信息，如边的源节点和目标节点。另一个则是它所保存的数据信息，例如数据类型，shape等。
+```python
+class Tensor(_TensorLike):
+  def __init__(self, op, value_index, dtype):
+    self._op = op       # 源节点，tensor的生产者，会计算得到tensor
+    # tensor在源节点的输出边集合中的索引。源节点可能会有多条输出边
+    self._value_index = value_index         # 利用op和value_index即可唯一确定tensor。
+    self._dtype = dtypes.as_dtype(dtype)    # tensor中保存的数据的数据类型
+    self._shape_val = tensor_shape.unknown_shape()  # tensor的shape，可以得到张量的rank，维度等信息
+    self._consumers = []                            # 目标节点列表，tensor的消费者，会使用该tensor来进行计算
+    self._handle_data = None
+    self._id = uid()
+```
+
+[Tensorflow代码解析（三）](https://zhuanlan.zhihu.com/p/25929909)
+python 部分
+```python
+# 在Python脚本中定义matmul运算
+tf.manual(a,b)
+    # 根据Ops名称MatMul从Ops库中找出对应Ops类型
+    _op_def_lib.apply_op('MatMul',a=a,b=b,...)
+    # ops/op_def_library.py
+    # 创建ops节点
+    graph.create_op(op_type_name,inputs,output_types,...)
+    # framework/ops.py
+    # 创建ops节点并指定相关属性和设备分配
+    node_def = _NodeDef(op_type,name,device=None,attrs=attrs)
+    ret = Operation(node_def,self,inputs=inputs,...)
+```
+
