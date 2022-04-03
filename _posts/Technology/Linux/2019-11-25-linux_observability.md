@@ -13,14 +13,12 @@ keywords: 可观测性
 * TOC
 {:toc}
 
-当我在说可观察性的时候我在说啥？CNCF 正在推进 OpenTelemetry 来实现metric + trace + log 一体化。 对于linux来说 metric == top/node-exporter;trace == perf; log = kernel log
-
-![](/public/upload/linux/observability.png)
-
 如何通过监控找到性能瓶颈？
 
-1. 微观上，快速地找出进程内的瓶颈函数，就是从代码层面直接寻找调用次数最频繁、耗时最长的函数，通常它就是性能瓶颈。[火焰图](http://www.brendangregg.com/flamegraphs.html)
-2. 宏观上，找出整个分布式系统中的瓶颈组件。全链路监控
+1. 宏观上，找出整个分布式系统中的瓶颈组件。全链路监控
+2. 微观上，快速地找出进程内的瓶颈函数，就是从代码层面直接寻找调用次数最频繁、耗时最长的函数，通常它就是性能瓶颈。[火焰图](http://www.brendangregg.com/flamegraphs.html)
+
+![](/public/upload/linux/linux_profile.png)
 
 ## cpu
 
@@ -153,44 +151,45 @@ root     32901 32794  0 00:01 pts/0    00:00:00 ps -ef
 
 ## perf
 
-[干货携程容器偶发性超时问题案例分析（一）](https://mp.weixin.qq.com/s/bSNWPnFZ3g_gciOv_qNhIQ)
+[perf](https://perf.wiki.kernel.org/index.php/Main_Page) began as a tool for using the performance counters subsystem in Linux, and has had various enhancements to add tracing capabilities. linux 有一个performance counters，perf 是这个子系统的外化。perf是性能分析的必备工具, 它最核心的能力是能访问硬件上的Performance Monitor Unit (PMU)。
 
-[干货携程容器偶发性超时问题案例分析（二）](https://mp.weixin.qq.com/s/7ZZqWPE1XNf9Mn_wj1HjUw)
+perf的原理是这样的：每隔一个固定的时间，就在CPU上（每个核上都有）产生一个中断，在中断上看看，当前是哪个pid，哪个函数，然后给对应的pid和函数加一个统计值，这样，我们就知道CPU有百分几的时间在某个pid，或者某个函数上了。这是一种采样的模式，我们预期，运行时间越多的函数，被时钟中断击中的机会越大，从而推测，那个函数（或者pid等）的CPU占用率就越高。perf最大的好处是它可以直接跟踪到整个系统的所有程序（而不仅仅是内核），所以perf通常是我们分析的第一步，我们先看到整个系统的outline，然后才会进去看具体的调度，时延等问题。
 
-两篇文章除了膜拜之外，最大的体会就是：业务、docker daemon、网关、linux内核、硬件  都可能会出问题，都得有手段去支持自己做排除法
+### event 和 采样
+
+三类event，event 是 perf 工作的基础，主要有两种：有使用硬件的 PMU 里的 event，也有在内核代码中注册的 event。
+1. Hardware event，Hardware event 来自处理器中的一个 PMU（Performance Monitoring Unit），这些 event 数目不多，都是底层处理器相关的行为，perf 中会命名几个通用的事件，比如 cpu-cycles，执行完成的 instructions，Cache 相关的 cache-misses。不同的处理器有自己不同的 PMU 事件
+    1. Performance counters are CPU hardware registers that count hardware events such as instructions executed, cache-misses suffered, or branches mispredicted. They form a basis for **profiling applications** to trace dynamic control flow and identify hotspots. perf provides rich generalized abstractions over hardware specific capabilities. Among others, it provides per task, per CPU and per-workload counters, sampling on top of these and source code event annotation. 
+2. Software event，Software event 是定义在 Linux 内核代码中的几个特定的事件，比较典型的有进程上下文切换（内核态到用户态的转换）事件 context-switches、发生缺页中断的事件 page-faults 等。
+3. Tracepoints event，实现方式和 Software event 类似，都是在内核函数中注册了 event。不仅是用在 perf 中，它已经是 Linux 内核 tracing 的标准接口了，ftrace，ebpf 等工具都会用到它。
+    1. Tracepoints are instrumentation points placed at logical locations in code, such as for system calls, TCP/IP events, file system operations, etc. These have negligible(微不足道的) overhead when not in use, and can be enabled by the perf command to collect information including timestamps and stack traces. perf can also dynamically create tracepoints using the kprobes and uprobes frameworks, for kernel and userspace dynamic tracing. The possibilities with these are endless.
+
+在这些 event 都准备好了之后，perf 又是怎么去使用这些 event 呢？有计数和采样两种方式
+1. 计数，就是统计某个 event 在一段时间里发生了多少次。一般用perf stat 查看
+2. 采样，Perf 对 event 的采样有两种模式：
+    1. 按照 event 的数目（period），比如每发生 10000 次 cycles event 就记录一次 IP、进程等信息， perf record 中的 -c 参数可以指定每发生多少次，就做一次记录
+    2. 定义一个频率（frequency）， perf record 中的 -F 参数就是指定频率的，比如 perf record -e cycles -F 99 -- sleep 1 ，就是指采样每秒钟做 99 次。
+    1. 通过-e指定感兴趣的一个或多个event（perf list可以列出支持的event）
+    2. 指定采样的范围, 比如进程级别 (-p), 线程级别 (-t), cpu级别 (-C), 系统级别 (-a)
+
+使用 perf 的常规步骤：在 perf record 运行结束后，会在磁盘的当前目录留下 perf.data 这个文件，里面记录了所有采样得到的信息。然后我们再运行 perf report 命令，查看函数或者指令在这些采样里的分布比例，后面我们会用一个例子说明。或者
+
+```sh
+// 在 perf record 运行结束后，会在磁盘的当前目录留下 perf.data 这个文件，里面记录了所有采样得到的信息。
+# perf record -a -g -- sleep 60
+// 用 perf script 命令把 perf record 生成的 perf.data 转化成分析脚本
+# perf script > out.perf
+# git clone --depth 1 https://github.com/brendangregg/FlameGraph.git
+# FlameGraph/stackcollapse-perf.pl out.perf > out.folded
+// 用 FlameGraph 工具来读取这个脚本，生成火焰图。
+# FlameGraph/flamegraph.pl out.folded > out.sv
+```
+
+perf record 在不加 -e 指定 event 的时候，它缺省的 event 就是 Hardware event cycles。
 
 ![](/public/upload/linux/perf_event.png)
 
-[perf](https://perf.wiki.kernel.org/index.php/Main_Page) began as a tool for using the performance counters subsystem in Linux, and has had various enhancements to add tracing capabilities. linux 有一个performance counters，perf 是这个子系统的外化。perf是性能分析的必备工具, 它最核心的能力是能访问硬件上的Performance Monitor Unit (PMU)。
 
-Performance counters are CPU hardware registers that count hardware events such as instructions executed, cache-misses suffered, or branches mispredicted. They form a basis for **profiling applications** to trace dynamic control flow and identify hotspots. perf provides rich generalized abstractions over hardware specific capabilities. Among others, it provides per task, per CPU and per-workload counters, sampling on top of these and source code event annotation.
-
-Tracepoints are instrumentation points placed at logical locations in code, such as for system calls, TCP/IP events, file system operations, etc. These have negligible(微不足道的) overhead when not in use, and can be enabled by the perf command to collect information including timestamps and stack traces. perf can also dynamically create tracepoints using the kprobes and uprobes frameworks, for kernel and userspace dynamic tracing. The possibilities with these are endless. 基于已有的或动态创建的tracepoints 跟踪数据 
-
-[系统性能分析从入门到进阶](https://mp.weixin.qq.com/s/beqzPadduGPSn6hw7oF4EQ)perf使用的时候一般会传入以下参数:
-
-1. 通过-e指定感兴趣的一个或多个event（perf list可以列出支持的event）
-2. 指定采样的范围, 比如进程级别 (-p), 线程级别 (-t), cpu级别 (-C), 系统级别 (-a)
-
-
-The userspace perf command present a simple to use interface with commands like:
-
-1. perf stat: obtain event counts
-2. perf record: record events for later reporting
-3. perf report: break down events by process, function, etc.
-4. perf annotate: annotate assembly or source code with event counts
-5. perf top: see live event count
-6. perf bench: run different kernel microbenchmarks
-
-[perf Tutorial](https://perf.wiki.kernel.org/index.php/Tutorial)
-
-[Perf -- Linux下的系统性能调优工具，第 1 部分](https://www.ibm.com/developerworks/cn/linux/l-cn-perf1/index.html) 值得再细读一遍，尤其是如何从linxu及硬件 视角优化性能。
-
-当算法已经优化，代码不断精简，人们调到最后，便需要斤斤计较了。cache 啊，流水线啊一类平时不大注意的东西也必须精打细算了。
-
-[干货携程容器偶发性超时问题案例分析（一）](https://mp.weixin.qq.com/s/bSNWPnFZ3g_gciOv_qNhIQ)[干货携程容器偶发性超时问题案例分析（二）](https://mp.weixin.qq.com/s/7ZZqWPE1XNf9Mn_wj1HjUw) 这两篇文章中，使用perf sched 发现了物理上存在的调度延迟问题。
-
-[容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)通过 `perf top` 命令可以查看 哪些函数占用了最多的cpu 时间
 
 ### perf stat
 
@@ -233,6 +232,20 @@ perf stat 给出了其他几个最常用的统计信息：
 perf sched 使用了转储后再分析 (dump-and-post-process) 的方式来分析内核调度器的各种事件
 
 [几十万实例线上系统的抖动问题定位](https://mp.weixin.qq.com/s/PordZi_H5fqX_-Ty9OH6qQ)
+
+### 分析实践
+
+[perf Tutorial](https://perf.wiki.kernel.org/index.php/Tutorial)
+
+[Perf -- Linux下的系统性能调优工具，第 1 部分](https://www.ibm.com/developerworks/cn/linux/l-cn-perf1/index.html) 值得再细读一遍，尤其是如何从linxu及硬件 视角优化性能。
+
+当算法已经优化，代码不断精简，人们调到最后，便需要斤斤计较了。cache 啊，流水线啊一类平时不大注意的东西也必须精打细算了。
+
+[干货携程容器偶发性超时问题案例分析（一）](https://mp.weixin.qq.com/s/bSNWPnFZ3g_gciOv_qNhIQ)[干货携程容器偶发性超时问题案例分析（二）](https://mp.weixin.qq.com/s/7ZZqWPE1XNf9Mn_wj1HjUw) 这两篇文章中，使用perf sched 发现了物理上存在的调度延迟问题。
+
+[容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)通过 `perf top` 命令可以查看 哪些函数占用了最多的cpu 时间
+
+[干货携程容器偶发性超时问题案例分析（一）](https://mp.weixin.qq.com/s/bSNWPnFZ3g_gciOv_qNhIQ)[干货携程容器偶发性超时问题案例分析（二）](https://mp.weixin.qq.com/s/7ZZqWPE1XNf9Mn_wj1HjUw)两篇文章除了膜拜之外，最大的体会就是：业务、docker daemon、网关、linux内核、硬件  都可能会出问题，都得有手段去支持自己做排除法
 
 ## 日志
 

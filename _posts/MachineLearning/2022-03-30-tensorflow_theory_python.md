@@ -253,7 +253,7 @@ class PartitionedVariable(object):
 2. 初始化器，，变量通过初始化器 (Initializer) 在初始化期间，将初始化值赋予 Variable 内部所持有 Tensor，完成 Variable 的就地修改。W.initializer 实际上为 Assign的 OP，这是 Variable 默认的初始化器。更为常见的是，通过调用 tf.global_variables_initializer() 将所有变量的初始化器进行汇总，然后启动 Session 运行该 OP。
 3. 事实上，搜集所有全局变量的初始化器的 OP 是一个 NoOp，即不存在输入，也不存在输出。所有变量的初始化器通过控制依赖边与该 NoOp 相连，保证所有的全局变量被初始化。
 
-Variable 由_VariableStore 管理
+Variable 由_VariableStore 管理（在较新的版本可能去掉了）
  
 ```python
 # tensorflow/tensorflow/python/ops/variable_scope.py

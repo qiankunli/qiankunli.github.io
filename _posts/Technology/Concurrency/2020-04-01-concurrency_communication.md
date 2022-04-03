@@ -37,7 +37,7 @@ keywords: Java  concurrency
 
 《java并发编程实战》按照面向对象编程的理论，对象之间通信需要依靠消息，而实际上，像 C++、Java 这些面向对象的语言，对象之间通信，依靠的是对象方法。对象方法和过程语言里的函数本质上没有区别，那面向对象理论里的消息是否就等价于面向对象语言里的对象方法呢？很长一段时间里，我都以为对象方法是面向对象理论中消息的一种实现，直到接触到 Actor 模型，才明白消息压根不是这个实现法。
 
-Actor 模型本质上是一种计算模型，基本的计算单元称为 Actor，换言之，在 Actor 模型中，所有的计算都是在 Actor 中执行的。在面向对象编程里面，一切都是对象；在 Actor 模型里，一切都是 Actor，并且 Actor 之间是完全隔离的，不会共享任何变量。但是 Java 语言本身并不支持 Actor 模型，需要借助第三方类库，目前能完备地支持 Actor 模型而且比较成熟的类库就是 Akka了，先基于 Akka 写一个 Hello World 程序
+Actor 模型本质上是一种**计算模型**，基本的计算单元称为 Actor，换言之，在 Actor 模型中，所有的计算都是在 Actor 中执行的。在面向对象编程里面，一切都是对象；在 Actor 模型里，一切都是 Actor，并且 Actor 之间是完全隔离的，不会共享任何变量。但是 Java 语言本身并不支持 Actor 模型，需要借助第三方类库，目前能完备地支持 Actor 模型而且比较成熟的类库就是 Akka了，先基于 Akka 写一个 Hello World 程序
 
 ```java
 //该Actor当收到消息message后，会打印Hello message
@@ -59,7 +59,9 @@ public static void main(String[] args) {
 
 首先创建了一个 ActorSystem（Actor 不能脱离 ActorSystem 存在）；之后创建了一个 HelloActor，Akka 中创建 Actor 并不是 new 一个对象出来，而是通过调用 `system.actorOf()` 方法创建的，该方法返回的是 ActorRef，而不是 HelloActor；最后通过调用 ActorRef 的 `tell()` 方法给 HelloActor 发送了一条消息 “Actor”。
 
-Actor 中的消息机制，就可以类比这现实世界里的写信。Actor 内部有一个邮箱（Mailbox），接收到的消息都是先放到邮箱里，如果邮箱里有积压的消息，那么新收到的消息就不会马上得到处理，也正是因为 Actor 使用单线程处理消息，所以不会出现并发问题。
+![](/public/upload/concurrency/akka_actor.png)
+
+Actor 中的消息机制，就可以类比这现实世界里的写信。Actor 内部有一个邮箱（Mailbox），接收到的消息都是先放到邮箱里，如果邮箱里有积压的消息，那么新收到的消息就不会马上得到处理，也正是因为 Actor 使用单线程处理消息，所以不会出现并发问题。采用基于 Actor 模型的 Akka 框架，在开发实现软件时，你就不需要关注底层的并发交互同步了(天然避免了在消息交互中需要解决的数据一致性的问题)，只需要聚焦到业务中设计每个 Actor 实现的业务逻辑，它需要接收什么消息，又需要向谁发送什么消息。在实际的业务开发中要注意，如果在使用 Actor 时，没有利用好 Actor 轻量级的特性，开发出来的 Actor 承载的业务逻辑太多，导致 Actor 的任务粒度过大 或IO 密集型业务，那么就很难发挥出 Actor 的最佳性能表现。
 
 |区别|消息|对象方法|
 |---|---|---|

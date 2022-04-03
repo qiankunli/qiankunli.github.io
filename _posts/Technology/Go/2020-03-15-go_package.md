@@ -15,14 +15,11 @@ keywords: Go 打包
 
 ![](/public/upload/go/go_module.png)
 
-
-
 ## 如何组织一个大项目的go 代码
 
 ### 宏观
 
 ```
-
 $tree -F exe-layout 
 exe-layout
 ├── cmd/
@@ -116,9 +113,10 @@ Golang使用包（package）这种语法元素来组织源码，所有**语法�
 对于go来说，其实并不在意你的代码是内部还是外部的，总之都在GOPATH里，任何import包的路径都是从GOPATH开始的；唯一的区别，就是内部依赖的包是开发者自己写的，外部依赖的包是go get下来的。Go 语言原生包管理的缺陷：
 
 1. 能拉取源码的平台很有限，绝大多数依赖的是 github.com
-2. 不能区分版本，以至于令开发者以最后一项包名作为版本划分
+2. 不能区分版本（对于依赖的同一个包只能从master分支上导入最新的提交，且不能导入包的指定的版本），以至于令开发者以最后一项包名作为版本划分。 
 3. 依赖 列表/关系 无法持久化到本地，需要找出所有依赖包然后一个个 go get
 4. 只能依赖本地全局仓库（GOPATH/GOROOT），无法将库放置于局部仓库（$PROJECT_HOME/vendor）
+5. 所有的项目都必须在GOPATH/src指向的目录下，或者必须更改GOPATH环境变量所指向的目录。
 
 ## vendor
 
@@ -152,6 +150,7 @@ vendor属性就是让go编译时，优先从项目源码树根目录下的vendor
 3. packages是被引用的最小单位
 
 [一文读懂Go Modules原理](https://mp.weixin.qq.com/s/FhUty8prexpxggXkkumDdw)
+[手把手教你如何创建及使用Go module](https://mp.weixin.qq.com/s/JpE5aIl2Lu0T1mEwksKw_Q)
 
 ### 版本
 

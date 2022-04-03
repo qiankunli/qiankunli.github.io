@@ -26,6 +26,8 @@ TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的�
 
 ## 宏观
 
+![](/public/upload/network/linux_tcp_function.png)
+
 ### 创建
 
 ![](/public/upload/linux/socket_create.png)
