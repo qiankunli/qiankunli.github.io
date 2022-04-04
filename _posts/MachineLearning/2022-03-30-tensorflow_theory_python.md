@@ -43,7 +43,7 @@ tensorflow
   core              // tf的核心，基本都是c++，包括运行时、图操作、op定义、kernel实现等
 ```
 
-结合tf 原生api（自己定义Variable 乘一乘，计算 output/loss/optimizer） 实际例子来看下
+结合tf 原生api（自己定义Variable 乘一乘，计算 output/loss，使用optimizer） 实际例子来看下
 
 ```python
 # 返回 _NumericColumn
@@ -291,7 +291,7 @@ Variable被划分到不同的集合中，方便后续操作。常见的集合有
 
 ## Layer
 
-A layer is a class implementing common neural networks operations, such as convolution, batch norm, etc. These operations require managing variables,losses, and updates, as well as applying TensorFlow ops to input tensors.  Users will just instantiate it and then treat it as a callable. tf 自己定义几个 variable 乘一乘，然后直接用就行了，但对常用模型来说，这些都是重复工作。
+A layer is a class implementing common neural networks operations, such as convolution, batch norm, etc. These operations require managing variables,losses, and updates, as well as applying TensorFlow ops to input tensors.  Users will just instantiate it and then treat it as a callable. tf 自己定义几个 variable 乘一乘，然后直接用就行了，但对常用模型来说，这些都是重复工作。Layer是一组简单的可重复利用的代码，可以认为是一系列op的集合，与op一样也是输入tensor并输出tensor的。
 
 ```python
 # tensorflow/tensorflow/python/layers/base.py

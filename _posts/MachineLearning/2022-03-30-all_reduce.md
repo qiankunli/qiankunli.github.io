@@ -17,7 +17,19 @@ keywords: allreduce
 
 [Ring AllReduce简介](https://mp.weixin.qq.com/s/K8l7H2zCUr9sGzYehizFMA) 各种配图都比较详细了。
 
-## 《用python实现深度学习框架》 api示例
+Reduce：从多个sender那里接收数据，最终combine到一个节点上
+
+![](/public/upload/machine/gpu_reduce.png)
+
+All-reduce：从多个sender那里接收数据，最终combine到每一个节点上。ringAllReduce 是实现 All-reduce 的一种算法（先reduce再broadcast 也是一种，一共有七八种之多）
+
+![](/public/upload/machine/gpu_all_reduce.png)
+
+Allreduce在单机不同架构下的速度比较
+
+![](/public/upload/machine/gpu_all_reduce_speed.png)
+
+## 《用python实现深度学习框架》 api示例（待补充）
 
 Ring AllReduce 分为Split/ScatterReudce/AllGather 三个步骤(《用python实现深度学习框架》配图解释的非常好)，对于每个worker 来说，它既是右邻居的client，要把自身的梯度发送出去，又是左邻居的server，接收来自左邻居的梯度。AllReduce 的gprc 定义
 ```
@@ -29,7 +41,7 @@ message RingAllReduceReq{
   enum Stage{
     INIT = 0;
     Scatter = 1;
-    Gather = 2;
+    Gather = 2
   }
   Stage stage = 1;
   NodeGradients node_gradients = 2;
@@ -39,14 +51,68 @@ message RingAllReduceReq{
 VariableWeightsInit 在单机训练的场景下，各变量节点的值是随机初始化的，但是分布式训练场景下，如果多个worker节点也各自随机初始化自己的变量节点，则会导致模型参数在多个worker 节点上不一致。其实从理论上说，随机甚至还是好事，不过从编程来说，还得加上这个保证。
 
 
-## horovod/allreduce 
+## horovod
+
+Horovod 目前架构的基础是：机器学习的模型参数在一张 GPU 上可以存下。
+
+### 使用
+
+```python
+import tensorflow as tf
+import horovod.tensorflow as hvd
+
+# Initialize Horovod
+hvd.init()
+# Pin GPU to be used to process local rank (one GPU per process)
+config = tf.ConfigProto()
+config.gpu_options.visible_device_list = str(hvd.local_rank())
+# Build model...
+loss = ...
+opt = tf.train.AdagradOptimizer(0.01 * hvd.size())
+# Add Horovod Distributed Optimizer
+opt = hvd.DistributedOptimizer(opt)
+# Add hook to broadcast variables from rank 0 to all other processes during initialization.
+hooks = [hvd.BroadcastGlobalVariablesHook(0)]
+# Make training operation
+train_op = opt.minimize(loss)
+# Save checkpoints only on worker 0 to prevent other workers from corrupting them.
+checkpoint_dir = '/tmp/train_logs' if hvd.rank() == 0 else None
+# The MonitoredTrainingSession takes care of session initialization, restoring from a checkpoint, saving to a checkpoint, and closing when done or an error occurs.
+with tf.train.MonitoredTrainingSession(checkpoint_dir=checkpoint_dir,config=config,hooks=hooks) as mon_sess:
+  while not mon_sess.should_stop():
+    # Perform synchronous training.
+    mon_sess.run(train_op)
+```
+
+[horovod搭配estimator](https://zhuanlan.zhihu.com/p/69806200)
+
+1. 单机多卡启动命令：`horovodrun -np 4 -H localhost:4 python train.py`
+  1. `-np` 指的是进程的数量
+  2. `localhost:4`表示localhost节点上4个GPU。
+  3. 会启动4个进程执行 `python train.py`（底层使用ssh进行命令分发）
+2. 多机多卡启动命令，不需要在每个机器上都启动，只需要在第一个机器上启动该命令即可 `horovodrun -np 16 -H server1:4,server2:4,server3:4,server4:4 python train.py`， 这里使用 4 个服务器，每个服务器使用 4 块 GPU
+
+### 架构
+
+```
+horovod/horovod
+  common        // 主要是c的部分
+  data
+  keras
+  mxnet         // 与mxnet融合
+  runner        // horovodrun 实现
+  tensorflow    // 与tensorflow融合
+```
+
+[基于 Horovod 进行深度学习分布式训练](https://mp.weixin.qq.com/s/oIgvC1EmiUcNXfZf9SLP0w)Horovod主要由数据通信层、通信控制层、深度学习框架接口层、启动层四部分组成。其中启动层通过horovodrun或mpirun启动训练进程，之后每个训练进程通过调用TensorFLow、PyTorch、MXNet等框架（`python train.py`）进行单个结点的数据输入、参数更新，在每个进程完成一个或多个batch计算后，得到的Tensor（参数）通过MPI或GLoo控制进行ring-allreduce，ring-allreduce 的通信可以基于MPI、NCLL、DDL、MLSL或GLoo。PS: Horovod 本身会在每一个worker 上启动一个进程（运行工作组件），然后内部 执行 `python train.py` 启动tf 框架进程，与框架融合的代码会负责 将tf 框架的 操作指令发给 Horovod 进程 干活。这就有点类似于 k8s 中的CNI 插件，CNI 插件一般分为两部分，一部分按照k8s的规范 提供执行接口（cni binary），另一部分独立运行在容器内 作为service，cni binary 会把 k8s 的指令 转给 service。
+
+![](/public/upload/machine/horovod_overview.png)
+
+
+### horovodrun 做了什么
 
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
 
-单机多 GPU 训练 `horovodrun -np 2 -H localhost:4 --gloo python /horovod/examples/tensorflow2/tensorflow2_mnist.py`
-，`-np` 指的是进程的数量，`localhost:4`表示localhost节点上4个GPU。会启动4个进程执行 `python tensorflow2_mnist.py`（底层使用ssh进行命令分发），使用的是allreduce 模型，rank/local_rank/world_size，Rendezvous 这些概念也都有，数据也要分片。
-
-多机多 GPU 分布式训练，这里使用 4 个服务器，每个服务器使用 4 块 GPU：`horovodrun -np 16 -H server1:4,server2:4,server3:4,server4:4 python train.py`
 
 horovodrun ==> run_commandline ==> _run ==> _run_static ==> _launch_job ==> run_controller ==> gloo_run ==> launch_gloo
 
@@ -96,6 +162,8 @@ def launch_gloo(command, exec_command, settings, nics, env, server_ip):
         exit_code, timestamp = value
 ```
 
+### 与tf 融合
+
 [深度学习分布式训练框架 horovod (7) --- DistributedOptimizer](https://mp.weixin.qq.com/s/0doWry-c1mEya18_7w9Jyw)Horovod 要求开发者使用Horovod自己定义的 hvd.DistributedOptimizer 代替 TensorFlow 官方的 optimizer，从而可以在优化模型阶段得到梯度。hvd.DistributedOptimizer继承keras Optimizer，然后hvd.DistributedOptimizer在其重载的get_gradients中把获取到的梯度传给`hvd.allreduce(gradients, …)`，从而实现整个horovod集群的梯度集体归并。具体计算梯度的逻辑是：
 1. TF 调用 hvd.DistributedOptimizer 的 compute_gradients 方法：
   1. hvd.DistributedOptimizer 首先会利用 TF 官方 optimizer.compute_gradients 计算出本地梯度；
@@ -105,3 +173,9 @@ def launch_gloo(command, exec_command, settings, nics, env, server_ip):
   1. 调用 TF 官方 optimizer.apply_gradients 对传入的参数进行处理，返回一个更新权值的op。TF 可以用这个返回值进行后续处理；
 对于 TF2.x，每行代码顺序执行，不需要构建图，所以 Horovod 梯度更新部分的实现并不是基于计算图的实现
 
+
+
+AllReduce 被注册为 Op，在 ComputeAsync 中，计算请求被入队到一个队列中。这一队列会被一个统一的后台线程处理。(待补充)
+
+
+### 与k8s运行

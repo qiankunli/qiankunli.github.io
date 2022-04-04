@@ -189,8 +189,6 @@ perf record 在不加 -e 指定 event 的时候，它缺省的 event 就是 Hard
 
 ![](/public/upload/linux/perf_event.png)
 
-
-
 ### perf stat
 
  perf stat 针对程序 t1 的输出
@@ -233,7 +231,25 @@ perf sched 使用了转储后再分析 (dump-and-post-process) 的方式来分�
 
 [几十万实例线上系统的抖动问题定位](https://mp.weixin.qq.com/s/PordZi_H5fqX_-Ty9OH6qQ)
 
-### 分析实践
+## ftrace
+
+ftrace对内核函数做 trace。最重要的有两个 tracers，分别是 function 和 function_graph。
+1. function tracer 可以用来记录内核中被调用到的函数的情况，比如或者我们关心的进程调用到的函数。还可以设置 func_stack_trace 选项，来查看被 trace 函数的完整调用栈。
+2. function_graph trracer 可以用来查看内核函数和它的子函数调用关系以及调用时间
+
+ftrace 的操作都可以在 tracefs 这个虚拟文件系统中完成（对于 CentOS，这个 tracefs 的挂载点在 `/sys/kernel/debug/tracing` 下），用户通过 tracefs 向内核中的 function tracer 发送命令，然后 function tracer 把收集到的数据写入一个 ring buffer，再通过 tracefs 输出给用户。
+
+![](/public/upload/linux/ftrace.png)
+
+frace 可以收集到内核中任意一个函数被调用的情况，这点是怎么做到的？这是因为在内核的每个函数中都加上了 hook 点。但不是在源码上直接加入的，而是利用 gcc 编译器的特性，为每个内核函数二进制码中预留了 5 个字节。
+
+## Tracepoint 和 kprobe
+
+tracepoint 其实就是在 Linux 内核的一些关键函数中显式埋下的 hook 点（hook点的逻辑是 寻找注册的probe 函数并执行），这样在 tracing 的时候，我们就可以在这些固定的点上挂载调试的函数，然后查看内核的信息。
+
+并不是在所有的函数中都有 tracepoint，我们又该怎么办呢？kprobe 可以动态地在所有的内核函数（除了 inline 函数）上挂载 probe 函数。当 kprobe 函数注册的时候，其实就是把目标函数地址上内核代码的指令码，替换成了“cc”，也就是 int3 指令。这样一来，当内核代码执行到这条指令的时候，就会触发一个异常而进入到 Linux int3 异常处理函数 do_int3() 里。在 do_int3() 这个函数里，如果发现有对应的 kprobe 注册了 probe，就会依次执行注册的 pre_handler()；原来的指令；最后是 post_handler()。理论上 kprobe 其实只要知道内核代码中任意一条指令的地址，就可以为这个地址注册 probe 函数。简单说 kprobe 把目标指令替换，替换的指令可以使程序跑到一个特定的 handler 里，去执行 probe 的函数。
+
+## 分析实践
 
 [perf Tutorial](https://perf.wiki.kernel.org/index.php/Tutorial)
 
@@ -246,6 +262,13 @@ perf sched 使用了转储后再分析 (dump-and-post-process) 的方式来分�
 [容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)通过 `perf top` 命令可以查看 哪些函数占用了最多的cpu 时间
 
 [干货携程容器偶发性超时问题案例分析（一）](https://mp.weixin.qq.com/s/bSNWPnFZ3g_gciOv_qNhIQ)[干货携程容器偶发性超时问题案例分析（二）](https://mp.weixin.qq.com/s/7ZZqWPE1XNf9Mn_wj1HjUw)两篇文章除了膜拜之外，最大的体会就是：业务、docker daemon、网关、linux内核、硬件  都可能会出问题，都得有手段去支持自己做排除法
+
+![](/public/upload/linux/linux_trace.png)
+
+排查思路
+
+1. 通过 perf 发现了一个内核函数的调用频率比较高
+2. 通过 ftrace(function tracer) 工具继续深入，对上大概知道这个函数是在什么情况下被调用到的，对下看到函数里所有子函数的调用以及时间。PS：就好比，看到某个项目 超时比较多，要么是自己代码不行，要么qps 高，那么下一步就是分析 上游谁调的最多。
 
 ## 日志
 

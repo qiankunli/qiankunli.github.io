@@ -20,6 +20,8 @@ keywords:  tensorflow keras Estimator
 2. 中层API (Mid level): 包括layers, datasets, loss和metrics等具有功能性的函数，例如网络层的定义，Loss Function，对结果的测量函数等；
 3. 底层API (Low level): 包括具体的加减乘除、具有解析式的数学函数、卷积、对Tensor属性的测量等。
 
+在tensorflow高阶API（Estimator、Dataset、Layer、FeatureColumn等）问世之前，用tensorflow开发、训练、评估、部署深度学习模型，并没有统一的规范和高效的标准流程。Tensorflow的实践者们基于低阶API开发的代码在可移植性方面可能会遇到各种困难。例如，单机可以运行的模型希望改成能够分布式环境下运行需要对代码做额外的改动，如何在一个异构的环境中训练模型。
+
 
 ## 原生api
 

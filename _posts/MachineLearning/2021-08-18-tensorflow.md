@@ -159,7 +159,7 @@ with tf.Session() as sess:
 
 ![](/public/upload/machine/tf_data.png)
 
-### feed_dict 读取csv
+### feed_dict 读取csv（不建议）
 
 ```python
 file_queue = tf.train.string_input_producer(["xx.csv"])
