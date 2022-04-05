@@ -57,6 +57,12 @@ Horovod 目前架构的基础是：机器学习的模型参数在一张 GPU 上�
 
 ### 使用
 
+在用户已经构建的代码上，只需要插入三段很短的代码即可：
+
+1. hvd.init()
+2. 创建horovod的优化器，即DistributedOptimizer，将旧的优化器封装起来
+3. 创建horovod的初始化hook，即BroadcastGlobalVariablesHook，将master的初始化值广播给其他worker
+
 ```python
 import tensorflow as tf
 import horovod.tensorflow as hvd
@@ -101,12 +107,14 @@ horovod/horovod
   keras
   mxnet         // 与mxnet融合
   runner        // horovodrun 实现
-  tensorflow    // 与tensorflow融合
+  tensorflow    // 与tensorflow 融合，比如将allreduce 算子注册tf上，挂到Optimizer的 _compute_gradients 逻辑中
 ```
 
-[基于 Horovod 进行深度学习分布式训练](https://mp.weixin.qq.com/s/oIgvC1EmiUcNXfZf9SLP0w)Horovod主要由数据通信层、通信控制层、深度学习框架接口层、启动层四部分组成。其中启动层通过horovodrun或mpirun启动训练进程，之后每个训练进程通过调用TensorFLow、PyTorch、MXNet等框架（`python train.py`）进行单个结点的数据输入、参数更新，在每个进程完成一个或多个batch计算后，得到的Tensor（参数）通过MPI或GLoo控制进行ring-allreduce，ring-allreduce 的通信可以基于MPI、NCLL、DDL、MLSL或GLoo。PS: Horovod 本身会在每一个worker 上启动一个进程（运行工作组件），然后内部 执行 `python train.py` 启动tf 框架进程，与框架融合的代码会负责 将tf 框架的 操作指令发给 Horovod 进程 干活。这就有点类似于 k8s 中的CNI 插件，CNI 插件一般分为两部分，一部分按照k8s的规范 提供执行接口（cni binary），另一部分独立运行在容器内 作为service，cni binary 会把 k8s 的指令 转给 service。
+
 
 ![](/public/upload/machine/horovod_overview.png)
+
+[基于 Horovod 进行深度学习分布式训练](https://mp.weixin.qq.com/s/oIgvC1EmiUcNXfZf9SLP0w)Horovod主要由数据通信层、通信控制层、深度学习框架接口层、启动层四部分组成。其中启动层通过horovodrun或mpirun启动训练进程，之后每个训练进程通过调用TensorFLow、PyTorch、MXNet等框架（`python train.py`）进行单个结点的数据输入、参数更新，在每个进程完成一个或多个batch计算后，得到的Tensor（参数）通过MPI或GLoo控制进行ring-allreduce，ring-allreduce 的通信可以基于MPI、NCLL、DDL、MLSL或GLoo。PS: Horovod 本身会在每一个worker 上启动一个进程（运行工作组件），然后内部 执行 `python train.py` 启动tf 框架进程，与框架融合的代码会负责 将tf 框架的 操作指令发给 Horovod 进程 干活。这就有点类似于 k8s 中的CNI 插件，CNI 插件一般分为两部分，一部分按照k8s的规范 提供执行接口（cni binary），另一部分独立运行在容器内 作为service，cni binary 会把 k8s 的指令 转给 service。
 
 
 ### horovodrun 做了什么
@@ -131,7 +139,47 @@ worker 负责训练和模型迭代。
 1. 每个 worker 节点会向 RendezvousServer 发起请求来得到自己的邻居节点信息，从而构造通信环。
 2. 在这个通信环之中，每个 worker 节点有一个左邻居和一个右邻居，在通信过程中，每个 worker 只会向它的右邻居发送数据，只会从左邻居接受数据。
 
+
+汇总一下逻辑： horovodrun ==> run_commandline ==> _run ==> _run_static ==> _launch_job ==> gloo_run
+
 ```python
+# horovod/horovod/runner/launch.py
+def _run(args):
+  if _is_elastic(args):
+    return _run_elastic(args)
+  else:
+    return _run_static(args)
+def _run_static(args):
+  ...
+  all_host_names, _ = hosts.parse_hosts_and_slots(args.hosts)
+  ...
+  command = args.command
+  _launch_job(args, settings, nics, command)
+def _launch_job(args, settings, nics, command):
+    env = os.environ.copy()
+    config_parser.set_env_from_args(env, args)
+    def gloo_run_fn():
+      driver_ip = network.get_driver_ip(nics)
+      gloo_run(settings, nics, env, driver_ip, command)
+    def mpi_run_fn():
+      mpi_run(settings, nics, env, command)
+    run_controller(args.use_gloo, gloo_run_fn,args.use_mpi, mpi_run_fn,args.use_jsrun, js_run_fn,args.verbose)
+if __name__ == '__main__':
+    run_commandline()   # ==> _run 
+```
+
+
+1. Horovod 在进行容错 AllReduce 训练时，除了启动 worker 进程外，还会启动一个 driver 进程。这个 driver 进程用于帮助 worker 调用 gloo 构造 AllReduce 通信环。
+2. driver 进程中会创建一个带有 KVStore 的 RendezvousServer，driver 会将参与通信的 worker 的 ip 等信息存入 KVstore 中。
+3. 然后 worker 就可以调用 gloo 来访问 RendezvousServer 构造通信环了。
+
+
+```python
+# horovod/horovod/runner/gloo_run.py
+def gloo_run(settings, nics, env, server_ip, command):
+    # Each thread will use ssh command to launch the job on each remote host. If an error occurs in one thread, entire process will be terminated. Otherwise, threads will keep running and ssh session.
+    exec_command = _exec_command_fn(settings)
+    launch_gloo(command, exec_command, settings, nics, env, server_ip)
 def launch_gloo(command, exec_command, settings, nics, env, server_ip):
     # Make the output directory if it does not exist
     if settings.output_filename:
@@ -164,6 +212,13 @@ def launch_gloo(command, exec_command, settings, nics, env, server_ip):
 
 ### 与tf 融合
 
+![](/public/upload/machine/horovod_arch.png)
+
+1. Horovod 不依托于某个框架，自己通过MPI建立了一套分布式系统，完成了allreduce, allgather等collective operations通信工作。PS：类似于上图 driver 组成的部分
+2. Horovod 定义的这套HVD OP是跟具体深度学习框架无关的，比如使用 TensorFlow时候，是无法直接insert到TF Graph中执行的，所以还需要注册TF的OP。针对 TensorFlow 模型分布式训练，Horovod 开发了 TensorFlow ops 来实现 Tensorflow tensor 的 AllReduce。而且这些 op 可以融入 TensorFlow 的计算图中，利用 TensorFlow graph 的 runtime 实现计算与通信的 overlapping，从而提高通信效率。以 TensorFlow 模型的 AllReduce 分布式训练为例，Horovod 开发了 allreduce ops 嵌入 TensorFlow 的反向计算图中，从而获取 TensorFlow 反向计算的梯度并进行梯度汇合。allreduce ops 可以通过调用 gloo 提供的 allreduce API 来实现梯度汇合的。
+
+
+
 [深度学习分布式训练框架 horovod (7) --- DistributedOptimizer](https://mp.weixin.qq.com/s/0doWry-c1mEya18_7w9Jyw)Horovod 要求开发者使用Horovod自己定义的 hvd.DistributedOptimizer 代替 TensorFlow 官方的 optimizer，从而可以在优化模型阶段得到梯度。hvd.DistributedOptimizer继承keras Optimizer，然后hvd.DistributedOptimizer在其重载的get_gradients中把获取到的梯度传给`hvd.allreduce(gradients, …)`，从而实现整个horovod集群的梯度集体归并。具体计算梯度的逻辑是：
 1. TF 调用 hvd.DistributedOptimizer 的 compute_gradients 方法：
   1. hvd.DistributedOptimizer 首先会利用 TF 官方 optimizer.compute_gradients 计算出本地梯度；
@@ -173,9 +228,101 @@ def launch_gloo(command, exec_command, settings, nics, env, server_ip):
   1. 调用 TF 官方 optimizer.apply_gradients 对传入的参数进行处理，返回一个更新权值的op。TF 可以用这个返回值进行后续处理；
 对于 TF2.x，每行代码顺序执行，不需要构建图，所以 Horovod 梯度更新部分的实现并不是基于计算图的实现
 
+```python
+# horovod/horovod/tensorflow/__init__.py
+def DistributedOptimizer(optimizer, name=None, use_locking=False, device_dense='',...):
+  ...
+  return hvd_k.DistributedOptimizer(optimizer=optimizer,name=name,device_dense=device_dense,device_sparse=device_sparse,...)
+# horovod/horovod/tensorflow/keras/__init__.py
+def DistributedOptimizer(optimizer, name=None,device_dense='', device_sparse='',...):
+  ...
+  return _impl.create_distributed_optimizer(keras=keras,optimizer=optimizer,name=name,device_dense=device_dense,device_sparse=device_sparse,...)
+# horovod/horovod/_keras/__init__.py
+def create_distributed_optimizer(keras, optimizer, name, device_dense, device_sparse,...):
+  class _DistributedOptimizer(keras.optimizers.Optimizer):
+    def __init__(self, **kwargs):
+      super(self.__class__, self).__init__(**kwargs)
+      ...
+      self._allreduce_grads = hvd._make_allreduce_grads_fn(self._name,device_dense,device_sparse,...)
+    def _compute_gradients(self, loss, var_list, grad_loss=None, tape=None):
+      tape = tf.GradientTape() if tape is None else tape
+      # 计算梯度
+      grads_and_vars = super(self.__class__, self)._compute_gradients(loss,var_list,grad_loss,tape=tape)
+      grads, weights = list(zip(*grads_and_vars))
+      # 利用 AllReduce 来得到各个进程平均后的梯度
+      allreduced_grads = self._allreduce(grads, weights)
+      return list(zip(allreduced_grads, weights))
+    def _allreduce(self, grads, vars):
+      ...
+      return self._allreduce_grads(grads, vars)
+    def apply_gradients(self, *args, **kwargs):
+      if self._agg_helper:
+        ...
+      else:
+        results = super(self.__class__, self).apply_gradients(*args, **kwargs)
+      return results
+# horovod/horovod/tensorflow/__init__.py
+def _make_allreduce_grads_fn(name, device_dense, device_sparse,compression, sparse_as_dense,...):
+    groups = vars_to_refs(groups) if isinstance(groups, list) else groups
+    # 弯弯绕绕最后执行_allreduce
+    return _make_cached_allreduce_grads_fn(name, device_dense, device_sparse,compression, sparse_as_dense,...)
+# horovod/horovod/tensorflow/mpi_ops.py
+def _load_library(name):
+    filename = resource_loader.get_path_to_datafile(name)
+    library = load_library.load_op_library(filename)
+    return library
+MPI_LIB = _load_library('mpi_lib' + get_ext_suffix())
+def _allreduce(tensor, name=None, op=Sum, prescale_factor=1.0, postscale_factor=1.0,...):  
+    # 调用的就是 HorovodAllreduceOp      
+    return MPI_LIB.horovod_allreduce(tensor, name=name, reduce_op=op,...)
+```
+AllReduce 被注册为 Op，在 ComputeAsync 中，计算请求被入队到一个队列中（EnqueueTensorAllreduce）。这一队列会被一个统一的后台线程处理，从而把 TF OP 和 Horovod OP 联系起来。
+```c++
+# horovod/horovod/tensorflow/mpi_ops.cc    
+class HorovodAllreduceOp : public AsyncOpKernel {
+public:
+  void ComputeAsync(OpKernelContext* context, DoneCallback done) override {
+    OP_REQUIRES_OK_ASYNC(context, ConvertStatus(common::CheckInitialized()),done);
 
+    auto node_name = ...
+    auto device = GetDeviceID(context);
+    auto tensor = context->input(0);
+    horovod::common::ReduceOp reduce_op = static_cast<horovod::common::ReduceOp>(reduce_op_);
+    Tensor* output;
+    OP_REQUIRES_OK_ASYNC(context, context->allocate_output(0, tensor.shape(), &output), done);
+    // ReadyEvent makes sure input tensor is ready, and output is allocated.
+    common::ReadyEventList ready_event_list;
+#if HAVE_GPU
+    ready_event_list.AddReadyEvent(std::shared_ptr<common::ReadyEvent>(RecordReadyEvent(context)));
+#endif
+    auto hvd_context = std::make_shared<TFOpContext>(context);
+    auto hvd_tensor = std::make_shared<TFTensor>(tensor);
+    auto hvd_output = std::make_shared<TFTensor>(*output);
+    // 把 张量的Allreduce操作加入Horovod后台队列，从而把 TF OP 和 Horovod OP 联系起来。
+    auto enqueue_result = EnqueueTensorAllreduce(hvd_context, hvd_tensor, hvd_output, ready_event_list, node_name, device,...);
+    OP_REQUIRES_OK_ASYNC(context, ConvertStatus(enqueue_result), done);
+  }
+private:
+  int reduce_op_;
+  // Using float since TF does not support double OP attributes
+  float prescale_factor_;
+  float postscale_factor_;
+  bool ignore_name_scope_;
+  int process_set_id_;
+};                             
+REGISTER_OP("HorovodAllreduce")
+    .Attr("T: {int32, int64, float16, float32, float64}")
+    .Attr("reduce_op: int")
+    .Attr("prescale_factor: float")
+    .Attr("postscale_factor: float")
+    .Attr("ignore_name_scope: bool = False")
+    .Attr("process_set_id: int = 0")
+    .Input("tensor: T")
+    .Output("sum: T")                      
+```
 
-AllReduce 被注册为 Op，在 ComputeAsync 中，计算请求被入队到一个队列中。这一队列会被一个统一的后台线程处理。(待补充)
+### 弹性训练
 
+[深度学习分布式训练框架 horovod (12) --- 弹性训练总体架构](https://mp.weixin.qq.com/s/9M-qoJHopFqkSJr9ymUY1g) 未读
 
 ### 与k8s运行
