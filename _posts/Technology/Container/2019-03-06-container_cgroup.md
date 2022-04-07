@@ -157,7 +157,7 @@ resources:
     memory: 100Mi
     cpu: 100m
 ```
-单位后缀 m 表示千分之一核，也就是说 1 Core = 1000m。so this resources object specifies that the container process needs 50/1000 of a core (5%) and is allowed to use at most 100/1000 of a core (10%).同样，2000m 表示两个完整的 CPU 核心，你也可以写成 2 或者 2.0。 **不带单位 默认单位就是1000，就是一个cpu**
+如果不明确标注单位，比如直接写 0.5，**默认单位就是Core**，即 0.5 个处理器；当然也可以明确使用Millcores为单位，比如写成 500 m，同样也代表 0.5 个处理器，因为 Kubernetes 规定了1 Core = 1000 Millcores。而对于内存来说，它早已经有了广泛使用的计量单位，即 Bytes，如果设置中不明确标注单位，**就会默认以 Bytes 计数**。为了实际设置的方便，Kubernetes 还支持以Ei、Pi、Ti、Gi、Mi、Ki，以及E、P、T、G、M、K为单位，这两者略微有一点儿差别。这里我就以Mi和M为例，它们分别是Mebibytes与Megabytes的缩写，前者表示 1024×1024 Bytes，后者表示 1000×1000 Bytes。
 
 cpu requests and cpu limits are implemented using two separate control systems.**cpu request和limit 是两个cpu cgroup 子系统**
 
@@ -198,7 +198,7 @@ $ docker inspect 472abbce32a5 --format '{{.HostConfig.CpuShares}} {{.HostConfig.
 
 cpu limits 会被带宽控制组设置为 cpu.cfs_period_us 和 cpu.cfs_quota_us 属性的值。
 
-### k8s CPU Qos
+### k8s CPU 服务质量等级/Qos
 
 [Kubernetes Resources Management – QoS, Quota, and LimitRange](https://www.cncf.io/blog/2020/06/10/kubernetes-resources-management-qos-quota-and-limitrangeb/)A node can be overcommitted when it has pod scheduled that make no request, or when the sum of limits across all pods on that node exceeds the available machine capacity. In an **overcommitted environment**, the pods on the node may attempt to use more compute resources than the ones available at any given point in time.When this occurs, the node must give priority to one container over another. Containers that have the lowest priority are terminated/throttle first. The entity used to make this decision is referred as the Quality of Service (QoS) Class.
 

@@ -63,7 +63,7 @@ ip link add link DEVICE [ name ] NAME
 
 ### netfilter 
 
-[深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)Netfilter 是 Linux Kernel 的一种 hook 机制，可以理解成在数据包经过内核网络协议栈处理的过程中，需要经过很多的方法处理，在特定的方法中定义了 hook，所以这些 hook 会在内核方法执行前/执行后被调用和执行。Linux 提供了 5 个这样的 hook，分别是 pre-routing、input、forword、output、post-routing。处理数据包的能力主要包括修改、跟踪、打标签、过滤等。一些要点:
+[深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)Netfilter 是 Linux Kernel 的一种 hook 机制，**围绕网络层（IP 协议）的周围**埋下了五个钩子（Hooks），每当有数据包流到网络层，经过这些钩子时，就会自动触发由内核模块注册在这里的回调函数，程序代码就能够通过回调来干预 Linux 的网络通信。 5 个hook分别是 pre-routing、input、forword、output、post-routing。处理数据包的能力主要包括修改、跟踪、打标签、过滤等。一些要点:
 1. 主机上的所有数据包都将通过 netfilter 框架
 2. 在 netfilter 框架中有5个钩子点: PRE_ROUTING, INPUT, FORWARD, OUTPUT, POST_ROUTING
 3. 命令行工具 iptables 可用于动态地将规则插入到钩子点中
@@ -77,16 +77,29 @@ ip link add link DEVICE [ name ] NAME
     2. 非本地的目标地址进入FORWARD（需要本机内核支持IP_FORWARD）
 2. 由本地**用户空间应用进程产生的**数据包，通过一次路由选择由**哪个接口**送往网络中
 
-iptables的四表五链：**在每个钩子点中**，规则被组织到具有预定义优先级的不同链中。为了按目的管理链，链被进一步组织到表中。
+Netfilter 允许在同一个钩子处注册多个回调函数，所以数据包在向钩子注册回调函数时，必须提供明确的优先级，以便触发时能按照优先级从高到低进行激活。而因为回调函数会有很多个，看起来就像是挂在同一个钩子上的一串链条，所以钩子触发的回调函数集合，就被称为“回调链”（Chained Callbacks）。**Netfilter 的钩子回调虽然很强大，但毕竟要通过程序编码才够能使用，并不适合系统管理员用来日常运维**。于是把用户常用的管理意图总结成具体的行为，预先准备好，然后就会在满足条件的时候自动激活行为。
+
+1. DROP：直接将数据包丢弃。
+2. REJECT：给客户端返回 Connection Refused 或 Destination Unreachable 报文。
+3. QUEUE：将数据包放入用户空间的队列，供用户空间的程序处理。
+4. RETURN：跳出当前链，该链里后续的规则不再执行。
+5. ACCEPT：同意数据包通过，继续执行后续的规则。
+6. JUMP：跳转到其他用户自定义的链继续执行。
+7. REDIRECT：在本机做端口映射。
+8. MASQUERADE：地址伪装，自动用修改源或目标的 IP 地址来做 
+9. NATLOG：在 /var/log/messages 文件中记录日志信息。
+
+这些行为本来能够被挂载到 Netfilter 钩子的回调链上，但 iptables 又进行了一层额外抽象，它不是把行为与链直接挂钩，而是会根据这些底层操作的目的，先总结为更高层次的规则。举个例子，假设你挂载规则的目的是为了实现网络地址转换（NAT），那就应该对符合某种特征的流量（比如来源于某个网段、从某张网卡发送出去）、在某个钩子上（比如做 SNAT 通常在 POSTROUTING，做 DNAT 通常在 PREROUTING）进行 MASQUERADE 行为，这样具有相同目的的规则，就应该放到一起才便于管理，所以也就形成了“规则表”的概念。
+
 
 1. 链，**分别对应**上面提到的五个关卡，PRE_ROUTING，INPUT，FORWARD，OUTPUT，POST_ROUTING，这五个关卡分别由netfilter的五个钩子函数来触发。为什么叫做“链”呢？这个关卡上的“规则”不止一条，很多条规则会按照顺序逐条匹配，将在此关卡的所有规则组织称“链”就很适合，
 2. 表，每一条“链”上的一串规则里面有些功能是相似的，比如，A类规则都是对IP或者端口进行过滤，B类规则都是修改报文，我们考虑能否将这些功能相似的规则放到一起，这样管理iptables规则会更方便。iptables把具有相同功能的规则集合叫做“表”，并且定一个四种表：filter;nat;mangle;raw
 
-不是所有的“链”都具有所有类型的“规则”，也就是说，某个特定表中的“规则”注定不能应用到某些“链”中
+因为数据包经过一个关卡的时候，会将“链”中所有的“规则”都按照顺序逐条匹配，这时候就涉及一个优先级的问题：raw→mangle→nat→filter→security，也就是前面我列举出的顺序。这里你要注意，在 iptables 中新增规则时，需要按照规则的意图指定要存入到哪张表中，如果没有指定，就默认会存入 filter 表。此外，每张表能够使用到的链也有所不同。
 
 ![](/public/upload/network/iptables.png)
 
-在实际使用iptables配置规则时，我们往往是以“表”为入口制定“规则”;因为数据包经过一个关卡的时候，会将“链”中所有的“规则”都按照顺序逐条匹配，这时候就涉及一个优先级的问题：`raw -> mangle -> nat -> filter`
+预置的五条链是直接源自于 Netfilter 的钩子，它们与规则表的对应关系是固定的，用户不能增加自定义的表，或者修改已有表与链的关系，但可以增加自定义的链。新增的自定义链与 Netfilter 的钩子没有天然的对应关系，换句话说就是不会被自动触发，只有显式地使用 JUMP 行为，从默认的五条链中跳转过去，才能被执行。
 
 ### 凭啥过滤
 

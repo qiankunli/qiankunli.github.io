@@ -141,7 +141,9 @@ Flannel 支持三种后端实现，分别是： VXLAN；host-gw； UDP。而 UDP
 
 ![](/public/upload/network/container_network_route_2.png)
 
-容器互通主要基于路由表打通，**一般配套设计是 一个物理机对应一个网段**，路由方案的关键是谁来路由？路由信息怎么感知？路由信息存哪？Kubernetes/etcd/每个主机bgp分发都来一份。calico 容器在**主机内外**都通过 路由规则连通（主机内不会创建网桥设备）；flannel host-gw 主机外靠路由连通，主机内靠网桥连通。
+容器互通主要基于路由表打通，把路由表分发到子网的每一台物理主机，**所有的物理主机都拥有整个容器网络的路由数据**。这样当跨主机访问容器时，Linux 主机可以根据自己的路由表得知，该容器具体位于哪台物理主机之中，从而直接将数据包转发过去。路由网络要求要么所有主机都位于同一个子网之内，都是二层连通的；要么不同二层子网之间由支持边界网关协议（Border Gateway Protocol，BGP）的路由相连，并且网络插件也同样支持 BGP 协议去修改路由表。
+
+**一般配套设计是 一个物理机对应一个网段**。路由方案的关键是谁来路由？路由信息怎么感知？路由信息存哪？Kubernetes/etcd/每个主机bgp分发都来一份。calico 容器在**主机内外**都通过 路由规则连通（主机内不会创建网桥设备）；flannel host-gw 主机外靠路由连通，主机内靠网桥连通。
 
 |overlay network|路由设备|路由更新|要求|
 |---|---|---|---|
@@ -197,6 +199,8 @@ There are two main ways they do it:
 ![](/public/upload/network/container_network_route.png)
 
 ### underlay/physical 网络
+
+这里的 Underlay 模式特指让容器和宿主机处于同一网络，两者拥有相同的地位的网络方案。Underlay 网络要求容器的网络接口能够直接与底层网络进行通信，因此这个 **** 模式是直接依赖于虚拟化设备与底层网络能力的。可以直接在硬件层面虚拟多张网卡，并且以硬件直通（Passthrough）的形式，交付给容器使用。
 
 [容器网络：盘点，解释与分析](http://www.dockerinfo.net/4289.html)
 

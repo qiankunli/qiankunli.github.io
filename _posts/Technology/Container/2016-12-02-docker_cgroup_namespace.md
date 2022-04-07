@@ -113,7 +113,7 @@ struct vfsmount {
 
 ### network namespace
 
-network namespace 倒是没有根， 但docker 创建 veth pair，root namespace 一个，child namespace 一个。此外 为 root namespace 额外加 iptables 和 路由规则，为 各个ethxx 提供路由和数据转发，并提供跨network namesapce 通信。
+Linux 目前提供的八种名称空间里，网络名称空间无疑是隔离内容最多的一种，它为命名空间内的所有进程提供了全套的网络设施，包括独立的设备界面、路由表、ARP 表，IP 地址表、iptables/ebtables 规则、协议栈，等等。
 
 ## cgroups
 

@@ -48,7 +48,7 @@ linux-1.2.13
 从这个图中，可以看到，到传输层时，横生枝节，**代码不再针对任何数据包都通用**。从下到上，收到的数据包由哪个传输层协议处理，根据从数据包传输层header中解析的数据确定。从上到下，数据包的发送使用什么传输层协议，由socket初始化时确定。
 
 1. vfs层
-1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。
+1. socket 是用于负责对上给用户提供接口，并且和文件系统关联。**应用程序通过读写收、发缓冲区（Receive/Send Buffer）来与 Socket 进行交互**。
 2. sock，负责向下对接内核网络协议栈
 3. tcp层 和 ip 层， linux 1.2.13相关方法都在 tcp_prot中。在高版本linux 中，sock 负责tcp 层， ip层另由struct inet_connection_sock 和 icsk_af_ops 负责。分层之后，诸如拥塞控制和滑动窗口的 字段和方法就只体现在struct sock和tcp_prot中，代码实现与tcp规范设计是一致的
 4. ip层 负责路由等逻辑，并执行nf_hook，也就是netfilter。netfilter是工作于内核空间当中的一系列网络（TCP/IP）协议栈的钩子（hook），为内核模块在网络协议栈中的不同位置注册回调函数（callback）。也就是说，**在数据包经过网络协议栈的不同位置时做相应的由iptables配置好的处理逻辑**。
@@ -58,6 +58,8 @@ linux-1.2.13
 ![](/public/upload/network/linux_recv_send.png)
 
 网卡中断处理程序为网络帧分配的，内核数据结构 sk_buff 缓冲区；是一个维护网络帧结构的双向链表，链表中的每一个元素都是一个网络帧（Packet）。**虽然 TCP/IP 协议栈分了好几层，但上下不同层之间的传递，实际上只需要操作这个数据结构中的指针，而无需进行数据复制**。
+
+![](/public/upload/network/linux_io.png)
 
 ## 数据结构
 
