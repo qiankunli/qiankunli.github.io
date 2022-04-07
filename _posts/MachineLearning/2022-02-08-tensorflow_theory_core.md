@@ -386,7 +386,8 @@ struct RecvOp : AsyncOpKernel {
 ### 实现
 
 [TensorFlow中的通信机制——Rendezvous（一）本地传输](https://www.cnblogs.com/deep-learning-stacks/p/10354258.html)最基本的Rendezvous类被定义在了tensorflow/core/framework/rendezvous.h文件中，它对外提供了最基本的Send、Recv和RecvAsync接口和实现。
-```c
+```c++
+// 每次分布式通信都需要有一个全局唯一的标识符
 // ParsedKey 消息传输的唯一标识符，用于建立 send 和 recv的对应关系
 // ParsedKey 的关键就是 src_device , dst_device 和 edge_name
 struct ParsedKey {
@@ -397,12 +398,15 @@ struct ParsedKey {
     DeviceNameUtils::ParsedName dst;
     StringPiece edge_name;  // 可以灵活指定为任何字符串，实现不同Key的区分。比如它可以是Tensor的名字，也可以是具有某种特殊意义的固定字符串
 }
-// Send() never blocks.
-virtual Status Send(const ParsedKey& key, const Args& args, const Tensor& val, const bool is_dead) = 0;
-virtual void RecvAsync(const ParsedKey& key, const Args& args, DoneCallback done) = 0; 
-// Synchronous wrapper for RecvAsync.
-Status Recv(const ParsedKey& key, const Args& args, Tensor* val, bool* is_dead, int64 timeout_ms);
-Status Recv(const ParsedKey& key, const Args& args, Tensor* val, bool* is_dead);
+class RendezvousInterface {
+public:
+  // Send() never blocks.
+  virtual Status Send(const ParsedKey& key, const Args& args, const Tensor& val, const bool is_dead) = 0;
+  virtual void RecvAsync(const ParsedKey& key, const Args& args, DoneCallback done) = 0; 
+  // Synchronous wrapper for RecvAsync.
+  Status Recv(const ParsedKey& key, const Args& args, Tensor* val, bool* is_dead, int64 timeout_ms);
+  Status Recv(const ParsedKey& key, const Args& args, Tensor* val, bool* is_dead);
+}
 ```
 在TensorFlow中，几乎每个Rendezvous实现类都有自己的消息队列缓存，而几乎每种消息队列缓存都是依靠Table实现的。Rendezvous的发送(Send)和接收(Recv)都将通过Table完成。Table 的 Item 有两个重要字段 
 1. Value：这就是参与通信Tensor本体
@@ -416,6 +420,10 @@ Status Recv(const ParsedKey& key, const Args& args, Tensor* val, bool* is_dead);
 2. 跨进程通信过程/RemoteRendezvous [TensorFlow中的通信机制——Rendezvous（二）gRPC传输](https://www.cnblogs.com/deep-learning-stacks/p/10355770.html)
   1. Send 和本地传输场景下的Send过程相同，本地Tensor处于Ready状态后就被放挂了本地Worker的Table中，至此Send过程就全部完成了。所以Send过程完全没有涉及到任何跨网络传输的内容，并且Send过程是非阻塞的。
   2. Recv方是Tensor的接收方，它的处理过程是：将所需要的Tensor对应的ParsedKey拼出后，主动向Send方主动发出Request，Send方在接收到Request后立即在本地Table中查找方所需要的Tensor，找到后，拷贝到CPU上，将Tensor封装成Response发送回Recv方（grpc）。在这个过程中，Recv方可以认为是Client，Send方可以认为是Server，通过发送Request和Response来完成Tensor的传输。
+
+[TensorFlow 分布式环境(8) --- 通信机制](https://mp.weixin.qq.com/s/WdzyFZTbd4WLUfch0w8t-A)
+
+![](/public/upload/machine/rendezvous_process.png)
 
 RemoteRendezvous需要支持不同的通信协议，因此派生了各种各样的实现类（主要扩展Recv）；从设计哲学上说，gRPC本身设计并不适合深度学习训练场景，如果你使用NCCL或者MPI，那么你会得到不一样的性能。
 1. gRPC发送Tensor前，接收Tensor后必须要做序列化，在Tensor很大的时候这是一个非常讨厌的overhead，发送接收延迟过大；

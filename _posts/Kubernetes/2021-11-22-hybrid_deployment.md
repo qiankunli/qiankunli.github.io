@@ -86,3 +86,5 @@ CPU Burst 解决了内核 BWC 调度时针对 CPU Limit 的限流问题，可以
 [基于Volcano的离在线业务混部技术探索](https://www.bilibili.com/video/BV1AZ4y1X7AQ) 视频未看
 
 [一文看懂业界在离线混部技术](https://mp.weixin.qq.com/s/pPinyOY7s016mIWiQV2gFA)
+
+[阿里巴巴云原生混部系统 Koordinator 正式开源](https://mp.weixin.qq.com/s/QpDuHCSTwwnYqSShHrG_tA) 代码已开源

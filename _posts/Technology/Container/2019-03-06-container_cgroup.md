@@ -61,7 +61,7 @@ d64e482d2843        mesos-705b5dc6-7169-42e8-a143-6a7dc2e32600   0.18%          
 4. BLOCK I/O 反映了磁盘带宽，The amount of data the container has read to and written from block devices on the host ，貌似是一个累计值，但可以部分反映 项目对磁盘的写程度，有助于解决[容器狂打日志怎么办？](http://qiankunli.github.io/2019/03/05/container_log.html)
 5. PID 反映了对应的进程号，也列出了进程id 与容器id的关系。根据pid 查询容器 id `docker stats --no-stream | grep 1169`
 
-## CFS 的发展
+## Linux的CPU管理——CFS 
 
 在 Linux 里面，进程大概可以分成两种：实时进程和 普通进程。每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列 rt_rq 和一个 CFS 运行队列 cfs_rq，在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进程需要运行。
 
@@ -134,7 +134,7 @@ shares值即CFS中每个进程的(准确的说是调度实体)权重(weight/load
 
 现在的多核系统中每个核心都有自己的缓存，如果频繁的调度进程在不同的核心上执行势必会带来缓存失效等开销。--cpuset-cpus 可以让容器始终在一个或某几个 CPU 上运行。--cpuset-cpus 选项的一个缺点是必须指定 CPU 在操作系统中的编号，这对于动态调度的环境(无法预测容器会在哪些主机上运行，只能通过程序动态的检测系统中的 CPU 编号，并生成 docker run 命令)会带来一些不便。解决办法 [深入理解 Kubernetes CPU Manager](https://mp.weixin.qq.com/s/4qnbtwXi4TScEIYyfRm9Qw)
 
-## Kubernetes
+## Kubernetes 与 CFS
 
 假设`cat /proc/cpuinfo| grep "processor"| wc -l` 查看某个node 的逻辑core 数为48，使用`kubectl describe node xx`查看node cpu情况
 ```
@@ -198,7 +198,7 @@ $ docker inspect 472abbce32a5 --format '{{.HostConfig.CpuShares}} {{.HostConfig.
 
 cpu limits 会被带宽控制组设置为 cpu.cfs_period_us 和 cpu.cfs_quota_us 属性的值。
 
-### Qos
+### k8s CPU Qos
 
 [Kubernetes Resources Management – QoS, Quota, and LimitRange](https://www.cncf.io/blog/2020/06/10/kubernetes-resources-management-qos-quota-and-limitrangeb/)A node can be overcommitted when it has pod scheduled that make no request, or when the sum of limits across all pods on that node exceeds the available machine capacity. In an **overcommitted environment**, the pods on the node may attempt to use more compute resources than the ones available at any given point in time.When this occurs, the node must give priority to one container over another. Containers that have the lowest priority are terminated/throttle first. The entity used to make this decision is referred as the Quality of Service (QoS) Class.
 
@@ -224,6 +224,7 @@ cgroup
       /pod6  
 ``` 
 
+### k8s CPU Qos 问题与解决
 
 [百度混部实践：如何提高 Kubernetes 集群资源利用率？](https://mp.weixin.qq.com/s/12XFN2lPB3grS5FteaF__A) 是一篇很好的讲混部的文章
 为什么原生 Kubernetes 没办法直接解决资源利用率的问题？
@@ -234,43 +235,6 @@ Kubernetes 原本的资源模型存在局限性（引入动态资源视图）。
 
 每个节点运行一个agent（单机引擎），agent根据 Guaranteed-Pod 的真实用量去给 Burstable/BestEffort 目录整体设置了一个值，这个值通过**动态计算而来**。
 `Burstable 资源使用 = 单机最大 CPU 用量 - Guaranteed容器用量 - Safety-Margin`，`BestEffort = 单机最大 CPU 用量 - Guaranteed容器用量 - Burstable容器用量 - Safety-Margin`，比如一个pod request=limit=5，日常使用1，当pod 忙起来了，即申请的 Pod 现在要把自己借出去的这部分资源拿回来了，如何处理？此时会通过动态计算缩小 Burstable 和 BestEffort 的这两个框的值，达到一个压制的效果。当资源用量持续上涨时，如果 BestEffort 框整体 CPU 用量小于 1c ，单机引擎会把 BestEffort Pod 全部驱逐掉。当 Guaranteed-Pod 的用量还在持续上涨的时候，就会持续的压低 Burstable 整框 CPU 的 Quota，如果Burstable 框下只有一个 Pod，Request 是 1c，Limit 是 10c，那么单机引擎最低会将 Burstable 整框压制到 1c。换言之，对于 Request，就是说那些用户真实申请了 Quota 的资源，一定会得到得到供给；对于 Limit - Request 这部分资源，单机引擎和调度器会让它尽量能够得到供给；对于 BestEffort，也就是 No Limit 这部分资源，只要单机的波动存在，就存在被优先驱逐的风险. PS： Pod 的Qos 与驱逐策略联系在一起。
-
-## 内存 
-
-### OOM Killer
-
-1. OOM Killer 在 Linux 系统里如果内存不足时，会杀死一个正在运行的进程来释放一些内存。如果进程 是容器的entrypoint ，则容器退出。`docker inspect` 命令查看容器， 容器处于"exited"状态，并且"OOMKilled"是 true。
-2. Linux 里的程序都是调用 malloc() 来申请内存，如果内存不足，直接 malloc() 返回失败就可以，为什么还要去杀死正在运行的进程呢？Linux允许进程申请超过实际物理内存上限的内存。因为 malloc() 申请的是内存的虚拟地址，系统只是给了程序一个地址范围，由于没有写入数据，所以程序并没有得到真正的物理内存。物理内存只有程序真的往这个地址写入数据的时候，才会分配给程序。PS： 虚拟内存通过 `ps aux`VSZ 查看；物理内存 `ps aux`RES（也成为RSS） 查看
-3. 在发生 OOM 的时候，Linux 到底是根据什么标准来选择被杀的进程呢？这就要提到一个在 Linux 内核里有一个 oom_badness() 函数，就是它定义了选择进程的标准。
-4. 我们怎样才能快速确定容器发生了 OOM 呢？这个可以通过查看内核日志及时地发现。使用用 `journalctl -k` 命令，或者直接查看日志文件 `/var/log/message`
-
-### Memory Cgroup
-
-`/sys/fs/cgroup/memory`
-
-1. memory.limit_in_bytes，一个控制组里所有进程可使用内存的最大值
-2. memory.oom_control，当控制组中的进程内存使用达到上限值时，这个参数能够决定会不会触发 OOM Killer（默认是），当然只能杀死控制组内的进程。`echo 1 > memory.oom_control` 即使控制组里所有进程使用的内存达到 memory.limit_in_bytes 设置的上限值，控制组也不会杀掉里面的进程，但会影响到控制组中正在申请物理内存页面的进程。这些进程会处于一个停止状态，不能往下运行了。
-3. memory.usage_in_bytes，只读，是当前控制组里所有进程实际使用的内存总和。
-
-Linux **内存类型**
-
-1. 内核需要分配内存给页表，内核栈，还有 slab，也就是内核各种数据结构的 Cache Pool；
-2. 用户态进程内存
-    1. RSS 内存包含了进程的代码段内存，栈内存，堆内存，共享库的内存 
-    2. 文件读写的 Page Cache。是一种为了提高磁盘文件读写性能而**利用空闲物理内存**的机制，因为系统调用 read() 和 write() 的缺省行为都会把读过或者写过的页面存放在 Page Cache 里。
-3. Linux 的内存管理有一种内存页面回收机制（page frame reclaim），会根据系统里空闲物理内存是否低于某个阈值（wartermark），来决定是否启动内存的回收。内存回收的算法会根据不同类型的内存以及内存的最近最少用原则，就是 LRU（Least Recently Used）算法决定哪些内存页面先被释放。因为 Page Cache 的内存页面只是起到 Cache 作用，自然是会被优先释放的。
-
-Memory Cgroup 里都不会对内核的内存做限制（比如页表，slab 等）。只限制用户态相关的两个内存类型，RSS（Resident Set Size） 和 Page Cache。当控制组里的进程需要申请新的物理内存，而且 memory.usage_in_bytes 里的值超过控制组里的内存上限值 memory.limit_in_bytes，这时我们前面说的 Linux 的内存回收（page frame reclaim）就会被调用起来。那么在这个控制组里的 page cache 的内存会根据新申请的内存大小释放一部分，这样我们还是能成功申请到新的物理内存，整个控制组里总的物理内存开销 memory.usage_in_bytes 还是不会超过上限值 memory.limit_in_bytes。PS：所以会出现 容器内存使用量总是在临界点 的现象。
-
-在 Memory Cgroup 中有一个参数 memory.stat，可以显示在当前控制组里各种内存类型的实际的开销。我们不能用 Memory Cgroup 里的 memory.usage_in_bytes，而需要用 memory.stat 里的 rss 值。这个很像我们用 free 命令查看节点的可用内存，不能看"free"字段下的值，而要看除去 Page Cache 之后的"available"字段下的值。
-
-Swap 是一块磁盘空间，当内存写满的时候，就可以把内存中不常用的数据暂时写到这个 Swap 空间上。这样一来，内存空间就可以释放出来，用来满足新的内存申请的需求。
-
-1. 在宿主机节点上打开 Swap 空间，在容器中就是可以用到 Swap 的。
-    1. 因为有了 Swap 空间，本来会被 OOM Kill 的容器，可以好好地运行了（RSS 没有超出）。如果一个容器中的程序发生了内存泄漏（Memory leak），那么本来 Memory Cgroup 可以及时杀死这个进程，让它不影响整个节点中的其他应用程序。结果现在这个内存泄漏的进程没被杀死，还会不断地读写 Swap 磁盘，反而影响了整个节点的性能。
-    2. 在内存紧张的时候，Linux 系统怎么决定是先释放 Page Cache，还是先把匿名内存释放并写入到 Swap 空间里呢？如果系统先把 Page Cache 都释放了，那么一旦节点里有频繁的文件读写操作，系统的性能就会下降。如果 Linux 系统先把匿名内存都释放并写入到 Swap，那么一旦这些被释放的匿名内存马上需要使用，又需要从 Swap 空间读回到内存中，这样又会让 Swap（其实也是磁盘）的读写频繁，导致系统性能下降。
-2. 显然，我们**在释放内存的时候，需要平衡 Page Cache 的释放和匿名内存的释放**。Linux swappiness 参数值的作用是，在系统里有 Swap 空间之后，当系统需要回收内存的时候，是优先释放 Page Cache 中的内存，还是优先释放匿名内存（也就是写入 Swap）。
-3. 在每个 Memory Cgroup 控制组里也有一个 memory.swappiness。 不同就是每个 Memory Cgroup 控制组里的 swappiness 参数值为 0 的时候，就可以让控制组里的内存停止写入 Swap。
 
 ## 磁盘
 

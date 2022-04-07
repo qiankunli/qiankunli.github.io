@@ -21,7 +21,7 @@ Reduce：从多个sender那里接收数据，最终combine到一个节点上
 
 ![](/public/upload/machine/gpu_reduce.png)
 
-All-reduce：从多个sender那里接收数据，最终combine到每一个节点上。ringAllReduce 是实现 All-reduce 的一种算法（先reduce再broadcast 也是一种，一共有七八种之多）
+All-reduce：从多个sender那里接收数据，最终combine到每一个节点上。ringAllReduce 是实现 All-reduce 的一种算法（先reduce再broadcast 也是一种，一共有七八种之多），字节也提出了一种算法 [bytePS](https://github.com/bytedance/byteps)，不是 ps 架构，而是一种带有辅助带宽节点（bandwidth server）的 allreduce 实现。[MPI，OpenMPI 与深度学习](https://zhuanlan.zhihu.com/p/158584571)
 
 ![](/public/upload/machine/gpu_all_reduce.png)
 
@@ -276,7 +276,7 @@ def _allreduce(tensor, name=None, op=Sum, prescale_factor=1.0, postscale_factor=
     # 调用的就是 HorovodAllreduceOp      
     return MPI_LIB.horovod_allreduce(tensor, name=name, reduce_op=op,...)
 ```
-AllReduce 被注册为 Op，在 ComputeAsync 中，计算请求被入队到一个队列中（EnqueueTensorAllreduce）。这一队列会被一个统一的后台线程处理，从而把 TF OP 和 Horovod OP 联系起来。
+AllReduce 被注册为 Op，在 ComputeAsync 中，计算请求被入队到一个进程内共享的全局对象维护的队列中（EnqueueTensorAllreduce）。这一队列会被一个统一的后台线程处理，从而把 TF OP 和 Horovod OP 联系起来。后台进程，会一直在执行一个循环 RunLoopOnce，后台线程会利用 MPIController 来处理入队的请求。MPIController 可以理解为是协调不同的 Rank 进程，处理请求的对象。
 ```c++
 # horovod/horovod/tensorflow/mpi_ops.cc    
 class HorovodAllreduceOp : public AsyncOpKernel {
