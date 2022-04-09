@@ -36,7 +36,7 @@ Serverless 应用架构中，SFF（Serverless For Frontend）可以让前端同�
 [Serverless 的喧哗与骚动（一）：Serverless 行业发展简史](https://www.infoq.cn/article/SXv6xredWW03P7NXaJ4m)
 
 1. 单机时代，操作系统管理了硬件资源，贴着资源层，高级语言让程序员描述业务，贴着业务层，编译器 /VM 把高级语言翻译成机器码，交给操作系统；
-2. 今天的云时代，资源的单位不再是 CPU、内存、硬盘了，而是容器、分布式队列、分布式缓存、分布式文件系统。
+2. 今天的云时代，资源的单位不再是 CPU、内存、硬盘了，而是容器、分布式队列、分布式缓存、分布式文件系统。就像从汇编语言发展到高级语言后，开发者不用再去关注寄存器、信号、中断等与机器底层相关的细节
 
 ![](/public/upload/architecture/machine_vs_cloud.png)
 

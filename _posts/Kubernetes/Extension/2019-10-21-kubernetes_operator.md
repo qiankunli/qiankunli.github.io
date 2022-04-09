@@ -13,48 +13,33 @@ keywords: kubernetes operator
 * TOC
 {:toc}
 
-[面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA)
+Operator 是使用自定义资源（CR，本人注：CR 即 Custom Resource，是 CRD 的实例）管理应用及其组件的自定义 Kubernetes 控制器。**高级配置和设置由用户在 CR 中提供**。Kubernetes Operator 基于嵌入在 Operator 逻辑中的最佳实践，**将高级指令转换为低级操作**。Kubernetes Operator 监视 CR 类型并采取特定于应用的操作，确保当前状态与该资源的理想状态相符。
+1. 什么是低级操作？ 假设我们要部署一套 Elasticsearch 集群，通常要在 StatefulSet 中定义相当多的细节，比如服务的端口、Elasticsearch 的配置、更新策略、内存大小、虚拟机参数、环境变量、数据文件位置等等，里面的细节配置非常多。**根本原因在于 Kubernetes 完全不知道 Elasticsearch 是个什么东西**，所有 Kubernetes 不知道的信息、不能启发式推断出来的信息，都必须由用户在资源的元数据定义中明确列出，必须一步一步手把手地“教会”Kubernetes 部署 Elasticsearch，这种形式就属于咱们刚刚提到的“低级操作”。PS：YAML Engineer
+2. 有了 Elasticsearch Operator 的CR，就相当于 Kubernetes 已经学会怎样操作 Elasticsearch 了。知道了所有它相关的参数含义与默认值，就不需要用户再手把手地教了，这种就是所谓的“高级指令”。
+  ```yaml
+  apiVersion: elasticsearch.k8s.elastic.co/v1
+  kind: Elasticsearch
+  metadata:
+    name: elasticsearch-cluster
+  spec:
+    version: 7.9.1
+    nodeSets:
+    - name: default
+      count: 3
+      config:
+        node.master: true
+        node.data: true
+        node.ingest: true
+        node.store.allow_mmap: false
+  ```
 
-[Kubernetes operator 模式开发实践](https://mp.weixin.qq.com/s/VJVVB5JJ_RlGnbq0hyFd8A)
+Operator 将简洁的高级指令转化为 Kubernetes 中具体操作的方法，跟 Helm 或 Kustomize 的思路并不一样：
+1. Helm 和 Kustomize 最终仍然是依靠 Kubernetes 的内置资源，来跟 Kubernetes 打交道的；
+2. Operator 则是要求开发者自己实现一个专门针对该自定义资源的控制器，在控制器中维护自定义资源的期望状态。
 
-来看一个Operator的示例：基于Operator 实现微服务的运维 MicroServiceDeploy 的 CR（custom resource） 
+operator 本质上不创造和提供新的服务，它只是已有 Kubernetes API service 的组合，但这种“抽象”大大简化了运维操作，否则这些逻辑都要由上层发布系统实现。**通过程序编码来扩展 Kubernetes，比只通过内置资源来与 Kubernetes 打交道要灵活得多**。比如，在需要更新集群中某个 Pod 对象的时候，由 Operator 开发者自己编码实现的控制器，完全可以在原地对 Pod 进行重启，不需要像 Deployment 那样，必须先删除旧 Pod，然后再创建新 Pod。
 
-```yaml
-apiVersion: custom.ops/v1
-kind: MicroServiceDeploy
-metadata:
-  name: ms-sample-v1s0
-spec:
-  msName: "ms-sample"                     # 微服务名称
-  fullName: "ms-sample-v1s0"              # 微服务实例名称
-  version: "1.0"                          # 微服务实例版本
-  path: "v1"                              # 微服务实例的大版本，该字符串将出现在微服务实例的域名中
-  image: "just a image url"               # 微服务实例的镜像地址
-  replicas: 3                             # 微服务实例的 replica 数量
-  autoscaling: true                       # 该微服务是否开启自动扩缩容功能
-  needAuth: true                          # 访问该微服务实例时，是否需要租户 base 认证
-  config: "password=88888888"             # 该微服务实例的运行时配置项
-  creationTimestamp: "1535546718115"      # 该微服务实例的创建时间戳
-  resourceRequirements:                   # 该微服务实例要求的机器资源
-    limits:                                 # 该微服务实例会使用到的最大资源配置
-      cpu: "2"
-      memory: 4Gi
-    requests:                               # 该微服务实例至少要用到的资源配置
-      cpu: "2"
-      memory: 4Gi
-  idle: false                             # 是否进入空载状态
-```
-
-以上一个 resource 实际上创建了很多其他的 Kubernetes resource，这些 Kubernetes resource 才真正构成了该微服务实际的能力
-
-1. 对于一个微服务而言必备的 Service, ServiceAccount 和 Deployment。
-2. 代表运行时配置项的ConfigMap
-3. 资源管理 ResourceQuota
-4. HPA自动扩缩容
-
-operator 本质上不创造和提供新的服务，它只是已有 Kubernetes API service 的组合，但这种“抽象”大大简化了运维操作，**否则这些逻辑都要由上层发布系统实现**。
 **Kubernetes 集群真正的能力（mount目录、操作GPU等）要通过 Kubelet 去支持**。 
-
 
 ## 内涵
 
@@ -164,3 +149,44 @@ spec:
   config:
     maxclients: "10000"
 ```
+### 微服务
+
+
+[面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA)
+
+[Kubernetes operator 模式开发实践](https://mp.weixin.qq.com/s/VJVVB5JJ_RlGnbq0hyFd8A)
+
+来看一个Operator的示例：基于Operator 实现微服务的运维 MicroServiceDeploy 的 CR（custom resource） 
+
+```yaml
+apiVersion: custom.ops/v1
+kind: MicroServiceDeploy
+metadata:
+  name: ms-sample-v1s0
+spec:
+  msName: "ms-sample"                     # 微服务名称
+  fullName: "ms-sample-v1s0"              # 微服务实例名称
+  version: "1.0"                          # 微服务实例版本
+  path: "v1"                              # 微服务实例的大版本，该字符串将出现在微服务实例的域名中
+  image: "just a image url"               # 微服务实例的镜像地址
+  replicas: 3                             # 微服务实例的 replica 数量
+  autoscaling: true                       # 该微服务是否开启自动扩缩容功能
+  needAuth: true                          # 访问该微服务实例时，是否需要租户 base 认证
+  config: "password=88888888"             # 该微服务实例的运行时配置项
+  creationTimestamp: "1535546718115"      # 该微服务实例的创建时间戳
+  resourceRequirements:                   # 该微服务实例要求的机器资源
+    limits:                                 # 该微服务实例会使用到的最大资源配置
+      cpu: "2"
+      memory: 4Gi
+    requests:                               # 该微服务实例至少要用到的资源配置
+      cpu: "2"
+      memory: 4Gi
+  idle: false                             # 是否进入空载状态
+```
+
+以上一个 resource 实际上创建了很多其他的 Kubernetes resource，这些 Kubernetes resource 才真正构成了该微服务实际的能力
+
+1. 对于一个微服务而言必备的 Service, ServiceAccount 和 Deployment。
+2. 代表运行时配置项的ConfigMap
+3. 资源管理 ResourceQuota
+4. HPA自动扩缩容

@@ -90,7 +90,7 @@ with tf.train.MonitoredTrainingSession(checkpoint_dir=checkpoint_dir,config=conf
     mon_sess.run(train_op)
 ```
 
-[horovod搭配estimator](https://zhuanlan.zhihu.com/p/69806200)
+horovod 的tf 结合又分为 与tf原生api、keras api、estimator 结合。[horovod搭配estimator](https://zhuanlan.zhihu.com/p/69806200)
 
 1. 单机多卡启动命令：`horovodrun -np 4 -H localhost:4 python train.py`
   1. `-np` 指的是进程的数量
@@ -121,6 +121,7 @@ horovod/horovod
 
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
 
+![](/public/upload/machine/horovod_arch.png)
 
 horovodrun ==> run_commandline ==> _run ==> _run_static ==> _launch_job ==> run_controller ==> gloo_run ==> launch_gloo
 
@@ -212,12 +213,8 @@ def launch_gloo(command, exec_command, settings, nics, env, server_ip):
 
 ### 与tf 融合
 
-![](/public/upload/machine/horovod_arch.png)
-
 1. Horovod 不依托于某个框架，自己通过MPI建立了一套分布式系统，完成了allreduce, allgather等collective operations通信工作。PS：类似于上图 driver 组成的部分
 2. Horovod 定义的这套HVD OP是跟具体深度学习框架无关的，比如使用 TensorFlow时候，是无法直接insert到TF Graph中执行的，所以还需要注册TF的OP。针对 TensorFlow 模型分布式训练，Horovod 开发了 TensorFlow ops 来实现 Tensorflow tensor 的 AllReduce。而且这些 op 可以融入 TensorFlow 的计算图中，利用 TensorFlow graph 的 runtime 实现计算与通信的 overlapping，从而提高通信效率。以 TensorFlow 模型的 AllReduce 分布式训练为例，Horovod 开发了 allreduce ops 嵌入 TensorFlow 的反向计算图中，从而获取 TensorFlow 反向计算的梯度并进行梯度汇合。allreduce ops 可以通过调用 gloo 提供的 allreduce API 来实现梯度汇合的。
-
-
 
 [深度学习分布式训练框架 horovod (7) --- DistributedOptimizer](https://mp.weixin.qq.com/s/0doWry-c1mEya18_7w9Jyw)Horovod 要求开发者使用Horovod自己定义的 hvd.DistributedOptimizer 代替 TensorFlow 官方的 optimizer，从而可以在优化模型阶段得到梯度。hvd.DistributedOptimizer继承keras Optimizer，然后hvd.DistributedOptimizer在其重载的get_gradients中把获取到的梯度传给`hvd.allreduce(gradients, …)`，从而实现整个horovod集群的梯度集体归并。具体计算梯度的逻辑是：
 1. TF 调用 hvd.DistributedOptimizer 的 compute_gradients 方法：
@@ -323,6 +320,120 @@ REGISTER_OP("HorovodAllreduce")
 
 ### 弹性训练
 
-[深度学习分布式训练框架 horovod (12) --- 弹性训练总体架构](https://mp.weixin.qq.com/s/9M-qoJHopFqkSJr9ymUY1g) 未读
+[深度学习分布式训练框架 horovod (12) --- 弹性训练总体架构](https://mp.weixin.qq.com/s/9M-qoJHopFqkSJr9ymUY1g) 
+
+容错，当众多worker之间对张量进行聚合操作时候，如果某一个worker失败，则gloo不会处理异常，而是抛出异常并且退出，这样所有worker都会报异常退出。为了不让某一个 worker 的失败导致整体训练退出，Horovod 需要做两方面工作：
+1. 不让异常影响现有作业。Horovod 必须捕获 gloo 抛出的异常，于是就构建了一个python处理异常机制。Worker 在捕获异常之后会将异常传递给对应的 Python API 处理，API 通过判断异常类型决定是否继续训练。如果异常信息中包括 “HorovodAllreduce”、“HorovodAllgather” 或者 “HorovodBroadcast” 等关键字，说明这可能是某个worker死掉导致的通信失败，这种异常被Horovod认为是可以恢复的。
+2. 放弃失败的worker，使用剩余可用worker继续训练。
+  1. 其他存活的 worker 停止当前的训练，记录当前模型迭代的步数。
+  2. 此时gloo的runtime已经出现问题，通信环已经破裂，无法在剩余的 worker 之间继续进行 AllReduce 操作。
+  3. 为了可以继续训练，Horovod Driver 会重新初始化 gloo，启动一个新的 rendezvous server，然后获取存活的 worker 的信息，利用这些worker组成新的通信环。
+  4. 当新的通信环构造成功后，rank 0 worker 会把自己的模型广播发给其他所有worker，这样大家就可以在一个基础上，接着上次停止的迭代开始训练。
+
+容错机制是被动操作，监控机制就是主动操作。在 Horovod 启动命令中提供一个发现脚本 discovery_host。discovery_host 由用户编写，负责发现可用的 worker 节点拓扑信息。Driver在运行之后会定期调用这个 bash 脚本来对集群监控，当worker发生变化时，discover_host 脚本会返回最新的worker状态，Driver 根据 discover_host 的返回值得到 worker 节点信息：
+1. 如果Driver发现有worker失败，就捕获异常，根据存活的worker信息来更新 RendezvousServer KVStore 的节点信息，号召大家重新建立通信环进行训练。
+2. 如果Driver发现有新worker节点加入集群，根据目前所有worker信息来更新 RendezvousServer KVStore 的节点信息，号召大家重新建立通信环进行训练。现有worker 节点收到通知后，会暂停当前训练，记录目前迭代步数，调用 shutdown 和 init 重新构造通信环。Driver也会在新节点上启动worker，扩充进程数目。
+3. 当新的通信环构造成功之后，rank 0 worker 会把自己的模型广播发给其他所有worker，这样大家就可以在一个基础上，接着上次停止的迭代开始训练。
+
+发现节点机制的几个关键设计点如下：
+
+1. 有节点变化时候，如何即时发现？Horovod是通过定期调用完成。
+2. 发现节点变化时候，如何通知各个worker? Horovod通过构建了一个通知机制完成。即，每个worker把自己注册到WorkerNotificationManager 之上，当有节点变化时候，WorkerNotificationManager  会逐一通知这些worker。
+3. worker得到通知之后，如何处理？Horovod 把worker的状态在深度框架上进一步封装成各种State，得到通知之后就会调用State的对应callback函数，或者同步状态，或者进行其他处理。
+
+示例代码
+```python
+import tensorflow as tf
+import horovod.tensorflow as hvd
+
+hvd.init()
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+  tf.config.experimental.set_memory_growth(gpu, True)
+if gpus:
+  tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
+
+dataset = ...
+model = ...
+
+optimizer = tf.optimizers.Adam(lr * hvd.size())
+
+@tf.function
+def train_one_batch(data, target, allreduce=True):
+    with tf.GradientTape() as tape:
+        probs = model(data, training=True)
+        loss = tf.losses.categorical_crossentropy(target, probs)
+    if allreduce:
+        tape = hvd.DistributedGradientTape(tape)
+    gradients = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+# Initialize model and optimizer state so we can synchronize across workers
+data, target = get_random_batch()
+train_one_batch(data, target, allreduce=False)
+
+# 使用 @hvd.elastic.run 对 train 做了一个封装
+@hvd.elastic.run
+def train(state):
+    for state.epoch in range(state.epoch, epochs):
+        for state.batch in range(state.batch, batches_per_epoch):
+            data, target = get_random_batch()
+            train_one_batch(data, target)
+            if state.batch % batches_per_commit == 0:
+                state.commit()
+        state.batch = 0
+
+def on_state_reset():
+    optimizer.lr.assign(lr * hvd.size())
+
+# 这里是新修改处，传入了一个 TensorFlowKerasState   
+state = hvd.elastic.TensorFlowKerasState(model, optimizer, batch=0, epoch=0)
+state.register_reset_callbacks([on_state_reset])
+train(state)
+```
+
+启动命令`horovodrun -np 18 --host-discovery-script discover_hosts.sh python train.py`
+
+worker 进程逻辑
+```python
+# horovod/tensorflow/elastic.py 
+def run(func):
+  from tensorflow.python.framework.errors_impl import UnknownError
+  def wrapper(state, *args, **kwargs):
+    try:
+      return func(state, *args, **kwargs)
+    except UnknownError as e:
+      if 'HorovodAllreduce' in e.message or 'HorovodAllgather' in e.message or 'HorovodBroadcast' in e.message:
+        raise HorovodInternalError(e)
+  return run_fn(wrapper, _reset)
+# horovod/common/elastic.py
+def run_fn(func, reset):
+  @functools.wraps(func)
+  def wrapper(state, *args, **kwargs):
+    notification_manager.init()
+    notification_manager.register_listener(state)
+    skip_sync = False
+    try:
+      while True:
+        if not skip_sync:
+          state.sync()                      # 当重置时候，用户也会进行必要的同步，具体是广播变量 和 存模型 两步
+        try:
+          return func(state, *args, **kwargs)
+        except HorovodInternalError:        # 训练出错
+          state.restore()                   # 进行恢复，就是重新加载模型，具体加载就是利用 TensorFlowKerasState 的 model, optimizer 这两个成员变量。
+          skip_sync = False
+        except HostsUpdatedInterrupt as e:  # driver发现一个节点被标记为新增或者移除时，将发送一个通知到 所有worker，worker 抛出 HostsUpdatedInterrupt
+          skip_sync = e.skip_sync
+        reset()
+        state.on_reset()                    # 执行用户设置的 reset callback
+    finally:
+        notification_manager.remove_listener(state)
+  return wrapper
+def _reset():
+    shutdown()
+    init()          # 重新建立 MPI 相关 context
+```
 
 ### 与k8s运行
+
+在 Kubernetes 上常见的是 kubeflow 社区的 tf-operator 支持 Tensorflow PS 模式，或者 mpi-operator 支持 horovod 的 mpi allreduce 模式。

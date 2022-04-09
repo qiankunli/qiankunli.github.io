@@ -26,6 +26,11 @@ KubeFlow不是什么
 
 kubeflow 也在不断发展，[Kubeflow Training Operator 统一云上 AI 训练](https://mp.weixin.qq.com/s/20eFlnOmbydmklCM3K8lJw)。阿里推出类似 kube-flow 的 [KubeDL 加入 CNCF Sandbox，加速 AI 产业云原生化](https://mp.weixin.qq.com/s/7SUhnW4cnk_3G9Q7lIytcA)
 
+
+Kubeflow 支持两种不同的 Tensorflow 框架分布式训练方法。
+1. Tensorflow 架构/ PS 模式，它依赖于集中式参数服务器来实现工作线程之间的协调。
+2. 分散式方法/mpi allreduce 模式，工作线程通过 MPI AllReduce 原语直接相互通信，不使用参数服务器。NVIDIA 的 NCCL 库已经在GPU 上有效地执行了大部分 MPI 原语，而 Uber 的Horovod 让使用 TensorFlow 执行多 GPU 和多节点训练变得轻而易举。与参数服务器相比，第二种方法可以更好地优化带宽和更好地扩展。
+
 ## 案例
 
 官方文档 [TensorFlow Training (TFJob)](https://www.bookstack.cn/read/kubeflow-1.3-en/10609d8d54cc9ad7.md)

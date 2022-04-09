@@ -13,8 +13,20 @@ keywords: 一致性协议
 * TOC
 {:toc}
 
+## 一致性和共识算法
 
-## 一致性和共识算法的关系
+### 概念
+
+周志明：系统高可用和高可靠之间的矛盾，是由于增加机器数量反而降低了可用性带来的（节点可能会挂掉）。为缓解这个矛盾，在分布式系统里主流的数据复制方法，是以操作转移（Operation Transfer）为基础的。我们想要改变数据的状态，除了直接将目标状态赋予它之外，还有另一种常用的方法，就是通过某种操作，把源状态转换为目标状态。能够使用确定的操作，促使状态间产生确定的转移结果的计算模型，在计算机科学中被称为状态机（State Machine）。
+
+1. 状态机有一个特性：任何初始状态一样的状态机，如果执行的命令序列一样，那么最终达到的状态也一样。在这里我们可以这么理解这个特性，**要让多台机器的最终状态一致，只要确保它们的初始状态和接收到的操作指令都是完全一致的就可以**。无论这个操作指令是新增、修改、删除或者其他任何可能的程序行为，都可以理解为要将一连串的操作日志正确地广播给各个分布式节点。广播指令与指令执行期间，允许系统内部状态存在不一致的情况，也就是不要求所有节点的每一条指令都是同时开始、同步完成的，只要求在此期间的内部状态不能被外部观察到，且当操作指令序列执行完成的时候，所有节点的最终的状态是一致的。这种模型，就是状态机复制（State Machine Replication）。
+2. 在分布式环境下，考虑到网络分区现象是不可能消除的，而且可以不必去追求系统内所有节点在任何情况下的数据状态都一致，所以采用的是“少数服从多数”的原则。也就是说，一旦系统中超过半数的节点完成了状态的转换，就可以认为数据的变化已经被正确地存储在了系统当中。
+
+根据这些讨论，我们需要设计出一种算法，能够让分布式系统内部可以暂时容忍存在不同的状态，但最终能够保证大多数节点的状态能够达成一致；同时，能够让分布式系统在外部看来，始终表现出整体一致的结果。这个让系统各节点不受局部的网络分区、机器崩溃、执行性能或者其他因素影响，能最终表现出整体一致的过程，就是各个节点的协商共识（Consensus）。这里需要注意的是，共识（Consensus）与一致性（Consistency）是有区别的：**一致性指的是数据不同副本之间的差异**，而共识是指达成一致性的方法与过程。
+
+[最难 paxos 和最易 raft ？](https://mp.weixin.qq.com/s/C8Mgl9ebMAG0hh6ekoO58w)**日志 + 状态机 可以成为任何有意义的工程系统**。比如 rocksdb，leveldb 等等 lsm 存储，它们数据先写 append log ，通过重放日志到达的系统状态一定是一致的。
+
+### 关系
 
 陈现麟：线性一致性是数据存储系统对外表现的一种形式，即好像只有一个数据副本，但是在实现数据一致性，实现容错的时候，我们需要共识算法的帮助。当然，这里要特别注意，我们通过共识算法，除了可以实现线性一致性，也可以实现顺序一致性等其他的数据一致性，共识算法是用来满足线性一致性的容错性的。同时，不使用共识算法，我们也可以实现数据的线性一致性，比如 ABD 和 SCD broadcast 之类的非共识算法，也可以实现线性一致性。
 
@@ -31,10 +43,9 @@ keywords: 一致性协议
 
 就好像连通n台服务器，要么两两都相连，要么大家都连在“交换机”上。协商的事情越复杂，人员构成越复杂，协商的次数、消息数量越多。协商2次 只是很理想的场景。
 
-
 ## basic-paxos
 
-每个Node 同时充当了两个角色：Proposer和Acceptor，在实现过程中， 两个角色在同一个进程里面。专门提一个Proposer概念（只是一个角色概念）的好处是：对业务代码没有侵入性，也就是说，我们不需要在业务代码中实现算法逻辑，就可以像使用数据库一样访问后端的数据。
+每个Node 可以同时充当了两个角色：Proposer和Acceptor，在实现过程中， 两个角色在同一个进程里面。
 
 ![](/public/upload/distribute/paxos_role.jpg)
 
@@ -43,17 +54,42 @@ keywords: 一致性协议
 |prepare阶段|proposer 生成全局唯一且自增的proposal id，广播propose<br>只广播proposal id即可，无需value|Acceptor 收到 propose 后，做出“两个承诺，一个应答”<br>1. 不再应答 proposal id **小于等于**当前请求的propose<br>2. 不再应答 proposal id **小于** 当前请求的 accept<br>3. 若是符合应答条件，返回已经accept 过的提案中proposal id最大的那个 propose 的value 和 proposal id， 没有则返回空值|争取提议权，争取到了提议权才能在Accept阶段发起提议，否则需要重新争取<br>学习之前已经提议的值|
 |accept阶段|提案生成规则<br>1. 从acceptor 应答中选择proposalid 最大的value 作为本次的提案<br>2. 如果所有的应答的天value为空，则可以自己决定value|在不违背“两个承诺”的情况下，持久化当前的proposal id和value|使提议形成多数派，提议一旦形成多数派则决议达成，可以开始学习达成的决议|
 
+![](/public/upload/distribute/paxos_process.png)
 
-**Proposer 之间并不直接交互**，Acceptor除了一个“存储”的作用外，还有一个信息转发的作用。**从Acceptor的视角看**，basic-paxos 及 multi-paxos 选举过程是协商一个值，每个Proposer提出的value 都可能不一样。所以第一阶段，先经由Acceptor将**已提交的**ProposerId 最大的value 尽可能扩散到Proposer（即决定哪个Proposer 是“意见领袖”）。第二阶段，再将“多数意见”形成“决议”（Acceptor持久化value）
+prepare阶段类似于 分布式锁中的抢占锁，引入随机超时时间来避免活锁的产生。
+
+假设一个分布式系统有五个节点，分别是 S1、S2、S3、S4 和 S5；全部节点都同时扮演着提案节点和决策节点的角色。此时，有两个并发的请求希望将同一个值分别设定为 X（由 S1 作为提案节点提出）和 Y（由 S5 作为提案节点提出）；我们用 P 代表准备阶段、用 A 代表批准阶段，这时候可能发生下面四种情况。情况一：比如，S1 选定的提案 ID 是 3.1（全局唯一 ID 加上节点编号），先取得了多数派决策节点的 Promise 和 Accepted 应答；此时 S5 选定的提案 ID 是 4.5，发起 Prepare 请求，收到的多数派应答中至少会包含 1 个此前应答过 S1 的决策节点，假设是 S3。那么，S3 提供的 Promise 中，必将包含 S1 已设定好的值 X，S5 就必须无条件地用 X 代替 Y 作为自己提案的值。由此，整个系统对“取值为 X”这个事实达成了一致。PS： 这个图表示的特别好，其它情况就不一一列举了。**这里的“设置值”不要类比成程序中变量赋值操作，应该类比成日志记录操作**。
+
+![](/public/upload/distribute/paxos_process_1.png)
 
 目前比较好的通俗解释，以贿选来描述 [如何浅显易懂地解说 Paxos 的算法？ - GRAYLAMB的回答 - 知乎](https://www.zhihu.com/question/19787937/answer/107750652)。
 
+**Proposer 之间并不直接交互**，Acceptor除了一个“存储”的作用外，还有一个信息转发的作用。**从Acceptor的视角看**，basic-paxos 及 multi-paxos 选举过程是协商一个值，每个Proposer提出的value 都可能不一样。所以第一阶段，先经由Acceptor将**已提交的**ProposerId 最大的value 尽可能扩散到Proposer（即决定哪个Proposer 是“意见领袖”）。第二阶段，再将“多数意见”形成“决议”（Acceptor持久化value）
 
 ## multi-paxos
 
-《分布式协议与算法实战》Multi-Paxos 是一种思想，不是算法，缺失实现算法的必须编程细节。而 Multi-Paxos 算法是一个统称，它是指基于 Multi-Paxos 思想，通过多个 Basic Paxos 实例实现一系列值的共识的算法（比如 Chubby 的 Multi-Paxos 实现、Raft 算法等）。
+《分布式协议与算法实战》Multi-Paxos 是一种思想，不是算法，缺失实现算法的必须编程细节。而 Multi-Paxos 算法是一个统称，它是指基于 Multi-Paxos 思想，通过多个 Basic Paxos 实例实现一系列值的共识的算法（比如 Chubby 的 Multi-Paxos 实现、Raft 算法等）。Multi Paxos 对 Basic Paxos 的核心改进是，增加了“选主”的过程。
+1. 提案节点会通过定时轮询（心跳），确定当前网络中的所有节点里是否存在一个主提案节点；
+2. 一旦没有发现主节点存在，节点就会在心跳超时后使用 Basic Paxos 中定义的准备、批准的两轮网络交互过程，向所有其他节点广播自己希望竞选主节点的请求，希望整个分布式系统对“由我作为主节点”这件事情协商达成一致共识；
+3. 如果得到了决策节点中多数派的批准，便宣告竞选成功。
 
-Basic Paxos达成一次决议至少需要两次网络来回，并发情况下可能需要更多，极端情况下甚至可能形成活锁，效率低下。Multi-Paxos选举一个Leader，提议由Leader发起，没有竞争，解决了活锁问题。提议都由Leader发起的情况下，Prepare阶段可以跳过，将两阶段变为一阶段，提高效率。Multi-Paxos并不假设唯一Leader，它允许多Leader并发提议，不影响安全性，极端情况下退化为Basic Paxos。Multi-Paxos与Basic Paxos的区别并不在于Multi（Basic Paxos也可以Multi），只是在同一Proposer**连续提议时**可以优化跳过Prepare直接进入Accept阶段，仅此而已。
+当选主完成之后，除非主节点失联会发起重新竞选，否则就**只有主节点本身才能够提出提案**。此时，无论哪个提案节点接收到客户端的操作请求，**都会将请求转发给主节点来完成提案**，而主节点提案的时候，也就无需再次经过准备过程，因为可以视作是经过选举时的那一次准备之后，后续的提案都是对相同提案 ID 的一连串的批准过程。
+
+![](/public/upload/distribute/multi_paxos_process.png)
+
+注意，二元组 (id, value) 已经变成了三元组 (id, i, value)，这是因为需要给主节点增加一个“任期编号”，这个编号必须是严格单调递增的，以应付主节点陷入网络分区后重新恢复，但另外一部分节点仍然有多数派，且已经完成了重新选主的情况，此时必须以任期编号大的主节点为准。
+
+从整体来看，当节点有了选主机制的支持后，就可以进一步简化节点角色，不必区分提案节点、决策节点和记录节点了，可以统称为“节点”，节点只有主（Leader）和从（Follower）的区别。此时的协商共识的时序图如下：
+
+![](/public/upload/distribute/multi_paxos_sequence.png)
+
+在这个理解的基础上，我们换一个角度来重新思考“分布式系统中如何对某个值达成一致”这个问题，可以把它分为下面三个子问题来考虑：
+1. 如何选主（Leader Election），有paxos 就行， 当然会涉及到许多工程上的细节，比如心跳、随机超时、并行竞选等
+2. 如何把数据复制到各个节点上（Entity Replication），会涉及到网络分区、节点失联等
+3. 如何保证过程是安全的（Safety），选主的结果一定是有且只有唯一的一个主节点，不可能同时出现两个主节点；保证选主过程是一定可以在某个时刻能够结束的。
+
+
+另一种表述：Basic Paxos达成一次决议至少需要两次网络来回，并发情况下可能需要更多，极端情况下甚至可能形成活锁，效率低下。Multi-Paxos选举一个Leader，提议由Leader发起，没有竞争，解决了活锁问题。提议都由Leader发起的情况下，Prepare阶段可以跳过，将两阶段变为一阶段，提高效率。Multi-Paxos并不假设唯一Leader，它允许多Leader并发提议，不影响安全性，极端情况下退化为Basic Paxos。Multi-Paxos与Basic Paxos的区别并不在于Multi（Basic Paxos也可以Multi），只是在同一Proposer**连续提议时**可以优化跳过Prepare直接进入Accept阶段。
 
 以 Chubby 的 Multi-Paxos 实现为例
 
@@ -177,67 +213,11 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 
 [深入剖析共识性算法 Raft](https://mp.weixin.qq.com/s/GhI7RYBdsrqlkU9o9CLEAg)
 
-## 工程化
-[最难 paxos 和最易 raft ？](https://mp.weixin.qq.com/s/C8Mgl9ebMAG0hh6ekoO58w)
-1. paxos 本质是确定一个值，把参与确定这个值的角色打包称为一组实例（ paxos instance ）；
-2. 不同实例之间决议互不干扰。多组 paxos 实例确定多个值，形成一组操作序列，也是就日志 ；
-3. 确定一个值序列有啥用？加个状态机就起飞了。**日志 + 状态机 可以成为任何有意义的工程系统**。比如 rocksdb，leveldb 等等 lsm 存储，它们数据先写 append log ，通过重放日志到达的系统状态一定是一致的。
-4. 为了解决递交提案混乱可能引发的效率问题（比如活锁），可以通过指定 Leader 角色来解决；
 
-raft 天生就是 paxos 协议工程化的一种样子。
-
-## 补充
-
-### 复制模型
-
-![](/public/upload/distribute/consistency_copy_log.png)
-
-假设KV集群有三台机器，机器之间相互通信，把自己的值传播给其他机器，三个客户端并发的向集群发送三个请求，值X 应该是多少？是多少没关系，135都行，向一个client返回成功、其它client返回失败（或实际值）也可，关键是Node1、Node2、Node3 一致。
-
-||Replicated State Machine|Primary-Backup System|
-|---|---|---|
-|中文|复制状态机|
-|应用的协议|Paxos、Raft|Zab|
-|mysql binlog的数据格式|statement<br>存储的是原始的sql语句|raw<br>数据表的变化数据|
-|redis持久化的两种方式|AOF<br>持久化的是客户端的set/incr/decr命令|RDB<br>持久化的是内存的快照|
-|数据同步次数|客户端的写请求都要在节点之间同步|有时可以合并|
-
-
-[中文版 Raft：寻找一种易于理解的一致性算法](https://mp.weixin.qq.com/s/u4WUx3C6x-_Wr6Tg87uPNw) 一致性算法的任务是保证复制日志的一致性。服务器上的一致性模块接收客户端发送的指令然后添加到自己的日志中。它和其他服务器上的**一致性模块**进行通信来保证每一个服务器上的日志最终都以相同的顺序包含相同的请求，即使有些服务器发生故障。一旦指令被正确的复制，每一个服务器的状态机按照日志顺序处理他们，然后输出结果被返回给客户端。因此，服务器集群看起来形成了一个高可靠的状态机。
-
-在《区块链核心算法解析》中，则采用另一种描述方式：对于一组节点，如果所有节点均以相同的顺序执行一个（可能是无限的）命令序列c1,c2,c3...，则这组节点 实现了状态复制。
-
-[《In Search of an Understandable Consensus Algorithm》](https://raft.github.io/raft.pdf)Consensus algorithms allow a collection of machines to work as a coherent group that can survive the fail- ures of some of its members. Because of this, they play a key role in building reliable large-scale software systems.
-
-
-### 如何理解ProposerId——逻辑锁
-
-[如何浅显易懂地解说 Paxos 的算法？](https://www.zhihu.com/question/19787937/answer/420487000)Basic Paxos 的两个阶段可以看成多机下的一次读 version number + value（读阶段，原文中的准备阶段），然后拿读到的 version number 和 value 做一次 CAS （略有不同，但思想类似）（写阶段，原文中的接受阶段），非常直观。
-
-**类比一下**，以mvcc 方式并发修改一行记录为例，假设一个student表， 带有version字段，当前version = 0, money = 100。线程1 和 线程2 都给zhangsan打钱（150,180）， 则打钱过程分两步
-
-1. 读取到money = 100，此时version = 0 `select money,version from student where name = zhangsan`
-2. 打钱 `update money = 150,version=1 set student where name = zhangsan and version = 0`
-
-    1. 如果在此期间 线程2没有修改过， 则vesion 为0，执行成功
-    2. 若修改过，则因为实际version = 1 无法匹配数据记录，修改失败。
-
-假设存在一个全局唯一自增id服务，线程2_id > 线程1_id，也可以换个方式 
-
-|步骤|线程1|线程2|
-|---|---|---|
-|改version占坑|`update version = 线程1_id where name = zhangsan and version < 线程1_id`||
-|改version占坑||`update version = 线程2_id where name = zhangsan and version < 线程2_id`|
-|结果||`version = 线程2_id`|
-|打钱|`update money = 150 set student where name = zhangsan and version = 线程1_id`||
-|打钱||`update money = 180 set student where name = zhangsan and version = 线程2_id`|
-|结果|失败|成功|
-
-paxos 与线程安全问题不同的地方是，paxos的node之间 是为了形成一致，而线程安全则是要么成功要么失败，所以有一点差异。 
+## 其它
 
 生活中面临的任何选择，最后都可以转换为一个问题：你想要什么（以及为此愿意牺牲什么）。任何不一致问题， 本质上都可以转换为一个一致问题。 一个队伍谁当老大 可以各不服气，但大家可以对“多票当选”取得一致，这就是所谓“民主”。**你可以不尊重老大，但必须尊重价值观**。而在basic-poxos 中，底层的“价值观”就是：**谁的ProposerId 大谁的优先级更高**。有了“优先级”/“价值观” 就可以让“无序”的世界变“有序”。 
 
 
-![](/public/upload/distribute/consistency.png)
 
 
