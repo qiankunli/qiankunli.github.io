@@ -35,17 +35,23 @@ client-go 只提供了rest api和 dynamic client来操作第三方资源，需�
 7. openapi-gen  生成openAPI定义
 code-generator还专门整合了这些gen，形成了generate-groups.sh和generate-internal-groups.sh这两个脚本。 PS：原来client/informer/lister 这些代码都是自动生成的
 
-一般带有crd 项目会有 hack 目录 包含 update-codegen.sh  脚本文件（执行code-generator）
+一般带有crd 项目会有 hack 目录 包含 update-codegen.sh  脚本文件（执行code-generator） 或包含Makefile 用来支持根据 crd struct 生成相关的deepcopy/defaults/client(clientset/informer/lister)/kustomize(包含crd yaml定义)文件。
 
 ```
 crd-project
+    /mainfests  # 
     /hack
         /update-codegen.sh  
     /pkg
         /apis/xx/v1
-            /types.go
+            /types.go                       # 自定义crd struct
             /zz_generated.deepcopy.go
             /zz_generated.defaults.go
+        /client
+            /clientset
+            /informers
+            /listers
+    /Makefile
 ```
 
 

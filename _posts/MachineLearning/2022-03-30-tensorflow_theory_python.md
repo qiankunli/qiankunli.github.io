@@ -373,7 +373,7 @@ def dense(inputs, units,activation=None,...):
 
 ### 整体实现
 
-Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
+Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算，再具体的说，**自动求导的部分是靠 Optimizer 串起来的**。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
 
 1. 计算梯度。即调用`compute_gradients (loss, var_list …)` 计算loss对指定val_list的梯度，返回元组列表 `list(zip(grads, var_list))`。
 2. 用计算得到的梯度来更新对应权重。即调用 `apply_gradients(grads_and_vars, global_step=global_step, name=None)` 将 `compute_gradients (loss, var_list …)` 的返回值作为输入对权重变量进行更新；
@@ -429,6 +429,63 @@ class Optimizer(object):
         pass
 ```
 
+一个简单的总结，当调用 Optimizer.minimize 方法时，使用 compute_gradients 方法，实现反向计算图的构造;使用 apply_gradients 方法，实现参数更新的子图构造。参数更新子图以 grads_and_vars 为输入，执行梯度下降的更新算法;最后，通 过 train_op 完成 global_step 值加 1，至此一轮 Step 执行完成。
+
+### compute_gradients
+
+compute_gradients 将根据 loss 的值，求解 var_list=[v1, v2, ..., vn] 的梯度，如果不传入var_list，那么默认就是所有trainable的variable。最终 返回的结果为:[(grad_v1, v1), (grad_v2, v2), ..., (grad_vn, vn)]。其中，compute_gradients 将调用 gradients 方法，构造反向传播的子图，可以形式化地描述为
+
+``` python
+def compute_gradients(loss, grad=I):
+  vrg = build_virtual_reversed_graph(loss)
+  for op in vrg.topological_sort():
+    # 对每个正 向子图中的 OP 寻找其「梯度函数」
+    grad_fn = ops.get_gradient_function(op)
+    # 调用该梯度函数，该梯度函数将构造该 OP 对 应的反向的局部子图。
+    grad = grad_fn(op, grad)
+def apply_gradients(grads_and_vars, learning_rate):
+    for (grad, var) in grads_and_vars:
+      # 对于每个 (grad_vi, vi)，构造一个更 新 vi 的子图
+      apply_gradient_descent(learning_rate, grad, var)
+```
+综上述，正向的一个 OP 对应反向的一个局部子图，并由该 OP 的梯度函数负责构造。 一般地，梯度函数满足如下原型:
+
+```python
+@ops.RegisterGradient("op_name")
+def op_grad_func(op, grad)
+```
+对于一个梯度函数，第一个参数 op 表示正向计算的 OP，根据它可以获取正向计算时 OP 的输入和输出;第二个参数 grad，是反向子图中上游节点传递过来的梯度，它是一个 已经计算好的梯度值 (初始梯度值全为 1)。一般地，正向子图中的一个 OP，对应反向子图中的一个局部子图。因为，正向 OP 的 梯度函数实现，可能需要多个 OP 才能完成相应的梯度计算。例如，Square 的 OP，对应梯 度函数构造了包含两个 2 个乘法 OP。
+
+```python
+@ops.RegisterGradient("Square")
+def SquareGrad(op, grad):
+    x = op.inputs[0]
+    with ops.control_dependencies([grad.op]):
+    x = math_ops.conj(x)
+    return grad * (2.0 * x)
+```
+
+![](/public/upload/machine/tf_bp_grad.png)
+
+
+
+
+### apply_gradients
+
+《Tensorflow内核剖析》
+
+```python
+class Optimizer(object):
+  def minimize(self, loss, var_list=None, global_step=None):
+    """Add operations to minimize loss by updating var_list.
+    """
+    grads_and_vars = self.compute_gradients(loss, var_list=var_list)
+    # 将梯度apply到变量上，具体梯度如何更新到变量，由 _apply_dense、_resource_apply_dense、_apply_sparse、_resource_apply_spars这四个方法实现。
+    return self.apply_gradients(grads_and_vars,global_step=global_step)
+```
+
+Optimizer 基类为每个实现子类预留了_create_slots()，_prepare()，_apply_dense()，_apply_sparse()四个接口出来，后面新构建的 Optimizer 只需要重写或者扩展 Optimizer 类的某几个函数即可。
+
 apply_gradients()核心的部分就是对每个 variable 本身应用 assign，体现在`update_ops.append(processor.update_op(self, grad))`
 
 ```python
@@ -456,8 +513,6 @@ class _DenseResourceVariableProcessor(_OptimizableVariable):
         update_op = optimizer._resource_apply_dense(g, self._v)
         return update_op
 ```
-
-Optimizer 基类的这个方法为每个实现子类预留了_create_slots()，_prepare()，_apply_dense()，_apply_sparse()四个接口出来，后面新构建的 Optimizer 只需要重写或者扩展 Optimizer 类的某几个函数即可。
 
 [tensorflow分布式源码解读4：AdamOptimizer](https://zhuanlan.zhihu.com/p/99071481)原生的tf 根据 梯度/grad 的类型 来决定更新weight/ variable 的方法，当传来的梯度是普通tensor时，调用_apply_dense方法去更新参数；当传来的梯度是IndexedSlices类型时，则去调用optimizer._apply_sparse_duplicate_indices函数。Embedding 参数的梯度中包含每个 tensor 中发生变化的数据切片 IndexedSlices。IndexedSlices类型是一种可以存储稀疏矩阵的数据结构，只需要存储对应的行号和相应的值即可。
 
@@ -515,64 +570,6 @@ class GradientDescentOptimizer(optimizer.Optimizer):
   def _prepare(self):
     self._learning_rate_tensor = ops.convert_to_tensor(self._learning_rate,name="learning_rate")
 ```
-
-
-### BP阶段/梯度计算
-
-《Tensorflow内核剖析》
-
-```python
-class Optimizer(object):
-  def minimize(self, loss, var_list=None, global_step=None):
-    """Add operations to minimize loss by updating var_list.
-    """
-    grads_and_vars = self.compute_gradients(loss, var_list=var_list)
-    # 将梯度apply到变量上，具体梯度如何更新到变量，由 _apply_dense、_resource_apply_dense、_apply_sparse、_resource_apply_spars这四个方法实现。
-    return self.apply_gradients(grads_and_vars,global_step=global_step)
-```
-
-compute_gradients 将根据 loss 的值，求解 var_list=[v1, v2, ..., vn] 的梯度，如果不传入var_list，那么默认就是所有trainable的variable。最终 返回的结果为:[(grad_v1, v1), (grad_v2, v2), ..., (grad_vn, vn)]。其中，compute_gradients 将调用 gradients 方法，构造反向传播的子图，可以形式化地描述为
-
-``` python
-def compute_gradients(loss, grad=I):
-  vrg = build_virtual_reversed_graph(loss)
-  for op in vrg.topological_sort():
-    # 对每个正 向子图中的 OP 寻找其「梯度函数」
-    grad_fn = ops.get_gradient_function(op)
-    # 调用该梯度函数，该梯度函数将构造该 OP 对 应的反向的局部子图。
-    grad = grad_fn(op, grad)
-def apply_gradients(grads_and_vars, learning_rate):
-    for (grad, var) in grads_and_vars:
-      # 对于每个 (grad_vi, vi)，构造一个更 新 vi 的子图
-      apply_gradient_descent(learning_rate, grad, var)
-```
-综上述，正向的一个 OP 对应反向的一个局部子图，并由该 OP 的梯度函数负责构造。 一般地，梯度函数满足如下原型:
-
-```python
-@ops.RegisterGradient("op_name")
-def op_grad_func(op, grad)
-```
-对于一个梯度函数，第一个参数 op 表示正向计算的 OP，根据它可以获取正向计算时 OP 的输入和输出;第二个参数 grad，是反向子图中上游节点传递过来的梯度，它是一个 已经计算好的梯度值 (初始梯度值全为 1)。一般地，正向子图中的一个 OP，对应反向子图中的一个局部子图。因为，正向 OP 的 梯度函数实现，可能需要多个 OP 才能完成相应的梯度计算。例如，Square 的 OP，对应梯 度函数构造了包含两个 2 个乘法 OP。
-
-```
-@ops.RegisterGradient("Square")
-    def SquareGrad(op, grad):
-      x = op.inputs[0]
-      with ops.control_dependencies([grad.op]):
-        x = math_ops.conj(x)
-        return grad * (2.0 * x)
-```
-
-![](/public/upload/machine/tf_bp_grad.png)
-
-一个简单的总结，当调用 Optimizer.minimize 方法时，使用 compute_gradients 方法，实现反向计算图的构造;使用 apply_gradients 方法，实现参数更新的子图构造。参数更新子图以 grads_and_vars 为输入，执行梯度下降的更新算法;最后，通 过 train_op 完成 global_step 值加 1，至此一轮 Step 执行完成。
-
-[从论文源码学习 之 embedding层如何自动更新](https://mp.weixin.qq.com/s/v0K_9Y6aWAyHj7N1bIGvBw) 讲的也而非常细、好。
-1. 前向求导关注的是输入是怎么影响到每一层的，反向求导则是关注于每一层是怎么影响到最终的输出结果的。自动求导就是每一个op/layer自己依据自己的输入和输出做前向计算/反向求导，而框架则负责组装调度这些op/layer，表现出来就是你通过框架去定义网络/计算图，框架自动前向计算并自动求导。TensorFlow的求导，实际上是先提供每一个op求导的数学实现，然后使用链式法则求出整个表达式的导数。
-2. 当你定义好了一个神经网络，常见的深度学习框架将其解释为一个dag（有向无环图），dag里每个节点就是op，从loss function这个节点开始，通过链式法则一步一步从后往前计算每一层神经网络的梯度，整个dag梯度计算的最小粒度就是op的 backward 函数（这里是手动的），而链式法则则是自动的。
-3. 构图的时候只需要写完前向的数据流图部分，TensorFlow 的做法是每一个 Op 在建图的时候就同时包含了它的梯度计算公式，构成前向计算图的时候会自动建立反向部分的计算图，前向计算出来的输入输出会保留下来，留到后向计算的时候用完了才删除。
-
-[Tensorflow代码解析（一）](https://zhuanlan.zhihu.com/p/25646408)反向计算限制了符号编程中内存空间复用的优势，因为在正向计算中的计算数据在反向计算中也可能要用到。从这一点上讲，粗粒度的计算节点比细粒度的计算节点更有优势，而TF大部分为细粒度操作，虽然灵活性很强，但细粒度操作涉及到更多的优化方案，在工程实现上开销较大，不及粗粒度简单直接。在神经网络模型中，TF将逐步侧重粗粒度运算。
 
 ## Graph数据结构
 
@@ -677,3 +674,12 @@ tf.manual(a,b)
     ret = Operation(node_def,self,inputs=inputs,...)
 ```
 
+
+## 其它
+
+[从论文源码学习 之 embedding层如何自动更新](https://mp.weixin.qq.com/s/v0K_9Y6aWAyHj7N1bIGvBw) 讲的也而非常细、好。
+1. 前向求导关注的是输入是怎么影响到每一层的，反向求导则是关注于每一层是怎么影响到最终的输出结果的。自动求导就是每一个op/layer自己依据自己的输入和输出做前向计算/反向求导，而框架则负责组装调度这些op/layer，表现出来就是你通过框架去定义网络/计算图，框架自动前向计算并自动求导。TensorFlow的求导，实际上是先提供每一个op求导的数学实现，然后使用链式法则求出整个表达式的导数。
+2. 当你定义好了一个神经网络，常见的深度学习框架将其解释为一个dag（有向无环图），dag里每个节点就是op，从loss function这个节点开始，通过链式法则一步一步从后往前计算每一层神经网络的梯度，整个dag梯度计算的最小粒度就是op的 backward 函数（这里是手动的），而链式法则则是自动的。
+3. 构图的时候只需要写完前向的数据流图部分，TensorFlow 的做法是每一个 Op 在建图的时候就同时包含了它的梯度计算公式，构成前向计算图的时候会自动建立反向部分的计算图，前向计算出来的输入输出会保留下来，留到后向计算的时候用完了才删除。
+
+[Tensorflow代码解析（一）](https://zhuanlan.zhihu.com/p/25646408)反向计算限制了符号编程中内存空间复用的优势，因为在正向计算中的计算数据在反向计算中也可能要用到。从这一点上讲，粗粒度的计算节点比细粒度的计算节点更有优势，而TF大部分为细粒度操作，虽然灵活性很强，但细粒度操作涉及到更多的优化方案，在工程实现上开销较大，不及粗粒度简单直接。在神经网络模型中，TF将逐步侧重粗粒度运算。
