@@ -263,20 +263,19 @@ callbacks.on_train_end(final_logs)
 
 ## Estimator
 
-[Introduction to TensorFlow Datasets and Estimators](https://developers.googleblog.com/2017/09/introducing-tensorflow-datasets.html) 它最大的特点在于兼容分布式和单机两种场景，工程师可以在同一套代码结构下即实现单机训练也可以实现分布式训练。 PS： 没有了 Session、Strategy 这些概念，这些概念 单机和分布式都不一样。 
+### 使用
+
+[Introduction to TensorFlow Datasets and Estimators](https://developers.googleblog.com/2017/09/introducing-tensorflow-datasets.html) 它最大的特点在于兼容分布式和单机两种场景，工程师可以在同一套代码结构下即实现单机训练也可以实现分布式训练。 PS： 隐藏了 Session、Strategy 这些概念，这些概念 单机和分布式都不一样。 
 
 ![](/public/upload/machine/estimator.png)
 
 1. 创建一个或多个输入函数，即input_fn
     ```python
-    # 第一个返回值 must be a dict in which each input feature is a key, and then a list of values for the training batch.
-    # 第二个返回值 is a list of labels for the training batch.
     def input_fn(file_path,perform_shuffle,repeat_count):
-    ...
-    将输入 转为 Dataset 再转为 input_fn 要求的格式
-    ...
-    return ({ 'feature_name1':[values], ..<etc>.., 'feature_namen':[values] },
-            [label_value])
+      # 第一个返回值 must be a dict in which each input feature is a key, and then a list of values for the training batch.
+       # 第二个返回值 is a list of labels for the training batch.
+      # 将输入 转为 Dataset 再转为 input_fn 要求的格式
+      return ({ 'feature_name1':[values], ..<etc>.., 'feature_namen':[values] },[label_value])
     ```
 2. 定义模型的特征列,即feature_columns
 3. 实例化 Estimator，指定特征列和各种超参数。
@@ -294,12 +293,91 @@ feature_columns = [tf.feature_column.numeric_column(k) for k in feature_names]
 # Create a deep neural network regression classifier.Use the DNNClassifier pre-made estimator
 classifier = tf.estimator.DNNClassifier(
    feature_columns=feature_columns, # The input features to our model
-   hidden_units=[10, 10], # Two layers, each with 10 neurons
+   hidden_units=[10, 10],           # Two layers, each with 10 neurons
    n_classes=3,
-   model_dir=PATH) # Path to where checkpoints etc are stored
+   model_dir=PATH)                  # Path to where checkpoints etc are stored
 # Train our model, use the previously function my_input_fn Input to training is a file with training example Stop training after 8 iterations of train data (epochs)
 classifier.train(input_fn=lambda: my_input_fn(FILE_TRAIN, True, 8))
 # Evaluate our model using the examples contained in FILE_TEST 
 # Return value will contain evaluation_metrics such as: loss & average_loss
 evaluate_result = estimator.evaluate(input_fn=lambda: my_input_fn(FILE_TEST, False, 4)
 ```
+
+### 原理
+
+```python
+# tensorflow/python/estimator/estimator.py
+class Estimator(object):
+  def __init__(self,
+    model_fn,               # 定义模型，根据不同的模式分别定义训练、评估和预测的图。
+    model_dir=None,         # 模型导出目录
+    config=None,            # 配置参数
+    params=None,            # 自定义Estimator的额外参数
+    warm_start_from=None):  # 模型热启动
+  def train(self,
+            input_fn,           # 返回训练特征和标签的tuple
+            hooks=None,         # 通过hook指定训练过程中的自定义行为
+            steps=None,         # 训练步数
+            max_steps=None,     # 训练总步数
+            saving_listeners=None):
+    with context.graph_mode():
+      hooks.extend(self._convert_train_steps_to_hooks(steps, max_steps))
+      loss = self._train_model(input_fn, hooks, saving_listeners)
+      logging.info('Loss for final step: %s.', loss)
+  # _train_model根据不同的配置，分别走到分布式训练和本地训练的函数
+  def _train_model(self, input_fn, hooks, saving_listeners):
+    if self._train_distribution:
+      return self._train_model_distributed(input_fn, hooks, saving_listeners)
+    else:
+      return self._train_model_default(input_fn, hooks, saving_listeners)
+```
+其中最核心的参数为model_fn
+```python
+def _model_fn(features,  # 特征，可以是Tensor或dict of Tensor
+    labels,              # 标签
+    mode,                # 模式，ModeKeys.TRAIN, ModeKeys.EVAL, ModeKeys.PREDICT
+    params,              # 自定义参数，即上面Estimator构造函数中的params
+    config):             # 配置参数
+    ...
+    # return EstimatorSpec
+```
+
+Estimator.train ==> _train_model ==> _train_model_default， 本地训练的实现  
+
+```python
+class Estimator(object):
+  def _train_model_default(self, input_fn, hooks, saving_listeners):
+    with ops.Graph().as_default() as g, g.device(self._device_fn):
+      random_seed.set_random_seed(self._config.tf_random_seed)
+      # 先创建global_step
+      global_step_tensor = self._create_and_assert_global_step(g)
+      # 调用input_fn来得到训练特征和标签
+      features, labels, input_hooks = (self._get_features_and_labels_from_input_fn(input_fn, ModeKeys.TRAIN))
+      worker_hooks.extend(input_hooks)
+      # 调用model_fn来得到训练图
+      estimator_spec = self._call_model_fn(features, labels, ModeKeys.TRAIN, self.config)
+      global_step_tensor = training_util.get_global_step(g)
+      # 进入training loop
+      return self._train_with_estimator_spec(estimator_spec, worker_hooks,hooks, global_step_tensor,saving_listeners)
+  def _train_with_estimator_spec(self, estimator_spec, worker_hooks, hooks,global_step_tensor, saving_listeners):                                
+    # 配置Hook
+    worker_hooks.extend(hooks)
+    worker_hooks.append(training.NanTensorHook(estimator_spec.loss)
+    worker_hooks.append(training.LoggingTensorHook(...))
+    saver_hooks = [h for h in all_hooks if isinstance(h, training.CheckpointSaverHook)]
+    worker_hooks.extend(estimator_spec.training_hooks)
+    worker_hooks.append(training.SummarySaverHook(...))
+    worker_hooks.append(training.StepCounterHook(...))
+    # 使用MonitoredTrainingSession进行Training loop
+    with training.MonitoredTrainingSession(master=self._config.master,is_chief=self._config.is_chief,checkpoint_dir=self._model_dir,scaffold=estimator_spec.scaffold,hooks=worker_hooks,....) as mon_sess:
+      loss = None
+      any_step_done = False
+      while not mon_sess.should_stop():
+        _, loss = mon_sess.run([estimator_spec.train_op, estimator_spec.loss])
+        any_step_done = True
+    if not any_step_done:
+      logging.warning('Training with estimator made no steps. Perhaps input is empty or misspecified.')
+    return loss
+```
+
+分布式训练实现用到了 Strategy，记录在 tensorflow 分布式原理的文章中。 

@@ -173,7 +173,7 @@ Prometheus Server 对`http://ip:9090/metrics` 返回的数据 不是直接原样
         # duration of the scrape.
         scrape_duration_seconds{job="<job-name>", instance="<instance-id>"}: xx
 
-带有__前缀的标签名称保留给Prometheus内部使用
+带有`__`前缀的标签名称保留给Prometheus内部使用
 
 
 

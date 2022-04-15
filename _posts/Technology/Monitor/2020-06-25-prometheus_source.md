@@ -141,6 +141,7 @@ groups:
 ![](/public/upload/go/prometheus_rule_object.png)
 
 1. rule 分为两种类型：RecordingRule 和 AlertingRule。 
+    1. recording rules 是提前设置好一个比较花费大量时间运算或经常运算的表达式，其结果保存成一组新的时间序列数据。当需要查询的时候直接会返回已经计算好的结果，这样会比直接查询快，同时也减轻了PromQl的计算压力，同时对可视化查询的时候也很有用，可视化展示每次只需要刷新重复查询相同的表达式即可。
 2. 无论是源码还是部署层面，prometheus server 都与alertmanager 平级，prometheus 调用/将报警数据**推给**alertmanager
 
 ![](/public/upload/go/prometheus_rule_sequence.png)

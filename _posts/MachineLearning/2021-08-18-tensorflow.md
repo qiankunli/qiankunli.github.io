@@ -176,7 +176,7 @@ with tf.Session() as sess:
 
 ### Dataset
 
-在训练我们的model的时候，需要把训练数据input到我们的算法model中。但有时候训练数据不是说只有几百条，而是成千上万的，这样如果直接把这些数据load到内存中的Tensor肯定是吃不消的，所以需要一种数据结构让算法能够批量地从disk中分批读取，然后用它们来训练我们的model， Dataset正是提供这种机制(transformation)来满足这方面的需求（建立input pipelines）。可以将Dataset理解成一个数据源，指向某些包含训练数据的文件列表，或者是内存里面已有的数据结构（比如Tensor objects)。
+在训练我们的model的时候，需要把训练数据input到我们的算法model中。但有时候训练数据不是说只有几百条，而是成千上万的，这样如果直接把这些数据load到内存中的Tensor肯定是吃不消的，所以需要一种数据结构让算法能够批量地从disk中分批读取，然后用它们来训练我们的model， Dataset正是提供这种机制(transformation)来满足这方面的需求（建立input pipelines）。可以将Dataset理解成一个数据源，指向某些包含训练数据的文件列表，或者是内存里面已有的数据结构（比如Tensor objects)。类似Spark RDD或DataFrame
 
 feed-dict 被吐槽太慢了 ，[如何在TensorFlow上高效地使用Dataset](https://mp.weixin.qq.com/s/umXx2o_J8OpsRfq-p9ssxg)推荐使用dataset API的原因在于，他提供了一套构建数据Pipeline的操作，包括以下三部分
 
@@ -186,8 +186,7 @@ feed-dict 被吐槽太慢了 ，[如何在TensorFlow上高效地使用Dataset](h
 
 Tensorflow封装了一组API来处理数据的读入，它们都属于模块 tf.data
 1. 从numpy 读取  
-
-  ```
+  ```python
   # create a random vector of shape (100,2)
   x = np.random.sample((100,2))
   # make a dataset from a numpy array

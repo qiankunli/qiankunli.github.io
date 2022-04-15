@@ -142,6 +142,20 @@ func (jc *JobController) ReconcileJobs(...)error{
 ```
 ### reconcilePods
 
+[Kubeflow实战系列: 利用TFJob运行分布式TensorFlow](https://mp.weixin.qq.com/s/PmAU0MrPkKh6YiWpFXTRFg) TFJob 的核心是构建ClusterSpec。
+
+
+```json
+{
+  "cluster":{
+    "chief":[],   
+    "ps":[],
+    "worker":[]
+  }
+}
+```
+
+tf_operator的工作就是创建对应的Pod, 并且将环境变量TF_CONFIG传入到每个Pod中，TF_CONFIG包含三部分的内容，当前集群ClusterSpec， 该节点的角色类型，以及id。
 ```go
 // pkg/controller.v1/tensorflow/pod.go
 func (tc *TFController) reconcilePods(...) {
