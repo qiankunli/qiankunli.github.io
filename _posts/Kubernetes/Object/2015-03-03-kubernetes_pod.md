@@ -139,6 +139,8 @@ type PodStatus struct {
 
 ## kubectl drain 发生了什么
 
+[Kubernetes Pod 删除操作源码解析](https://mp.weixin.qq.com/s/L-CQhYzxqxOoy9xYp6-JMA)
+
 kubectl drain 将以某种方式驱逐 Pod。drain 将向控制平面发出删除目标节点上的 Pod 的请求。通过 API 将 Pod 从集群中删除后，所有发生的事情就是该 Pod 在元数据服务器中被标记为要删除。这会向所有相关子系统发送一个 Pod 删除通知
 
 1. 目标节点上的 kubelet 开始关闭 Pod。

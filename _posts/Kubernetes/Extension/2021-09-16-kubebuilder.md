@@ -61,9 +61,9 @@ crd-project
 1.  coreOS 开源的 Operator-SDK（https://github.com/operator-framework/operator-sdk ）
 2.  K8s 兴趣小组维护的 Kubebuilder（https://github.com/kubernetes-sigs/kubebuilder ）
 
-[kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) 是一个用来帮助用户快速实现 Kubernetes CRD Operator 的 SDK。当然，kubebuilder 也不是从0 生成所有controller 代码，k8s 提供给一个 [Kubernetes controller-runtime Project](https://github.com/kubernetes-sigs/controller-runtime)  a set of go libraries for building Controllers. controller-runtime 在Operator SDK中也有被用到。
+当我们需要增加新资源时就需要声明crd资源和构建operator。不同的opertor都需要连接apiserver同步自定义资源，因此会有高度冗余的逻辑。kubebuilder不仅会为我们生成opertor服务框架，还能自动同步自定义资源的变化。用户只需要定义CRD结构，和处理资源变动时的回调即可。
 
-有点类似于spring/controller-runtime提供核心抽象,springboot/kubebuilder 将一切集成起来。所谓的k8s 开发，就是定义crd(较少) ，并根据crd 的add/update/delete做工作（较多）， 有了controller-runtime，屏蔽了缓存等细节，**我们只需要实现 Reconcile 方法即可**。
+![](/public/upload/kubernetes/kubebuilder_controller.png)
 
 ```go
 type Reconciler interface {
@@ -72,7 +72,24 @@ type Reconciler interface {
 }
 ```
 
+[kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) 是一个用来帮助用户快速实现 Kubernetes CRD Operator 的 SDK。当然，kubebuilder 也不是从0 生成所有controller 代码，k8s 提供给一个 [Kubernetes controller-runtime Project](https://github.com/kubernetes-sigs/controller-runtime)  a set of go libraries for building Controllers. controller-runtime 在Operator SDK中也有被用到。
 
+
+以下部分是kubebuilder的框架性组件
+
+1. Cache，Kubebuilder 的核心组件，负责在 Controller 进程里面根据 Scheme 同步 Api Server 中所有该 Controller 关心 GVKs 的 GVRs，其核心是 GVK -> Informer 的映射，Informer 会负责监听对应 GVK 的 GVRs 的创建/删除/更新操作，以触发 Controller 的 Reconcile 逻辑。
+2. Controller，Kubebuidler 为我们生成的脚手架文件，我们只需要实现 Reconcile 方法即可。
+3. Clients，在实现 Controller 的时候不可避免地需要对某些资源类型进行创建/删除/更新，就是通过该 Clients 实现的，其中查询功能实际查询是本地的 Cache，写操作直接访问 Api Server。
+4. Index，由于 Controller 经常要对 Cache 进行查询，Kubebuilder 提供 Index utility 给 Cache 加索引提升查询效率。
+5. Finalizer，在一般情况下，如果资源被删除之后，我们虽然能够被触发删除事件，但是这个时候从 Cache 里面无法读取任何被删除对象的信息，这样一来，导致很多垃圾清理工作因为信息不足无法进行，K8s 的 Finalizer 字段用于处理这种情况。在 K8s 中，只要对象 ObjectMeta 里面的 Finalizers 不为空，对该对象的 delete 操作就会转变为 update 操作，具体说就是 update deletionTimestamp 字段，其意义就是告诉 K8s 的 GC“在deletionTimestamp 这个时刻之后，只要 Finalizers 为空，就立马删除掉该对象”。所以一般的使用姿势就是在创建对象时把 Finalizers 设置好（任意 string），然后处理 DeletionTimestamp 不为空的 update 操作（实际是 delete），根据 Finalizers 的值执行完所有的 pre-delete hook（此时可以在 Cache 里面读取到被删除对象的任何信息）之后将 Finalizers 置为空即可。
+6. OwnerReference，K8s GC 在删除一个对象时，任何 ownerReference 是该对象的对象都会被清除，与此同时，Kubebuidler 支持所有对象的变更都会触发 Owner 对象 controller 的 Reconcile 方法。
+
+
+kubebuilder 依赖于 controller-runtime 实现 controller 整个处理流程，在此工程中，controller 对资源的监听依赖于 Informer 机制，controller-runtime 在此机制上又封装了一层，其整体流程入下图
+
+![](/public/upload/kubernetes/kubebuilder_reconcile.png)
+
+其中 Informer 已经由kubebuilder和contorller-runtime 实现，监听到的资源的事件（创建、删除、更新）都会放在 Informer 中。然后这个事件会经过 predict()方法进行过滤，经过interface enqueue进行处理，最终放入 workqueue中。我们创建的 controller 则会依次从workqueue中拿取事件，并调用我们自己实现的 Recontile() 方法进行业务处理。
 
 ## 示例demo
 
@@ -111,7 +128,8 @@ type Reconciler interface {
         /controllers
             /application_controller.go  // 定义 ApplicationReconciler ，核心逻辑就在这里实现
         main.go                         // ApplicationReconciler 添加到 Manager，Manager.Start(stopCh)
-        go.mod                          
+        go.mod     
+        Makefile                     
     ```
 执行 `make install` 实质是执行 `kustomize build config/crd | kubectl apply -f -` 将cr yaml 提交到apiserver上。之后就可以 提交Application yaml 到 k8s 了。将crd struct 注册到 schema，则client-go 可以支持对crd的 crudw 等操作。
 
@@ -125,6 +143,11 @@ go build  之后，可执行文件即可 监听k8s（由`--kubeconfig` 参数指
 `kubebuilder create webhook --group apps --version v1alpha1 --kind Application --programmatic-validation --defaulting`
 
 [kubebuilder 注释标记](https://book.kubebuilder.io/reference/markers.html)，比如：令crd支持kubectl scale，对crd实例进行基础的值校验，允许在kubectl get命令中显示crd的更多字段，等等
+
+可以在crd types.go 加一些kubebuilder 标记，用于codegen 工具辅助生成 yaml文件、go代码等。
+
+我们在生成的 CR 结构体代码中会发现由很多 kubebuilder 自定义的注解，例如// +kubebuilder:object:root=true 等，其实这些在编译时会增加对应的功能，更多注解见[Markers for Config/Code Generation​book.kubebuilder.io](https://book.kubebuilder.io/reference/markers.html)
+
 
 
 

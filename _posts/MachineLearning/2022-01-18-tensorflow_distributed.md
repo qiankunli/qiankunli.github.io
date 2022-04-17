@@ -85,7 +85,7 @@ server = tf.train.Server(cluster, job_name="worker", task_index=1)
 server = tf.train.Server(cluster, job_name="ps", task_index=0)
 ```
 
-至此，我们已经启动了一个TensorFlow Cluster，它由两个worker节点和一个ps节点组成，每个节点上都有Master Service和Worker Service，其中worker节点上的Worker Service将负责梯度运算，ps节点上的Worker Service将负责参数更新，三个Master Service将仅有一个会在需要时被用到，负责子图划分与Task派发。PS： **这是与spark 不同的地方，spark 的后台服务是事先启动好的**。
+**至此，我们已经启动了一个TensorFlow Cluster**，它由两个worker节点和一个ps节点组成，每个节点上都有Master Service和Worker Service，其中worker节点上的Worker Service将负责梯度运算，ps节点上的Worker Service将负责参数更新，三个Master Service将仅有一个会在需要时被用到，负责子图划分与Task派发。PS： **这是与spark 不同的地方，spark 的后台服务是事先启动好的**。
 
 **有了Cluster，我们就可以编写Client**，构建计算图，并提交到这个Cluster上执行。使用分布式TensorFlow时，最常采用的分布式训练策略是数据并行，数据并行就是在很多设备上放置相同的模型，在TensorFlow中称之为Replicated training，主要表现为两种模式：图内复制(in-graph replication)和图间复制(between-graph replication)。不同的运行模式，Client的表现形式不一样。
 

@@ -75,10 +75,11 @@ func main() {
 		Scheme:             scheme,		// 要将你监听的crd 加入到scheme 中
 		Port:               9443,})
     // 2. init Reconciler（Controller）
-	if err = (&controllers.ApplicationReconciler{
+	c := &controllers.ApplicationReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {...}
+	}
+	if err = c.SetupWithManager(mgr); err != nil {...}
     // 3. start Manager
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {...}
 }
@@ -91,19 +92,14 @@ ApplicationReconciler 是我们定义的Application object 对应的Reconciler �
 ```go
 // kubebuilder 生成
 func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).    // 生成Controller Builder 对象
-		For(&appsv1alpha1.Application{}).       // 为Controller指定cr
-        Complete(r)                             // 为Controller指定Reconciler
-}
-// Complete ==> Build
-func (blder *Builder) Build(r reconcile.Reconciler) (controller.Controller, error) {
-	// Set the Config
-	blder.loadRestConfig()
-	// Set the ControllerManagedBy
-	if err := blder.doController(r); err != nil {return nil, err}
-	// Set the Watch
-	if err := blder.doWatch(); err != nil {return nil, err}
-	return blder.ctrl, nil
+	c, err := controller.New(r.ControllerName(), mgr, controller.Options{
+		Reconciler: r,
+	})
+	// 为Controller指定cr
+	c.Watch(&source.Kind{Type: &appsv1alpha1.Application{}}, &handler.EnqueueRequestForObject{},
+		predicate.Funcs{CreateFunc: r.onOwnerCreateFunc()},
+	)
+	return nil
 }
 func New(name string, mgr manager.Manager, options Options) (Controller, error) {
 	...
@@ -163,6 +159,7 @@ Controller 逻辑主要有两个（任何Controller 都是如此），对应两�
 
 ![](/public/upload/kubernetes/controller_watch.png)
 
+以 tf-job的 TFJobReconciler 为例
 ```go
 // 这里明确了 Controller 监听哪些Type， 或者说哪些 event 会触发Controller
 func (r *TFJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
