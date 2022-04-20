@@ -66,6 +66,13 @@ prepare阶段类似于 分布式锁中的抢占锁，引入随机超时时间来
 
 **Proposer 之间并不直接交互**，Acceptor除了一个“存储”的作用外，还有一个信息转发的作用。**从Acceptor的视角看**，basic-paxos 及 multi-paxos 选举过程是协商一个值，每个Proposer提出的value 都可能不一样。所以第一阶段，先经由Acceptor将**已提交的**ProposerId 最大的value 尽可能扩散到Proposer（即决定哪个Proposer 是“意见领袖”）。第二阶段，再将“多数意见”形成“决议”（Acceptor持久化value）
 
+
+### 另一种表述
+
+![](/public/upload/distribute/paxos_sequence.png)
+
+应用程序连接到任意一台服务器后提起状态修改请求（也可以是获得某个状态锁的请求），从图上看也就是服务器 1，会将这个请求发送给集群中其他服务器进行表决。如果某个服务器同时收到了另一个应用程序同样的修改请求，它可能会拒绝服务器 1 的表决，并且自己也发起一个同样的表决请求，那么其他服务器就会根据时间戳和服务器排序规则进行表决。表决结果会发送给其他所有服务器，最终发起表决的服务器也就是服务器 1，会根据收到的表决结果决定该修改请求是否可以执行，事实上，只有在收到多数表决同意的情况下才会决定执行。当有多个请求同时修改某个数据的情况下，服务器的表决机制保证只有一个请求会通过执行，从而保证了数据的一致性。
+
 ## multi-paxos
 
 《分布式协议与算法实战》Multi-Paxos 是一种思想，不是算法，缺失实现算法的必须编程细节。而 Multi-Paxos 算法是一个统称，它是指基于 Multi-Paxos 思想，通过多个 Basic Paxos 实例实现一系列值的共识的算法（比如 Chubby 的 Multi-Paxos 实现、Raft 算法等）。Multi Paxos 对 Basic Paxos 的核心改进是，增加了“选主”的过程。
@@ -213,6 +220,13 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 
 [深入剖析共识性算法 Raft](https://mp.weixin.qq.com/s/GhI7RYBdsrqlkU9o9CLEAg)
 
+## ZAB
+
+Paxos 算法有点过于复杂、实现难度也比较高，所以 ZooKeeper 在编程实现的时候将其简化成了一种叫做 ZAB 的算法（Zookeeper Atomic Broadcast， Zookeeper 原子广播）。
+
+ZAB 算法的目的，同样是在多台服务器之间达成一致，保证这些服务器上存储的数据是一致的。ZAB 算法的主要特点在于：需要在这些服务器中选举一个 Leader，所有的写请求都必须提交给 Leader。由 Leader 服务器向其他服务器（Follower）发起 Propose，通知所有服务器：我们要完成一个写操作请求，大家检查自己的数据状态，是否有问题。如果所有 Follower 服务器都回复 Leader 服务器 ACK，即没有问题，那么 Leader 服务器会向所有 Follower 发送 Commit 命令，要求所有服务器完成写操作。这样包括 Leader 服务器在内的所有 ZooKeeper 集群服务器的数据，就都更新并保持一致了。如果有两个客户端程序同时请求修改同一个数据，因为必须要经过 Leader 的审核，而 Leader 只接受其中一个请求，数据也会保持一致。PS：怪不得带有广播二字
+
+在实际应用中，客户端程序可以连接任意一个 Follower，进行数据读写操作。如果是写操作，那么这个请求会被这个 Follower 发送给 Leader，进行如上所述的处理；如果是读操作，因为所有服务器的数据都是一致的，那么这个 Follower 直接返回自己本地的数据给客户端就可以了。
 
 ## 其它
 

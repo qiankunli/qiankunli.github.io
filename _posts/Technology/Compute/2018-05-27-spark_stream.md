@@ -31,7 +31,7 @@ keywords: Spark
 
 ## spark sql
 
-spark 常规处理的是 非结构化文件，比如文本文件。Spark SQL是一个支持结构化/半结构化数据处理的Spark模块。
+spark 常规处理的是 非结构化文件，比如文本文件，RDD 的value 可以是任意类型。Spark SQL是一个支持结构化/半结构化数据处理的Spark模块。
 
 多了结构化信息，带来以下不同：
 

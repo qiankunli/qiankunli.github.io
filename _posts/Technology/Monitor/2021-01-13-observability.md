@@ -25,6 +25,8 @@ keywords: observability
 
 [淘宝客户端诊断体系升级实践](https://mp.weixin.qq.com/s/9nQUQPT9NWILRxsnZxllUQ)
 
+全站变更系统。
+
 ## 监控报警内在原因
 
 [蚂蚁智能监控](https://mp.weixin.qq.com/s/ZitNUki9QgMTnahy77n8XQ)在设计稳定性架构之初，我们首先应该意识到系统的运行时环境和输入都不会是稳定的。

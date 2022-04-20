@@ -84,6 +84,6 @@ values-pre-env.yaml       // 预发环境 Helm values 文件。
 values-prod-env.yaml      // 生产环境 Helm values 文件。
 ```
 
-`helm upgrade --install —debug —dry-run` 可以看到渲染后的yaml
+`helm install —debug —dry-run` 可以看到渲染后的yaml (具体参数有问题，貌似各个版本还有不同)
 
 helm 日常操作也是区分namespace 的。

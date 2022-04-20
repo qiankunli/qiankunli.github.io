@@ -20,13 +20,6 @@ keywords: container cpu
 [为什么不建议把数据库部署在Docker容器内](https://mp.weixin.qq.com/s/WetiMHwBEHmGzvXY6Pb-jQ)资源隔离方面，Docker确实不如虚拟机KVM，Docker是利用Cgroup实现资源限制的，**只能限制资源消耗的最大值，而不能隔绝其他程序占用自己的资源**。如果其他应用过渡占用物理机资源，将会影响容器里MySQL的读写效率。
 
 ## 观察cpu 使用
-
-[腾讯TencentOS 十年云原生的迭代演进之路](https://mp.weixin.qq.com/s/Cbck85WmivAW0mtMYdeEIw)通过将 Kubernetes Service QoS Class 与 TencentOS Priority 一一对应，在内核层原生感知优先级(Tencent Could Native Scheduler)，在底层提供强隔离机制(Cgroup Priority/CPU QoS/Memory QoS/IO QoS/Net QoS)，最大程度保证混部后业务的服务质量。而且这种优先级机制是贯穿在整个 cgroups 子系统中。
-
-[谷歌每年节省上亿美金，资源利用率高达60%，用的技术有多厉害！](https://mp.weixin.qq.com/s/AoOFF1RztZmC4vAamnsaOw)
-
-![](/public/upload/container/container_schedule.png)
-
 ### linux 视角
 
 ![](/public/upload/container/process_top.png)
@@ -60,6 +53,8 @@ d64e482d2843        mesos-705b5dc6-7169-42e8-a143-6a7dc2e32600   0.18%          
 3. NET I/O 反映了进出带宽
 4. BLOCK I/O 反映了磁盘带宽，The amount of data the container has read to and written from block devices on the host ，貌似是一个累计值，但可以部分反映 项目对磁盘的写程度，有助于解决[容器狂打日志怎么办？](http://qiankunli.github.io/2019/03/05/container_log.html)
 5. PID 反映了对应的进程号，也列出了进程id 与容器id的关系。根据pid 查询容器 id `docker stats --no-stream | grep 1169`
+
+具体到语言级，各个语言都有对应的分析工具，比如java 应用，可以进一步使用vjtop等工具分析进程内线程。
 
 ## Linux的CPU管理——CFS 
 
@@ -235,6 +230,12 @@ Kubernetes 原本的资源模型存在局限性（引入动态资源视图）。
 
 每个节点运行一个agent（单机引擎），agent根据 Guaranteed-Pod 的真实用量去给 Burstable/BestEffort 目录整体设置了一个值，这个值通过**动态计算而来**。
 `Burstable 资源使用 = 单机最大 CPU 用量 - Guaranteed容器用量 - Safety-Margin`，`BestEffort = 单机最大 CPU 用量 - Guaranteed容器用量 - Burstable容器用量 - Safety-Margin`，比如一个pod request=limit=5，日常使用1，当pod 忙起来了，即申请的 Pod 现在要把自己借出去的这部分资源拿回来了，如何处理？此时会通过动态计算缩小 Burstable 和 BestEffort 的这两个框的值，达到一个压制的效果。当资源用量持续上涨时，如果 BestEffort 框整体 CPU 用量小于 1c ，单机引擎会把 BestEffort Pod 全部驱逐掉。当 Guaranteed-Pod 的用量还在持续上涨的时候，就会持续的压低 Burstable 整框 CPU 的 Quota，如果Burstable 框下只有一个 Pod，Request 是 1c，Limit 是 10c，那么单机引擎最低会将 Burstable 整框压制到 1c。换言之，对于 Request，就是说那些用户真实申请了 Quota 的资源，一定会得到得到供给；对于 Limit - Request 这部分资源，单机引擎和调度器会让它尽量能够得到供给；对于 BestEffort，也就是 No Limit 这部分资源，只要单机的波动存在，就存在被优先驱逐的风险. PS： Pod 的Qos 与驱逐策略联系在一起。
+
+[腾讯TencentOS 十年云原生的迭代演进之路](https://mp.weixin.qq.com/s/Cbck85WmivAW0mtMYdeEIw)通过将 Kubernetes Service QoS Class 与 TencentOS Priority 一一对应，在内核层原生感知优先级(Tencent Could Native Scheduler)，在底层提供强隔离机制(Cgroup Priority/CPU QoS/Memory QoS/IO QoS/Net QoS)，最大程度保证混部后业务的服务质量。而且这种优先级机制是贯穿在整个 cgroups 子系统中。
+
+[谷歌每年节省上亿美金，资源利用率高达60%，用的技术有多厉害！](https://mp.weixin.qq.com/s/AoOFF1RztZmC4vAamnsaOw)
+
+![](/public/upload/container/container_schedule.png)
 
 ## 磁盘
 
