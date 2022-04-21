@@ -23,7 +23,6 @@ keywords: linux命令
 
 创建进程的系统调用叫fork。这个名字很奇怪，中文叫“分支”为啥启动一个新进程叫“分支”呢？在 Linux 里，要创建一个新的进程，需要一个老的进程调用fork 来实现，其中老的进程叫作父进程（Parent Process），新的进程叫作子进程（Child Process）。当父进程调用 fork 创建进程的时候，子进程将各个子系统为父进程创建的数据结构也全部拷贝了一份，甚至连程序代码也是拷贝过来的。
 
-
 对于 fork 系统调用的返回值，如果当前进程是子进程，就返回0；如果当前进程是父进程，就返回子进程的进程号。这样首先在返回值这里就有了一个区分，然后通过 if-else 语句判断，如果是父进程，还接着做原来应该做的事情；如果是子进程，需要请求另一个系统调用execve来执行另一个程序，这个时候，子进程和父进程就彻底分道扬镳了，也即产生了一个分支（fork）了。
 
     public static void main(String[] args) throws IOException {
@@ -163,7 +162,7 @@ Linux 启动过程：BIOS ==> MBR ==> BootLoader(grub) ==> kernel ==> systemd(ce
 
 POSIX表示可移植操作系统接口（Portable Operating System Interface of UNIX，缩写为 POSIX ），POSIX标准定义了操作系统应该为应用程序提供的接口标准。
 
-### 内核就是一个由interrupt驱动的程序
+### 内核就是一个由interrupt驱动的程序？
 
 图画的不准确，待改进
 
@@ -196,6 +195,8 @@ POSIX表示可移植操作系统接口（Portable Operating System Interface of 
 
 ## 从glibc 到系统调用
 
+为什么需要系统调用？为了保证操作系统的稳定性和安全性。用户程序不可以直接访问硬件资源，如果用户程序需要访问硬件资源，必须调用操作系统提供的接口，这个调用接口的过程也就是系统调用。用户写的代码最终也会被编译为机器指令，用户代码不允许出现in/out 等访问硬件的指令，想执行这些指令只能“委托”系统人员写的内核代码。或者说，假设机器支持100条指令，开发只能使用其中六七十个，高级语言经过编译器的翻译后不会使用这些指令，但在汇编时代，用户提交的汇编代码指令是可以随便用的。
+
 [The GNU C Library (glibc)](https://www.gnu.org/software/libc/started.html)
 
 ![](/public/upload/linux/glibc_systemcall_kernel.jpg)
@@ -207,35 +208,32 @@ syscal和 int 指令一样，都会发生特权级切换，都可以让 CPU 跳�
 3. glibc 的 syscal-template.S 使用这些宏, 定义了系统调用的调用方式(也是通过宏)
 4. 其中会调用 DO_CALL (也是一个宏), 32位与 64位实现不同
 
+glibc 里面的 open 函数`int open(const char *pathname, int flags, mode_t mode)`，在 glibc 的源代码中，有个文件 syscalls.list，里面列着所有 glibc 的函数对应的系统调用
 
-glibc 里面的 open 函数
-
-    int open(const char *pathname, int flags, mode_t mode)
-
-在 glibc 的源代码中，有个文件 syscalls.list，里面列着所有 glibc 的函数对应的系统调用
-
-    # File name Caller  Syscall name    Args    Strong name Weak names
-    open		-	open		Ci:siv	__libc_open __open open
-
-以32位为例，函数名 ==> Syscall name ==> DO_CALL ==> `int $0x80`
-
-    /* Linux takes system call arguments in registers:
-        syscall number	%eax	     call-clobbered
-        arg 1		%ebx	     call-saved
-        arg 2		%ecx	     call-clobbered
-        arg 3		%edx	     call-clobbered
-        arg 4		%esi	     call-saved
-        arg 5		%edi	     call-saved
-        arg 6		%ebp	     call-saved
-    ......
-    */
-    #define DO_CALL(syscall_name, args)                           \
-        PUSHARGS_##args                               \
-        DOARGS_##args                                 \
-        movl $SYS_ify (syscall_name), %eax;                          \
-        ENTER_KERNEL                                  \
-        POPARGS_##args
-    # define ENTER_KERNEL int $0x80
+```
+# File name Caller  Syscall name    Args    Strong name Weak names
+open		-	open		Ci:siv	__libc_open __open open
+```
+以32位为例，函数名 ==> Syscall name ==> DO_CALL（该函数直接由汇编代码定义） ==> `int $0x80`
+```c
+/* Linux takes system call arguments in registers:
+    syscall number	%eax	     call-clobbered
+    arg 1		%ebx	     call-saved
+    arg 2		%ecx	     call-clobbered
+    arg 3		%edx	     call-clobbered
+    arg 4		%esi	     call-saved
+    arg 5		%edi	     call-saved
+    arg 6		%ebp	     call-saved
+......
+*/
+#define DO_CALL(syscall_name, args)                           \
+    PUSHARGS_##args                               \
+    DOARGS_##args                                 \
+    movl $SYS_ify (syscall_name), %eax;                          \
+    ENTER_KERNEL                                  \
+    POPARGS_##args
+# define ENTER_KERNEL int $0x80
+```
 
 函数传参到底层就是寄存器传参了。glibc 让我们完全以C语言的方式与内核交互，屏蔽了系统调用表、软中断、寄存器等硬件细节。
 
@@ -245,42 +243,39 @@ glibc 里面的 open 函数
 //传递一个参数所用的宏
 #define API_ENTRY_PARE1(intnr,rets,pval1) \
 __asm__ __volatile__(\
-         "movq %[inr],%%rax\n\t"\//系统服务号
-         "movq %[prv1],%%rbx\n\t"\//第一个参数
-         "int $255 \n\t"\//触发中断
-         "movq %%rax,%[retval] \n\t"\//处理返回结果
-         :[retval] "=r" (rets)\
-         :[inr] "r" (intnr),[prv1]"r" (pval1)\
-         :"rax","rbx","cc","memory"\
+        "movq %[inr],%%rax\n\t"\//系统服务号
+        "movq %[prv1],%%rbx\n\t"\//第一个参数
+        "int $255 \n\t"\//触发中断
+        "movq %%rax,%[retval] \n\t"\//处理返回结果
+        :[retval] "=r" (rets)\
+        :[inr] "r" (intnr),[prv1]"r" (pval1)\
+        :"rax","rbx","cc","memory"\
     )
 //传递四个参数所用的宏    
 #define API_ENTRY_PARE4(intnr,rets,pval1,pval2,pval3,pval4) \
 __asm__ __volatile__(\
-         "movq %[inr],%%rax \n\t"\//系统服务号
-         "movq %[prv1],%%rbx \n\t"\//第一个参数
-         "movq %[prv2],%%rcx \n\t"\//第二个参数
-         "movq %[prv3],%%rdx \n\t"\//第三个参数
-         "movq %[prv4],%%rsi \n\t"\//第四个参数
-         "int $255 \n\t"\//触发中断
-         "movq %%rax,%[retval] \n\t"\//处理返回结果
-         :[retval] "=r" (rets)\
-         :[inr] "r" (intnr),[prv1]"g" (pval1),\
-         [prv2] "g" (pval2),[prv3]"g" (pval3),\
-         [prv4] "g" (pval4)\
-         :"rax","rbx","rcx","rdx","rsi","cc","memory"\
+        "movq %[inr],%%rax \n\t"\//系统服务号
+        "movq %[prv1],%%rbx \n\t"\//第一个参数
+        "movq %[prv2],%%rcx \n\t"\//第二个参数
+        "movq %[prv3],%%rdx \n\t"\//第三个参数
+        "movq %[prv4],%%rsi \n\t"\//第四个参数
+        "int $255 \n\t"\//触发中断
+        "movq %%rax,%[retval] \n\t"\//处理返回结果
+        :[retval] "=r" (rets)\
+        :[inr] "r" (intnr),[prv1]"g" (pval1),\
+        [prv2] "g" (pval2),[prv3]"g" (pval3),\
+        [prv4] "g" (pval4)\
+        :"rax","rbx","rcx","rdx","rsi","cc","memory"\
     )
 //示例：时间库函数
-sysstus_t api_time(buf_t ttime)
-{
+sysstus_t api_time(buf_t ttime){
     sysstus_t rets;
     API_ENTRY_PARE1(INR_TIME,rets,ttime);//处理参数，执行int指令 
     return rets;
 }
 // 根据 INR_TIME 查询系统服务表 得到krlsvetabl_time 入口函数
-sysstus_t krlsvetabl_time(uint_t inr, stkparame_t *stkparv)
-{
-    if (inr != INR_TIME)//判断是否时间服务号
-    {
+sysstus_t krlsvetabl_time(uint_t inr, stkparame_t *stkparv){
+    if (inr != INR_TIME)//判断是否时间服务号{
         return SYSSTUSERR;
     }
     //调用真正时间服务函数 
@@ -288,7 +283,7 @@ sysstus_t krlsvetabl_time(uint_t inr, stkparame_t *stkparv)
 }
 ```
 
-[Linux拦截系统调用](https://mp.weixin.qq.com/s/a8gLkVQ-RKLbveEZUJGeWA)说白了，系统调用其实就是函数调用，只不过调用的是内核态的函数。但与普通的函数调用不同，系统调用不能使用 call 指令来调用，而是需要使用 软中断 来调用。在 Linux 系统中，系统调用一般使用 int 0x80 指令（x86）或者 syscall 指令（x64）来调用。
+[Linux拦截系统调用](https://mp.weixin.qq.com/s/a8gLkVQ-RKLbveEZUJGeWA)说白了，系统调用其实就是函数调用，只不过调用的是内核态的函数。但与普通的函数调用不同，系统调用不能使用 call 指令来调用（**call不触发特权级切换**，改变特定寄存器的值），而是需要使用 软中断 来调用。在 Linux 系统中，系统调用一般使用 int 0x80 指令（x86）或者 syscall 指令（x64）来调用。
 1. 在 Linux 内核中，使用 sys_call_table 数组来保存所有系统调用，sys_call_table 数组每一个元素代表着一个系统调用的入口
 2. 当应用程序需要调用一个系统调用时，首先需要将要调用的系统调用号（也就是系统调用所在 sys_call_table 数组的索引）放置到 eax 寄存器中，然后通过使用 int 0x80 指令触发调用 0x80 号软中断服务。
 3. 0x80 号软中断服务，会通过以下代码来调用系统调用。PS： 经了软中断一手，还是调用了call

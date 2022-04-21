@@ -113,7 +113,7 @@ In computer programming, a subroutine is a sequence of program instructions that
 Heap is used for dynamic memory allocation(data with dynamic size ) and unlike stack, the program needs to look up the data in heap using pointers.  
 
 
-光有栈，对于面向过程的程序设计还远远不够，因为栈上的数据在函数返回的时候就会被释放掉，所以**无法将数据传递至函数外部**，只能通过不断拷贝的方式保持其“存活”。而全局变量、静态变量生存期虽然与整个程序保持一致，但没有办法在程序的运行过程中动态生成，只能在编译的时候定义，有很多情况下缺乏表现力，且完全暴露给所有程序代码使用，在这种情况下，堆（Heap）是一种唯一的选择。The heap is an area of dynamically-allocated memory that is **managed automatically by the operating system or the memory manager library**. Memory on the heap is allocated, deallocated, and resized regularly during program execution, and this can lead to a problem called fragmentation. 堆适合管理生存期较长的一些数据，这些数据在退出作用域以后也不会消失。
+光有栈，对于面向过程的程序设计还远远不够，因为栈上的数据在函数返回的时候就会被释放掉，所以**无法将数据传递至函数外部**，只能通过不断拷贝的方式保持其“存活”。而全局变量、静态变量生存期虽然与整个程序保持一致，但没有办法在程序的运行过程中动态生成，只能在编译的时候定义，有很多情况下缺乏表现力，且完全暴露给所有程序代码使用，在这种情况下，堆（Heap）是一种唯一的选择。The heap is an area of dynamically-allocated memory that is **managed automatically by the operating system or the memory manager library**. Memory on the heap is allocated, deallocated, and resized regularly during program execution, and this can lead to a problem called fragmentation. 
 
 ```c
 #include <stdio.h>
@@ -139,8 +139,6 @@ int main(void) {
 如果堆上有足够的空间的满足我们代码的内存申请，内存分配器可以完成内存申请无需内核参与，否则将通过操作系统调用（brk）进行扩展堆，通常是申请一大块内存。（对于 malloc 大默认指的是大于 MMAP_THRESHOLD 个字节 - 128KB）。
 
 任何线程都可以在堆上申请空间（全局的），因此每次申请堆内存都必须进行同步处理，竞争十分激烈，必然会出现线程阻塞。在java 中，为每个线程在eden 区分配一块TLAB 空间，线程在各自的TLAB内存区域申请空间，无需加锁，这是一种典型的空间换时间的策略。
-
-
 
 ## 其它
 

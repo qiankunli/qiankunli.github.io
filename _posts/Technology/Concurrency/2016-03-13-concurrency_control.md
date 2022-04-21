@@ -250,6 +250,10 @@ void up(struct semaphore *sem)
 
 [大话Linux内核中锁机制之完成量、互斥量](http://blog.sina.com.cn/s/blog_6d7fa49b01014q9b.html)
 
+为啥要有条件变量？互斥量是多线程间同时访问某一共享变量时，保证变量可被安全访问的手段。互斥只要求线程间访问某一资源时不存在同时处理或者交替处理的可能，而**对线程本身的调度顺序没有限制**，光靠mutex 无法实现wait condition 的效果。
+
+条件变量自身并不包含条件。**因为它通常和 if (或者while) 一起用，所以叫条件变量**。条件变量，是为了解决等待需求。考虑实现生产者消费者队列，生产者和消费者各是一个线程。一个明显的依赖是，消费者线程依赖生产者线程 push 元素进队列。没有条件变量，你会怎么实现消费者呢？让消费者线程一直轮询“队列是否为空”（需要加 mutex)，轮询时自旋或sleep。一般条件变量，锁和用户提供的判定条件这三个因素一起组合使用。PS：或者说没有一个抽象 直接表示“有则消费、无则等待”的效果，go 用channel可以做到，这也说明的channel 的抽象更高。
+
 ###  linux 线程
 
 [Understanding Linux Process States](https://access.redhat.com/sites/default/files/attachments/processstates_20120831.pdf)
@@ -292,7 +296,7 @@ void up(struct semaphore *sem)
 2. 指令重排序、内存屏障，cpu 内存模型等
 3. x86_64 相关的指令：lock、cas等
 4. linux 进程/线程的实现，提供的快速同步/互斥机制 futex(fast userspace muTeXes)
-5. 并发基础原语 pthread_mutex/pthread_cond 在 glibc 的实现。这是C++ 的实现基础
+5. 对于 C11 标准之前的 C 语言来说，想要构建多线程应用，只能依赖于所在平台上的专有接口，比如 Unix 与类 Unix 平台上广泛使用的 POSIX 模型（windows可能是别的）。自 C11 标准后，C 语言为我们专门提供了一套通用的并发编程接口，你可以通过标准库头文件 threads.h 与 stdatomic.h 来使用它们。
 6. java 内存模型，java 并发基础原语 在 jvm hotspot 上的实现
 7. java.util.concurrent
 
