@@ -535,7 +535,7 @@ class DAGScheduler(private[scheduler] val sc: SparkContext,private[scheduler] va
 3. 创建 TaskSet（注意，TaskSet 由 DAGScheduler 创建，而可调度对象 TaskSetManager 则由 TaskScheduler 创建）
 4. 调用 TaskScheduler 的 submitTasks 方法提交刚刚创建的 TaskSet
 
-对于划分的每一个 Stage，DAGScheduler 会为之创建对应的任务集合 TaskSet。DAGScheduler 以 TaskSet 为粒度向 TaskScheduler 提交任务调度请求。
+对于划分的每一个 Stage，DAGScheduler 会为之创建对应的任务集合 TaskSet（RDD ==> stage ==> Task，RDD 最终落地为 Task）。DAGScheduler 以 TaskSet 为粒度向 TaskScheduler 提交任务调度请求。
 
 TaskScheduler 接收到 DAGScheduler 创建的 TaskSet 后，创建 TaskSetManager，SchedulableBuilder 即调用 addTaskSetManager 方法将刚刚创建的 TaskSetManager 追加到任务队列中。TaskScheduler 请求分布式计算资源， SchedulerBackend 搜集可用计算资源，并以 Worker Offers 的形式反馈给 TaskScheduler，TaskScheduler 根据获得的 Worker Offers，根据调度规则（FIFO 或 Fair）和本地性的限制，搜集适合调度的任务集合，并以 TaskDescriptions 的形式反馈给 SchedulerBackend， 对于获取到的 TaskDescriptions，SchedulerBackend 将其中封装的任务代码分发到对应的 Executors 上，开启分布式任务执行流程。
 
