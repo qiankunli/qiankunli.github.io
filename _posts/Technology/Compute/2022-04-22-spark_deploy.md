@@ -541,6 +541,8 @@ TaskScheduler 接收到 DAGScheduler 创建的 TaskSet 后，创建 TaskSetManag
 
 Executors在接收到 LaunchTask 消息后立即调用 Executor 的 launchTask 方法开始干活。launchTask 首先把 TaskDescription 封装为 TaskRunner（TaskRunner 实现了 Java Runnable 接口，用于多线程并发），随即将封装好的 TaskRunner 交由 Executor 线程池，线程池则调用 TaskRunner 的 run 方法来执行任务。TaskRunner 先对 TaskDescription 中的 serializedTask 进行反序列化得到 Task；然后，为该 Task 指定内存管理器 MemoryManager，MemoryManager 维护一个 Executor 中所有 Tasks 的内存占用以及回收情况。接着调用 Task 的 run 方法来执行任务并获取任务结果，TaskRunner 最终将任务结果封装为 DirectTaskResult 或 IndirectTaskResult 并通过调用 ExecutorBackend 的 statusUpdate 方法将执行状态和结果返回。
 
+## 整体总结
+
 ![](/public/upload/compute/spark_run.png)
 
 1. client: SparkSubmit.main ==> org.apache.spark.deploy.yarn.Client.main 向yarn 为AM 申请一个 container 让AM 可以跑起来。
