@@ -16,27 +16,13 @@ keywords: Scala
 
 [Scala 初学指南](https://www.gitbook.com/book/windor/beginners-guide-to-scala/details)
 
-[函数式思维:为什么函数式编程越来越受关注](https://www.ibm.com/developerworks/cn/java/j-ft20/index.html)
-
-1. 因为runtime的能力变得更强：一个猜测是：比如并发执行for循环，那么如果还在语言中写for循环的话，jvm就不知道是否可以并发执行）
-2. 并且语言获得了更强大的抽象（比如异步future、缓存等下沉到语言层面）。大家想下，一个异步框架 给你的抽象 是不是实现一个handler 就行了。当语言将这个框架的能力 集成进来以后，可以将这个 handler 的接口做的更简洁。
-
-所以开发世界变得更加函数化，这使开发人员可以花费更多的时间来思考结果的影响，而不是思考如何生成结果。比如以前语言不支持 异步也不用框架的话，就难免异步代码 和 业务代码 混淆在一起。由于高阶函数等抽象出现在语言中，它们将成为高度优化的操作的自定义机制。
-
-因此，**函数式编程的流行，跟语言的发展有关系，以前不流行，不是不想，是语言暂时没办法提供那个抽象能力**。
-
-||简化|
-|---|---|
-|c/c++ ==> java|内存管理|
-|java ==> scala|类型推断，迭代|
-
 [A Scala Tutorial for Java programmers](http://www.scala-lang.org/docu/files/ScalaTutorial-zh_CN.pdf)
 
 [怎样最高效地学习Scala](http://blog.csdn.net/chszs/article/details/51693175)
 
-**scala将面向对象和函数式编程糅合在了一起，因此我们讨论scala时，主要也从这两个方面入手。**
+[Strategic Scala Style: Principle of Least Power](http://www.lihaoyi.com/post/StrategicScalaStylePrincipleofLeastPower.html) ， Scala的语言特性不算多，但是语言特性之间过于正交，一方面你把语言特性组合起来之后可以变得很复杂，写出各种其他语言的范式，另一方面容易玩脱。不想玩脱的话，就得优先选用功能最弱的功能（尽量少用scala的高级特性）。只在弱的功能解决不了你面临的问题时，才用更强的功能。Scala的创始人Martin Odersky也在李浩毅博客下面举双手赞成
 
-## 面向对象特性/和java异同点
+## 一些概念
 
 共同点
 
@@ -51,42 +37,104 @@ keywords: Scala
 	* 丰富的模式匹配支持，Pattern matching is a mechanism for checking a value（可以是任何类型） against a pattern
 	* Any、AnyRef、AnyVal
 	* bottom type：Null、Nothing
-	
-4. 类和对象
-	
-	* case class和enum
-	* object 与静态类
-
-5. 在scala中，主构造器（还有辅助构造器）是整个类体，构造器所需的所有参数都被罗列在类名称后面。
 6. trait和java interface的异同
 7. akka和golang并发机制的异同
 
-代码的简写
+### 构造器
 
-	class Name(var value:String)
-	
-从概念上讲，上述代码和下面的代码是等价的：
+在scala中，主构造器（还有辅助构造器）是整个类体，构造器所需的所有参数都被罗列在类名称后面。从概念上讲，`class Name(var value:String)`和下面的代码是等价的：
 
-	class Name(s:String){
-		private var _value:String =s
-		def value:String = _value	// get方法
-		def value_= (newValue:String):Unit = _value=newValue // set方法
-	}
+```scala
+class Name(s:String){
+	private var _value:String =s
+	def value:String = _value							 // get方法
+	def value_= (newValue:String):Unit = _value=newValue // set方法
+}
+```
+
 
 `def value_= (newValue:String):Unit = _value=newValue`，其中`value_=`是一个方法名（绝不绝），该名的函数类型是`(newValue:String):Unit`，函数的具体实现是`_value=newValue`
 
+### 伴生类和伴生对象
 
-[浅谈编程语言的类型系统](http://blog.csdn.net/ce123_zhouwei/article/details/8976652) 的基本内容
+*  using parentheses(圆括号) on the instance of a class actually calls the apply method defined on this class. This approach is widely used in the standard library as well as in third-party libraries.`val joe = new Person("zhangsan")`，joe.apply() 等同于 `joe()`. **apply 方法是一个语法糖**。
+*  Scala doesn’t have the static keyword but it does have syntax for defining singletons. **If you need to define methods or values that can be accessed on a type rather than an instance**, use the object keyword.
+	```scala
+	object RandomUtils {
+		def random100 = Math.round(Math.random * 100)
+	}
+	```
+	After RandomUtils is defined this way, you will be able to use method random100 without creating any instances of the class: RandomUtils.random100
+*  If an object has the same name as a class, then it’s called a companion object. Companion objects are often used in Scala for defining additional methods and implicit values. 
 
-1. 编程语言的本质在于回答两个问题：如何表示信息；如何处理信息
-2. 宇宙虽然鬼斧神工，丰富多彩，但是在微观上，整个世界仅仅是由少数寥寥几种基本粒子构成的。程序繁杂的外表之下，骨子里都是由一些“基本粒子”，按照一定的组合方式构成的。那么究竟有哪些基本粒子，又允许进行何种组合？一门语言定义了一套基本类型的“集合”，这个集合就作为一个整体被称为类型系统。
-3. 坦白讲，“系统”是一个非常模糊的概念。我们会说操作系统、消化系统、生态系统……各种各样的系统，然而对于系统本身是什么，在不同的科学领域有截然不同的定义。通常我们所说的系统中，**存在一些基本要素**（软件模块、细胞、物种等等），然后**存在一定的相互作用关系**（函数调用、细胞连接、捕食与被捕食等等），在此基础上**实现一定的功能**（完成金融计算、排解人体毒素、完成有机物的自然循环等等）。那么我们就把这些基本元素，以及其构成方式，统称为一个系统。
+伴生类和伴生对象：由于static定义的类和对象破坏了 面向对象编程的规范完整性，因此scala 在设计之初就没有static关键字概念，类相关的静态属性都放在伴生对象object中。当同一个文件内同时存在`object x`和`class x`的声明时：我们称`class x`称作`object x`的伴生类。其`object x`称作`class x`的伴生对象。
+1. 伴生类和伴生对象需要同名。
+2. 类和伴生对象之间没有界限——它们可以互相访问彼此的private字段和private方法。
+3. 没有class，只有object则是单例模式类。
+4. 只有伴生对象中可以定义main函数，类似于static修饰
 
-[函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html)
+### case 和 锅炉板模式
 
-## 其它
+[Java正在“Kotlin化”](https://mp.weixin.qq.com/s/ut6l7ipdkN3O-9rIELuEcQ)Java record 是我们长期以来一直要求的一项特性，我相信你早就多次遇到这样的场景了，那就是极不情愿地实现 toString、hashCode、equals 方法以及每个字段的 getter。Kotlin 提供了数据类（data class）来解决这个问题，Java 也通过发布 record 类来解决了这个问题，同样的问题，Scala 是通过 case 类来解决的。这些类的主要目的是在对象中保存不可变的数据。PS：**有点类似DDD中的值对象。或者说，语言设计正在想业务模型的需要靠拢**。
 
-对于scala和go来说，通过variable:Type来声明变量类型，方法也是一种变量，方法的类型就是方法的返回值。
+[Boilerplate code](https://en.wikipedia.org/wiki/Boilerplate_code)
+
+In computer programming, boilerplate code or boilerplate refers to sections of code that have to be included in many places with little or no alteration. It is often used when referring to languages that are considered verbose, i.e. the programmer must write a lot of code to do minimal jobs.
+
+比如，setter/getter 就是典型的锅炉板代码，尽管每个类的setter/getter 细节不一样，但setter/getter 代码 占了Pet 类代码量的一半。
+
+```java
+public class Pet {
+    private String name;
+    private Person owner;
+    public Pet(String name, Person owner) {
+        this.name = name;
+        this.owner = owner;
+    }
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public Person getOwner() {
+        return owner;
+    }
+    public void setOwner(Person owner) {
+        this.owner = owner;
+    }
+}
+```
+
+To reduce the amount of boilerplate, many frameworks have been developed, e.g. Lombok for Java.
+
+```java	
+@AllArgsConstructor
+@Getter
+@Setter
+public class Pet {
+    private String name;
+    private Person owner;
+}
+```
+	
+scala 就更简洁了
+
+```scala
+case class Pet(var name: String, var owner: Person)
+```
+
+从jdk14 开始支持 java record 也有类似效果
+
+```java
+public record EmployeeRecord(String firstName, String surname,
+ int age, AddressRecord address, double salary) {  
+}
+```
+
+boilerplate code 理念扩展下层次 就成了 boilerplate pattern， 比如配置中心、服务发现等。单纯配置中心或服务发现功能需要大量的代码，但对于不同业务方来说，不同之处可能就是几个参数，这也是spring cloud的重要理念。
+
+case class 和 case object可以和match配合使用
 
 ## sbt
 
