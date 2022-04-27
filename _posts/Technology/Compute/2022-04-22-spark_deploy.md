@@ -50,7 +50,26 @@ Spark框架除了提供Spark应用程序的计算框架外，还提供了一套�
 
 ![](/public/upload/compute/spark_cluster_deploy.png)
 
+### 整体设计
+
+![](/public/upload/compute/spark_run.png)
+
+代码上
+1. client: SparkSubmit.main ==> org.apache.spark.deploy.yarn.Client.main 向yarn 为AM 申请一个 container 让AM 可以跑起来。
+2. AM: ApplicationMaster.main ==> ApplicationMaster.run ==> wordcount.main 作为driver，并启动ExecutorBackend 准备与driver.DAGScheduler 交互
+3. Executor侧：ExecutorBackend.main ==> ExecutorBackend.run ==> ExecutorBackend.onStart 向driver 注册，receive 接收driver.DAGScheduler 指令
+4. 剩下的就是 driver.DAGScheduler 与 driver.TaskScheduler 如何拆分、调度Task，ExecutorBackend 收到Task 如何执行的问题了。wordcount.main ==> DAGScheduler.runJob/submitJob/submitStage ==> TaskScheduler 为TaskSet 计算适合的节点 返回  DAGScheduler TaskDescriptions，DAGScheduler 将其中封装的任务代码分发到对应的 Executors 上，开启分布式任务执行流程。
+
+
 ### 客户端操作
+
+客户端干了哪些活儿
+
+1. 根据yarnConf来初始化yarnClient，并启动yarnClient
+2. 创建客户端Application，并获取Application的ID，进一步判断集群中的资源是否满足executor和ApplicationMaster申请的资源，如果不满足则抛出IllegalArgumentException；
+3. 设置资源、环境变量：其中包括了设置Application的Staging目录、准备本地资源（jar文件、log4j.properties）、设置Application其中的环境变量、创建Container启动的Context等；
+4. 设置Application提交的Context，包括设置应用的名字、队列、AM的申请的Container、标记该作业的类型为Spark；
+5. 申请Memory，并最终通过yarnClient.submitApplication向ResourceManager提交该Application。
 
 不管是什么spark的哪种运行模式，提交任务的命令都少不了Spark-submit，下面以提交wordCount的项目的命令为例：
 
@@ -115,14 +134,6 @@ object SparkSubmit {
 ```
 main 方法也像普通方法一样，被`method.invoke`执行了。SparkSubmit.main ==> org.apache.spark.deploy.yarn.Client.main
 
-客户端进行操作
-
-1. 根据yarnConf来初始化yarnClient，并启动yarnClient
-2. 创建客户端Application，并获取Application的ID，进一步判断集群中的资源是否满足executor和ApplicationMaster申请的资源，如果不满足则抛出IllegalArgumentException；
-3. 设置资源、环境变量：其中包括了设置Application的Staging目录、准备本地资源（jar文件、log4j.properties）、设置Application其中的环境变量、创建Container启动的Context等；
-4. 设置Application提交的Context，包括设置应用的名字、队列、AM的申请的Container、标记该作业的类型为Spark；
-5. 申请Memory，并最终通过yarnClient.submitApplication向ResourceManager提交该Application。
-
 我们来看下 `org.apache.spark.deploy.yarn.Client` 的main 方法实现
 
 ```scala
@@ -175,7 +186,27 @@ AM的命令：`val commands = /bin/java "org.apache.spark.deploy.yarn.Applicatio
 
 当作业提交到YARN上之后，客户端就没事了，甚至在终端关掉那个进程也没事，因为整个作业运行在YARN集群上进行，运行的结果将会保存到HDFS或者日志中。Spark Yarn Client向YARN中提交应用程序，包括ApplicationMaster程序、启动ApplicationMaster的命令、需要在Executor中运行的程序等；
 
-### 提交到YARN集群，YARN操作
+梳理下上述代码
+```
+val appArgs = new SparkSubmitArguments(args)
+submit(SparkSubmitArguments)
+  val (childArgs, childClasspath, sysProps, childMainClass) = prepareSubmitEnvironment(args)
+  runMain(childArgs, childClasspath, sysProps, childMainClass, args.verbose)
+    loader = xx
+    addJarToClasspath
+    System.setProperty(key, value)
+    mainClass = Utils.classForName(childMainClass)
+    mainMethod.invoke(null, childArgs.toArray)  实质就是client.main
+       val args = new ClientArguments(argStrings)
+       new Client(args, sparkConf).run()
+       this.appId = client.submitApplication()
+         containerContext = xx
+         appContext = xx
+         yarnClient.submitApplication(appContext)	
+```
+可以看到，提交代码的实质是 Client的使用，所以用户可以不用spark-subumit，在自己项目代码里直接使用Client 对象提交spark 任务[java提交spark任务到yarn平台](https://blog.csdn.net/weixin_36647532/article/details/80766350)
+
+### 提交到YARN集群后，YARN操作
 
 既然是来启动AM的，所以就先创建一个AM，并且执行了master.run()
 ```scala
@@ -541,11 +572,3 @@ TaskScheduler 接收到 DAGScheduler 创建的 TaskSet 后，创建 TaskSetManag
 
 Executors在接收到 LaunchTask 消息后立即调用 Executor 的 launchTask 方法开始干活。launchTask 首先把 TaskDescription 封装为 TaskRunner（TaskRunner 实现了 Java Runnable 接口，用于多线程并发），随即将封装好的 TaskRunner 交由 Executor 线程池，线程池则调用 TaskRunner 的 run 方法来执行任务。TaskRunner 先对 TaskDescription 中的 serializedTask 进行反序列化得到 Task；然后，为该 Task 指定内存管理器 MemoryManager，MemoryManager 维护一个 Executor 中所有 Tasks 的内存占用以及回收情况。接着调用 Task 的 run 方法来执行任务并获取任务结果，TaskRunner 最终将任务结果封装为 DirectTaskResult 或 IndirectTaskResult 并通过调用 ExecutorBackend 的 statusUpdate 方法将执行状态和结果返回。
 
-## 整体总结
-
-![](/public/upload/compute/spark_run.png)
-
-1. client: SparkSubmit.main ==> org.apache.spark.deploy.yarn.Client.main 向yarn 为AM 申请一个 container 让AM 可以跑起来。
-2. AM: ApplicationMaster.main ==> ApplicationMaster.run ==> wordcount.main 作为driver，并启动ExecutorBackend 准备与driver.DAGScheduler 交互
-3. Executor侧：ExecutorBackend.main ==> ExecutorBackend.run ==> ExecutorBackend.onStart 向driver 注册，receive 接收driver.DAGScheduler 指令
-4. 剩下的就是 driver.DAGScheduler 与 driver.TaskScheduler 如何拆分、调度Task，ExecutorBackend 收到Task 如何执行的问题了。wordcount.main ==> DAGScheduler.runJob/submitJob/submitStage ==> TaskScheduler 为TaskSet 计算适合的节点 返回  DAGScheduler TaskDescriptions，DAGScheduler 将其中封装的任务代码分发到对应的 Executors 上，开启分布式任务执行流程。
