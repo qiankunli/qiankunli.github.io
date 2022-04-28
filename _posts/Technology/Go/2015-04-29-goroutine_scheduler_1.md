@@ -87,6 +87,8 @@ static void scheduler(void) {
 
 ### GPM模型
 
+![](/public/upload/go/gpm.png)
+
 ```go
 static void schedule(void) {
     G *gp;

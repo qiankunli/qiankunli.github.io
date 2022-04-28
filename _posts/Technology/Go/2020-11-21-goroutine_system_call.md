@@ -87,7 +87,7 @@ G1将进行同步系统调用以阻塞M1
 
 ![](/public/upload/go/go_scheduler_sync_systemcall_1.png)
 
-调度器介入后：识别出G1已导致M1阻塞，此时，调度器将M1与P分离，同时也将G1带走。然后调度器引入新的M2来服务P。
+调度器介入后：识别出G1已导致M1阻塞，此时，调度器将M1与P分离（**正因为M 和P 可能分离，所以mcache 挂在P上**），同时也将G1带走。然后调度器引入新的M2来服务P。
 
 ![](/public/upload/go/go_scheduler_sync_systemcall_2.png)
 
