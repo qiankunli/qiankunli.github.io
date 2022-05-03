@@ -142,12 +142,7 @@ go build  之后，可执行文件即可 监听k8s（由`--kubeconfig` 参数指
 如果我们需要对 用户录入的 Application 进行合法性检查，可以开发一个webhook
 `kubebuilder create webhook --group apps --version v1alpha1 --kind Application --programmatic-validation --defaulting`
 
-[kubebuilder 注释标记](https://book.kubebuilder.io/reference/markers.html)，比如：令crd支持kubectl scale，对crd实例进行基础的值校验，允许在kubectl get命令中显示crd的更多字段，等等
-
-可以在crd types.go 加一些kubebuilder 标记，用于codegen 工具辅助生成 yaml文件、go代码等。
-
-我们在生成的 CR 结构体代码中会发现由很多 kubebuilder 自定义的注解，例如// +kubebuilder:object:root=true 等，其实这些在编译时会增加对应的功能，更多注解见[Markers for Config/Code Generation​book.kubebuilder.io](https://book.kubebuilder.io/reference/markers.html)
-
+可以在crd types.go 加一些kubebuilder 标记，用于codegen 工具辅助生成 yaml文件、go代码等。比如：令crd支持kubectl scale，对crd实例进行基础的值校验，允许在kubectl get命令中显示crd的更多字段，等等。更多注解见[Markers for Config/Code Generation​book.kubebuilder.io](https://book.kubebuilder.io/reference/markers.html)
 
 
 

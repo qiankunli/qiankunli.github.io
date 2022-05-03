@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 特征工程
+title: X的生成——特征工程
 category: 架构
 tags: MachineLearning
 keywords: feature engineering

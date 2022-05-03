@@ -71,6 +71,9 @@ Kubernetes requires each pod to have an IP in a flat networking namespace with f
 
 ## 跨主机通信
 
+[Kubernetes 网络模型基础指南](https://mp.weixin.qq.com/s/YRHSx9FaCyB6nQGSylHPOA)通常集群中的每个节点都分配有一个 CIDR，用来指定该节点上运行的 Pod 可用的 IP 地址。一旦以 CIDR 为目的地的流量到达节点（xx技术），节点就会将流量转发到正确的 Pod（xx技术）。
+
+
 [CNI 网络方案优缺点及最终选择](https://mp.weixin.qq.com/s/pPrA_5BaYG9AwYNy4n_gKg)
 
 2020.4.18补充：很多文章都是从跨主机容器如何通信 的来阐述网络方案，这或许是一个很不好的理解曲线，从实际来说，一定是先有网络，再为Pod “连上网”。

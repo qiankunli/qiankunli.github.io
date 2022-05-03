@@ -18,6 +18,9 @@ keywords: influxdb
 [官网](https://www.influxdata.com/)
 
 
+
+MySQL 的执行引擎和存储引擎是分开的。存储引擎提供了一些基础的方法（比如通过索引，或者扫描表）来获取表数据，而做连接、计算等功能，是在 MySQL 的执行引擎中完成的。
+
 influxdb 提供统一的TICK 技术栈，The TICK stack - Open Source Components
 
 1. Telegraf - Data collection

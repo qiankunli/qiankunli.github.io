@@ -78,6 +78,8 @@ RDMA本身指的是一种技术，具体协议层面，包含Infiniband（IB）�
 |驱动||rdma-core|
 |接口|socket|libibverbs|
 
+[系列解读SMC-R：透明无感提升云上TCP应用网络性能](https://mp.weixin.qq.com/s/Zz0qTbG9ZbRT53LHPJ_koQ)Shared Memory Communication over RDMA (SMC-R) 是一种基于 RDMA 技术、兼容 socket 接口的内核网络协议，由 IBM 提出并在 2017 年贡献至 Linux 内核。SMC-R 能够帮助 TCP 网络应用程序透明使用 RDMA，获得高带宽、低时延的网络通信服务。
+
 ### GPU 卡间通信
 
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
@@ -143,6 +145,13 @@ Gloo 为CPU和GPU提供了集合通信程序的优化实现。但如果是在使
 
 [利用多 GPU 加速深度学习模型训练](https://mp.weixin.qq.com/s/wiqOHIVfL2gKnRUhY62EBA)多机软件设计一般采用 MPI（Message Passing Interface）实现数据交互。MPI 是一种消息传递库接口描述标准，规定了点对点消息传递、协作通信、组和通讯员概念、进程拓扑、环境管理等各项内容，支持 C 和 Fortran 语言。**NCCL 出现得更晚一些，参考并兼容了 MPI 已有 API**。**NCCL 更多考虑了 GPU 的特性**，例如任意两块 GPU 之间的通信开销是有区别的，跨 QPI 情况与同一 PCIe Switch 情况，以及有 NVLink/ 无 NVLink 情况就有明显差异，但 MPI 认为两种情况下 GPU 与 GPU 都是等同的，甚至 **MPI 认为跨机器的 GPU 也是等同的**，这对于多 GPU 通信效率会有影响。MPI 可以和 NCCL 结合，实现**层次化的**并行通信机制，即同一台机器上的不同 GPU 之间采用 NCCL 通信，而不同机器上的 GPU 之间采用 MPI 辅助通信。[NCCL and MPI](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/mpi.html)
 
+
+## 优化手段
+
+![](/public/upload/machine/distributed_trainning_optimize.png)
+关于深度的分布式训练，主要工作主从技术栈上呈现从浅层到深层的一个过程。
+1. 前三类的优化基本上是处于框架层，需要平台为用户提供基础的框架支持。比如说在计算图的并行化策略方面，我们通过GSPMD和GPipe提供了包括数据并行、模型并行和流水线并行的通用化的并行化策略的抽象层。此外，我们通过DeepSpeed来做支持，用ZeRO (Zero Redundancy Optimizer)来优化Optimizer的显存使用，以及我们可以用低精度的压缩来加速参数的同步
+2. 集合通信层的一些优化，这类优化对于用户跟上层的框架完全透明，不需要改动上层的代码就能够真正落地。拿网络的协议站做一个类比的话，NCCL基本上跟IP协议一样，是整个协议栈的narrow waist的位置。[Fast Socket：NCCL的高性能网络栈](https://mp.weixin.qq.com/s/P50A3bGJfoekGcIxImv16A) 提到了对NCCL 本身的优化，比较底层。
 
 ## 数据并行ps/allreduce
 

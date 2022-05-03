@@ -41,6 +41,45 @@ apiserver 核心职责
 
 适合从下到上看。不考虑鉴权等，先解决一个Kind 的crudw，多个Kind （比如/api/v1/pods, /api/v1/services）汇聚成一个APIGroupVersion，多个APIGroupVersion（比如/api/v1, /apis/batch/v1, /apis/extensions/v1） 汇聚为 一个GenericAPIServer 即api server。
 
+### APIServer 启动
+
+[K8s 如何提供更高效稳定的编排能力？K8s Watch 实现机制浅析](https://mp.weixin.qq.com/s/0H0sYPBT-9JKOle5Acd_IA)APIServer 启动采用 Cobra 命令行，解析相关 flags 参数，经过 Complete(填充默认值)->Validate(校验) 逻辑后，通过 Run 启动服务。在 Run 函数中，按序分别初始化 APIServer 链(APIExtensionsServer、KubeAPIServer、AggregatorServer)，分别服务于 CRD(用户自定义资源)、K8s API(内置资源)、API Service(API 扩展资源) 对应的资源请求。
+
+```go
+// kubernetes/cmd/kube-apiserver/app/server.go
+// 创建 APIServer 链(APIExtensionsServer、KubeAPIServer、AggregatorServer)，分别服务 CRD、K8s API、API Service
+func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan struct{}) (*aggregatorapiserver.APIAggregator, error) {
+   // 创建 APIServer 通用配置
+   kubeAPIServerConfig, serviceResolver, pluginInitializer, err := CreateKubeAPIServerConfig(completedOptions)
+   if err != nil {
+      return nil, err
+   }
+   ...
+   // 第一：创建 APIExtensionsServer
+   apiExtensionsServer, err := createAPIExtensionsServer(apiExtensionsConfig, genericapiserver.NewEmptyDelegateWithCustomHandler(notFoundHandler))
+   if err != nil {
+      return nil, err
+   }
+   // 第二：创建 KubeAPIServer
+   kubeAPIServer, err := CreateKubeAPIServer(kubeAPIServerConfig, apiExtensionsServer.GenericAPIServer)
+   if err != nil {
+      return nil, err
+   }
+   ...
+   // 第三：创建 AggregatorServer
+   aggregatorServer, err := createAggregatorServer(aggregatorConfig, kubeAPIServer.GenericAPIServer, apiExtensionsServer.Informers)
+   if err != nil {
+      // we don't need special handling for innerStopCh because the aggregator server doesn't create any go routines
+      return nil, err
+   }
+   return aggregatorServer, nil
+}
+```
+
+之后，经过非阻塞(NonBlockingRun) 方式启动 SecureServingInfo.Serve，并配置 HTTP2(默认开启) 相关传输选项，最后启动 Serve 监听客户端请求。
+
+![](/public/upload/kubernetes/apiserver_start.png)
+
 启动的一些重要步骤：
 1. 创建 server chain。Server aggregation（聚合）是一种支持多 apiserver 的方式，其中包括了一个 generic apiserver，作为默认实现。
 2. 生成 OpenAPI schema，保存到 apiserver 的 Config.OpenAPIConfig 字段。
@@ -95,6 +134,10 @@ type Interface interface {
 ```
 
 封装了对etcd 的操作，还提供了一个cache 以减少对etcd 的访问压力。在Storage这一层，并不能感知到k8s资源对象之类的内容，纯粹的存储逻辑。
+
+[K8s 如何提供更高效稳定的编排能力？K8s Watch 实现机制浅析](https://mp.weixin.qq.com/s/0H0sYPBT-9JKOle5Acd_IA)
+
+![](/public/upload/kubernetes/apiserver_etcd.png)
 
 ### registry 层
 

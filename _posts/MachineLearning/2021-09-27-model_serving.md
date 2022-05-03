@@ -188,6 +188,8 @@ spec:
 
 ## 调优
 
+[腾讯邱东洋：深度模型推理加速的术与道](https://mp.weixin.qq.com/s/-PZE3OrOVGldiQ09u2qL4g)未读
+
 ### 特点
 
 [Morphling：云原生部署 AI ， 如何把降本做到极致？](https://mp.weixin.qq.com/s/Kl4Bimy6YCfGLZbK12pGcg) 专门整了一个论文，推理业务相对于传统服务部署的配置有以下特性：

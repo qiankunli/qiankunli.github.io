@@ -26,6 +26,8 @@ SSA-IR（Single Static Assignment）是一种介于高级语言和汇编语言�
 
 ## go编译器
 
+Go 语言的编译器完全用 Go 语言本身来实现，它完全实现了从（编译）前端到后端的所有工作
+
 ![](/public/upload/go/go_compiler.png)
 
 [漫谈Go语言编译器（01）](https://mp.weixin.qq.com/s/0q0k8gGX56SBKJvfMquQkQ) 
