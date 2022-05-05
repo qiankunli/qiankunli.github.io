@@ -13,6 +13,11 @@ keywords:  gpu
 {:toc}
 
 
+[使用 Elastic GPU 管理 Kubernetes GPU 资源](https://mp.weixin.qq.com/s/MBOTPiAtPqIJcpJUwAeG7g)在 GPU 场景，还是存在以下不足：
+1. 集群 GPU 资源缺少全局视角。没有直观方式可获取集群层面 GPU 信息，比如 Pod / 容器与 GPU 卡绑定关系、已使用 GPU 卡数等。
+2. 不能很好支持多 GPU 后端。各种 GPU 技术（nvidia docker、qGPU、vCUDA、gpu share、GPU 池化）均需独立部署组件，无法统一调度和管理。
+腾讯云参考 PV/PVC/StorageClass 提出了ElasticGPU/ElasticGPUClaim/EGPUClass。
+
 ## 上报/调度/容器创建
 
 [Kubernetes GPU管理与Device Plugin机制](https://time.geekbang.org/column/article/70876)对于云的用户来说，在 GPU 的支持上，他们最基本的诉求其实非常简单：我只要在 Pod 的 YAML 里面，声明某容器需要的 GPU 个数，那么 Kubernetes 为我创建的容器里就应该出现对应的 GPU 设备，以及它对应的驱动目录。以 NVIDIA 的 GPU 设备为例，上面的需求就意味着当用户的容器被创建之后，这个容器里必须出现如下两部分设备和目录：

@@ -14,6 +14,8 @@ keywords: 深度学习
 
 [通俗易懂讲解梯度下降法！](https://mp.weixin.qq.com/s/YhEGL2LT3qv0oBXteb8IpA) 蛮不错的一篇文章。
 
+[从梯度下降到 Adam！一文看懂各种神经网络优化算法](https://mp.weixin.qq.com/s/P62TfrsQ_CZYEZzN5Vt5Pw)
+
 ## 梯度下降法的实现方式
 
 1. batch gradient descent

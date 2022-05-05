@@ -158,6 +158,8 @@ emb = tf.feature_column.input_layer(ids, [W])
 
 DL 推荐模型的嵌入层是比较特殊的：它们为模型贡献了大量参数，但几乎不需要计算，而计算密集型denser layers的参数数量则要少得多。所以对于推荐系统，嵌入层的优化十分重要。
 
+[点击率预测模型Embedding层的学习和训练](https://mp.weixin.qq.com/s/caBZw8PYYBYbpdsDT63MRA)
+
 ### 原理上
 [TensorFlow在美团外卖推荐场景的GPU训练优化实践-参数规模的合理化](https://mp.weixin.qq.com/s/rEHhf32L09KXGJ9bbB2LEA)
 1. 去交叉特征
