@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 《聊聊架构》 书评的笔记
+title: 架构大杂烩
 category: 架构
 tags: Architecture
 keywords: 聊聊架构
@@ -76,6 +76,12 @@ keywords: 聊聊架构
 
 
 ## 其它
+
+[如何画好一张架构图？](https://mp.weixin.qq.com/s/2HjvNnfP7bLNQF5xh8PxIQ)
+1. I claim that you want to start communicating between independent modules no sooner than you absolutely HAVE to, and that you should avoid splitting things up until you really need to, because that communication complexity often swamps the complexity of the actual pieces involved in it.（让我们认识到一种现象，把复杂系统拆分成模块，似乎并没有降低整个系统的复杂度。它降低的只是子系统的复杂度。而整个系统的复杂度，反而会由于拆分后的模块之间，不得不进行交互，变得更加复杂。）
+2. The fundamental organization of a system, embodied in its components, their relationships to each other and the environment, and the principles governing its design and evolution.　Architecture = Structure of Component + Relationships + Principles & Guidelines。
+3. 架构的本质是为了管理复杂性；架构的本质就是对系统进行有序化重构，不断减少系统的“熵”，使系统不断进化；架构的本质就是对系统进行有序化重构，以符合当前业务的发展，并可以快速扩展。架构的过程其实就是建模的过程。
+4. 架构的核心目的：管理复杂性，效率最大化。架构的两个主要变化来源：一个是以改善软件质量为目的的内在结构性变化；另外一个是以满足客户需求为目的的外在功能性变化。
 
 [我对技术架构的理解与架构师角色的思考](https://mp.weixin.qq.com/s/GQZuxBw8mdWv67naal3PCg)每时每刻都在发生技术的升级和变革，需要持续不断地学习，才能对老的架构有新的认识，对于老问题产生新的解法。为什么你能解决这个问题，并且能解决这一类问题？一定是需要你看的多，想的多，这背后是大量的实践和知识的积累，并且是站在过去的肩膀上。
 架构师需要什么样的能力？

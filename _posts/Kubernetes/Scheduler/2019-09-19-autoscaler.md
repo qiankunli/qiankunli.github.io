@@ -8,7 +8,7 @@ keywords: kubernetes autoscaler
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -88,18 +88,19 @@ target 推荐显示，容器请求25 milliCPU 和 262144 千字节的内存时�
 
 配置示例
 
-	apiVersion: autoscaling.k8s.io/v1beta2
-	kind: VerticalPodAutoscaler
-	metadata:
-	  name: my-vpa
-	spec:
-	  targetRef:
-	    apiVersion: "extensions/v1beta1"
-	    kind:       Deployment
-	    name:       my-deployment
-	  updatePolicy:
-	    updateMode: "Auto"
-
+```yaml
+apiVersion: autoscaling.k8s.io/v1beta2
+kind: VerticalPodAutoscaler
+metadata:
+	name: my-vpa
+spec:
+	targetRef:
+	apiVersion: "extensions/v1beta1"
+	kind:       Deployment
+	name:       my-deployment
+	updatePolicy:
+	updateMode: "Auto"
+```
 
 1. targetRef 指定了被监控的对象是名叫 my-deployment的Deployment
 2. updateMode 字段的值为 Auto，意味着VerticalPodAutoscaler 可以删除 Pod，调整 CPU 和内存请求，然后启动一个新 Pod。
@@ -131,6 +132,24 @@ updatePolicy
 [kubernetes 资源管理概述](https://cizixs.com/2018/06/25/kubernetes-resource-management/)
 
 随着业务的发展，应用会逐渐增多，每个应用使用的资源也会增加，总会出现集群资源不足的情况。为了动态地应对这一状况，我们还需要 CLuster Auto Scaler，能够根据整个集群的资源使用情况来增减节点。CA 是面向事件工作的，并每 10 秒检查一次是否存在不可调度（Pending）的 Pod(当调度器无法找到可以容纳 Pod 的节点时，这个 Pod 是不可调度的）。此时，CA 开始创建新节点。
+
+CA（ cluster-autoscaler）是用来弹性伸缩kubernetes集群的，自动的根据部署的应用所请求的资源量来动态的伸缩集群
+
+1. 什么时候扩？
+	1. 由于资源不足，pod调度失败，导致pod处于pending状态时
+2. 什么时候缩？
+	node的资源利用率较低时，且此node上存在的pod都能被重新调度到其他节点
+1. 什么样的节点不会被CA删除
+	1. 节点上有pod被PodDisruptionBudget控制器限制。
+	2. 节点上有命名空间是kube-system的pods。
+	3. 节点上的pod不是被控制器创建，例如不是被deployment, replica set, job, stateful set创建。
+	4. 节点上有pod使用了本地存储
+	5. 节点上pod驱逐后无处可去，即没有其他node能调度这个pod
+	6. 节点有注解：”cluster-autoscaler.kubernetes.io/scale-down-disabled”: “true”
+4. 如何防止node被Cluster Autoscaler删除
+	1. kubectl annotate node cluster-autoscaler.kubernetes.io/scale-down-disabled=true
+
+![](/public/upload/kubernetes/cluster_autoscaler.png)
 
 对于公有云来说，Cluster Auto Scaler 就是监控这个集群因为资源不足而 pending 的 pod，根据用户配置的阈值调用公有云的接口来申请创建机器或者销毁机器。对于私有云，则需要对接内部的管理平台。
 

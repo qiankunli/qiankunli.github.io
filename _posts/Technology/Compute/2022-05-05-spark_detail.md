@@ -10,7 +10,7 @@ keywords: Spark
 
 ## 前言
 
-## 内存
+## 内存划分及用途
 
 ![](/public/upload/compute/spark_mem.png)
 
