@@ -42,7 +42,13 @@ k8s
 
 ## helm
 
-Helm 一开始的目标就很明确：如果说 Kubernetes 是云原生操作系统的话，那 Helm 就要成为这个操作系统上面的应用商店与包管理工具。如 Debian 系的 apt-get 命令与 dpkg 格式、RHEL 系的 yum 命令与 rpm 格式，Helm 主要用来管理 Chart 包，Helm Chart 包中包含一系列 YAML 格式的 Kubernetes 资源定义文件，以及这些资源的配置，可以通过 Helm Chart 包来整体维护这些资源。
+Helm 一开始的目标就很明确：如果说 Kubernetes 是云原生操作系统的话，那 Helm 就要成为这个操作系统上面的应用商店与包管理工具。如 Debian 系的 apt-get 命令与 dpkg 格式、RHEL 系的 yum 命令与 rpm 格式，Helm 主要用来管理 Chart 包，Helm Chart 包中包含一系列 YAML 格式的 Kubernetes 资源/object定义文件，以及这些资源的配置，可以通过 Helm Chart 包来整体维护这些资源。
+
+[详解 Kubernetes 包管理工具 Helm](https://mp.weixin.qq.com/s/aGCkhI0-OsQaPgPMOxDTHw)Helm 是一个可执行文件，具有以下特性：
+1. Kubernetes 管理组件和应用程序的部署生命周期
+2. 基于模板的定义，支持跨部署环境 (例如，开发、质保、生产) 的可移植性
+3. 钩子机制可以在部署生命周期的不同阶段注入特定于用例的代码
+4. 部署测试框架
 
 
 ### 原理
@@ -55,7 +61,7 @@ helm命令可以从Chart Repository中下载 Helm Chart 包，读取kubeconfig�
 
 ### 模板文件
 
-比如官方仓库中 WordPress Chart 的目录结构是这样的：
+开发 Helm Chart 需要使用预定义的目录结构组织文件，比如官方仓库中 WordPress Chart 的目录结构是这样的：
 
 ```
 WordPress
@@ -72,7 +78,53 @@ WordPress
 
 ![](/public/upload/kubernetes/helm_template.png)
 
-Chart 模板一个应用只用编写一次，可以重复使用。在部署时，可以指定不同的配置，从而将应用部署在不同的环境中，或者在同一环境中部署不同配置的应用。
+Helm Chart 中的 YAML 文件是使用 Helm 的模板语言开发的，下面是由 helm create 生成的被模板化的 ingress 描述示例，提供了几个变量，用来定义和配置 ingress 资源，包括是否应该创建 ingress 资源。
+
+```yaml
+{{- if .Values.ingress.enabled -}}
+{{- $fullName := include "helm-demo.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+{{- if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1beta1
+{{- else -}}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "helm-demo.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- range .Values.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            backend:
+              serviceName: {{ $fullName }}
+              servicePort: {{ $svcPort }}
+          {{- end }}
+    {{- end }}
+  {{- end }}
+```
+
+通过模板，Helm 提供了对 Kubernetes 资源如何部署的大量控制。规划良好的模板模式可以生成单个部署包，使 Helm Chart 能够成功部署，范围从开发人员工作站上的单节点 Kubernetes 集群到生产 Kubernetes 集群。
 
 
 ### 使用

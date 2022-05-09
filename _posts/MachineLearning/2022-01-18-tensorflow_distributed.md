@@ -220,122 +220,12 @@ with my_strategy.scope():
 
 [基于Tensorflow高阶API构建大规模分布式深度学习模型系列: 开篇](https://zhuanlan.zhihu.com/p/38470806)
 
-### Strategy 原理
-
-[TensorFlow 分布式 DistributedStrategy 之基础篇](https://mp.weixin.qq.com/s/n-hfz8bicdW8cU46yobnPQ)从系统角度或者说从开发者的角度看，Strategy 是基于Python作用域或装饰器来实现的一套机制。它提供了一组命名的分布式策略，如ParameterServerStrategy、CollectiveStrategy来作为Python作用域，这些策略可以被用来捕获用户函数中的模型声明和训练逻辑，其将在用户代码开始时生效。在后端，分布式系统可以重写计算图，并根据选择的策略合并相应的语义。
-
-```python
-# 示例
-strategy = tf.distribute.XXStrategy(...)
-with strategy.scope():
-  ...
-```
-StrategyBase 主要是靠 StrategyExtendedV2 干活。
-```python
-class StrategyBase(object):
-  def run(self, fn, args=(), kwargs=None, options=None):      # Invokes `fn` on each replica, with the given arguments.
-    ...
-  def reduce(self, reduce_op, value, axis):   # Reduce `value` across replicas and return result on current device.
-    ...
-  def extended(self):     # Strategy 很多操作直接转给了 StrategyExtendV1/V2
-    return self._extended
-  def scope(self):
-    return self._extended._scope(self) 
-  def make_dataset_iterator(self, dataset):
-  def make_input_fn_iterator(self,input_fn,replication_mode=InputReplicationMode.PER_WORKER):
-  def experimental_distribute_dataset(self, dataset, options=None):
-  def distribute_datasets_from_function(self, dataset_fn, options=None):
-  def experimental_run(self, fn, input_iterator=None):
-    with self.scope():
-      args = (input_iterator.get_next(),) if input_iterator is not None else ()
-    return self.run(fn, args=args)
-# tensorflow/tensorflow/python/distribute/distribute_lib.py
-class StrategyExtendedV2(object):
-  def _scope(self, strategy):
-  """Implementation of tf.distribute.Strategy.scope()."""
-  def creator_with_resource_vars(*args, **kwargs):
-    _require_strategy_scope_extended(self)
-    kwargs["use_resource"] = True
-    kwargs["distribute_strategy"] = strategy
-    return self._create_variable(*args, **kwargs)
-
-  def distributed_getter(getter, *args, **kwargs):
-    if not self._allow_variable_partition():
-      if kwargs.pop("partitioner", None) is not None:
-        tf_logging.log_first_n(
-            tf_logging.WARN, "Partitioned variables are disabled when using "
-            "current tf.distribute.Strategy.", 1)
-    return getter(*args, **kwargs)
-
-  return _CurrentDistributionContext(
-      strategy,
-      variable_scope.variable_creator_scope(creator_with_resource_vars),
-      variable_scope.variable_scope(variable_scope.get_variable_scope(),custom_getter=distributed_getter), 
-      self._default_device)
-```
-xxStrategy.scope 一执行，首先是把 Variable 的创建函数 creator_with_resource_vars（各种XXStrategy 子类实现_create_variable） 给挂到了 当前默认graph 和 thread local 上。
-```python
-# tensorflow/tensorflow/python/ops/variable_scope.py
-def variable_creator_scope(variable_creator):
-  with ops.get_default_graph()._variable_creator_scope(variable_creator): 
-    yield
-# tensorflow/tensorflow/python/framework/ops.py
-class Graph(object):
-  def _variable_creator_scope(self, creator, priority=100):
-    old = self._variable_creator_stack
-    new = list(old)
-    new.append((priority, creator))
-    new.sort(key=lambda item: item[0])
-    self._thread_local._variable_creator_stack = new
-    ...
-# tensorflow/tensorflow/python/ops/variables.py
-class Variable(six.with_metaclass(VariableMetaclass,trackable.Trackable)):
-  ...
-class VariableMetaclass(type):
-  def _variable_v1_call(cls,initial_value=None,trainable=None,...):
-    previous_getter = lambda **kwargs: default_variable_creator(None, **kwargs)
-    for _, getter in ops.get_default_graph()._variable_creator_stack: 
-      previous_getter = _make_getter(getter, previous_getter)
-    return previous_getter(initial_value=initial_value,trainable=trainable,...)
-  def __call__(cls, *args, **kwargs):
-    if cls is VariableV1:
-      return cls._variable_v1_call(*args, **kwargs)
-    elif cls is Variable:
-      return cls._variable_v2_call(*args, **kwargs)
-    ...                                     
-```
-xxStrategy.scope 返回一个 _CurrentDistributionContext 对象，作为一个上下文管理器，包含 `__enter__` 和 `__exit__` 方法（with退出时执行），将 contenxt 信息保存在了当前默认 graph 和 thread local上
-
-
-```python
-class _CurrentDistributionContext(object):
-  def __enter__(self):
-    ...
-    _push_per_thread_mode(self._context)  # ==> distribution_strategy_context._push_per_thread_mode
-  def __exit__(self, exception_type, exception_value, traceback):
-    ...
-    _pop_per_thread_mode()
-# tensorflow/python/distribute/distribution_strategy_context.py
-def _push_per_thread_mode(context):
-  ops.get_default_graph()._distribution_strategy_stack.append(context) 
-def _pop_per_thread_mode():
-  ops.get_default_graph()._distribution_strategy_stack.pop(-1)
-def get_strategy():
-  return _get_per_thread_mode().strategy
-def _get_per_thread_mode():
-  try:
-    return ops.get_default_graph()._distribution_strategy_stack[-1]  # pylint: disable=protected-access
-  except (AttributeError, IndexError):
-    return _get_default_replica_mode()
-```
-
-上游创建Variable的时候（tf.Variable），从thread local或默认graph 拿到 creator_with_resource_vars，进而执行 XXStrategy._create_variable 方法。PS： **xxStrategy 将threadlocal 和 默认Graph 作为 中转，将自定义逻辑挂进去，而创建Variable 、训练逻辑在 接口层保持不变，底层实现则从 threadlocal 和 默认Graph 获取相关 策略函数并执行**。 
 
 ### 与estimator 结合使用
 
 Estimator.train ==> _train_model ==> _train_model_distributed，可以看到
 1. 训练代码都在 Strategy.scope 范围下
-2. 在 训练数据的获取 `_get_iterator_from_input_fn(input_fn, ModeKeys.TRAIN, strategy)` 训练图构建 `strategy.extended.call_for_each_replica` 都有Strategy 直接参与
+2. 在 训练数据的获取 `_get_iterator_from_input_fn(input_fn, ModeKeys.TRAIN, strategy)` 、训练图构建 `strategy.extended.call_for_each_replica` 都有Strategy 直接参与
 
 ```python
 class Estimator(object):
@@ -379,6 +269,169 @@ class Estimator(object):
         _, loss = mon_sess.run([estimator_spec.train_op, estimator_spec.loss])
     return loss                          
 ```
+
+## Strategy 原理
+
+[TensorFlow 分布式 DistributedStrategy 之基础篇](https://mp.weixin.qq.com/s/n-hfz8bicdW8cU46yobnPQ)从系统角度或者说从开发者的角度看，Strategy 是基于Python作用域或装饰器来实现的一套机制。它提供了一组命名的分布式策略，如ParameterServerStrategy、CollectiveStrategy来作为Python作用域，这些策略可以被用来捕获用户函数中的模型声明和训练逻辑，其将在用户代码开始时生效。在后端，分布式系统可以重写计算图，并根据选择的策略合并相应的语义。
+
+[TensorFlow 分布式之 ParameterServerStrategy V1](https://mp.weixin.qq.com/s/1a7voy_NR_bLj2a_b9-mBA)Strategy 工作原理，我们从分布式训练的几个过程来描述 
+1. 初始化，负责获取集群信息。
+2. 如何获取训练数据。XXStrategy.distribute_datasets_from_function(dataset_fn) 或 XXStrategy.experimental_distribute_dataset(dataset)
+3. 作用域和（创建）变量。不需要XXStrategy.create_variable，但要求必须在 XXStrategy.scope 执行 tf.variable，tf.variable 时会 从 threadlocal 和 默认Graph 获取（XXStrategy.scope 时挂载好的） XXStrategy.creator_with_resource_vars 并执行。 
+4. 运行，即XXStrategy.run。
+
+总结一下就是：XXStrategy 提供了 训练过程的各个步骤实现，要么直接执行 XXStrategy 方法，要么间接执行，XXStrategy 持有集群、设备信息，以便根据策略 实现取数、创建变量（将变量放置到设备上）、构建计算图 等操作。
+
+### 初始化
+
+比如ParameterServerStrategyExtended 初始化之后各字段值如下
+
+![](/public/upload/machine/parameter_server_strategy_extended_initialize.png)
+
+### 获取训练数据
+
+XXStrategy.distribute_datasets_from_function(dataset_fn) ==> XXStrategyExtended._experimental_distribute_datasets_from_function(dataset_fn) ==> input_lib.get_distributed_datasets_from_function(dataset_fn,...) ==> DistributedDatasetsFromFunctionV1，返回 DistributedIteratorV1，既然得到了 iterator，就可以从数据集之中获得数据了。
+
+```python
+class DistributedDatasetsFromFunctionV1(DistributedDatasetsFromFunction):
+  def _make_initializable_iterator(self, shared_name=None):
+    return self._get_iterator()
+  def _make_one_shot_iterator(self):
+    return self._get_iterator()
+  def _get_iterator(self):
+    iterators = _create_iterators_per_worker(self._datasets,self._input_workers, True,self._options)                                                                                  
+    iterator = DistributedIteratorV1(self._input_workers, iterators,self._strategy,self._enable_get_next_as_optional)                                
+    iterator._element_spec = self._element_spec 
+    return iterator
+```
+
+另一条方式： XXStrategy.experimental_distribute_dataset(dataset) ==> XXStrategyExtended._experimental_distribute_dataset ==> input_lib.get_distributed_dataset(dataset, ...) ==> DistributedDatasetV1(dataset, ...) 
+
+```python
+class DistributedDatasetV1(DistributedDataset):
+  def make_one_shot_iterator(self):
+    return self._make_one_shot_iterator()
+  def _make_one_shot_iterator(self):
+    return self._get_iterator()
+  def _get_iterator(self):
+    worker_iterators = _create_iterators_per_worker(self._cloned_datasets,self._input_workers)                                          
+    iterator = DistributedIteratorV1(self._input_workers, worker_iterators,self._strategy)                         
+    iterator.element_spec = self.element_spec  
+    return iterator
+```
+
+### 作用域和（创建）变量
+
+StrategyBase 的 scope 方法返回一个 Context manager，其使用当前策略来建立分布式变量，当进入 Strategy.scope 时会发生：
+1. "strategy" 成为全局上下文内的 "当前" strategy 。在这个作用域内，tf.distribute.get_strategy() 将返回此策略。在此范围之外，它返回默认的无操作策略。
+2. 进入此作用域也会进入"cross-replica context"。
+3. **"scope"内的变量创建被策略拦截**。每个策略都定义了它想要如何影响变量的创建。像 'MirroredStrategy'、'TPUStrategy' 和 'MultiWorkerMirroredStrategy' 这样的同步策略会在每个副本上创建复制的变量，而 'ParameterServerStrategy' 在参数服务器上创建变量。这是使用自定义的 tf.variable_creator_scope 完成的。
+4. 在某些策略中，还可以输入默认的设备作用域：比如在"MultiWorkerMirroredStrategy"中，为每个工作者输入默认的设备作用域 "/CPU:0"。
+
+StrategyBase 主要是靠 StrategyExtendedV2 干活。
+```python
+class StrategyBase(object):
+  def run(self, fn, args=(), kwargs=None, options=None):      # Invokes `fn` on each replica, with the given arguments.
+    ...
+  def reduce(self, reduce_op, value, axis):   # Reduce `value` across replicas and return result on current device.
+    ...
+  def extended(self):     # Strategy 很多操作直接转给了 StrategyExtendV1/V2
+    return self._extended
+  def scope(self):
+    return self._extended._scope(self) 
+  def make_dataset_iterator(self, dataset):
+  def make_input_fn_iterator(self,input_fn,replication_mode=InputReplicationMode.PER_WORKER):
+  def experimental_distribute_dataset(self, dataset, options=None):
+  def distribute_datasets_from_function(self, dataset_fn, options=None):
+  def experimental_run(self, fn, input_iterator=None):
+    with self.scope():
+      args = (input_iterator.get_next(),) if input_iterator is not None else ()
+    return self.run(fn, args=args)
+
+# tensorflow/tensorflow/python/distribute/distribute_lib.py
+class StrategyExtendedV2(object):
+  def _scope(self, strategy):
+    def creator_with_resource_vars(*args, **kwargs):
+      _require_strategy_scope_extended(self)
+      kwargs["use_resource"] = True
+      kwargs["distribute_strategy"] = strategy
+      return self._create_variable(*args, **kwargs)
+    def distributed_getter(getter, *args, **kwargs):
+      return getter(*args, **kwargs)
+  return _CurrentDistributionContext(strategy,variable_scope.variable_creator_scope(creator_with_resource_vars),
+        variable_scope.variable_scope(variable_scope.get_variable_scope(),custom_getter=distributed_getter), self._default_device)
+# tensorflow/tensorflow/python/ops/variable_scope.py
+def variable_creator_scope(variable_creator):
+  with ops.get_default_graph()._variable_creator_scope(variable_creator): 
+    yield
+# tensorflow/tensorflow/python/framework/ops.py
+class Graph(object):
+  def _variable_creator_scope(self, creator, priority=100):
+    old = self._variable_creator_stack
+    new = list(old)
+    new.append((priority, creator))
+    new.sort(key=lambda item: item[0])
+    self._thread_local._variable_creator_stack = new
+    ...
+```
+xxStrategy.scope  ==> variable_scope.variable_creator_scope(creator_with_resource_vars) ==> ops.get_default_graph()._variable_creator_scope(variable_creator) /Graph._variable_creator_scope ，把 Variable 的创建函数 creator_with_resource_vars（各种XXStrategy 子类实现_create_variable） 给挂到了 当前默认graph 和 thread local 上。
+
+
+创建Variable的时候 tf.Variable ==> VariableMetaclass.__call__ ==> VariableMetaclass._variable_v1_call ==> previous_getter ==> ops.get_default_graph()._variable_creator_stack(从thread local或默认graph 拿到 creator_with_resource_vars) ==> StrategyExtendedV2.creator_with_resource_vars ==> XXStrategy._create_variable 来创建变量。
+
+```python
+# tensorflow/tensorflow/python/ops/variables.py
+class Variable(six.with_metaclass(VariableMetaclass,trackable.Trackable)):
+  # Variable 是 VariableMetaclass 子类
+  ...
+class VariableMetaclass(type):
+  def _variable_v1_call(cls,initial_value=None,trainable=None,...):
+    previous_getter = lambda **kwargs: default_variable_creator(None, **kwargs)
+    # previous_getter 来自 ops.get_default_graph()
+    for _, getter in ops.get_default_graph()._variable_creator_stack: 
+      previous_getter = _make_getter(getter, previous_getter)
+    return previous_getter(initial_value=initial_value,trainable=trainable,...)
+  def __call__(cls, *args, **kwargs):
+    if cls is VariableV1:
+      return cls._variable_v1_call(*args, **kwargs)
+    elif cls is Variable:
+      return cls._variable_v2_call(*args, **kwargs)
+    ...                                     
+```
+
+以ParameterServerStrategy 为例，第一个操作序列是建立变量，第二个操作序列是处理变量。
+
+![](/public/upload/machine/parameter_server_strategy_extended_create_variable.png)
+
+xxStrategy.scope 返回一个 _CurrentDistributionContext 对象，作为一个上下文管理器，包含 `__enter__` 和 `__exit__` 方法（with退出时执行），将 contenxt 信息保存在了当前默认 graph 和 thread local上
+
+```python
+class _CurrentDistributionContext(object):
+  def __enter__(self):
+    ...
+    _push_per_thread_mode(self._context)  # ==> distribution_strategy_context._push_per_thread_mode
+  def __exit__(self, exception_type, exception_value, traceback):
+    ...
+    _pop_per_thread_mode()
+# tensorflow/python/distribute/distribution_strategy_context.py
+def _push_per_thread_mode(context):
+  ops.get_default_graph()._distribution_strategy_stack.append(context) 
+def _pop_per_thread_mode():
+  ops.get_default_graph()._distribution_strategy_stack.pop(-1)
+def get_strategy():
+  return _get_per_thread_mode().strategy
+def _get_per_thread_mode():
+  try:
+    return ops.get_default_graph()._distribution_strategy_stack[-1]  # pylint: disable=protected-access
+  except (AttributeError, IndexError):
+    return _get_default_replica_mode()
+```
+
+### 运行
+
+以ParameterServerStrategy 为例
+
+![](/public/upload/machine/parameter_server_strategy_extended_run.png)
 
 ## 部署
 

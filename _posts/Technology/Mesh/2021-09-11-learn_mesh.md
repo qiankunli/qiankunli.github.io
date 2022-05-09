@@ -41,7 +41,7 @@ keywords: mosn detail
     6. 超时透传，实时透传上游超时给下游，帮助业务实现动态TTL机制
 2. trace 平台和监控平台
 3. 自动止损 ==> 稳定性预案平台， 根据监控平台的指标异常实时调参，执行流量降级、切机房、切流等 ==> 反馈到监控平台 ==> 稳定性预案平台继续调参， 实现闭环
-4. 混沌工程
+4. 混沌工程 [深度解读：分布式系统韧性架构压舱石OpenChaos](https://mp.weixin.qq.com/s/x-aRajL_ThKgVpOwV5GgXA)
 5. 系统容量评估（压测）
 
 ![](/public/upload/mesh/mesh_apply.png)

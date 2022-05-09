@@ -13,6 +13,8 @@ keywords: go 设计哲学
 * TOC
 {:toc}
 
+[深入剖析对 Go 的成功作出巨大贡献的设计决策](https://mp.weixin.qq.com/s/zXOjaIuvu4XrWSGRqndOiw)
+
 ## 组合
 
 《Go语言第一课》在 Go 语言设计层面，Go 设计者为开发者们提供了正交的语法元素，以供后续组合使用

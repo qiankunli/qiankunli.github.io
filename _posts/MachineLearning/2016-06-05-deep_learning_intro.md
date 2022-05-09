@@ -69,6 +69,8 @@ Let's talk RNN. Recurrent networks are basically neural networks that evolve thr
 
 邵浩：大家现在都在谈人工智能技术，而且很多人都会把人工智能和 AlphaGo 以及深度学习划上等号。其实人工智能涵盖的学科范围是非常广泛的，包括心理学、神经科学、哲学、认知科学等等。我们目前看到的大量成果都只是深度学习和大数据的化学反应。而且，大量的人工智能应用还都是人工 + 智能，离真正的认知智能差距甚远。如何利用技术赋能产品，得到用户和资本的认可，才是最重要的
 
+[AI当前遇到的问题和挑战](https://mp.weixin.qq.com/s/Zb__OnxBUBBeHBXRp0UEmw)
+
 ## 影响
 
 在自动驾驶中，输入是摄像头拍摄的实时画面（即当前状态），输出为方向盘的控制方向或车速大小。
