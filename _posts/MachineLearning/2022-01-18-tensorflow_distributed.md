@@ -223,6 +223,8 @@ with my_strategy.scope():
 
 ### 与estimator 结合使用
 
+[using_tfdistributestrategy_with_estimator_limited_support](https://www.tensorflow.org/guide/distributed_training#using_tfdistributestrategy_with_estimator_limited_support)
+
 Estimator.train ==> _train_model ==> _train_model_distributed，可以看到
 1. 训练代码都在 Strategy.scope 范围下
 2. 在 训练数据的获取 `_get_iterator_from_input_fn(input_fn, ModeKeys.TRAIN, strategy)` 、训练图构建 `strategy.extended.call_for_each_replica` 都有Strategy 直接参与
@@ -272,15 +274,16 @@ class Estimator(object):
 
 ## Strategy 原理
 
-[TensorFlow 分布式 DistributedStrategy 之基础篇](https://mp.weixin.qq.com/s/n-hfz8bicdW8cU46yobnPQ)从系统角度或者说从开发者的角度看，Strategy 是基于Python作用域或装饰器来实现的一套机制。它提供了一组命名的分布式策略，如ParameterServerStrategy、CollectiveStrategy来作为Python作用域，这些策略可以被用来捕获用户函数中的模型声明和训练逻辑，其将在用户代码开始时生效。在后端，分布式系统可以重写计算图，并根据选择的策略合并相应的语义。
+[TensorFlow 分布式 DistributedStrategy 之基础篇](https://mp.weixin.qq.com/s/n-hfz8bicdW8cU46yobnPQ)从系统角度或者说从开发者的角度看，Strategy 是基于Python作用域或装饰器来实现的一套机制。它提供了一组命名的分布式策略，如ParameterServerStrategy、CollectiveStrategy来作为Python作用域，这些策略可以被用来捕获用户函数中的模型声明和训练逻辑，其将在用户代码开始时生效。在后端，分布式系统可以重写计算图，并根据选择的策略合并相应的语义。因此我们分析的核心就是如何把数据读取，模型参数，分布式计算融合到Python作用域或装饰器之中。
 
 [TensorFlow 分布式之 ParameterServerStrategy V1](https://mp.weixin.qq.com/s/1a7voy_NR_bLj2a_b9-mBA)Strategy 工作原理，我们从分布式训练的几个过程来描述 
 1. 初始化，负责获取集群信息。
 2. 如何获取训练数据。XXStrategy.distribute_datasets_from_function(dataset_fn) 或 XXStrategy.experimental_distribute_dataset(dataset)
 3. 作用域和（创建）变量。不需要XXStrategy.create_variable，但要求必须在 XXStrategy.scope 执行 tf.variable，tf.variable 时会 从 threadlocal 和 默认Graph 获取（XXStrategy.scope 时挂载好的） XXStrategy.creator_with_resource_vars 并执行。 
-4. 运行，即XXStrategy.run。
+4. 运行，即调用XXStrategy.run为每个副本运行函数。
+5. 使用一个方法（如tf.distributed.Strategy.reduce）将得到的 per-replica 的值转换成普通的张量。
 
-总结一下就是：XXStrategy 提供了 训练过程的各个步骤实现，要么直接执行 XXStrategy 方法，要么间接执行，XXStrategy 持有集群、设备信息，以便根据策略 实现取数、创建变量（将变量放置到设备上）、构建计算图 等操作。
+总结一下就是：XXStrategy 提供了 训练过程的各个步骤实现，要么直接执行 XXStrategy 方法，要么间接执行，XXStrategy 持有集群、设备信息，以便根据策略 实现取数、创建变量（包括variable placement）、构建计算图 等操作。
 
 ### 初始化
 
@@ -289,6 +292,11 @@ class Estimator(object):
 ![](/public/upload/machine/parameter_server_strategy_extended_initialize.png)
 
 ### 获取训练数据
+
+对于输入数据集，主要有两种实现：
+
+1. experimental_distribute_dataset ：从 tf.data.Dataset 生成 tf.distribute.DistributedDataset，得到的数据集可以像常规数据集一样迭代读取。
+2. _distribute_datasets_from_function ：通过调用 dataset_fn 来分发 tf.data.Dataset。
 
 XXStrategy.distribute_datasets_from_function(dataset_fn) ==> XXStrategyExtended._experimental_distribute_datasets_from_function(dataset_fn) ==> input_lib.get_distributed_datasets_from_function(dataset_fn,...) ==> DistributedDatasetsFromFunctionV1，返回 DistributedIteratorV1，既然得到了 iterator，就可以从数据集之中获得数据了。
 
@@ -305,7 +313,7 @@ class DistributedDatasetsFromFunctionV1(DistributedDatasetsFromFunction):
     return iterator
 ```
 
-另一条方式： XXStrategy.experimental_distribute_dataset(dataset) ==> XXStrategyExtended._experimental_distribute_dataset ==> input_lib.get_distributed_dataset(dataset, ...) ==> DistributedDatasetV1(dataset, ...) 
+XXStrategy.experimental_distribute_dataset(dataset) ==> XXStrategyExtended._experimental_distribute_dataset ==> input_lib.get_distributed_dataset(dataset, ...) ==> DistributedDatasetV1(dataset, ...) 
 
 ```python
 class DistributedDatasetV1(DistributedDataset):
@@ -319,6 +327,10 @@ class DistributedDatasetV1(DistributedDataset):
     iterator.element_spec = self.element_spec  
     return iterator
 ```
+
+[TensorFlow 分布式 DistributedStrategy 之基础篇](https://mp.weixin.qq.com/s/n-hfz8bicdW8cU46yobnPQ)DistributedDataset 的 iter 方法会针对每个 worker 建立一个 iterator，最后统一返回一个 DistributedIterator。DistributedIterator 的 get_next 方法完成了获取数据功能。
+
+![](/public/upload/machine/distributed_iterator.png)
 
 ### 作用域和（创建）变量
 
