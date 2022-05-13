@@ -30,7 +30,7 @@ val words: RDD[String] = sparkContext.textFile(“~/words.csv”)
 val keywords: RDD[String] = words.filter(word => dict.contains(word))
 keywords.cache	// Storage Memory 内存区域
 keywords.count
-keywords.map((_, 1)).reduceByKey(_ + _).collect	# ，reduceByKey 算子会引入 Shuffle，而 Shuffle 过程中所涉及的内部数据结构，如映射、排序、聚合等操作所仰仗的 Buffer、Array 和 HashMap，都会消耗 Execution Memory 区域中的内存
+keywords.map((_, 1)).reduceByKey(_ + _).collect	// reduceByKey 算子会引入 Shuffle，而 Shuffle 过程中所涉及的内部数据结构，如映射、排序、聚合等操作所仰仗的 Buffer、Array 和 HashMap，都会消耗 Execution Memory 区域中的内存
 ```
 
 Spark 区分堆内内存和堆外内存：对于堆外内存来说，Spark 通过调用 Java Unsafe 的 allocateMemory 和 freeMemory 方法，直接在操作系统内存中申请、释放内存空间，管理成本较高；对于堆内内存来说，无需 Spark 亲自操刀而是由 JVM 代理。但频繁的 JVM GC 对执行性能来说是一大隐患。

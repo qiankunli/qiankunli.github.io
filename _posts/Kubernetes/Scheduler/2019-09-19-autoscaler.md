@@ -136,7 +136,7 @@ updatePolicy
 CA（ cluster-autoscaler）是用来弹性伸缩kubernetes集群的，自动的根据部署的应用所请求的资源量来动态的伸缩集群
 
 1. 什么时候扩？
-	1. 由于资源不足，pod调度失败，导致pod处于pending状态时
+	1. 由于资源不足，pod调度失败，导致pod处于pending状态时。看样子，还需要调度器给一个  FailedScheduling(all nodes are unavailable) 标记，即调度器考察了所有节点，都发现无法执行这个任务。
 2. 什么时候缩？
 	node的资源利用率较低时，且此node上存在的pod都能被重新调度到其他节点
 1. 什么样的节点不会被CA删除

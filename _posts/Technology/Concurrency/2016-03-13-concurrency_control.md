@@ -55,6 +55,17 @@ static __always_inline void arch_atomic_sub(int i, atomic_t *v){
 
 LOCK_PREFIX 是一个宏，根据需要展开成“lock;”或者空串。单核心 CPU 是不需要 lock 前缀的，只要在多核心 CPU 下才需要加上 lock 前缀。Linux 定义了 __READ_ONCE，__WRITE_ONCE 这两个宏，是对代码封装并利用 GCC 的特性对代码进行检查，把让错误显现在编译阶段。其中的“volatile int *”是为了提醒编译器：这是对内存地址读写，不要有优化动作，每次都必须强制写入内存或从内存读取。
 
+[深入剖析 split locks](https://mp.weixin.qq.com/s/WeKM58WF6hVaxT3vRuQ2zg)GCC 内置的__sync_fetch_and_add 函数、Kernel 中的 atomic_inc 函数、CAS 都是使用 lock 指令前缀实现的。LOCK指令前缀声明后，随同执行的指令会变为原子指令。原理就是在随同指令执行期间，锁住系统总线，禁止其他处理器进行内存操作，使其独占内存来实现原子操作。
+
+![](/public/upload/concurrency/lock_system_bus.png)
+
+现在处理器的核越来越多，如果每个核都频繁的产生 LOCK#信号，来独占内存总线，这样其余的核不能访问内存，导致性能会有很大的下降，该怎么办？INTEL 为了优化总线锁导致的性能问题，在 P6 后的处理器上，引入了缓存锁（cache locking）机制：通过缓存一致性协议保证多个 CPU 核访问跨 cache line 的内存地址的多次访问的原子性与一致性，而不需要锁内存总线。
+
+![](/public/upload/concurrency/lock_system_bus_timeline.png)
+
+缓存锁是依赖缓存一致性协议（MESI）来保证内存访问的原子性，因为缓存一致性协议会阻止被多个 CPU 缓存的内存地址被多个 CPU 同时修改。在代码指令前面声明了 LOCK 指令前缀，想要原子访问内存数据，如果内存数据可以被缓存在 CPU 的 cache 中，运行时通常不会在总线上产生 LOCK#信号，而是通过缓存一致性协议、总线仲裁机制与 cache 锁定来阻止两个或以上的 CPU 核，对同一块地址的并发访问。那么**是不是所有的总线锁都可以被优化为缓存锁呢**？答案是否定的，不能被优化的情况就是 split lock（产生条件：对数据执行原子访问；要访问的数据在 cache 中跨 cache line 存储）。因为原子操作是比较基础的操作，不能避免，如果数据只存储在一个 cache line 中，那就可以解决问题。
+
+
 ### 内存屏障
 
 [剖析Disruptor:为什么会这么快？(三)揭秘内存屏障](http://ifeve.com/disruptor-memory-barrier/)

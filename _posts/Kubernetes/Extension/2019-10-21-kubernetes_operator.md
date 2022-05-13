@@ -13,6 +13,12 @@ keywords: kubernetes operator
 * TOC
 {:toc}
 
+
+
+[Kubernetes应用管理深度剖析](https://mp.weixin.qq.com/s/9o2m03veD5hP7mUbCirftg)以分布式系统为代表的有状态应用，并不像Web应用一样“开箱即用”，这些系统需要特定应用领域的知识才能正确扩展，升级和重新配置，同时防止数据丢失或不可用。**Operator 其实并不是一个工具，而是为了解决一个问题而存在的一个思路**，将特定于应用程序的操作知识编码到软件中，利用功能强大的Kubernetes抽象来正确地运行和管理应用程序。
+
+![](/public/upload/kubernetes/operator_application.png)
+
 Operator 是使用自定义资源（CR，本人注：CR 即 Custom Resource，是 CRD 的实例）管理应用及其组件的自定义 Kubernetes 控制器。**高级配置和设置由用户在 CR 中提供**。Kubernetes Operator 基于嵌入在 Operator 逻辑中的最佳实践，**将高级指令转换为低级操作**。Kubernetes Operator 监视 CR 类型并采取特定于应用的操作，确保当前状态与该资源的理想状态相符。
 1. 什么是低级操作？ 假设我们要部署一套 Elasticsearch 集群，通常要在 StatefulSet 中定义相当多的细节，比如服务的端口、Elasticsearch 的配置、更新策略、内存大小、虚拟机参数、环境变量、数据文件位置等等，里面的细节配置非常多。**根本原因在于 Kubernetes 完全不知道 Elasticsearch 是个什么东西**，所有 Kubernetes 不知道的信息、不能启发式推断出来的信息，都必须由用户在资源的元数据定义中明确列出，必须一步一步手把手地“教会”Kubernetes 部署 Elasticsearch，这种形式就属于咱们刚刚提到的“低级操作”。PS：YAML Engineer
 2. 有了 Elasticsearch Operator 的CR，就相当于 Kubernetes 已经学会怎样操作 Elasticsearch 了。知道了所有它相关的参数含义与默认值，就不需要用户再手把手地教了，这种就是所谓的“高级指令”。
@@ -34,10 +40,12 @@ Operator 是使用自定义资源（CR，本人注：CR 即 Custom Resource，�
   ```
 
 Operator 将简洁的高级指令转化为 Kubernetes 中具体操作的方法，跟 Helm 或 Kustomize 的思路并不一样：
-1. Helm 和 Kustomize 最终仍然是依靠 Kubernetes 的内置资源，来跟 Kubernetes 打交道的；
-2. Operator 则是要求开发者自己实现一个专门针对该自定义资源的控制器，在控制器中维护自定义资源的期望状态。
+1. Helm 和 Kustomize 最终仍然是依靠 Kubernetes 的内置资源，来跟 Kubernetes 打交道的，是一种标准化的普适性工具，把你的 K8S 资源模板化，**yaml资源定义与配置分离**，方便共享，进而在不同的配置中重用。
+2. Operator 则是要求开发者自己实现一个专门针对该自定义资源的控制器，在控制器中维护自定义资源的期望状态，以便自动化管理。Operator与特定应用是一对一的关系。
 
-operator 本质上不创造和提供新的服务，它只是已有 Kubernetes API service 的组合，但这种“抽象”大大简化了运维操作，否则这些逻辑都要由上层发布系统实现。**通过程序编码来扩展 Kubernetes，比只通过内置资源来与 Kubernetes 打交道要灵活得多**。比如，在需要更新集群中某个 Pod 对象的时候，由 Operator 开发者自己编码实现的控制器，完全可以在原地对 Pod 进行重启，不需要像 Deployment 那样，必须先删除旧 Pod，然后再创建新 Pod。
+Helm与Operator并不是完全独立的，很多Operator能做的事情，如应用集群初始化配置、监控更新等通过一些init Container，以及Helm的Hook机制等，最终也能够达到同等效果。只不过这些配置可能显得极为复杂且不易维护，得不偿失；此外，两者还可能有结合的场景，比如市面上很多开源项目的Operator本身就是通过Helm进行部署和管理的。
+
+operator 本质上不创造和提供新的服务，它只是已有 Kubernetes pod/service 等的组合（也是依靠 Kubernetes 的内置资源），但这种“抽象”大大简化了运维操作，否则这些逻辑都要由上层发布系统实现。**通过程序编码来扩展 Kubernetes，比只通过内置资源来与 Kubernetes 打交道要灵活得多**。比如，在需要更新集群中某个 Pod 对象的时候，由 Operator 开发者自己编码实现的控制器，完全可以在原地对 Pod 进行重启，不需要像 Deployment 那样，必须先删除旧 Pod，然后再创建新 Pod。
 
 **Kubernetes 集群真正的能力（mount目录、操作GPU等）要通过 Kubelet 去支持**。 
 

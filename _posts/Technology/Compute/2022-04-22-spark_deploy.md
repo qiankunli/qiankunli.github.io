@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Spark部署模式及源码分析
+title: 从Spark部署模式开始讲源码分析
 category: 技术
 tags: Compute
 keywords: Spark
@@ -473,7 +473,7 @@ private[spark] class CoarseGrainedExecutorBackend(override val rpcEnv: RpcEnv,dr
 ```
 dataRDD.flatMap(_.split(" ")).map((_,1)).reduceByKey(_ + _).collect()
 ```
-每一个 Actions 算子都会触发 SparkContext 的 runJob 函数调用，从而开启一段分布式调度之旅。SparkContext.runJob 主要作用是调用 DAGScheduler 的 runJob 函数。PS：从这个视角看，tf 是静态图执行，client侧算子的实现是 拼接graphDef，而spark 算子的实现则更像动态图立即执行（eager mode），只是转换算子是惰性计算
+**每一个 Actions 算子都会触发 SparkContext 的 runJob 函数调用，从而开启一段分布式调度之旅**。SparkContext.runJob 主要作用是调用 DAGScheduler 的 runJob 函数。
 
 ```scala
 // spark/core/src/main/scala/org/apache/spark/rdd/RDD.scala
@@ -570,5 +570,15 @@ class DAGScheduler(private[scheduler] val sc: SparkContext,private[scheduler] va
 
 TaskScheduler 接收到 DAGScheduler 创建的 TaskSet 后，创建 TaskSetManager，SchedulableBuilder 即调用 addTaskSetManager 方法将刚刚创建的 TaskSetManager 追加到任务队列中。TaskScheduler 请求分布式计算资源， SchedulerBackend 搜集可用计算资源，并以 Worker Offers 的形式反馈给 TaskScheduler，TaskScheduler 根据获得的 Worker Offers，根据调度规则（FIFO 或 Fair）和本地性的限制，搜集适合调度的任务集合，并以 TaskDescriptions 的形式反馈给 SchedulerBackend， 对于获取到的 TaskDescriptions，SchedulerBackend 将其中封装的任务代码分发到对应的 Executors 上，开启分布式任务执行流程。
 
+回顾一下drvier流程： Actions 算子触发 SparkContext.runJob ==> DAGScheduler.runJob ==> DAGScheduler.submitJob == EventProcessLoop/ JobSubmitted event ==> DAGScheduler.handleJobSubmitted 创建所有stage ==> DAGScheduler.submitStage ==> DAGScheduler.submitMissingTasks 创建TaskSet ==> TaskScheduler.submitTasks ==> 为TaskSet 创建TaskSetManager 并加入任务队列，向SchedulerBackend 请求资源，拿到 Worker Offers ==> 计算TaskDescriptions 并发给 SchedulerBackend，SchedulerBackend 分发TaskDescriptions 中的任务代码到 Executors 上。
+
 Executors在接收到 LaunchTask 消息后立即调用 Executor 的 launchTask 方法开始干活。launchTask 首先把 TaskDescription 封装为 TaskRunner（TaskRunner 实现了 Java Runnable 接口，用于多线程并发），随即将封装好的 TaskRunner 交由 Executor 线程池，线程池则调用 TaskRunner 的 run 方法来执行任务。TaskRunner 先对 TaskDescription 中的 serializedTask 进行反序列化得到 Task；然后，为该 Task 指定内存管理器 MemoryManager，MemoryManager 维护一个 Executor 中所有 Tasks 的内存占用以及回收情况。接着调用 Task 的 run 方法来执行任务并获取任务结果，TaskRunner 最终将任务结果封装为 DirectTaskResult 或 IndirectTaskResult 并通过调用 ExecutorBackend 的 statusUpdate 方法将执行状态和结果返回。
+
+
+## 与tf 对比起来看
+
+1. tf 是静态图执行，client侧算子的实现是 拼接完整的graphDef，而spark 算子的实现则更像动态图立即执行（eager mode），只是转换算子是惰性计算。
+2. tf 每一个worker 可能跑的是完整的graphDef （数据并行模式下），spark 的每一个executor 只跑一个Stage 下的Task。
+3. tf 下的每一个op 只是一个名字，具体实现worker 根据名字找到 对应的kernel 执行，spark 则直接将 task 序列化分发到 executor（毕竟java 对象只是一个`byte[]`）
+
 
