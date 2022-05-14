@@ -257,6 +257,15 @@ metadata:
     prometheus.io/port: '9104'    # 告诉 Prometheus要抓取的端口，将被放入__address__标签中
 ```
 
+[分布式系统可观测性之应用业务指标监控实践](https://mp.weixin.qq.com/s/t8rgWMwkGhOXfHU-9qatDQ) Micrometer提供了多种度量类库(Meter)，Meter是指一组用于收集应用中的度量数据的接口。为了方便微服务应用接入，我们封装了micrometer-spring-boot-starter。如果想要记录打印方法的调用次数和时间，需要给print方法加上@Timed注解，并给指标定义一个名称。
+
+```java
+@Timed(value = "biz.print", percentiles = {0.95, 0.99}, description = "metrics of print")
+public String print(PrintData printData) {
+
+}
+```
+
 #### pod cpu和内存——Metrics Server/cadvisor
 
 Metrics server复用了api-server的库来实现自己的功能，比如鉴权、版本等，为了实现将数据存放在内存中，去掉了默认的etcd存储，引入了内存存储。因为存放在内存中，因此监控数据是没有持久化的，可以通过第三方存储来拓展

@@ -231,37 +231,17 @@ private int awaitDone(boolean timed, long nanos)
 
 ### 解决回调地狱——promise模式
 
-Netty 和 Guava 的扩展都提供了 addListener 这样的接口，用于处理 Callback 调用，但future的Callback容易出现回调地狱的问题，由此衍生出了 Promise 模式来解决这个问题。
+[CompletableFuture原理与实践-外卖商家端API的异步化](https://mp.weixin.qq.com/s/GQGidprakfticYnbVYVYGQ)在Java8之前我们一般通过Future实现异步，Future用于表示异步计算的结果，只能通过阻塞或者轮询的方式获取结果，而且不支持设置回调方法。Netty 和 Guava 的扩展都提供了 addListener 这样的接口，用于处理 Callback 调用，但future的Callback容易出现回调地狱的问题，由此衍生出了 Promise 模式来解决这个问题。
 
 jdk1.8 也提供了相关的方案：CompletableFuture，A Future that may be explicitly completed (setting its value and status), and may be used as a CompletionStage, supporting dependent functions and actions that trigger upon its completion.
 
 [[concurrency-interest] CompletableFuture](http://cs.oswego.edu/pipermail/concurrency-interest/2012-December/010423.html) CompletableFuture 曾经被讨论过以下命名：SettableFuture, FutureValue, Promise, and
 probably others.
 
+
 ### 基于异步接口组织业务逻辑——编排/Futures 
 
 the biggest advantage of using Futures is composability. You might imagine that dealing with transformations which are themselves asynchronous means having to somehow extract your result from a mess that looks like `Future<Future<…<Future<T>>…>>`. The existence of methods like thenCompose means that **any sequence of asynchronous operations will be handled like one asynchronous operation** in the rest of your program and this what makes reasoning about and working with these operations much easier.  将多个异步操作组合为一个异步操作
-
-### CompletionFutre
-
-我们看jdk1.8 CompletionFutre，可以看到：各种thenXX，即便对同步调用的返回值进行各种处理，也不过如此了。**将异步代码写的如何更像 同步代码 一点，是异步抽象/封装一个发展方向**。
-
-```java
-void business(){
-    Value value1 = timeConsumingOperation1();
-    Object result1 = function1(value1);
-    Object result2 = function2(value1);
-    Value value2 = timeConsumingOperation2();
-    Object result3 = function3(value1,value2);
-    ...
-}
-void business(){
-    CompletionFutre future1 = timeConsumingOperationAsync1();
-    CompletionFutre future2 = timeConsumingOperationAsync2();
-    future.thenApply(function1).thenApply(function2).thenCombine(future2,function3);
-    ...
-}
-```
 
 ### guava ListenableFuture和AbstractFuture
 
@@ -301,5 +281,27 @@ public abstract class AbstractExecutorService implements ExecutorService{
 
 ListenableFuture所具备的addListener方法则是任务挂在一个地方，当run方法执行完毕后，执行这些任务。（不同的guava版本实现代码有很大不同）
 
+### CompletionFutre
+
+我们看jdk1.8 CompletionFutre，可以看到：各种thenXX，即便对同步调用的返回值进行各种处理，也不过如此了。**将异步代码写的如何更像 同步代码 一点，是异步抽象/封装一个发展方向**。
+
+```java
+void business(){
+    Value value1 = timeConsumingOperation1();
+    Object result1 = function1(value1);
+    Object result2 = function2(value1);
+    Value value2 = timeConsumingOperation2();
+    Object result3 = function3(value1,value2);
+    ...
+}
+void business(){
+    CompletionFutre future1 = timeConsumingOperationAsync1();
+    CompletionFutre future2 = timeConsumingOperationAsync2();
+    future1.thenApply(function1).thenApply(function2).thenCombine(future2,function3);
+    ...
+}
+```
+
+CompletableFuture中包含两个字段：result和stack。result用于存储当前CF的结果，stack（Completion）表示当前CF完成后需要触发的依赖动作（Dependency Actions），去触发依赖它的CF的计算，依赖动作可以有多个（表示有多个依赖它的CF），以栈（Treiber stack）的形式存储，stack表示栈顶元素。
 
 

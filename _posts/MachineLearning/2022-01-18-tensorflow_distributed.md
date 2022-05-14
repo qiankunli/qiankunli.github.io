@@ -186,6 +186,10 @@ regressor = tf.estimator.LinearRegressor(
 
 tf单机 与 分布式训练代码 很不一样，再加上ps-worker/allreduce 等训练策略 训练代码写起来就更乱了，为此 tf 为分布式训练 专门抽象了 `tf.distribute.Strategy`，想办法在训练代码层面 屏蔽掉 不同策略的差异。Strategy 代码从v1.14 开始比较完整了。
 
+[TensorFlow 分布式之 ParameterServerStrategy V2](https://mp.weixin.qq.com/s/pGrK9oTPXlxqYnY5pQHnEw)Strategy支持训练有两种主要方法：
+1. Keras  Model.fit 或者 estimator API。如果用户喜欢用高层次抽象来训练，则建议使用这种方式。
+2. 自定义训练循环（custom training loop）。如果用户需要自己实现或者定义训练细节，则可以考虑这种方式。
+
 ### 代码示例
 
 StrategyBase 代码注释中给出了一个  custom training loop 代码示例
@@ -287,7 +291,28 @@ class Estimator(object):
 
 ### 初始化
 
-比如ParameterServerStrategyExtended 初始化之后各字段值如下
+```python
+# 指定如何对变量进行分区
+variable_partitioner = ( tf.distribute.experimental.partitioners.MinSizePartitioner(min_shard_bytes=(256 << 10),max_shards=NUM_PS))
+strategy = tf.distribute.experimental.ParameterServerStrategy(cluster_resolver,variable_partitioner=variable_partitioner)
+```
+初始化方法如下，主要工作是连接到集群，然后调用 _extended 进行继续初始化。
+
+```python
+  def __init__(self, cluster_resolver, variable_partitioner=None):
+    self._cluster_resolver = cluster_resolver
+    self._verify_args_and_config(cluster_resolver)
+    self._cluster_coordinator = None
+    self._connect_to_cluster(coordinator_name="chief")  # 连接到集群
+    self._extended = ParameterServerStrategyV2Extended(self, cluster_resolver,variable_partitioner)                                           
+    super(ParameterServerStrategyV2, self).__init__(self._extended)
+    distribute_lib.distribution_strategy_gauge.get_cell("V2").set("ParameterServerStrategy")
+    self._should_use_with_coordinator = True
+    # Used while constructing distributed iterators.
+    self._canonicalize_devices = False
+```
+
+ParameterServerStrategyExtended 初始化之后各字段值如下
 
 ![](/public/upload/machine/parameter_server_strategy_extended_initialize.png)
 
