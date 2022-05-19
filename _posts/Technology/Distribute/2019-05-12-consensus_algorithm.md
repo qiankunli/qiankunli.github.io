@@ -220,6 +220,8 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 
 [深入剖析共识性算法 Raft](https://mp.weixin.qq.com/s/GhI7RYBdsrqlkU9o9CLEAg)
 
+类似的思路：[The Google File System （二）：如何应对网络瓶颈？](https://time.geekbang.org/column/article/422468)
+
 ## ZAB
 
 Paxos 算法有点过于复杂、实现难度也比较高，所以 ZooKeeper 在编程实现的时候将其简化成了一种叫做 ZAB 的算法（Zookeeper Atomic Broadcast， Zookeeper 原子广播）。

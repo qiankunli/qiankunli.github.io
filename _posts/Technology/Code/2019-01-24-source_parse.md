@@ -45,6 +45,12 @@ keywords: 源码分析
 
 ![](/public/upload/other/common_sense_vs_infomation.png)
 
+why 比what 和how 重要，看源码之后 还有一个看论文。找回技术发展的脉络。
+
+![](/public/upload/code/learn_article.png)
+
+AngelList 的创始人纳瓦尔·拉威康（Naval Ravikant）说过这样一段话：知识是一座摩天大楼。你可以在记忆的脆弱基础上走捷径，或者在理解的钢架上慢慢建立。
+
 ## 分析方法
 
 ### 前期准备

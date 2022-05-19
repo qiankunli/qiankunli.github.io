@@ -128,6 +128,8 @@ N、W、R 值的不同组合，会产生不同的一致性效果，具体来说�
 
 如果要提高数据的可靠性，在设置 `request.required.acks=-1` 的同时，也要 `min.insync.replicas` 这个参数 (可以在 broker 或者 topic 层面进行设置) 的配合，这样才能发挥最大的功效。
 
+类似的思路：[ The Google File System （二）：如何应对网络瓶颈？](https://time.geekbang.org/column/article/422468)
+
 
 ## 其它
 

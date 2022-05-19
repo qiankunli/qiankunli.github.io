@@ -15,6 +15,8 @@ keywords:  概率论
 
 机器学习模型本质上就是用模型表达的概率分布去刻画真实世界的概率分布。
 
+[详解最大似然估计、最大后验概率估计及贝叶斯公式](https://mp.weixin.qq.com/s/_YND-c4wAwsz2IWyTzrqeA) 未读。
+
 ## 概率论
 
 ![](/public/upload/machine/probability_theory.png)
