@@ -51,12 +51,10 @@ keywords: 一致性协议
 
 ||proposer|acceptor|作用|
 |---|---|---|---|
-|prepare阶段|proposer 生成全局唯一且自增的proposal id，广播propose<br>只广播proposal id即可，无需value|Acceptor 收到 propose 后，做出“两个承诺，一个应答”<br>1. 不再应答 proposal id **小于等于**当前请求的propose<br>2. 不再应答 proposal id **小于** 当前请求的 accept<br>3. 若是符合应答条件，返回已经accept 过的提案中proposal id最大的那个 propose 的value 和 proposal id， 没有则返回空值|争取提议权，争取到了提议权才能在Accept阶段发起提议，否则需要重新争取<br>学习之前已经提议的值|
+|prepare阶段|proposer 生成全局唯一且自增的proposal id，**广播**propose<br>只广播proposal id即可，无需value|Acceptor 收到 propose 后，做出“两个承诺，一个应答”<br>1. 不再应答 proposal id **小于等于**当前请求的propose<br>2. 不再应答 proposal id **小于** 当前请求的 accept<br>3. 若是符合应答条件，返回已经accept 过的提案中proposal id最大的那个 propose 的value 和 proposal id， 没有则返回空值|争取提议权，争取到了提议权才能在Accept阶段发起提议，否则需要重新争取<br>学习之前已经提议的值|
 |accept阶段|提案生成规则<br>1. 从acceptor 应答中选择proposalid 最大的value 作为本次的提案<br>2. 如果所有的应答的天value为空，则可以自己决定value|在不违背“两个承诺”的情况下，持久化当前的proposal id和value|使提议形成多数派，提议一旦形成多数派则决议达成，可以开始学习达成的决议|
 
 ![](/public/upload/distribute/paxos_process.png)
-
-prepare阶段类似于 分布式锁中的抢占锁，引入随机超时时间来避免活锁的产生。
 
 假设一个分布式系统有五个节点，分别是 S1、S2、S3、S4 和 S5；全部节点都同时扮演着提案节点和决策节点的角色。此时，有两个并发的请求希望将同一个值分别设定为 X（由 S1 作为提案节点提出）和 Y（由 S5 作为提案节点提出）；我们用 P 代表准备阶段、用 A 代表批准阶段，这时候可能发生下面四种情况。情况一：比如，S1 选定的提案 ID 是 3.1（全局唯一 ID 加上节点编号），先取得了多数派决策节点的 Promise 和 Accepted 应答；此时 S5 选定的提案 ID 是 4.5，发起 Prepare 请求，收到的多数派应答中至少会包含 1 个此前应答过 S1 的决策节点，假设是 S3。那么，S3 提供的 Promise 中，必将包含 S1 已设定好的值 X，S5 就必须无条件地用 X 代替 Y 作为自己提案的值。由此，整个系统对“取值为 X”这个事实达成了一致。PS： 这个图表示的特别好，其它情况就不一一列举了。**这里的“设置值”不要类比成程序中变量赋值操作，应该类比成日志记录操作**。
 
