@@ -114,6 +114,41 @@ A streaming platform has three key capabilities:
     } finally {
         consumer.close(); //4
     }
+
+## 高可用机制
+
+1. 为了让 Kafka 能够高可用，我们需要对于每一个分区都有多个副本，和 GFS 一样，Kafka 的默认参数选择了 3 个副本。
+2. 这些副本中，有一个副本是 Leader，其余的副本是 Follower。我们的 Producer 写入数据的时候，只需要往 Leader 写入就好了。Leader 自然也就是将对应的数据，写入到本地的日志文件里。
+3. 然后，每一个 Follower 都会从 Leader 去拉取最新的数据，一旦 Follower 拉到数据之后，会向 Leader 发送一个 Ack 的消息。
+4. 我们可以设定，有多少个 Follower 成功拉取数据之后，就能认为 Producer 写入完成了。这个可以通过在发送的消息里，设定一个 acks 的字段来决定。如果 acks=0，那就是 Producer 的消息发送到 Broker 之后，不管数据是否刷新到本地硬盘，我们都认为写入已经完成了；而如果设定 acks=2，意味着除了 Leader 之外，至少还有一个 Follower 也把数据写入完成，并且返回 Leader 一个 Ack 消息之后，消息才写入完成。我们可以通过调整 acks 这个参数，来在数据的可用性和性能之间取得一个平衡。
+
+## 负载均衡机制
+
+Kafka 本身没有 Master，每一个 Kafka 的 Broker 启动的时候，就会把自己注册到 ZooKeeper 上，注册信息自然是 Broker 的主机名和端口。在 ZooKeeper 上，Kafka 还会记录，这个 Broker 里包含了哪些主题（Topic）和哪些分区（Partition）。上游的 Producer 只需要监听 Brokers 的目录，就能知道下游有哪些 Broker。那么，无论是随机发送，还是根据消息中的某些字段进行分区，上游都可以很容易地把消息发送到某一个 Broker 里。
+
+所有的 Broker 本身也不维护任何状态，对应的状态信息也是放在 ZooKeeper 上，而下游的 Consumer 也是一样。
+
+Kafka 的 Consumer 一样会把自己“注册”到 ZooKeeper 上。在同一个 Consumer Group 下，一个 Partition 只会被一个 Consumer 消费，这个 Partition 和 Consumer 的映射关系，也会被记录在 ZooKeeper 里。这部分信息，被称之为“所有权注册表”。而 Consumer 会不断处理 Partition 的数据，一旦某一段的数据被处理完了，对应这个 Partition 被处理到了哪个 Offset 的位置，也会被记录到 ZooKeeper 上。这样，即使我们的 Consumer 挂掉，由别的 Consumer 来接手后续的消息处理，它也可以知道从哪里做起。那么在这个机制下，一旦我们针对 Broker 或者 Consumer 进行增减，Kafka 就会做一次数据“再平衡（Rebalance）”。所谓再平衡，就是把分区重新按照 Consumer 的数量进行分配，确保下游的负载是平均的。Kafka 的算法也非常简单，就是每当有 Broker 或者 Consumer 的数量发生变化的时候，会再平均分配一次。
+
+如果我们有 X 个分区和 Y 个 Consumer，那么 Kafka 会计算出 N=X/Y，然后把 0 到 N-1 的分区分配给第一个 Consumer，N 到 2N-1 的分配给第二个 Consumer，依此类推。而因为之前 Partition 的数据处理到了哪个 Offset 是有记录的，所以新的 Consumer 很容易就能知道从哪里开始处理消息。
+
+Kafka 对于消息的处理也是“**至少一次**”的。如果消息成功处理完了，那么我们会通过更新 ZooKeeper 上记录的 Offset，来确认这一点。而如果在消息处理的过程中，Consumer 出现了任何故障，我们都需要从上一个 Offset 重新开始处理。这样，我们自然也就避免不了重复处理消息。
+
+## 为什么kafka 这么快
+
+
+
+《大数据经典论文解读》传统的消息队列，关注的是小数据量下，是否每一条消息都被业务系统处理完成了。因为这些消息队列里的消息，可能就是一笔实际的业务交易，我们需要等待 consumer 处理完成，确认结果才行。但是整个系统的吞吐量却没有多大。Kafka 的假设是，我们处理的是互联网领域的海量日志，我们对于丢失一部分日志是可以容忍的。因为几 TB 的广告浏览和点击日志少了几条，其实并不会对业务产生什么影响。但是，我们需要关注系统整体的吞吐量、可扩展性、以及错误恢复能力。kafka的整体设计
+1. 让所有的 Consumer 来“拉取”数据，而不是主动“推送”数据给到 Consumer。并且，Consumer 到底消费完了哪些数据，是由 Consumer 自己维护的，而不是由 Kafka 这个消息队列来进行维护。
+2. 采用了一个非常简单的追加文件写的方式来直接作为我们的消息队列。在 Kafka 里，每一条消息并没有通过一个唯一的 message-id，来标识或者维护。整个消息队列也没有维护什么复杂的内存里的数据结构。下游的消费者，只需要维护一个此时它处理到的日志，在这个日志文件中的偏移量（offset）就好了。
+
+基于这两个设计思路，Kafka 做了一些简单的限制，那就是一个 consumer 总是顺序地去消费，来自一个特定分区（Partition）的消息。而一个 Partition 则是 Kafka 里面可以并行处理的最小单位，这就是说，一个 Partition 的数据，只会被一个 consumer 处理。这样一来，整个 Kafka 的系统设计也一下子变得特别简单。所有的 Producer 生成消息，和 Consumer 消费消息，都变成了简单的顺序的文件读和文件写。而我们知道，硬盘的顺序读写的性能要远高于随机读写。Kafka 是直接使用本地的文件系统承担了消息队列持久化的功能，所以 Kafka 干脆没有实现任何缓存机制，而是直接依赖了 Linux 文件系统里的页缓存（Page Cache）。Kafka 写入的数据，本质上都还是在 Page Cache。而且因为我们是进行流式数据处理，读写的数据有很强的时间局部性，Broker 刚刚写入的数据，几乎立刻会被下游的 Consumer 读取访问，所以大量的数据读写都会命中缓存。除了利用文件系统之外，Kafka 还利用了 Linux 下的 sendfile API，通过 DMA 直接将数据从文件系统传输到网络通道，所以它的网络数据传输开销也很小。
+
+1. 写入优化：利用了“磁盘” 顺序写比 内存读写还快的特性。Kafka的message是不断追加到本地磁盘文件末尾的，换句话说， **kafka 基于磁盘 主要因素是因为磁盘顺序写比内存操作更快**，附带因为磁盘容量更大。
+2. 读取优化：零拷贝。
+2. 文件分段。Kafka的队列topic被分为了多个区partition, 每个partition又分为了多个segment，所以一个队列中的消息实际上是保存在N多个片段文件中，通过分段的方式，每次文件操作都是对一个小文件的操作，非常轻便，同时也增加了并行处理能力
+3. 批量发送
+4. 数据压缩
 	
 ## 背景知识
 

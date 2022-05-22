@@ -122,7 +122,7 @@ kafka 中partition 是物理上的概念，仅从逻辑概念上看
 
 ![](/public/upload/architecture/kafka_subscribe_publish_3.png)
 
-所有接入topic 的consumer group 都会收到消息，producer 没有类似routingkey 可以进行topic 内部 consumer group的指定，因此Kafka只提供了广播和单播（一对一广播）的消息模型，不支持组播（消息只发给topic 内的特定n个consumer group）。因此对于复杂场景，一般rabbitmq 项目只需要一个exchange即可，而kafka 通常要多个topic，**所以kafka topic 其实跟 rabbitmq的 routingkey 逻辑上作用更像**。
+所有接入topic 的consumer group 都会收到消息，producer 没有类似routingkey 可以进行topic 内部 consumer group的指定，因此Kafka只提供了广播和单播（一对一广播）的消息模型，不支持组播（消息只发给topic 内的特定n个consumer group）。因此对于复杂场景，一般rabbitmq 项目只需要一个exchange即可，而kafka 通常要多个topic，**所以kafka topic 其实跟 rabbitmq的 routingkey 逻辑上作用更像**。
 
 ### 发布订阅模型小结
 
