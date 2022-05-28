@@ -17,7 +17,7 @@ keywords: feature engineering
 
 特征： 是指数据中抽取出来的对结果预测有用的信息，也就是数据的相关属性。
 
-特征工程：使用专业背景知识和技巧处理数据，使得 特征能在机器学习算法上发挥更好的作用的过程。从原始数据生成可用于模型训练的训练样本（原始特征 ==> 模型特征）。这个领域有专门的书《Feature Engineering for Machine Learning》。
+特征工程：使用专业背景知识和技巧处理数据，使得 特征能在机器学习算法上发挥更好的作用的过程。推荐模型本质上是一个函数，输入输出都是数字或数值型的向量。从原始数据生成可用于模型训练的训练样本（原始特征 ==> 模型特征）。这个领域有专门的书《Feature Engineering for Machine Learning》。
 
 ![](/public/upload/machine/feature_engineer_process.png)
 
@@ -51,25 +51,7 @@ keywords: feature engineering
 6. 灵活性（ Flexible ）：对下游任务有一定的普适性
 7. 自适应（ Adaptive ）：对数据分布的变化有一定的鲁棒性
 
-## 特征构建
 
-在原始数据集中的特征的形式不适合直接进行建模时，使用一个或多个原特征构造新的特征 可能会比直接使用原有特征更有效。
-
-1. 数据规范化，使不同规格的数据转换到 同一规格（特征缩放/normalize）。否则，大数值特征会主宰模型训练，这会导致更有意义的小数值特征被忽略，导致梯度更新在误差超平面上不断震荡，模型的学习效率较低。
-    1. 归一化
-    2. Z-Score 标准化
-2. 定量特征二值化，设定一个阈值，大于阈值的赋值为1，小于等于阈值的赋值为0
-3. 定性特征哑编码
-4. 特征分箱/binning，即特征离散化/Bucketizer，按照某种方法把数值型特征值映射到有限的几个“桶（bin）”内。比如，可以把1天24个小时按照如下规则划分为5个桶，使得每个桶内的不同时间都有类似的目标预测能力，比如有类似的购买概率。高基数（high-cardinality）类别型特征也有必要做特征分箱。
-5. 聚合特征构造，单特征区分性不强时，可尝试组合不同特征。
-6. 转换特征构造，比如幂变换、log变换、绝对值等
-
-常用的特征变换操作
-1. 数值型特征的常用变换：特征缩放；特征分箱。
-2. 类别型特征的常用变换：交叉组合；特征分箱（binning）；统计编码
-3. 时序特征：历史事件分时段统计；环比、同比
-
-在spark 和tf 中都有对应的处理函数。
 
 ## 特征提取
 
@@ -80,11 +62,31 @@ keywords: feature engineering
 
 ## 特征选择
 
-从现有特征中选择最有用的特征进行训练
+在一个数据集中，每个特征在标签预测或分类过程中发挥的作用其实都不同。对于那些没作用和作用小的数据，我们就可以删掉，来降低数据的维度，节省模型拟合时的计算空间。从现有特征中选择最有用的特征进行训练，这就是特征选择。怎么看哪个特征作用大，哪个作用小？一种常用的方法：相关性热力图。
 
-1. 过滤式 Filter
-2. 包裹式 Wrapper
-3. 嵌入式 embedding 
+除了特征选择工具，“数据降维”也可以归入到特征选择中。当然，也有人把降维视为一种独立的特征工程类型。那什么是数据降维呢? 其实就是通过特定算法，把多维特征压缩成低维的特征，也就是通过算法实现特征选择，减少特征的数目。
+
+## 特征变换
+
+特征分为连续和离散两类，不同的特征类型，有不同的特征变换方式。
+1. 数值型特征的常用变换：特征缩放；特征分箱。
+2. 类别型特征的常用变换：交叉组合；特征分箱（binning）；统计编码
+3. 时序特征：历史事件分时段统计；环比、同比
+
+在spark 和tf 中都有对应的处理函数。
+
+## 特征构建
+
+在原始数据集中的特征的形式不适合直接进行建模时，**使用一个或多个原特征构造新的特征**可能会比直接使用原有特征更有效。假设我们现在有一个航班的旅客订单信息数据集，记录了几年内每一天航班的旅客订票情况。通过这个数据集，我们要帮航空公司构建一个模型，来预测未来某天的客流量。那么，你能想到什么特征工程方法，有可能提高模型的效率？其实，我们可以根据“订单日期”这个字段，再人工添加一个新字段，来标明每一天的具体航班是在国家公休假日的之前、之中还是之后，或并不靠近公休假日。这个方法，其实是把与预测客流量这个任务的相关先验知识编码到了特征中，以辅助机器学习算法理解为什么流量会出现可能的波动。
+
+1. 数据规范化，使不同规格的数据转换到 同一规格（特征缩放/normalize）。否则，大数值特征会主宰模型训练，这会导致更有意义的小数值特征被忽略，导致梯度更新在误差超平面上不断震荡，模型的学习效率较低。
+    1. 归一化
+    2. Z-Score 标准化
+2. 定量特征二值化，设定一个阈值，大于阈值的赋值为1，小于等于阈值的赋值为0
+3. 定性特征哑编码
+4. 特征分箱/binning，即特征离散化/Bucketizer，按照某种方法把数值型特征值映射到有限的几个“桶（bin）”内。比如，可以把1天24个小时按照如下规则划分为5个桶，使得每个桶内的不同时间都有类似的目标预测能力，比如有类似的购买概率。高基数（high-cardinality）类别型特征也有必要做特征分箱。
+5. 聚合特征构造，单特征区分性不强时，可尝试组合不同特征。
+6. 转换特征构造，比如幂变换、log变换、绝对值等
 
 ## 特征准入和淘汰
 
@@ -142,7 +144,7 @@ Combining features, better known as feature crosses, enables the model to learn 
     |electronics|1| 	 [0, 1, 0, 0]|
     |sport|2| 	 [0, 0, 1, 0]|
     |history|3|	 [0, 0, 0, 1]|
-    
+
 4. Categorical vocabulary column, We cannot input strings directly to a model. Instead, **we must first map strings to numeric or categorical value**s. Categorical vocabulary columns provide a good way to represent strings as a one-hot vector.
 5. indicator column, treats each category as an element in a one-hot vector, where the matching category has value 1 and the rest have 0
 5. embedding column, Instead of representing the data as a one-hot vector of many dimensions, an embedding column represents that data as a lower-dimensional, ordinary vector in which each cell can contain any number, not just 0 or 1. By permitting a richer palette of numbers for every cell
@@ -270,6 +272,8 @@ class DenseFeatures(kfc._BaseFeaturesLayer):
 2. Generally a single example in training data is described with FeatureColumns. At the first layer of the model, this column-oriented data should be converted to a single `Tensor`.
 
 ## spark 特征处理
+
+[特征处理：如何利用Spark解决特征处理问题？](https://time.geekbang.org/column/article/295300)工业界的数据集往往都是 TB 甚至 PB 规模的，这在单机上肯定是没法处理的。
 
 以kaggle 房价预测项目为例，将数据集读取为 spark DataFrame
 
