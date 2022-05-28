@@ -60,6 +60,12 @@ scrape_configs:
     - targets: ['localhost:9104','localhost:9105']
 ```
 
+[relabel_configs vs metric_relabel_configs](https://www.robustperception.io/relabel_configs-vs-metric_relabel_configs)relabel_config 作用于scrape 之前，metric_relabel_configs 作用域scrape 之后保存之前。
+1. relabel_configs, **Prometheus needs to know what to scrape**, and that's where service discovery and relabel_configs come in. Relabel configs allow you to select which targets you want scraped, and what the target labels will be. So if you want to say scrape this type of machine but not that one, use relabel_configs.
+2. metric_relabel_configs, metric_relabel_configs by contrast are applied after the scrape has happened, but before the data is ingested by the storage system. So if there are some expensive metrics you want to drop, or labels coming from the scrape itself (e.g. from the /metrics page) that you want to manipulate that's where  metric_relabel_configs applies.
+
+
+
 启动prometheus `prometheus --config.file=prometheus.yml`
 
 [Reloading Prometheus’ Configuration](https://www.robustperception.io/reloading-prometheus-configuration)类似于nginx 运行时reload 配置文件一样`nignx -c nginx.conf -s reload`， prometheus 也支持运行时reload

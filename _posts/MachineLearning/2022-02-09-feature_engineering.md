@@ -17,7 +17,9 @@ keywords: feature engineering
 
 特征： 是指数据中抽取出来的对结果预测有用的信息，也就是数据的相关属性。
 
-特征工程：使用专业背景知识和技巧处理数据，使得 特征能在机器学习算法上发挥更好的作用的过程。把原始数据转变为 模型的训练数据的过程。
+特征工程：使用专业背景知识和技巧处理数据，使得 特征能在机器学习算法上发挥更好的作用的过程。从原始数据生成可用于模型训练的训练样本（原始特征 ==> 模型特征）。这个领域有专门的书《Feature Engineering for Machine Learning》。
+
+![](/public/upload/machine/feature_engineer_process.png)
 
 数据经过整理变成信息，信息能解决某个问题就是知识，知识通过反复实践形成才能，才能融会贯通就是智慧。 
 
@@ -25,20 +27,52 @@ keywords: feature engineering
 
 [Scaling Distributed Machine Learning with the Parameter Server](https://web.eecs.umich.edu/~mosharaf/Readings/Parameter-Server.pdf)Machine learning systems are widely used in Web search,spam detection, recommendation systems, computational advertising, and document analysis. These systems automatically learn models from examples, termed training data, and typically consist of three components: feature extraction, the objective function, and learning.Feature extraction processes the raw training data, such as documents, images and user query logs, to obtain feature vectors, where each feature captures an attribute of the training data. Preprocessing can be executed efficiently by existing frameworks such as MapReduce.
 
+
+[机器学习训练中常见的问题和挑战](https://mp.weixin.qq.com/s/Ez_ZpfCfXjeN9a4e72kIAA)
+1. 在2001年发表的一篇著名论文中，微软研究员Michele Banko和Eric Brill表明，给定足够的数据，截然不同的机器学习算法（包括相当简单的算法）在自然语言歧义消除这个复杂问题上，表现几乎完全一致。对复杂问题而言，数据比算法更重要，这一想法被Peter Norvig等人进一步推广，于2009年发表论文“The Unreasonable Effectiveness of Data”。不过需要指出的是，中小型数据集依然非常普遍，获得额外的训练数据并不总是一件轻而易举或物美价廉的事情，所以暂时先不要抛弃算法。
+2. 如果训练集满是错误、异常值和噪声（例如，低质量的测量产生的数据），系统将更难检测到底层模式，更不太可能表现良好。如果某些实例明显是异常情况，那么直接将其丢弃，或者尝试手动修复错误，都会大有帮助。如果某些实例缺少部分特征（例如，5%的顾客没有指定年龄），你必须决定是整体忽略这些特征、忽略这部分有缺失的实例、将缺失的值补充完整（例如，填写年龄值的中位数），还是训练一个带这个特征的模型，再训练一个不带这个特征的模型。[机器学习中数据缺失值这样处理才香！](https://mp.weixin.qq.com/s/aUmu_qU5G2ifUR4wX9l75Q)
+3. 只有训练数据里包含足够多的相关特征以及较少的无关特征，系统才能够完成学习。一个成功的机器学习项目，其关键部分是提取出一组好的用来训练的特征集。
+
+[特征工程如何找有效的特征？ - 杨旭东的回答 - 知乎](https://www.zhihu.com/question/349860940/answer/2499614543)深度学习时期，与CV、语音、NLP领域不同（深度学习技术在计算机视觉、语音、NLP领域的成功，使得在这些领域手工做特征工程的重要性大大降低），搜推广场景下特征工程仍然对业务效果具有很大的影响，并且占据了算法工程师的很多精力。**数据决定了效果的上限，算法只能决定逼近上限的程度**，而特征工程则是数据与算法之间的桥梁。关于特征工程的三个误区：
+
+1. 在搜索、推荐、广告等领域，特征数据主要以关系型结构组织和存储，在关系型数据上的特征生成和变换操作主要有两大类型
+    1. 一种是基于行（row-based）的特征变换，也就是同一个样本的不同特征之间的变换操作，比如特征组合；
+    2. 另一种是基于列（column-based）的特征变换，比如类别型特征的分组统计值，如最大值、最小值、平均值、中位数等。
+    模型可以一定程度上学习到row-based的特征变换，比如PNN、DCN、DeepFM、xDeepFM、AutoInt等模型都可以建模特征的交叉组合操作。尽管如此，模型却很难学习到基于列的特征变换，这是因为深度模型一次只能接受一个小批次的样本，无法建模到全局的统计聚合信息，而这些信息往往是很重要的。综上，即使是深度学习模型也是需要精准特征工程的。
+2. 有了AutoFE工具就不再需要手工做特征工程。AutoFE 还处于初级阶段，特征工程非常依赖数据科学家的业务知识、直觉和经验。
+3. 特征工程是没有技术含量的脏活累活。很多学生和刚参加工作不久的同事会有一种偏见，那就是算法模型才是高大上的技术，特征工程是脏活累活，没有技术含量。算法模型的更新迭代速度太快了，总会有效率更高、效果更好的模型被提出，从而让之前的积累变得无用。另一方面，特征工程的经验沉淀就好比是一个滚雪球的过程，雪球会越滚越大，最终我们会成为一个业务的领域专家，对业务贡献无可代替的价值。
+
+[什么是好的特征工程](https://yangxudong.github.io/good-feature/)，高质量特征需要满足以下标准：
+1. 有区分性（Informative）
+2. 特征之间相互独立（Independent）
+3. 简单易于理解（Simple）
+4. 伸缩性（ Scalable ）：支持大数据量、高基数特征
+5. 高效率（ Efficient ）：支持高并发预测
+6. 灵活性（ Flexible ）：对下游任务有一定的普适性
+7. 自适应（ Adaptive ）：对数据分布的变化有一定的鲁棒性
+
 ## 特征构建
 
 在原始数据集中的特征的形式不适合直接进行建模时，使用一个或多个原特征构造新的特征 可能会比直接使用原有特征更有效。
 
-1. 数据规范化，使不同规格的数据转换到 同一规格。否则，大数值特征会主宰模型训练，这会导致更有意义的小数值特征被忽略
+1. 数据规范化，使不同规格的数据转换到 同一规格（特征缩放/normalize）。否则，大数值特征会主宰模型训练，这会导致更有意义的小数值特征被忽略，导致梯度更新在误差超平面上不断震荡，模型的学习效率较低。
     1. 归一化
     2. Z-Score 标准化
 2. 定量特征二值化，设定一个阈值，大于阈值的赋值为1，小于等于阈值的赋值为0
 3. 定性特征哑编码
-4. 分箱，一般在建立分类模型时，需要对连续变量离散化
-5. 聚合特征构造，对多个特征分组聚合
+4. 特征分箱/binning，即特征离散化/Bucketizer，按照某种方法把数值型特征值映射到有限的几个“桶（bin）”内。比如，可以把1天24个小时按照如下规则划分为5个桶，使得每个桶内的不同时间都有类似的目标预测能力，比如有类似的购买概率。高基数（high-cardinality）类别型特征也有必要做特征分箱。
+5. 聚合特征构造，单特征区分性不强时，可尝试组合不同特征。
 6. 转换特征构造，比如幂变换、log变换、绝对值等
 
+常用的特征变换操作
+1. 数值型特征的常用变换：特征缩放；特征分箱。
+2. 类别型特征的常用变换：交叉组合；特征分箱（binning）；统计编码
+3. 时序特征：历史事件分时段统计；环比、同比
+
+在spark 和tf 中都有对应的处理函数。
+
 ## 特征提取
+
 将原始数据转换为 一组具有明显 物理意义（比如几何特征、纹理特征）或统计意义的特征
 1. 降维方面的 PCA、ICA、LDA 等
 2. 图像方面的SIFT、Gabor、HOG 等
@@ -46,11 +80,15 @@ keywords: feature engineering
 
 ## 特征选择
 
+从现有特征中选择最有用的特征进行训练
+
 1. 过滤式 Filter
 2. 包裹式 Wrapper
 3. 嵌入式 embedding 
 
 ## 特征准入和淘汰
+
+CTR任务中，user_id和item_id的数量那么大，也常规embedding吗？如果是大厂的话，就是直接加。大厂所使用的parameter server一般都有特征的准入与逐出机制。尽管模型代码上都一视同仁地将所有user_id, item_id加入模型，但是只有那些出现超过一定次数的id，才最终被parameter server分配空间。而且对于非活跃用户、过时下架的item，parameter server也会逐出，释放空间。
 
 商业场景中，时时刻刻都会有新的样本产生，新的样本带来新的特征。有一些特征出现频次较低，如果全部加入到模型中，一方面对内存来说是个挑战，另外一方面，低频特征会带来过拟合。因此XDL针对这样的数据特点，提供了一些特征准入机制，包括基于概率进行过滤，布隆过滤器等。比如DeepRec支持了两种特征准入的方式：基于Counter的特征准入和基于Bloom Filter的特征准入：
 
@@ -114,6 +152,7 @@ Combining features, better known as feature crosses, enables the model to learn 
 以上图为例,one of the categorical_column_with... functions maps the example string to a numerical categorical value. 
 1. As an indicator column. A function converts each numeric categorical value into an **81-element vector** (because our palette consists of 81 words), placing a 1 in the index of the categorical value (0, 32, 79, 80) and a 0 in all the other positions.
 2. As an embedding column. A function uses the numerical categorical values (0, 32, 79, 80) as indices to a lookup table. Each slot in that lookup table contains a **3-element vector**. **How do the values in the embeddings vectors magically get assigned?** Actually, the assignments happen during training. That is, the model learns the best way to map your input numeric categorical values to the embeddings vector value in order to solve your problem. Embedding columns increase your model's capabilities, since an embeddings vector learns new relationships between categories from the training data. Why is the embedding vector size 3 in our example? Well, the following "formula" provides a general rule of thumb about the number of embedding dimensions:`embedding_dimensions =  number_of_categories**0.25`
+
 ### Estimator 方式
 
 花的识别，示例代码
@@ -227,6 +266,77 @@ class DenseFeatures(kfc._BaseFeaturesLayer):
 
 1. 继承关系，DenseFeatures ==> _BaseFeaturesLayer ==> Layer， DenseFeatures 是一个layer，描述了对input dataset 的处理，位于模型的第一层（也叫特征层）
 2. Generally a single example in training data is described with FeatureColumns. At the first layer of the model, this column-oriented data should be converted to a single `Tensor`.
+
+## spark 特征处理
+
+以kaggle 房价预测项目为例，将数据集读取为 spark DataFrame
+
+```scala
+import org.apache.spark.sql.DataFrame
+ 
+// 这里的下划线"_"是占位符，代表数据文件的根目录
+val rootPath: String = _
+val filePath: String = s"${rootPath}/train.csv"
+val sourceDataDF: DataFrame = spark.read.format("csv").option("header", true).load(filePath)
+
+// 将engineeringDF定义为var变量，后续所有的特征工程都作用在这个DataFrame之上
+var engineeringDF: DataFrame = sourceDataDF
+```
+“BedroomAbvGr”字段的含义是居室数量，在 train.csv 这份数据样本中，“BedroomAbvGr”包含从 1 到 8 的连续整数。现在，我们根据居室数量，把房屋粗略地划分为小户型、中户型和大户型。
+```scala
+// 原始字段
+val fieldBedroom: String = "BedroomAbvGrInt"
+// 包含离散化数据的目标字段
+val fieldBedroomDiscrete: String = "BedroomDiscrete"
+// 指定离散区间，分别是[负无穷, 2]、[3, 4]和[5, 正无穷]
+val splits: Array[Double] = Array(Double.NegativeInfinity, 3, 5, Double.PositiveInfinity)
+// 定义并初始化Bucketizer
+val bucketizer = new Bucketizer()
+    // 指定原始列
+    .setInputCol(fieldBedroom)
+    // 指定目标列
+    .setOutputCol(fieldBedroomDiscrete)
+    // 指定离散区间
+    .setSplits(splits)
+// 调用transform完成离散化转换
+engineeringData = bucketizer.transform(engineeringData)
+```
+
+计算完之后，engineeringData DataFrame 多了一列 BedroomDiscrete，用012 来代表小中大户型。
+
+作为特征工程的最后一个环节，向量计算主要用于构建训练样本中的特征向量（Feature Vectors）。在 Spark MLlib 框架下，训练样本由两部分构成，第一部分是预测标的（Label），在“房价预测”的项目中，Label 是房价。而第二部分，就是特征向量，在形式上，特征向量可以看作是元素类型为 Double 的数组。
+
+```scala
+import org.apache.spark.ml.feature.VectorAssembler
+/**
+入选的数值特征：selectedFeatures
+归一化的数值特征：scaledFields
+离散化的数值特征：fieldBedroomDiscrete
+热独编码的非数值特征：oheFields
+*/
+val assembler = new VectorAssembler()
+    .setInputCols(selectedFeatures ++ scaledFields ++ fieldBedroomDiscrete ++ oheFields)
+    .setOutputCol("features")
+engineeringData = assembler.transform(engineeringData)
+```
+
+转换完成之后，engineeringData 这个 DataFrame 就包含了一列名为“features”的新字段，这个字段的内容，就是每条训练样本的特征向量。接下来，通过 setFeaturesCol 和 setLabelCol 来指定特征向量与预测标的，定义出线性回归模型。
+
+```scala
+// 定义线性回归模型
+val lr = new LinearRegression()
+    .setFeaturesCol("features")
+    .setLabelCol("SalePriceInt")
+    .setMaxIter(100)
+// 训练模型
+val lrModel = lr.fit(engineeringData)
+// 获取训练状态
+val trainingSummary = lrModel.summary
+// 获取训练集之上的预测误差
+println(s"Root Mean Squared Error (RMSE) on train data: ${trainingSummary.rootMeanSquaredError}")
+```
+
+如果算法人员懂spark，可以把数据读取为dataframe，然后一路转换dataframe，最终转成训练集。但实际上机器学习平台为了支持特征处理 + 训练的可编排，一般会为一次数据转换启动一个spark任务，任务之间通过hdfs流转数据，hdfs ==> dataframe ==> hdfs落盘 ==> dataframe ==> hdfs落盘 ==> tfdataset ==> tf训练任务。
 
 ## 其它
 

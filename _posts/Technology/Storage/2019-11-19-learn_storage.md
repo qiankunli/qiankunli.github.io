@@ -69,3 +69,5 @@ On the other hand, ACID’s consistency refers to data integrity guarantees that
 ## 数据平台
 
 [爱奇艺基础数据平台演进](https://mp.weixin.qq.com/s/zKZ8jJ1pzNlZ2s3jpeFvJA)
+
+[字节跳动数据库的过去、现状与未来](https://mp.weixin.qq.com/s/4Bvo0EBo_xtKdVcqhGynCQ)

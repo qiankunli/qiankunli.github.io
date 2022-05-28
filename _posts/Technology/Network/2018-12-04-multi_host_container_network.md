@@ -51,7 +51,8 @@ Kubernetes 网络大致分为两大类，使用不同的技术
 
 1. 直接路由: BGP等
 2. 隧道: VxLAN, IPIP, GRE等。
-	1. ipip,gre: 主机互相维护对端的隧道地址
+	1. ipip：利用了Linux 的tun/tap设备，对IP层的报文再加了一层IP层的封装实现的一种overlay模式。
+	2. gre: 主机互相维护对端的隧道地址
 	2. vxlan 通过主机的内核路由
 3. NAT: 例如docker的桥接网络模式
 4. 其它方式
@@ -234,6 +235,8 @@ There are two main ways they do it:
 ## 网络隔离
 
 Kubernetes 对 Pod 进行“隔离”的手段，即：NetworkPolicy，NetworkPolicy 实际上只是宿主机上的一系列 iptables 规则。在具体实现上，凡是支持 NetworkPolicy 的 CNI 网络插件，都维护着一个 NetworkPolicy Controller，通过控制循环的方式对 NetworkPolicy 对象的增删改查做出响应，然后在宿主机上完成 iptables 规则的配置工作。
+
+[Kubernetes网络策略，这一篇就够了](https://mp.weixin.qq.com/s/UuD5sDpoHibsCedkYIKfnw)
 
 ## Cilium 
 

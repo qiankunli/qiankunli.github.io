@@ -136,7 +136,7 @@ updatePolicy
 CA（ cluster-autoscaler）是用来弹性伸缩kubernetes集群的，自动的根据部署的应用所请求的资源量来动态的伸缩集群
 
 1. 什么时候扩？
-	1. 由于资源不足，pod调度失败，导致pod处于pending状态时。看样子，还需要调度器给一个  FailedScheduling(all nodes are unavailable) 标记，即调度器考察了所有节点，都发现无法执行这个任务。
+	1. 由于资源不足，pod调度失败，导致pod处于pending状态时。
 2. 什么时候缩？
 	node的资源利用率较低时，且此node上存在的pod都能被重新调度到其他节点
 1. 什么样的节点不会被CA删除
@@ -155,6 +155,57 @@ CA（ cluster-autoscaler）是用来弹性伸缩kubernetes集群的，自动的�
 
 [Kubernetes 的自动伸缩你用对了吗？](https://mp.weixin.qq.com/s/GKS3DJHm4p0Tjtj8nJRGmA)
 
+### 源码分析
+
+```go
+// k8s.io/autoscaler/cluster-autoscaler/core/static_autoscaler.go
+// RunOnce iterates over node groups and scales them up/down if necessary
+func (a *StaticAutoscaler) RunOnce(currentTime time.Time) errors.AutoscalerError {
+  ...
+  unschedulablePods, err := unschedulablePodLister.List()
+  ...
+  // 过滤掉实际可以调度的pod，实现上 拿候选node 都试一遍能不能跑在这些node上
+  unschedulablePodsToHelp, _ := a.processors.PodListProcessor.Process(a.AutoscalingContext, unschedulablePods)
+  if len(unschedulablePodsToHelp) == 0 {
+    scaleUpStatus.Result = status.ScaleUpNotNeeded
+    klog.V(1).Info("No unschedulable pods")
+  } else if a.MaxNodesTotal > 0 && len(readyNodes) >= a.MaxNodesTotal {
+    scaleUpStatus.Result = status.ScaleUpNoOptionsAvailable
+    klog.V(1).Info("Max total nodes in cluster reached")
+  } else if allPodsAreNew(unschedulablePodsToHelp, currentTime) {
+    a.processorCallbacks.DisableScaleDownForLoop()
+    scaleUpStatus.Result = status.ScaleUpInCooldown
+    klog.V(1).Info("Unschedulable pods are very new, waiting one iteration for more")
+  } else {
+    scaleUpStatus, typedErr = ScaleUp(autoscalingContext, a.processors, a.clusterStateRegistry, unschedulablePodsToHelp, readyNodes, daemonsets, nodeInfosForGroups, a.ignoredTaints)
+    if a.processors != nil && a.processors.ScaleUpStatusProcessor != nil {
+      a.processors.ScaleUpStatusProcessor.Process(autoscalingContext, scaleUpStatus)
+      scaleUpStatusProcessorAlreadyCalled = true
+    }
+  }
+  if a.ScaleDownEnabled {
+	...
+  }
+}
+```
+从源码看，一开始先获取所有pending的pod，之后过滤掉实际可以调度的pod（实现上 拿候选node 都试一遍能不能跑在这些node上）。一般这样的pod 会带有一个 FailedScheduling(all nodes are unavailable) 标记，即调度器考察了所有节点，都发现无法执行这个任务（代码上倒没有检查这个状态）。
+
+```go
+// k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes/listers.go
+// NewUnschedulablePodInNamespaceLister returns a lister providing pods that failed to be scheduled in the given namespace.  
+func NewUnschedulablePodInNamespaceLister(kubeClient client.Interface, namespace string, stopchannel <-chan struct{}) PodLister {
+  // watch unscheduled pods
+  selector := fields.ParseSelectorOrDie("spec.nodeName==" + "" + ",status.phase!=" +
+    string(apiv1.PodSucceeded) + ",status.phase!=" + string(apiv1.PodFailed))
+  podListWatch := cache.NewListWatchFromClient(kubeClient.CoreV1().RESTClient(), "pods", namespace, selector)
+  store, reflector := cache.NewNamespaceKeyedIndexerAndReflector(podListWatch, &apiv1.Pod{}, time.Hour)
+  podLister := v1lister.NewPodLister(store)
+  go reflector.Run(stopchannel)
+  return &UnschedulablePodLister{
+    podLister: podLister,
+  }
+}
+```
 
 ## 自定义crd 支持autoscaler
 

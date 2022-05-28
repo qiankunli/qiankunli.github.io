@@ -22,6 +22,7 @@ keywords:  gpu
 
 [深度剖析：针对深度学习的GPU共享](https://cloud.tencent.com/developer/article/1757129)
 
+[TKE qGPU 通过两层调度解决 GPU 资源碎片问题](https://mp.weixin.qq.com/s/ycGLxFxO2OQ7HC18bXJHUA)
 
 ## 虚拟化（未完成）
 
@@ -143,3 +144,5 @@ dcgm-exporter采集指标项以及含义:
 [dcgm-exporter](https://github.com/NVIDIA/dcgm-exporter) 可以物理机部署，也可以根据官方建议 使用daemonset 部署，之后配置一个 service，用于Prometheus找到节点上dcgm-exporter服务监听的端口，然后访问dcgm-exporter。
 
 从k8s 1.13开始，kubelet通过`/var/lib/kubelet/pod-resources`下的Unix套接字来提供pod资源查询服务，dcgm-exporter可以访问`/var/lib/kubelet/pod-resources/`下的套接字服务查询为每个pod分配的GPU设备，然后将GPU的pod信息附加到收集的度量中。
+
+[监控Kubernetes集群的GPU资源](https://mp.weixin.qq.com/s/f8kKzcZqsbSmD2lArfCZpw)

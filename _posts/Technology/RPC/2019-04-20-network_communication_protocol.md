@@ -34,6 +34,10 @@ keywords: network communication protocol
 
 ## 协议的几个套路
 
+||定位要调用的服务|消息长度|消息前后兼容|
+|---|---|---|---|
+|HTTP|URL|header里Content-Length|body里自己解决|
+|RPC|指定Service和Method名|协议header里自行约定|交给具体IDL|
 
 ### 如何表达长度
 

@@ -24,6 +24,8 @@ Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个�
 
 ## Admission Controller
 
+[为什么需要 Kubernetes 准入控制器](https://mp.weixin.qq.com/s/TjvIdKY6EJMVx6TiagM7Jg)
+
 准入控制器是kubernetes 的API Server上的一个链式Filter，它根据一定的规则决定是否允许当前的请求生效，并且有可能会改写资源声明。比如
 
 1. enforcing all container images to come from a particular registry, and prevent other images from being deployed in pods. 
