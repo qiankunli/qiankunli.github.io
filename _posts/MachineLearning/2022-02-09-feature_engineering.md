@@ -135,12 +135,14 @@ Combining features, better known as feature crosses, enables the model to learn 
     |>= 1980 but < 2000| 	 [0, 0, 1, 0]|
     |> 2000|	 [0, 0, 0, 1]|
 3. Categorical identity column, 用一个向量表示一个数字，意图与Bucketized Column 是在一致的，让模型可以学习每一个类别的权重
+
     |类别|数字|	 Represented as...|
     |---|---|---|
     |kitchenware|0|	 [1, 0, 0, 0]|
     |electronics|1| 	 [0, 1, 0, 0]|
     |sport|2| 	 [0, 0, 1, 0]|
     |history|3|	 [0, 0, 0, 1]|
+    
 4. Categorical vocabulary column, We cannot input strings directly to a model. Instead, **we must first map strings to numeric or categorical value**s. Categorical vocabulary columns provide a good way to represent strings as a one-hot vector.
 5. indicator column, treats each category as an element in a one-hot vector, where the matching category has value 1 and the rest have 0
 5. embedding column, Instead of representing the data as a one-hot vector of many dimensions, an embedding column represents that data as a lower-dimensional, ordinary vector in which each cell can contain any number, not just 0 or 1. By permitting a richer palette of numbers for every cell
