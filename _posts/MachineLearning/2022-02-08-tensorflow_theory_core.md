@@ -147,6 +147,8 @@ class Node {
 4. （Worker）图二次分裂：worker根据当前可用硬件资源，如CPU GPU，将Graph Partition按照op算子设备约束规范（例如tf.device('/cpu:0')，二次分裂到不同设备上。每个计算设备对应一个Graph Partition。
 5. 图运行(Worker)：对于每一个计算设备，worker依照op在kernel中的实现，完成op的运算。设备间数据通信可以使用send/recv节点，而worker间通信，则使用GRPC或RDMA协议。
 
+《大规模数据处理实战》不少人在理解 PCollection 的时候都觉得这不那么符合他们的直觉。许多人都会自然地觉得 PCollection 才应该是节点，而 Transform 是边。因为数据给人的感觉是一个实体，应该用一个方框表达；而边是有方向的，更像是一种转换操作。其实，区分节点和边的关键是看一个 Transform 是不是会有多于一个的输入和输出。每个 Transform 都可能有大于一个的输入 PCollection，它也可能输出大于一个的输出 PCollection。所以，我们只能把 Transform 放在节点的位置。因为一个节点可以连接多条边，而同一条边却只能有头和尾两端。
+
 
 ### 结合分布式环境
 

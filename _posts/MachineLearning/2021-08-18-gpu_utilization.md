@@ -22,7 +22,7 @@ keywords:  gpu
 
 [深度剖析：针对深度学习的GPU共享](https://cloud.tencent.com/developer/article/1757129)
 
-[TKE qGPU 通过两层调度解决 GPU 资源碎片问题](https://mp.weixin.qq.com/s/ycGLxFxO2OQ7HC18bXJHUA)
+[TKE qGPU 通过两层调度解决 GPU 资源碎片问题](https://mp.weixin.qq.com/s/ycGLxFxO2OQ7HC18bXJHUA) [TKE qGPU 通过 CRD 管理集群 GPU 卡资源](https://mp.weixin.qq.com/s/mIgh689r7-1veyAQ2DeU0Q)
 
 ## 虚拟化（未完成）
 

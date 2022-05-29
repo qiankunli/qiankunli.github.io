@@ -76,8 +76,8 @@ runC这类容器低层运行时不包含镜像管理，它假定容器的文件�
 
 有时候某个容器疯狂的写文件，大量占用磁盘，可以根据这些 overlay 目录找到所属的 容器id
 ```sh
-# 检索正在运行的容器
-docker ps -q | xargs docker inspect --format '{{.State.Pid}}, {{.Id}}, {{.Name}}, {{.GraphDriver.Data.WorkDir}}'|grep b941fe7f18c19285614a27857af1c811b4e117551d54f04b44c8ce5b6b585ad8
+# 检索正在运行的容器 哪个使用了目录 b941fe7f18c19285614a27857af1c811b4e117551d54f04b44c8ce5b6b585ad8
+docker ps -q | xargs docker inspect --format '{{.State.Pid}}, {{.Id}}, {{.Name}}, {{.GraphDriver.Data.WorkDir}}'| grep b941fe7f18c19285614a27857af1c811b4e117551d54f04b44c8ce5b6b585ad8
 # 检索所有的容器
 docker ps -a |awk '{print $1}'|grep -v CONTAINER | xargs docker inspect --format '{{.State.Pid}}, {{.Id}}, {{.Name}}, {{.GraphDriver.Data.WorkDir}}'|grep 96cafbea806cfe0ccc98
 ```
