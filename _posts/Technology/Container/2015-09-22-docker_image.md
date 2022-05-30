@@ -46,6 +46,20 @@ keywords: Docker image Dockerfile
 
 ![](/public/upload/container/container_image_overview.png)
 
+## 容器文件系统往事
+
+[容器那些事儿-从graph dirver谈起](https://mp.weixin.qq.com/s/ZkZUQLZcxMoXM3B9Oh8qjQ)容器中使用两种文件系统：overlay 和 snapshotting。
+1. AUFS 和 OverlayFS 都为 overlay 文件系统，有多个目录为镜像中的每一层提供文件 diff。overlay 通常工作在 EXT4 和 XFS 这类文件系统上。
+2. 而 snapshot 文件系统包括 devicemapper、btrfs 和 ZFS，它们在块层级处理文件 diff。snapshot 文件系统只在其格式化的卷上。
+ 
+Docker 最早只支持 Ubuntu，因为它是唯一支持 AUFS 的Linux发行版，Docker 使用 overlay 文件系统来构建镜像和容器的读写层。为了让 Docker 能够支持老版本的内核，需要 Docker 除 AUFS 以为更多的文件系统。因此，对支持device mapper（LVM thinpool）成为替换 AUFS 兼容老版本的可选项。为了让更多Linux发行版用户用上 Docker，文件系统的支持必须是可插拔的。Solomon 设计了一个新的驱动 API 以支持 Docker 中的多个文件系统。他们将新 API 命名为 graph driver，因为 Docker 将镜像各层的关系建模在“图”中，而文件系统主要存储镜像。但是随着时间的推移，需求日益增多，graph driver有很多问题，于是又出现了 snapshotter API 。
+
+联合文件系统是一种 堆叠文件系统，通过不停地叠加文件实现对文件的修改。可以**把多个目录内容联合挂载到同一个目录下** ，而目录的物理位置是分开的，并且对文件系统的修改是**类似于 git 的 commit 一样 作为一次提交来一层层的叠加的**。其中，增加操作通过在读写层增加新文件实现，删除操作一般通过添加额外的删除属性文件实现，比如删除`a.file`时读写层增加一个`a.file.delete`文件。修改只读层文件时，需要先复制一份儿文件到读写层，然后修改复制的文件。PS：所以我们说镜像是一层层的，每个layer是什么呢？ 一堆文件，比如`a.file` 和 `b.file.delete` 文件。
+
+容器的rootfs 由多个layer 文件叠加而成，每个layer 文件在分发时都必须被打包成一个tar 文件（即`a.file` 和`b.file.delete`或whiteout标记 弄成一个文件），可选择压缩或非压缩的方式。打成一个文件的好处 除了发布方便，还可以生成摘要，便于校验和按内容寻址。
+
+在 Docker 中，镜像相当于是容器的模板，一个镜像可以衍生出多个容器。镜像利用 UnionFS 技术来实现，就可以**利用其 分层的特性 来进行镜像的继承**，基于基础镜像，制作出各种具体的应用镜像，不同容器就可以直接 共享基础的文件系统层 ，同时再加上自己独有的改动层，大大提高了存储的效率。对于相同的镜像层，每一个容器都会有自己的可写容器层，并且所有的变化都存储在这个容器层中，所以多个容器可以共享对同一个底层镜像的访问，并且拥有自己的数据状态。而当容器被删除时，其可写容器层也会被删除，如果用户需要持久化容器里的数据，就需要使用 Volume 挂载到宿主机目录。
+
 ## 本地存储
 
 [Where are Docker images stored?](http://blog.thoward37.me/articles/where-are-docker-images-stored/)
@@ -63,12 +77,14 @@ keywords: Docker image Dockerfile
 },
 ```
 
-1. lower， 这一层里的文件是不会被修改的，你可以认为它是只读的。
-2. uppder， 在 OverlayFS 中，如果有文件的创建，修改，删除操作，那么都会在这一层反映出来，它是可读写的。
+1. lower， 表示较为底层的目录，对应 Docker 中的只读镜像层
+2. uppder， 在 OverlayFS 中，如果有文件的创建，修改，删除操作，那么都会在这一层反映出来，它是可读写的。对应 Docker 中的可写容器层
 3. merged，挂载点（mount point）目录，也是用户看到的目录，用户的实际文件操作在这里进行。
-4. work，只是一个存放临时文件的目录，OverlayFS 中如果有文件修改，就会在中间过程中临时存放文件到这里。
+4. work，只是一个存放临时文件的目录，OverlayFS 中如果有文件修改，就会在中间过程中临时存放文件到这里，在使用过程中对用户不可见
 
-![](/public/upload/container/container_aufs.jpg)
+![](/public/upload/container/container_aufs.png)
+
+上图lowerdir 所对应的镜像层（ Image layer ），实际上是可以有很多层的，图中只画了一层。
 
 镜像要复用，所以只能只读。但程序的运行会写文件，所以要可写。OverlayFS/UnionFS 解决这个折中的问题。
 

@@ -28,6 +28,8 @@ keywords: network
 1. 数据结构：namespace 和 cgroups 数据在内核中如何组织
 2. 算法：内核如何应用namespace 和 cgroups 数据
 
+[使用 Go 和 Linux Kernel 技术探究容器化原理](https://mp.weixin.qq.com/s/Z5j0LPYQE5dCR0LOzbUlrQ) 写的非常好，与go 调用有结合，建议细读。
+
 ## namespace
 
 《深入剖析kubernetes》：用户运行在容器里的应用进程，跟宿主机上的其他进程一样，都由宿主机操作系统统一管理，只不过这些被隔离的进程拥有额外设置过的Namespace 参数。而docker 在这里扮演的角色，更多的是旁路式的辅助和管理工作。 
