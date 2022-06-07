@@ -84,19 +84,17 @@ Docker 最早只支持 Ubuntu，因为它是唯一支持 AUFS 的Linux发行版�
 
 ![](/public/upload/container/container_aufs.png)
 
-上图lowerdir 所对应的镜像层（ Image layer ），实际上是可以有很多层的，图中只画了一层。
-
-镜像要复用，所以只能只读。但程序的运行会写文件，所以要可写。OverlayFS/UnionFS 解决这个折中的问题。
-
-runC这类容器低层运行时不包含镜像管理，它假定容器的文件包已经从镜像里解压出来并存放于文件系统中。containerd是最常用的 容器高层运行时，提供镜像下载、解压等功能，但不包含镜像构建、上传等功能， 再往上，Docker 提供了许多 UX 增强功能。——镜像并不是运行容器所必须的。
-
-有时候某个容器疯狂的写文件，大量占用磁盘，可以根据这些 overlay 目录找到所属的 容器id
+上图lowerdir 所对应的镜像层（ Image layer ），实际上是可以有很多层的，图中只画了一层。有时候某个容器疯狂的写文件，大量占用磁盘，可以根据这些 overlay 目录找到所属的 容器id。或者反过来，容器退出后，想查询容器内新增的某个文件，可以查看容器 UpperDir 对应的目录。
 ```sh
 # 检索正在运行的容器 哪个使用了目录 b941fe7f18c19285614a27857af1c811b4e117551d54f04b44c8ce5b6b585ad8
 docker ps -q | xargs docker inspect --format '{{.State.Pid}}, {{.Id}}, {{.Name}}, {{.GraphDriver.Data.WorkDir}}'| grep b941fe7f18c19285614a27857af1c811b4e117551d54f04b44c8ce5b6b585ad8
 # 检索所有的容器
 docker ps -a |awk '{print $1}'|grep -v CONTAINER | xargs docker inspect --format '{{.State.Pid}}, {{.Id}}, {{.Name}}, {{.GraphDriver.Data.WorkDir}}'|grep 96cafbea806cfe0ccc98
 ```
+
+镜像要复用，所以只能只读。但程序的运行会写文件，所以要可写。OverlayFS/UnionFS 解决这个折中的问题。
+
+runC这类容器低层运行时不包含镜像管理，它假定容器的文件包已经从镜像里解压出来并存放于文件系统中。containerd是最常用的 容器高层运行时，提供镜像下载、解压等功能，但不包含镜像构建、上传等功能， 再往上，Docker 提供了许多 UX 增强功能。——镜像并不是运行容器所必须的。
 
 ## 制作镜像
 

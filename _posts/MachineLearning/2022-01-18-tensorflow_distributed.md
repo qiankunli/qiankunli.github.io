@@ -278,6 +278,8 @@ class Estimator(object):
 
 ## Strategy 原理
 
+[TensorFlow 分布式之 ClusterCoordinator](https://mp.weixin.qq.com/s/uPLu8zzlHVrMQW-kDiyGMw)TensorFlow 2 推荐使用一种基于中央协调的架构来进行参数服务器训练。每个worker和ps-server都运行一个 tf.distribution.Server，在此基础上，一个协调者任务负责在worker和ps-server上创建资源，调度功能，并协调训练。协调器使用 tf.distribution.experimental.coordinator.ClusterCoordinator 来协调集群，使用 tf.distribution.experimental.ParameterServerStrategy 来定义参数服务器上的变量和工作者的计算。
+
 [TensorFlow 分布式 DistributedStrategy 之基础篇](https://mp.weixin.qq.com/s/n-hfz8bicdW8cU46yobnPQ)从系统角度或者说从开发者的角度看，Strategy 是基于Python作用域或装饰器来实现的一套机制。它提供了一组命名的分布式策略，如ParameterServerStrategy、CollectiveStrategy来作为Python作用域，这些策略可以被用来捕获用户函数中的模型声明和训练逻辑，其将在用户代码开始时生效。在后端，分布式系统可以重写计算图，并根据选择的策略合并相应的语义。因此我们分析的核心就是如何把数据读取，模型参数，分布式计算融合到Python作用域或装饰器之中。
 
 [TensorFlow 分布式之 ParameterServerStrategy V1](https://mp.weixin.qq.com/s/1a7voy_NR_bLj2a_b9-mBA)Strategy 工作原理，我们从分布式训练的几个过程来描述 

@@ -241,6 +241,16 @@ Saga事务的优缺点：
 
 [分布式事务解决方案汇总：2PC、消息中间件、TCC、状态机+重试+幂等](http://www.10tiao.com/html/551/201904/2652561205/1.html)
 
+[事件驱动的分布式事务架构设计](https://mp.weixin.qq.com/s/r43JvRY3LCETMoZjrdNxXA) 在传统的软件架构中，应用逻辑是通过请求、过程驱动的。一个请求执行一段逻辑同步返回一个响应，在业务逻辑中，将要执行的代码按照过程顺序进行编排。而事件驱动架构中，事件消费者会以异步的方式处理事件生产者产生的事件，原来过程当中的逻辑交给事件消费者去处理，解开服务之间的耦合，使应用的逻辑聚焦，应用的职责单一，代码更加简洁，也能提升系统的响应能力。
+
+![](/public/upload/distribute/event_driven_arch.png)
+
+随着对云原生技术的理解深入，**从 Kubernetes Control-Loop 思想中获得灵感**，全新设计了高性能、无侵入、事件驱动的 Go 语言分布式事务框架 hptx，以及支持跨语言分布式事务、读写分离、分库分表的 Mesh 方案 DBPack。下图展示了 hptx 和 dbpack 的事务协调逻辑，事务发起者 AggregationSvc 发起全局事务提交、回滚，仅仅是修改 ETCD 中的数据状态，然后立即返回。订单服务和商品服务使用前缀 bs/${appid} Watch 存储在 ETCD 中的分支事务数据，当分支事务的数据发生过变更后，ETCD 马上推送一个变更事件给相应服务，订单服务和商品服务收到变更事件后，将数据加入 workqueue 去执行提交或回滚的逻辑。AggregationSvc 提交、回滚时不会调用 OrderSvc、ProductSvc 的接口，整个过程通过 ETCD 解耦后异步执行。事务分支提交或者回滚失败后，会重新进入到 workqueue 当中继续消费，直至提交、回滚成功，或回滚超时。
+
+![](/public/upload/distribute/hptx_arch.png)
+
+在这个架构中，已经没有中心化事务协调者 TC Server，用户只需要关心自身应用的高可用，如果应用多副本部署，hptx 和 dbpack 会通过 etcd 选主，只有选为 master 的副本才能 watch 自身产生的分支事务数据去做提交、回滚，避免了提交、回滚逻辑重复执行的问题。集成 hptx，只需要依赖相应的 sdk，而不需要部署额外的 TC Server，但状态数据的存储由原来的 Mysql 换成了 ETCD。
+
 ## 小结
 
 2018.9.26 补充：《左耳听风》中提到：

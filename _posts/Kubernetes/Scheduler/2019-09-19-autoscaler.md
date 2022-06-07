@@ -27,6 +27,7 @@ keywords: kubernetes autoscaler
 1. How am I going to scale pods and applications?
 2. How can I keep containers running in a healthy state and running efficiently?
 3. With the on-going changes in my code and my users’ workloads, how can I keep up with such changes?
+4. 激增的流量负载与资源容量规划的矛盾如何解决？资源成本与系统可用性如何平衡？
 
 ## HPA和VPA工作原理——CRD的典型应用
 
@@ -40,11 +41,10 @@ keywords: kubernetes autoscaler
 3. 对于每个应用，创建一个对象的vpa or hpa对象
 4. hpa or vpa CRD 不停的拉取metric 数据，根据hpa or vpa 对象配置的策略，计算出pod 的最佳replica（hpa）或resource（vpa），更改deployment 配置，重启deployment
 
-
-
 ## Vertical Pod Autoscaler
 
 [Kubernetes 垂直自动伸缩走向何方?](https://mp.weixin.qq.com/s/ykWgx1WJxBFSPidD1To53Q)垂直自动伸缩（VPA，Vertical Pod Autoscaler） 是一个基于历史数据、集群可使用资源数量和实时的事件（如 OMM， 即 out of memory）来自动设置Pod所需资源并且能够在运行时自动调整资源基础服务。
+
 
 ### 示例
 
@@ -125,7 +125,24 @@ updatePolicy
 2. Auto(默认)：VPA 在 Pod 创建时分配资源，并且能够在 Pod 的其他生命周期更新它们，包括淘汰和重新调度 Pod。
 3. Off：VPA 从不改变Pod资源。Recommender 而依旧会在VPA对象中生成推荐信息，他们可以被用在演习中。
 
+### 实践
 
+
+[中国工商银行容器在线纵向扩容的创新实践](https://mp.weixin.qq.com/s/VFYblOnEG2VbjnBbaqXdiA)目前最常用的策略是通过增加容器副本数来提升系统整体的处理能力，即容器横向扩容，但只适用于无状态服务，而对于一些有状态服务（如数据库服务、消息队列等中间件应用）并不适用。大型互联网公司（如亚马逊、谷歌、IBM 等）均在容器纵向扩容领域开展了较多实践（如表 1 所示）。容器纵向扩容的主要实现方式有两种：Vertical Pod Autoscaler（VPA）方式和修改 Kubernetes 源码方式。其中，VPA 方式能够根据容器资源使用率自动设置 CPU 和内存的软硬限制，从而为每个容器提供适当的资源，但需要重建容器。修改 Kubernetes 源码方式可以保证容器在线扩容，但对 Kubernetes 源码侵入性较强，对于后续 Kubernetes 版本升级有较大影响。容器不重启修改容器资源的方式，PS： 感觉动静有点大。
+1. 更新容器的 cgroup，涉及到kubelet 四层的 CGroup 树 结构
+2. 取出 ETCD 中 PodSpec 数据，修改完限制参数再更新至 ETCD。
+3. 重新计算 PodSpec 的 Hash 值，将最新的 Hash 值更新至 PodSpec。只要 v1.Container 的任何一个字段发生改变都会导致期望的容器 hash 值变化。如果 hash 值变化则返回 true， Kubelet就会执行 SyncPod 方法重启Pod。
+
+唯品会有提过一个通过docker api 直接改容器资源的方案，也无需重启容器。
+
+[Pod 垂直自动伸缩的使用](https://mp.weixin.qq.com/s/R56Ls6eiuSyFWUki2EfhvA) vpa局限性
+1. 不能和 HPA 一起使用
+2. 需要至少两个健康的 Pod 才能工作。由于 VPA 会破坏一个 Pod，并重新创建一个 Pod 来进行垂直自动伸缩，因此它需要至少两个监控的 Pod 副本来确保不会出现服务中断。
+3. 默认最小内存分配为250MiB
+4. 不能用于单个独立的 Pod。VPA 只适用于 Deployments、StatefulSets、DaemonSets、ReplicaSets 等控制器
+
+目前 VPA 在生产中的最佳方式是在**推荐模式**下使用，这有助于我们了解最佳的资源请求值是多少，以及随着时间推移它们是如何变化的。
+一旦配置了，我们就可以通过获取这些 metrics 指标，并将其发送到监控工具中去，比如 Prometheus 和 Grafana 或者 ELK 技术栈。然后可以利用这些数据来调整 Pods 的大小。
 
 ## Cluster Auto Scaler 
 
@@ -262,14 +279,7 @@ spec:
 
 理论上 HPA 和 VPA 是可以共同工作的，**HPA 负责瓶颈资源，VPA 负责其他资源**。比如对于 CPU 密集型的应用，使用 HPA 监听 CPU 使用率来调整 pods 个数，然后用 VPA 监听其他资源（memory、IO）来动态扩展这些资源的 request 大小即可。当然这只是理想情况
 
-[Pod 垂直自动伸缩的使用](https://mp.weixin.qq.com/s/R56Ls6eiuSyFWUki2EfhvA) vpa局限性
-1. 不能和 HPA 一起使用
-2. 需要至少两个健康的 Pod 才能工作。由于 VPA 会破坏一个 Pod，并重新创建一个 Pod 来进行垂直自动伸缩，因此它需要至少两个监控的 Pod 副本来确保不会出现服务中断。
-3. 默认最小内存分配为250MiB
-4. 不能用于单个独立的 Pod。VPA 只适用于 Deployments、StatefulSets、DaemonSets、ReplicaSets 等控制器
 
-目前 VPA 在生产中的最佳方式是在**推荐模式**下使用，这有助于我们了解最佳的资源请求值是多少，以及随着时间推移它们是如何变化的。
-一旦配置了，我们就可以通过获取这些 metrics 指标，并将其发送到监控工具中去，比如 Prometheus 和 Grafana 或者 ELK 技术栈。然后可以利用这些数据来调整 Pods 的大小。
 
 
 

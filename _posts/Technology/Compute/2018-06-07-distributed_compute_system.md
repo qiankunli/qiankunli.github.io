@@ -53,6 +53,8 @@ keywords: 分布式系统
 5. 学习hadoop，节点间通信 直接成了 读写分布式文件系统，使得对外抽象得以简化。
 6. 学习spark，节点间 通信直接成了“内存复制”，并利用函数式思想，简化了对外api
 	
+[基于任务调度的企业级分布式批处理方案](https://mp.weixin.qq.com/s/prmaTNv_c5cRPrVXojwung)	
+
 ### 将计算异地执行
 
 [huangll99/DistributedTask](https://github.com/huangll99/DistributedTask/tree/master/src/main/java/com/hll/dist)

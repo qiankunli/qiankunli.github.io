@@ -13,7 +13,7 @@ keywords: kubernetes Apimachinery
 * TOC
 {:toc}
 
-[k8s中Apimachinery、Api、Client-go库之间的关系](https://cloud.tencent.com/developer/article/1814637)k8s.io/client-go, k8s.io/api, k8s.io/apimachinery 是基于Golang的 Kubernetes 编程的核心。
+[k8s中Apimachinery、Api、Client-go库之间的关系](https://cloud.tencent.com/developer/article/1814637)k8s.io/client-go, k8s.io/api, k8s.io/apimachinery 是基于Golang的 Kubernetes 编程的核心，是 schema 的实现。kubernetes 中 schema 就是 GVK 的属性约束 与 GVR 之间的映射。
 1. apimachinery 是最基础的库，包括核心的数据结构，比如 Scheme、Group、Version、Kind、Resource，以及排列组合出来的 常用的GVK、GV、GK、GVR等等，再就是编码、解码等操作。**类似于Java 中的Class/Method/Field 这些**。
 2. api 库，这个库依赖 apimachinery，提供了k8s的内置资源，以及注册到 Scheme 的接口，这些资源比如：Pod、Service、Deployment、Namespace
 3. client-go 库，这个库依赖前两个库，提供了访问k8s 内置资源的sdk，最常用的就是 clientSet。底层通过 http 请求访问k8s 的 api-server，从etcd获取资源信息
@@ -32,8 +32,8 @@ Kubernetes API是一个HTTP形式的API，主要有三种形式
 1. Domain
 2. API group, 在逻辑上相关的一组 Kind 集合。如 Job 和 ScheduledJob 都在 batch API group 里。同一资源的不同版本的 API，会放到一个 group 里面。一开始 所有资源都在一条 `/apis/$VERSION/` 路径下，用户很难使用不同版本的资源并保持控制器之间的兼容性。
 3. Version, 标示 API group 的版本更新， API group 会有多个版本 (version)。v1alpha1: 初次引入 ==> v1beta1: 升级改进 ==> v1: 开发完成毕业。 group  + domain + version 在url 上经常体现为`$group_$domain/version` 比如 `batch.tutorial.kubebuilder.io/v1`
-4. Kind, 表示实体的类型。直接对应一个Golang的类型，会持久化存储在etcd 中
-5. Resource, 通常是小写的复数词，Kind 的小写形式（例如，pods），用于标识一组 HTTP 端点（路径），来对外暴露 CURD 操作。每个 Kind 和 Resource 都存在于一个APIGroupVersion 下，分别通过 GroupVersionKind 和 GroupVersionResource 标识。关联GVK 到GVR （资源存储与http path）的映射过程称作 REST mapping。
+4. Kind, 表示实体的类型。直接对应一个Golang的类型，**定义在type.go**，会持久化存储在etcd 中
+5. Resource, 通常是小写的复数词，Kind 的小写形式（例如，pods），用于**标识一组 HTTP 端点**（路径），来对外暴露 CURD 操作。每个 Kind 和 Resource 都存在于一个APIGroupVersion 下，分别通过 GroupVersionKind 和 GroupVersionResource 标识。关联GVK 到GVR （资源存储与http path）的映射过程称作 REST mapping。
 
 ![](/public/upload/kubernetes/k8s_rest_api.png)
 

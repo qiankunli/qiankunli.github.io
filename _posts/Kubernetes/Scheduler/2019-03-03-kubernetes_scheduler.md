@@ -239,6 +239,8 @@ func main() {
 }
 ```
 
+[K8s调度框架引入PreEnqueue设计](https://mp.weixin.qq.com/s/ViWhCydGcqSQltWJlbx2Pw)
+
 ## 代码分析
 
 ![](/public/upload/kubernetes/scheduler_overview.png)

@@ -98,7 +98,11 @@ liveness 起初是`/healthcheck`
 
 k8s-sync 同时也将 pod 信息同步到mysql 中，方便开发根据项目名、ip 等在后台查询并访问项目容器。随着k8s-sync 功能的丰富，我们对k8s-sync 也进行了多次重构。
 
+
+[解决微服务架构下流量有损问题的实践和探索](https://mp.weixin.qq.com/s/eQzy3zvvEokNXYL637LNCg)总结的很全面。中间件的云原生化就是中间件基于k8s的场景进行各种适配。
+
 [微服务与K8s生命周期对齐](https://mp.weixin.qq.com/s/ahqtXp56o4943wmJp6x4zg)
+
 
 ## 体会
 
