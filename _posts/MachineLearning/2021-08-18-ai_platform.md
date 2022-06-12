@@ -92,6 +92,10 @@ AI平台的定位：面向算法工程师，围绕AI 模型的全生命周期去
 5. GPU 远程调用
 6. 数据编排和加速
 
+[vivo推荐中台升级路：机器成本节约75%，迭代周期低至分钟级](https://mp.weixin.qq.com/s/fpmepb75j_Qr0UlXR6YnQg)玲珑·推荐中台主要为数据及算法工程师提供从算法策略到 A/B 实验的工程架构解决方案、通用的特征服务和样本生产服务、模型的离线训练到上线部署全生命周期管理、高性能推理等能力。玲珑·推荐中台包含四大模块：推荐中心、特征中心、模型中心、端云协同推荐。
+
+![](/public/upload/machine/vivo_ai_platform.png)
+
 ## 腾讯
 
 [腾讯般若系统](https://mp.weixin.qq.com/s/NISDTSjrHCRSHbjkH5b-Bg)

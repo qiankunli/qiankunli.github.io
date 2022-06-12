@@ -192,6 +192,8 @@ Control group /:
 ```
 所以，Pod 本身有一个cgroup父节点（Node），每个容器也可以单独调整。Pod 不仅仅是一组容器。Pod 是一个自给自足的高级构造。所有 Pod 的容器都运行在同一台机器（集群节点）上，它们的生命周期是同步的，并且通过削弱隔离性来简化容器间的通信。
 
+[Kubernetes 上运行有状态应用的最佳实践](https://mp.weixin.qq.com/s/l3GPCNO4P828Fl_CjaK7WA) 未读。
+
 
 
 

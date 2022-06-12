@@ -16,6 +16,8 @@ Kubernetes 这样的分布式操作系统对外提供服务是通过 API 的形�
 
 [Kubebuilder：让编写 CRD 变得更简单](https://mp.weixin.qq.com/s/Gzpq71nCfSBc1uJw3dR7xA)K8s 作为一个“容器编排”平台，其核心的功能是编排，Pod 作为 K8s 调度的最小单位,具备很多属性和字段，K8s 的编排正是通过一个个控制器根据被控制对象的属性和字段来实现。PS：再具体点就是 crud pod及其属性字段
 
+[Kubernetes 的核心是 API 而非容器](https://mp.weixin.qq.com/s/MEhDJYg_lmjbPEdFFLdedg)提供一套跨厂商的标准结构和语义来声明核心基础设施（Pod/Service/Volume/ServiceAccount/……）， 是 Kubernetes 成功的基础。在此基础上，它又通过 CRD（Custom Resource Definition）， 将这个结构扩展到任何/所有基础设施资源。CRD 在 1.7 引入，允许云厂商和开发者自己的服务复用 Kubernetes 的 spec/impl 编程框架。
+
 对于用户来说，实现 CRD 扩展主要做两件事：
 
 1. 编写 CRD 并将其部署到 K8s 集群里；这一步的作用就是让 K8s 知道有这个资源及其结构属性，在用户提交该自定义资源的定义时（通常是 YAML 文件定义），K8s 能够成功校验该资源并创建出对应的 Go struct 进行持久化，同时触发控制器的调谐逻辑。

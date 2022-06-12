@@ -81,7 +81,7 @@ keywords: mesh microservice
 [基于 Mesh 的统一路由在海外业务的实践](https://mp.weixin.qq.com/s/ts1ZxKJ39wCl3MbppsnRMg)
 
 [Service Mesh和API网关正在逐步融合](https://mp.weixin.qq.com/s/U45eLwrr9qWKFkIKbZ-P0Q)当 “API Gateway 作为一个客户端访问内部服务” 时，它的确和一个普通内部服务作为客户端去访问其他服务没有本质差异：服务发现、负载均衡、流量路由、熔断、限流、服务降级、故障注入、日志、监控、链路追踪、访问控制、加密、身份认证…… 当我们把网关访问内部服务的功能一一列出来时，发现几乎所有的这些功能都是和服务间调用重复。
-以支付宝移动网关为例，在过去十年间，网关经历了从单体到微服务，从中心化到去中心化，从共享的 gateway.jar 包到利用 MOSN 实现网关 Mesh 化/ Sidecar 化，最终演变成了（gateway sidecar 与bff sidecar合并，前提：BFF 完全收口外部流量）
+以支付宝移动网关为例，在过去十年间，网关经历了从单体到微服务，从中心化到去中心化，从共享的 gateway.jar 包到利用 MOSN 实现网关 Mesh 化/ Sidecar 化，最终演变成了（gateway sidecar 与bff sidecar合并，前提：BFF 完全收口外部流量） [K8s 网关选型初判：Nginx 还是 Envoy?](https://mp.weixin.qq.com/s/yy08xJmoFgzIZ2Y2eSjwMw) 未读
 
 ![](/public/upload/mesh/mesh_gateway.png)
 ## 部署架构

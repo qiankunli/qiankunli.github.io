@@ -45,7 +45,7 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 [Reasons Kubernetes is cool](https://jvns.ca/blog/2017/10/05/reasons-kubernetes-is-cool/)once you have a working Kubernetes cluster you really can set up a production **HTTP service** (“run 5 of this application, set up a load balancer, give it this DNS name, done”) with just one configuration file. 对运维来说部署java application 和 部署mysql 是两个事情，但对于k8s 来说，就是一个事情。 
 
-## 赢在orchestrator
+## 赢在API
 
 一般orchestrator 包括但不限于以下功能：
 
@@ -62,6 +62,14 @@ The unit of scheduling in Kubernetes is a pod. Essentially, this is a tightly co
 2. **The logical organization of all resources, such as pods, deployments, or services, happens through labels.** label 的作用不小啊
 
 Kubernetes is highly extensible, from defining new workloads and resource types in general to customizing its user-facing parts, such as the CLI tool kubectl (pronounced cube cuddle).
+
+[Kubernetes 的核心是 API 而非容器](https://mp.weixin.qq.com/s/MEhDJYg_lmjbPEdFFLdedg)容器并非 Kubernetes 最重要、最有价值的地方，Kubernetes 也并非仅仅是一个更广泛意义上的 Workload 调度器 —— 高效地调度不同类型的 Workload 只是 Kubernetes 提供的一种重要价值，但并不是它成功的原因。Kubernetes 的成功和价值在于，提供了一种标准的编程接口（API），可以用来编写和使用软件定义的基础设施服务。Kubernetes 是一个针对云服务（Cloud Services）的标准 API 框架。PS：没有标准化，云的发展
+1. Specification + Implementation 构成一个完整的 API 框架 —— 用于设计、实现和使用各种类型和规模的基础设施服务；
+2. 这些 API 都基于相同的核心结构和语义：typed resources watched and reconciled by controllers （资源按类型划分，控制器监听相应类型的资源，并将其实际 status 校准到 spec 里期望的状态）。
+
+我们说 Kubernetes 的核心是其 API 框架，但并不是说这套 API 框架就是完美的。事实上，后一点（完美）并不（非常）重要，因为 Kubernetes 模型已经成为一个事实标准：开发者理解它、大量工具主动与它对接、主流厂商也都已经原生支持它。用户认可度、互操作性 经常比其他方面更能决定一个产品能否成功。随着 Kubernetes 资源模型越来越广泛的传播，现在已经能够 用一组 Kubernetes 资源来描述一整个**软件定义计算环境**。就像用 docker run 可以启动单个程序一样，用 kubectl apply -f 就能部署和运行一个分布式应用， 而无需关心是在私有云还是公有云以及具体哪家云厂商上，Kubernetes 的 API 框架已经屏蔽了这些细节。
+
+
 
 ##  Container Engine cluster
 

@@ -61,6 +61,8 @@ keywords:  Kubernetes practice
 [关于多集群Kubernetes的一些思考](https://mp.weixin.qq.com/s/haBM1BSDWLhRYBJH4cJHvA)
 [多云环境下的资源调度：Karmada scheduler的框架和实现](https://mp.weixin.qq.com/s/RvnEMpK7l9bqbQCrbPqBPQ)
 
+[vivo大规模 Kubernetes 集群自动化运维实践](https://mp.weixin.qq.com/s/L9z1xLXUnz52etw2jDkDkw) 未读。
+
 ## 降本增效
 
 [CPU利用率从10%提升至60%：中型企业云原生成本优化实战指南](https://mp.weixin.qq.com/s/ab-kXdpVDmEexHFMizn8Aw)
