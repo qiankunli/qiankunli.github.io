@@ -364,8 +364,6 @@ val trainingSummary = lrModel.summary
 println(s"Root Mean Squared Error (RMSE) on train data: ${trainingSummary.rootMeanSquaredError}")
 ```
 
-
-
 ## 工程化
 
 [美团外卖特征平台的建设与实践](https://mp.weixin.qq.com/s/CWY7RQcfidkvAAQCI5kRKg) 未全明白，比较全面。

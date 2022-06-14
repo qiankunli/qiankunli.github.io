@@ -229,6 +229,10 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {...}
 ```
 ## kubelet 垃圾收集
 
+[Kubernetes 容器和镜像 GC 原理解析](https://mp.weixin.qq.com/s/POFrdCQNe_rxY0VVMQ1TXA)
+1. 容器GC：退出的容器也会继续占用系统资源，比如还会在文件系统存储很多数据、Docker 应用也要占用 CPU 和内存去维护这些容器。Docker 本身并不会自动删除已经退出的容器，因此 kubelet 就负起了这个责任。kubelet 容器的回收是为了删除已经退出的容器以节省节点的空间，提升性能。容器 GC 虽然有利于空间和性能，但是删除容器也会导致错误现场被清理，不利于 debug 和错误定位，因此不建议把所有退出的容器都删除。因此容器的清理需要一定的策略，主要是告诉 kubelet 你要保存多少已经退出的容器（有一些对应的参数）。
+2. 镜像GC：镜像主要占用磁盘空间，虽然 docker 使用镜像分层可以让多个镜像共享存储，但是长时间运行的节点如果下载了很多镜像也会导致占用的存储空间过多。如果镜像导致磁盘被占满，会造成应用无法正常工作。docker 默认也不会做镜像清理，镜像一旦下载就会永远留在本地，除非被手动删除。镜像的清理和容器不同，**是以占用的空间作为标准的**，用户可以配置当镜像占据多大比例的存储空间时才进行清理。清理的时候会优先清理最久没有被使用的镜像，镜像被 pull 下来或者被容器使用都会更新它的最近使用时间（有一些对应的参数）。
+
 ```go
 // k8s.io/kubernetes/pkg/kubelet/kubelet.go
 func (kl *Kubelet) StartGarbageCollection() {

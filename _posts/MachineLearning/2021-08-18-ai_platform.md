@@ -96,6 +96,10 @@ AI平台的定位：面向算法工程师，围绕AI 模型的全生命周期去
 
 ![](/public/upload/machine/vivo_ai_platform.png)
 
+具体一点
+
+![](/public/upload/machine/vivo_ai_platform_overview.png)
+
 ## 腾讯
 
 [腾讯般若系统](https://mp.weixin.qq.com/s/NISDTSjrHCRSHbjkH5b-Bg)
