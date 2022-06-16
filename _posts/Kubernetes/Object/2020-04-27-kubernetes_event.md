@@ -16,6 +16,7 @@ keywords:  Kubernetes event
 ## Kubernetes events 
 
 [彻底搞懂 Kubernetes 中的 Events](https://mp.weixin.qq.com/s/bgzZP6ZC0thePY_dltCRAg) 可以看一些细节。
+
 ### 是什么
 
 [Understanding Kubernetes cluster events](https://banzaicloud.com/blog/k8s-cluster-logging/)Kubernetes events are objects that show you what is happening inside a cluster, such as what decisions were made by the scheduler or why some pods were evicted from the node. All core components and extensions (operators) may create events through the API Server.
@@ -65,6 +66,15 @@ Events 量非常大，只能存在一个很短的时间，很有必要将它们e
 [如何用Loki来分析Kubernetes事件](https://mp.weixin.qq.com/s/WxWH3UbRqfc3UnBjQ7KrUA)
 1. Kubernetes中关于Node的事件不多，对于节点上更多偏向底层的状态（如内核死锁、容器运行时无响应等）并不能通过事件的方式通知出来。Node Problem Detector作为一个很好的补充，它可以将node上更细节的事件以NodeCondition和Event方式上报给Kubernetes。
 2. 作者把基于Loki的Kubernetes事件分析面板贡献在了Grafana Lab上面，我们可以访问如下网站下载Dashboard。https://grafana.com/grafana/dashboards/14003
+
+[可视化 Kubernetes 历史记录](https://mp.weixin.qq.com/s/JpdFQHqvuJqS3cDsNYy2Ag)Sloop 可以监控 Kubernetes event ，记录事件和资源状态变化的历史，并提供可视化来帮助调试过去的事件。主要特点：
+1. 允许查找和检查不再存在的资源（例如：发现之前部署中的 pod ）。
+2. **提供时间线显示**，显示deployment 、ReplicaSet 和 StatefulSet 更新中相关资源的退出。
+3. 帮助调试瞬态和间歇性错误。
+4. 可以查看 Kubernetes 应用程序中随时间的变化。
+5. 是一个独立的服务，不依赖于分布式存储。
+
+![](/public/upload/kubernetes/kubernetes_event_timeline.png)
 
 ## 获取event 数据
 
