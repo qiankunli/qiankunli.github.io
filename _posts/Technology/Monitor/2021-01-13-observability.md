@@ -30,10 +30,17 @@ keywords: observability
 2. APM：Application Performance Monitoring ，应用性能监控
 3. NPM：Network Performance Monitoring ，网络性能监控。其关键在于实现全网流量的可视化，对数据包、网络接口、流数据进行监控和分析。
 4. RUM：Real User Monitoring，真实用户监控。关键在于端到端反应用户的真实体验，捕捉用户和页面的每一个交互并分析其性能。
-同时，可观测存在三个主要的数据源：
-1. 指标（metrics），告诉我们是否有故障
-2. 链路（trace），告诉我们故障在哪里
-3. 日志（log），告诉我们故障的原因。
+同时，可观测存在三个主要的数据源： [聊聊可观测性之数据模型](https://mp.weixin.qq.com/s/K11XBQlPJIxFGmsC39_lNQ)
+1. 指标（metrics），告诉我们是否有故障，它的数据模型：LabelSet + Timestamp + Number
+2. 链路（trace），告诉我们故障在哪里，数据模型：LabelSet + Timestamp + String，和 Metric 类似，只是 Number 换成了 String
+3. 日志（log），告诉我们故障的原因，数据模型：Operation Name + Start / End Timestamp + Attributes + Events + Parent + SpanContext。
+    1. Operation Name：操作名
+    2. Start / End Timestamp：开始和结束时间
+    3. Attributes：KV 对，包括 Status（比如 OK、Cancelled、Permission Denied）、
+    4. SpanKind（CLIENT、SERVER、PRODUCER、CONSUMER、INTERNAL 等）、自定义信息等
+    5. Events：若干个元组列表，每个元组包括 timestamp、name、Attributes，用于记录一系列重要事件
+    6. Parent 包含父亲的 Span ID、Trace ID
+    7. SpanContext 包含自身的 Span ID、Trace ID
 所处行业不同，对可观测体系的需求也会有较大差异。比如说，电商行业可能对链路和日志监控的联动要求很高，但物联网系统可能很多不需要链路监控。
 
 ## 监控报警内在原因
@@ -174,6 +181,10 @@ devops基本理念：
 2. AutoTracing，eBPF追踪的是每个Request相关的TCP/UDP通信函数，通过挂载到这些系统调用函数中实现自动追踪，**高度完整的展示出微服务调用链**。PS：异步调用的追踪还有欠缺
 3. AutoTagging，MetaFlow Agent通过**同步K8s、服务注册中心的大量的资源、服务、API属性信息**，然后由Server进程汇总并统一插入到所有的可观测性数据上，使得我们能够无缝的、在所有数据之间关联切换，呈现应用调用的全栈性能。[基于AutoTagging构建统一的可观测性数据平台的实践](https://mp.weixin.qq.com/s/KISlJ_7aAVh55CJnfsvqcQ)
 4. SmartEncoding，MetaFlow会为所有观测数据自动注入大量的Tag，比如在容器环境中，从客户端去访问服务端这样的双端数据，可能要注入上百个维度的标签，这些标签有可能是非常长的字符串，给我们的后端存储造成了非常大的压力。MetaFlow创新的使用SmartEncoding机制，在Agent上独立采集标签和观测数据，同步到Server端后**对标签进行独立的整形编码**，并将整形编码注入到观测数据中存储下来，使得整个标签的注入开销降低10倍。由于存储的标签都是Int编码之后的，有助于降低查询过程中的数据检索量，也能显著提升查询性能。而对于一些衍生的Tag则完全没必要存储在数据库中，MetaFlow Server通过SQL接口抽象出来底层的一个大宽表。比如在底层我们存储了40个标签，通过Server的抽象，把它延展成100个标签的虚拟大宽表。上层应用在虚拟大宽表之上进行查询，完全感受不到标签是否存储在数据中、是以Int还是String的形式存储。
+
+## 工程
+
+[案例：vivo容器集群监控系统架构与实践](https://mp.weixin.qq.com/s/VqMsE60G-89ITkk_I7U0bQ)
 
 ## 其它
 

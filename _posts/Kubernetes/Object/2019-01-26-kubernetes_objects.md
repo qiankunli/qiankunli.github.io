@@ -58,7 +58,7 @@ type GroupVersionKind struct {
 	Kind    string
 }
 ```
-scheme struct 将golang object 映射为可能的GVK。一个GVK 到一个GVR 的映射被称为 REST mapping,  RESTMapper interface/ RESTMapping struct 来完成转换。
+schema struct 将golang object 映射为可能的GVK。一个GVK 到一个GVR 的映射被称为 REST mapping,  RESTMapper interface/ RESTMapping struct 来完成转换。
 
 ![](/public/upload/kubernetes/kubernetes_type.png)
 

@@ -20,7 +20,7 @@ keywords: Scala
 
 [怎样最高效地学习Scala](http://blog.csdn.net/chszs/article/details/51693175)
 
-[Strategic Scala Style: Principle of Least Power](http://www.lihaoyi.com/post/StrategicScalaStylePrincipleofLeastPower.html) ， Scala的语言特性不算多，但是语言特性之间过于正交，一方面你把语言特性组合起来之后可以变得很复杂，写出各种其他语言的范式，另一方面容易玩脱。不想玩脱的话，就得优先选用功能最弱的功能（尽量少用scala的高级特性）。只在弱的功能解决不了你面临的问题时，才用更强的功能。Scala的创始人Martin Odersky也在李浩毅博客下面举双手赞成
+[Strategic Scala Style: Principle of Least Power](http://www.lihaoyi.com/post/StrategicScalaStylePrincipleofLeastPower.html) ， Scala的语言特性不算多，但是语言特性之间过于正交，一方面你把语言特性组合起来之后可以变得很复杂，写出各种其他语言的范式，另一方面容易玩脱。不想玩脱的话，就得优先选用功能最弱的功能（尽量少用scala的高级特性）。只在弱的功能解决不了你面临的问题时，才用更强的功能。Scala的创始人Martin Odersky也在李浩毅博客下面举双手赞成。
 
 ## 一些概念
 
@@ -30,7 +30,7 @@ keywords: Scala
 
 不同点
 
-1. 方法嵌套
+1. 函数是first-class成员，方法嵌套
 2. 泛型的表示不同
 3. 类型系统 [浅谈编程语言的类型系统](http://blog.csdn.net/ce123_zhouwei/article/details/8976652) 
 

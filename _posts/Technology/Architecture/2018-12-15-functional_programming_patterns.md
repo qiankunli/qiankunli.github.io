@@ -27,6 +27,8 @@ a simple exercise of grammatical analysis. Consider a sentence like: “smoking 
 
 Unfortunately, this transformation process is often unnecessary, or merely serves the purpose of shoehorning some concepts that are natural in functional programming into the object oriented paradigm. Moreover, this adaptation comes at the cost of a higher verbosity, lower readability and more difficult maintainability. In fact, it not only requires you to create objects with the exclusive purpose of wrapping one or more functions into them, but it also makes it necessary to develop some extra logic to glue these objects together down the line. The same goal could be achieved with a straightforward function composition. 把动作搞成对象，不仅多一个对象的概念，还要你花精力将几个对象黏合在一起（胶水代码），远不如function composition 来的直接。
 
+函数式编程并不仅仅是把函数组合起来而已，函数式编程的精髓在于尽可能的**推迟副作用**（真正干活的时候才生效）。
+
 ### 命令模式的“缩写”
 
 	public static void log(String message) {
