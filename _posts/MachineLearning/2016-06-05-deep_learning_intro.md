@@ -93,7 +93,7 @@ Let's talk RNN. Recurrent networks are basically neural networks that evolve thr
 
 现代的后端数据处理越来越偏向于DAG的形态，Spark不说了，DAG是最大特色；神经网络本身也可以看作是一个DAG（RNN其实也可以看作无数个单向DNN的组合）；TensorFlow也是强调其Graph是DAG，另外编程模式上，Reactive编程也很受追捧。无论如何，数据，数据的跟踪Tracking，数据的流向，是现代后台系统的核心问题，只有Dataflow和Data Pipeline清晰了，整个后台架构才会清楚。
 
-
+![](/public/upload/machine/aiops_overview.png)
 
 
 

@@ -142,3 +142,7 @@ Allocatable:
 [Crane-scheduler：基于真实负载进行调度](https://mp.weixin.qq.com/s/s0usEAA3pFemER97HS5G-Q)Crane-scheduler是一个基于scheduler framework 实现的完整调度器。
 
 [Trimaran: 基于实际负载的K8s调度插件](https://mp.weixin.qq.com/s/I1aJfHIt_frZE9xS59QuPw)
+
+## 拓扑感知
+
+[Kubernetes 资源拓扑感知调度优化](https://mp.weixin.qq.com/s/CgW1zqfQBdUQo8qDtV-57Q)

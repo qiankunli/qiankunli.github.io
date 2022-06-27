@@ -44,7 +44,7 @@ keywords:  Kubernetes 混部
 1. CPU 资源质量
     1. [添加 K8S CPU limit 会降低服务性能？](https://mp.weixin.qq.com/s/cR6MpQu-n1cwMbXmVaXqzQ) 可以查看container_cpu_cfs_throttled_periods_total 指标
     1. CPU Burst，例如对于 CPU Limit = 2 的容器，操作系统内核会限制容器在每 100 ms 周期内最多使用 200 ms 的 CPU 时间片，进而导致请求的响应时延（RT）变大。当容器真实 CPU 资源使用小于 cfs_quota 时，内核会将多余的 CPU 时间“存入”到 cfs_burst 中；当容器有突发的 CPU 资源需求，需要使用超出 cfs_quota 的资源时，内核的 CFS 带宽控制器（CFS Bandwidth Controller，简称 BWC） 会允许其消费其之前存到 cfs_burst 的时间片。最终达到的效果是将容器**更长时间的平均 CPU 消耗限制在 quota 范围内，允许短时间内的 CPU 使用超过其 quota**。
-    2. CPU 拓扑感知调度。在多核节点下，进程在运行过程中经常会被迁移到其不同的核心，，考虑到有些应用的性能对 CPU 上下文切换比较敏感，kubelet 提供了 static 策略，允许 Guarantee 类型 Pod 独占 CPU 核心。CPU 绑核并不是“银弹”，若同一节点内大量 Burstable  类型 Pod 同时开启了拓扑感知调度，CPU 绑核可能会产生重叠，在个别场景下反而会加剧应用间的干扰。因此，拓扑感知调度更适合针对性的开启。
+    2. CPU 拓扑感知调度。在多核节点下，进程在运行过程中经常会被迁移到其不同的核心，考虑到有些应用的性能对 CPU 上下文切换比较敏感，kubelet 提供了 static 策略，允许 Guarantee 类型 Pod 独占 CPU 核心。CPU 绑核并不是“银弹”，若同一节点内大量 Burstable  类型 Pod 同时开启了拓扑感知调度，CPU 绑核可能会产生重叠，在个别场景下反而会加剧应用间的干扰。因此，拓扑感知调度更适合针对性的开启。
     3. 针对低优先级离线容器的 CPU 资源压制能力：内核Group Identity，Group Identity 功能可以对每一个容器设置身份标识，以区分容器中的任务优先级，系统内核在调度包含具有身份标识的任务时，会根据不同的优先级做相应处理。比如高优先级任务 有更多资源抢占机会。 
     4. 在 CPU 被持续压制的情况下，BE 任务自身的性能也会受到影响，将其驱逐重调度到其他空闲节点反而可以使任务更快完成。
 2. 内存资源质量

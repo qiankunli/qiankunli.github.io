@@ -145,7 +145,7 @@ updatePolicy
 一旦配置了，我们就可以通过获取这些 metrics 指标，并将其发送到监控工具中去，比如 Prometheus 和 Grafana 或者 ELK 技术栈。然后可以利用这些数据来调整 Pods 的大小。
 
 ## Cluster Auto Scaler 
-
+[Airbnb 如何实现 Kubernetes 集群动态扩展](https://mp.weixin.qq.com/s/aSPnXtmaudGjjbBuI9a77Q)
 [kubernetes 资源管理概述](https://cizixs.com/2018/06/25/kubernetes-resource-management/)
 
 随着业务的发展，应用会逐渐增多，每个应用使用的资源也会增加，总会出现集群资源不足的情况。为了动态地应对这一状况，我们还需要 CLuster Auto Scaler，能够根据整个集群的资源使用情况来增减节点。CA 是面向事件工作的，并每 10 秒检查一次是否存在不可调度（Pending）的 Pod(当调度器无法找到可以容纳 Pod 的节点时，这个 Pod 是不可调度的）。此时，CA 开始创建新节点。

@@ -10,6 +10,9 @@ keywords: Scala
 
 ## 前言
 
+* TOC
+{:toc}
+
 阅读材料
 
 [从Java走进Scala（Scala经典读物）](http://developer.51cto.com/art/200909/154717.htm)

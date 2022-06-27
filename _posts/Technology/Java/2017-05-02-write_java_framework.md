@@ -32,10 +32,12 @@ xxx
 
 ## spi
 
+[剖析 SPI 在 Spring 中的应用](https://mp.weixin.qq.com/s/6YCCsjWwBMk9pX4LCvlEsA)SPI（Service Provider Interface），是Java内置的一种服务提供发现机制，**可以为接口寻找服务实现**。SPI机制将服务的具体实现转移到了程序外，为框架的扩展和解耦提供了极大的便利。
+
 [阅读 Flink 源码前必知必会 - SPI 和 ClassLoader](https://mp.weixin.qq.com/s/PtmlneRo6AG4Fyb8y-Bvrw)在框架设计中，要遵循的原则是对扩展开放，对修改关闭，保证框架实现对于使用者来说是黑盒。因为框架不可能做好所有的事情，只能把共性的部分抽离出来进行流程化，然后留下一些扩展点让使用者去实现，这样不同的扩展就不用修改源代码或者对框架进行定制。
 
 ### 概念
-[JDK/Dubbo/Spring 三种 SPI 机制，谁更好？](https://mp.weixin.qq.com/s/6SU1BPvNTCv_fhnMx3GhLw) SPI 的本质是将接口实现类的全限定名配置在文件中，并由服务加载器读取配置文件，加载实现类。
+[JDK/Dubbo/Spring 三种 SPI 机制，谁更好？](https://mp.weixin.qq.com/s/6SU1BPvNTCv_fhnMx3GhLw) SPI 的本质是将接口实现类的全限定名配置在文件中，并由服务加载器读取配置文件，加载实现类。PS: **本质是类加载的一种应用**。
 
 [java中的SPI机制](http://www.cnblogs.com/javaee6/p/3714719.html)
 
