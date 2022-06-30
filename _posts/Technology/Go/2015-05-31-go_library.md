@@ -53,6 +53,15 @@ if glog.V(2) {
 glog.V(2).Info("log this")
 ```
 
+[如何在 Go 函数中获取调用者的函数名、文件名、行号...](https://mp.weixin.qq.com/s/Z2CCgpG7WSqgxE7ky-CBVg)跟踪调用链的神器。 
+```go
+pc, file, lineNo, ok := runtime.Caller(1)
+fmt.Println(pc)
+fmt.Println(file)
+fmt.Println(lineNo)
+fmt.Println(ok)
+```
+
 ## unsafe
 
 [深度解密Go语言之unsafe](https://mp.weixin.qq.com/s/OO-kwB4Fp_FnCaNXwGJoEw)相比于 C 语言中指针的灵活，Go 的指针多了一些限制。
@@ -236,6 +245,8 @@ type App struct {
 **设计模式分为创建、结构和行为三大类，如果自己构造依赖关系， 则创建 与 行为 两个目的的代码容易耦合在一起， 代码较长，给理解造成困难。**
 
 ![](/public/upload/go/go_ioc_layer.png)
+
+[为什么依赖注入只在 Java 技术栈中流行，在 go 和 cpp 没有大量使用？](https://www.zhihu.com/question/521822847/answer/2451020694)
 
     
 ## command line application

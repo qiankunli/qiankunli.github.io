@@ -14,13 +14,11 @@ keywords: feature engineering
 {:toc}
 
 
-[美团外卖特征平台的建设与实践](https://mp.weixin.qq.com/s/CWY7RQcfidkvAAQCI5kRKg) 未全明白，比较全面。
-
 [实时特征计算平台架构方法论和实践](https://mp.weixin.qq.com/s/X709pAF_bkxQXNdF8DmseQ)
 
 ![](/public/upload/machine/feature_service.png)
 
-## 特征存储
+## 为什么会有特征平台
 
 如何提高模型效果？
 1. Model-centric: 以调整模型代码、调优模型超参数为主的系统调优策略，在这种策略下，可以认为数据集是固定的 Data-centric: 
@@ -59,16 +57,33 @@ Andrew认为，在搭建模型时，特征生产与模型训练的时间占比�
 
 [网易新闻推荐工程优化 - 特征平台篇](https://mp.weixin.qq.com/s/FfarWoYrpyxnIMi5T-acGw)业内常见的特征平台的核心设计往往为数据表，比如设计用户表和文章表。离线训练时将日志信息、用户表、文章表做join处理以生成样本；在线服务时则有专门的服务加速从数据表中获取内容的过程。
 
+[推荐系统(6): 特征平台实践与思考 ](https://zhuanlan.zhihu.com/p/490480311)由于特征种类多样，线上数据的来源也常常五花八门
+1. 比如物品的实时统计特征，可能通过客户端上报实时计算点击数、点赞数、购买数。
+2. 用户画像可能是离线计算，从hive 或hdfs 每天更；
+3. 物品的一些基础属性也可能是通过mysql db表生成。
+
+因此，一个统一的特征平台(包括离线流程)，可以:
+1. 统一特征口径: 特征的统计口径唯一，减少沟通成本，通过统一的接入作业，也可以复用模块代码，加快迭代速度
+2. 特征复用: 统一特征接入和上线流程，每个特征唯一id，上线过程复核，减少特征的重复。
+3. 质量监控: 特征覆盖率，分布统一监控，同时收拢出口，可以监控和限制特征的使用频率，及时下线淘汰的特征，减少成本。
+
+
 [特征平台（Feature Store）：序论](https://zhuanlan.zhihu.com/p/406897374) 业界已经有 Feast/Tecton/Databricks Feature Store/LinkedIn Feathr 等
-1. Feature Registry：一般数据库即可，以承载特征元数据，比如 name、entities、schema、source
+1. Feature Registry：一般数据库即可，以承载特征元数据，用来描述: 数据从哪里来，经过什么处理，变成什么样子，最后存到哪里去，这一整个流程。
 2. 特征计算/ Feature Pipeline。从各类原始数据，例如日志、记录、表，经过关联、统计、转化、聚集等操作得到的一系列值。这些Pipeline通常是Spark、Flink、Hive、SQL作业，并且批处理作业还需要一个编排系统（例如Apache Airflow）进行管理。PS： 以下工程通过python 等描述后，交给spark 执行
     1. 对于需要从原始数据计算得到的特征，Feathr称之为Anchored Feature，即该Feature是Anchor（锚定）在某个数据源上的。其Feature定义过程如下：
         1. 声明特征数据源，比如使用HDFS上的文件作为数据源
         2. 声明Feature对象，该对象记录了name、feature_type（数据类型）、transform（特征计算逻辑）等信息
         3. 声明FeatureAnchor对象
     2. 对于基于其他特征计算得到的特征，Feathr称之为Derived Feature（衍生特征）。其定义过程与AnchorFeature类似，只是将Source换成input_features。
-3. Offline Store：同时支持SQL数据库/数据仓库和数据湖，包含了特征的所有版本，Feast中是一个时序表，包含timestamp/entity/feature 等
-4. Online Store：比如Redis，用于存储特征的最新版本，服务于模型推理时的特征在线消费场景
+3. Offline Store：同时支持SQL数据库/数据仓库和数据湖，包含了特征的所有版本
+    1. Feast方案中是一个时序表，包含timestamp/entity/feature 等
+    2. shema free: 比如json。但这种格式无论是存储占用还是序列化开销都比较大
+    3. Protobuf: pb协议相对通用，在没有复杂嵌套情况下，可以简单定义 feature_id,feature_type,feature_value三个类型，类似于tensorflow example的协议。
+    4. [Flatbuffer](https://google.github.io/flatbuffers/): 。同样是谷歌出品，通过打平+offset的方式，反序列化基本为0。但缺点是构造复杂，不适合嵌套结构。
+4. Online Store：比如Redis，服务于模型推理时的特征在线消费场景。一些公司会用到特征分组：特征分组将相同维度下的多个特征进行聚合，以减少特征Key的数量，避免大量Key读写对KV存储性能造成的影响。还有定期全量刷新 和 增量同步等问题。 业界常见的特征在线存储方式有两种：单一版本存储和多版本存储。
+    1. 单一版本存储即覆盖更新，用新数据直接覆盖旧数据，实现简单，对物理存储占用较少，但在数据异常的时候无法快速回滚。
+    2. 多版本存储相比前者，增加了版本概念，每一份数据都对应特定版本，虽然物理存储占用较多，但在数据异常的时候可通过版本切换的方式快速回滚，保证线上稳定性。
 5. SDK：比如基于Python开发的SDK，供用户使用
 
 工作流程大概如下
@@ -79,7 +94,16 @@ Andrew认为，在搭建模型时，特征生产与模型训练的时间占比�
 
 ![](/public/upload/machine/feast_store.png)
 
+特征监控
+1. 离线天级可以通过抽样全量特征，主要分析来源数据是否异常。
+    1. 特征异常值
+    2. 特征覆盖率
+    3. 特征max min avg 中位数等数据分布
+3. 在线监控主要是从 feature server 端，抽样上报，主要分析特征调用方，调用数据源，调用频率等等。除了用来统计流量来源，也可以及时发现一些过期不用的特征，通过下线存储来达到节约成本的目的。
+
+
 ### vivo
+
 [vivo推荐中台升级路：机器成本节约75%，迭代周期低至分钟级](https://mp.weixin.qq.com/s/fpmepb75j_Qr0UlXR6YnQg)
 
 ![](/public/upload/machine/vivo_ai_platform_overview.png)
@@ -112,12 +136,16 @@ Andrew认为，在搭建模型时，特征生产与模型训练的时间占比�
 
 根据特征算子的输入、输出依赖关系将特征算子列表转成特征算子依赖关系图，该图为一个有向无环图。运行时，只需要根据图结点的依赖关系进行遍历计算，即可得到最终的特征数据。
 
+### 美团
 
+[美团外卖特征平台的建设与实践](https://mp.weixin.qq.com/s/CWY7RQcfidkvAAQCI5kRKg) 未全明白，比较全面。
+
+### 疑问
+
+1. 很多特征平台涉及到了特征存储的格式，说明特征平台负责了特征数据的计算和存储（美团叫 特征共享表），特征平台 ==> 特征集 ==> 训练样本（模型支持的数据格式）  ==> 训练。有了特征平台之后，只要根据特征集配置 从特征平台抽取 各个特征组成训练样本即可。像美团提到的，训练样本还可能直接来自于线上服务的日志。也有的公司 “特征平台”只是描述了 特征从哪里来、从原始数据如何转换，每次训练时要从原始数据抓取开始、特征转换、拼接训练样本。是特征平台自己控制特征的计算，还是说dag 训练的时候执行特征的计算？ 这个取决于是 临时进行特征计算更快，还是特征计算完成后 每个特征单独存储，然后按需join 拼凑训练样本更快？
+2. 平台里的kv 存储，存的是raw 特征 ，还是转换后的特征？大部分方案kv 存的是 特征转换后的值，美团貌似存的是特征转换前的值。
 
 ## 其它
-
-
-如果算法人员懂spark，可以把原始特征数据读取为dataframe，然后一路转换dataframe，最终转成训练集。但实际上机器学习平台为了支持特征处理 + 训练的可编排，一般会为一次数据转换启动一个spark任务，任务之间通过hdfs流转数据，hdfs ==> dataframe ==> hdfs落盘 ==> dataframe ==> hdfs落盘 ==> tfdataset ==> tf训练任务。为啥不写到一个spark任务呢？因为算法写不了这个spark 任务，又要支持他灵活编排。spark 任务之间通过hdfs 流转数据，有点又回到了mapreduce的感觉，如果能做到 两个spark 任务之间的数据流转在内存里、或者说 根据dag的 特征处理部分 翻译出来一个完整的saprk 任务，是不是会大大加快特征处理这块的速度？
 
 模型仓库与模型服务
 1. 模型仓库，主要是对离线训练完成的模型进行统一管理，并且提供离线模型的一键部署能力。算法同事**在完成模型训练之后**，只需要确定该离线模型符合预期并加入模型仓库。
