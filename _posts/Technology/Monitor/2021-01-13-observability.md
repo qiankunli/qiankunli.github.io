@@ -186,6 +186,8 @@ devops基本理念：
 
 [案例：vivo容器集群监控系统架构与实践](https://mp.weixin.qq.com/s/VqMsE60G-89ITkk_I7U0bQ)
 
+[线上故障突突突？如何紧急诊断、排查与恢复](https://mp.weixin.qq.com/s/dbipI2HBbtvlAIsIRXLHYA) 问题实例流量隔离（而不是杀死实例）、内存快照、Arthas UI化、耗时/报错与源代码关联，真是把“故障 1 分钟响应、5 分钟定位、10 分钟恢复” 给做透了。
+
 ## 其它
 
 [做出让人爱不释手的基础软件：可观测性和可交互性](https://mp.weixin.qq.com/s/WEO1y8vg21CXlix8wO28hw) 个人理解: 尽可能多的监控，之后就是尽量串起来

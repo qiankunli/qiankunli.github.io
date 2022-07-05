@@ -23,6 +23,10 @@ keywords: tensornet
 1. 一种方式是直接通过 pybind11 调用c++ 对应函数，调用时即立即执行
 2. 一种调用 自定义算子，由session.run 真正触发执行。 
 
+定制tf时要不要新增python层接口：
+1. 新增python层接口。那么就要自定义一个python库，在这个库里应用自定义或原生OP，或者只是单纯调用下 c++函数做一些初始化工作
+2. 使用原有的tf python层接口。那么就要从 tensorboard 看计算图，看看tf python 函数用到了哪些原生op，这些op有哪些作用，哪些op需要自己自定义实现，进而替换掉这些原生op。 
+
 ## Wide&Deep模型Demo
 
 ```python

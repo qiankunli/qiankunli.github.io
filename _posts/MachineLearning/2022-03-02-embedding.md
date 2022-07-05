@@ -164,6 +164,35 @@ DL 推荐模型的嵌入层是比较特殊的：它们为模型贡献了大量�
 
 [点击率预测模型Embedding层的学习和训练](https://mp.weixin.qq.com/s/caBZw8PYYBYbpdsDT63MRA)
 
+[TensorFlow 模型准实时更新上线的设计与实现](https://mp.weixin.qq.com/s/JGbELXp0aLn9n7JE1wQXvA)计算图结构由模型的算法结构决定，对数据的操作即为 operation（ op ）。当模型结构确定的情况下，我们的增强就需要对 op 进行定制。 PS：介绍了针对 embedding 参数的特点，如何通过自定义op 对其进行优化。
+
+```python
+a_matrix = random.random(size=(2,4))
+b_matrix = random.random(size=(2,4))
+print("a_matrix=", a_matrix)
+print("b_matrix=", b_matrix)
+a = tf.Variable(a_matrix, dtype=tf.float32, name="a")
+b = tf.Variable(b_matrix, dtype=tf.float32, name="b")
+ 
+res_a = tf.nn.embedding_lookup(a, [0, 0], name="lookup_a")
+res_b = tf.nn.embedding_lookup(b, [1, 1], name="lookup_b")
+y = tf.add(res_a, res_b)
+ 
+saver = tf.train.Saver(variables._all_saveable_objects(), sharded=True, write_version=saver_pb2.SaverDef.V2,  allow_empty=True)
+meta_graph_def = saver.export_meta_graph(as_text=True, clear_devices=True, strip_default_attrs=True)
+
+with open("./meta_graph_def.pbtxt", "w") as f:
+    f.write(str(meta_graph_def))
+...
+```
+这个计算图实现了简单的计算，定义两个变量，分别执行 embedding_lookup，然后对查询结果求和计算。代码中对 graph 进行保存，也保存了 tensorboard 所需的数据，用于进一步分析。使用 tensorboard 打开文件保存的路径，我们可以看到这个计算图的直观表现。分别查看计算节点，**就可以观察到 op 的输入输出关系**。PS：总结一下，定制tf时要不要新增python层接口：
+1. 新增python层接口。那么就要自定义一个python库，在这个库里应用自定义或原生OP，或者只是单纯调用下 c++函数做一些初始化工作
+2. 使用原有的tf python层接口。那么就要从 tensorboard 看计算图，看看tf python 函数用到了哪些原生op，这些op有哪些作用，哪些op需要自己自定义实现，进而替换掉这些原生op。 
+
+![](/public/upload/machine/tensorflow_custom_op.png)
+
+定制好 op 后，如何替换模型计算图中原生的 op 呢？TensorFlow 在模型保存时，会生成 meta_graph_def 文件，文件内容是采用类似 json 的格式描述计算图的结构关系。当加载此文件时，TensorFlow 会根据文件中描述的结构信息构建出计算图。可以修改模型保存的 meta_graph_def 文件，将其中的 op 替换为我们定制的 op，同时修改每个 node 的 input 和 output 关系，以修改 op 之间的依赖关系。随后用修改过的 meta_graph_def 文件加载回模型的计算图，即完成了**对原有计算图结构的修改**。
+
 ### 原理上
 [TensorFlow在美团外卖推荐场景的GPU训练优化实践-参数规模的合理化](https://mp.weixin.qq.com/s/rEHhf32L09KXGJ9bbB2LEA)
 1. 去交叉特征

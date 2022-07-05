@@ -45,6 +45,10 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 [Reasons Kubernetes is cool](https://jvns.ca/blog/2017/10/05/reasons-kubernetes-is-cool/)once you have a working Kubernetes cluster you really can set up a production **HTTP service** (“run 5 of this application, set up a load balancer, give it this DNS name, done”) with just one configuration file. 对运维来说部署java application 和 部署mysql 是两个事情，但对于k8s 来说，就是一个事情。 
 
+[为什么我们需要基于kubernetes的云操作系统？](https://mp.weixin.qq.com/s/5UUNFLbEMNuK0K1Alpp5Nw)
+
+![](/public/upload/kubernetes/kubernetes_cloud_os.png)
+
 ## 赢在API
 
 一般orchestrator 包括但不限于以下功能：

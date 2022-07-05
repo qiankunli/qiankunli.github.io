@@ -42,7 +42,9 @@ sock_create 函数完成通用套接字创建、初始化任务后，再调用�
 
 sync 和accept 队列的长度，sync 的重试次数都可以设置。如果应用程序处理较慢，会导致accept 队列。sync 攻击（伪造很多客户端ip 发送sync请求，但不发送ack）会导致sync 队列满。
 
-### 数据接收过程
+## 数据接收过程
+
+![](/public/upload/network/network_receive.png)
 
 [容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)在内核中，网络设备驱动是通过中断的方式来接受和处理数据包。当网卡设备上有数据到达的时候，会触发一个硬件中断来通知 CPU 来处理数据，此类处理中断的程序一般称作 ISR (Interrupt Service Routines)。ISR 程序不宜处理过多逻辑，否则会让设备的中断处理无法及时响应。因此 Linux 中将中断处理函数分为上半部和下半部。上半部是只进行最简单的工作，快速处理然后释放 CPU。剩下将绝大部分的工作都放到下半部中，下半部中逻辑由内核线程选择合适时机进行处理。
 Linux 2.4 以后内核版本采用的下半部实现方式是软中断，由 ksoftirqd 内核线程全权处理， 正常情况下每个 CPU 核上都有自己的软中断处理数队列和 ksoftirqd 内核线程。
@@ -88,7 +90,7 @@ struct prot{
 
 ![](/public/upload/linux/network_recv.png)
 
-### 数据的发送
+## 数据的发送
 
 用户在初始化socket之后，会得到一个fd，socket.write ==> sock.write ==> inet.write ==> tcp.write ==> ip_queue_xmit ==> dev_queue_xmit ==> ei_start_xmit.
 
@@ -96,137 +98,16 @@ struct prot{
 
 ![](/public/upload/network/linux_package_send.png)
 
-## linux1.2.13
+## 真正干活的ksoftirqd
 
-[Linux TCP/IP 协议栈源码分析](https://www.cnblogs.com/my_life/articles/4691254.html)
+软中断有专门的内核线程 ksoftirqd处理。每个 CPU 都会绑定一个 ksoftirqd 内核线程，比如， 2 个 CPU 时，就会有 ksoftirqd/0 和 ksoftirqd/1 这两个内核线程。
 
-首先，我们从device struct开始。struct反映了很多东西，比如看一下linux的进程struct，就很容易理解进程为什么能干那么多事情。
+[聊聊 veth 数据流](https://mp.weixin.qq.com/s/3aoQCJywV00berRwbH0ocQ)数据包（data package）穿过TCP/IP不同层时叫法不同。在应用层叫做message，到了TCP层叫做segment、UDP层叫datagram，流到了IP层叫做datagram，而在链路层则称为frame，到了物理层就变成bitstream（比特流）
 
-linux会维护一个device struct list，通过它能找到所有的网络设备。device struct 和设备不是一对一关系。
-```c
-include/linux/netdevice.h
-struct device{
-    /*
-    * This is the first field of the "visible" part of this structure
-    * (i.e. as seen by users in the "Space.c" file). It is the name
-    * the interface.
-    */
-    char *name;
-    /* I/O specific fields - FIXME: Merge these and struct ifmap into one */
-    unsigned long rmem_end; /* shmem "recv" end */
-    unsigned long rmem_start; /* shmem "recv" start */
-    unsigned long mem_end; /* shared mem end */
-    unsigned long mem_start; /* shared mem start */
-    // device 只是一个struct，可能几个struct共用一个物理网卡
-    unsigned long base_addr; /* device I/O address */
-    // 赋给中断号
-    unsigned char irq; /* device IRQ number */
-    /* Low-level status flags. */
-    volatile unsigned char start, /* start an operation */
-        tbusy, /* transmitter busy */
-        interrupt; /* interrupt arrived */
+![](/public/upload/linux/ksoftirqd.png)
 
-    struct device *next;
-    /* The device initialization function. Called only once. */
-    // 初始化函数
-    int (*init)(struct device *dev);
-    /* Some hardware also needs these fields, but they are not part of the
-    usual set specified in Space.c. */
-    unsigned char if_port; /* Selectable AUI, TP,..*/
-    unsigned char dma; /* DMA channel */
-    struct enet_statistics* (*get_stats)(struct device *dev);
-    /*
-    * This marks the end of the "visible" part of the structure. All
-    * fields hereafter are internal to the system, and may change at
-    * will (read: may be cleaned up at will).
-    */
-    /* These may be needed for future network-power-down code. */
-    unsigned long trans_start; /* Time (in jiffies) of last Tx */
-    unsigned long last_rx; /* Time of last Rx */
-    unsigned short flags; /* interface flags (a la BSD) */
-    unsigned short family; /* address family ID (AF_INET) */
-    unsigned short metric; /* routing metric (not used) */
-    unsigned short mtu; /* interface MTU value */
-    unsigned short type; /* interface hardware type */
-    unsigned short hard_header_len; /* hardware hdr length */
-    void *priv; /* pointer to private data */
-    /* Interface address info. */
-    unsigned char broadcast[MAX_ADDR_LEN]; /* hw bcast add */
-    unsigned char dev_addr[MAX_ADDR_LEN]; /* hw address */
-    unsigned char addr_len; /* hardware address length */
-    unsigned long pa_addr; /* protocol address */
-    unsigned long pa_brdaddr; /* protocol broadcast addr */
-    unsigned long pa_dstaddr; /* protocol P-P other side addr */
-    unsigned long pa_mask; /* protocol netmask */
-    unsigned short pa_alen; /* protocol address length */
-    struct dev_mc_list *mc_list; /* Multicast mac addresses */
-    int mc_count; /* Number of installed mcasts*/
-    struct ip_mc_list *ip_mc_list; /* IP multicast filter chain */
-    /* For load balancing driver pair support */
-    unsigned long pkt_queue; /* Packets queued */
-    struct device *slave; /* Slave device */
-    // device的数据缓冲区
-    /* Pointer to the interface buffers. */
-    struct sk_buff_head buffs[DEV_NUMBUFFS];
-    /* Pointers to interface service routines. */
-    // 打开设备
-    int (*open)(struct device *dev);
-    // 关闭设备
-    int (*stop)(struct device *dev);
-    // 调用具体的硬件将数据发到物理介质上，网络栈最终调用它发数据
-    int (*hard_start_xmit) (struct sk_buff *skb, struct device *dev);
-    int (*hard_header) (unsigned char *buff,struct device *dev,unsigned short type,void *daddr,void *saddr,unsigned len,struct sk_buff *skb);
-    int (*rebuild_header)(void *eth, struct device *dev,unsigned long raddr, struct sk_buff *skb);
-    unsigned short (*type_trans) (struct sk_buff *skb, struct device *dev);
-    #define HAVE_MULTICAST
-    void (*set_multicast_list)(struct device *dev, int num_addrs, void *addrs);
-    #define HAVE_SET_MAC_ADDR
-    int (*set_mac_address)(struct device *dev, void *addr);
-    #define HAVE_PRIVATE_IOCTL
-    int (*do_ioctl)(struct device *dev, struct ifreq *ifr, int cmd);
-    #define HAVE_SET_CONFIG
-    int (*set_config)(struct device *dev, struct ifmap *map);
-};
-```
-
-耐心的看完这个结构体，网络部分的初始化就是围绕device struct的创建及其中字段（和函数）的初始化.
-
-linux内核与网络驱动程序的边界：linux内核准备好device struct和dev_base指针(这句不准确，或许是ethdev_index[])，kernel启动时，执行驱动程序事先挂好的init函数，init函数初始化device struct并挂到dev_base上(或ethdev_index上)。
-
-ei开头的都是驱动程序自己的函数。
-
-### 接收数据
-
-device struct 初始化时，会为这个设备生成一个irq(中断号)，为irq其绑定ei_interrutp（网卡的中断处理函数），同时会建立一个irq与device的映射。接收到数据后，触发ei_interrutp, ei_interrutp根据中断号得到device,执行`ei_receive（device)`, ei_receive 将数据拷贝到 数据接收队列（元素为 sk_buff，具有prev和next指针，struct device 维护了 sk_buff_head），执行内核的netif_rx,netif_rx 触发软中断 执行net_bh，net_bh 遍历 packet_type list 查看数据 符合哪个协议（不是每次都遍历），执行`packet_type.func`将数据包传递给网络层协议接收函数，`packet_type.func` 的可选值 arp_rcv,ip_rcv. ip_rcv中带有device 参数，用于校验数据包的mac 地址是否在 device.mc_list 之内，及检查是否开启IP_FORWARD等。
-
-![](/public/upload/network/data_rcv.png)
-
-![](/public/upload/linux/network_source_recv.gif)
-
-### 收到数据包的几种情况
-
-1. 来的网络包正是服务端期待的下一个网络包 seq = rcv_nxt
-2. end_seq < rcv_nxt 服务端期待 5，但来了一个3，说明3和4的ack 客户端没有收到，服务端应重新发送
-3. seq 不小于 rcv_nxt + tcp_receive_window，说明客户端发送得太猛了。本来 seq 肯定应该在接收窗口里面的，这样服务端才来得及处理，结果现在超出了接收窗口，说明客户端一下子把服务端给塞满了。这种情况下，服务端不能再接收数据包了，只能发送 ACK了，在 ACK 中会将接收窗口为 0 的情况告知客户端，客户就知道不能再发送了。**这个时候双方只能交互窗口探测数据包**，直到服务端因为用户进程把数据读走了，空出接收窗口，才能在 ACK里面再次告诉客户端，又有窗口了，又能发送数据包了。
-4. seq < rcv_nxt 但 end_seq > rcv_nxt，说明从 seq 到 rcv_nxt 这部分网络包原来的 ACK 客户端没有收到，所以客户端重新发送了一次，从 rcv_nxt到 end_seq 时新发送的
-5. 乱序包
-
-### Socket 读取
-
-1. VFS 层：read 系统调用找到 struct file，根据里面的 file_operations 的定义，调用 sock_read_iter 函数。sock_read_iter 函数调用 sock_recvmsg 函数
-2. Socket 层：从 struct file 里面的 private_data 得到 struct socket，根据里面 ops 的定义，调用 inet_recvmsg 函数
-3. Sock 层：从 struct socket 里面的 sk 得到 struct sock，根据里面 sk_prot 的定义，调用 tcp_recvmsg 函数。
-4. TCP 层：tcp_recvmsg 函数会依次读取 receive_queue 队列、prequeue 队列和 backlog 队列。
-
-socket.read 的本质就是去内核读取 receive_queue 队列、prequeue 队列和 backlog 队列 中的数据。如果实在没有数据包，则调用 sk_wait_data，等待在那里
-
-### 发送数据
-
-由网络协议栈调用hard_start_xmit(初始化时，驱动程序将ei_start_xmit函数挂到其上)
-
-总的来说，kernel有几个extern的struct、pointer和func，驱动程序初始化完毕后，为linux内核准备了一个device struct list（驱动程序自己有一些功能函数，挂到device struct的函数成员上）。收到数据时，**kernel的extern func(比如netif_rx)在中断环境下被驱动程序调用**。发送数据时，则由内核网络协议栈调用device.hard_start_xmit，进而执行驱动程序函数。
-
-![](/public/upload/linux/network_source_send.gif)
+1. ksoftirqd首先是一个死循环。如果有网络设备挂在poll_list上面，只要满足条件，它就会从poll_list上面将其取下来，执行该设备驱动程序所注册的poll()。poll()不断地从net_device的RingBuffer里面取出数据包，转成skb格式，并沿着网络设备子系统 -> IP协议层 -> TCP层一路调用内核里面的函数来分析和处理这个skb。从上图可以看到**skb从RingBuffer被取出来，到最后落到位于TCP层的socket接收队列里，都是在ksoftirqd这个内核线程里完成的**。这个处理过程还包括iptables的处理，路由的查询等各种费时费力的工作。所以如果iptables设置得非常多的话，会导致ksoftirqd处理每一个skb的时间变长，进而导致消费RingBuffer的速度变慢，对外的表现就是机器的吞吐量降低。
+2. 当通过veth发送数据出去（此为发送端veth，相应的另外一个叫接收端veth）的时候，不会触发硬件中断，也没有RingBuffer参与这个过程。发送端的veth在网络设备层会将skb直接塞入一个叫input_pkt_queue里，和poll_list一样，它也是位于数据结构softnet_data中。接着触发软中断使得ksoftirqd开始消费input_pkt_queue里的skb，veth1是插在bridge上的，bridge的行为类似二层交换机。在网络设备层调用 __netif_receive_skb_core 函数时，skb不会进入协议栈，而是会进入网桥处理。
 
 ## 不同的缓存方式 and 处理网络包的三个主体
 
@@ -277,6 +158,10 @@ DPDK全称Intel Data Plane Development Kit，是Intel提供的数据平面开发
 DPDK能够绕过内核协议栈，本质上是得益于 UIO 技术，UIO技术也不是DPDK创立的，是内核提供的一种运行在用户空间的I/O技术，Linux系统中一般的驱动设备都是运行在内核空间，在用户空间用的程序调用即可，UIO则是将驱动的很少一部分运行在内核空间，绝大多数功能在用户空间实现，通过 UIO 能够拦截中断，并重设中断回调行为，从而绕过内核协议栈后续的处理流程。
 
 ![](/public/upload/network/tcp.png)
+
+## 其它
+
+无论 TCP 还是 UDP，端口号都只占 16 位，也就说其最大值也只有 65535。那是不是说，如果使用 TCP 协议，在单台机器、单个 IP 地址时，并发连接数最大也只有 65535 呢？对于这个问题，首先你要知道，Linux 协议栈，通过五元组来标志一个连接（即协议，源 IP、源端口、目的 IP、目的端口)。对客户端来说，每次发起 TCP 连接请求时，都需要分配一个空闲的本地端口，去连接远端的服务器。由于这个本地端口是独占的，所以客户端最多只能发起 65535 个连接。对服务器端来说，其通常监听在固定端口上（比如 80 端口），等待客户端的连接。根据五元组结构，我们知道，客户端的 IP 和端口都是可变的。如果不考虑 IP 地址分类以及资源限制，服务器端的理论最大连接数，可以达到 2 的 48 次方（IP 为 32 位，端口号为 16 位），远大于 65535。服务器端可支持的连接数是海量的，当然，由于 Linux 协议栈本身的性能，以及各种物理和软件的资源限制等，这么大的连接数，还是远远达不到的（实际上，C10M 就已经很难了）。
 
 ## 引用
 

@@ -19,6 +19,8 @@ keywords: network
 
 [快速界定故障：Socket Tracer网络监控实践](https://mp.weixin.qq.com/s/0w5t_KkHRLXkEY1_qbdTtw)
 
+《深入理解Linux网络》带着问题去串联网络知识。
+
 ## 网络协议
 
 ![](/public/upload/network/network_protocol.png)
