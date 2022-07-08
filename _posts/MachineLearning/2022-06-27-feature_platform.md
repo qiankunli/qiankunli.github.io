@@ -87,6 +87,7 @@ Andrew认为，在搭建模型时，特征生产与模型训练的时间占比�
 5. SDK：比如基于Python开发的SDK，供用户使用
 
 工作流程大概如下
+
 1. 特征元数据
 2. 特征计算，使用python或dsl 描述特征计算逻辑，交给spark 等处理，处理完成后存储到 Offline Store 中，并同步一份给 Online Store
 3. 模型训练，训练时从 Offline Store 中拼接 训练样本
@@ -139,6 +140,8 @@ Andrew认为，在搭建模型时，特征生产与模型训练的时间占比�
 ### 美团
 
 [美团外卖特征平台的建设与实践](https://mp.weixin.qq.com/s/CWY7RQcfidkvAAQCI5kRKg) 未全明白，比较全面。
+
+[外卖广告大规模深度学习模型工程实践](https://mp.weixin.qq.com/s/JG8ygiHVW4y-OOlf4Mv5DQ) 比较全面。 
 
 ### 疑问
 

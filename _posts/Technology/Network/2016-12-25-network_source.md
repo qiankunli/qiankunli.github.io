@@ -23,7 +23,6 @@ linux网络编程中，各层有各层的struct，但有一个struct是各层通
 
 TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的网络包，就会将网络包缓存起来，等待应用层的读取。应用层通过 Socket 监听某个端口，因而读取的时候，内核会根据 TCP 头中的端口号，将网络包发给相应的Socket。
 
-
 ## 宏观
 
 ![](/public/upload/network/linux_tcp_function.png)
@@ -44,6 +43,7 @@ sync 和accept 队列的长度，sync 的重试次数都可以设置。如果应
 
 ## 数据接收过程
 
+《深入理解Linux网络》
 ![](/public/upload/network/network_receive.png)
 
 [容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)在内核中，网络设备驱动是通过中断的方式来接受和处理数据包。当网卡设备上有数据到达的时候，会触发一个硬件中断来通知 CPU 来处理数据，此类处理中断的程序一般称作 ISR (Interrupt Service Routines)。ISR 程序不宜处理过多逻辑，否则会让设备的中断处理无法及时响应。因此 Linux 中将中断处理函数分为上半部和下半部。上半部是只进行最简单的工作，快速处理然后释放 CPU。剩下将绝大部分的工作都放到下半部中，下半部中逻辑由内核线程选择合适时机进行处理。
@@ -92,20 +92,34 @@ struct prot{
 
 ## 数据的发送
 
-用户在初始化socket之后，会得到一个fd，socket.write ==> sock.write ==> inet.write ==> tcp.write ==> ip_queue_xmit ==> dev_queue_xmit ==> ei_start_xmit.
+send 系统调用：在内核中找到 socket（记录着各种协议栈的函数地址），函数调用由系统调用进入协议栈，inet_sendmsg 是AF_INET 协议族提供的通用发送函数，经过协议栈处理后进入RingBuffer，随后网卡驱动真正将数据发送出去，当发送完成的时候，通过硬中断来通知CPU，然后清理RingBuffer。
 
-传输层将用户的数据包装成sk_buff 下放到ip层，在ip层，函数ip_queue_xmit()的功能是将数据包进行一系列复杂的操作，比如是检查数据包是否需要分片。同时，根据目的ip、iptables等规则，选取一个dev发送数据。
+![](/public/upload/linux/tcp_send.png)
+
+```
+inet_sendmsg ==>
+tcp_sendmsg # 申请一个 内核态的skb 内存并挂到 socket 发送队列sk_write_queue，将用户待发送的数据拷贝到skb，同时进行一些判断，如果条件不满足（比如未发送的数据是否已经超过最大窗口的一半了），这次用户要发送的数据只是拷贝到内核就完事了。假设发射条件已经满足了
+  ==> tcp_write_xmit # 滑动窗口、拥塞控制
+    ==> tcp_transmit_skb # 克隆一个新的skb，实际传输出去的是skb_copy，网卡发送完成的时候，skb_copy 会释放掉。tcp 支持丢失重传，skb 要等到收到ack 再真正删除
+      ==> ip_queue_xmit # 路由项查找、IP头设置、netfilter过滤、skb切分（大于MTU的话）
+        ==> 邻居子系统 # 有可能发出arp请求，然后封装mac头，将skb再传递到更下层的设备子系统
+          ==> dev_queue_xmit # 网卡有多个发送队列（一个队列由一个RingBuffer表示），选择发送队列，while循环不断的从队列中取出skb并进行发送
+            ==> dev_hard_start_xmit # 将skb 挂到RingBuffer上，将skb所有数据都映射到DMA地址，触发真实的发送。发送完毕后，网卡触发硬中断NET_RX_SOFTIRQ 来释放 清理skb，解除DMA 映射。 
+```
+
+在网络包的发送过程中，**用户进程（在内核态）完成了绝大部分工作**，甚至连调用驱动的工作都干了。如果发送网络包的时候 进程内核态 cpu quota用尽 或者其它进程需要cpu的时候，触发软中断 NET_TX_SOFTIRQ ，由ksoftirqd 执行net_tx_action 函数，找到发送队列，最终调用驱动程序的入口函数 dev_hard_start_xmit 
 
 ![](/public/upload/network/linux_package_send.png)
 
 ## 真正干活的ksoftirqd
 
-软中断有专门的内核线程 ksoftirqd处理。每个 CPU 都会绑定一个 ksoftirqd 内核线程，比如， 2 个 CPU 时，就会有 ksoftirqd/0 和 ksoftirqd/1 这两个内核线程。
+软中断有专门的内核线程 ksoftirqd处理/内核线程ksoftirqd包含了所有的软中断处理逻辑。每个 CPU 都会绑定一个 ksoftirqd 内核线程，比如， 2 个 CPU 时，就会有 ksoftirqd/0 和 ksoftirqd/1 这两个内核线程。
 
 [聊聊 veth 数据流](https://mp.weixin.qq.com/s/3aoQCJywV00berRwbH0ocQ)数据包（data package）穿过TCP/IP不同层时叫法不同。在应用层叫做message，到了TCP层叫做segment、UDP层叫datagram，流到了IP层叫做datagram，而在链路层则称为frame，到了物理层就变成bitstream（比特流）
 
 ![](/public/upload/linux/ksoftirqd.png)
 
+1. RingBuffer是内存中一块特殊区域，网卡在收到数据的时候以DMA的方式将包写到RingBuffer中。
 1. ksoftirqd首先是一个死循环。如果有网络设备挂在poll_list上面，只要满足条件，它就会从poll_list上面将其取下来，执行该设备驱动程序所注册的poll()。poll()不断地从net_device的RingBuffer里面取出数据包，转成skb格式，并沿着网络设备子系统 -> IP协议层 -> TCP层一路调用内核里面的函数来分析和处理这个skb。从上图可以看到**skb从RingBuffer被取出来，到最后落到位于TCP层的socket接收队列里，都是在ksoftirqd这个内核线程里完成的**。这个处理过程还包括iptables的处理，路由的查询等各种费时费力的工作。所以如果iptables设置得非常多的话，会导致ksoftirqd处理每一个skb的时间变长，进而导致消费RingBuffer的速度变慢，对外的表现就是机器的吞吐量降低。
 2. 当通过veth发送数据出去（此为发送端veth，相应的另外一个叫接收端veth）的时候，不会触发硬件中断，也没有RingBuffer参与这个过程。发送端的veth在网络设备层会将skb直接塞入一个叫input_pkt_queue里，和poll_list一样，它也是位于数据结构softnet_data中。接着触发软中断使得ksoftirqd开始消费input_pkt_queue里的skb，veth1是插在bridge上的，bridge的行为类似二层交换机。在网络设备层调用 __netif_receive_skb_core 函数时，skb不会进入协议栈，而是会进入网桥处理。
 

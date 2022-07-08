@@ -93,7 +93,7 @@ effect 类型
 
 ![](/public/upload/kubernetes/dynamic_scheduler.png)
 
-为了避免Pod调度到高负载的Node上，需要先通过预选把一些高负载的Node过滤掉，同时为了使集群各节点的负载尽量均衡，Dynamic-scheduler会根据Node负载数据进行打分, 负载越低打分越高。Dynamic-scheduler只能保证在调度的那个时刻会将Pod调度到低负载的Node上，但是随着业务的高峰期不同Pod在调度之后，这个Node可能会出现高负载。为了避免由于Node的高负载对业务产生影响，我们在Dynamic-scheduler之外还实现了一个Descheduler，它会监控Node的高负载情况，将一些配置了高负载迁移的Pod迁移到负载比较低的Node上。
+为了避免Pod调度到高负载的Node上，需要先通过预选把一些高负载的Node过滤掉，同时为了使集群各节点的负载尽量均衡，Dynamic-scheduler会根据Node负载数据进行打分, 负载越低打分越高。Dynamic-scheduler只能保证在调度的那个时刻会将Pod调度到低负载的Node上，但是随着业务的高峰期不同Pod在调度之后，这个Node可能会出现高负载。为了避免由于Node的高负载对业务产生影响，我们在Dynamic-scheduler之外还实现了一个Descheduler，它会监控Node的高负载情况，将一些配置了高负载迁移的Pod迁移到负载比较低的Node上。[K8s 中 Descheduler 默认策略不够用？扩展之](https://mp.weixin.qq.com/s/pkDxexvrzmtuLMWwzi0p_g)
 
 ![](/public/upload/kubernetes/descheduler.png)
 
