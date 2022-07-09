@@ -57,8 +57,7 @@ keywords: linux 内核
 2. msadsc_t 表示一个内存页，包含页的状态、页的地址、页的分配记数、页的类型、页的链表。**物理内存页有多少就需要有多少个 msadsc_t 结构**。
     ```c
     //内存空间地址描述符标志
-    typedef struct s_MSADFLGS
-    {
+    typedef struct s_MSADFLGS{
         u32_t mf_olkty:2;    //挂入链表的类型
         u32_t mf_lstty:1;    //是否挂入链表
         u32_t mf_mocty:2;    //分配类型，被谁占用了，内核还是应用或者空闲
@@ -66,8 +65,7 @@ keywords: linux 内核
         u32_t mf_uindx:24;   //分配计数
     }__attribute__((packed)) msadflgs_t; 
     //物理地址和标志  
-    typedef struct s_PHYADRFLGS
-    {
+    typedef struct s_PHYADRFLGS{
         u64_t paf_alloc:1;     //分配位
         u64_t paf_shared:1;    //共享位
         u64_t paf_swap:1;      //交换位
@@ -80,8 +78,7 @@ keywords: linux 内核
         u64_t paf_padrs:52;    //页物理地址位
     }__attribute__((packed)) phyadrflgs_t;
     //内存空间地址描述符
-    typedef struct s_MSADSC
-    {
+    typedef struct s_MSADSC{
         list_h_t md_list;           //链表
         spinlock_t md_lock;         //保护自身的自旋锁
         msadflgs_t md_indxflgs;     //内存空间地址描述符标志
@@ -111,20 +108,17 @@ void init_memmgr(){
 内存管理代码的结构是：接口函数调用框架函数，框架函数调用核心函数。可以发现，这个接口函数返回的是一个 msadsc_t 结构的指针。如果能在 dm_mdmlielst 数组中找到对应请求页面数的 msadsc_t 结构就直接返回，如果没有就寻找下一个 dm_mdmlielst 数组中元素，依次迭代直到最大的 dm_mdmlielst 数组元素，然后依次对半分割，直到分割到请求的页面数为止。释放时会查找相邻且物理地址连续的 msadsc_t 结构，进行合并，合并工作也是迭代过程，直到合并到最大的连续 msadsc_t 结构或者后面不能合并为止，最后把这个合并到最大的连续 msadsc_t 结构，挂载到对应的 dm_mdmlielst 数组中。释放算法核心逻辑是要对空闲页面进行合并，合并成更大的连续的内存页面。
 ```c
 //内存分配页面框架函数
-msadsc_t *mm_divpages_fmwk(memmgrob_t *mmobjp, uint_t pages, uint_t *retrelpnr, uint_t mrtype, uint_t flgs)
-{
+msadsc_t *mm_divpages_fmwk(memmgrob_t *mmobjp, uint_t pages, uint_t *retrelpnr, uint_t mrtype, uint_t flgs){
     //返回mrtype对应的内存区结构的指针
     memarea_t *marea = onmrtype_retn_marea(mmobjp, mrtype);
-    if (NULL == marea)
-    {
+    if (NULL == marea){
         *retrelpnr = 0;
         return NULL;
     }
     uint_t retpnr = 0;
     //内存分配的核心函数
     msadsc_t *retmsa = mm_divpages_core(marea, pages, &retpnr, flgs);
-    if (NULL == retmsa)
-    {
+    if (NULL == retmsa){
         *retrelpnr = 0;
         return NULL;
     }
@@ -137,17 +131,14 @@ msadsc_t *mm_divpages_fmwk(memmgrob_t *mmobjp, uint_t pages, uint_t *retrelpnr, 
 //retrealpnr->存放实际分配内存页面数的指针
 //mrtype->请求的分配内存页面的内存区类型
 //flgs->请求分配的内存页面的标志位
-msadsc_t *mm_division_pages(memmgrob_t *mmobjp, uint_t pages, uint_t *retrealpnr, uint_t mrtype, uint_t flgs)
-{
-    if (NULL == mmobjp || NULL == retrealpnr || 0 == mrtype)
-    {
+msadsc_t *mm_division_pages(memmgrob_t *mmobjp, uint_t pages, uint_t *retrealpnr, uint_t mrtype, uint_t flgs){
+    if (NULL == mmobjp || NULL == retrealpnr || 0 == mrtype){
         return NULL;
     }
 
     uint_t retpnr = 0;
     msadsc_t *retmsa = mm_divpages_fmwk(mmobjp, pages, &retpnr, mrtype, flgs);
-    if (NULL == retmsa)
-    {
+    if (NULL == retmsa){
         *retrealpnr = 0;
         return NULL;
     }
@@ -155,8 +146,7 @@ msadsc_t *mm_division_pages(memmgrob_t *mmobjp, uint_t pages, uint_t *retrealpnr
     return retmsa;
 }
 //释放内存页面核心
-bool_t mm_merpages_core(memarea_t *marea, msadsc_t *freemsa, uint_t freepgs)
-{
+bool_t mm_merpages_core(memarea_t *marea, msadsc_t *freemsa, uint_t freepgs){
     bool_t rets = FALSE;
     cpuflg_t cpuflg;
     //内存区加锁
@@ -168,18 +158,15 @@ bool_t mm_merpages_core(memarea_t *marea, msadsc_t *freemsa, uint_t freepgs)
     return rets;
 }
 //释放内存页面框架函数
-bool_t mm_merpages_fmwk(memmgrob_t *mmobjp, msadsc_t *freemsa, uint_t freepgs)
-{
+bool_t mm_merpages_fmwk(memmgrob_t *mmobjp, msadsc_t *freemsa, uint_t freepgs){
     //获取要释放msadsc_t结构所在的内存区
     memarea_t *marea = onfrmsa_retn_marea(mmobjp, freemsa, freepgs);
-    if (NULL == marea)
-    {
+    if (NULL == marea){
         return FALSE;
     }
     //释放内存页面的核心函数
     bool_t rets = mm_merpages_core(marea, freemsa, freepgs);
-    if (FALSE == rets)
-    {
+    if (FALSE == rets){
         return FALSE;
     }
     return rets;
@@ -188,16 +175,13 @@ bool_t mm_merpages_fmwk(memmgrob_t *mmobjp, msadsc_t *freemsa, uint_t freepgs)
 //mmobjp->内存管理数据结构指针
 //freemsa->释放内存页面对应的首个msadsc_t结构指针
 //freepgs->请求释放的内存页面数
-bool_t mm_merge_pages(memmgrob_t *mmobjp, msadsc_t *freemsa, uint_t freepgs)
-{
-    if (NULL == mmobjp || NULL == freemsa || 1 > freepgs)
-    {
+bool_t mm_merge_pages(memmgrob_t *mmobjp, msadsc_t *freemsa, uint_t freepgs){
+    if (NULL == mmobjp || NULL == freemsa || 1 > freepgs){
         return FALSE;
     }
     //调用释放内存页面的框架函数
     bool_t rets = mm_merpages_fmwk(mmobjp, freemsa, freepgs);
-    if (FALSE == rets)
-    {
+    if (FALSE == rets){
         return FALSE;
     }
     return rets;
@@ -353,15 +337,49 @@ Linux 系统中用来管理物理内存页面的**伙伴系统**，以及负责�
 
 ## Linux代码上的体现
 
-    // 持有task_struct 便可以访问进程在内存中的所有数据
-    struct task_struct {
-        ...
-        struct mm_struct                *mm;
-        struct mm_struct                *active_mm;
-        ...
-        void  *stack;   // 指向内核栈的指针
-    }
+[说出来你可能不信，内核这家伙在内存的使用上给自己开了个小灶](https://zhuanlan.zhihu.com/p/347562875)
+基于伙伴系统管理连续空闲页面：伙伴指的是两个内存块大小相同、地址连续，同属于一个大块区域。free_area 是一个包含11个元素的数组，每一个元素分别代表的是 空闲可分配连续4kb/8kb/16kb...4Mb内存链表。
+```c
+struct zone{
+    free_area free_area[MAX_ORDER];
+    ...
+}
+// alloc_pages到 上述多个链表中寻找可用连续页面
+struct page * alloc_pages(gfp_t gfp_mask,unsigned int order)
+```
 
+### 内核如何使用内存
+
+一个页面大小是4k，对于实际使用的对象来说，有的对象1k多， 有的只有几百甚至几十个字节，如果都直接分配一个4kb的页面来存储的话也太铺张了，所以伙伴系统不能直接使用。在伙伴系统之上，内核又给自己搞了一个专用的内存分配器，叫slab或slub。slab最大的特点是：一个slab内只分配特定大小、甚至是特定的对象。这样当一个对象释放内存后，另一个同类对象可以直接使用这块内存。
+
+```c
+struct kmem_cache{
+    struct kmem_cache_node **node
+    ...
+}
+struct kmem_cache_node{
+    struct list_head slabs_partial;
+    struct list_head slabs_full;
+    struct list_head slabs_free;
+}
+```
+
+![](/public/upload/linux/slab.png)
+每个cache 都有满、半满、空三个链表，每个链表节点都对应一个slab，一个slab由一个或者多个内存页组成。当cache中内存不够的时候，会调用基于伙伴系统的分配器alloc_pages 请求整页连续内存分配。
+内核中会有很多kmem_cache 存在， 它们是在linux初始化，或者是运行的过程中分配出来的，有的专用的，有的通用的。
+![](/public/upload/linux/kmem_cache.png)
+
+### 进程如何使用内存
+```c 
+// 持有task_struct 便可以访问进程在内存中的所有数据
+struct task_struct {
+    ...
+    struct mm_struct                *mm;
+    struct mm_struct                *active_mm;
+    ...
+    void  *stack;   // 指向内核栈的指针
+}
+```
 Linux使用mm_struct来表示进程的地址空间，该描述符表示着进程所有地址空间的信息
 
 ![](/public/upload/linux/linux_virtual_address.png)

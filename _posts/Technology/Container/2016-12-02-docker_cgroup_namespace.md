@@ -117,6 +117,14 @@ struct vfsmount {
 
 Linux 目前提供的八种名称空间里，网络名称空间无疑是隔离内容最多的一种，它为命名空间内的所有进程提供了全套的网络设施，包括独立的设备界面、路由表、ARP 表，IP 地址表、iptables/ebtables 规则、协议栈，等等。
 
+Linux 中每个进程（线程）都是用 task_struct 来表示的。每个 task_struct 都要关联到一个 namespace 对象 nsproxy，而 nsproxy 又包含了 netns。对于网卡设备和 socket 来说，通过自己的成员来直接表明自己的归属。
+
+![](/public/upload/container/netns_struct.png)
+
+网络 namespace 的主要数据结构 struct net 的定义，每一个 netns 中都有一个 loopback_dev，最核心的数据结构是 `struct netns_ipv4 ipv4`，每个 net 下都包含了自己的路由表、iptable 以及内核参数配置等等。
+
+![](/public/upload/container/netns_struct_detail.png)
+
 ## cgroups
 
 [彻底搞懂容器技术的基石： cgroup](https://mp.weixin.qq.com/s/6Ts6-aZDr8qOdnaNUqwTFQ)

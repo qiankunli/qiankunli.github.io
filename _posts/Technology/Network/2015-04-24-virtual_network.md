@@ -40,7 +40,7 @@ tun 和 tap 是一组通用的虚拟驱动程序包，是两个相对独立的�
 
 ### veth
 
-veth和其它的网络设备都一样，一端连接的是内核协议栈。eth0的另一端是物理网络，veth设备是成对出现的，**veth另一端两个设备彼此相连**，一个设备收到协议栈的数据发送请求后，会将数据发送到另一个设备上去。Linux 开始支持网络名空间隔离的同时，也提供了veth，让两个隔离的网络名称空间之间可以互相通信。
+veth和其它的网络设备都一样，一端连接的是内核协议栈。eth0的另一端是物理网络，veth设备是成对出现的，**veth另一端两个设备彼此相连**（内部通过指针相互关联），一个设备收到协议栈的数据发送请求后，会将数据发送到另一个设备上去。Linux 开始支持网络名空间隔离的同时，也提供了veth，让两个隔离的网络名称空间之间可以互相通信。
 
 [手把手带你搞定4大容器网络问题](https://mp.weixin.qq.com/s/2PakMU3NR_tkly6K0HsAlQ)如果我们不能与一个专用的网络堆栈通信，那么它就没那么有用了。veth 设备是虚拟以太网设备。它们可以作为网络命名空间之间的隧道（也可以作为独立的网络设备使用）。虚拟以太网设备总是成对出现：`sudo ip link add veth0 type veth peer name ceth0`。创建后，veth0和ceth0都驻留在主机的网络堆栈（也称为根网络命名空间）上。为了连接根命名空间和netns0命名空间，我们需要将一个设备保留在根命名空间中，并将另一个设备移到netns0中：`sudo ip link set ceth0 netns netns0`。一旦我们打开设备并分配了正确的 IP 地址，任何出现在其中一台设备上的数据包都会立即出现在连接两个命名空间的对端设备上。
 
@@ -140,17 +140,10 @@ A bridge transparently relays traffic between multiple network interfaces. **In 
 	</tr>
 </table>
 
-通俗的说，网桥屏蔽了eth1和eth2的存在。正常情况下，每一个linux 网卡都有一个device or net_device struct.这个struct有一个rx_handler。
+1. 正常情况下，每一个linux 网卡都有一个device or net_device struct，这个struct有一个rx_handler。eth0驱动程序收到数据后，会执行rx_handler，rx_handler会把数据包一包，交给network layer。
+2. 而接入网桥的eth1，在其绑定br0时，其rx_handler会换成br0的rx_handler（不同版本实现不同，总之是bridge会接管该veth的数据接收过程）。等于是eth1网卡的驱动程序拿到数据后，直接执行br0的rx_handler往下走了。所以，eth1本身的ip和mac，network layer已经不知道了，只知道br0。br0的rx_handler会决定将收到的报文转发、丢弃或提交到协议栈上层。如果是转发，从自己连接的所有设备中查找目的设备，调用该设备的发送函数将数据发送出去。
 
-eth0驱动程序收到数据后，会执行rx_handler。rx_handler会把数据包一包，交给network layer。从源码实现就是，接入网桥的eth1，在其绑定br0时，其rx_handler会换成br0的rx_handler。等于是eth1网卡的驱动程序拿到数据后，直接执行br0的rx_handler往下走了。所以，eth1本身的ip和mac，network layer已经不知道了，只知道br0。
-
-br0的rx_handler会决定将收到的报文转发、丢弃或提交到协议栈上层。如果是转发，br0的报文转发在数据链路层，但也会执行一些本来属于network layer的钩子函数。也有一种说法是，网桥处于forwarding状态时，报文必须经过layer3转发。这些细节的确定要通过学习源码来达到，此处先不纠结。
-
-读了上文，应该能明白以下几点。
-
-1. 为什么要给网桥配置ip，或者说创建br0 bridge的同时，还会创建一个br0 iface。
-2. 为什么eth0和eth1在l2,连上br0后，eth1和eth0的连通还要受到iptables rule的控制。
-3. 网桥首先是为了屏蔽eth0和eth1的，其次是才是连通了eth0和eth1。
+![](/public/upload/network/bridge_veth_communication.png)
 
 2018.12.3 补充：一旦一张虚拟网卡被“插”在网桥上，它就会变成该网桥的“从设备”。从设备会被“剥夺”调用网络协议栈处理数据包的资格，从而“降级”成为网桥上的一个端口。而这个端口唯一的作用，就是接收流入的数据包，然后把这些数据包的“生杀大权”（比如转发或者丢弃），全部交给对应的网桥。
 

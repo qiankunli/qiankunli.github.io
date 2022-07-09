@@ -127,6 +127,8 @@ github 案例项目
 1. [QNJR-GROUP/EasyTransaction](https://github.com/QNJR-GROUP/EasyTransaction)
 2. [moonufo/galaxyLight](https://github.com/moonufo/galaxyLight)
 
+[阿里 Seata 新版本终于解决了 TCC 模式的幂等、悬挂和空回滚问题](https://mp.weixin.qq.com/s/nM81BRyQRTWab78a6KTD-g) 未读
+
 ## Saga
 [基于Saga的分布式事务调度落地](https://mp.weixin.qq.com/s/7F0iDvySj8OrluVLdeMzVQ)
 
