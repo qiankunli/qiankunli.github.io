@@ -157,6 +157,8 @@ int * func(void) {
 
 ![](/public/upload/basic/gc_strategy.png)
 
+[垃圾回收：如何避免内存泄露？](https://time.geekbang.org/column/article/465516) 未整理。 
+
 ### 最基本的 mark-and-sweep 算法伪代码
 
 mutator 通过 new 函数来申请内存
