@@ -113,6 +113,8 @@ happens-before规则由两部分组成，一部分是program order，即单线�
 
 ## 进程内存布局
 
+[JVM 的内存布局和 Linux 进程的内存布局有什么关系？它们是一样的吗？](https://time.geekbang.org/column/article/454080) 推荐细读。
+
 [Linux内核基础知识](http://qiankunli.github.io/2019/05/01/linux_kernel_basic.html)进程内存布局
 
 ![](/public/upload/linux/virtual_memory_space.jpg)

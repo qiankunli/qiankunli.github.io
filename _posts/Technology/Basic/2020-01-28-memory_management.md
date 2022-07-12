@@ -13,7 +13,7 @@ keywords: memory management
 * TOC
 {:toc}
 
-[Demystifying memory management in modern programming languages](https://deepu.tech/memory-management-in-programming/)是一个系列，建议细读。
+[Demystifying memory management in modern programming languages](https://deepu.tech/memory-management-in-programming/)是一个系列，建议细读。推荐极客时间教程《编程高手必学的内存知识》
 
 ## 整体描述
 
