@@ -22,7 +22,7 @@ keywords: linux kernel
 
 ![](/public/upload/linux/linux_load_stage.png)
 
-bios ==> bootsect.s ==> setup.s ==> 要和其他全部操作系统代码做链接的 head.s。就是逐渐进入保护模式，并设置分段、分页、中断等机制的地方。最终的内存布局变成了这个样子。
+bios ==> bootsect.s ==> setup.s ==> 要和其他全部操作系统代码做链接的 head.s。就是逐渐进入保护模式，并设置（按功能）分段、（按大小）分页、中断等机制的地方。最终的内存布局变成了这个样子。
 
 ![](/public/upload/linux/linux_load_mem.png)
 

@@ -45,6 +45,7 @@ int run(int code,int a ,int b){
 }
 ```
 上面这个只能解释iadd=0x01字节码的解释器，**第一代jvm就是这么干的**。
+
 ```c++
 // HOTSPOT/src/share/vm/intercepter/bytecodeintercepter.cpp
 BytecodeInterpreter::run(interpreterState istate){
@@ -63,6 +64,8 @@ BytecodeInterpreter::run(interpreterState istate){
 ```
 
 [Java 并发——基石篇（中）](https://www.infoq.cn/article/BpWRQGe-TUUbMmZ5rqtC)Java 程序编译之后，会产生很多字节码指令，每一个字节码指令在 JVM 底层执行的时候又会变成一堆 C 代码，这一堆 C 代码在编译之后又会变成很多的机器指令，这样一来，我们的 java 代码最终到机器指令一层，所产生的机器指令将是指数级的，因此就导致了 Java 执行效率非常低下。
+
+《编程高手必须的内存知识》Java 字节码是一种基于栈的中间格式，每一条字节码的语义都是由 Java 语言规范规定的，不管在什么平台上，模拟栈和变量表这两个数据结构都是相同的。本质上，**字节码就是对模拟栈和变量表不断地进行操作**。这种逐条取出字节码，逐条执行的方式被称为解释执行。对字节码进行解释执行的执行器叫做解释器。解释器的运行效率肯定很差，对于加法操作，C++ 的加法语句会被翻译成加法指令，只需要一条就够了。但是 Java 的加法语句却要经历两次出栈操作、一次加法操作和一次入栈操作。PS： 字节码有点像dsl
 
 ### C 支持动态执行 机器码
 
@@ -109,6 +112,33 @@ int main(int argc, char **argv) {
     return 0;
 }
 ```
+
+《编程高手必须的内存知识》JVM 在运行之初将 class 文件加载进内存，然后就开始解释执行。如果一个函数被执行多次，JVM 就会认为这个函数是一个热点 (hotspot) 函数，然后就将它翻译成机器码执行。
+1. JIT是申请一块既有写权限又有执行权限的内存，然后把你要编译的 Java 方法，翻译成机器码，写入到这块内存里。当再需要调用原来的 Java 方法时，就转向调用这块内存。
+2. 基于采样的编译优化和退优化，下面是一个 C 语言编译器没有办法优化，但是 JIT 编译却能进一步优化的例子。C 编译器无法知道在第 9 行 b 的真实取值是什么。只能严格按照这个函数的逻辑去生成比较，跳转，赋值等等
+
+    ```java
+    public static int test(boolean flag) {
+        int b = 0;
+        if (flag) {
+            b = 3;
+        }
+        else {
+            b = 2;
+        }
+        return b + 4;
+    }
+    ```
+
+    JIT 编译器在开始之前，test 方法是由解释器执行的。解释器一边执行，一边会统计 flag 的取值，这种统计就叫做性能采样（Profiling)。当 JIT 编译器发现，test 方法被调用了 500 次（这个阈值可以以 JVM 参数指定），每一次 flag 的值都是 true，那它就可以合理地猜测，下一次可能还是 true，它就会把 test 方法优化成这个样子：
+
+    ```java
+    public static int test(boolean flag) {
+        if (!flag)
+            deoptimize()    // 由 JIT 编译器退回到解释器进行执行
+        return 7;
+    }
+    ```
 
 ###  class字节码 ==> 机器码
 

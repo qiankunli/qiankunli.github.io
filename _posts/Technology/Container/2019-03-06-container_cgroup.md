@@ -221,6 +221,8 @@ cgroup
 
 ### k8s CPU Qos 问题与解决
 
+[Kubernetes 中 CPU 调度管理的现状与限制](https://mp.weixin.qq.com/s/M0iAujzSelESTITU7quo-g) 提了不少有意思的提案。
+
 [百度混部实践：如何提高 Kubernetes 集群资源利用率？](https://mp.weixin.qq.com/s/12XFN2lPB3grS5FteaF__A) 是一篇很好的讲混部的文章
 为什么原生 Kubernetes 没办法直接解决资源利用率的问题？
 1. 资源使用是动态的，而配额是静态限制。在线业务会根据其使用的峰值去预估 Quota（Request 和 Limit），配额申请之后就不能再修改，但资源用量却是动态的，白天和晚上的用量可能都不一样。
