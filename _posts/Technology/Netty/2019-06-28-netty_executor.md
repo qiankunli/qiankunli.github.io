@@ -54,14 +54,19 @@ SingleThreadEventExecutor 作为一个Executor，实现Executor.execute 方法�
 ## 作业线程
 
 
-
 Runnable + Thread 实现了 logic 和 runner 的分离，runner 又进一步扩展为 executor，与ThreadPerTaskExecutor 中的线程不同，线程复用之后，SingleThreadEventExecutor/ThreadPoolExecutor 中的线程必须改造为拥有task处理逻辑的作业线程。
 
 [从操作系统层面分析Java IO演进之路](https://mp.weixin.qq.com/s/KgJFyEmZApF7l5UUJeWf8Q)work的线程数量，取决于初始化时创建了几个epoll，worker的复用本质上是epoll的复用。work之间为什么要独立使用epoll？为什么不共享？
 1. 为了避免各个worker之间发生争抢连接处理，netty直接做了物理隔离，避免竞争。各个worker只负责处理自己管理的连接，并且后续该worker中的每个client的读写操作完全由 该线程单独处理，天然避免了资源竞争，避免了锁。
 2. worker单线程，性能考虑：worker不仅仅要epoll_wait，还是处理read、write逻辑，加入worker处理了过多的连接，势必造成这部分消耗时间片过多，来不及处理更多连接，性能下降。
 
+NioEventLoop 是对线程、epoll 等概念进行了一个集中的封装。
+1. 首先，EventLoop 本身就是一个线程。看 NioEventLoop 的继承关系就能看出来。NioEventLoop 继承于 SingleThreadEventLoop，而 SingleThreadEventLoop 又继承于 SingleThreadEventExecutor。SingleThreadEventExecutor 实现了在 Netty 中对本地线程的抽象。在 SingleThreadEventExecutor 中不但封装了线程对象 Thread，而且还配置了一个任务队列 taskQueue，用于其它线程向它来放置待处理的任务。
+2. 另外 NioEventLoopEventLoop 以 selector 的名义封装了 epoll
+
 ### 作业线程的逻辑——取任务并执行
+
+当 worker 线程起来以后，会进入线程循环，在循环中会遍历自己的任务队列，如果没有任务可处理，便 select 来观察自己所负责的 channel 上是否有事件发生。worker 线程会调用 select 发现自己所管理的所有子 channel 上的可读可写事件。在发现有可读事件后，会调用 processSelectedKeys，最后触发 pipeline 使得 EchoServerHandler 方法开始执行。
 
 ThreadPoolExecutor 的作业逻辑 由Worker 定义
 

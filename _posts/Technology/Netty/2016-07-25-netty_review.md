@@ -48,9 +48,9 @@ Java 的标准类库，由于其基础性、通用性的定位，往往过于关
 2. 事件调度层：它的核心组件包含 EventLoopGroup、EventLoop。——EventLoop 本质是一个线程池，主要负责接收 Socket I/O 请求，并分配事件循环器来处理连接生命周期中所发生的各种事件。
 3. 服务编排层：它的职责实现网络事件的动态编排和有序传播——ChannelPipeline 基于责任链模式，方便业务逻辑的拦截和扩展；本质上它是一个双向链表将不同的 ChannelHandler 链接在一块，当 I/O 读写事件发生时, 会依次调用 ChannelHandler 对 Channel(Socket) 读取的数据进行处理。
 
-
-
 ## channel
+
+Channel 是 JavaNIO 里的一个概念。大家把它理解成 socket，以及在 socket 之上的一系列操作方法的封装就可以了。另外在 Java 中，习惯把 listen socket 叫做父 channel，客户端握手请求到达以后创建出来的新连接叫做子 channel，方便区分。
 
 netty channel: A nexus to a network socket or a component which is capable of I/O operations such as read, write, connect, and bind.
 
@@ -73,11 +73,11 @@ AbstractChannel{
     
 ## pipeline
 
-filter能够**以声明的方式**插入到http请求响应的处理过程中。
+在每个 Channel 对象的内部，除了封装了 socket 以外，还都一个特殊的数据结构 DefaultChannelPipeline pipeline。在这个 pipeline 里是各种时机里注册的 handler。Channel 上的读写操作都会走到这个 DefaultChannelPipeline 中，当 channel 上完成 register、active、read、readComplete 等操作时，会触发 pipeline 中的相应方法。
 
 inbound事件通常由io线程触发，outbound事件通常由用户主动发起。
 
-ChannelPipeline的代码相对比较简单，**内部维护了一个ChannelHandler的容器和迭代器**（pipeline模式都是如此），可以方便的进行ChannelHandler的增删改查。
+ChannelPipeline的代码相对比较简单，**内部维护了一个ChannelHandler的容器和迭代器**（pipeline模式都是如此），可以方便的进行ChannelHandler的增删改查。其实就是一个双向链表，以及链表上的各式各样的操作方法。
 
 1. ChannelPipeline
 2. DefaultChannelPipeline

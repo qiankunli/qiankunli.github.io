@@ -13,12 +13,13 @@ keywords: JAVA netty
 到目前为止，笔者关于netty写了十几篇博客，内容非常零碎，笔者一直想着有一个总纲的东西来作为主干，将这些零碎place it in context。所以梳理了一张图，从上往下“俯视”看，netty有哪些东西?
 
 
-为什么很多人会觉得学习netty代码比较难（这也是笔者最初的感受）？**因为对于大部分人来说，是先接触了netty，才第一次接触nio、同步操作异步化 等技术/套路，除了要理解netty代码本身的抽象之外，还需理解很多新概念。**
+为什么很多人会觉得学习netty代码比较难（这也是笔者最初的感受）？**因为对于大部分人来说，是先接触了netty，才第一次接触nio、同步操作异步化 等技术/套路，除了要理解netty代码本身的抽象之外，还需理解很多新概念。**，此外，相比 C/C++ ，Java 的封装程度比较高。Java 语言本身的 JVM 中 NIO 对网络的封装就已经屏蔽了很多底层的概念了，再加上 Netty 又封装了一层，所以 Java 开发者常用的一些术语和概念和其它语言出入很大。
 
 ![](/public/upload/netty/learn_netty.png)
 
 可以和go 版本的netty 对比着看 [Go 语言网络库 getty 的那些事](https://mp.weixin.qq.com/s/z22k-E2ybjAMNtxzj5Aikw) 未读完
 
+[剖析Netty内部网络实现原理](https://mp.weixin.qq.com/s/DS52g3bibU9kNH75UFxGqA) 很经典
 
 ## 三个基本的技术点
 
