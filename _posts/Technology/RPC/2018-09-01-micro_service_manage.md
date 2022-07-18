@@ -303,6 +303,37 @@ class GenericService {
 1. 安全保证：服务提供方收到请求后，不知道这次请求是哪个调用方发起的，没法判断这次请求是属于之前打过招呼的调用方还是没有打过招呼的调用方，所以也就没法选择拒绝这次请求还是继续执行。我们需要给每个调用方设定一个唯一的身份，每个调用方在调用之前都先来服务提供方这登记下身份，只有登记过的调用方才能继续放行，没有登记过的调用方一律拒绝。HMAC 就是其中一种具体实现。服务提供方应用里面放一个用于 HMAC 签名的私钥，在授权平台上用这个私钥为申请调用的调用方应用进行签名，这个签名生成的串就变成了调用方唯一的身份。服务提供方在收到调用方的授权请求之后，我们只要需要验证下这个签名跟调用方应用信息是否对应得上就行了，这样集中式授权的瓶颈也就不存在了。
 2. 快速定位问题：在 RPC 框架打印的异常信息中，是包括定位异常所需要的异常信息的，比如是哪类异常引起的问题（如序列化问题或网络超时问题），是调用端还是服务端出现的异常，调用端与服务端的 IP 是什么，以及服务接口与服务分组都是什么等等。一款优秀的 RPC 框架**要对异常进行详细地封装**，还要对各类异常进行分类，每类异常都要有明确的异常标识码，并整理成一份简明的文档。并且异常信息中要包含排查问题时所需要的重要信息，比如服务接口名、服务分组、调用端与服务端的 IP，以及产生异常的原因。总之就是，要让使用方在复杂的分布式应用系统中，根据异常信息快速地定位到问题。
 3. 分布式链路跟踪，分布式链路跟踪就是将一次分布式请求还原为一个完整的调用链路，我们可以在整个调用链路中跟踪到这一次分布式请求的每一个环节的调用情况，比如调用是否成功，返回什么异常，调用的哪个服务节点以及请求耗时等等。这样如果我们发现服务调用出现问题，通过这个方法，我们就能快速定位问题，**哪怕是多个部门合作，也可以一步到位**。RPC 在整合分布式链路跟踪需要做的最核心的两件事就是“埋点”和“传递”。
+4. 全链路灰度 [全链路灰度在数据库上我们是怎么做的？](https://mp.weixin.qq.com/s/GDWkSbHR5WctQa6d5EDi3w) 挺好玩的
+    1. 给流量打标：
+        ```yaml
+        apiVersion: traffic.opensergo.io/v1alpha1
+        kind: TrafficLabelRule
+        metadata:
+        name: my-traffic-label-rule
+        labels:
+            app: spring-cloud-zuul
+        spec:
+        selector:
+            app: spring-cloud-zuul
+        trafficLabel: gray
+        match:
+        - condition: "=="    # 匹配表达式
+            type: header       # 匹配属性类型
+            key: 'location'   # 参数名
+            value: cn-shenzhen       # 参数值
+        ```
+    2. 给 Workload 打标签：
+        ```
+        apiVersion: traffic.opensergo.io/v1alpha1
+        kind: WorkloadLabelRule
+        metadata:
+        name: gray-sts-label-rule
+        spec:
+        workloadLabels: ['gray']
+        selector:
+            db: mse-demo
+            table: mse_demo_table_gray
+        ```
 
 对公司内rpc的观察：
 

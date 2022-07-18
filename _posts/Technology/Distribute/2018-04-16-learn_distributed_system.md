@@ -68,6 +68,8 @@ keywords: 分布式系统
     ![](/public/upload/distribute/cipu_overview.png)
 2. **CIPU 位于网络和存储必经之路**，一方面把存储和计算进行了存算分离，能在芯片层面直接支持存储设备的硬件虚拟化。不需要CPU的介入，存储设备的性能也能大幅提升。CIPU还支持多个节点之间通过NVMe协议共享云盘块存储，更好的实现存储资源的池化。
 
+[分布式系统设计模式](https://mp.weixin.qq.com/s/sSwXgrHvQcjSuiy9bA8d_g)
+
 ### 不要沉迷与具体的算法
 
 [distributed-systems-theory-for-the-distributed-systems-engineer](http://the-paper-trail.org/blog/distributed-systems-theory-for-the-distributed-systems-engineer/) 文中提到：
