@@ -111,7 +111,6 @@ keywords: memory management
 
 ## 内存回收/gc
 
-
 ```c
 int * func(void) {
     int num = 1234;

@@ -147,7 +147,7 @@ A bridge transparently relays traffic between multiple network interfaces. **In 
 
 2018.12.3 补充：一旦一张虚拟网卡被“插”在网桥上，它就会变成该网桥的“从设备”。从设备会被“剥夺”调用网络协议栈处理数据包的资格，从而“降级”成为网桥上的一个端口。而这个端口唯一的作用，就是接收流入的数据包，然后把这些数据包的“生杀大权”（比如转发或者丢弃），全部交给对应的网桥。
 
-## vlan
+## （交换机的）vlan
 
 [VLAN是二层技术还是三层技术-车小胖的回答知乎](https://www.zhihu.com/question/52278720/answer/140914508)先用生活里的例子来比喻一下什么是VLAN，以及VLAN解决哪些问题。在魔都中心城区，经常有一些大房子被用来群租，有时大客厅也会放几张床用于出租，睡在客厅里的人肯定不爽的，因为有打呼噜的、有磨牙的、有梦游的、有说梦话的，一地鸡毛。为了克服以上的互相干扰，房东将客厅改造成若干个小房间，小房间还有门锁，这样每个房间就有了自己的私密空间，又可以有一定的安全性，至少贵重的物品可以放在房间里不怕别人拿错了。
 
@@ -161,12 +161,22 @@ A bridge transparently relays traffic between multiple network interfaces. **In 
 
 ### vlan 划分
 
-1. 常用的 VLAN 划分方式是通过端口进行划分，虽然这种划分 VLAN 的方式设置比较很简单， 但仅适用于终端设备物理位置比较固定的组网环境。随着移动办公的普及，终端设备可能不 再通过固定端口接入交换机，这就会增加网络管理的工作量。比如，一个用户可能本次接入 交换机的端口 1，而下一次接入交换机的端口 2，由于端口 1 和端口 2 属于不同的 VLAN，若 用户想要接入原来的 VLAN 中，网管就必须重新对交换机进行配置。显然，这种划分方式不 适合那些需要频繁改变拓扑结构的网络。
+交换机端口类型
+1. Access，只能属于1个VLAN， 比如`port default vlan vlan-id`，将Access端口加入到指定的VLAN中。它缺省VLAN ID就是它所在VLAN。
+	1. Acess端口收报文，收到报文判断是否有VLAN信息，如果没有则打上PVID并进行交换转发；如果有，则丢弃。
+	2. Acess端口发报文，报文VLAN信息被剥离直接发送出去。
+2. Trunk，可以允许多个VLAN通过，可以接收和发送多个VLAN 报文，所以需要设置缺省VLAN ID/PVID。
+	1. Trunk端口接收报文，如果没有则打上端口的PVID，并进行交换转发。如果有则判断该Trunk端口是否允许该VLAN的数据进入：如果允许则转发，如果不允许则丢弃
+	2. Trunk端口发送报文，比较端口的PVID和将要发送报文的VLAN信息，如果两者相等则剥离VLAN信息，再发送；如果不相等则直接发送
+3. Hybrid，可以允许多个VLAN通过，可以接收和发送多个VLAN 报文。
+
+交换机内部在处理数据包时，所有的数据包一定是打上VLAN tag的，交换机在接收到帧后，会根据对应端口类型采取相应的数据收、发处理。如果帧需要通过另一台交换机转发，则该帧必须通过干道链路透传到对端交换设备上。为了保证其它交换设备能够正确处理帧中的VLAN信息，在干道链路上传输的帧必须都打上了VLAN标签。当交换机最终确定帧出端口后，在将帧发送给主机前需要将VLAN标签从帧中删除，这样主机接收到的帧都是不带VLAN标签的以太网帧，也只有这样主机才可能识别。所以一般情况下，**干道链路上传输的都是带VLAN标签的帧，接入链路上传送到的都是不带VLAN标签帧**。这样处理的好处是：网络中配置的VLAN信息可以被所有交换设备正确处理，而主机不需要了解VLAN信息。
+
+1. 常用的 VLAN 划分方式是通过端口进行划分，虽然这种划分 VLAN 的方式设置比较很简单， 但仅适用于终端设备物理位置比较固定的组网环境。随着移动办公的普及，终端设备可能不再通过固定端口接入交换机，这就会增加网络管理的工作量。比如，一个用户可能本次接入 交换机的端口 1，而下一次接入交换机的端口 2，由于端口 1 和端口 2 属于不同的 VLAN，若 用户想要接入原来的 VLAN 中，网管就必须重新对交换机进行配置。显然，这种划分方式不 适合那些需要频繁改变拓扑结构的网络。
 2. 而 MAC VLAN 则可以有效解决这个问题，它根据 终端设备的 MAC 地址来划分 VLAN。这样，即使用户改变了接入端口，也仍然处在原 VLAN 中。**注意，这种称为mac based vlan，跟macvlan还不是一个意思**
+3. 基于ip地址 划分vlan
 
-在交换机上配置了IMP(ip-mac-port映射)功能以后，交换机会检查每个数据包的源IP地址和MAC，对于没有在交换机内记录的IP和MAC地址的计算机所发出的数据包都会被交换机所阻止。ip-mac-port映射静态设置比较麻烦，可以开启交换机上面的DHCP SNOOPING功能， DHCP Snooping可以自动的学习IP和MAC以及端口的配对，并将学习到的对应关系保存到交换机的本地数据库中。
-
-默认情况下，交换机上每个端口只允许绑定一个IP-MAC条目，所以在使用docker macvlan时要打开这样的限制。
+在交换机上配置了IMP(ip-mac-port映射)功能以后，交换机会检查每个数据包的源IP地址和MAC，对于没有在交换机内记录的IP和MAC地址的计算机所发出的数据包都会被交换机所阻止。ip-mac-port映射静态设置比较麻烦，可以开启交换机上面的DHCP SNOOPING功能， DHCP Snooping可以自动的学习IP和MAC以及端口的配对，并将学习到的对应关系保存到交换机的本地数据库中。默认情况下，交换机上每个端口只允许绑定一个IP-MAC条目，所以在使用docker macvlan时要打开这样的限制。
 
 ### 为何要一个VLAN一个网段？
 
@@ -194,7 +204,6 @@ A bridge transparently relays traffic between multiple network interfaces. **In 
 两个 VLAN 之间位于独立的广播域，是完全二层隔离的，要通信就只能通过三层设备。假设位于 VLAN-A 中的主机 A1，希望把数据包发送给 VLAN-B 中的主机 B2，由于 A、B 两个 VLAN 之间二层链路不通，因此引入了单臂路由。单臂路由不属于任何 VLAN，它与交换机之间的链路允许任何 VLAN ID 的数据包通过，这种接口被称为 TRUNK。这样，A1 要和 B2 通信，A1 就把数据包先发送给路由（只需把路由设置为网关即可做到），然后路由根据数据包上的 IP 地址得知 B2 的位置，去掉 VLAN-A 的 VLAN Tag，改用 VLAN-B 的 VLAN Tag 重新封装数据包后，发回给交换机，交换机收到后就可以顺利转发给 B2 了。由于 A1、B2 各自处于独立的网段上，它们又各自要把同一个路由作为网关使用，这就要求路由器必须同时具备 192.168.1.0/24 和 192.168.2.0/24 的 IP 地址。当然，如果真的就只有 VLAN-A、VLAN-B 两个 VLAN，那把路由器上的两个接口分别设置不同的 IP 地址，然后用两条网线分别连接到交换机上，也勉强算是一个解决办法。但要知道，VLAN 最多可以支持 4096 个 VLAN，那如果要接四千多条网线就太离谱了。因此为了解决这个问题，802.1Q 规范中专门定义了子接口（Sub-Interface）的概念，它的作用是允许在同一张物理网卡上，针对不同的 VLAN 绑定不同的 IP 地址。
 
 ![](/public/upload/network/vlan_sub_interface.png)
-
 
 ## vxlan
 
@@ -236,6 +245,7 @@ MACVLAN 借用了 VLAN 子接口的思路，并且在这个基础上更进一步
 采用Macvlan网络模式之后，容器里面的网络协议栈和宿主机是完全独立。这就导致容器不能使用宿主机的iptables规则从而容器里面无法通过ClusterIP去访问Service。
 
 ### 与 mac based vlan 区别
+
 要跟mac based vlan 有所区分，参见[虚拟网络](http://qiankunli.github.io/2015/04/24/virtual_network.html)。
 
 Macvlan, MACVLAN or MAC-VLAN allows you to configure multiple Layer 2 (i.e. Ethernet MAC) addresses **on a single physical interface**. Macvlan allows you to configure sub-interfaces (also termed slave devices) of a parent, physical Ethernet interface (also termed upper device), each with its own unique (randomly generated) MAC address, and consequently its own IP address. Applications, VMs and containers can then bind to a specific sub-interface to connect directly to the physical network, using their own MAC and IP address. 基于物理机网卡 physical interface 创建多个 sub-interface，拥有自己的MAC and IP ，直接接入physical network。
@@ -292,6 +302,66 @@ static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev){
     return dev_queue_xmit(skb);
 }
 ```
+
+## vlan/macvlan/ipvlan
+
+[从 VLAN 到 IPVLAN: 聊聊虚拟网络设备及其在云原生中的应用](https://mp.weixin.qq.com/s/eGLvJHW5AbQx7KqynSIpLw)
+1. VLAN全称是 Virtual Local Area Network，用于在以太网中隔离不同的广播域。它诞生的时间很早，1995 年，IEEE 就发表了 802.1Q 标准定义了在以太网数据帧中 VLAN 的格式，并且沿用至今。VLAN 原本和 bridge 一样是一个交换机上的概念，不过 Linux 将它们都进行了软件的实现。Linux 在每个以太网数据帧中使用一个 16bit 的 vlan_proto 字段和 16bit 的 vlan_tci 字段实现 802.1q 协议，同时对于每一个 VLAN，都会虚拟出一个子设备来处理去除 VLAN 之后的报文，没错 VLAN 也有属于自己的子设备，即 VLAN sub-interface，不同的 VLAN 子设备通过一个主设备进行物理上的报文收发。
+1. 内核对网络设备的抽象（无论是真实的还是虚拟的）
+	1. 内核会对每一类网络设备抽象出一个专门响应 netlink 消息的结构体，它们都按照 rtnl_link_ops 结构来实现，用于响应对网络设备的创建，销毁和修改。例如比较直观的 Veth 设备：
+		```C
+		static struct rtnl_link_ops veth_link_ops = {
+			.kind   = DRV_NAME,
+			.priv_size  = sizeof(struct veth_priv),
+			.setup    = veth_setup,
+			.validate = veth_validate,
+			.newlink  = veth_newlink,
+			.dellink  = veth_dellink,
+			.policy   = veth_policy,
+			.maxtype  = VETH_INFO_MAX,
+			.get_link_net = veth_get_link_net,
+			.get_num_tx_queues  = veth_get_num_queues,
+			.get_num_rx_queues  = veth_get_num_queues,
+		};
+		```
+
+	2. 对于一个网络设备来说，Linux 的操作和硬件设备的响应本身也需要一套规范，Linux 将其抽象为 net_device_ops 这个结构体。依然以 Veth 设备为例：
+		```C
+		static const struct net_device_ops veth_netdev_ops = {
+			.ndo_init            = veth_dev_init,
+			.ndo_open            = veth_open,
+			.ndo_stop            = veth_close,
+			.ndo_start_xmit      = veth_xmit,		// 发送数据包
+			.ndo_get_stats64     = veth_get_stats64,
+			.ndo_set_rx_mode     = veth_set_multicast_list,
+			.ndo_set_mac_address = eth_mac_addr,
+			#ifdef CONFIG_NET_POLL_CONTROLLER
+			.ndo_poll_controller  = veth_poll_controller,
+			#endif
+			.ndo_get_iflink   = veth_get_iflink,
+			.ndo_fix_features = veth_fix_features,
+			.ndo_set_features = veth_set_features,
+			.ndo_features_check = passthru_features_check,
+			.ndo_set_rx_headroom  = veth_set_rx_headroom,
+			.ndo_bpf    = veth_xdp,
+			.ndo_xdp_xmit   = veth_ndo_xdp_xmit,
+			.ndo_get_peer_dev = veth_peer_dev,
+		};
+		```
+
+1. 对于接收数据包，Linux 的收包动作并不是由各个进程自己去完成的，而是由 ksoftirqd 内核线程负责了从驱动接收、网络层（ip，iptables）、传输层（tcp，udp）的处理，最终放到用户进程持有的 Socket 的 recv 缓冲区中，然后由内核 inotify 用户进程处理。对于虚拟设备来说，所有的差异集中于网络层之前，在这里有一个统一的入口，即__netif_receive_skb_core。__netif_receive_skb_core ==> xx(将 VLAN 信息从数据包中提取等) ==> vlan_do_receive ==> another_round 重新按照正常数据包的流程执行一次__netif_receive_skb_core，按照正常包的处理逻辑进入，进入了 rx_handler 的处理，就像一个正常的数据包一样，在子设备上通过与主设备相同的 rx_handler 进入到网络层。
+
+	![](/public/upload/network/vlan_sub_interface_receive.png)
+2. VLAN 子设备的数据发送的入口是 vlan_dev_hard_start_xmit，在硬件发送时，VLAN 子设备会进入 vlan_dev_hard_start_xmit 方法，这个方法实现了 ndo_start_xmit 接口，它通过__vlan_hwaccel_put_tag 方法填充 VLAN 相关的以太网信息到报文中，然后修改了报文的设备为主设备，调用主设备的 dev_queue_xmit 方法重新进入主设备的发送队列进行发送
+
+	![](/public/upload/network/vlan_sub_interface_send.png)
+3. **macvlan 和 ipvlan 也有上述的类似的结构体和方法**。VLAN 子设备和 MACVlan，IPVlan 的核心逻辑很相似：
+	1. 主设备负责物理上的收发包。
+	2. 主设备将子设备管理为多个 port，然后根据一定的规则找到 port，比如 VLAN 信息，mac 地址以及 ip 地址（macvlan_hash_lookup，vlan_find_dev，ipvlan_addr_lookup）。
+	3. 主设备收包后，都需要经过在__netif_receive_skb_core 中走一段“回头路”.
+	4. 子设备**发包**最终都是直接通过修改报文的 dev，然后让主设备去操作。
+
+我们为什么要虚拟网络呢？这个问题有很多答案，但是和云计算的价值一样，虚拟网络作为云计算的一项基础技术，它们最终都是为了资源利用效率的提升。MACVlan 和 IPVlan 就是服务了这个最终目的，从虚拟化到容器化，时代对**网络密度**提出了越来越高的要求，伴随着容器技术的诞生，首先是 veth 走上舞台，但是密度够了，**还要性能的高效**，MACVlan 和 IPVlan 通过子设备提升密度并保证高效的方式应运而生。
 
 ## 其它
 
