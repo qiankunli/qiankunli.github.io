@@ -185,3 +185,25 @@ chain.doFilter 就是一个内部递归，只是分散在了两个对象上执�
 	    at org.apache.catalina.core.StandardHostValve.throwable(StandardHostValve.java:378)  
 
 	客户端tcp 连接关闭时，服务端会有大量的CLOSE_WAIT 状态的连接，检查服务端CLOSE_WAIT 连接数 也是定位问题的手段之一。
+
+## 其它
+
+[千万不要把 Request 传递到异步线程里面！有坑！](https://mp.weixin.qq.com/s/v6RDLm5GV_Z5Ss_cS3R8eA)
+2. 容器通常会 recycle 请求对象，以避免创建请求对象的性能开销。
+1. 每个 request 对象只在 servlet 的服务方法的范围内有效，或者在过滤器的 doFilter 方法的范围内有效。除非异步处理功能被启用，并且在 request 上调用了 startAsync 方法，此时request 对象的生命周期一直会延续到在 AsyncContext 上调用 complete 方法之前。此外，调用 complete 方法之后 response 流才会关闭。
+	```
+	if (调用过 request 的 startAsync 方法) {
+		先不回收
+	}
+	```
+	异步的正确打开方式
+	```
+	AsyncContext asyncContext = request.startAsync(request,response)
+	new Thread(()->{
+		...
+		PrintWriter out = response.getWriter()
+		out.xx
+		out.flush()
+		asyncContext.complete()
+	}).start()
+	```

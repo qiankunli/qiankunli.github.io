@@ -14,6 +14,10 @@ keywords: virtual network
 * TOC
 {:toc}
 
+[Macvlan和IPvlan基础知识](https://mp.weixin.qq.com/s/r_CuqjypaaMRDZfW-RHjxw)运行裸机服务器时，主机网络可以很简单，只需很少的以太网接口和提供外部连接的默认网关。但当我们在一个主机中运行多个虚拟机时，需要在主机内和跨主机之间提供虚拟机之间的连接。一般，单个主机中的VM数量不超过15-20个。但在一台主机上运行Containers时，单个主机上的Containers数量很容易超过100个，需要有成熟的机制来实现Containers之间的网络互联。概括地说，容器或虚拟机之间有两种通信方式。在底层网络方法中，虚拟机或容器直接暴露给主机网络，Bridge、macvlan和ipvlan网络驱动程序都可以做到。在Overlay网络方法中，容器或VM网络和底层网络之间存在额外的封装形式，如VXLAN、NVGRE等。
+
+**我们为什么要虚拟网络呢？**这个问题有很多答案，但是和云计算的价值一样，虚拟网络作为云计算的一项基础技术，它们最终都是为了资源利用效率的提升。MACVlan 和 IPVlan 就是服务了这个最终目的，从虚拟化到容器化，时代对**网络密度**提出了越来越高的要求，伴随着容器技术的诞生，首先是 veth 走上舞台，但是密度够了，**还要性能的高效**，MACVlan 和 IPVlan 通过子设备提升密度并保证高效的方式应运而生。
+
 [Linux虚拟网络技术学习](https://mp.weixin.qq.com/s/2PYds2LDie7W5sXYi1qwew)在Linux虚拟化技术中，网络层面，通常重要的三个技术分别是Network Namespace、veth pair、以及网桥或虚拟交换机技术。
 
 1. 对于每个 Network Namespace 来说，它会有自己独立的网卡、路由表、ARP 表、iptables 等和网络相关的资源。ip命令提供了`ip netns exec`子命令可以在对应的 Network Namespace 中执行命令。PS： 也就是`ip netns exec` 操作网卡、路由表、ARP表、iptables 等。也可以打开一个shell ，后面所有的命令都在这个Network Namespace中执行，好处是不用每次执行命令时都要带上ip netns exec ，缺点是我们无法清楚知道自己当前所在的shell，容易混淆。
@@ -29,12 +33,16 @@ keywords: virtual network
 常见 PCIe 设备中，最适合 虚拟化 的就是网卡了: 一或多对 TX/RX queue + 一或多个中断，结合上一个 Routing ID，就可以抽象为一个 VF。而且它是近乎无状态的。
 
 ### tun/tap
+[一文读懂网络虚拟化之 tun/tap 网络设备](https://mp.weixin.qq.com/s/bGY7BJdIz3SE491SclKRMQ)tun 和 tap 是一组通用的虚拟驱动程序包，是两个相对独立的虚拟网络设备
+1. tun 模式 与 tap 模式。其中 tap 模拟了以太网设备，操作二层数据包（以太帧），tun 则是模拟了网络层设备，操作三层数据包（IP 报文）。
+2. 它和物理设备eth0的差别，它们的一端虽然都连着协议栈，但另一端不一样，eth0的另一端是物理网络，这个物理网络可能就是一个交换机，**而tun0的另一端是一个用户层的程序**。
+3. 使用 tun/tap 设备的目的，其实是为了把来自协议栈的数据包，先交给某个打开了`/dev/net/tun`字符设备的用户进程处理后，再把数据包重新发回到链路中。如此一来，只要**协议栈中的数据包能被用户态程序截获并加工处理**，程序员就有足够的舞台空间去玩出各种花样，比如数据压缩、流量加密、透明代理等功能，都能够在此基础上实现。PS：有点类似于FUSE 用户态实现文件系统
 
-tun 和 tap 是一组通用的虚拟驱动程序包，是两个相对独立的虚拟网络设备，其中 tap 模拟了以太网设备，操作二层数据包（以太帧），tun 则是模拟了网络层设备，操作三层数据包（IP 报文）。它和物理设备eth0的差别，它们的一端虽然都连着协议栈，但另一端不一样，eth0的另一端是物理网络，这个物理网络可能就是一个交换机，**而tun0的另一端是一个用户层的程序**。使用 tun/tap 设备的目的，其实是为了把来自协议栈的数据包，先交给某个打开了/dev/net/tun字符设备的用户进程处理后，再把数据包重新发回到链路中。如此一来，只要协议栈中的数据包能被用户态程序截获并加工处理，程序员就有足够的舞台空间去玩出各种花样，比如数据压缩、流量加密、透明代理等功能，都能够在此基础上实现。PS：有点类似于FUSE 用户态实现文件系统
-
-![](/public/upload/network/tun_vpn.png)
+![](/public/upload/network/tun_tap.png)
 
 以最典型的 VPN 应用程序为例，应用程序通过 tun 设备对外发送数据包后，tun 设备如果发现另一端的字符设备已经被 VPN 程序打开（这就是一端连接着网络协议栈，另一端连接着用户态程序），就会把数据包通过字符设备发送给 VPN 程序，VPN 收到数据包，会修改后再重新封装成新报文，比如数据包原本是发送给 A 地址的，VPN 把整个包进行加密，然后作为报文体，封装到另一个发送给 B 地址的新数据包当中。
+
+![](/public/upload/network/tun_vpn.png)
 
 不过，使用 tun/tap 设备来传输数据需要经过两次协议栈，所以会不可避免地产生一定的性能损耗，因而如果条件允许，容器对容器的直接通信并不会把 tun/tap 作为首选方案，而是一般基于 veth 来实现的。但 tun/tap 并没有像 veth 那样，有要求设备成对出现、数据要原样传输的限制，数据包到了用户态程序后，我们就有完全掌控的权力，要进行哪些修改、要发送到什么地方，都可以通过编写代码去实现，所以 tun/tap 方案比起 veth 方案有更广泛的适用范围。
 
@@ -230,6 +238,8 @@ VLAN 有两个明显的缺陷
 
 ## macvlan 
 
+macvlan模式是从一个物理网卡虚拟出多个虚拟网络接口，每个虚拟的接口都有单独的mac地址，可以给这些虚拟接口配置IP地址，在bridge模式下，父接口作为交换机来完成子接口间的通信，子接口可以通过父接口访问外网；
+
 MACVLAN 借用了 VLAN 子接口的思路，并且在这个基础上更进一步，不仅允许对同一个网卡设置多个 IP 地址，还允许对同一张网卡上设置多个 MAC 地址，这也是 MACVLAN 名字的由来。原本 MAC 地址是网卡接口的“身份证”，应该是严格的一对一关系，而 MACVLAN 打破了这层关系。方法就是在物理设备之上、网络栈之下生成多个虚拟的 Device，每个 Device 都有一个 MAC 地址，新增 Device 的操作本质上相当于在系统内核中，注册了一个收发特定数据包的回调函数，每个回调函数都能对一个 MAC 地址的数据包进行响应，当物理设备收到数据包时，会先根据 MAC 地址进行一次判断，确定交给哪个 Device 来处理，如下图所示。
 
 ![](/public/upload/network/macvlan.png)
@@ -277,7 +287,12 @@ Docker macvlan driver automagically creates host sub interfaces when you create 
 
 ## ipvlan
 
-ipvlan 的虚拟网络接口是和物理网络接口共享同一个 mac 地址。
+与macvlan类似，ipvlan也是在一个物理网卡上虚拟出多个子接口，与macvlan不同的是，ipvlan的每一个子接口的mac地址是一样的，IP地址不同；ipvlan支持L2和L3模式。
+1. ipvlan L2 模式和 macvlan bridge 模式工作原理很相似，父接口作为交换机来转发子接口的数据。同一个网络的子接口可以通过父接口来转发数据，而如果想发送到其他网络，报文则会通过父接口的路由转发出去。
+2. L3 模式下，ipvlan 有点像路由器的功能，它在各个虚拟网络和主机网络之间进行不同网络报文的路由转发工作。只要父接口相同，即使虚拟机/容器不在同一个网络，也可以互相 ping 通对方，因为 ipvlan 会在中间做报文的转发工作。L3 模式下的虚拟接口不会接收到多播或者广播的报文，为什么呢？这个模式下，所有的网络都会发送给父接口，所有的 ARP 过程或者其他多播报文都是在底层的父接口完成的。
+
+需要注意的是：外部网络默认情况下是不知道 ipvlan 虚拟出来的网络的，如果不在外部路由器上配置好对应的路由规则，ipvlan 的网络是不能被外部直接访问的。
+
 
 为容器手动配置上 ipvlan 的网络接口
 ```
@@ -352,7 +367,7 @@ static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev){
 1. 对于接收数据包，Linux 的收包动作并不是由各个进程自己去完成的，而是由 ksoftirqd 内核线程负责了从驱动接收、网络层（ip，iptables）、传输层（tcp，udp）的处理，最终放到用户进程持有的 Socket 的 recv 缓冲区中，然后由内核 inotify 用户进程处理。对于虚拟设备来说，所有的差异集中于网络层之前，在这里有一个统一的入口，即__netif_receive_skb_core。__netif_receive_skb_core ==> xx(将 VLAN 信息从数据包中提取等) ==> vlan_do_receive ==> another_round 重新按照正常数据包的流程执行一次__netif_receive_skb_core，按照正常包的处理逻辑进入，进入了 rx_handler 的处理，就像一个正常的数据包一样，在子设备上通过与主设备相同的 rx_handler 进入到网络层。
 
 	![](/public/upload/network/vlan_sub_interface_receive.png)
-2. VLAN 子设备的数据发送的入口是 vlan_dev_hard_start_xmit，在硬件发送时，VLAN 子设备会进入 vlan_dev_hard_start_xmit 方法，这个方法实现了 ndo_start_xmit 接口，它通过__vlan_hwaccel_put_tag 方法填充 VLAN 相关的以太网信息到报文中，然后修改了报文的设备为主设备，调用主设备的 dev_queue_xmit 方法重新进入主设备的发送队列进行发送
+2. VLAN 子设备的数据发送的入口是 vlan_dev_hard_start_xmit，在硬件发送时，VLAN 子设备会进入 vlan_dev_hard_start_xmit 方法，这个方法实现了 ndo_start_xmit 接口，它通过__vlan_hwaccel_put_tag 方法填充 VLAN 相关的以太网信息到报文中，然后**修改了报文的设备为主设备**，调用主设备的 dev_queue_xmit 方法重新进入主设备的发送队列进行发送
 
 	![](/public/upload/network/vlan_sub_interface_send.png)
 3. **macvlan 和 ipvlan 也有上述的类似的结构体和方法**。VLAN 子设备和 MACVlan，IPVlan 的核心逻辑很相似：
@@ -361,7 +376,13 @@ static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev){
 	3. 主设备收包后，都需要经过在__netif_receive_skb_core 中走一段“回头路”.
 	4. 子设备**发包**最终都是直接通过修改报文的 dev，然后让主设备去操作。
 
-我们为什么要虚拟网络呢？这个问题有很多答案，但是和云计算的价值一样，虚拟网络作为云计算的一项基础技术，它们最终都是为了资源利用效率的提升。MACVlan 和 IPVlan 就是服务了这个最终目的，从虚拟化到容器化，时代对**网络密度**提出了越来越高的要求，伴随着容器技术的诞生，首先是 veth 走上舞台，但是密度够了，**还要性能的高效**，MACVlan 和 IPVlan 通过子设备提升密度并保证高效的方式应运而生。
+
+[Macvlan和IPvlan基础知识](https://mp.weixin.qq.com/s/r_CuqjypaaMRDZfW-RHjxw)
+1. 使用Bridge时，必须需要使用NAT进行外部连接。
+1. 对于vlan子接口，每个子接口使用vlan属于不同的L2域，并且所有子接口具有相同的MAC地址。
+2. 使用macvlan，每个子接口都会获得唯一的mac和ip地址，并**直接暴露在底层网络中**。Macvlan接口通常用于虚拟化应用程序，每个macvlan接口都连接到一个Container或VM。每个容器或VM都可以像主机一样直接从公共服务器获取dhcp地址。这将有助于已经拥有IP寻址方案的Containers成为其传统网络的一部分的客户。
+4. ipvlan与macvlan类似，不同之处在于端点具有相同的mac地址。ipvlan支持L2和L3模式。在ipvlan l2模式下，每个端点获取相同的MAC地址但不同的IP地址。在ipvlan l3模式下，数据包可在端点之间路由，因此提供了更好的可扩展性。
+3. 在某些交换机，由于端口安全的原因而限制了每个物理端口的最大MAC地址数，在这种情况下，应使用ipvlan。在使用普通dhcp服务器的情况下则需要使用macvlan，因为dhcp服务器要求每个子接口必须要有唯一的mac地址，这种情况下显然ipvlan不满足要求。
 
 ## 其它
 

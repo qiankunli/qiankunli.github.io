@@ -15,6 +15,8 @@ keywords: container network
 
 [调试Kubernetes集群中的网络停顿问题](https://mp.weixin.qq.com/s/u5aEQhZTDtLrVdC8AO_ogQ)顶级文章，建议多次拜读。
 
+[Macvlan和IPvlan基础知识](https://mp.weixin.qq.com/s/r_CuqjypaaMRDZfW-RHjxw)运行裸机服务器时，主机网络可以很简单，只需很少的以太网接口和提供外部连接的默认网关。但当我们在一个主机中运行多个虚拟机时，需要在主机内和跨主机之间提供虚拟机之间的连接。一般，单个主机中的VM数量不超过15-20个。但在一台主机上运行Containers时，单个主机上的Containers数量很容易超过100个，需要有成熟的机制来实现Containers之间的网络互联。概括地说，容器或虚拟机之间有两种通信方式。在底层网络方法中，虚拟机或容器直接暴露给主机网络，Bridge、macvlan和ipvlan网络驱动程序都可以做到。在Overlay网络方法中，容器或VM网络和底层网络之间存在额外的封装形式，如VXLAN、NVGRE等。
+
 [一文理解 K8s 容器网络虚拟化](https://mp.weixin.qq.com/s/rVf2_0yefEgAyLgJgq5-kw)
 
 容器的一个诉求：To make a VM mobile you want to be able to move it's physical location without changing it's apparent network location.

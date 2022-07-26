@@ -23,15 +23,29 @@ keywords: Scala  akka
 
 ![](/public/upload/scala/kafka_server_framework.jpg)
 
-对kafka好奇的几个问题：
+## 网络架构
 
-1. 数据在磁盘上是如何存储的？
+[Kafka 超高并发网络 架构演进过程](https://mp.weixin.qq.com/s/1bTGw444lTbzXnh7MvY4bA)
+1. 对于 Kafka Broker 来说就是用来接收生产者发送过来的请求，简单的实现大概是
+    ```
+    while(true){
+        Request request = accept(connection)
+        handle(request)
+    }
+    ```
+2. 这种方式存在2个致命的缺陷？请求阻塞： 只能顺序处理每个请求，即每个请求都必须等待前一个请求处理完毕才能得到处理。吞吐量非常差： 由于只能顺序处理，无法并发，效率太低，所以吞吐量非常差，只适合请求发送非常不频繁的系统。
+3. 多线程异步处理模式，缺点：为每个请求都创建线程的做法开销很大。
+    ```
+    while(true){
+        Request request = accept(connection)
+        Thread thread = new Thread(handle(request))
+        thread.start()
+    }
+    ```
+4. Reactor 模式，多路复用，对于 Kafka 这种超高并发系统来说，一个 Selector 多路复用器（监听这些连接、接收请求、处理响应结果都是同一个 Selector 在进行处理）是 Hold 不住的，为了减轻当前 Selector 的处理负担，引入另外一个Selector 处理队列，原来的 Selector 只负责监听连接。
 
-## 网络层
 
-kafka client (producer/consumer) 与kafka server通信时使用自定义的协议，一个线程 一个selector 裸调java NIO 进行网络通信。 
-
-面对高并发、低延迟的需求，kafka 服务端使用了多线程+多selector 
+kafka client (producer/consumer) 与kafka server通信时使用自定义的协议，一个线程 一个selector 裸调java NIO 进行网络通信。 面对高并发、低延迟的需求，kafka 服务端使用了多线程+多selector 
 
 ![](/public/upload/netty/kafka_server_nio.jpg)
 
@@ -39,7 +53,6 @@ kafka client (producer/consumer) 与kafka server通信时使用自定义的协�
 
 1. 分层实现，网络io 部分负责读写数据，并将数据序列化/反序列化为协议请求。
 2. 协议请求交给 上层处理， API层就好比 tomcat 中的servlet
-
 
 ## 单机——基本实现
 

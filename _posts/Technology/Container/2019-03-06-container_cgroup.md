@@ -195,8 +195,11 @@ cpu limits 会被带宽控制组设置为 cpu.cfs_period_us 和 cpu.cfs_quota_us
 
 ### k8s CPU 服务质量等级/Qos
 
-[Kubernetes Resources Management – QoS, Quota, and LimitRange](https://www.cncf.io/blog/2020/06/10/kubernetes-resources-management-qos-quota-and-limitrangeb/)A node can be overcommitted when it has pod scheduled that make no request, or when the sum of limits across all pods on that node exceeds the available machine capacity. In an **overcommitted environment**, the pods on the node may attempt to use more compute resources than the ones available at any given point in time.When this occurs, the node must give priority to one container over another. Containers that have the lowest priority are terminated/throttle first. The entity used to make this decision is referred as the Quality of Service (QoS) Class.
+[cgroups 在 K8s 中的应用](https://mp.weixin.qq.com/s/bgoFj-aZo-RMh2hR5h0zrA)kubelet 作为 kubernetes 中的 node agent，所有 cgroup 的操作都由其内部的 containerManager 模块实现，containerManager 会通过 cgroup 将资源使用层层限制：node -> qos -> pod -> container。每一层都抽象出一种资源管理模型，通过这种方式提供了一种稳定的运行环境。如下图所示：
 
+![](/public/upload/container/kubelet_cgroup.png)
+
+[Kubernetes Resources Management – QoS, Quota, and LimitRange](https://www.cncf.io/blog/2020/06/10/kubernetes-resources-management-qos-quota-and-limitrangeb/)A node can be overcommitted when it has pod scheduled that make no request, or when the sum of limits across all pods on that node exceeds the available machine capacity. In an **overcommitted environment**, the pods on the node may attempt to use more compute resources than the ones available at any given point in time. **When this occurs, the node must give priority to one container over another**. Containers that have the lowest priority are **terminated/throttle** first. The entity used to make this decision is referred as the Quality of Service (QoS) Class.
 
 request 和 limit 
 
