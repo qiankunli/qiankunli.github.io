@@ -73,6 +73,31 @@ keywords: 数据结构
 1. 由于链表不⽀持随机访问，因此**如果想要获取数组中间项和倒数第⼏项等特定元素**就需要⼀些特殊的⼿段，⽽这个⼿段就是**快慢指针**。⽐如要 找链表中间项就搞两个指针，⼀个⼤步⾛（⼀次⾛两步），⼀个⼩步⾛（⼀次⾛⼀步），这样快指针⾛到头，慢指针刚好在中间。 如果要求链 表倒数第 2 个，那就让快指针先⾛⼀步，慢指针再⾛，这样快指针⾛到头，慢指针刚好在倒数第⼆个。
 2. 单链表⽆法在 `O(1)` 的时间拿到前驱节点，这也是为什么我们遍历的时候⽼是维护⼀个前驱节点的原因。但是本质原因其实是**链表的增删操作都依赖前驱节点**，这是链表的基本操作，是链表的特性天⽣决定的。
 
+解决链表问题的时候，先把基本的头插、尾插、遍历等方法备好，结合go 语言的高阶函数，可以大大提高的代码的可读性。比如反转链表，有下面TraverseList 的加持，就比在一个函数里撸要方便很多，可读性也好很多。
+```go
+func Append(cur, node *ListNode) {
+	next := cur.Next
+	cur.Next = node
+	node.Next = next
+}
+func TraverseList(head *ListNode, handler func(i int, node *ListNode)) {
+	cur := head
+	i := 0
+	for cur != nil {
+		next := cur.Next // node 可以被handler 挪用
+		handler(i, cur)
+		i++
+		cur = next
+	}
+}
+func Print(l *ListNode) {
+	for l != nil {
+		fmt.Println(l.Val)
+		l = l.Next
+	}
+}
+```
+
 ## 队列
 
 教科书上一说队列，就是四个字“先进先出”,这四个字是无法表述队列的巨大作用的.
