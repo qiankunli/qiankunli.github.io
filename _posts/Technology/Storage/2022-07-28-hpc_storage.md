@@ -4,7 +4,7 @@ layout: post
 title: 高性能计算与存储
 category: 技术
 tags: Storage
-keywords: ceph
+keywords: hpc 对象存储 AI
 
 ---
 

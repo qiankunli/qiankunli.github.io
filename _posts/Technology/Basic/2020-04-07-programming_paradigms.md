@@ -13,7 +13,6 @@ keywords:  programming paradigms
 * TOC
 {:toc}
 
-
 ## 串一串编程范式
 
 [架构整洁之道, 看这一篇就够了！](https://mp.weixin.qq.com/s/Kd1T40KZWvdThKC3IN6n-Q)

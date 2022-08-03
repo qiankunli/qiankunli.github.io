@@ -38,6 +38,8 @@ keywords: TIDB
 
 ## 关于一致性
 
+分布式的存储系统他们实现数据复制的方法是完全一样的，该原理能查到的最早的出处是 1978 年 Lamport 的一篇论文《The Implementation of Reliable Distributed Multiprocess Systems》。不管在mysql，sqlserver关系型数据库里面，还是在redis，mongo等非关系型存储引擎里，他们都在用数据复制的状态机原理。
+
 ### 存储大势的发展：ACID’s Consistency vs. CAP’s Consistency
 
 一开始数据库都是单机的，实现ACID 的特性相对简单，然后数据量开始变大，在分布式场景下可用性盖过了一致性（所谓的CAP，大部分最终选择了牺牲了部分一致性），此时一致性由上游根据业务需要来取舍。 但是ACID 的需求只是被转移却从未消失过，Avoiding lost updates, dirty reads, stale reads and enforcing app-specific integrity constraints are critical concerns for app developers，Solving these concerns directly **at the database layer** using the consistency provided by ACID transactions is a much simpler approach.

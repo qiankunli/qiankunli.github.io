@@ -267,7 +267,7 @@ out = top + bot
 
 ## 可视化
 
-用户需要在程序中使用 tf.summary 模块提供的工具，输出必要的序列化数据，FileWriter 保存到事件文件，然后启动 Tensorboard 加载事件文件，从而在各个面板中展示对应的可视化对象。
+用户在程序中使用 tf.summary 模块提供的工具，输出必要的序列化数据，FileWriter 保存到事件文件，然后启动 Tensorboard 加载事件文件，从而在各个面板中展示对应的可视化对象。
 1. summary，在定义计算图时，在适当位置加上一些summary 操作。 summary 操作输入输出也是张量，只是输出是汇总数据。
 2. merge，在训练时可能加入了 多个summary 操作，此时需要使用 tf.summary.merge_all 将这些summary 操作 合成一个操纵
 3. run，执行session.run 时，需要通过 tf.summary.FileWrite() 指定一个目录告诉程序把产生的文件放到指定位置，然后使用`add_summary()` 将某一步summary 数据记录到文件中

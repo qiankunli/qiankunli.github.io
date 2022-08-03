@@ -161,6 +161,8 @@ type Pool struct {
 
 ## Go代码中的依赖注入
 
+[深入浅出依赖注入及其在抖音直播中的应用](https://mp.weixin.qq.com/s/Zp-OqCVVr9CbDv1Y1zWN-w)在软件工程中，依赖注入（dependency injection）的意思为：给予调用方它所需要的事物。“注入”是指将“依赖”传递给调用方的过程。在“注入”之后，调用方才会调用该“依赖”。传递依赖给调用方，而不是让让调用方直接获得依赖，这个是该设计的根本需求。该设计的目的是为了分离调用方和依赖方，从而实现代码的高内聚低耦合，提高可读性以及重用性。
+
 [Go中的依赖注入](https://www.jianshu.com/p/cb3682ad34a7) 推荐使用 [uber-go/dig](https://github.com/uber-go/dig) 
 A reflection based dependency injection toolkit for Go.
 

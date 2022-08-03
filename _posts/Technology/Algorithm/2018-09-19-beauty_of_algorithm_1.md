@@ -78,9 +78,9 @@ keywords: 数据结构与算法之美
 	}
 	// 快速排序递归函数，p,r 为下标	
 	quick_sort_c(A, p, r) { 
-		if p >= rthen return 
+		if p >= r then return 
 		q = partition(A, p, r) // 获取分区点 
-		quick_sort_ck_sort_c(A, p, q-1) 
+		quick_sort_c(A, p, q-1) 
 		quick_sort_c(A, q+1, r)
 	}
 

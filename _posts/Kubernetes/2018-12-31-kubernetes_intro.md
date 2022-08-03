@@ -15,6 +15,8 @@ keywords: kubernetes
 
 ## Kubernetes——集群操作系统
 
+[为什么我们需要基于kubernetes的云操作系统？](https://mp.weixin.qq.com/s/5UUNFLbEMNuK0K1Alpp5Nw)现在，IaaS、PaaS 和 SaaS 在云原生技术普及的浪潮中已经名存实亡，比如容器运行在裸机上就已经拥有非常好的性能了，是否还需要 IaaS 这一层？PaaS、SaaS 本质都是容器，是否还需要区分？这三层架构实际上已经被击穿！
+
 比较 Kubernetes 和单机操作系统，Kubernetes 相当于内核，它负责集群软 硬件资源管理，并对外提供统一的入口，用户可以通过这个入口来使用集群，和集 群沟通。
 
 ![](/public/upload/kubernetes/k8s_vs_kernel.png)

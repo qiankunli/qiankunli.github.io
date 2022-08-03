@@ -14,7 +14,7 @@ keywords: 数据结构
 * TOC
 {:toc}
 
-数据结构 + 数据结构 ==> 某方面更优秀的数据结构。算法也要类似的特点，leetcode上成千上万道算法题，最后只归结到十几类题目，比如排序+自定义排序策略，就可以解决很多实际问题。数据结构 + 算法 ==> 更优秀的数据结构。
+数据结构 + 数据结构 ==> 某方面更优秀的数据结构。算法也要类似的特点，leetcode上成千上万道算法题，最后只归结到十几类题目，比如“排序+自定义排序策略”，就可以解决很多实际问题。数据结构 + 算法 ==> 更优秀的数据结构。
 
 基于冯诺依曼体系结构的计算机本质上是一个状态机，为什么这么说呢？因为 CPU 要进行计算就必须和内存打交道。内存就是用来保存状态（数据）的，内存中当前存储的所有数据构成了当前的状态，CPU 只能利用当前的状态计算下一个状态。我们用计算机处理问题，无非就是在思考：如何用变量来储存状态，以及如何在状态之间转移：由一些变量计算出另一些变量，由当前状态计算出下一状态。
 基于这些，我们也就得到了评判算法的优劣最主要的两个指标：
@@ -28,6 +28,7 @@ keywords: 数据结构
 数据结构分为逻辑结构、存储结构以及对应结构的数据运算，比如，你可以用一个数组表示一个图，也可以用链表存储一个图（或者一个图中包含数组和链表）。
 
 整体脉络：**数据结构 ==> 增删改查、遍历方法  ==> 基于基本方法之上的，找到符合某一个/多个特征的元素 的算法**。
+1. 遍历有多种方式，比如线性表的从左到右、从右到左、左右一起遍历（比如快排、回文字串），比如树和图的深度优先、广度优先，遍历的过程中找到符合某个条件的节点等等。遍历可以轮询数据结构的每个节点，也可以是轮询数据结构的每个可能的子结构（比如字符串、数组的子序列）。
 
 ### 逻辑结构
 
@@ -73,13 +74,33 @@ keywords: 数据结构
 1. 由于链表不⽀持随机访问，因此**如果想要获取数组中间项和倒数第⼏项等特定元素**就需要⼀些特殊的⼿段，⽽这个⼿段就是**快慢指针**。⽐如要 找链表中间项就搞两个指针，⼀个⼤步⾛（⼀次⾛两步），⼀个⼩步⾛（⼀次⾛⼀步），这样快指针⾛到头，慢指针刚好在中间。 如果要求链 表倒数第 2 个，那就让快指针先⾛⼀步，慢指针再⾛，这样快指针⾛到头，慢指针刚好在倒数第⼆个。
 2. 单链表⽆法在 `O(1)` 的时间拿到前驱节点，这也是为什么我们遍历的时候⽼是维护⼀个前驱节点的原因。但是本质原因其实是**链表的增删操作都依赖前驱节点**，这是链表的基本操作，是链表的特性天⽣决定的。
 
-解决链表问题的时候，先把基本的头插、尾插、遍历等方法备好，结合go 语言的高阶函数，可以大大提高的代码的可读性。比如反转链表，有下面TraverseList 的加持，就比在一个函数里撸要方便很多，可读性也好很多。
+解决链表问题的时候，先把基本的头插、尾插、遍历等方法备好，结合go 语言的高阶函数，可以大大提高的代码的可读性。比如反转链表，有下面TraverseList 的加持，就比在一个函数里撸业务逻辑 + 遍历逻辑要方便很多，可读性也好很多。
+
 ```go
-func Append(cur, node *ListNode) {
+// 插入节点
+func InsertAfter(cur, node *ListNode) {
 	next := cur.Next
 	cur.Next = node
 	node.Next = next
 }
+// 插入list，按list顺序
+func InsertAfterByOrder(cur, l *ListNode) {
+	next := cur.Next
+	TraverseList(l, func(i int, node *ListNode) {
+		cur.Next = node
+		cur = cur.Next
+	})
+	cur.Next = next
+}
+// 插入list，按list 逆序，也就是头插
+func InsertAfterByReverseOrder(cur, l *ListNode) {
+	next := cur.Next
+	TraverseList(l, func(i int, node *ListNode) {
+		InsertAfter(cur, node)
+	})
+	l.Next = next
+}
+// 此处的 handler 在遍历的过程中还个了node的元信息，即node的索引
 func TraverseList(head *ListNode, handler func(i int, node *ListNode)) {
 	cur := head
 	i := 0
@@ -90,10 +111,37 @@ func TraverseList(head *ListNode, handler func(i int, node *ListNode)) {
 		cur = next
 	}
 }
+// 将 list 分为 k 个长度子list 并遍历子list
+func TraverseKList(head *ListNode, k int, handler func(head, tail *ListNode, len int)) {
+	l := &ListNode{}
+	cur := l
+	count := 0
+	TraverseListByNode(head, func(i int, isTail bool, node *ListNode) {
+		cur.Next = node
+		cur = cur.Next
+		count++
+		if (i+1)%k == 0 || isTail {
+			handler(l.Next, cur, count)
+			l = &ListNode{}
+			cur = l
+			count = 0
+		}
+	})
+}
 func Print(l *ListNode) {
 	for l != nil {
 		fmt.Println(l.Val)
 		l = l.Next
+	}
+}
+```
+对于数组和字符串来说，除了元素遍历外，还可以遍历子序列（连续和非连续的）
+```
+func TraverseChildSequence(nums []int, handler func(nums []int, start, end int)) {
+	for i := 0; i < len(nums); i++ {
+		for j := i; j < len(nums); j++ {
+			handler(nums, i, j)
+		}
 	}
 }
 ```
@@ -138,6 +186,8 @@ DOM 树是⼀种树结构， ⽽ HTML 作为⼀种 DSL 去描述这种树结构�
 
 ![](/public/upload/algorithm/backtrack_2.png)
 
+不管是DFS 还是BFS，本质上都是搜索，且通常来说都是暴力搜索（f(n) 展开为f(n-1)，跟暴力搜索差不多了 ），因此需要对问题的所有可能情况进行穷举时，可以使用DFS和BFS，回溯法也是DFS 的一种，即回溯法也是一种保留搜索方法，只不过会涉及前进和回溯的过程。不管是DFS 还是BFS ，如果是在二维矩阵或图上进行搜索，通常都需要使用visited 来记录节点访问状态，树不存在还，也就不需要visited。
+
 ### DFS
 
 DFS算法流程
@@ -153,7 +203,7 @@ DFS算法流程
 ⼀个典型的通⽤的 DFS 模板可能是这样的：
 
 ```
-const visited = {}
+const visited = {}  
 function dfs(i) {
     if (满⾜特定条件）{
         // 返回结果 or 退出搜索空间
@@ -204,15 +254,15 @@ function dfs(root) {
     if (满⾜特定条件）{
         // 返回结果 or 退出搜索空间
     }
-    dfs(root.left)
-    dfs(root.right)
-    // 主要逻辑
+    l = dfs(root.left)
+    r = dfs(root.right)
+    // 主要逻辑，通常会对l 和r 进行一些操作，比如问题依赖左右子树的返回值
 }
 ```
 树是一个递归结构，因此大部分算法可以先用递归实现，然后看看要求再转为迭代实现。
 
 ### BFS
-
+本质就是不断访问邻居，把邻居逐个加入队列，根据队列先进先出的特点，把每一层节点访问完后，会继续访问下一层节点。
 1. ⾸先将根节点放⼊队列中。 
 2. 从队列中取出第⼀个节点，并检验它是否为⽬标。 如果找到⽬标，则结束搜索并回传结果。 否则将它所有尚未检验过的直接⼦节点加⼊队列中。 
 3. 若队列为空，表示整张图都检查过了——亦即图中没有欲搜索的⽬
@@ -222,7 +272,7 @@ function dfs(root) {
 ```
 const visited = {}
 function bfs() {
-    let q = new Queue()
+    let q = new Queue() // 如果在带权图上进行BFS，则可以考虑使用优先级队列来完成
     q.push(初始状态)
     while(q.length) {   // 队列不空，⽣命不⽌
         let i = q.pop()
@@ -294,7 +344,10 @@ function bfs() {
 2. 从缓存中删除一个数据
 3. 在缓存中查找一个数据
 
-这三个操作都涉及到查找操作，换句话说，对数据的操作无外乎crud，而cud都离不开查询。进而很明显，基于有序结构的查询速度是最快的，也就引出了排序算法的重要性。
+这三个操作都涉及到查找操作，换句话说，对数据的操作无外乎crud，而cud都离不开查询。进而很明显，基于有序结构的查询速度是最快的，也就引出了排序算法的重要性。PS：查找 ==> 遍历 ==> 排序加速遍历
+1. 针对不同的数据结构，查找的概念也会泛化，比如图中的查找最短路径，查找数组内符合某个条件的连续子序列/子序列/排列
+2. 查找基本办法是遍历，不同的数据结构不同的遍历方法，迭代、递归（f(n)展开为f(n-1) 也是一种遍历）等等，遍历即暴力搜索，需要利用“搜索目标的特性”在遍历过程中剪枝。
+3. 复杂结构的排序比较少见，排序一般可以加速单重遍历（毕竟不用一个个找了），对于子序列/排列问题，涉及到多重遍历（层数由子序列/排列的长度决定），有时根据“搜索目标的特性”，多重遍历的部分层遍历可以是并列关系（比如结果元素不重复且此消彼长，“三数之和+结果不重复”问题，可以使用头尾指针分别从头尾开始遍历，一层当两层用），因此排序也可以减少多重遍历的层数。
 
 
 ### 查询的不同意涵
@@ -325,7 +378,7 @@ Algorithms for managing data structures sometimes involve recursion. With recurs
 
 ## 数据结构的"基本类型化"
 
-较早出现的编程语言,比如c语言,基本类型只包括:int,char,long等,string,map等则需要引用库.而对于新兴语言,比如go和python等,则在语言层面支持string,map等复杂结构.这一趋势,甚至扩展到了一些内存数据库.
+较早出现的编程语言，比如c语言，基本类型只包括:int,char,long等，string、map等则需要引用库。而对于新兴语言，比如go和python等，则在语言层面支持string、map等复杂结构。这一趋势，甚至扩展到了一些内存数据库。
 
 
 

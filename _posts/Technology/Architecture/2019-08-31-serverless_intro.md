@@ -21,6 +21,10 @@ keywords: serverless
 
 [拥抱开放，Serverless 时代的下一征程](https://mp.weixin.qq.com/s/BSM_IQ14worC_qfPnVLOuw)
 
+[谈一谈企业级弹性伸缩与优化建设](https://mp.weixin.qq.com/s/iOHr3QzML6kDV4__v29qPg) Serverless 不是特指某种技术，而是无服务器、按需弹性、按量计费、简化运维等的工具结合， 通过一个应用引擎框架集成云开发、FaaS、BaaS、托管K8s、DevOps、服务治理、弹性等帮助业务轻松上云
+
+![](/public/upload/architecture/serverless_design.png)
+
 ## 为什么Serverless 会火
 
 从用户视角看：托管node ==> 托管pod ==> 托管function。从实践上也是必须这样慢慢推进的，比如一家公司不用云厂商的对象存储、数据库，然后突然一步托管到function 是不可能的。[Serverless 时代下微服务应用全托管解决方案](https://mp.weixin.qq.com/s/dxNX1pG6n72cclZD1IENmg)微服务化给运维带来了很大的挑战:

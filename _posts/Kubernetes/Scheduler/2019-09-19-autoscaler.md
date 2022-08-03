@@ -13,12 +13,15 @@ keywords: kubernetes autoscaler
 * TOC
 {:toc}
 
+
+
 开源框架[kubernetes/autoscaler](https://github.com/kubernetes/autoscaler)
+
+[谈一谈企业级弹性伸缩与优化建设](https://mp.weixin.qq.com/s/iOHr3QzML6kDV4__v29qPg) 系统的讲了弹性能力平台化。
 
 [kubernetes 资源管理概述](https://cizixs.com/2018/06/25/kubernetes-resource-management/)
 
 ![](/public/upload/kubernetes/kubernetes_resource_manager.png)
-
 
 [Kubernetes Autoscaling 101: Cluster Autoscaler, Horizontal Pod Autoscaler, and Vertical Pod Autoscaler](https://medium.com/magalix/kubernetes-autoscaling-101-cluster-autoscaler-horizontal-pod-autoscaler-and-vertical-pod-2a441d9ad231) 
 
