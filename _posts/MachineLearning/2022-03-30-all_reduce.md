@@ -438,3 +438,7 @@ def _reset():
 ### 与k8s运行
 
 在 Kubernetes 上常见的是 kubeflow 社区的 tf-operator 支持 Tensorflow PS 模式，或者 mpi-operator 支持 horovod 的 mpi allreduce 模式。
+
+## 其它
+
+百度：AIAK-Training 是基于 Horovod 深度定制优化的分布式训练框架（Horovod 是 TensorFlow、Pytorch 等的分布式深度学习训练框架），在保留 Horovod 已有功能特性的基础上，增加了新的通信优化特性，完全兼容 Horovod 原有 API，经典模型的训练效率提升 50% 以上。

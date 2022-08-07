@@ -102,42 +102,76 @@ R-S 触发器
 
 在我们的想象中，物理机机器内部似乎要维护一张大而全的指令集表，每次cpu 读入一个机器指令时，去扫描这张指令集表，从而识别机器码，并进一步判断该操作码后是否有操作数。而事实上，cpu 内置的“指令集” 是硬件结构/数字电路。只要向cpu 传递一个指令，cpu 便可以根据预先设定好的电路进行解码（高低电平），然后操作对应的寄存器或者某些电路 去读取该操作码后面的操作数。同时，另一些电路支持读取当前机器指令的下一条指令。 如此一来，cpu 便能完成取指 ==> 译码 ==> 执行 ==> 取指的循环了。PS：从内存中取数 可以认为是 让 所有的 存储电路有选择的输出，内存地址每一根线即开关。那么译码（地址+时钟）也可以认为 让所有电路有选择的 触发，指令代码的每一位即开关。
 
-## 画电路图
+## 硬件描述语言
 
-Verilog 是一种优秀的硬件描述语言，它可以用类似 C 语言的高级语言设计芯片，从而免去了徒手画门电路的烦恼。
+在芯片设计时，根据不同模块的功能特点，通常把它们分为数字电路模块和模拟电路模块。模拟电路还是像早期的半导体电路那样，处理的是连续变化的模拟信号，所以只能用传统的电路设计方法。而数字电路处理的是已经量化的数字信号，往往用来实现特定的逻辑功能，更容易被抽象化，所以就产生了专门用于设计数字电路的硬件描述语言。没错，芯片前端设计工程师写 Verilog 代码的目的，就是把一份电路用代码的形式表示出来，然后由计算机把代码转换为所对应的逻辑电路。
+
+写软件代码和写硬件代码的最大区别是什么？Verilog 代码和 C 语言、Java 等这些计算机编程语言有本质的不同，在可综合（这里的“可综合”和代码“编译”的意思差不多）的 Verilog 代码里，基本所有写出来的东西都对应着实际的电路。所以，我们用 Verilog 的时候，必须理解每条语句实质上对应着什么电路，并且要从电路的角度来思考它为何要这样设计。而高级编程语言通常只要功能实现就行。在 Verilog 里举几个例子来说明：
+1. 声明变量的时候，如果指定是一个 reg，那么这个变量就有寄存数值的功能，可以综合出来一个实际的寄存器；
+2. 如果指定是一段 wire，那么它就只能传递数据，只是表示一条线。
+3. 写一个判断语句，可能就对应了一个 MUX（数据选择器）
+4. 写一个 for 可能就是把一段电路重复好几遍。
+
+在开始一个大的芯片设计时，往往需要先从整个芯片系统做好规划，在写具体的 Verilog 代码之前，把系统划分成几个大的基本的功能模块。之后，每个功能模块再按一定的规则，划分出下一个层次的基本单元。Verilog 都是基于模块进行编写的，一个模块实现一个基本功能，大部分的 Verilog 逻辑语句都放在模块内部。
+
+一个包含加、减、与、或、非等功能的简单 ALU 模块
 ```
-/*----------------------------------------------------------------
-Filename: alu.v
-Function: 设计一个N位的ALU(实现两个N位有符号整数加 减 比较运算)
------------------------------------------------------------------*/
-module alu(ena, clk, opcode, data1, data2, y);
-    //定义alu位宽
-    parameter N = 32; //输入范围[-128, 127]
-    //定义输入输出端口
-    input ena, clk;
-    input [1 : 0] opcode;
-    input signed [N - 1 : 0] data1, data2; //输入有符号整数范围为[-128, 127] 
-    output signed [N : 0] y; //输出范围有符号整数范围为[-255, 255]
-    //内部寄存器定义
-    reg signed [N : 0] y;
-    //状态编码
-    parameter ADD = 2'b00, SUB = 2'b01, COMPARE = 2'b10;
-    //逻辑实现
-    always@(posedge clk)
-    begin
-        if(ena)
-        begin
-            casex(opcode)
-                ADD: y <= data1 + data2; //实现有符号整数加运算
-                SUB: y <= data1 - data2; //实现有符号数减运算
-                COMPARE: y <= (data1 > data2) ? 1 : ((data1 == data2) ? 0 : 2); //data1 = data2 输出0; data1 > data2 输出1; data1 < data2 输出2;
-                default: y <= 0;
-            endcase
-        end
-    end
+module alu(a, b, cin, sel, y);
+  input [7:0] a, b;
+  input cin;
+  input [3:0] sel;
+  output [7:0] y;
+
+  reg [7:0] y;
+  reg [7:0] arithval;
+  reg [7:0] logicval;
+
+  // 算术执行单元
+  always @(a or b or cin or sel) begin
+    case (sel[2:0])
+      3'b000  : arithval = a;
+      3'b001  : arithval = a + 1;
+      3'b010  : arithval = a - 1;
+      3'b011  : arithval = b;
+      3'b100  : arithval = b + 1;
+      3'b101  : arithval = b - 1;
+      3'b110  : arithval = a + b;
+      default : arithval = a + b + cin;
+    endcase
+  end
+
+  // 逻辑处理单元
+  always @(a or b or sel) begin
+    case (sel[2:0])
+      3'b000  : logicval =  ~a;
+      3'b001  : logicval =  ~b;
+      3'b010  : logicval = a & b;
+      3'b011  : logicval = a | b;
+      3'b100  : logicval =  ~((a & b));
+      3'b101  : logicval =  ~((a | b));
+      3'b110  : logicval = a ^ b;
+      default : logicval =  ~(a ^ b);
+    endcase
+  end
+
+  // 输出选择单元
+  always @(arithval or logicval or sel) begin
+    case (sel[3])
+      1'b0    : y = arithval;
+      default : y = logicval;
+    endcase
+  end
+
 endmodule
 ```
 
+通过逻辑综合，我们就能完成从 Verilog 代码到门级电路的转换。而逻辑综合的结果，就是把设计的 Verilog 代码，翻译成门级网表 Netlist。逻辑综合需要基于特定的综合库，不同的库中，门电路基本标准单元（Standard Cell）的面积、时序参数是不一样的。所以，选用的综合库不一样，综合出来的电路在时序、面积上也不同。因此，哪怕采用同样的设计，选用台湾的台积电（TSMC）工艺和上海的中芯国际（SMIC）的工艺，最后生产出来的芯片性能也是有差异的。通常，工业界使用的逻辑综合工具有 Synopsys 的 Design Compiler（DC），Cadence 的 RTL Compiler，Synplicity 的 Synplify 等。然而，这些 EDA 工具都被国外垄断了，且需要收取高昂的授权费用。学习用途 可以使用轻量级开源综合工具Yosys
+
+![](/public/upload/basic/alu_dot.png)
+
+可以看到，这张图是由基本的 and、or、not、add、sub、cmp、mux 等电路单元组成。如果你还想进一步了解它们底层电路结构，可以自行查阅大学里学过的《数电》《模电》。
+
+整体思路：cpu ==> 模块 == 硬件描述语言 ==> 基本电路单元  ==> 门电路 
 
 ## 其它
 

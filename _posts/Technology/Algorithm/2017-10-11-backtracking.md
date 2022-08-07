@@ -26,11 +26,14 @@ keywords: backtracking
 [写递归函数的正确思维方法](http://blog.csdn.net/vagrxie/article/details/8470798)基本要点：
 
 1. 看到一个递归实现, 我们总是难免陷入不停的回溯验证之中（把变量的变化依次写出来）, 因为回溯就像反过来思考迭代, 这是我们习惯的思维方式, 但是其实无益于理解。数学归纳法才是理解的递归的方式，函数式编程也有这么点意思。
-2. **递归并不是算法，它是和迭代对应的⼀种编程⽅法。只不过，我们通常借 助递归去分解问题⽽已**。递归中如果存在重复计算（我们称重叠⼦问题，下⽂会讲到），那就是使 ⽤记忆化递归（或动态规划）解题的强有⼒信号之⼀。可以看出动态规划 的核⼼就是使⽤记忆化的⼿段消除重复⼦问题的计算，如果这种重复⼦问 题的规模是指数或者更⾼规模，那么记忆化递归（或动态规划）带来的收 益会⾮常⼤。为了消除这种重复计算，我们可使⽤查表的⽅式。即⼀边递归⼀边使⽤ “记录表”（⽐如哈希表或者数组）记录我们已经计算过的情况，当下次再 次碰到的时候，如果之前已经计算了，那么直接返回即可，这样就避免了 重复计算。
+2. **递归并不是算法，它是和迭代对应的⼀种编程⽅法。只不过，我们通常借 助递归去分解问题⽽已**。对于`f(n) = max(f(n-1),f(n-2))` 可以用递归写，也可以用 用迭代 从f(0) f(1) 一直求到f(n)。**递归中如果存在重复计算**（称为重叠⼦问题），那就是使 ⽤记忆化递归（或动态规划）解题的强有⼒信号之⼀。可以看出动态规划 的核⼼就是使⽤记忆化的⼿段消除重复⼦问题的计算，如果这种重复⼦问 题的规模是指数或者更⾼规模，那么记忆化递归（或动态规划）带来的收 益会⾮常⼤。为了消除这种重复计算，我们可使⽤查表的⽅式。即⼀边递归⼀边使⽤ “记录表”（⽐如哈希表或者数组）记录我们已经计算过的情况，当下次再 次碰到的时候，如果之前已经计算了，那么直接返回即可，这样就避免了 重复计算。 
 3. 如果你刚开始接触递归，⼀个简 单练习递归的⽅式是将你写的迭代全部改成递归形式。⽐如你写了⼀个程 序，功能是“将⼀个字符串逆序输出”，那么使⽤迭代将其写出来会⾮常容 易，那么你是否可以使⽤递归写出来呢？通过这样的练习，可以让你逐步 适应使⽤递归来写程序。
+
+当我们处理递归问题时， 如何定义递归出口是非常重要的一步。递归出口是递归函数 可以直接处理的最简单子问题。一把有关树的DFS 问题，递归出口都是叶子节点或空节点，然后基于叶子节点/空节点 判断当前路径是否符合要求。
 
 ## 动态规划
 
+动态规划和其它算法思想如递归、回溯、分治、贪心等方法都有一定的联系，**其背后的基本思想是枚举**，虽然看起来简单， 但如何涵盖所有可能，并尽可能重叠子问题的计算是一个难点。每一个动态规划问题，都可以被抽象为一个数学函数，这个函数的自变量集合就是题目的所有取值，值域就是题目要求的答案的所有可能。**我们的目的就是填充这个函数的内容**，使得给定自变量x 能够唯一映射到一个值y（当然自变量可能有多个，对应递归函数的参数可能有多个）。
 4. 动态规划最重要的两个概念：最优⼦结构和⽆后效性。
     1. ⽆后效性决定了是否可使⽤动态规划来解决。即⼦问题的解⼀旦确定，就不再改变，不受在这之后、包含它的更⼤的问 题的求解决策影响。背包问题中选择是否拿第三件物品，不应该影 响是否拿前⾯的物品。⽐如题⽬规定了拿了第三件物品之后，第⼆件物品的价值就会变低或变⾼）。这种情况就不满⾜⽆后向性。
     2. 最优⼦结构决定了具体如何解决。
@@ -123,11 +126,14 @@ function dfs(i) {
 
 迭代法：
 
-	for(i=0;i<len;i++){
-		for(j=i;j<len;j++){
-			print(str,i,j);
-		}
-	}
+```
+// i,j 相当于头尾指针
+for(i=0;i<len;i++){
+    for(j=i;j<len;j++){
+        print(str,i,j);
+    }
+}
+```
 	
 位图法
 
@@ -142,56 +148,59 @@ function dfs(i) {
 
 幂集中的每个元素是一个集合，它或是空集，或含集合A中一个元素，或含集合A中两个元素…… 或等于集合A。反之，从集合A 的每个元素来看，它只有两种状态：它或属幂集的无素集，或不属幂集的元素集。则求幂集p(A)的元素的过程可看成是依次对集合A中元素进行“取”或“舍”的过程，并且可以用一棵二叉树来表示过程中幂集元素的状态变化过程，树中的根结点表示幂集元素的初始状态（空集）；叶子结点表示它的终结状态，而第i层的分支结点，则表示已对集合A中前i-1个元素进行了取舍处理的当前状态（左分支表示取，右分支表示舍 ）。因此求幂集元素的过程即为先序遍历这棵状态树的过程
 
-
-	public class B {
-	    private String str = "abc";
-	    private int[] x = new int[3];
-	    private void print(int[] x) {
-	        for (int i = 0; i < x.length; i++) {
-	            if (x[i] == 1) {
-	                System.out.print(str.charAt(i));
-	            }
-	        }
-	        System.out.println();
-	    }
-	    public void backtrack(int i) {
-	    	  /*
-	    	  	x[i] 本质也是个位图，等x[i]从0到len赋值完毕，即可根据位图打印字符串
-	    	  */
-	        if (i >= str.length()) {
-	        	  // 到达叶子节点
-	            print(x);
-	        } else {
-	            for (int isChoose = 0; isChoose <= 1; isChoose++) {
-	                x[i] = isChoose;
-	                backtrack(i + 1);
-	            }
-	            /*相当于
-	              x[i] = 0;
-	              backtrack(i + 1);
-	              x[i] = 1;
-	              backtrack(i + 1);
-	              这就有了二叉树分叉的效果
-	            */
-	        }
-	    }
-	    public static void main(String[] args) {
-	        new B().backtrack(0);
-	    }
-	}
+```
+public class B {
+    private String str = "abc";
+    private int[] x = new int[3];
+    private void print(int[] x) {
+        for (int i = 0; i < x.length; i++) {
+            if (x[i] == 1) {
+                System.out.print(str.charAt(i));
+            }
+        }
+        System.out.println();
+    }
+    public void backtrack(int i) {
+            /*
+            x[i] 本质也是个位图，等x[i]从0到len赋值完毕，即可根据位图打印字符串
+            */
+        if (i >= str.length()) {
+                // 到达叶子节点
+            print(x);
+        } else {
+            for (int isChoose = 0; isChoose <= 1; isChoose++) {
+                x[i] = isChoose;
+                backtrack(i + 1);
+            }
+            /*相当于
+                x[i] = 0;
+                backtrack(i + 1);
+                x[i] = 1;
+                backtrack(i + 1);
+                这就有了二叉树分叉的效果
+            */
+        }
+    }
+    public static void main(String[] args) {
+        new B().backtrack(0);
+    }
+}
+```
 
 对于代码：
 
-	backtrack{
-		if (i >= str.length()) {
-			print(x);
-		}else{
-			x[i] = 0;
-			backtrack(i + 1);
-			x[i] = 1;
-			backtrack(i + 1);
-		}
-	}
+```
+backtrack{
+    if (i >= str.length()) {
+        print(x);
+    }else{
+        x[i] = 0;
+        backtrack(i + 1);
+        x[i] = 1;
+        backtrack(i + 1);
+    }
+}
+```
 	
 对于局部变量，递归函数每次运行时，都是全新的。**如果递归函数操作全局数组，则在递归的过程中，就天然的有了二叉树分叉的效果。** 此处,`{x0 ==> x2 ==> x2}` 代表一条路径。
 
@@ -199,29 +208,33 @@ function dfs(i) {
 
 可以推断，表示一个三叉树的先序遍历，需要在同一层调用三次递归方法，此时x[i]就是另外的含义了。
 
-	x[i] = 0;
-	backtrack(i + 1);
-	x[i] = 1;
-	backtrack(i + 1);
-	x[i] = 2;
-	backtrack(i + 1);
+```
+x[i] = 0;
+backtrack(i + 1);
+x[i] = 1;
+backtrack(i + 1);
+x[i] = 2;
+backtrack(i + 1);
+```
 	
 	
 回溯时，还有另外一种实现思路，即使用xc[i]直接存储子集
 
-    private String str = "abc";
-    private char[] xc = new char[3];
-    public void backtrack(int i) {
-        System.out.println(new String(xc));
-        if (i >= str.length()) {
-            return;
-        } else {
-            xc[i] = str.charAt(i);
-            backtrack(i + 1);
-            xc[i] = 0;
-            backtrack(i + 1);
-        }
+```
+private String str = "abc";
+private char[] xc = new char[3];
+public void backtrack(int i) {
+    System.out.println(new String(xc));
+    if (i >= str.length()) {
+        return;
+    } else {
+        xc[i] = str.charAt(i);
+        backtrack(i + 1);
+        xc[i] = 0;
+        backtrack(i + 1);
     }
+}
+```
     
 
 ### 全排列
