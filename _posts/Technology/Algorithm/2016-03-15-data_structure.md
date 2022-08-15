@@ -16,8 +16,7 @@ keywords: 数据结构
 
 数据结构 + 数据结构 ==> 某方面更优秀的数据结构。算法也要类似的特点，leetcode上成千上万道算法题，最后只归结到十几类题目，比如“排序+自定义排序策略”，就可以解决很多实际问题。数据结构 + 算法 ==> 更优秀的数据结构。
 
-基于冯诺依曼体系结构的计算机本质上是一个状态机，为什么这么说呢？因为 CPU 要进行计算就必须和内存打交道。内存就是用来保存状态（数据）的，内存中当前存储的所有数据构成了当前的状态，CPU 只能利用当前的状态计算下一个状态。我们用计算机处理问题，无非就是在思考：如何用变量来储存状态，以及如何在状态之间转移：由一些变量计算出另一些变量，由当前状态计算出下一状态。
-基于这些，我们也就得到了评判算法的优劣最主要的两个指标：
+基于冯诺依曼体系结构的计算机本质上是一个状态机，为什么这么说呢？因为 CPU 要进行计算就必须和内存打交道。内存就是用来保存状态（数据）的，内存中当前存储的所有数据构成了当前的状态，CPU 只能利用当前的状态计算下一个状态。我们用计算机处理问题，无非就是在思考：如何用变量来储存状态，以及如何在状态之间转移：由一些变量计算出另一些变量，由当前状态计算出下一状态。基于这些，我们也就得到了评判算法的优劣最主要的两个指标：
 1. 空间复杂度：就是为了支持计算所必需存储的状态
 2. 时间复杂度：就是初始状态到最终状态所需多少步
 
@@ -130,7 +129,7 @@ func Print(l *ListNode) {
 	}
 }
 ```
-对于数组和字符串来说，除了元素遍历外，还可以遍历子序列（连续和非连续的）
+对于数组和字符串来说，除了元素遍历外，还可以遍历子序列（连续和非连续的），元素可以重复多次或无限次的话子序列就更多了（零钱兑换问题）。
 ```
 func TraverseChildSequence(nums []int, handler func(nums []int, start, end int)) {
 	for i := 0; i < len(nums); i++ {
@@ -140,6 +139,11 @@ func TraverseChildSequence(nums []int, handler func(nums []int, start, end int))
 	}
 }
 ```
+为此算法花活儿也很多
+1. 比如i,j 可以认为是滑动窗口的左右指针，但因为j 一定大于i，可以将嵌套的循环展开（正常遍历 子序列/字串 要多层循环），通过减少内层循环的次数来降低算法的时间复杂度，o(n*n) 变为o(n)。滑动窗口常用语解决数组、字符串的子元素问题
+    1. **滑动窗口一般需要辅助的数据结构**，比如双端队列（右侧指针右移是加入，左侧指针右移是移除，且保持元素原有的相对顺序）、字典等，记录窗口内元素的特性：比如最大值、最小值、包含某些元素、和等，并与目标进行对比
+    2. 窗口长度固定或固定，左右指针的右移不一定是连续的
+2. 在算法优化方面，针对平方阶算法，由于通常必须至少遍历数据一次，**无法省略最外层循环**，优化重点应考虑是否能**降低内层操作的时间复杂度**，无论优化到对数阶还是常数阶，算法的效率都会有相当可观的提高。
 
 ## 队列
 
@@ -322,7 +326,7 @@ DFS 一般用栈实现，BFS 一般用队列实现，可以看看这些算法在
 
 ### 设计数据结构的过程是一种“映射”
 
-[Data Structure](https://www.encyclopedia.com/computing/dictionaries-thesauruses-pictures-and-press-releases/data-structure)Computer solution of a real-world problem involves designing some ideal data structures, and then mapping these onto available data structures (e.g. arrays, records, lists, queues, and trees) for the implementation. 先假设一种理想结构（以及它的api是啥） 然后再考虑着 组合基本结构去实现。
+[Data Structure](https://www.encyclopedia.com/computing/dictionaries-thesauruses-pictures-and-press-releases/data-structure)Computer solution of a real-world problem involves designing some ideal data structures, and then mapping these onto available data structures (e.g. arrays, records, lists, queues, and trees) for the implementation. 先假设存在一种理想结构（以及它的api是啥，具体的说输入输出是啥），用流程 + 数据结构 将问题解决，然后再考虑着 组合基本结构去实现。
 
 
 我们说面向的对象的四个基本特性：抽象、封装、继承、多态。在四个基本特性之上呢，一群类的组合，有了各种设计模式。

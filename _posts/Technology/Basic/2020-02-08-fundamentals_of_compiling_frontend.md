@@ -71,7 +71,7 @@ Id :                [a-zA-Z_] ([a-zA-Z_] | [0-9])*;
 
 **AST 叶子节点，就是词法分析阶段生成的 Token。对这棵 AST 做深度优先的遍历，你就能依次得到原来的 Token**。
 
-AST的生成有很多现成的工具，比如 Yacc（或 GNU 的版本，Bison）、Antlr、JavaCC 等。[javascript-ast](https://resources.jointjs.com/demos/javascript-ast)提供javascript 语法树的可视化
+AST的生成有很多现成的工具，比如 Yacc（或 GNU 的版本，Bison）、Antlr、JavaCC 等。[javascript-ast](https://resources.jointjs.com/demos/javascript-ast)提供javascript 语法树的可视化。 
 
 
 
@@ -197,7 +197,7 @@ type Stmt interface {}  // 语句
 4. 作用域判断
 5. 代码压缩
 
-java 中有一个 [INRIA/spoon](https://github.com/INRIA/spoon)java AST库，支持将一个java source 文件解析为CtClass 类，笔者使用这个库 根据CtClass 解析web controller 类代码文本，生成web api 数据并同步到api 管理系统上。
+java 中有一个 [INRIA/spoon](https://github.com/INRIA/spoon)java AST库，支持将一个java source 文件解析为CtClass 类，笔者使用这个库 根据CtClass 解析web controller 类代码文本，生成web api 数据并同步到api 管理系统上。 [用了那么久的Lombok，你知道它的原理么？](https://mp.weixin.qq.com/s/BZzHAZcEn4T5rXrNKeb5Pw)
 
 ## 实例分析——一个简单的解释器
 
