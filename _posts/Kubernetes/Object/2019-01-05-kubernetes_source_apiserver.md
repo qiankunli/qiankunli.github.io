@@ -86,6 +86,8 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 3. 遍历 schema 中的所有 API group，为每个 API group 配置一个 storage provider，这是一个通用 backend 存储抽象层。
 4. 遍历每个 group 版本，为每个 HTTP route 配置 REST mappings。稍后处理请求时，就能将 requests 匹配到合适的 handler。
 
+[Kubernetes API Server handler 注册过程分析](https://mp.weixin.qq.com/s/OUqrmZegNnuvi--3beeoBw) **未读**。以内置资源的 handler 注册过程为线索介绍了 APiServer 的启动过程和 handler 注册过程。对APIServer的访问会先经过 filter，再路由给具体的 handler。filter 在 DefaultBuildHandlerChain 中定义，主要对请求做超时处理，认证，鉴权等操作。handler 的注册则是初始化 APIGoupInfo 并设置其 VersionedResourcesStorageMap 后作为入参，调用 GenericAPIServer.InstallAPIGroups即可完成 handler 的注册。`k8s.io/apiserver/pkg/endpoints/handlers`包中的代码则是对用户请求做编解码，对象版本转换，协议处理等操作，最后在交给rest.Storage 具体实现的接口进行处理。
+
 ### 请求处理流程 
 
 [资深专家深度剖析Kubernetes API Server第1章](https://cloud.tencent.com/developer/article/1330591)

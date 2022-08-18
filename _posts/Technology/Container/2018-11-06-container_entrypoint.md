@@ -65,28 +65,18 @@ panic("No working init found.  Try passing init= option to kernel. "
         "See Linux Documentation/admin-guide/init.rst for guidance.");
 ```
 
-管理孤儿进程。当一个子进程终止后，它首先会变成一个“失效(defunct)”的进程，也称为“僵尸（zombie）”进程，等待父进程或系统收回（通过wait/waitpid 函数）。如果父进程已经结束了，那些依然在运行中的子进程会成为“孤儿（orphaned）”进程。在Linux中Init进程(PID1)作为所有进程的父进程，会维护进程树的状态，一旦有某个子进程成为了“孤儿”进程后，init就会负责接管这个子进程。当一个子进程成为“僵尸”进程之后，如果其父进程已经结束，init会收割这些“僵尸”，释放PID资源。
+## 管理孤儿/僵尸（zombie）进程
 
-僵尸进程（内存文件等都已释放，只留了一个stask_struct instance）如果不清理，就会消耗系统中的进程号资源，最坏会导致创建新进程。
+1. 一个正常的进程退出流程是这样的：子进程退出后，给父进程发送一个SIGCHLD的信号，父进程收到这个信号后，会通过wait系统调用来回收子进程。
+2. 如果父进程已经结束了，那些依然在运行中的子进程会成为“孤儿（orphaned）”进程。在Linux中Init进程(PID1)作为所有进程的父进程，会维护进程树的状态，一旦有某个子进程成为了“孤儿”进程后，init就会负责接管这个子进程。当一个子进程成为“僵尸”进程之后，如果其父进程已经结束，init会收割这些“僵尸”，释放PID资源。
+3. 僵尸进程（内存文件等都已释放，只留了一个stask_struct instance）如果不清理，就会消耗系统中的进程号资源，最坏会导致创建新进程。
 
-社区 有一个容器init 项目tini [使用 Tini 清理 Docker 容器僵死进程](https://mp.weixin.qq.com/s/Ktd56YQsU8pP6kUs3_uU4Q)
+如果僵尸进程是在容器内产生的，就更好不处理了。
+1. 以 Docker Container 为例，容器创建后，默认情况下是不会共享宿主机的 PID Namespace，它会自己创建一个 PID Namespace，**这个 PID Namespace 的1号/init进程就是我们创建容器时指定的entrypoint**。
+2. 根据linux进程回收的原理，孤儿进程都会被init进程接管，并由init进程来回收。那在docker容器自己创建出来的 PID Namespace 中，孤儿进程的父进程都会变成 entrypoint 进程。很多entrypoint都不具备主动回收僵尸进程的能力，那一个会产生僵尸进程的容器，里面的僵尸进程就一直得不到回收。
+3. 知道了原理，预防方式就比较简单：让具备僵尸进程回收能力的进程充当容器的init进程。
 
-```c
-int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
-        pid_t current_pid;
-        int current_status;
-        while (1) {
-                current_pid = waitpid(-1, &current_status, WNOHANG);
-
-                switch (current_pid) {
-                        case -1:
-                                if (errno == ECHILD) {
-                                        PRINT_TRACE("No child to wait");
-                                        break;
-                                }
-
-…
-```
+## 传递 SIGTERM 信号
 
 linux 信号机制
 
@@ -96,33 +86,19 @@ linux 信号机制
     3. Default，，Linux 为每个信号都定义了一个默认的行为，包含终止、忽略等，SIGKILL 和 SIGSTOP 的默认行为都是终止。
 2. SIGTERM 是kill 默认发出的  `kill pid` = `kill -SIGTERM pid`
 3. init 进程的特殊性，在每个 Namespace 的 init 进程建立的时候，就会打上 SIGNAL_UNKILLABLE 这个标签，1 号进程永远不会响应 SIGKILL 和 SIGSTOP 这两个特权信号。对于其他的信号，如果用户自己注册了 handler，1 号进程可以响应。
-3. 容器的一般使用专用的init 进程（注册并实现非SIGKILL 和 SIGSTOP  信号的处理函数）， 负责转发信号到所有的子进程，并且回收僵尸进程。 docker原生提供的init进程为tini 
-
-```sh
-docker run -d --init ubuntu:14.04 bash -c "cd /home/ && sleep 100
-oot@24cc26039c4d:/# ps -ef
-UID PID PPID C STIME TTY TIME CMD
-root 1 0 2 14:50 ? 00:00:00 /sbin/docker-init -- bash -c cd /home/ && sleep 100
-root 6 1 0 14:50 ? 00:00:00 bash -c cd /home/ && sleep 100
-root 7 6 0 14:50 ? 00:00:00 sleep 100
-```
-
-## 以进程管理工具作为entrypoint
 
 [理解Docker容器的进程管理](https://yq.aliyun.com/articles/5545)docker stop  对PID1进程 的要求
 
 1. 支持管理运行过程中可能产生的僵尸/孤儿进程
 2. 容器的PID=1进程需要能够正确的处理SIGTERM信号来支持优雅退出，如果容器中包含多个进程，需要PID=1进程能够正确的传播SIGTERM信号来结束所有的子进程之后再退出。
 
-
 综上，如果一个容器有多个进程，可选的实践方式为：
 
 1. 多个进程关系对等，由一个init 进程管理，比如supervisor、systemd
 2. 一个进程（A）作为主进程，拉起另一个进程（B）
-
-	* A 先挂，因为容器的生命周期与 主进程一致，则进程B 也会被kill 结束
-	* B 先挂，则要看A 是否具备僵尸进程的处理能力（大部分不具备）。若A 不具备，B 成为僵尸进程，容器存续期间，僵尸进程一致存在。
-	* A 通常不支持 SIGTERM
+  * A 先挂，因为容器的生命周期与 主进程一致，则进程B 也会被kill 结束
+  * B 先挂，则要看A 是否具备僵尸进程的处理能力（大部分不具备）。若A 不具备，B 成为僵尸进程，容器存续期间，僵尸进程一致存在。
+  * A 通常不支持 SIGTERM
 
 所以第二种方案通常不可取，对于第一种方案，则有init 进程的选型问题
 
@@ -136,6 +112,40 @@ root 7 6 0 14:50 ? 00:00:00 sleep 100
 
 ## 进程管理工具的选择
 
+### tini
+
+1. bash 是自带僵尸进程回收能力的，但bash 不会将收到的信号传递给它的子进程，它只管自己接收就完事了。
+2. 容器的一般使用专用的init 进程（注册并实现非SIGKILL 和 SIGSTOP  信号的处理函数）， 负责转发信号到所有的子进程，并且回收僵尸进程。 docker原生提供的init进程为tini。 [使用 Tini 清理 Docker 容器僵死进程](https://mp.weixin.qq.com/s/Ktd56YQsU8pP6kUs3_uU4Q)
+
+```sh
+# 启动容器的时候带上个 --init 参数，docker 就会用它自带的 init 进程作为容器的1号进程
+docker run -d --init ubuntu:14.04 bash -c "cd /home/ && sleep 100
+oot@24cc26039c4d:/# ps -ef
+UID PID PPID C STIME TTY TIME CMD
+root 1 0 2 14:50 ? 00:00:00 /sbin/docker-init -- bash -c cd /home/ && sleep 100
+root 6 1 0 14:50 ? 00:00:00 bash -c cd /home/ && sleep 100
+root 7 6 0 14:50 ? 00:00:00 sleep 100
+```
+
+```c
+int reap_zombies(const pid_t child_pid, int* const child_exitcode_ptr) {
+  pid_t current_pid;
+  int current_status;
+  while (1) { 
+    current_pid = waitpid(-1, &current_status, WNOHANG);
+    switch (current_pid) {
+      case -1:
+        if (errno == ECHILD) {
+          PRINT_TRACE("No child to wait");
+          break;
+        }
+…
+```
+
+tini 并不能回收所有的僵尸进程
+1. 对于tini ==> entrypoint ==> 进程1 ==> 进程2，当进程1挂掉后，进程2会成为孤儿进程，被 tini 接管并回收
+2. 对于tini ==> entrypoint ==> 进程1，如果 entrypoint 产生的子进程变成了僵尸进程，那 tini 是回收不了的。因为要让进程1被 tini 接管，就必须把它的父进程 entrypoint 杀掉，因为**僵尸进程能被 tini 回收的前提条件是，僵尸进程的父进程挂掉了**。而杀掉 entrypoint 也就意味着容器需要被重启。所以，这种情况下的僵尸进程 tini 是处理不了的，此时只能通过重启容器来清理僵尸进程。
+
 ### 自定义脚本
 
 官方 [Run multiple services in a container](https://docs.docker.com/config/containers/multi-service_container/)
@@ -147,8 +157,6 @@ root 7 6 0 14:50 ? 00:00:00 sleep 100
 A fully­ powered Linux environment typically includes an ​init​ process that spawns and supervises other processes, such as system daemons. The command defined in the CMD instruction of the Dockerfile is the only process launched inside the Docker container, so ​system daemons do not start automatically, even if properly installed.
 
 [runit - a UNIX init scheme with service supervision](http://smarden.org/runit/)
-
-
 
 Dockerfile
 
@@ -165,7 +173,6 @@ COPY myapp/start.sh /etc/service/myapp/run
 exec command
 ```
 
-	
 在这个Dockerfile 中，CMD 继承自 base image。 将`myapp/start.sh` 拷贝到 容器的 `/etc/service/myapp/run`	文件中即可 被runit 管理，runit 会管理 `/etc/service/` 下的应用（目录可配置），即 Each service is associated with a service directory
 
 这里要注意：记得通过exec 方式执行 command，这涉及到 [shell，exec，source执行脚本的区别](https://www.jianshu.com/p/dd7956aec097)

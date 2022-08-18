@@ -58,7 +58,7 @@ Kubernetes 有一个readiness probe，用来检测项目的健康状态，上下
 
 
 liveness 起初是`/healthcheck`
-1. 有一次运维改动机房网络，导致liveness probe 探测失败（kubelet 无法访问本机所在 容器ip），kubelet 认为liveness probe  不通过 ==> 大量项目重启 ==> 因为项目之间存在依赖关系，依赖服务失败，项目本身启动失败 ==> 频繁重启
+1. 有一次运维改动机房网络，导致liveness probe 探测失败（kubelet 无法访问本机所在 容器ip），kubelet 认为liveness probe  不通过 ==> **livenessProbe涉及到 RestartPolicy**，大量项目重启 ==> 因为项目之间存在依赖关系，依赖服务失败，项目本身启动失败 ==> 频繁重启
 2. 后来我们不再配置 liveness probe ，仅配置readiness probe
     1. 对于物理机坏等场景，k8s 可以正常恢复
     2. 如果容器内存不足 导致实例挂掉，k8s 无法自动重启，这个可以通过内存报警来预防

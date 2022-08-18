@@ -167,7 +167,7 @@ the pause container servers as an anchoring point for the pod and make it easy t
 
 pause container 被称为 infrastructure container，中文有的文章简称 Infra 容器。Infra 容器一定要占用极少的资源，所以它使用的是一个非常特殊的镜像，叫作：`k8s.gcr.io/pause`。这个镜像是一个用汇编语言编写的、永远处于“暂停”状态的容器，解压后的大小也只有 100~200 KB 左右。PS：代码里start/stopSandbox 就是在操作pause 容器
 
-[vivo AI计算平台在线业务落地实践](https://mp.weixin.qq.com/s/nvXm0zEshtOMWrN5mqEHsQ)k8s 给 pod 提供了一个 shareProcessNamespace 特性，可以在 pod 内开启共享 PID 名称空间，将 pod 中的 1 号进程变成了 /pause，并在 /pause 进程中实现了对容器内其他进程的管理，从而避免出现僵尸进程。
+[vivo AI计算平台在线业务落地实践](https://mp.weixin.qq.com/s/nvXm0zEshtOMWrN5mqEHsQ)k8s 给 pod 提供了一个 shareProcessNamespace 特性，可以在 pod 内开启共享 PID 名称空间，将 pod 中的 1 号进程变成了 /pause，并在 /pause 进程中实现了对容器内其他进程的管理，从而避免出现僵尸进程。pod 内其他容器默认情况下不会共享 pause PID Namespace，如果不共享 PID Namespace，那其他容器内的僵尸进程就无法将其父进程变成 pause，pause 自然也回收不了其他容器的僵尸进程。
 
 **Pod 最重要的一个事实是：它只是一个逻辑概念。有了Pod，我们可以说Network Namespace和Volume 不是container A 的，也不是Container B的，而是Pod 的。**。[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)pause 容器作为同一个 Pod 中所有其他容器的基础容器，它为 Pod 中的每个业务容器提供了大量的 Pod 级别资源，这些资源都是 Linux 命名空间（包括网络命名空间，IPC 命名空间和 PID 命名空间）。
 
