@@ -28,7 +28,7 @@ Java 的标准类库，由于其基础性、通用性的定位，往往过于关
 单独从性能角度，Netty 在基础的 NIO 等类库之上进行了很多改进，例如：
 1. 更加优雅的 Reactor 模式实现、灵活的线程模型、利用 EventLoop 等创新性的机制，可以非常高效地管理成百上千的 Channel。
 2. 充分利用了 Java 的 Zero-Copy 机制，并且从多种角度，“斤斤计较”般的降低内存分配和回收的开销。例如，使用池化的 Direct Buffer 等技术，在提高 IO 性能的同时，减少了对象的创建和销毁；**利用反射等技术直接操纵 SelectionKey**，使用数组而不是 Java 容器等。
-3. 使用更多本地代码。例如，直接利用 JNI 调用 Open SSL 等方式，获得比 Java 内建 SSL 引擎更好的性能。
+3. 使用更多本地代码。例如，直接利用 JNI 调用 Open SSL 等方式，获得比 Java 内建 SSL 引擎更好的性能。[密集计算场景下的 JNI 实战](https://mp.weixin.qq.com/s/98uzysR9oUxKBN0zqlthiQ) 未读
 4. 在通信协议、序列化等其他角度的优化。
 
 

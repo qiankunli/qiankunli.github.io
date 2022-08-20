@@ -15,7 +15,7 @@ keywords: serverless
 
 
 
-云计算相关技术的发展，往往有一个特点：云厂商的驱动性非常强，因为云厂商往往会最先感知到普遍性的用户需求，并且有足够的数据支撑其做出合理的判断与创新。所以 Serverless 架构的创新很多时候也都是由厂商驱动的；一篇讲Serverless 的文章有一个留言：Serverless是在服务网格架构之后进行业务逻辑层的改造。Serverless 的核心理念是按需使用，自动弹性。**用户不需要容量规划**。 PS：有点像云厂商直接卖pod/按pod收费
+云计算相关技术的发展，往往有一个特点：云厂商的驱动性非常强，因为云厂商往往会最先感知到普遍性的用户需求，并且有足够的数据支撑其做出合理的判断与创新。所以 Serverless 架构的创新很多时候也都是由厂商驱动的；一篇讲Serverless 的文章有一个留言：Serverless是在服务网格架构之后进行业务逻辑层的改造。Serverless 的核心理念是按需使用，解耦应用和资源，自动弹性。**用户不需要容量规划，即不需要提前评估和预留容量**，在运行时按照实际需求自动伸缩。 PS：有点像云厂商直接卖pod/按pod收费，pod 也尽量不需要配cpu和mem
 
 ![](/public/upload/architecture/serverless_overview.png)
 
@@ -171,7 +171,7 @@ Knative 作为最流行的应用 Severlesss 编排引擎，其中一个核心能
 
 ## 与FaaS的关系
 
-Serverless不等价于FaaS。也有人故意划分为Functions Serverless和容器化的Serverless。
+Serverless不等价于FaaS。也有人故意划分为Functions Serverless和容器化的Serverless。Serverless和FaaS是不同的概念，FaaS在目前的实践中一般都会实现为Serverless，但Serverless并不局限于一定是FaaS模式，比如普通的微服务也是可以以Serverless方式部署的。
 
 FaaS 与应用托管 PaaS（**应用托管平台**） 平台对比，**最大的区别在于资源利用率**，这也是 FaaS 最大的创新点。FaaS 的应用实例可以缩容到 0，而应用托管 PaaS 平台则至少要维持 1 台服务器或容器。FaaS 优势背后的关键点是可以极速启动，现在的云服务商，基于不同的语言特性，冷启动平均耗时基本在 100～700 毫秒之间。
 

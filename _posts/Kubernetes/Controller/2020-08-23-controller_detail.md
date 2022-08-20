@@ -64,3 +64,5 @@ metadata:
     1. minimum-container-ttl-duration, 容器dead 之后多久可以被删除
     2. maximum-dead-containers-per-container, 每个pod 最多允许的dead 容器数量，超过的容器会被删掉
     3. maximum-dead-containers, 主机上最多允许的dead 容器数量，超过的容器会被删掉
+
+[kubelet 垃圾回收机制](https://mp.weixin.qq.com/s/GInMyCUdAjaa2hFX3swbNg)

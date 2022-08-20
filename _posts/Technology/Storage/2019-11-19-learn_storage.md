@@ -59,16 +59,19 @@ On the other hand, ACID’s consistency refers to data integrity guarantees that
 
 上述的各种机制 在mysql、postgresql、tidb 中都有体现，实现一个机制有多种策略，有些策略只能单机用，有些策略可以推广到分布式上。分布式可以有coordinator ，也可以消灭coordinator， 通过不断地 探察本质，逐步逼近实现一个分布式ACID 的原子能力是什么？ 
 
-
-
 ## 数据平台
 
 [爱奇艺基础数据平台演进](https://mp.weixin.qq.com/s/zKZ8jJ1pzNlZ2s3jpeFvJA)
 
 [字节跳动数据库的过去、现状与未来](https://mp.weixin.qq.com/s/4Bvo0EBo_xtKdVcqhGynCQ)
+[字节跳动用九年时间打造出了怎样的数据平台](https://mp.weixin.qq.com/s/kOPmedd4N2OxRP-JEk1c2g)
 
 [业务数据治理体系化思考与实践](https://mp.weixin.qq.com/s/AlxIMPnKcWSyhOSe8-OfTQ)早期以问题驱动治理、凭经验治理为主。主要包括以下几个方面。
 1. 治理认知差异大，思路不统一。治理不彻底、治理经验缺乏沉淀
 2. 治理方法不标准
 3. 治理效率低、效果差
 4. 数据管治缺乏体系化，缺乏整体顶层治理方案设计，问题越来越复杂，单点难解决，不同问题的优先级无法确定。治理不符合MECE原则：每个治理方向由哪些问题组成，哪些最重要，哪些的ROI最高，哪些问题和治理动作可以合并，同一问题在数仓不同主题、不同分层的衡量标准和治理方法应该有哪些差异，都需要在体系化治理中进行考虑。
+
+## 其它
+
+[图数据库存储技术及实践](https://mp.weixin.qq.com/s/NCvw1P5AXWIsDdi2tc5J7Q)
