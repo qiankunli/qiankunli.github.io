@@ -27,9 +27,7 @@ keywords: kubernetes
 |程序分发|镜像仓库|应用商店|
 |系统入口|apiserver|系统调用|
 
-2019.8.13：刘超《趣谈linux操作系统》
-
-最初使用汇编语言的前辈，在程序中需要指定使用的硬件资源，例如，指定使用哪个寄存器、放在内存的哪个位置、写入或者读取那个串口等等。对于这些资源的使用，需要程序员自己心里非常地清楚，要不然一旦 jump 错了位置，程序就无法运行。为了将程序员从对硬件的直接操作中解放出来，我们有了操作系统这一层，用来实现对于硬件资源的统一管理。某个程序使用哪个 CPU、哪部分内存、哪部分硬盘，都由操作系统自行分配和管理。其实操作系统最重要的事情，就是调度（当前任务需要多少资源，当前空闲多少资源，做一个适配）。因此，在内核态就产生这些模块：进程管理子系统、内存管理子系统、文件子系统、设备子系统网络子系统。这些模块通过统一的 API，也就是系统调用，对上提供服务。基于 API，用户态有很多的工具可以帮我们使用好 Linux 操作系统，比如用户管理、软件安装、软件运行、周期性进程、文件管理、网络管理和存储管理。但是到目前为止，我们能管理的还是少数几台机器。当我们面临数据中心成千上万台机器的时候，仍然非常“痛苦”。
+2019.8.13：刘超《趣谈linux操作系统》最初使用汇编语言的前辈，在程序中需要指定使用的硬件资源，例如，指定使用哪个寄存器、放在内存的哪个位置、写入或者读取那个串口等等。对于这些资源的使用，需要程序员自己心里非常地清楚，要不然一旦 jump 错了位置，程序就无法运行。为了将程序员从对硬件的直接操作中解放出来，我们有了操作系统这一层，用来实现对于硬件资源的统一管理。某个程序使用哪个 CPU、哪部分内存、哪部分硬盘，都由操作系统自行分配和管理。其实操作系统最重要的事情，就是调度（当前任务需要多少资源，当前空闲多少资源，做一个适配）。因此，在内核态就产生这些模块：进程管理子系统、内存管理子系统、文件子系统、设备子系统网络子系统。这些模块通过统一的 API，也就是系统调用，对上提供服务。基于 API，用户态有很多的工具可以帮我们使用好 Linux 操作系统，比如用户管理、软件安装、软件运行、周期性进程、文件管理、网络管理和存储管理。但是到目前为止，我们能管理的还是少数几台机器。当我们面临数据中心成千上万台机器的时候，仍然非常“痛苦”。
 
 ![](/public/upload/kubernetes/linux_vs_kubernetes.jpg)
 
@@ -41,7 +39,7 @@ PS：上图很有意思的一点是，将Kubernetes 的各项机制，根据内�
 
 docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜像到 容器的转变。但`docker run` 仍然有太多要表述的，比如`docker run`的各种参数： 资源、网络、存储等，“一个容器一个服务”本身也不够反应应用的复杂性（或者 说还需要额外的信息 描述容器之间的关系，比如`--link`）。
 
-我们学习linux的时候，知道linux 提供了一种抽象：一切皆文件。没有人会质疑基本单元为何是文件不是磁盘块？linux 还提供了一种抽象叫“进程”，没有人会好奇为何 linux 不让你直接操纵cpu 和 内存。一个复杂的系统，最终会在某个层面收敛起来，就好像一个web系统，搞到最后就是一系列object 的crud。类似的，如果我们要实现一个“集群操作系统”，容器的粒度未免太小。也就是说，镜像和容器之间仍然有鸿沟要去填平？kubernetes 叫pod，marathon叫Application，中文名统一叫“应用”。在这里，应用是一组容器的有机组 合，同时也包括了应用运行所需的网络、存储的需求的描述。而像这样一个“描述” 应用的 YAML 文件，放在 etcd 里存起来，然后通过控制器模型驱动整个基础设施的 状态不断地向用户声明的状态逼近，就是 Kubernetes 的核心工作原理了。“有了 Pod 和容 器设计模式，我们的**应用基础设施才能够与应用(而不是容器)进行交互和响应的能力**，实现了“云”与“应用”的直接对接。而有了声明式 API，我们的应用基础而设 施才能真正同下层资源、调度、编排、网络、存储等云的细节与逻辑解耦”。
+我们学习linux的时候，知道linux 提供了一种抽象：一切皆文件。没有人会质疑基本单元为何是文件不是磁盘块？linux 还提供了一种抽象叫“进程”，没有人会好奇为何 linux 不让你直接操纵cpu 和 内存。**一个复杂的系统，最终会在某个层面收敛起来**，就好像一个web系统，搞到最后就是一系列object 的crud。类似的，如果我们要实现一个“集群操作系统”，容器的粒度未免太小。也就是说，镜像和容器之间仍然有鸿沟要去填平？kubernetes 叫pod，marathon叫Application，中文名统一叫“应用”。在这里，应用是一组容器的有机组 合，同时也包括了应用运行所需的网络、存储的需求的描述。而像这样一个“描述” 应用的 YAML 文件，放在 etcd 里存起来，然后通过控制器模型驱动整个基础设施的 状态不断地向用户声明的状态逼近，就是 Kubernetes 的核心工作原理了。“有了 Pod 和容 器设计模式，我们的**应用基础设施才能够与应用(而不是容器)进行交互和响应的能力**，实现了“云”与“应用”的直接对接。而有了声明式 API，我们的应用基础而设 施才能真正同下层资源、调度、编排、网络、存储等云的细节与逻辑解耦”。
 
 关于声明式api，举一个调度例子， 假设一个服务有10个实例，要求两个实例不能在同一个机器上。在“命令式”的传统发布系统中，一般会指定每个实例所在的机器（就像指定数据放在哪个集群器、放在内存的哪个位置一样）而对于k8s，“两个实例不能在同一个机器上”就是一个配置而已， 由k8s相机将实例调度在不同的机器上。PS：笔者最近在团队管理上也有一些困惑， 其实，你直接告诉小伙伴怎么做并不是一个很好的方式，他们不自由，你也很心累。比较好的方式是做好目标管理，由他们自己不断去填平目标与现实的鸿沟。
 
@@ -77,26 +75,6 @@ Kubernetes is highly extensible, from defining new workloads and resource types 
 
 
 
-##  Container Engine cluster
-
-本小节主要来自对[https://cloud.google.com/container-engine/docs](https://cloud.google.com/container-engine/docs)的摘抄，有删减。
-
-本小节主要讲了Container Engine cluster和Pod的概念
-
-A Container Engine cluster is a group of Compute Engine instances running Kubernetes. It consists of one or more node instances, and a Kubernetes master instance. A cluster is the foundation of a Container Engine application—pods,services, and replication controllers all run on top of a cluster.
-
-一个Container Engine cluster主要包含一个master和多个slave节点，它是上层的pod、service、replication controllers的基础。
-
-1. The Kubernetes master, Every cluster has a single master instance. The master provides a unified view into the cluster and, through its publicly-accessible endpoint, is the doorway(途径) for interacting with the cluster.
-2. Nodes, A cluster can have one or more node instances. These are managed from the master, and run the services necessary to support Docker containers. Each node runs the Docker runtime and hosts a Kubelet agent（管理docker runtime）, which manages the Docker containers scheduled on the host. Each node also runs a simple network proxy（网络代理程序）.
-
-**The master runs the Kubernetes API server, which services REST requests, schedules pod creation and deletion on worker nodes, and synchronizes pod information (such as open ports and location) with service information.**
-
-1. 提供统一视图
-2. service REST requests
-3. 调度
-4. 控制，使得actual state满足desired state 
-
 ## 设计理念
 
 [火得一塌糊涂的kubernetes有哪些值得初学者学习的？](https://mp.weixin.qq.com/s/iI5vpK5bVkKmdbf9sbAGWw)
@@ -130,6 +108,8 @@ A Container Engine cluster is a group of Compute Engine instances running Kubern
 ## Kubernetes 仍需进一步发展
 
 [Kubernetes何时才会消于无形却又无处不在？](https://mp.weixin.qq.com/s?__biz=MzA5OTAyNzQ2OA==&mid=2649699253&idx=1&sn=7f47db06b63c4912c2fd8b4701cb8d79&chksm=88930cd6bfe485c04b99b1284d056c886316024ba4835be8967c4266d9364cffcfedaf397acc&mpshare=1&scene=23&srcid=1102iGdvWF6lcNRaDD19ieRy%23rd)一项技术成熟的标志不仅仅在于它有多流行，还在于它有多不起眼并且易于使用。Kubernetes依然只是一个半成品，还远未达到像Linux内核及其周围操作系统组件在过去25年中所做到的那种“隐形”状态。
+
+k8s 重新定义了上下游交付的标准。有了k8s 之前，公有云卖货是 xx 配置服务器xx 钱一年，交付的是虚拟机。有了k8s 之后，公有云交付的是k8s 集群，业务方 将自己的业务 部署到k8s，并根据 需要调用公有云接口 扩容或缩容 k8s 集群。
 
 [解读2018：我们处在一个什么样的技术浪潮当中？](https://mp.weixin.qq.com/s?__biz=MjM5MDE0Mjc4MA==&mid=2651011968&idx=1&sn=3d500660f7dd47c9fa4033bd9fa69c2f&chksm=bdbec3d38ac94ac523355e1e21f04af71e47a0841d1af0afedecc528b5eb4a5f9fe83f105a11&mpshare=1&scene=1&srcid=12217gWDeJ0aPl8BVBUycQyh#rd)Kubernetes 还是太底层了，真正的云计算并不应该是向用户提供的 Kubernetes 集群。2014 年 AWS 推出 Lambda 服务，Serverless 开始成为热词。从理论上说，Serverless 可以做到 NoOps、自动扩容和按使用付费，也被视为云计算的未来。Serverless 是我们过去 25 年来在 SaaS 中走的最后一步，因为我们已经渐渐将越来越多的职责交给了服务提供商。——Joe Emison 《为什么 Serverless 比其他软件开发方法更具优势》
 

@@ -36,6 +36,8 @@ keywords: network
 
 linux内核对命名空间的支持完全隔离了工作环境中应用程序的视野。
 
+一个进程的每种Linux namespace 都可以在对应的`/proc/进程号/ns/` 下有一个对应的虚拟文件，并且链接到一个真实的namespace 文件上。通过`/proc/进程号/ns/` 可以感知到进程的所有linux namespace；一个进程 可以选择加入到一个已经存在的namespace 当中；也就是可以加入到一个“namespace” 所在的容器中。这便是`docker exec`、两个容器共享network namespace 的原理。
+
 ### 来源
 
 命名空间最初是用来解决命名唯一性问题的，即解决不同编码人员编写的代码模块在合并时可能出现的重名问题。

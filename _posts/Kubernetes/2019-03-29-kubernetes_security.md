@@ -44,7 +44,7 @@ Linux capabilities（有点k8s sa 的味道了）
 
 rootless container 中的"rootless"不仅仅指容器中以非 root 用户来运行进程，还指以非 root 用户来创建容器，管理容器。也就是说，启动容器的时候，Docker 或者 podman 是以非 root 用户来执行的。
 
-## k8s访问权限控制
+## k8s访问object权限控制
 
 ![](/public/upload/kubernetes/k8s_api_access_control.svg)
 
@@ -56,7 +56,7 @@ rootless container 中的"rootless"不仅仅指容器中以非 root 用户来运
 
 认证的过程即是证明user身份的过程。Kubernetes中有两类用户：
 
-1. ServiceAccount账户是由Kubernetes提供API（资源）进行创建和管理的，ServiceAccount可以认为是特殊的Secret资源（创建一个ServiceAccount 默认会创建一个Secret），可作为用户集群内资源访问APIServer的认证所用。可以通过mount的方式挂载到Pod内进行使用。
+1. ServiceAccount账户是由Kubernetes提供API（资源）进行创建和管理的，**ServiceAccount可以认为是特殊的Secret资源**（创建一个ServiceAccount 默认会创建一个Secret），可作为用户集群内资源访问APIServer的认证所用。可以通过mount的方式挂载到Pod内进行使用。
 2. 真实的用户通常是从外部发起请求访问APIServer，由管理员管理认证凭证，而Kubernetes本身不管理任何的用户和凭证信息的，即所有的用户都是逻辑上的用户，无法通过API调用Kubernetes API进行创建真实用户。
 
 [Managing Service Accounts](https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/)

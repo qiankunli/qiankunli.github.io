@@ -49,7 +49,9 @@ keywords: learn kubernetes
 
 随着 Kubernetes 基础设施越来越复杂，第三方插件与能力越来越多，社区的维护者们也发现 Kubernetes 这个“数据库”内置的“数据表”无论从规模还是复杂度上，都正在迎来爆炸式的增长。所以  Kubernetes 社区很早就在讨论如何给 Kubernetes  设计出一个“数据视图（View）”出来。阿里正在推 （OAM）及 oam-kubernetes-runtime。
 
-k8s 重新定义了上下游交付的标准。有了k8s 之前，公有云卖货是 xx 配置服务器xx 钱一年，交付的是虚拟机。有了k8s 之后，公有云交付的是k8s 集群，业务方 将自己的业务 部署到k8s，并根据 需要调用公有云接口 扩容或缩容 k8s 集群。
+
+
+声明式的好处 在[ansible学习](http://qiankunli.github.io/2018/12/29/ansible.html) ansible 与其它集群操作工具saltstack等的对比中也有体现。
 
 ## 通用实现
 
@@ -61,66 +63,6 @@ k8s 重新定义了上下游交付的标准。有了k8s 之前，公有云卖货
 4. 通过Informer 提供过的Lister 拥有遍历数据的能力，将操作结果 重新通过kubeclient 写入到apiserver 
 
 ![](/public/upload/kubernetes/component_overview.png)
-
-## 从技术实现角度的整体设计
-
-[A few things I've learned about Kubernetes](https://jvns.ca/blog/2017/06/04/learning-about-kubernetes/) 值得读三遍
-
-[47 advanced tutorials for mastering Kubernetes](https://techbeacon.com/top-tutorials-mastering-kubernetes) 设计k8s 的方方面面，未详细读
-
-### 从单机到集群到调度
-
-一个逻辑链条是 kubelet ==> api server ==> scheduler。当你一想k8s有点懵的时候，可以从这个角度去发散。
-
-1. the “kubelet” is in charge of running containers on nodes
-2. If you tell the API server to run a container on a node, it will tell the kubelet to get it done (indirectly)
-3. the scheduler translates “run a container” to “run a container on node X”
-
-kubelet/api server/scheduler 本身可能会变，但它们的功能以及 彼此的交互接口 不会变的太多，it’s a good place to start
-
-### 源码包结构
-
-[kubernetes源码解读——源码结构](https://blog.csdn.net/ZQZ_QiZheng/article/details/54729869)
-
-![](/public/upload/kubernetes/k8s_source_package.png)
-
-1. pkg是kubernetes的主体代码，里面实现了kubernetes的主体逻辑
-2. cmd是kubernetes的所有后台进程的代码，主要是各个子模块的启动代码，具体的实现逻辑在pkg下
-3. plugin主要是kube-scheduler和一些插件
-
-源码地址 [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes)
-
-```
-go get -d k8s.io/kubernetes
-cd $GOPATH/src/k8s.io/kubernetes
-```
-
-然后使用ide 工具比如goland 等就可以打开Kubernetes 文件夹查看源码了。
-
-感觉你 `go get github.com/kubernetes` 也没什么错，但因为代码中 都是 `import k8s.io/kubernetes/xxx` 所以推荐前者
-
-
-## 如何看待k8s
-
-笔者最开始接触k8s 是想用k8s 接管公司的测试环境，所以一直以来对k8s的理解停留在 如何将一个项目运行在k8s上，之后向前是ci/cd，向后是监控报警等。一直以来有两个误区：
-1. 虽然知道k8s 支持crd，但只是认为crd 是增强服务发布能力的。**以发布、运行服务为主来先入为主的理解k8s**。
-2. k8s 是声明式的，所以crd 也应该是声明式的。
-
-这个印象在openkruise 推出ImagePullJob 之后产生了动摇，这个crd的作用是将 image 下发到指定个规则的node上。[面对不可避免的故障，我们造了一个“上帝视角”的控制台](https://mp.weixin.qq.com/s/QxTMLqf8VspXWy4N4AIFuQ) 中chaosblade 的crd 则支持向某个进程注入一个故障。chaosblade  本身首先是一个故障注入平台，然后才是支持在k8s 平台上支持故障注入（物理机也是支持的）。
-
-[TKE qGPU 通过 CRD 管理集群 GPU 卡资源](https://mp.weixin.qq.com/s/mIgh689r7-1veyAQ2DeU0Q)通过 GPU CRD 扫描物理 GPU 的信息，并在 qGPU 生命周期中更新使用到的物理 GPU 资源，从而解决在共享 GPU 场景下缺少可见性的问题。
-
-另一个例子是自动扩缩容，其实并不复杂，直接api 变更replicas 即可。 但hpa 提供一个 平台化的能力来 做这件事（metric + 策略 + 控制器），是很值得思考的一个点。
-
-当然这个观点在 [面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA) 被认为是错误的。几个错误思维：
-1. 一切设计皆 YAML；
-2. 一切皆合一；
-3. 一切皆终态；
-4. 一切交互皆 cr。
-
-[谈谈 Kubernetes 的问题和局限性](https://mp.weixin.qq.com/s/ULfmxZh2PBYK-298Xskf2Q)
-
-[Kubernetes 上分布式系统的演化](https://mp.weixin.qq.com/s/9Oz9sSWHYRVps2N8nqjvhA)
 
 ## 一个充分支持扩展的系统
 
@@ -148,3 +90,25 @@ Kubernetes 本身就是微服务的架构，虽然看起来复杂，但是容易
 [你该如何为 Kubernetes 定制特性](https://mp.weixin.qq.com/s/0XZa2KBubdNtN6sJTonluA)
 
 [假如重新设计Kubernetes](https://mp.weixin.qq.com/s/QgROwPVRgpE-jF7vMtjJcQ)
+
+## 从技术实现角度的整体设计
+
+[A few things I've learned about Kubernetes](https://jvns.ca/blog/2017/06/04/learning-about-kubernetes/) 值得读三遍
+
+[47 advanced tutorials for mastering Kubernetes](https://techbeacon.com/top-tutorials-mastering-kubernetes) 设计k8s 的方方面面，未详细读
+
+
+[kubernetes源码解读——源码结构](https://blog.csdn.net/ZQZ_QiZheng/article/details/54729869)
+
+![](/public/upload/kubernetes/k8s_source_package.png)
+
+1. pkg是kubernetes的主体代码，里面实现了kubernetes的主体逻辑
+2. cmd是kubernetes的所有后台进程的代码，主要是各个子模块的启动代码，具体的实现逻辑在pkg下
+3. plugin主要是kube-scheduler和一些插件
+
+源码地址 [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes)
+
+```
+go get -d k8s.io/kubernetes
+cd $GOPATH/src/k8s.io/kubernetes
+```

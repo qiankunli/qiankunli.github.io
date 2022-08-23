@@ -260,6 +260,8 @@ func printiface(i iface) {
 
 ## 反射
 
+[Golang 中反射的应用与理解](https://mp.weixin.qq.com/s/TmzV2VTfkE8of2_zuKa0gA)反射，就是能够在运行时更新变量和检查变量的值、调用变量的方法和变量支持的内在操作，而不需要在编译时就知道这些变量的具体类型。这种机制被称为反射。Golang 的基础类型是静态的（也就是指定 int、string 这些的变量，它的 type 是 static type），在创建变量的时候就已经确定，反射主要与 Golang 的 interface 类型相关（它的 type 是 concrete type），只有运行时 interface 类型才有反射一说。当程序运行时， 我们获取到一个 interface 变量， 程序应该如何知道当前变量的类型，和当前变量的值呢？当然我们可以有预先定义好的指定类型， 但是如果有一个场景是我们需要编写一个函数，能够处理一类共性逻辑的场景，但是输入类型很多，或者根本不知道接收参数的类型是什么，或者可能是没约定好；也可能是传入的类型很多，这些类型并不能统一表示。这时反射就会用的上了，典型的例子如：json.Marshal。在 Golang 中为我们提供了两个方法，分别是 reflect.ValueOf  和 reflect.TypeOf，见名知意这两个方法分别能帮我们获取到对象的值和类型。Valueof 返回的是 Reflect.Value 对象，是一个 struct,而 typeof 返回的是 Reflect.Type 是一个接口。我们只需要简单的使用这两个进行组合就可以完成多种功能。
+
 [深度解密GO语言之反射](https://juejin.im/post/5cd0d6ed6fb9a0321556f618)反射的本质是程序在运行期探知对象的类型信息和内存结构（泛化一点说，就是我想知道某个指针对应的内存里有点什么），不用反射能行吗？可以的！使用汇编语言，直接和内层打交道，什么信息不能获取？但是，当编程迁移到高级语言上来之后，就不行了！就只能通过反射来达到此项技能。
 
 ![](/public/upload/go/go_reflect.jpeg)
@@ -267,6 +269,8 @@ func printiface(i iface) {
 reflect 包里定义了一个接口`reflect.Type`和一个结构体`reflect.Value`，它们提供很多函数来获取存储在接口里的类型信息，反射包中的所有方法基本都是围绕着 Type 和 Value 这两个类型设计的。`reflect.Type` 主要提供关于类型相关的信息，所以它和 _type 关联比较紧密； `reflect.Value` 则结合 `_type` 和 data 两者，因此程序员可以获取甚至改变类型的值。
 
 ![](/public/upload/go/reflect_object.png)
+
+
 
 ### TypeOf
 

@@ -112,7 +112,9 @@ keywords: hpc 对象存储 AI
 
 [B站基于Iceberg + Alluxio 助力湖仓一体项目落地实践](https://mp.weixin.qq.com/s/ydGwr3ehOty2EwqiSm_A6w) 未读
 
-[重新定义容器化 Serverless 应用的数据访问](https://mp.weixin.qq.com/s/GN7FBxOQYJdol6rEBQ2WSA)Fluid 的实质是利用计算集群的空闲资源（CPU，Memory，Disk）和特定场景的抽象假设简化问题，通过数据分流（Data Offloading）降低中心存储的压力；就近缓存（Tiered Locality Cache）和亲和性调度（Cache Locality Scheduling）提升数据访问性能；在计算资源高并发访问数据的时候，通过自动化扩容缓存集群提供弹性 IO 吞吐能力。
+[重新定义容器化 Serverless 应用的数据访问](https://mp.weixin.qq.com/s/GN7FBxOQYJdol6rEBQ2WSA)[Fluid](https://github.com/fluid-cloudnative/fluid) is an open source Kubernetes-native Distributed Dataset Orchestrator and Accelerator for data-intensive applications, such as big data and AI applications.云原生环境与更早的大数据处理框架在设计理念和机制上存在天然分歧。深受Google三篇论文GFS、MapReduce、BigTable影响的Hadoop大数据生态，从诞生之初即信奉和实践“移动计算而不是数据”的理念。因此以Spark，Hive，MapReduce为代表的数据密集型计算框架及其应用为减少数据传输，其设计更多地考虑数据本地化架构。但随着时代的变迁，为兼顾资源扩展的灵活性与使用成本，计算和存储分离的架构在更新兴的云原生环境中大行其道。因此云原生环境里需要类似Fluid这样的一款组件来**补充大数据框架拥抱云原生以后的数据本地性的缺失**。
+
+Fluid 的实质是利用计算集群的空闲资源（CPU，Memory，Disk）和特定场景的抽象假设简化问题，通过数据分流（Data Offloading）降低中心存储的压力；就近缓存（Tiered Locality Cache）和亲和性调度（Cache Locality Scheduling）提升数据访问性能；在计算资源高并发访问数据的时候，通过自动化扩容缓存集群提供弹性 IO 吞吐能力。Fluid Dataset资源对象准备完成后（即与Alluxio实例绑定后），与该资源对象关联的PV, PVC已经由Fluid生成，应用可以通过该PVC完成远程文件在Pod中的挂载，并通过挂载目录实现远程文件访问。PS：Dataset 表述了要访问哪些数据源文件，对pod 提供了pv和pvc ，对下封装了缓存、数据集调度等能力。
 
 ![](/public/upload/storage/fluid_overview.png)
 

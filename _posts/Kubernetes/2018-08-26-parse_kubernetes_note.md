@@ -10,8 +10,6 @@ keywords: kubernetes
 
 ## 简介
 
-本文来自对极客时间《深入剖析kubernetes》的学习，作者本身对k8s 有一定的基础，但认为同样一个事情 听听别人 如何理解、表述 是很有裨益的，尤其是作者 还是k8s 领域的大牛。
-
 作者在开篇中提到的几个问题 ，也是笔者一直的疑惑
 
 1. 容器技术纷繁复杂，“牵一发而动全身”的主线 在哪里
@@ -28,9 +26,7 @@ PaaS 主要是提供了一种名叫“应用托管”的能力。虚拟机技术
 1. 将云端虚拟机 做的尽量与 本地环境一样
 2. 无论本地还是云端，代码都跑在 约定的环境里 ==> docker 镜像的精髓
 
-与《尽在双11》作者提到的 “docker 最重要的特质是docker 镜像” 一致，docker 镜像提供了一种非常便利的打包机制。
-
-《阿里巴巴云原生实践15讲》应用的开发者不应该关注于虚拟机等底层基 础设施，而应该专注在编写业务逻辑这件最有价值的事情上。这个理念，在越来越多 的人得以通过云的普及开始感受到管理基础设施的复杂性和高成本之后，才变得越来 越有说服力。在这幅蓝图中，Linux 容器已经跳出了**进程沙箱**的局限性，开始扮演着“应用容器”的角色。在这个新的舞台上，容器和应用终于画上了等号，这才最终使 得平台层系统能够实现应用的全生命周期托管。PS：把你的代码给我，再告诉我需要多少cpu和内存，就可以run起来了。跑在那个机器上？你不用关心。8080端口可以用么？随你便。挂了怎么办？自动给你拉起来。更新代码呢？一条命令就可以。
+《阿里巴巴云原生实践15讲》应用的开发者不应该关注于虚拟机等底层基 础设施，而应该专注在编写业务逻辑这件最有价值的事情上。这个理念，在越来越多 的人得以通过云的普及开始感受到管理基础设施的复杂性和高成本之后，才变得越来 越有说服力。在这幅蓝图中，Linux 容器已经跳出了**进程沙箱**的局限性，开始扮演着“应用容器”的角色。在这个新的舞台上，容器和应用终于画上了等号，这才最终使 得平台层系统能够实现应用的全生命周期托管。PS：把你的代码给我，再告诉我需要多少cpu和内存，就可以run起来了。跑在哪个机器上？你不用关心。8080端口可以用么？随你便。挂了怎么办？自动给你拉起来。更新代码呢？一条命令就可以。
 
 
 ### 农村包围城市
@@ -59,13 +55,7 @@ java 是一个单机版的业务逻辑实现语言，但在微服务架构成为
 1. 很多资源无法隔离，也就是说隔离是不彻底的。比如宿主机的 时间，你设置为0时区，我设置为东八区，肯定乱套了
 2. 很多linux 命令依赖 /proc，比如top，而 容器内/proc 反应的是 宿主机的信息
 
-对于大多数开发者而言，他们对应用依赖的理解，一直局限在编程语言层面，比如golang的godeps.json。容器镜像 打包的不只是应用， 还有整个操作系统的文件和目录。这就意味着，应用以及它运行所需要的所有依赖，都被封装在了一起，进而成为“沙盒”的一部分。参见 [linux 文件系统](http://qiankunli.github.io/2018/05/19/linux_file_mount.html)
-
-默认情况下，Docker 会为你提供一个隐含的ENTRYPOINT，即`/bin/sh -c`。所以在不指定ENTRYPOINT时，CMD的内容就是ENTRYPOINT 的参数。因此，一个不成文的约定是称docker 容器的启动进程为ENTRYPOINT 进程。
-
-一个进程的每种Linux namespace 都可以在对应的`/proc/进程号/ns/` 下有一个对应的虚拟文件，并且链接到一个真实的namespace 文件上。通过`/proc/进程号/ns/` 可以感知到进程的所有linux namespace；一个进程 可以选择加入到一个已经存在的namespace 当中；也就是可以加入到一个“namespace” 所在的容器中。这便是`docker exec`、两个容器共享network namespace 的原理。
-
-一个 容器，可以被如下看待
+对于大多数开发者而言，他们对应用依赖的理解，一直局限在编程语言层面，比如golang的godeps.json。容器镜像 打包的不只是应用， 还有整个操作系统的文件和目录。这就意味着，应用以及它运行所需要的所有依赖，都被封装在了一起，进而成为“沙盒”的一部分。一个 容器，可以被如下看待
 
 1. 在docker registry 上 由manifest + 一组blob/layer 构成的镜像文件
 2. 一组union mount 在`/var/lib/docker/aufs/mnt` 上的rootfs
@@ -103,14 +93,6 @@ PS：从Borg 在google 基础设施的定位看，**或许我们学习k8s，不�
 
 ![](/public/upload/kubernetes/k8s_framework.JPG)
 
-PS：笔者一直对CNI、CSI 有点困惑，为什么不将其纳入到container runtime/oci 的范畴。在此猜测一番
-
-1. oci 的两个部分：runtime spec 和 image spec，runtime spec不说了oci就是干这事儿的。对于后者，image spec 若是不统一，runtime spec 也没法统一，更何况docker image才是 docker 的最大创新点，所以干脆放一起了。
-2. docker 给人的错觉是 创建容器 与 配置容器volume/network 是一起的，其实呢，完全可以在容器启动之后，通过csi、cni 驱动相关工具（比如容器引擎）去做。
-2. 若是oci 纳入了CSI 和 CNI，则oci 就不是一个单机跑的小工具了。csi和cni 都需要对全局状态有所感知，比如提供一个ipam driver 来维护已分配/未分配的ip。当然，将CNI、CSI 从OCI中剥离，由k8s 在编排/调度层直接操纵，使其最大限度了减少了对container runtime 的依赖性。
-
-2018.9.20 补充，笔者通过私信问了作者，回答是：CNI、CSI 属于PaaS层。
-
 k8s 强在哪里
 
 1. 看k8s的组件图，包括master 和node
@@ -128,47 +110,8 @@ k8s 强在哪里
 
 	![](/public/upload/kubernetes/k8s_pod.PNG)
 
-声明式的好处 在[ansible学习](http://qiankunli.github.io/2018/12/29/ansible.html) ansible 与其它集群操作工具saltstack等的对比中也有体现。
 
 kubernetes 真正的价值，在于提供了一套基于容器构建分布式系统的基础依赖。k8s提供了一种宏观抽象，作为一个集群操作系统，运行各种类型的应用。
-
-## k8s 部署
-
-kubelet 这个奇怪的名字，来自于Borg项目里的同源组件Borglet
-
-![](/public/upload/kubernetes/k8s_work.png)
-
-部署跟k8s的运行机制分不开，具体的说就是
-
-||部署什么|如何部署|
-|---|---|---|
-|master节点|三大组件|容器|
-|node节点|kubelet|直接运行|
-||插件，比如kube-proxy/dns/网络/可视化/存储|容器|
-||zk|看个人喜欢|
-
-当应用本身发生变化时 开发和运维可以通过容器和镜像来进行同步。 当应用部署参数发生变化时，这些yaml 文件就是它们相互沟通和信任的媒介。
-
-关联内容参见 [在CoreOS集群上搭建Kubernetes](http://qiankunli.github.io/2015/01/29/Kubernetes_installation.html)
-
-## kubernetes objects
-
-![](/public/upload/kubernetes/parse_k8s_1.png)
-
-yaml配置参见[kubernetes yaml配置](http://qiankunli.github.io/2018/11/04/kubernetes_yaml.html) 
-
-|现在|未来|
-|---|---|
-|进程|容器|
-|进程组|pod|
-|可执行文件|镜像|
-|操作系统|kubernetes|
-
-在细讲k8s的具体技术时，文章的主要脉络：
-
-![](/public/upload/kubernetes/parse_k8s_skeleton.png)
-
-[Kubernetes controller 组件](http://qiankunli.github.io/2015/03/03/kubernetes_controller.html)
 
 ## 小结
 
