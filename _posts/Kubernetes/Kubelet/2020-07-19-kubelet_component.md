@@ -349,6 +349,45 @@ k8s.io/kubernetes
 
 [Kubelet从人门到放弃：拓扑管理](https://mp.weixin.qq.com/s/L02BjTt4Znpw3KrllkeP-Q)
 
+## Pod生命周期管理
+
+[Kubernetes 设计模式之生命周期管理](https://mp.weixin.qq.com/s/2WJvhW-nKNnkVW45f9HVOQ)
+
+![](/public/upload/kubernetes/pod_hook.png)
+
+注意
+1. postStart 与 entrypoint 是异步的
+2. preStop 必须在terminationGracePeriodSeconds内完成（默认30s)，一些妙用
+    1. 不管容器因为什么原因失败，做一些清理工作。比如容器挂在了volume 写了一些临时文件，容器退出后，清理临时文件
+    2. 容器因为一些原因退出时（比如oom），记录oom信息 [Kubernetes PreStop hook for container crash troubleshooting](https://dzlab.github.io/kubernetes/2021/12/16/k8s-prestop/)
+
+从源码可以看到，preStop 是在容器中执行的。
+
+```go
+// kubernetes@v1.15.10/pkg/kubelet/lifecycle/handlers.go
+func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod, container *v1.Container, handler *v1.Handler) (string, error) {
+	switch {
+	case handler.Exec != nil:
+		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
+		return msg, err
+	case handler.HTTPGet != nil:
+		msg, err := hr.runHTTPHandler(pod, container, handler)
+		return msg, err
+	default:
+		err := fmt.Errorf("Invalid handler: %v", handler)
+		msg := fmt.Sprintf("Cannot run handler: %v", err)
+		klog.Errorf(msg)
+		return msg, err
+	}
+}
+// kubernetes@v1.15.10/pkg/kubelet/kuberuntime/kuberuntime_container.go
+func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID, cmd []string, timeout time.Duration) ([]byte, error) {
+	stdout, stderr, err := m.runtimeService.ExecSync(id.ID, cmd, timeout)
+	return append(stdout, stderr...), err
+}
+```
+
+
 ## 其它
 
 1. PodManager, Pod 在内存中的管理结构，crud 访问kubelet 内存中的Pod 都通过它（线程安全），包括mirror Pod 和static Pod

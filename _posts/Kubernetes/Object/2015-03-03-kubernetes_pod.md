@@ -163,9 +163,7 @@ all containers within a single pod share the same network namespace. 那么现�
 2. 假设container1 挂了（比如业务代码问题），则就殃及container2, container3 。
 3. 尤其container3 还没有启动的时候，container1 挂了，那container3 怎么办呢？
 
-the pause container servers as an anchoring point for the pod and make it easy to determine what network namespace the pod containers should join. 
-
-pause container 被称为 infrastructure container，中文有的文章简称 Infra 容器。Infra 容器一定要占用极少的资源，所以它使用的是一个非常特殊的镜像，叫作：`k8s.gcr.io/pause`。这个镜像是一个用汇编语言编写的、永远处于“暂停”状态的容器，解压后的大小也只有 100~200 KB 左右。PS：代码里start/stopSandbox 就是在操作pause 容器
+the pause container servers as an anchoring point for the pod and make it easy to determine what network namespace the pod containers should join. pause container 被称为 infrastructure container，中文有的文章简称 Infra 容器。Infra 容器一定要占用极少的资源，所以它使用的是一个非常特殊的镜像，叫作：`k8s.gcr.io/pause`。这个镜像是一个用汇编语言编写的、永远处于“暂停”状态的容器，解压后的大小也只有 100~200 KB 左右。PS：代码里start/stopSandbox 就是在操作pause 容器
 
 [vivo AI计算平台在线业务落地实践](https://mp.weixin.qq.com/s/nvXm0zEshtOMWrN5mqEHsQ)k8s 给 pod 提供了一个 shareProcessNamespace 特性，可以在 pod 内开启共享 PID 名称空间，将 pod 中的 1 号进程变成了 /pause，并在 /pause 进程中实现了对容器内其他进程的管理，从而避免出现僵尸进程。pod 内其他容器默认情况下不会共享 pause PID Namespace，如果不共享 PID Namespace，那其他容器内的僵尸进程就无法将其父进程变成 pause，pause 自然也回收不了其他容器的僵尸进程。
 

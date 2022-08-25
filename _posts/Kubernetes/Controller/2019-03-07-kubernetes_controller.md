@@ -41,19 +41,19 @@ for {
 
 ## 整体架构
 
-《programming kubernetes》 Kubernetes **控制平面**大量使用事件和松散耦合的组件。其它分布式系统使用rpc 来触发行为。但Kubernetes 并没有这么做（**纯粹依赖事件来进行多组件协同，许多独立的控制循环只通过 api server 上对象的变化进行通信**）。Kubernetes controller 监听api server 中的Kubernetes 对象操作：添加、删除、更新。当发生此类事件时，controller 将执行其业务逻辑。监听事件 是通过api server 和controller 之间的http 长连接发送，从而驱动informer
+《programming kubernetes》 Kubernetes **控制平面**大量使用事件和松散耦合的组件。其它分布式系统使用rpc 来触发行为。但Kubernetes 并没有这么做（**纯粹依赖事件来进行多组件协同，许多独立的控制循环只通过 api server 上对象的变化进行通信**，有点事件驱动架构的意思，根据对象变动采取动作，所谓采取动作也是cud对象）。Kubernetes controller 监听api server 中的Kubernetes 对象操作：添加、删除、更新。当发生此类事件时，controller 将执行其业务逻辑。监听事件 是通过api server 和controller 之间的http 长连接发送，从而驱动informer
 
 ![](/public/upload/kubernetes/k8s_custom_controller.png)
 
 ### 控制器与Informer——如何高效监听一个http server
 
-控制器与api server的关系——从拉取到监听：In order to retrieve an object's information, the controller sends a request to Kubernetes API server.However, repeatedly retrieving information from the API server can become expensive. Thus, in order to get and list objects multiple times in code, Kubernetes developers end up using cache which has already been provided by the **client-go** library. Additionally, the controller doesn't really want to send requests continuously. It only cares about events when the object has been created, modified or deleted. 
+控制器与api server的关系——从拉取到监听：In order to retrieve an object's information, the controller sends a request to Kubernetes API server.However, repeatedly retrieving information from the API server can become expensive. Thus, in order to get and list objects multiple times in code, Kubernetes developers end up **using cache** which has already been provided by the **client-go** library. Additionally, the controller doesn't really want to send requests continuously. It only cares about events when the object has been created, modified or deleted. 
 
 ![](/public/upload/kubernetes/k8s_controller_model.png)
 
 上图上半部分为client-go 原理，下半部分是informer 与controller 的交互。Informer  间接通过工作队列（Workqueue）与controller 通信
 1. Informer  可以添加自定义回调函数，但controller 并不直接 注册业务 逻辑到 informer 回调上。一旦有资源被添加、修改或删除，就会将相应的事件加入到工作队列中。
-2. 工作队列用于状态更新事件的有序处理并协助实现重试。所有的控制器排队进行读取，一旦某个控制器发现这个事件与自己相关，就执行相应的操作。如果操作失败，就将该事件放回队列，等下次排到自己再试一次。如果操作成功，就将该事件从队列中删除。 
+2. **工作队列用于状态更新事件的有序处理并协助实现重试**。所有的控制器排队进行读取，一旦某个控制器发现这个事件与自己相关，就执行相应的操作。如果操作失败，就将该事件放回队列，等下次排到自己再试一次。如果操作成功，就将该事件从队列中删除。 
 
 ### 事件驱动
 

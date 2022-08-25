@@ -18,7 +18,7 @@ Kubernetes 跟 Docker 等很多项目最大的不同，就在于它不推荐你�
 
 1. Convenience，比如`kubectl create -f https://k8s.io/examples/application/deployment.yaml --record` 命令行可这样玩不了
 2. Maintenance， 比如使用git 管理
-3. Flexibility，也就是说表达能力更强
+3. Flexibility，也就是说表达能力更强，也是helm 这些工具工作的基础
 
 
 [简化 Kubernetes Yaml 文件创建](https://yq.aliyun.com/articles/341213)由于Yaml文件格式比较复杂，即使是老司机有时也不免会犯错或需要查询文档，因此可以dry-run 一下，`kubectl run myapp --image=nginx --dry-run -o yaml` 会输出模拟运行 nginx 镜像的yaml 文件内容，copy-paste 即可。或者你可以` kubectl get deployment my-nginx -o yaml ` 查看一个已有 kubernetes object 的配置，依葫芦画瓢。

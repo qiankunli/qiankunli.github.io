@@ -49,20 +49,8 @@ keywords: learn kubernetes
 
 随着 Kubernetes 基础设施越来越复杂，第三方插件与能力越来越多，社区的维护者们也发现 Kubernetes 这个“数据库”内置的“数据表”无论从规模还是复杂度上，都正在迎来爆炸式的增长。所以  Kubernetes 社区很早就在讨论如何给 Kubernetes  设计出一个“数据视图（View）”出来。阿里正在推 （OAM）及 oam-kubernetes-runtime。
 
-
-
 声明式的好处 在[ansible学习](http://qiankunli.github.io/2018/12/29/ansible.html) ansible 与其它集群操作工具saltstack等的对比中也有体现。
 
-## 通用实现
-
-除apiserver/kubectl 之外（kubelet 类似，但更复杂些），与api server 通信的Controller/Scheduler 的业务逻辑几乎一致
-
-1. 组件需要与apiserver 交互，但核心功能组件不直接与api-server 通信，而是抽象了一个Informer 负责apiserver 数据的本地cache及监听。Informer 还会比对 资源是否变更（依靠内部的Delta FIFO Queue），只有变更的资源 才会触发handler。**因为Informer 如此通用，所以Informer 的实现在 apiserver 的 访问包client-go 中**。*在k8s推荐的官方java库中，也支持直接创建Informer 对象*。
-2. 组件 全部采用control loop 逻辑
-3. 组件 全部内部维护一个 queue队列，通过注册Informer事件 函数保持 queue数据的更新 或者说 作为队列的生产者，control loop 作为队列的消费者。
-4. 通过Informer 提供过的Lister 拥有遍历数据的能力，将操作结果 重新通过kubeclient 写入到apiserver 
-
-![](/public/upload/kubernetes/component_overview.png)
 
 ## 一个充分支持扩展的系统
 
@@ -112,3 +100,14 @@ Kubernetes 本身就是微服务的架构，虽然看起来复杂，但是容易
 go get -d k8s.io/kubernetes
 cd $GOPATH/src/k8s.io/kubernetes
 ```
+
+## k8s各个组件的实现思路
+
+除apiserver/kubectl 之外（kubelet 类似，但更复杂些），与api server 通信的Controller/Scheduler 的业务逻辑几乎一致
+
+1. 组件需要与apiserver 交互，但核心功能组件不直接与api-server 通信，而是抽象了一个Informer 负责apiserver 数据的本地cache及监听。Informer 还会比对 资源是否变更（依靠内部的Delta FIFO Queue），只有变更的资源 才会触发handler。**因为Informer 如此通用，所以Informer 的实现在 apiserver 的 访问包client-go 中**。*在k8s推荐的官方java库中，也支持直接创建Informer 对象*。
+2. 组件 全部采用control loop 逻辑
+3. 组件 全部内部维护一个 queue队列，通过注册Informer事件 函数保持 queue数据的更新 或者说 作为队列的生产者，control loop 作为队列的消费者。
+4. 通过Informer 提供过的Lister 拥有遍历数据的能力，将操作结果 重新通过kubeclient 写入到apiserver 
+
+![](/public/upload/kubernetes/component_overview.png)

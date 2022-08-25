@@ -190,7 +190,9 @@ https://github.com/tencentmusic/cube-studio/wiki
 
 ### 存储
 
-hdfs+MapReduce 存算一体 ==> 存算分离 ==> 存算分离+Alluxio粘合。
+整体脉络：hdfs+MapReduce 存算一体 ==> 存算分离 ==> 存算分离+Alluxio粘合。
+
+如何分析一个任务的io耗时？一般GPU利用率70%以上说明短板不是在数据读取了。可以做一些对比实验，比如单节点单任务，数据放到内存，对比下gpu利用率。一般训练过程中卡顿，除非在tf dag中有一些利用率低的op算子，否则大部分都是dataloader/prefetch的问题，有的是dataloader的设计问题，有的是硬盘问题。
 
 [Fluid + JindoFS 助力微博海量小文件模型训练速度提升 18 倍](https://mp.weixin.qq.com/s/Ome6v7BYlvyqzXbliJ6Ieg)
 1. 计算存储分离架构导致数据访问高延时，导致训练慢。平台的文件存储在远端的分布式存储中，但是计算集群可能是**不同网络的私有集群**。
@@ -200,8 +202,7 @@ hdfs+MapReduce 存算一体 ==> 存算分离 ==> 存算分离+Alluxio粘合。
 
 [如何用Alluxio来加速云上深度学习训练？](https://mp.weixin.qq.com/s/QiZnqc0LVzLtotgsxy_b3w)在Alluxio之上可以对接不同的数据应用，包括Spark、Flink这种ETL工具，presto这种query工具，以及TensorFlow、PyTorch等深度学习框架。在Alluxio下面也可以连接不同数据源，比如阿里云、腾讯云、HDFS等。**深度学习训练框架PyTorch、TensorFlow、Caffe，它们的原生数据源都是本地文件系统。企业数据量日益扩大，导致我们需要去使用分布式数据源**。Alluxio可以把来自不同的远端存储系统，以及分布式文件系统的数据都挂载到Alluxio统一的命名空间之内。通过Alluxio POSIX API，把这些数据变成类似于本地文件的形式，提供给各种训练任务。对数据进行读写缓存，对元数据进行本地缓存。A ==> hdfs ==> B 可以变为 A ==> Alluxio ==> hdfs ==> Alluxio ==> B，实际数据还未写入hdfs 即可被读取，即使数据持久化的速度比较慢，也不影响B。PS：深度学习有很多epoch，一个文件会被读取epoch次，理论上说，如果训练样本大于单节点 内存，那么第二轮epoch 不会比第一轮epoch快多少，还得从hdfs 再读一下，这个时候用缓存就很有意义。不过推广搜如果数据量很大（几亿条），一般epoch=1。如果数据量较小，则epoch会比较多。小时级更新的模型，尽管数据量小，因为时间限制，epoch也不会很大。
 
-如何分析一个任务的io耗时、通信耗时？对于io耗时，一般GPU利用率70%以上说明短板不是在数据读取了。可以做一些对比实验，比如单节点单任务，数据放到内存，对比下gpu利用率。一般训练过程中卡顿，除非在tf dag中有一些利用率低的op算子，否则大部分都是dataloader的问题，有的是dataloader的设计问题，有的是硬盘问题。
-    
+
 [Atlas超算平台基于 Fluid + Alluxio 的计算加速实践](https://mp.weixin.qq.com/s/mHAAOv9D5oNKsejfJQsDjA) 对于音频训练场景（其它场景也很有参考意义）
 
 |Atlas 早期遇到的问题||早期问题的解决方案|

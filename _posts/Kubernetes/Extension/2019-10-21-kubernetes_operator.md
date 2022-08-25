@@ -13,8 +13,6 @@ keywords: kubernetes operator
 * TOC
 {:toc}
 
-
-
 [Kubernetes应用管理深度剖析](https://mp.weixin.qq.com/s/9o2m03veD5hP7mUbCirftg)以分布式系统为代表的有状态应用，并不像Web应用一样“开箱即用”，这些系统需要特定应用领域的知识才能正确扩展，升级和重新配置，同时防止数据丢失或不可用。**Operator 其实并不是一个工具，而是为了解决一个问题而存在的一个思路**，将特定于应用程序的操作知识编码到软件中，利用功能强大的Kubernetes抽象来正确地运行和管理应用程序。
 
 ![](/public/upload/kubernetes/operator_application.png)

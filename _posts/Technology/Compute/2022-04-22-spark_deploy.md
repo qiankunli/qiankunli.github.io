@@ -12,6 +12,8 @@ keywords: Spark
 
 既然是分布式系统，就绕不开部署模式。
 
+[讲讲Spark的动态分配](https://mp.weixin.qq.com/s/5e7RIBp4_OxKbGLFNyzmEw) 讲的蛮不错
+
 ## 部署模式
 
 [一篇文章读懂：Spark运行模式](https://mp.weixin.qq.com/s/DvyLZS7Nv7HdFdmBWJX_Yg)运行Spark的应用程序，其实仅仅需要两种角色，Driver和Executor。Driver负责将用户的应用程序划分为多个Job，分成多个Task，将Task提交到Executor中运行。Executor负责运行这些Task并将运行的结果返回给Driver程序。**Driver和Executor实际上并不关心是运行在哪的，只要能够启动Java进程，将Driver程序和Executor运行起来，并能够使Driver和Executor进行通信即可**(PS：Driver 和 Executor 不需要各自是一个独立的进程)。所以根据Driver和Executor的运行位置的不同划分出了多种部署模式。

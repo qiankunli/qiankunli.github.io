@@ -29,6 +29,12 @@ Please remember that at the end of the day, all programs that work on UNIX machi
 3. 当调用一些系统方法的时候（如文件 I/O），如果系统方法调用的时候发生阻塞，这种情况下，网络轮询器（NetPoller）无法使用，而进行系统调用的  G1  将阻塞当前 M1。调度器引入 其它M 来服务 M1 的P。
 4. 如果在 Goroutine 去执行一个 sleep 操作，导致 M 被阻塞了。Go 程序后台有一个监控线程 sysmon，它监控那些长时间运行的 G 任务然后设置可以强占的标识符，别的 Goroutine 就可以抢先进来执行。
 
+[Go 适合 IO 密集型？并不准确！](https://mp.weixin.qq.com/s/xDXwsVjOfU2j3gisiHTZTQ)Go 适合 IO 密集型的场景。但其实这里并不准确。更准确的是 Go 适合的是网络 IO 密集型的场景，而非磁盘 IO 密集型。甚至可以说，Go 对于磁盘 IO 密集型并不友好。根本原因：在于网络 socket 句柄和文件句柄的不同。网络 IO 能够用异步化的事件驱动的方式来管理，磁盘 IO 则不行。
+1. socket 句柄可读可写事件都有意义，socket buffer 里有数据，说明对端网络发数据过来了，即满足可读事件。有 buffer 可以写，那么说明还能发送数据，满足可写事件。所以 socket 的句柄实现了 .poll 方法，可以用 epoll 池来管理。socket 句柄可以设置为 noblocking （非阻塞的方式），这样当网络 IO 还未就绪的时候（比如read 一下没有数据）就可以**在 Go 代码里把调度权切走**，去执行其他协程，这样就实现了网络 IO 的并发。
+2. 文件句柄可读可写事件则没有意义，因为文件句柄理论上是永远都是可读可写的，文件 IO 的 read/write 都是同步的 IO（比如read 一下，没数据直接就卡住了） ，没有实现 .poll 所以也用不了 epoll 池来监控读写事件。所以磁盘 IO 的完成只能同步等待。然而磁盘 IO 的等待则会带来 Go 最不能容忍的事情：卡线程。
+
+Go 的代码执行者是系统线程，也就是 G-M-P 模型的 M ，M 不断的从队列 P 中取 G（协程任务）出来执行。当 G 出现等待事件的时候（比如网络 IO），那么立马切走，取下一个执行。这样让 M 一直不停的满载，就能保证 Go 协程任务的高吞吐。那么问题来了，如果某个 G 卡线程了，就相当于这个 M 被废了，吞吐能力就下降。如果 M 全卡住了那相当于整个程序卡死了。然而对于类似系统调用这种卡线程却是无法人为控制的。Go runtime 为了解决这个问题，就只能创建更多的线程来保证一直有可运行的 M 。所以，你经常会发现，当系统调用很慢的时候，M 的数量会变多，甚至会暴涨。下面来看一下 Go 怎么处理这种系统调用的？
+
 ## 系统调用
 
 Go 语言通过 Syscall 和 Rawsyscall 等使用汇编语言编写的方法封装了操作系统提供的所有系统调用，其中 Syscall 在 Linux 386 上的实现如下：
@@ -62,6 +68,11 @@ ok:
 [Golang - 调度剖析](https://segmentfault.com/a/1190000016611742)
 
 [Go: Goroutine, OS Thread and CPU Management](https://medium.com/a-journey-with-go/go-goroutine-os-thread-and-cpu-management-2f5a5eaf518a) Go optimizes the system calls — whatever it is blocking or not — by wrapping them up in the runtime. This wrapper will automatically **dissociate** the P from the thread M and allow another thread to run on it.
+
+系统调用的逻辑是属于 Go 程序外部代码，Go 用 entersyscall 和 exitsyscall 来包装一下，主要是和调度交互。
+1. entersyscall 的作用：把当前 M 的 P 设置为 _Psyscall 状态，打上标识 解绑 P -> M 的绑定，但 M 还保留 P 的指针。
+2. existsyscall 的作用：由于 M 到 P 的指向还在，那么优先还是用原来的 P。 如果原来的 P 被处理掉了，那么就去用一个新的 P ，如果还没有，那就只能把G 挂到全局队列了。
+Go 的 sysmon（内部监控线程）发现有这种卡了超过 10 ms 的 M ，那么就会把 P 剥离出来，给到其他的 M 去处理执行，M 数量不够就会新创建。
 
 ### 异步系统调用
 
