@@ -101,6 +101,19 @@ keywords: hpc 对象存储 AI
 4. 统一调度，业界有一个开源项目叫 Fluid，它可以将整个训练的过程分成了两个阶段，一个阶段是用来做数据加载，另外一个阶段才是用来做真正的训练。这两个阶段拆分之后，在不同的任务之间 pipeline 并发起来。举个简单的例子，整个系统可能只有四张 GPU 卡，A 训练跟 B 训练都需要去用这四张卡来做训练，那在 A 训练跑 GPU 任务的时候，完全可以让 B 训练提前做数据预加载的工作，将数据提前预热到 PFS 或者 RapidFS 里。等到 A 训练任务完成的时候，就直接可以让调度器把 B 训练跑起来了。整体上看到的效果就是 B 的数据加载阶段被隐藏掉了，加载过程跟计算过程分阶段 pipeline 化了。对于那些训练任务很多的用户，GPU 等待时间变少了，利用率得到了很大的提高。
 
 
+## k8s下的数据集管理Fluid
+
+[重新定义容器化 Serverless 应用的数据访问](https://mp.weixin.qq.com/s/GN7FBxOQYJdol6rEBQ2WSA)[Fluid](https://github.com/fluid-cloudnative/fluid) is an open source Kubernetes-native Distributed Dataset Orchestrator and Accelerator for data-intensive applications, such as big data and AI applications.云原生环境与更早的大数据处理框架在设计理念和机制上存在天然分歧。深受Google三篇论文GFS、MapReduce、BigTable影响的Hadoop大数据生态，从诞生之初即信奉和实践“移动计算而不是数据”的理念。因此以Spark，Hive，MapReduce为代表的数据密集型计算框架及其应用为减少数据传输，其设计更多地考虑数据本地化架构。但随着时代的变迁，为兼顾资源扩展的灵活性与使用成本，计算和存储分离的架构在更新兴的云原生环境中大行其道。因此云原生环境里需要类似Fluid这样的一款组件来**补充大数据框架拥抱云原生以后的数据本地性的缺失**。
+
+计算和存储分离的模式使得以往我们认为非常特殊的服务可以被无状态化，可以像正常服务一样被纳入 devops 体系中，而基于 Fluid 的数据编排和加速系统，则是实践计算和存储分离的一个切口。
+
+Fluid 的实质是利用计算集群的空闲资源（CPU，Memory，Disk）和特定场景的抽象假设简化问题，通过数据分流（Data Offloading）降低中心存储的压力；就近缓存（Tiered Locality Cache）和亲和性调度（Cache Locality Scheduling）提升数据访问性能；在计算资源高并发访问数据的时候，通过自动化扩容缓存集群提供弹性 IO 吞吐能力。Fluid Dataset资源对象准备完成后（即与Alluxio实例绑定后），与该资源对象关联的PV, PVC已经由Fluid生成，应用可以通过该PVC完成远程文件在Pod中的挂载，并通过挂载目录实现远程文件访问。PS：Dataset 表述了要访问哪些数据源文件，对pod 提供了pv和pvc ，对下封装了缓存、数据集调度等能力。
+
+![](/public/upload/storage/fluid_overview.png)
+
+
+## 存算分离的缓存系统Alluxio
+
 [如何用Alluxio来加速云上深度学习训练？](https://mp.weixin.qq.com/s/QiZnqc0LVzLtotgsxy_b3w)在Alluxio之上可以对接不同的数据应用，包括Spark、Flink这种ETL工具，presto这种query工具，以及TensorFlow、PyTorch等深度学习框架。在Alluxio下面也可以连接不同数据源，比如阿里云、腾讯云、HDFS等。**深度学习训练框架PyTorch、TensorFlow、Caffe，它们的原生数据源都是本地文件系统。企业数据量日益扩大，导致我们需要去使用分布式数据源**。Alluxio可以把来自不同的远端存储系统，以及分布式文件系统的数据都挂载到Alluxio统一的命名空间之内。通过Alluxio POSIX API，把这些数据变成类似于本地文件的形式，提供给各种训练任务。
 
 ![](/public/upload/storage/alluxio_posix_api.png)
@@ -111,12 +124,6 @@ keywords: hpc 对象存储 AI
 4. **可以把 把Alluxio作为整个数据的抽象层**。整个训练集群，不管它需要的数据源来自何方，来自一些存储系统，由大数据ETL处理好的数据，或者是C++、python处理好的数据，都可以通过Alluxio进行读缓存，供给给训练。所有数据预处理的中间数据，以及训练的中间数据，都可以通过Alluxio进行暂时的写缓存。对于数据预处理和训练的结果，我们也可以通过Alluxio持久化到不同的存储系统之中。不管大家有什么样的数据应用，都可以通过Alluxio来对不同的数据源中的数据进行读写操作。
 
 [B站基于Iceberg + Alluxio 助力湖仓一体项目落地实践](https://mp.weixin.qq.com/s/ydGwr3ehOty2EwqiSm_A6w) 未读
-
-[重新定义容器化 Serverless 应用的数据访问](https://mp.weixin.qq.com/s/GN7FBxOQYJdol6rEBQ2WSA)[Fluid](https://github.com/fluid-cloudnative/fluid) is an open source Kubernetes-native Distributed Dataset Orchestrator and Accelerator for data-intensive applications, such as big data and AI applications.云原生环境与更早的大数据处理框架在设计理念和机制上存在天然分歧。深受Google三篇论文GFS、MapReduce、BigTable影响的Hadoop大数据生态，从诞生之初即信奉和实践“移动计算而不是数据”的理念。因此以Spark，Hive，MapReduce为代表的数据密集型计算框架及其应用为减少数据传输，其设计更多地考虑数据本地化架构。但随着时代的变迁，为兼顾资源扩展的灵活性与使用成本，计算和存储分离的架构在更新兴的云原生环境中大行其道。因此云原生环境里需要类似Fluid这样的一款组件来**补充大数据框架拥抱云原生以后的数据本地性的缺失**。
-
-Fluid 的实质是利用计算集群的空闲资源（CPU，Memory，Disk）和特定场景的抽象假设简化问题，通过数据分流（Data Offloading）降低中心存储的压力；就近缓存（Tiered Locality Cache）和亲和性调度（Cache Locality Scheduling）提升数据访问性能；在计算资源高并发访问数据的时候，通过自动化扩容缓存集群提供弹性 IO 吞吐能力。Fluid Dataset资源对象准备完成后（即与Alluxio实例绑定后），与该资源对象关联的PV, PVC已经由Fluid生成，应用可以通过该PVC完成远程文件在Pod中的挂载，并通过挂载目录实现远程文件访问。PS：Dataset 表述了要访问哪些数据源文件，对pod 提供了pv和pvc ，对下封装了缓存、数据集调度等能力。
-
-![](/public/upload/storage/fluid_overview.png)
 
 ## 其它
 

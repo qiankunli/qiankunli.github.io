@@ -119,7 +119,7 @@ spec:
 4. VPA Recommender 会暴露一个同步 API 获取 Pod 详细信息并返回推荐信息。
 5. 所有的 Pod 创建请求都会通过 VPA Admission Controller。如果 Pod 与任何一个 VPA 对象匹配，那么 Admission controller 会依据 VPA Recommender 推荐的值重写容器的资源。如果 Recommender 连接不上，它将会返回 VPA Object 中缓存的推荐信息。
 6. VPA Updater 是负责实时更新 Pod 的组件。如果一个 Pod 使用 VPA 的自动模式，那么 Updater 会依据推荐资源来决定如何更新。在 MVP 模式中，这需要通过删除 Pod 然后依据新的资源重建 Pod 来实现，这种方法需要 Pod 属于一个 Replica Set（或者其他能够重新创建它的组件）。在未来，Updater 会利用原地升级，因为重新创建或者重新分配Pod对服务是很有破坏性的，必须尽量减少这种操作。
-7. VPA 仅仅控制容器的资源请求,它把资源限制设置为无限,资源请求的计算基于对当前和过去运行状况的分析。
+7. VPA 仅仅控制容器的资源请求，它把资源限制设置为无限，资源请求的计算基于对当前和过去运行状况的分析。
 8. History Storage 是从 API Server 中获取资源利用率信号和内存溢出并将它们永久保存的组件。Recommender 在一开始用这些历史数据来初始化状态。History Storage 基础的实现是使用 Prometheus。
 
 updatePolicy
@@ -148,7 +148,8 @@ updatePolicy
 一旦配置了，我们就可以通过获取这些 metrics 指标，并将其发送到监控工具中去，比如 Prometheus 和 Grafana 或者 ELK 技术栈。然后可以利用这些数据来调整 Pods 的大小。
 
 ## Cluster Auto Scaler 
-[Airbnb 如何实现 Kubernetes 集群动态扩展](https://mp.weixin.qq.com/s/aSPnXtmaudGjjbBuI9a77Q)
+
+[Airbnb 如何实现 Kubernetes 集群动态扩展](https://mp.weixin.qq.com/s/aSPnXtmaudGjjbBuI9a77Q) 提到了对CA的扩展。
 [kubernetes 资源管理概述](https://cizixs.com/2018/06/25/kubernetes-resource-management/)
 
 随着业务的发展，应用会逐渐增多，每个应用使用的资源也会增加，总会出现集群资源不足的情况。为了动态地应对这一状况，我们还需要 CLuster Auto Scaler，能够根据整个集群的资源使用情况来增减节点。CA 是面向事件工作的，并每 10 秒检查一次是否存在不可调度（Pending）的 Pod(当调度器无法找到可以容纳 Pod 的节点时，这个 Pod 是不可调度的）。此时，CA 开始创建新节点。

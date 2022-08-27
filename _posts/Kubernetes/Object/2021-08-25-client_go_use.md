@@ -56,7 +56,7 @@ k8s.io/api
 
 ### RESTClient
 
-RESTClient是所有客户端的父类，底层调用了Go语言net\http库，访问API Server的RESTful接口。以查询pod 为例
+RESTClient是所有客户端的父类，底层调用了Go语言`net\http`库，访问API Server的RESTful接口。以查询pod 为例
 
 ```go
 // 从本机加载kubeconfig配置文件，因此第一个参数为空字符串

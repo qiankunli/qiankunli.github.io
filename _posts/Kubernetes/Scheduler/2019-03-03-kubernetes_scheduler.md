@@ -20,9 +20,11 @@ keywords: kubernetes scheduler
 3. 调度器的原理， [How Kubernetes Initializers work](https://ahmet.im/blog/initializers/)
 the scheduler is yet another controller, watching for Pods to show up in the API server and assigns each of them to a Node [How does the Kubernetes scheduler work?](https://jvns.ca/blog/2017/07/27/how-does-the-kubernetes-scheduler-work/).
 
-    while True:
-        pods = queue.getPod()
-        assignNode(pod)
+```
+while True:
+    pods = queue.getPod()
+    assignNode(pod)
+```
 
 **scheduler is not responsible for actually running the pod – that’s the kubelet’s job. So it basically just needs to make sure every pod has a node assigned to it.**
 
@@ -31,7 +33,7 @@ the scheduler is yet another controller, watching for Pods to show up in the API
 [Create a custom Kubernetes scheduler](https://developer.ibm.com/technologies/containers/articles/creating-a-custom-kube-scheduler/#)
 
 1. The default scheduler starts up according to the parameters given.
-2. It watches on apiserver, and puts pods where its spec.nodeName is empty into its internal scheduling queue.
+2. It watches on apiserver, and puts pods where its `spec.nodeName` is empty into its internal scheduling queue.
 It pops out a pod from the scheduling queue and starts a standard scheduling cycle.
 3. It retrieves “hard requirements” (like cpu/memory requests, nodeSelector/nodeAffinity) from the pod’s API spec. Then the predicates phase occurs where it calculates to give a node candidates list which satisfies those requirements.
 4. It retrieves “soft requirements” from the pod’s API spec and also applies some default soft “policies” (like the pods prefer to be more packed or scattered across the nodes). It finally gives a score for each candidate node, and picks up the final winner with the highest score.
@@ -39,11 +41,11 @@ It pops out a pod from the scheduling queue and starts a standard scheduling cyc
 
 ![](/public/upload/kubernetes/scheduler_arch.png)
 
+上述设计在批调度器上就不是一定的，批调度器因为要支持gang scheduler，即比如一个job包含5个pod，至少3个pod启动才可以正常工作，此时就不能一个pod一个pod判断，批调度器会采用session的方式，一个session 对当前的 pod node状态 的”定格“，一次性为当前 session内所有未调度的pod 确定node。
+
 ## Kubernetes 资源模型与资源管理
 
-从编排系统的角度来看，Node 是资源的提供者，Pod 是资源的使用者，而调度是将两者进行恰当的撮合。在 Kubernetes 里，Pod 是最小的原子调度单位。这也就意味着，所有跟调度和资源管理相关的属性都应该是属于 Pod 对象的字段。而这其中最重要的部分，就是 Pod 的CPU 和内存配置
-
-在 Kubernetes 中，像 CPU 这样的资源被称作“可压缩资源”（compressible resources）。它的典型特点是，当可压缩资源不足时，Pod 只会“饥饿”，但不会退出。而像内存这样的资源，则被称作“不可压缩资源（incompressible resources）。当不可压缩资源不足时，Pod 就会因为 OOM（Out-Of-Memory）被内核杀掉。
+从编排系统的角度来看，Node 是资源的提供者，Pod 是资源的使用者，而调度是将两者进行恰当的撮合。在 Kubernetes 里，Pod 是最小的原子调度单位。这也就意味着，所有跟调度和资源管理相关的属性都应该是属于 Pod 对象的字段。而这其中最重要的部分，就是 Pod 的CPU 和内存配置。在 Kubernetes 中，像 CPU 这样的资源被称作“可压缩资源”（compressible resources）。它的典型特点是，当可压缩资源不足时，Pod 只会“饥饿”，但不会退出。而像内存这样的资源，则被称作“不可压缩资源（incompressible resources）。当不可压缩资源不足时，Pod 就会因为 OOM（Out-Of-Memory）被内核杀掉。
 
 ### request and limit
 
@@ -78,8 +80,8 @@ DaemonSet 的 Pod 都设置为 Guaranteed 的 QoS 类型。否则，一旦 Daemo
 
 在 Kubernetes 项目中，默认调度器的主要职责，就是为一个新创建出来的 Pod，寻找一个最合适的节点（Node）而这里“最合适”的含义，包括两层： 
 
-1. 从集群所有的节点中，根据调度算法挑选出所有可以运行该 Pod 的节点；
-2. 从第一步的结果中，再根据调度算法挑选一个最符合条件的节点作为最终结果。
+1. 预选：从集群所有的节点中，根据调度算法挑选出所有可以运行该 Pod 的节点；
+2. 优选：从第一步的结果中，再根据调度算法挑选一个最符合条件的节点作为最终结果。
 
 所以在具体的调度流程中，默认调度器会首先调用一组叫作 Predicate 的调度算法，来检查每个 Node。然后，再调用一组叫作 Priority 的调度算法，来给上一步得到的结果里的每个 Node 打分。最终的调度结果，就是得分最高的那个Node。
 

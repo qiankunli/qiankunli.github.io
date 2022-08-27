@@ -39,6 +39,7 @@ keywords: test environment
 3. 资源配置低
 
 [线下环境为何不稳定？怎么破](https://mp.weixin.qq.com/s/gGg0SGGgOvMrSxVyyMYXKw) 建议细读
+[测试环境不稳定&复杂的必然性及其对策](https://mp.weixin.qq.com/s/rQSwS7kMsdUxtAvSSmTD6Q)
 
 ### 资源配置低
 

@@ -82,6 +82,20 @@ docker run -v dir:/container/dir imagename command
 
 即使用以上两种命令，也只能删除没有容器连接的Volume。连接到用户指定主机目录的Volume永远不会被docker删除。bypasses the Union File System, independent of the container’s life cycle.Docker therefore never automatically deletes volumes when you remove a container, nor will it “garbage collect” volumes that are no longer referenced by a container. **Docker 有 Volume 的概念，但对它只有少量且松散的管理（没有生命周期的概念），Docker 较新版本才支持对基于本地磁盘的 Volume 的生存期进行管理**。
 
+## Kubernetes的存储设计理念
+
+周志明
+1. 容器是镜像的运行时实例，为了保证镜像能够重复地产生出具备一致性的运行时实例，必须要求镜像本身是持久而稳定的，这就决定了**在容器中发生的一切数据变动操作，都不能真正写入到镜像当中**，否则必然会破坏镜像稳定不变的性质。PS：云原生伴随着存算分离，但终究还是要访问数据的，尤其是针对数据密集型应用。
+1. Docker 内建支持了三种挂载类型，分别是 Bind（--mount type=bind）、Volume（--mount type=volume）和 tmpfs（--mount type=tmpfs）
+1. Bind Mount 是 Docker 最早提供的（发布时就支持）挂载类型，作用是把宿主机的某个目录（或文件）挂载到容器的指定目录（或文件）下
+2. 从 Docker 17.06 版本开始，Bind 就在 Docker Swarm 中借用了--mount参数过来，这个参数默认创建的是 Volume Mount，从 Bind Mount 到 Volume Mount，实质上是容器发展过程中对存储抽象能力提升的外在表现。我们根据“Bind”这个名字，以及 Bind Mount 的实际功能，其实可以合理地推测，Docker 最初认为“Volume”就只是一种“外部宿主机的磁盘存储到内部容器存储的映射关系”，但后来它眉头一皱，发现事情并没有那么简单：存储的位置并不局限只在外部宿主机，存储的介质并不局限只是物理磁盘，存储的管理也并不局限只有映射关系。
+	1. 比如，Bind Mount 只能让容器与本地宿主机之间建立某个目录的映射，那么如果想要在不同宿主机上的容器共享同一份存储，就必须先把共享存储挂载到每一台宿主机操作系统的某个目录下，然后才能逐个挂载到容器内使用，这种跨宿主机共享存储的场景涉及到大量与宿主机环境相关的操作，只能由管理员人工地去完成，不仅繁琐，而且由于每台宿主机环境的差异，还会导致主机很难实现自动化。
+	2. 即使只考虑单台宿主机的情况，Docker 也完全有支持 Volume Mount 的必要。在 Bind Mount 的设计里，Docker 只有容器的控制权，存放容器生产数据的主机目录是完全独立的，与 Docker 没有任何关系，它既不受 Docker 保护，也不受 Docker 管理。所以这就使得数据很容易被其他进程访问到，甚至是被修改和删除。
+4. 存储并不是只有挂载在宿主机上的物理存储这一种介质。在云计算时代，网络存储逐渐成为了数据中心的主流选择，不同的网络存储都有各自的协议和交互接口。而且，**并不是所有的存储系统都适合先挂载到操作系统，然后再挂载到容器的**，如果 Docker 想要越过操作系统去支持挂载某种存储系统，首先必须要知道该如何访问它，然后才能把容器中的读写操作自动转移到该位置。Docker 把解决如何访问存储的功能模块叫做存储驱动（Storage Driver）。PS：弹性集群，节点是可能是临时申请和释放的，物理机完全可以具备fuse等能力，将对文件的读写变为网络读写。
+5. Kubernetes 把 Volume 分为了持久化的 PersistentVolume 和非持久化的普通 Volume 两类，普通 Volume 的设计目标并不是为了持久地保存数据，而是为同一个 Pod 中多个容器提供可共享的存储资源，所以普通 Volume 的生命周期非常明确，也就是与挂载它的 Pod 有着相同的生命周期。这样，就意味着尽管普通 Volume 不具备持久化的存储能力，但至少比 Pod 中运行的任何容器的存活期都更长。
+6. PersistentVolume 可以独立于 Pod 存在，生命周期与 Pod 无关，所以也就决定了 PersistentVolume 不应该依附于任何一个宿主机节点，否则必然会对 Pod 调度产生干扰限制。那么，**在把 PersistentVolume 与 Pod 分离后，就需要专门考虑 PersistentVolume 该如何被 Pod 所引用的问题了**。所以，Kubernetes 又额外设计出了 PersistentVolumeClaim 资源。
+
+
 ## kubernetes volume——为容器提供外置存储能力
 
 A Volume is a directory, possibly with some data in it, which is accessible to a Container. Kubernetes Volumes are similar to but not the same as Docker Volumes.
@@ -135,19 +149,6 @@ spec:
 4. CSI/Flexvolume：这是两种数据卷扩容方式，可以理解为抽象的数据卷类型。每种扩展方式都可再细化成不同的存储类型；
 
 因为 PVC 允许用户消耗抽象的存储资源，所以用户需要不同类型、属性和性能的 PV 就是一个比较常见的需求了，在这时我们可以通过 StorageClass 来提供不同种类的 PV 资源，上层用户就可以直接使用系统管理员提供好的存储类型。
-
-## Kubernetes的存储设计理念
-
-周志明
-1. 容器是镜像的运行时实例，为了保证镜像能够重复地产生出具备一致性的运行时实例，必须要求镜像本身是持久而稳定的，这就决定了在容器中发生的一切数据变动操作，都不能真正写入到镜像当中，否则必然会破坏镜像稳定不变的性质。
-1. Docker 内建支持了三种挂载类型，分别是 Bind（--mount type=bind）、Volume（--mount type=volume）和 tmpfs（--mount type=tmpfs）
-1. Bind Mount 是 Docker 最早提供的（发布时就支持）挂载类型，作用是把宿主机的某个目录（或文件）挂载到容器的指定目录（或文件）下
-2. 从 Docker 17.06 版本开始，Bind 就在 Docker Swarm 中借用了--mount参数过来，这个参数默认创建的是 Volume Mount，从 Bind Mount 到 Volume Mount，实质上是容器发展过程中对存储抽象能力提升的外在表现。我们根据“Bind”这个名字，以及 Bind Mount 的实际功能，其实可以合理地推测，Docker 最初认为“Volume”就只是一种“外部宿主机的磁盘存储到内部容器存储的映射关系”，但后来它眉头一皱，发现事情并没有那么简单：存储的位置并不局限只在外部宿主机，存储的介质并不局限只是物理磁盘，存储的管理也并不局限只有映射关系。
-	1. 比如，Bind Mount 只能让容器与本地宿主机之间建立某个目录的映射，那么如果想要在不同宿主机上的容器共享同一份存储，就必须先把共享存储挂载到每一台宿主机操作系统的某个目录下，然后才能逐个挂载到容器内使用，这种跨宿主机共享存储的场景涉及到大量与宿主机环境相关的操作，只能由管理员人工地去完成，不仅繁琐，而且由于每台宿主机环境的差异，还会导致主机很难实现自动化。
-	2. 即使只考虑单台宿主机的情况，Docker 也完全有支持 Volume Mount 的必要。在 Bind Mount 的设计里，Docker 只有容器的控制权，存放容器生产数据的主机目录是完全独立的，与 Docker 没有任何关系，它既不受 Docker 保护，也不受 Docker 管理。所以这就使得数据很容易被其他进程访问到，甚至是被修改和删除。
-4. 存储并不是只有挂载在宿主机上的物理存储这一种介质。在云计算时代，网络存储逐渐成为了数据中心的主流选择，不同的网络存储都有各自的协议和交互接口。而且，**并不是所有的存储系统都适合先挂载到操作系统，然后再挂载到容器的**，如果 Docker 想要越过操作系统去支持挂载某种存储系统，首先必须要知道该如何访问它，然后才能把容器中的读写操作自动转移到该位置。Docker 把解决如何访问存储的功能模块叫做存储驱动（Storage Driver）。
-5. Kubernetes 把 Volume 分为了持久化的 PersistentVolume 和非持久化的普通 Volume 两类，普通 Volume 的设计目标并不是为了持久地保存数据，而是为同一个 Pod 中多个容器提供可共享的存储资源，所以普通 Volume 的生命周期非常明确，也就是与挂载它的 Pod 有着相同的生命周期。这样，就意味着尽管普通 Volume 不具备持久化的存储能力，但至少比 Pod 中运行的任何容器的存活期都更长。
-6. PersistentVolume 可以独立于 Pod 存在，生命周期与 Pod 无关，所以也就决定了 PersistentVolume 不应该依附于任何一个宿主机节点，否则必然会对 Pod 调度产生干扰限制。那么，**在把 PersistentVolume 与 Pod 分离后，就需要专门考虑 PersistentVolume 该如何被 Pod 所引用的问题了**。所以，Kubernetes 又额外设计出了 PersistentVolumeClaim 资源。
 
 ## kubelet 相关代码实现
 

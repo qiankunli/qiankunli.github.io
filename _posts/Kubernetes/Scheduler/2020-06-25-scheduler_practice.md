@@ -13,6 +13,8 @@ keywords:  Scheduler
 * TOC
 {:toc}
 
+整体脉络：粗放的资源评估；节点分时复用 ==> 节点超卖，根据负载动态调度（调整超卖比例、动态驱逐等）==> 节点划分资源池，高优池支持绑核、cpu负载控制在50%以下，池间强隔离，不同池运行不同类型的任务，池资源大小随负载动态调整。
+
 [一篇文章搞定大规模容器平台生产落地十大实践](https://mp.weixin.qq.com/s/Cv4i5bxseMEwx1C_Annqig) 为了实现应用的高可用，需要容器在集群中合理分布
 
 1. **拓扑约束依赖** Pod Topology Spread Constraints, 拓扑约束依赖于Node标签来标识每个Node所在的拓扑域。

@@ -64,7 +64,7 @@ cgroup 是 调度器 暴露给外界操作 的接口，对于 进程cpu 相关�
 
 ### CFS 基于虚拟运行时间的调度
 
-[What is the concept of vruntime in CFS](https://stackoverflow.com/questions/19181834/what-is-the-concept-of-vruntime-in-cfs/19193619)vruntime is a measure of the "runtime" of the thread - the amount of time it has spent on the processor. The whole point of CFS is to be fair to all; hence, the algo kind of boils down to a simple thing: (among the tasks on a given runqueue) the task with the lowest vruntime is the task that most deserves to run, hence select it as 'next'. CFS（完全公平调度器）是Linux内核2.6.23版本开始采用的进程调度器，具体的细节蛮复杂的，整体来说是保证每个进程运行的虚拟时间一致， 每次选择vruntime 较少的进程来执行。
+[What is the concept of vruntime in CFS](https://stackoverflow.com/questions/19181834/what-is-the-concept-of-vruntime-in-cfs/19193619)vruntime is a measure of the "runtime" of the thread - the amount of time it has spent on the processor. The whole point of CFS is to be fair to all; hence, the algo kind of boils down to a simple thing: (among the tasks on a given runqueue) the task with the lowest vruntime is the task that most deserves to run, hence select it as 'next'. CFS（完全公平调度器）是Linux内核2.6.23版本开始采用的进程调度器，具体的细节蛮复杂的，整体来说是保证每个进程运行的虚拟时间一致， **每次选择vruntime 较少的进程来执行**。
 
 vruntime就是根据权重、优先级（留给上层介入的配置）等将实际运行时间标准化。在内核中通过prio_to_weight数组进行nice值和权重的转换。
 
@@ -175,7 +175,7 @@ $ docker inspect f2321226620e --format '{{.HostConfig.CpuShares}}'
 ```
 Why 51, and not 50? The cpu control group and docker both divide a core into 1024 shares, whereas kubernetes divides it into 1000.
 
-Requests 使用的是 cpu shares 系统，cpu shares 将每个 CPU 核心划分为 1024 个时间片，并保证每个进程将获得固定比例份额的时间片。如果总共有 1024 个时间片，并且两个进程中的每一个都将 cpu.shares 设置为 512，那么它们将分别获得大约一半的 CPU 可用时间。但 cpu shares 系统无法精确控制 CPU 使用率的上限，也就是说如果一个进程没有使用它的这一份，其它进程是可以使用的。
+Requests 使用的是 cpu shares 系统，cpu shares 将每个 CPU 核心划分为 1024 个时间片，并保证每个进程将获得固定比例份额的时间片。如果总共有 1024 个时间片，并且两个进程中的每一个都将 cpu.shares 设置为 512，那么它们将分别获得大约一半的 CPU 可用时间。但 cpu shares 系统无法精确控制 CPU 使用率的上限，也就是说如果一个进程没有使用它的这一份，其它进程是可以使用的。PS：核心是cfs每次挑选vruntime 最小的来执行，但某个进程如果io较多，就进不到就绪队列里，就只能等下一个调度周期了。
 
 
 ### limit
@@ -241,6 +241,8 @@ Kubernetes 原本的资源模型存在局限性（引入动态资源视图）。
 [谷歌每年节省上亿美金，资源利用率高达60%，用的技术有多厉害！](https://mp.weixin.qq.com/s/AoOFF1RztZmC4vAamnsaOw)
 
 ![](/public/upload/container/container_schedule.png)
+
+某些时候要对pod做绑核处理，或者是保护这个业务进程，或者是避免这个业务频繁切换干扰其它业务进程。尽量将同一个物理核上的逻辑核同时绑定给一个业务使用。否则，如果在线任务和混部任务分别跑在一个物理核的两个逻辑核上，在线任务还是有可能受到“noisy neighbor”干扰。
 
 ## 磁盘
 
