@@ -14,14 +14,47 @@ keywords: tensorflow python
 {:toc}
 
 我们知道python 层作为Client 主要作用是构建GraphDef 交给 Master 处理，但很明显，我们写的 训练代码 跟GraphDef 构建工作并没有一一对应，也没有直接操作OP，这里仍然有很多的抽象工作，包括Model/Layer/feature_column/optimizer 等工作，从上到下依次是
-1. 构建模型，模型训练
+
+1. 构建模型，模型训练 `session.run`
 2. feature_column/layer 拼接为模型
-3. tensor 转换（也就是op调用）构成layer / feature_column
-4. op 调用 实质是 构建GraphDef。PS： 就好比 client rpc 的方法调用 实质是 socket.write
+3. tensor 转换构成layer / feature_column
+4. tensor 读取和计算通过op，op 调用 实质是 构建GraphDef。PS： 就好比 client rpc 的方法调用 实质是 socket.write
+
+
+```python
+# model parameters
+W = tf.Variable(0.3,  tf.float32)
+b = tf.Variable(-0.3, tf.float32)
+# model inputs & outputs
+x = tf.placeholder(tf.float32)
+y = tf.placeholder(tf.float32)
+# the model
+out = W * x + b
+# loss function
+loss = tf.reduce_sum(tf.square(out - y))
+# optimizer
+optimizer = tf.train.GradientDescentOptimizer(0.001)
+train = optimizer.minimize(loss)
+# training data
+x_train = np.random.random_sample((100,)).astype(np.float32)
+y_train = np.random.random_sample((100,)).astype(np.float32)
+# training
+init = tf.global_variables_initializer()
+with tf.Session() as sess:
+    sess.run(init)
+    for i in range(1000):
+        sess.run(train, {x:x_train, y:y_train})
+        current_loss = sess.run(loss, {x:x_train, y:y_train})
+        print("iter step %d training loss %f" % (i, current_loss))
+    print(sess.run(W))
+    print(sess.run(b))
+```
+
+上层model 与底层数据流图/graph，layer1 ==> layer2 ==> ...layern 被**展开**成了 op，tenor 在layer 之间的流动 转换为了 dag op 间的流动。在执行层面的体现就是计算机按顺序运行一个个 OP。
+
+## 源码结构
 
 本文主要来自 tf r1.4 分支的代码
-
-源码结构
 
 ```
 tensorflow
@@ -196,6 +229,7 @@ def _safe_embedding_lookup_sparse(embedding_weights,sparse_ids,sparse_weights=No
     ```
     
 ### StateManager
+
 在较新版本的tf中，Some `FeatureColumn`s（比如EmbeddingColumn） create variables or resources to assist their computation. The `StateManager` is responsible for creating and storing these objects since `FeatureColumn`s are supposed to be stateless configurationonly.  
 
 ```python
@@ -373,10 +407,11 @@ def dense(inputs, units,activation=None,...):
 
 ### 整体实现
 
-Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图, TensorFlow 使用自动微分 (反向传播) 来进行梯度运算，再具体的说，**自动求导的部分是靠 Optimizer 串起来的**。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
+Tensorflow的底层结构是由张量组成的计算图。计算图就是底层的编程系统，每一个计算都是图中的一个节点，计算之间的依赖关系则用节点之间的边来表示。计算图构成了前向/反向传播的结构基础。给定一个计算图，前向部分 为张量读取与计算，**表现为Variable的计算方法 和Layer的堆叠**，TensorFlow 使用自动微分 (反向传播) 来进行梯度运算，再具体的说，**自动求导的部分是靠 Optimizer 串起来的**。tf.train.Optimizer允许我们通过minimize()函数自动进行权值更新，此时`tf.train.Optimizer.minimize()`做了两件事：
 
 1. 计算梯度。即调用`compute_gradients (loss, var_list …)` 计算loss对指定val_list的梯度，返回元组列表 `list(zip(grads, var_list))`。
 2. 用计算得到的梯度来更新对应权重。即调用 `apply_gradients(grads_and_vars, global_step=global_step, name=None)` 将 `compute_gradients (loss, var_list …)` 的返回值作为输入对权重变量进行更新；
+
 将minimize()分成两个步骤的原因是：可以在某种情况下对梯度进行修正，防止梯度消失或者梯度爆炸。
 
 ```python
@@ -429,7 +464,7 @@ class Optimizer(object):
         pass
 ```
 
-一个简单的总结，当调用 Optimizer.minimize 方法时，使用 compute_gradients 方法，实现反向计算图的构造;使用 apply_gradients 方法，实现参数更新的子图构造。参数更新子图以 grads_and_vars 为输入，执行梯度下降的更新算法;最后，通 过 train_op 完成 global_step 值加 1，至此一轮 Step 执行完成。
+一个简单的总结，当调用 Optimizer.minimize 方法时，使用 compute_gradients 方法，实现反向计算图的构造；使用 apply_gradients 方法，实现参数更新的子图构造。参数更新子图以 grads_and_vars 为输入，执行梯度下降的更新算法；最后，通过 train_op 完成 global_step 值加 1，至此一轮 Step 执行完成。
 
 ### compute_gradients
 
@@ -466,9 +501,6 @@ def SquareGrad(op, grad):
 ```
 
 ![](/public/upload/machine/tf_bp_grad.png)
-
-
-
 
 ### apply_gradients
 

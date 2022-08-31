@@ -28,7 +28,7 @@ keywords:  tensorflow distributed
 3. worker是用来执行具体任务的
 4. chief，集群中一般有多个worker，需要指定其中一个worker为主节点（cheif，默认worker0），chief节点会执行一些额外的工作，比如模型导出之类的。
 
-客户端（client）进程负责构建计算图（graph），创建 tensorflow::Session 实例。客户端一般由 Python 或 C++ 编写。当客户端调用 Session.run() 时将向主进程（master）发送请求，主进程会选择特定工作进程（worker）完成实际计算。客户端、主进程和工作进程可以位于同一台机器实现本地计算，也可以位于不同机器即分布式计算。主进程和工作进程的集合称为服务端(server)，一个客户端可以同多个服务端交互。服务端进程会创建 tf.train.Server 实例并持续运行。client 与 server 之间以 grpc 通信。
+客户端（client）进程负责构建计算图（graph），创建 tensorflow::Session 实例。客户端一般由 Python 或 C++ 编写。当客户端调用 `Session.run()` 时将向主进程（master）发送请求，主进程会选择特定工作进程（worker）完成实际计算。客户端、主进程和工作进程可以位于同一台机器实现本地计算，也可以位于不同机器即分布式计算。主进程和工作进程的集合称为服务端(server)，一个客户端可以同多个服务端交互。服务端进程会创建 tf.train.Server 实例并持续运行。client 与 server 之间以 grpc 通信。
 
 在每一台机器上起一个tf.train.Server的服务，然后放在一个集群里，整个集群的server会通过网络通信。
 
@@ -56,8 +56,12 @@ tf.train.ClusterSpec({
 
 job用job_name(字符串)标识， "ps" 及 "worker" 为 `job_name`。而task用index(整数索引)标识，那么cluster中的每个task可以用job的name加上task的index来唯一标识，例如`/job:worker/task:1`。可以通过脚本或者借助调度框架来动态构建 ClusterSpec。
 
+## 编程模型
 
-## Low-level 分布式编程模型
+![](/public/upload/machine/tensorflow_overview.png)
+
+### Low-level 分布式编程模型
+
 针对以下cluster 配置
 ```py
 tf.train.ClusterSpec({
@@ -160,7 +164,7 @@ elif FLAGS.job_name == "worker":
 
 虽然图间复制具有较好的扩展性，但是从以上代码可以看到，**写一个分布式TensorFlow应用，需要用户自行控制不同组件的运行，这就需要用户对TensorFlow的分布式架构有较深的理解**。另外，分布式TensorFlow应用与单机版TensorFlow应用的代码是两套，一般使用过程中，用户都是先在单机上调试好基本逻辑，然后再部署到集群，在部署分布式TensorFlow应用前，就需要将前面的单机版代码改写成分布式多机版，用户体验非常差。所以说，**使用Low-level 分布式编程模型，不能做到一套代码既可以在单机上运行也可以在分布式多机上运行，其用户门槛较高**，一度被相关工程及研究人员诟病。为此，TensorFlow推出了High-level分布式编程模型，极大地改善用户易用性。
 
-## High-level 分布式编程模型
+### High-level 分布式编程模型
 
 TensorFlow提供Estimator和Dataset高阶API，简化模型构建以及数据输入，用户通过Estimator和Dataset高阶API编写TensorFlow应用，不用了解TensorFlow内部实现细节，只需关注模型本身即可。
 

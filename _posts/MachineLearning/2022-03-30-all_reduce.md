@@ -17,7 +17,7 @@ keywords: allreduce
 
 [Ring AllReduce简介](https://mp.weixin.qq.com/s/K8l7H2zCUr9sGzYehizFMA) 各种配图都比较详细了。
 
-Reduce：从多个sender那里接收数据，最终combine到一个节点上
+Reduce：从多个sender那里接收数据，最终combine到一个节点上。RingAllReduce 是一个环状拓扑结构，在环状结构中不存在中心节点，其各个节点的地位是相同的。梯度同步时，每个worker 只向其右边的邻居发送数据，并从左边的邻居接收数据。这样的架构可以充分利用每个节点的带宽资源，避免中心节点的瓶颈问题。更重要的是，由于梯度被平均放到了不同的节点上，**所有节点之间完成一次同步所需要的通信量只跟参数总量有关，而与集群中的节点数量无关**。因此，这种架构下的模型训练效率随着集群规模的增加几乎呈线性增长。
 
 ![](/public/upload/machine/gpu_reduce.png)
 
@@ -37,7 +37,7 @@ Ring AllReduce 分为Split/ScatterReudce/AllGather 三个步骤(《用python实�
 ```
 service RingAllReduceService{
   rpc Receive(RingAllReduceReq) returns (RingAllReduceResp){}
-  rpc VariableWeightsInit(VariableWeightsReqResp) returns(VariableWeightsInit){}
+  rpc VariableWeightsInit(VariableWeightsReqResp) returns(VariableWeightsReqResp){}
 }
 message RingAllReduceReq{
   enum Stage{
@@ -51,6 +51,244 @@ message RingAllReduceReq{
 ```
 
 VariableWeightsInit 在单机训练的场景下，各变量节点的值是随机初始化的，但是分布式训练场景下，如果多个worker节点也各自随机初始化自己的变量节点，则会导致模型参数在多个worker 节点上不一致。其实从理论上说，随机甚至还是好事，不过从编程来说，还得加上这个保证。
+
+```python
+class RingAllReduceService(arrpc.RingAllReduceServiceServicer):
+    def __init__(self, vars_init_fn, scatter_fn, gather_fn):
+        # 参数初始化回调函数，由外部trainer传入
+        self.vars_init_fn = vars_init_fn
+        # scatter回调函数，由外部的trainer传入
+        self.scatter_fn = scatter_fn
+        # gather回调函数，由外部的trainer传入
+        self.gather_fn = gather_fn
+
+
+    def VariableWeightsInit(self, varibale_weights_req, context):
+        '''
+        变量节点初始化。接收上一个worker发送来的初始值并更新自身的变量节点值
+        '''
+        variable_weights_cache = DistCommon._deserialize_proto_variable_weights(
+            varibale_weights_req)
+        self.vars_init_fn(variable_weights_cache)
+        return common_pb2.VariableWeightsReqResp()
+
+    def Recieve(self, send_req, context):
+        stage = send_req.stage
+        # 从gRPC请求中解析出发送来的节点和梯度
+        node_gradients_dict = DistCommon._deserialize_proto_node_gradients(send_req.node_gradients)
+        # 接收到左邻居的请求，根据当前阶段的不同，执行不同的回调函数
+        if stage == arpb.RingAllReduceReq.SCATTER:
+            acc_no = send_req.node_gradients.acc_no
+            self.scatter_fn(node_gradients_dict, acc_no)
+        elif stage == arpb.RingAllReduceReq.GATHER:
+            self.gather_fn(node_gradients_dict)
+        else:
+            print('[ALLREDUCE] Invalid ring all-reduce stage: {}, it should be either SCATTER or GATHER'.format(stage))
+        return arpb.RingAllReduceResp()
+```
+Recieve 解析左邻居发来的节点和梯度，根据当前处于SCATTER 阶段还是GATHER 阶段分别调用不同的回调函数：self.scatter_fn 或self.gather_fn，这两个回调函数会在类实例化时从外部传入。
+```python
+class DistTrainerRingAllReduce(Trainer):
+    '''
+    Ring All-Reduce模式的分布式训练
+    '''
+    def __init__(self, *args, **kargs):
+        Trainer.__init__(self, *args, **kargs)
+
+        # 读取集群配置信息和自身信息
+        self.cluster_conf = kargs['cluster_conf']
+        self.worker_index = kargs['worker_index']
+
+        self.workers = self.cluster_conf['workers']
+        self.worker_num = len(self.workers)
+        self.host = self.workers[self.worker_index]
+
+        self.step = self.worker_num - 1
+
+        # 根据集群的环状拓扑结构确定右邻居
+        self.target_host = self.workers[(
+            self.worker_index + 1) % self.worker_num]
+
+        # 本节点是否已被初始化
+        self.is_init = False
+        self.init_cond = threading.Condition()
+
+        self.cur_partion_index = self.worker_index
+        self.partition = []
+
+        # 获取所有可训练节点
+        self.variables = get_trainable_variables_from_graph()
+
+        # 根据worker的总数量，对即将更新的变量节点列表进行等长切分
+        self._partition_variables()
+
+        # 用于控制梯度的发送和接收
+        self.is_recieved = False
+        self.recieved_gradients = None
+        self.recieved_acc_no = None
+        self.cond = threading.Condition()
+
+        # 创建本节点的梯度接收服务
+        allreduce.RingAllReduceServer(
+            self.host, self.worker_index,
+            self._variable_weights_init_callback,
+            self._scatter_callback,
+            self._gather_callback).serve()
+
+        # 创建连接目标节点的梯度发送client
+        self.client = allreduce.RingAllReduceClient(self.target_host)
+
+
+    def _variable_weights_init(self):
+
+        var_weights_dict = dict()
+        for node in default_graph.nodes:
+            if isinstance(node, Variable) and node.trainable:
+                var_weights_dict[node.name] = node.value
+        print('[INIT] Send variable init weights to worker ', self.target_host)
+
+        # 第一个节点不需要等待，使用默认值更新给下一个节点
+        if self.worker_index == 0:
+            self.client.variable_weights_init(var_weights_dict)
+        else:
+            self.init_cond.acquire()
+            while not self.is_init:
+                self.init_cond.wait()
+            self.init_cond.release()
+            self.client.variable_weights_init(var_weights_dict)
+
+
+    def _variable_weights_init_callback(self, var_weights_dict):
+
+        # 第一个节点不需要接收上一个节点的初始值
+        if self.worker_index != 0:
+            print('[INIT] Variables initializing weights from last worker node...')
+            for var_name, weights in var_weights_dict.items():
+                update_node_value_in_graph(var_name, weights)
+        # 已初始化完成，通知发送流程
+        self.init_cond.acquire()
+        self.is_init = True
+        self.init_cond.notify_all()
+        self.init_cond.release()
+
+
+    def _optimizer_update(self):
+        # 共执行 N-1 次scatter操作，把本worker的梯度切片发送给下一个worker
+        # 同时接收左邻居发送过来的梯度，累加到自己的对应切片上
+        for scatter_index in range(self.step):
+            gradients_part = self._get_gradients_partition()
+            cur_acc_no = self.optimizer.acc_no if scatter_index == 0 else self.recieved_acc_no
+            # 把自身的一个数据分块发送给右邻居
+            self.client.send(gradients_part, cur_acc_no, 'scatter')
+            # 等待接收并处理完左邻居节点的数据
+            self._wait_for_recieve('scatter')
+
+        # 然后执行 N-1 次all-gather操作，把本worker的梯度切片发送给下一个worker
+        # 同时接收上一个worker发送过来的梯度并替换自己的对应切片
+        for gather_index in range(self.step):
+            gradients_part = self._get_gradients_partition()
+            self.client.send(gradients_part, 0, 'gather')
+            self._wait_for_recieve('gather')
+
+        self.optimizer.update()
+
+
+    def _partition_variables(self):
+        '''
+        根据worker的总数量，对即将更新的权值变量列表进行等长切分
+        '''
+        var_num = len(self.variables)
+        part_length = math.ceil(var_num / self.worker_num)
+        assert part_length > 0
+
+        start = 0
+        end = start + part_length
+        for i in range(self.worker_num - 1):
+            self.partition.append((start, end))
+            start = end
+            end = start + part_length
+
+        self.partition.append((start, var_num))
+
+
+    def _get_gradients_partition(self):
+        '''
+        获取下一个梯度切片
+        '''
+        start, end = self.partition[self.cur_partion_index]
+        part_variables = self.variables[start:end]
+        self.cur_partion_index = (
+            self.cur_partion_index + self.step) % self.worker_num
+        part_gradients = dict()
+        for var in part_variables:
+            part_gradients[var] = self.optimizer.acc_gradient[var]
+        return part_gradients
+
+
+    def _scatter_callback(self, node_gradients_dict, acc_no):
+        '''
+        Scatter 阶段的回调函数，接收上一个worker发送过来的梯度和样本数
+        '''
+        if self.cond.acquire():
+            while self.is_recieved:
+                self.cond.wait()
+
+            # 把接收到的梯度缓存下来
+            self.recieved_gradients = node_gradients_dict
+            self.recieved_acc_no = acc_no
+            self.is_recieved = True
+
+            # 通知主流程，把接收到的梯度更新到优化器
+            self.cond.notify_all()
+            self.cond.release()
+        else:
+            self.cond.wait()
+
+    def _gather_callback(self, node_gradients_dict):
+        '''
+        All-gather 阶段的回调函数，接收上一个worker发送来的梯度
+        '''
+        if self.cond.acquire():
+            while self.is_recieved:
+                self.cond.wait()
+
+            self.recieved_gradients = node_gradients_dict
+            self.is_recieved = True
+
+            # 通知主流程，把接收到的梯度更新到优化器
+            self.cond.notify_all()
+            self.cond.release()
+        else:
+            self.cond.wait()
+
+
+    def _wait_for_recieve(self, stage):
+        '''
+        等待梯度，并把接收到的梯度更新到优化器中
+        '''
+        if self.cond.acquire():
+            while not self.is_recieved:
+                self.cond.wait()
+
+            # 如果是scatter阶段则累加梯度，同时累加样本数
+            if stage == 'scatter':
+                self.optimizer.apply_gradients(
+                    self.recieved_gradients,  summarize=True, acc_no=self.recieved_acc_no)
+
+            # 如果是all-gather阶段则覆盖梯度，样本数保持不变
+            else:
+                self.optimizer.apply_gradients(
+                    self.recieved_gradients, summarize=False, acc_no=self.optimizer.acc_no)
+
+            self.is_recieved = False
+
+            # 梯度已被更新，通知接收流程继续接收新的梯度
+            self.cond.notify_all()
+            self.cond.release()
+        else:
+            self.cond.wait()
+
+```
 
 ## horovod
 

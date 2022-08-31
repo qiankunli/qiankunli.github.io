@@ -504,16 +504,4 @@ void ExecutorState::Process(TaggedNode tagged_node, int64 scheduled_usec) {
 操作节点执行 过程本质是 节点对应的核函数的执行过程。会话运行时，ExecutorImpl::Initialize 会对数据流图上每个操作节点 调用create_kernel 函数，这时创建的 核函数对象 是对应 操作在特定设备上的特化版本。
 
 
-## 其它
 
-### C API
-
-tf 早期通过swig 实现python 调用c
-1. 在 pywrap_tensorflow_internal.cc 的实现中，静 态注册了一个函数符号表，实现了 Python 函数名到 C 函数名的二元关系。
-2. _pywrap_tensorflow_internal.so 包 含了整个 TensorFlow 运行时的所有符号。
-3. pywrap_tensorflow_internal.py 模块首次被导入时，自动地加载 _pywrap_tensorflow_internal.so 的动态链接库
-4. 在运行时，按 照 Python 的函数名称，匹配找到对应的 C 函数实现，最终实现 Python 到 c_api.c 具体 实现的调用关系。c_api.h 是 TensorFlow 的后端执行系统面向前端开放的公共 API 接口。
-
-Client 存在部分 C++ 实现，即 tensorflow::Session。其中，tf.Session 实例直接持有 tensorflow::Session 实例的句柄。一般地，用户使用的是 tf.Session 实施编程
-
-![](/public/upload/machine/tf_client.png)

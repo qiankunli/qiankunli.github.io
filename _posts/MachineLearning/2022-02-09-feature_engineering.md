@@ -27,6 +27,8 @@ keywords: feature engineering
 
 [Scaling Distributed Machine Learning with the Parameter Server](https://web.eecs.umich.edu/~mosharaf/Readings/Parameter-Server.pdf)Machine learning systems are widely used in Web search,spam detection, recommendation systems, computational advertising, and document analysis. These systems automatically learn models from examples, termed training data, and typically consist of three components: feature extraction, the objective function, and learning.Feature extraction processes the raw training data, such as documents, images and user query logs, to obtain feature vectors, where each feature captures an attribute of the training data. Preprocessing can be executed efficiently by existing frameworks such as MapReduce.
 
+[推荐算法中的特征工程](https://mp.weixin.qq.com/s/znXKG9EDEQDl7jlnpUpFCA)深度学习时代，某些领域，如计算机视觉、自然语言处理等，因为模型具有很强的特征表达能力，特征工程显得不那么重要了。但在搜推广领域，特征工程仍然对业务效果具有很大的影响，并且占据了算法工程师很多精力。
+
 ## 特征工程的重要性
 
 《成为AI产品经理》因为数据和特征决定了机器学习的上限，而模型和算法只是逼近这个上限而已，所以数据特征是否全面，数据量是否足够对于算法同学来说是非常重要的。比如预测用户是否会流失
@@ -82,6 +84,8 @@ keywords: feature engineering
 
 ### 特征选择/把场景进行向量化
 
+特征选择通过包括去除无用变量、共线性变量的。比如体检数据中，姓名、编号、联系方式、住址等对模型训练就没有任何作用。共线性变量就是线性相关性很强的变量，比如销售员的销售记录，销售量和销售额就完全是线性的（产品单价相同）二者只需取其一。
+
 在一个数据集中，每个特征在标签预测或分类过程中发挥的作用其实都不同。对于那些没作用和作用小的数据，我们就可以删掉，来降低数据的维度，节省模型拟合时的计算空间。从现有特征中选择最有用的特征进行训练（排除掉不重要的特征，留下重要特征），这就是特征选择。怎么看哪个特征作用大，哪个作用小？
 
 1. 一般来说，算法工程师会对希望入模的特征设置对应的覆盖度、IV 等指标，这是特征选择的第一步。
@@ -97,6 +101,8 @@ keywords: feature engineering
 4. 除法。可以根据不同的资源情况，选择不同的特征集，进行建模。在有限的资源下，选择价值最大的模型在线Work。另外，可以针对比较大的特征集建模，在流量低峰启用，提升资源利用率的同时给业务带来更大收益。还有一种应用场景是流量降级，推理服务监控在线资源的消耗，一旦资源计算达到瓶颈，切换到降级模型。
 
 ### 特征变换
+
+比如根据身高、体重信息判断人的健康状况，单单把身高、体重不加处理的直接交给模型进行训练， 训练结构就不够好，因为身高、体重处于一定范围的占大多数，模型对这个区间的数据训练的很好，但对于区间之外的特例，因为数据量小，也就不足以达到良好的训练水平，最后预测的结果也会不够准确。此时可以构建一个”身高/体重“比率特征，特征本身更能反应健康状况，特殊比例值的数据相对更多一些。
 
 特征分为连续和离散两类，不同的特征类型，有不同的特征变换方式。
 1. 数值型特征的常用变换：特征缩放；特征分箱。

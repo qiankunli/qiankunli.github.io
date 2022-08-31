@@ -34,7 +34,7 @@ keywords: ml framework
 然后我们还需要一些组件把上面这个 4 种基本组件整合到一起，形成一个 pipeline
 
 1. net 组件负责管理 tensor 在 layers 之间的前向和反向传播，同时能提供获取参数、设置参数、获取梯度的接口
-2. model 组件负责整合所有组件，形成整个 pipeline。即 net 组件进行前向传播 -> losses 组件计算损失和梯度 -> net 组件将梯度反向传播 -> optimizer 组件将梯度更新到参数。
+2. model 组件负责整合所有组件，形成整个 pipeline。即 net 组件进行前向传播 -> losses 组件计算损失和梯度 -> net 组件将梯度反向传播 -> optimizer 组件将梯度更新到参数。PS：一般框架都需要一个对象提供一个操作入口
 
 基本的框架图如下图
 
@@ -57,8 +57,7 @@ model.apply_grad(grads)
 test_pred = model.forward(test_X)
 ```
 
-tensor 张量是神经网络中基本的数据单位，我们这里直接使用 numpy.ndarray 类作为 tensor 类的实现。
-layer需要有提供 forward 和 backward 接口进行对应的运算。同时还应该将该层的参数和梯度记录下来。先实现一个基类如下
+tensor 张量是神经网络中基本的数据单位，我们这里直接使用 numpy.ndarray 类作为 tensor 类的实现。layer需要有提供 forward 和 backward 接口进行对应的运算。同时还应该将该层的参数和梯度记录下来。先实现一个基类如下
 ```python
 class Layer(object):
   def __init__(self, name):
@@ -204,7 +203,7 @@ class Model(object):
 
 ## 执行层
 
-上面的抽象组件这么热闹，到真正的实现就又是另一幅天地了，可以好好品味 上层model 抽象与底层数据流图的gap，layer1 ==> layer2 ==> ...layern 被**展开**成了 op，tenor 在layer 之间的流动 转换为了 dag op 间的流动。[深度学习分布式训练的现状及未来](https://zhuanlan.zhihu.com/p/466002243)AI 模型训练任务流程：初始化模型参数 -> 逐条读取训练样本 -> 前向、反向、参数更新 -> 读取下一条样本 -> 前向、反向、参数更新 -> ... 循环，直至收敛。在软件层面的体现就是计算机按顺序运行一个个 OP。
+上面的抽象组件这么热闹，到真正的实现就又是另一幅天地了，可以好好品味 上层model 抽象与底层数据流图的gap，layer1 ==> layer2 ==> ...layern 被**展开**成了 op，tenor 在layer 之间的流动 转换为了 dag op 间的流动。[深度学习分布式训练的现状及未来](https://zhuanlan.zhihu.com/p/466002243)AI 模型训练任务流程：初始化模型参数 -> 逐条读取训练样本 -> 前向、反向、参数更新 -> 读取下一条样本 -> 前向、反向、参数更新 -> ... 循环，直至收敛。在执行层面的体现就是计算机按顺序运行一个个 OP。
 
 几乎所有的 AI 框架都有 OP 的概念，简单来说就是一个函数，完成某个具体的功能，比如说加法、矩阵乘法、卷积等。为什么要多此一举引入这样一个概念呢？这其实是给每个具体计算功能抽象出一个统一接口，在静态图场景下能实现函数的编排（OP 的自由组合）。
 
@@ -385,6 +384,4 @@ int main() {
 3. 开源的实现用的是TensorFlow 1.4，而线上用的TensorFlow 2.3，好多函数的参数都变掉了
 4. 费了九牛二虎之力把模型效果调好了，发现上线也会有很多问题，比如训练速度太慢、内存占用太大、推理qps跟不上、离线效果好在线效果跪等等。
 
-遇到这么多问题，你还有精力去做你的下一个idea吗？你还能斗志昂扬，坚持不懈的去探索新方向吗？
-
-[刘童璇：阿里巴巴稀疏模型训练引擎DeepRec](https://mp.weixin.qq.com/s/loc0htzz6rBX29Ds89Rd9Q) 可以学习针对稀疏场景如何去优化tensorflow。
+遇到这么多问题，你还有精力去做你的下一个idea吗？你还能斗志昂扬，坚持不懈的去探索新方向吗？[刘童璇：阿里巴巴稀疏模型训练引擎DeepRec](https://mp.weixin.qq.com/s/loc0htzz6rBX29Ds89Rd9Q) 可以学习针对稀疏场景如何去优化tensorflow。

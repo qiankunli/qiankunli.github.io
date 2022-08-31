@@ -22,7 +22,7 @@ TensorFlow，这是个很形象的比喻，意思是 张量(Tensor)在神经网�
 
 TensorFlow 使用库模式（不是框架模式），工作形态是由用户编写主程序代码，调用python或其它语言函数库提供的接口实现计算逻辑。用户部署和使用TensorFlow 时，不需要启动专门的守护进程，也不需要调用特殊启动工具，只需要像编写普通本地应用程序那样即可上手。
 
-![](/public/upload/machine/tensorflow_overview.png)
+
 
 ## 核心概念
 

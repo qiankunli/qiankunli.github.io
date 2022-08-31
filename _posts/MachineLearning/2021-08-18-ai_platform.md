@@ -25,8 +25,6 @@ AI 平台可能是云原生技术栈上最具"可玩性"的一种场景。种类
 
 我们开发ML模型依赖于几个要素，如数据、算法或参数，在实验过程中，这些要素会随着时间的推移而改变，从而生成不同的版本。创建数据和参数版本镜像可以帮助我们跟踪不同的版本，但版本控制有其自身的成本。市面上有很多书讲算法原理、如何训练ML模型，也有很多书讲如何构建软件项目，但很少有书把这两个世界融合起来，对于如何构建由ML驱动实际应用的项目工程方面，如数据收集、存储、模型部署、管理以及监控运维等方面的书却很少见。
 
-ML 是一个通过算法和统计模型从数据中学习知识的学科，当我们遇到的问题可以用一套可管理的确定性规则（且随着数据变化并不需要变更规则）来解决时，这类问题便不需要ML。
-
 DevOps依靠工具、自动化和工作流程来抽象软件工程的复杂性，让开发人员专注于需要解决的实际问题，在软件开发领域已经基本成为标配，那为什么这套方法论或经验不能直接应用到ML领域呢？其原因在于，ML的**跨领域特性**延伸出了新的维度，比如**增加了一个额外的数据维度**
 1. 对于传统软件，几乎可以即时体现代码变化对结果的影响，但在ML中，想到看到代码变化对结果的影响需要重新训练模型
 2. 对于传统软件，一个版本的代码产生一个版本的软件，在版本控制系统的辅助下，我们可以在任何时候创建应用程序的任意变体。在ML中，**开发的结果不是代码而是模型**，而这个模型又是由创建和训练模型的代码版本及其所使用的数据产生。代码和数据分别处在两个平行的平面上，它们之间共享时间维度，但在所有其它方面都是独立的。
@@ -130,17 +128,16 @@ AI平台的定位：面向算法工程师，围绕AI 模型的全生命周期去
 
 [cube-studio](https://github.com/tencentmusic/cube-studio)腾讯音乐直接开源的一个ai训练平台。
 
+https://github.com/tencentmusic/cube-studio/wiki
+
+![](/public/upload/machine/cube_studio_overview.png)
+
 ### 美团
 
 [美团外卖特征平台的建设与实践](https://mp.weixin.qq.com/s/CWY7RQcfidkvAAQCI5kRKg)
 
 ![](/public/upload/machine/meituan_ai.png)
 
-## cube-studio
-
-https://github.com/tencentmusic/cube-studio/wiki
-
-![](/public/upload/machine/cube_studio_overview.png)
 
 ## 基础设施
 
@@ -190,7 +187,7 @@ https://github.com/tencentmusic/cube-studio/wiki
 
 ### 存储
 
-整体脉络：hdfs+MapReduce 存算一体 ==> 存算分离 ==> 存算分离+Alluxio粘合。
+整体脉络：hdfs+MapReduce 存算一体 ==> 存算分离 ==> 存算分离+ 分布式缓存系统粘合。
 
 如何分析一个任务的io耗时？一般GPU利用率70%以上说明短板不是在数据读取了。可以做一些对比实验，比如单节点单任务，数据放到内存，对比下gpu利用率。一般训练过程中卡顿，除非在tf graph中有一些利用率低的op算子，否则大部分都是dataloader/prefetch的问题，有的是dataloader的设计问题，有的是硬盘问题。
 
@@ -200,7 +197,7 @@ https://github.com/tencentmusic/cube-studio/wiki
 3. 多数深度学习框架并不支持 HDFS 接口，导致开发难：比如 PyTorch，MxNet 等框架只支持 POSIX 协议接口，HDFS 接口需要额外的对接开发。因此需要同时支持模型开发阶段的 POSIX 接口以及模型训练阶段的 HDFS 接口，引入模型代码适配不同存储的复杂性。
 4. HDFS 服务成为了性能单点，一旦某个任务拖慢了 HDFS 系统，其他的训练任务也会受到影响。而且，一旦 HDFS 无法工作，整个训练集群也会受到影响。
 
-[如何用Alluxio来加速云上深度学习训练？](https://mp.weixin.qq.com/s/QiZnqc0LVzLtotgsxy_b3w)在Alluxio之上可以对接不同的数据应用，包括Spark、Flink这种ETL工具，presto这种query工具，以及TensorFlow、PyTorch等深度学习框架。在Alluxio下面也可以连接不同数据源，比如阿里云、腾讯云、HDFS等。**深度学习训练框架PyTorch、TensorFlow、Caffe，它们的原生数据源都是本地文件系统。企业数据量日益扩大，导致我们需要去使用分布式数据源**。Alluxio可以把来自不同的远端存储系统，以及分布式文件系统的数据都挂载到Alluxio统一的命名空间之内。通过Alluxio POSIX API，把这些数据变成类似于本地文件的形式，提供给各种训练任务。对数据进行读写缓存，对元数据进行本地缓存。A ==> hdfs ==> B 可以变为 A ==> Alluxio ==> hdfs ==> Alluxio ==> B，实际数据还未写入hdfs 即可被读取，即使数据持久化的速度比较慢，也不影响B。PS：深度学习有很多epoch，一个文件会被读取epoch次，理论上说，如果训练样本大于单节点 内存，那么第二轮epoch 不会比第一轮epoch快多少，还得从hdfs 再读一下，这个时候用缓存就很有意义。不过推广搜如果数据量很大（几亿条），一般epoch=1。如果数据量较小，则epoch会比较多。小时级更新的模型，尽管数据量小，因为时间限制，epoch也不会很大。
+[如何用Alluxio来加速云上深度学习训练？](https://mp.weixin.qq.com/s/QiZnqc0LVzLtotgsxy_b3w)在Alluxio之上可以对接不同的数据应用，包括Spark、Flink这种ETL工具，presto这种query工具，以及TensorFlow、PyTorch等深度学习框架。在Alluxio下面也可以连接不同数据源，比如阿里云、腾讯云、HDFS等。**深度学习训练框架PyTorch、TensorFlow、Caffe，它们的原生数据源都是本地文件系统。企业数据量日益扩大，导致我们需要去使用分布式数据源**。Alluxio可以把来自不同的远端存储系统，以及分布式文件系统的数据都挂载到Alluxio统一的命名空间之内。通过Alluxio POSIX API，把这些数据变成类似于本地文件的形式，提供给各种训练任务。对数据进行读写缓存，对元数据进行本地缓存。A ==> hdfs ==> B 可以变为 A ==> Alluxio ==> hdfs ==> Alluxio ==> B，实际数据还未写入hdfs 即可被读取，即使数据持久化的速度比较慢，也不影响B。PS：深度学习有很多epoch，一个文件会被读取epoch次，理论上说，如果训练样本大于单节点 内存，那么第二轮epoch 不会比第一轮epoch快多少，还得从hdfs 再读一下，这个时候用缓存就很有意义。
 
 
 [Atlas超算平台基于 Fluid + Alluxio 的计算加速实践](https://mp.weixin.qq.com/s/mHAAOv9D5oNKsejfJQsDjA) 对于音频训练场景（其它场景也很有参考意义）
