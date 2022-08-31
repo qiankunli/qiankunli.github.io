@@ -31,13 +31,13 @@ keywords: memory management
 
 我们可以将内存管理简单地分成手动管理和自动管理两种方式，手动管理内存一般是指由工程师在需要时通过 malloc 等函数手动申请内存并在不需要时调用 free 等函数释放内存；自动管理内存由编程语言的内存管理系统自动管理，在编程语言的编译期或者运行时中引入，最常见的自动内存管理机制就是垃圾回收，一些编程语言也会使用自动引用计数辅助内存的管理，自动内存管理会带来额外开销并影响语言的运行时性能。
 
+![](/public/upload/basic/memory_pool.jpg)
+
 **内存管理可以分为三个层次**，自底向上分别是：
 
 1. 操作系统内核的内存管理
 2. glibc层使用系统调用维护的内存管理算法。glibc/ptmalloc2，google/tcmalloc，facebook/jemalloc。C 库内存池工作时，会预分配比你申请的字节数更大的空间作为内存池。比如说，当主进程下申请 1 字节的内存时，Ptmalloc2 会预分配 132K 字节的内存（Ptmalloc2 中叫 Main Arena），应用代码再申请内存时，会从这已经申请到的 132KB 中继续分配。当我们释放这 1 字节时，Ptmalloc2 也不会把内存归还给操作系统。
 3. 应用程序从glibc动态分配内存后，根据应用程序本身的程序特性进行优化， 比如netty的arena
-
-![](/public/upload/basic/memory_pool.jpg)
 
 进程/线程与内存：Linux 下的 JVM 编译时默认使用了 Ptmalloc2 内存池，64 位的 Linux 为**每个线程**的栈分配了 8MB 的内存，还（为每个线程？）预分配了 64MB 的内存作为堆内存池。在多数情况下，这些预分配出来的内存池，可以提升后续内存分配的性能。但也导致创建很多线程时会占用大量内存。
 
@@ -53,8 +53,37 @@ keywords: memory management
 
 ![](/public/upload/linux/linux_virtual_address.png)
 
-![](/public/upload/linux/linux_memory_management.png)
+[30张图带你领略glibc内存管理精髓](https://mp.weixin.qq.com/s/pdv5MMUQ9ACpeCpyGnxb1Q)Linux 系统在装载 elf 格式的程序文件时，会调用 loader 把可执行文件中的各个段依次载入到从某一地址开始的空间中。用户程序可以直接使用系统调用来管理 heap 和mmap 映射区域，但更多的时候程序都是使用 C 语言提供的 malloc()和 free()函数来动态的分配和释放内存。stack区域是唯一不需要映射，用户却可以访问的内存区域，这也是利用堆栈溢出进行攻击的基础。
 
+1. 对于heap的操作，操作系统提供了brk()函数，c运行时库提供了sbrk()函数。
+2. 对于mmap映射区域的操作，操作系统提供了mmap()和munmap()函数。
+
+![](/public/upload/basic/glibc_mm.png)
+
+内存的延迟分配，只有在真正访问一个地址的时候才建立这个地址的物理映射，这是 Linux 内存管理的基本思想之一。Linux 内核在用户申请内存的时候，只是给它分配了一个线性区（也就是虚拟内存），并没有分配实际物理内存；只有当用户使用这块内存的时候，内核才会分配具体的物理页面给用户，这时候才占用宝贵的物理内存。内核释放物理页面是通过释放线性区，找到其所对应的物理页面，将其全部释放的过程。
+
+```c
+struct mm_struct {
+    ...
+    unsigned long (*get_unmapped_area) (struct file *filp,
+    unsigned long addr, unsigned long len,
+    unsigned long pgoff, unsigned long flags);
+    ...
+    unsigned long mmap_base; /* base of mmap area */
+    unsigned long task_size; /* size of task vm space */
+    ...
+    unsigned long start_code, end_code, start_data, end_data;   
+    unsigned long start_brk, brk, start_stack;
+    unsigned long arg_start, arg_end, env_start, env_end;
+    ...
+    // [start_code,end_code)表示代码段的地址空间范围
+    // [start_data,end_start)表示数据段的地址空间范围
+    // [start_brk,brk)分别表示heap段的起始空间和当前的heap指针
+    // [start_stack,end_stack)表示stack段的地址空间范围
+    // mmap_base表示memory mapping段的起始地址
+}
+```
+C语言的动态内存分配基本函数是 malloc()，在 Linux 上的实现是通过内核的 brk 系统调用。brk()是一个非常简单的系统调用， 只是简单地改变mm_struct结构的成员变量 brk 的值。
 
 ## 语言/运行时
 
@@ -202,3 +231,7 @@ sweep(start, end):
             free(scan)
         scan = nextObject(scan)
 ```
+
+## 其它
+
+![](/public/upload/linux/linux_memory_management.png)
