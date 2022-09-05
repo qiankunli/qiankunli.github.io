@@ -343,11 +343,17 @@ k8s.io/kubernetes
 
 ![](/public/upload/kubernetes/kubelet_cadvisor_object.png)
 
-## cpu 管理
+## CPU Manager
+
+理想状态是 进程只跑在一个 NUMA node里。在 NUMA CPU 架构下，如何精细化调度Pod？
 
 [Kubelet从入门到放弃:识透CPU管理](https://mp.weixin.qq.com/s/ViuaEIE0mEaWMJPCJm5-xg)
 
 [Kubelet从人门到放弃：拓扑管理](https://mp.weixin.qq.com/s/L02BjTt4Znpw3KrllkeP-Q)
+
+[详解K8s资源拓扑感知调度、资源优化策略最佳实践](https://mp.weixin.qq.com/s/FNSqnc5k1s4Nt-ysqdRqAw) 专门设计了agent、scheduler plugin。
+
+
 
 ## Pod生命周期管理
 

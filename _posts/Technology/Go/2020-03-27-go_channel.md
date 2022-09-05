@@ -19,28 +19,33 @@ Go 对并发的原生支持可不是仅仅停留在口号上的，Go 在语法�
 
 ## 背景知识
 
-在 g 对象中，有一个名字为 waiting 的 sudog* 指针，它表示这个 goroutine** 正在等待什么东西或者正在等待哪些东西。sudog 是一个链表形式的类型，waitlink 表示它的下一个节点。
+在 g 对象中，有一个名字为 waiting 的 sudog* 指针，它表示这个 goroutine 正在等待什么东西或者正在等待哪些东西。sudog 是一个链表形式的类型，waitlink 表示它的下一个节点。
 
 ```go
 type g struct {
   // ...
   atomicstatus   uint32  // 表示 goroutine 的状态
   param          unsafe.Pointer // 唤醒时参数
-  waiting        *sudog // 等待队列，后文会说到
+  waiting        *sudog // 等待队列，goroutine ready之前，会waiting做一些检查，waiting不为空是不能运行的。
   // ...
 }
+// sudog is necessary because the g ↔ synchronization object relation is many-to-many. 
 type sudog struct {
-        // ....
-        isSelect bool
-        elem     unsafe.Pointer // data element (may point to stack)      
-        waitlink    *sudog // g.waiting list or semaRoot
-        c           *hchan // channel
+	// ....
+	isSelect bool
+	elem     unsafe.Pointer // data element (may point to stack)      
+	waitlink    *sudog // g.waiting list or semaRoot
+	c           *hchan // channel
+	g 			*g
 }
+// sudogs are allocated from a special pool. Use acquireSudog and releaseSudog to allocate and free them.
 func acquireSudog() *sudog {}
 func releaseSudog(s *sudog) {}
 ```
 
-gopark 将当前的 goroutine 修改成等待状态，然后等待被唤醒。goready 函数用来唤醒一个 goroutine，它将 goroutine 的状态修改为可运行状态，随后会被调度器运行。当被调度时，对应的 gopark 函数返回。
+1. gopark 将当前的 goroutine 修改成等待状态，然后等待被唤醒。
+2. goready 函数用来唤醒一个 goroutine，它将 goroutine 的状态修改为可运行状态，随后会被调度器运行。
+3. 当被调度时，对应的 gopark 函数返回。
 
 ## channel
 
@@ -70,6 +75,7 @@ type hchan struct {
 	elemtype *_type         // 当前 Channel 能够收发的元素类型
 	sendx    uint           // Channel 的发送操作处理到的位置；
     recvx    uint           // Channel 的接收操作处理到的位置；
+	// 就像linux socket的 等待队列一样，方便根据channel找到goroutine
 	recvq    waitq          //  recv 等待列表，即（ <-ch ）
 	sendq    waitq			//  send 等待列表，即（ ch<- ）
 
@@ -215,7 +221,7 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 
 ### 关闭
 
-编译器会将用于关闭管道的 close 关键字转换成 OCLOSE 节点以及 runtime.closechan 的函数调用。该函数在最后会为所有被阻塞的 Goroutine 调用 runtime.goready 触发调度。
+编译器会将用于关闭管道的 close 关键字转换成 OCLOSE 节点以及 runtime.closechan 的函数调用。该函数在最后会为所有被阻塞的 Goroutine 调用 runtime.goready 触发调度。PS：所以close 也成了一种 通知的方式。
 
 ## select
 
@@ -290,7 +296,7 @@ const (
 
 [面向信仰编程-select](https://draveness.me/golang/docs/part2-foundation/ch05-keyword/golang-select/)C 语言中的 select 关键字可以同时监听多个文件描述符的可读或者可写的状态，Go 语言中的 select 关键字也能够让 Goroutine 同时等待多个 Channel 的可读或者可写，在多个文件或者 Channel 发生状态改变之前，select 会一直阻塞当前线程或者 Goroutine。
 
-runtime 通过遍历+等待的方式实现 select 语义，遍历时判断如果 有可执行的 case 或者 select 中带有 default，那么就执行之。如果没有，就通过 gopark 将调用者转换为等待状态，使用 sudog 链表表示它在多个通道上等待。其中任意一个通道对应的 sudog 都可以唤醒调用者。
+runtime 通过遍历+等待的方式实现 select 语义，遍历时判断如果 有可执行的 case 或者 select 中带有 default，那么就执行之。如果没有，就通过 gopark 将调用者转换为等待状态，**使用 sudog 链表表示它在多个通道上等待**。其中任意一个通道对应的 sudog 都可以唤醒调用者。
 
 与 Channel 同步出现的 **Select 更像是一个语法糖**， 其本质仍然是一个 chansend 和 chanrecv 的两个通用实现。 但为了支持 Select 在不同分支上的非阻塞操作，selectgo 完成了这一需求。`func selectgo(cas0 *scase, order0 *uint16, ncases int) (int, bool)` 它的第一个返回值表示需要执行哪个 case, 第 2 个返回值表示如果要执行的 case 是 caseRecv，那么接收数据是否成功。
 
@@ -361,6 +367,7 @@ c<-struct{}               	// 向channel写入一个“事件”
 
 
 [一文带你搞懂从单队列到优先级队列的实现](https://mp.weixin.qq.com/s/bPLRcsmSO5_MvqN8F812zQ)
+
 ### 使用无缓冲 channel 替代锁
 
 这种并发设计逻辑更符合 Go 语言所倡导的“不要通过共享内存来通信，而是通过通信来共享内存”的原则。PS： 好像没有使用锁好懂

@@ -13,12 +13,6 @@ keywords: Go goroutine scheduler
 * TOC
 {:toc}
 
-[赵海平与张宏波谈编程语言](https://mp.weixin.qq.com/s/FI2WFOENBxgCbykvy9wBYQ)为什么 Google 要去做 Golang 呢？是因为我们在这个过去的五到十年里面，就发现了实际上绝大多数的公司在写什么呢？在写分布式计算。特别常见的情况是我调你、你调它，它调它。团队大了之后拆分 engineering task 拆分完了之后，我就要 RPC 调用对吧？很多的 application 就变成了所谓的 IO intensive 的这种形式，20 年前的话，很多的软件都是在做大量的计算对吧，没有太多的 RPC 因为都在一个机器上进行。 IO多了，问题就来了，你的线程模型是什么？一个io一个线程不行，最后就发现了一定要用比如说 epoll 这种模型，要搞 user thread ，让其他的人都能够很快的去跳到这个模型上，所以他才把 goroutine （协程）这个概念变成了 first classcitizen ，所以其实人家的本意是在这里。
-
-[The Go scheduler](https://morsmachine.dk/go-scheduler)为什么Go 运行时需要一个用户态的调度器？
-1. 线程调度成本高，比如context switch比如陷入内核执行，如创建一个 Goroutine 的栈内存消耗为 2 KB，而 thread 占用 1M 以上空间
-2. 操作系统在Go模型下不能做出好的调度决策。os 只能根据时间片做一些简单的调度。
-3. 协程的切换不需要陷入内核，协程的威力在于IO的处理，恰好这部分是线程的软肋
 
 [调度的本质](https://mp.weixin.qq.com/s/5E5V56wazp5gs9lrLvtopA)Go 调度的本质是一个生产-消费流程，生产端是正在运行的 goroutine 执行 `go func(){}()` 语句生产出 goroutine 并塞到三级队列中去（包含P的runnext），消费端则是 Go 进程中的 m 在不断地执行调度循环。运行时(runtime)能够将goroutine多路复用到一个小的线程池中。这个观点非常新颖，这种熟悉加意外的效果其实就是你成长的时机。
 
@@ -28,11 +22,21 @@ keywords: Go goroutine scheduler
 
 [万字长文深入浅出 Golang Runtime](https://zhuanlan.zhihu.com/p/95056679)调度在计算机中是分配工作所需资源的方法，linux的调度为CPU找到可运行的线程，而Go的调度是为M（线程）找到P（内存、执行票据）和可运行的G。
 
+### 为什么弄协程？
+
+[赵海平与张宏波谈编程语言](https://mp.weixin.qq.com/s/FI2WFOENBxgCbykvy9wBYQ)为什么 Google 要去做 Golang 呢？是因为我们在这个过去的五到十年里面，就发现了实际上绝大多数的公司在写什么呢？在写分布式计算。特别常见的情况是我调你、你调它，它调它。团队大了之后拆分 engineering task 拆分完了之后，我就要 RPC 调用对吧？很多的 application 就变成了所谓的 IO intensive 的这种形式，20 年前的话，很多的软件都是在做大量的计算对吧，没有太多的 RPC 因为都在一个机器上进行。 **IO多了，问题就来了**，你的线程模型是什么？一个io一个线程不行，最后就发现了一定要用比如说 epoll 这种模型，要搞 user thread ，让其他的人都能够很快的去跳到这个模型上，所以他才把 goroutine （协程）这个概念变成了 first classcitizen ，所以其实人家的本意是在这里。
+
 [谈谈协程的历史与现状](https://mp.weixin.qq.com/s/5H_ux7cYv03ponKlNnmfRg)IO密集型一直是提高CPU利用率的难点，在抢占式调度中也有对应的解决方案：异步+回调，但原来整体的逻辑被拆分为好几个部分，让整个程序的可读性非常差。随着网络技术的发展和高并发要求，**对IO型任务处理的低效逐渐受到重视**，终于协程的机会来了。go中的协程被称为goroutine，协程对操作系统而言是透明的，也就是操作系统无法直接调度协程，因此必须有个中间层来接管goroutine。goroutine仍然是基于线程来实现的，因为线程才是CPU调度的基本单位，在go语言内部维护了一组数据结构和N个线程，**协程的代码被放进队列中来由线程来实现调度执行**，这就是著名的GMP模型。
+
+[The Go scheduler](https://morsmachine.dk/go-scheduler)为什么Go 运行时需要一个用户态的调度器？
+1. 线程调度成本高，比如context switch比如陷入内核执行，如创建一个 Goroutine 的栈内存消耗为 2 KB，而 thread 占用 1M 以上空间
+2. 操作系统在Go模型下不能做出好的调度决策。**os 只能根据时间片做一些简单的调度**。
+3. 协程的切换不需要陷入内核，协程的威力在于IO的处理，恰好这部分是线程的软肋
+
 
 ## 调度模型的演化
 
-[Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952) **调度就是创建一个操作系统线程执行schedule函数**。
+[Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952) **go调度就是创建一个操作系统线程执行schedule函数**。
 
 ```go
 // 程序启动时的初始化代码
@@ -82,7 +86,9 @@ static void scheduler(void) {
 
 ![](/public/upload/go/go_scheduler_gm.jpg)
 
-在这个阶段，**goroutine 调度跟 java 的ThreadPool 是一样一样的**，除了io操作会阻塞线程外，java Executor也可以视为一个用户态线程调度框架。runnable 表示运行逻辑 提交到queue，ThreadPool 维持多个线程 从queue 中取出runnable 并执行。调度器本身（schedule 方法），在正常流程下，是不会返回的，也就是不会结束主流程。schedule 会不断地运行调度流程，GoroutineA 完成了，就开始寻找 GoroutineB，寻找到 B 了，就把已经完成的 A 的调度权交给 B，让 GoroutineB 开始被调度，一直继续下去。当然了，也有被正在阻塞（Blocked）的 G。假设 G 正在做一些系统、网络调用，那么就会导致 G 停滞。这时候 M（系统线程）就会被会重新放内核队列中，等待新的一轮唤醒。
+在这个阶段，**goroutine 调度跟 java 的ThreadPool 是一样一样的**，除了io操作会阻塞线程外，java Executor也可以视为一个用户态线程调度框架。runnable 表示运行逻辑 提交到queue，ThreadPool 维持多个线程 从queue 中取出runnable 并执行，只不过ThreadPool是执行runnable 直到完成runable。
+
+调度器本身（schedule 方法），在正常流程下，是不会返回的，也就是不会结束主流程。schedule 会不断地运行调度流程，GoroutineA 完成了或时间到了，就开始寻找 GoroutineB，寻找到 B 了，就把已经完成的 A 的调度权交给 B，让 GoroutineB 开始被调度，一直继续下去。当然了，也有被正在阻塞（Blocked）的 G。假设 G 正在做一些系统、网络调用，那么就会导致 G 停滞。这时候 M（系统线程）就会被会重新放内核队列中，等待新的一轮唤醒。
 
 ### GPM模型
 
@@ -106,7 +112,7 @@ static void schedule(void) {
 
 ![](/public/upload/go/go_scheduler_gpm.jpg)
  
-为什么引入Local Run Queue？它存在的意义在于实现工作窃取（work stealing）算法
+**为什么引入Local Run Queue？**它存在的意义在于实现工作窃取（work stealing）算法
 1. 在没有 P 的情况下，所有的 G 只能放在一个全局的队列中。对全局队列的操作均需要竞争同一把锁，mutex 需要保护所有与 goroutine 相关的操作（创建、完成、重排等）， 导致伸缩性不好. 
 2. GM 模型下一个协程派生的协程也会放入全局的队列, 大概率是被其他 m运行了, “父子协程” 被不同的m 运行，内存亲和性不好。
 
@@ -191,8 +197,6 @@ g0 是一个运行时中比较特殊的 Goroutine，它会深度参与运行时�
 
 ### P
 
-
-
 P全称是Processor，处理器，表示调度的上下文，它可以被看做一个运行于线程 M 上的本地调度器，所以它维护了一个goroutine队列（环形链表），里面存储了所有需要它来执行的goroutine。通过处理器 P 的调度，每一个内核线程都能够执行多个 Goroutine，它能在 Goroutine 进行一些 I/O 操作时及时切换，提高线程的利用率。
 
 P 整个结构除去 本地 G 队列外，就是一些性能追踪、内存分配(mcache)、统计、调试、GC 辅助的字段了。
@@ -227,7 +231,7 @@ p 结构体中的状态 status 可选值
 
 调度器，所有 Goroutine 被调度的核心，存放了调度器持有的全局资源，以及访问这些资源需要的锁。
 
-[Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)要实现对goroutine的调度，仅仅有g结构体对象是不够的，至少还需要一个存放所有（可运行）goroutine的容器，便于工作线程寻找需要被调度起来运行的goroutine，于是Go调度器又引入了schedt结构体，一方面用来保存调度器自身的状态信息，另一方面它还拥有一个用来保存goroutine的运行队列。因为每个Go程序只有一个调度器，所以在每个Go程序中schedt结构体只有一个实例对象，该实例对象在源代码中被定义成了一个共享的全局变量，这样每个工作线程都可以访问它以及它所拥有的goroutine运行队列，我们称这个运行队列为全局运行队列。
+[Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)要实现对goroutine的调度，仅仅有g结构体对象是不够的，至少还需要一个存放所有（可运行）goroutine的容器，便于工作线程寻找需要被调度起来运行的goroutine，于是Go调度器又引入了schedt结构体，一方面用来保存调度器自身的状态信息，另一方面它还拥有一个用来保存goroutine的运行队列。因为每个Go程序只有一个调度器，所以在每个Go程序中schedt结构体只有一个实例对象，该实例对象在源代码中被定义成了一个共享的全局变量，这样每个工作线程都可以访问它以及它所拥有的goroutine运行队列，我们称这个运行队列为**全局运行队列**。
 
 
 ```go
@@ -235,7 +239,7 @@ p 结构体中的状态 status 可选值
 type schedt struct {
 	midle        muintptr   // 空闲的 M 列表
 	pidle      puintptr     // 空闲 p 链表
-	runq     gQueue 	// 全局 runnable G 队列
+	runq     gQueue 	    // 全局 runnable G 队列
 	runqsize int32
 	// defer 结构的池
 	deferlock mutex
@@ -257,7 +261,7 @@ m0 m                    // 代表进程的主线程
 g0  g                   // m0的g0，也就是m0.g0 = &g0
 ```
 
-## 其它容器
+### 其它容器
 
 ![](/public/upload/go/gmp_container.png)
 
@@ -267,14 +271,14 @@ g0  g                   // m0的g0，也就是m0.g0 = &g0
 
 和函数的区别是，函数调用时，调用者跟被调用者之间像是一种上下级的关系；当我们使用函数的时候，**简单地保持一个调用栈就行了**。当 fun1 调用 fun2 的时候，就往栈里增加一个新的栈帧，用于保存 fun2 的本地变量、参数等信息；这个函数执行完毕的时候，fun2 的栈帧会被弹出（恢复栈顶指针 sp），并跳转到返回地址（调用 fun2 的下一条指令），继续执行调用者 fun1 的代码。
 
-而在协程中，调用者跟被调用者更像是互相协作的关系，比如一个是生产者，一个是消费者。如果调用的是协程 coroutine1，该怎么处理协程的栈帧呢？因为协程并没有执行完，显然还不能把它简单地丢掉。这种情况下，程序可以从堆里申请一块内存，保存协程的活动记录，包括本地变量的值、程序计数器的值（当前执行位置）等等。这样，当下次再激活这个协程的时候，可以在栈帧和寄存器中恢复这些信息。
+而在协程中，调用者跟被调用者更像是互相协作的关系，比如一个是生产者，一个是消费者。如果调用的是协程 coroutine1，**该怎么处理协程的栈帧呢？因为协程并没有执行完，显然还不能把它简单地丢掉**。这种情况下，程序可以**从堆里申请一块内存**，保存协程的活动记录，包括本地变量的值、程序计数器的值（当前执行位置）等等。这样，当下次再激活这个协程的时候，可以在栈帧和寄存器中恢复这些信息。
 
 1. Stackful Coroutine，每个协程，都有一个自己专享的协程栈。可以在协程栈的任意一级，暂停协程的运行。可以从一个线程脱离，附加到另一个线程上。PS： Go中的G 所表达的主要内容
 2. Stackless Coroutine，在主栈上运行协程的机制，会被绑定在创建它的线程上
 
 ## G0
 
-[关于Go并发编程，你不得不知的“左膀右臂”——并发与通道！](https://mp.weixin.qq.com/s/BvIPDCKuCbe7Xd9oI6BvjQ)运行时系统中的每个M都会拥有一个特殊的G，一般称为M的g0。M的g0不是由Go程序中的代码间接生成的，而是由Go运行时系统在初始化M时创建并分配给该M的。M的g0一般用于执行调度、垃圾回收、栈管理等方面的任务。M还会拥有一个专用于处理信号的G，称为gsignal。除了g0和gsignal之外，其他由M运行的G都可以视为用户级别的G，简称用户G，g0和gsignal可称为系统G。Go运行时系统会进行切换，以使**每个M都可以交替运行用户G和它的g0**。PS：g0 就是M 的代码逻辑 `g1 ->  g0 -> g2 -> g0 -> g3`
+[关于Go并发编程，你不得不知的“左膀右臂”——并发与通道！](https://mp.weixin.qq.com/s/BvIPDCKuCbe7Xd9oI6BvjQ)运行时系统中的每个M都会拥有一个特殊的G，一般称为M的g0。M的g0不是由Go程序中的代码间接生成的，而是由Go运行时系统在初始化M时创建并分配给该M的。M的g0一般用于执行调度、垃圾回收、栈管理等方面的任务。M还会拥有一个专用于处理信号的G，称为gsignal。除了g0和gsignal之外，其他由M运行的G都可以视为用户级别的G，简称用户G，g0和gsignal可称为**系统G**。Go运行时系统会进行切换，以使**每个M都可以交替运行用户G和它的g0**。PS：g0 就是M 的代码逻辑 `g1 ->  g0 -> g2 -> g0 -> g3`
 
 [聊聊 g0](https://mp.weixin.qq.com/s/Ie8niOb_0C9z2kACNvWCtg)linux 执行调度任务：cpu 发生时间片中断，正在执行的线程 被剥离cpu，cpu 执行调度 程度寻找下一个线程并执行。 调度程度 的运行依托 栈、寄存器等上下文环境。对于go 来说，每一个线程/M 一直在执行一个 调度循环`schedule()->execute()->gogo()->g2()->goexit()->goexit1()->mcall()->goexit0()->schedule()` ，每个被调度的协程 有自己的栈 等 空间，那么先后执行的 两个协程之间 运行 schedule 这些逻辑时，也需要一些栈空间，这些都归属于g0。
 
@@ -294,15 +298,13 @@ Go runtime还会用Background thread来运行一些相对特别的G（如 Networ
 
 goroutine一些重要设计：
 1. 堆栈开始很小（只有 4K），但可按需自动增长；
-2. 坚决干掉了 “线程局部存储（TLS）” 特性的支持，让执行体更加精简；
+2. 坚决干掉了 “线程局部存储（TLS）” 特性的支持，让执行体更加精简。P内的 g 共用P的cache。
 3. 提供了同步、互斥和其他常规执行体间的通讯手段，包括大家非常喜欢的 channel；
 4. 提供了几乎所有重要的系统调用（尤其是 IO 请求）的包装。
 
 [Scheduling In Go : Part I - OS Scheduler](https://www.ardanlabs.com/blog/2018/08/scheduling-in-go-part1.html)
 [Scheduling In Go : Part II - Go Scheduler](https://www.ardanlabs.com/blog/2018/08/scheduling-in-go-part2.html)
 [Scheduling In Go : Part III - Concurrency](https://www.ardanlabs.com/blog/2018/12/scheduling-in-go-part3.html)
-
-笔者今日学习Joe Armstrong的博士论文《面对软件错误构建可靠的分布式系统》，文中提到“在构建可容错软件系统的过程中要解决的本质问题就是故障隔离。”操作系统进程本身就是一种天然的故障隔离机制，当然从另一个层面，进程间还是因为共享cpu和内存等原因相互影响。进程要想达到容错性，就不能与其他进程有共享状态；它与其他进程的唯一联系就是由内核消息系统传递的消息。 
 
 
 [goroutine与调度器](http://blog.csdn.net/chanshimudingxi/article/details/40855467)

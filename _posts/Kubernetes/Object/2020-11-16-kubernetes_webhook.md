@@ -17,8 +17,8 @@ keywords:  Kubernetes webhook
 
 Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个设计和各类 Web 框架中的 Filter  很像，就是一个插件化的责任链，责任链中的每个插件针对 apiserver 收到的请求做一些操作或校验。分类
 
-2. MutatingWebhookConfiguration，操作 api 对象的， 会对request的resource，进行转换，比如填充默认的request/limit
-1. ValidatingWebhookConfiguration，校验 api 对象的, 比如校验Pod副本数必须大于2。
+2. MutatingWebhookConfiguration，在对象持久化之前，修改对象的内容或者拒绝请求。 会对request的resource，进行转换，比如填充默认的request/limit。因为对象的字段可能被不同的准入控制器修改多次，所以准入控制器链的顺序就尤其重要。
+1. ValidatingWebhookConfiguration，在对象持久化之前，校验对象的内容或者拒绝请求。 比如校验Pod副本数必须大于2。
 
 使用场景：[使用 Admission Webhook 机制实现多集群资源配额控制](https://mp.weixin.qq.com/s/i3KtTSfab2JrjeFR4tdy_A)未读
 

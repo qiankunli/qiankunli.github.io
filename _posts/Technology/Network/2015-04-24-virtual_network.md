@@ -33,6 +33,7 @@ keywords: virtual network
 常见 PCIe 设备中，最适合 虚拟化 的就是网卡了: 一或多对 TX/RX queue + 一或多个中断，结合上一个 Routing ID，就可以抽象为一个 VF。而且它是近乎无状态的。
 
 ### tun/tap
+
 [一文读懂网络虚拟化之 tun/tap 网络设备](https://mp.weixin.qq.com/s/bGY7BJdIz3SE491SclKRMQ)tun 和 tap 是一组通用的虚拟驱动程序包，是两个相对独立的虚拟网络设备
 1. tun 模式 与 tap 模式。其中 tap 模拟了以太网设备，操作二层数据包（以太帧），tun 则是模拟了网络层设备，操作三层数据包（IP 报文）。
 2. 它和物理设备eth0的差别，它们的一端虽然都连着协议栈，但另一端不一样，eth0的另一端是物理网络，这个物理网络可能就是一个交换机，**而tun0的另一端是一个用户层的程序**。
@@ -97,7 +98,7 @@ Linux Bridge 是在 Linux Kernel 2.2 版本开始提供的二层转发工具，�
 3. 如果数据包是单播帧，且 MAC 地址在地址转发表中已存在，则直接转发到地址表中指定的设备。
 4. 如果数据包是此前转发过的，又重新发回到此 Bridge，说明冗余链路产生了环路。由于以太帧不像 IP 报文那样有 TTL 来约束，所以一旦出现环路，如果没有额外措施来处理的话，就会永不停歇地转发下去。那么对于这种数据包，就需要交换机实现生成树协议（Spanning Tree Protocol，STP）来交换拓扑信息，生成唯一拓扑链路以切断环路。
 
-Linux Bridge 不仅用起来像交换机，实现起来也像交换机。对于通过brctl命令显式接入网桥的设备，Linux Bridge 与物理交换机的转发行为是完全一致的，它也不允许给接入的设备设置 IP 地址，**因为网桥是根据 MAC 地址做二层转发的，就算设置了三层的 IP 地址也没有意义**。不过，它与普通的物理交换机也还是有一点差别的，普通交换机只会单纯地做二层转发，Linux Bridge 却还支持把发给它自身的数据包，接入到主机的三层协议栈中。除了显式接入的设备外，它自己也无可分割地连接着一台有着完整网络协议栈的 Linux 主机，因为 Linux Bridge 本身肯定是在某台 Linux 主机上创建的，我们可以看作是 Linux Bridge 有一个与自己名字相同的隐藏端口，隐式地连接了创建它的那台 Linux 主机。因此，Linux Bridge 允许给自己设置 IP 地址，这样就比普通交换机多出了一种特殊的转发情况：如果数据包的目的 MAC 地址为网桥本身，并且网桥设置了 IP 地址的话，那该数据包就会被认为是收到发往创建网桥那台主机的数据包，这个数据包将不会转发到任何设备，而是直接交给上层（三层）协议栈去处理。这时，网桥就取代了物理网卡 eth0 设备来对接协议栈，进行三层协议的处理。
+Linux Bridge 不仅用起来像交换机，实现起来也像交换机。对于通过brctl命令显式接入网桥的设备，Linux Bridge 与物理交换机的转发行为是完全一致的，它也不允许给接入的设备设置 IP 地址，**因为网桥是根据 MAC 地址做二层转发的，就算设置了三层的 IP 地址也没有意义**。不过，它与普通的物理交换机也还是有一点差别的，普通交换机只会单纯地做二层转发，**Linux Bridge 却还支持把发给它自身的数据包，接入到主机的三层协议栈中**。除了显式接入的设备外，它自己也无可分割地连接着一台有着完整网络协议栈的 Linux 主机，因为 Linux Bridge 本身肯定是在某台 Linux 主机上创建的，我们可以看作是 Linux Bridge 有一个与自己名字相同的隐藏端口，隐式地连接了创建它的那台 Linux 主机。因此，Linux Bridge 允许给自己设置 IP 地址，这样就比普通交换机多出了一种特殊的转发情况：如果数据包的目的 MAC 地址为网桥本身，并且网桥设置了 IP 地址的话，那该数据包就会被认为是收到发往创建网桥那台主机的数据包，这个数据包将不会转发到任何设备，而是直接交给上层（三层）协议栈去处理。这时，网桥就取代了物理网卡 eth0 设备来对接协议栈，进行三层协议的处理。
 
 
 [Bridge vs Macvlan](https://hicu.be/bridge-vs-macvlan)
@@ -106,13 +107,9 @@ Linux Bridge 不仅用起来像交换机，实现起来也像交换机。对于�
 
 [Linux 虚拟网络设备之 bridge](https://mp.weixin.qq.com/s/BWyO9zb4I2lMyjVBAoVCiA)bridge 常用场景
 
-![](/public/upload/network/bridge_tun.png)
-
 ![](/public/upload/network/bridge_veth.png)
 
 [Macvlan and IPvlan basics](https://sreeninet.wordpress.com/2016/05/29/macvlan-and-ipvlan/)In linux bridge implementation, VMs or Containers will connect to bridge and bridge will connect to outside world. For external connectivity, we would need to use NAT. container 光靠 bridge 无法直接访问外网。
-
-A bridge transparently relays traffic between multiple network interfaces. **In plain English this means that a bridge connects two or more physical Ethernets together to form one bigger (logical) Ethernet** 
 
 
 <table>
@@ -167,6 +164,8 @@ A bridge transparently relays traffic between multiple network interfaces. **In 
 
 对于支持 VLAN 的交换机，当这个交换机把二层的头取下来的时候，就能够识别这个 VLAN ID。这样只有相同 VLAN 的包，才会互相转发，不同 VLAN 的包，是看不到的。有一种口叫作 Trunk 口，它可以转发属于任何 VLAN 的口。交换机之间可以通过这种口相互连接。PS：说白了就是 在**网络层支持了 “多路复用”**，类似于http2 的StreamId，rpc 框架中的requestId
 
+![](/public/upload/network/vlan_sub_interface.png)
+
 ### vlan 划分
 
 交换机端口类型
@@ -211,7 +210,7 @@ A bridge transparently relays traffic between multiple network interfaces. **In 
 
 两个 VLAN 之间位于独立的广播域，是完全二层隔离的，要通信就只能通过三层设备。假设位于 VLAN-A 中的主机 A1，希望把数据包发送给 VLAN-B 中的主机 B2，由于 A、B 两个 VLAN 之间二层链路不通，因此引入了单臂路由。单臂路由不属于任何 VLAN，它与交换机之间的链路允许任何 VLAN ID 的数据包通过，这种接口被称为 TRUNK。这样，A1 要和 B2 通信，A1 就把数据包先发送给路由（只需把路由设置为网关即可做到），然后路由根据数据包上的 IP 地址得知 B2 的位置，去掉 VLAN-A 的 VLAN Tag，改用 VLAN-B 的 VLAN Tag 重新封装数据包后，发回给交换机，交换机收到后就可以顺利转发给 B2 了。由于 A1、B2 各自处于独立的网段上，它们又各自要把同一个路由作为网关使用，这就要求路由器必须同时具备 192.168.1.0/24 和 192.168.2.0/24 的 IP 地址。当然，如果真的就只有 VLAN-A、VLAN-B 两个 VLAN，那把路由器上的两个接口分别设置不同的 IP 地址，然后用两条网线分别连接到交换机上，也勉强算是一个解决办法。但要知道，VLAN 最多可以支持 4096 个 VLAN，那如果要接四千多条网线就太离谱了。因此为了解决这个问题，802.1Q 规范中专门定义了子接口（Sub-Interface）的概念，它的作用是允许在同一张物理网卡上，针对不同的 VLAN 绑定不同的 IP 地址。
 
-![](/public/upload/network/vlan_sub_interface.png)
+
 
 ## vxlan
 
@@ -318,7 +317,7 @@ static int ipvlan_xmit_mode_l2(struct sk_buff *skb, struct net_device *dev){
 }
 ```
 
-## vlan/macvlan/ipvlan
+## vlan/macvlan/ipvlan 底层实现
 
 [从 VLAN 到 IPVLAN: 聊聊虚拟网络设备及其在云原生中的应用](https://mp.weixin.qq.com/s/eGLvJHW5AbQx7KqynSIpLw)
 1. VLAN全称是 Virtual Local Area Network，用于在以太网中隔离不同的广播域。它诞生的时间很早，1995 年，IEEE 就发表了 802.1Q 标准定义了在以太网数据帧中 VLAN 的格式，并且沿用至今。VLAN 原本和 bridge 一样是一个交换机上的概念，不过 Linux 将它们都进行了软件的实现。Linux 在每个以太网数据帧中使用一个 16bit 的 vlan_proto 字段和 16bit 的 vlan_tci 字段实现 802.1q 协议，同时对于每一个 VLAN，都会虚拟出一个子设备来处理去除 VLAN 之后的报文，没错 VLAN 也有属于自己的子设备，即 VLAN sub-interface，不同的 VLAN 子设备通过一个主设备进行物理上的报文收发。

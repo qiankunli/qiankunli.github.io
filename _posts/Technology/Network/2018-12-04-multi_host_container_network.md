@@ -49,6 +49,11 @@ Kubernetes 网络大致分为两大类，使用不同的技术
 1. 一类是 Cluster IP，是一层反向代理的虚拟ip；service/ingress，早期 kube-proxy 是采用 iptables，后来引入 IPVS 也解决了大规模容器集群的网络编排的性能问题。
 2. 一类是 Pod IP，容器间交互数据
 
+
+针对docker 跨主机通信时网络中一堆的NAT包，Kubernetes 提出IP-per-pod model ，这个 IP 是真正属于该 Pod 的，对这个 Pod IP 的访问就是真正对它的服务的访问，中间拒绝任何的变造。比如以 10.1.1.1 的 IP 去访问 10.1.2.1 的 Pod，结果到了 10.1.2.1 上发现，它实际上借用的是宿主机的 IP，而不是源 IP，这样是不被允许的。**在通信的两端Pod看来，以及整个通信链路中`<source ip,source port,dest ip,dest port>` 是不能改变的**。设计这个原则的原因是，用户不需要额外考虑如何建立Pod之间的连接，也不需要考虑如何将容器端口映射到主机端口等问题。
+
+Kubernetes 对怎么实现这个模型其实是没有什么限制的，用 underlay 网络来**控制外部路由器进行导流**是可以的；如果希望解耦，用 overlay 网络在底层网络之上再加一层叠加网，这样也是可以的。总之，只要达到模型所要求的目的即可。**因为`<source ip,source port,dest ip,dest port>`不能变，排除NAT/DAT，其实也就只剩下路由和解封包两个办法了**。
+
 [深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)主机A上的实例(容器、VM等)如何与主机B上的另一个实例通信?有很多解决方案:
 
 1. 直接路由: BGP等
@@ -59,9 +64,6 @@ Kubernetes 网络大致分为两大类，使用不同的技术
 3. NAT: 例如docker的桥接网络模式
 4. 其它方式
 
-针对docker 跨主机通信时网络中一堆的NAT包，Kubernetes 提出IP-per-pod model ，这个 IP 是真正属于该 Pod 的，对这个 Pod IP 的访问就是真正对它的服务的访问，中间拒绝任何的变造。比如以 10.1.1.1 的 IP 去访问 10.1.2.1 的 Pod，结果到了 10.1.2.1 上发现，它实际上借用的是宿主机的 IP，而不是源 IP，这样是不被允许的。**在通信的两端Pod看来，以及整个通信链路中`<source ip,source port,dest ip,dest port>` 是不能改变的**。设计这个原则的原因是，用户不需要额外考虑如何建立Pod之间的连接，也不需要考虑如何将容器端口映射到主机端口等问题。
-
-Kubernetes 对怎么实现这个模型其实是没有什么限制的，用 underlay 网络来**控制外部路由器进行导流**是可以的；如果希望解耦，用 overlay 网络在底层网络之上再加一层叠加网，这样也是可以的。总之，只要达到模型所要求的目的即可。**因为`<source ip,source port,dest ip,dest port>`不能变，排除NAT/DAT，其实也就只剩下路由和解封包两个办法了**。
 
 Rather than prescribing a certain networking solution, Kubernetes only states three fundamental requirements:
 
@@ -69,12 +71,11 @@ Rather than prescribing a certain networking solution, Kubernetes only states th
 * Nodes can communicate with all containers (and vice versa) without NAT.
 * The IP a container sees itself is the same IP as others see it. each pod has its own IP address that other pods can find and use. 很多业务启动时会将自己的ip 发出去（比如注册到配置中心），这个ip必须是外界可访问的。 学名叫：flat address space across the cluster.
 
-
 Kubernetes requires each pod to have an IP in a flat networking namespace with full connectivity to other nodes and pods across the network. This IP-per-pod model yields a backward-compatible way for you to treat a pod almost identically to a VM or a physical host（**ip-per-pod 的优势**）, in the context of naming, service discovery, or port allocations. The model allows for a smoother transition from non–cloud native apps and environments.  这样就 no need to manage port allocation
 
 ## 跨主机通信
 
-[Kubernetes 网络模型基础指南](https://mp.weixin.qq.com/s/YRHSx9FaCyB6nQGSylHPOA)通常集群中的每个节点都分配有一个 CIDR，用来指定该节点上运行的 Pod 可用的 IP 地址。一旦以 CIDR 为目的地的流量到达节点（xx技术），节点就会将流量转发到正确的 Pod（xx技术）。
+[Kubernetes 网络模型基础指南](https://mp.weixin.qq.com/s/YRHSx9FaCyB6nQGSylHPOA)通常集群中的每个节点都分配有一个 CIDR，用来指定该节点上运行的 Pod 可用的 IP 地址。一旦以 CIDR 为目的地的流量到达节点（xx技术），节点就会将流量转发到正确的 Pod（xx技术）。换个说法，**如果要求所有 Pod 具有 IP 地址，那么就要确保整个集群中的所有 Pod 的 IP 地址是唯一的**。这可以通过为每个节点分配一个唯一的子网（podCIDR）来实现，即从子网中为 Pod 分配节点 IP 地址。从 podCIDR 中的子网值为节点上的 Pod 分配了 IP 地址。由于所有节点上的 podCIDR 是不相交的子网，因此它允许为每个 pod 分配唯一的IP地址。
 
 
 [CNI 网络方案优缺点及最终选择](https://mp.weixin.qq.com/s/pPrA_5BaYG9AwYNy4n_gKg)
@@ -105,8 +106,9 @@ there are two ways for Containers or VMs to communicate to each other.
 
 ### 宿主机之间
 
-1. 流控，就是说我的这个方案要不要支持 Network Policy，如果支持的话又要用何种方式去实现。这里需要注意的是，我们的实现方式一定需要在数据路径必经的一个关节点上。如果数据路径不通过该 Hook 点，那就不会起作用；
-2. 通道，即两个主机之间通过什么方式完成包的传输。我们有很多种方式，比如以路由的方式，具体又可分为 **BGP 路由**或者**直接路由**。还有各种各样的**隧道技术**等等。最终我们实现的目的就是一个容器内的包通过容器，经过接入层传到宿主机，再穿越宿主机的流控模块（如果有）到达通道送到对端。
+1. 通道，即两个主机之间通过什么方式完成包的传输。我们有很多种方式，比如以路由的方式，具体又可分为 **BGP 路由**或者**直接路由**。还有各种各样的**隧道技术**等等。最终我们实现的目的就是一个容器内的包通过容器，经过接入层传到宿主机，再穿越宿主机的流控模块（如果有）到达通道送到对端。
+2. 流控，就是说我的这个方案要不要支持 Network Policy，如果支持的话又要用何种方式去实现。这里需要注意的是，我们的实现方式一定需要在数据路径必经的一个关节点上。如果数据路径不通过该 Hook 点，那就不会起作用；
+
 
 ## overlay / underlay
 

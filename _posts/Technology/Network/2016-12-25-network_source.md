@@ -15,6 +15,8 @@ keywords: network
 
 linux网络编程中，各层有各层的struct，但有一个struct是各层通用的，这就是描述接收和发送数据的struct sk_buff.
 
+## 分层与内核态
+
 2019.7.5补充：应用层和内核互通的机制是通过 Socket 系统调用，经常有人会问，**Socket 属于哪一层？其实它哪一层都不属于**，它属于操作系统的概念，而非网络协议分层的概念。只不过操作系统选择对于网络协议的实现模式是，**二到四层的处理代码在内核里面**，七层的处理代码让应用自己去做，两者需要跨内核态和用户态通信，就需要一个系统调用完成这个衔接，这就是 Socket。
 
 从 TCP/IP 协议栈的角度来看，传输层以上的都是应用程序的一部分，Linux 与传统的 UNIX 类似，TCP/IP 协议栈驻留在内核中，与内核的其他组件共享内存。传输层以上执行的网络功能，都是在用户地址空间完成的。
@@ -27,7 +29,7 @@ TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的�
 
 ![](/public/upload/network/linux_tcp_function.png)
 
-### 创建
+### 创建socket
 
 ![](/public/upload/linux/socket_create.png)
 
@@ -35,7 +37,9 @@ sock_create 函数完成通用套接字创建、初始化任务后，再调用�
 
 ### 建立连接
 
-[那些你不知道的TCP冷门知识！](https://mp.weixin.qq.com/s/6lop61UtnQ-vfWJy17V87w)在Linux中，一般情况下都是内核代理三次握手的，当client端调用 `connect()` 之后内核负责发送SYN，接收SYN-ACK，发送ACK。然后 `connect()` 系统调用才会返回，客户端侧握手成功。而服务端的Linux内核会在收到SYN之后负责回复SYN-ACK再等待ACK之后才会让 `accept()` 返回，从而完成服务端侧握手。于是Linux内核就需要引入半连接队列（用于存放收到SYN，但还没收到ACK的连接）和全连接队列（用于存放已经完成3次握手，但是应用层代码还没有完成 accept() 的连接）两个概念，用于存放在握手中的连接。
+[那些你不知道的TCP冷门知识！](https://mp.weixin.qq.com/s/6lop61UtnQ-vfWJy17V87w)在Linux中，一般情况下都是**内核代理三次握手**的
+1. 当client端调用 `connect()` 之后内核负责发送SYN，接收SYN-ACK，发送ACK。然后 `connect()` 系统调用才会返回，客户端侧握手成功。
+2. 服务端的Linux内核会在收到SYN之后负责回复SYN-ACK再等待ACK之后才会让 `accept()` 返回，从而完成服务端侧握手。于是Linux内核就需要引入半连接队列（用于存放收到SYN，但还没收到ACK的连接）和全连接队列（用于存放已经完成3次握手，但是应用层代码还没有完成 accept() 的连接）两个概念，用于存放在握手中的连接。
 
 ![](/public/upload/network/tcp_handshake.png)
 
@@ -44,6 +48,7 @@ sync 和accept 队列的长度，sync 的重试次数都可以设置。如果应
 ## 数据接收过程
 
 《深入理解Linux网络》
+
 ![](/public/upload/network/network_receive.png)
 
 [容器网络一直在颤抖，罪魁祸首竟然是 ipvs 定时器](https://mp.weixin.qq.com/s/pY4ZKkzgfTmoxsAjr5ckbQ)在内核中，网络设备驱动是通过中断的方式来接受和处理数据包。当网卡设备上有数据到达的时候，会触发一个硬件中断来通知 CPU 来处理数据，此类处理中断的程序一般称作 ISR (Interrupt Service Routines)。ISR 程序不宜处理过多逻辑，否则会让设备的中断处理无法及时响应。因此 Linux 中将中断处理函数分为上半部和下半部。上半部是只进行最简单的工作，快速处理然后释放 CPU。剩下将绝大部分的工作都放到下半部中，下半部中逻辑由内核线程选择合适时机进行处理。
@@ -51,7 +56,7 @@ Linux 2.4 以后内核版本采用的下半部实现方式是软中断，由 kso
 
 ![](/public/upload/network/linux_network_package_receive.png)
 
-网络相关的中断程序在网络子系统初始化的时候进行注册， NET_RX_SOFTIRQ 的对应函数为 `net_rx_action()` ，在 `net_rx_action()` 函数中会调用网卡设备设置的 poll 函数，批量收取网络数据包并调用上层注册的协议函数进行处理，如果是为 ip 协议，则会调用 ip_rcv，上层协议为 icmp 的话，继续调用 icmp_rcv 函数进行后续的处理。
+网络相关的中断程序在网络子系统初始化的时候进行注册， NET_RX_SOFTIRQ 的对应函数为 `net_rx_action()` ，在 `net_rx_action()` 函数中会调用网卡设备设置的 poll 函数，批量收取网络数据包并调用上层注册的协议函数进行处理，如果是为 ip 协议，则会调用 ip_rcv，上层协议为 icmp 的话，继续调用 icmp_rcv 函数进行后续的处理。PS：参考后续的ksoftirqd
 
 ```c
 struct sock {
@@ -107,9 +112,7 @@ tcp_sendmsg # 申请一个 内核态的skb 内存并挂到 socket 发送队列sk
             ==> dev_hard_start_xmit # 将skb 挂到RingBuffer上，将skb所有数据都映射到DMA地址，触发真实的发送。发送完毕后，网卡触发硬中断NET_RX_SOFTIRQ 来释放 清理skb，解除DMA 映射。 
 ```
 
-在网络包的发送过程中，**用户进程（在内核态）完成了绝大部分工作**，甚至连调用驱动的工作都干了。如果发送网络包的时候 进程内核态 cpu quota用尽 或者其它进程需要cpu的时候，触发软中断 NET_TX_SOFTIRQ ，由ksoftirqd 执行net_tx_action 函数，找到发送队列，最终调用驱动程序的入口函数 dev_hard_start_xmit 
 
-![](/public/upload/network/linux_package_send.png)
 
 ## 真正干活的ksoftirqd
 
@@ -121,7 +124,9 @@ tcp_sendmsg # 申请一个 内核态的skb 内存并挂到 socket 发送队列sk
 
 1. RingBuffer是内存中一块特殊区域，网卡在收到数据的时候以DMA的方式将包写到RingBuffer中。
 1. ksoftirqd首先是一个死循环。如果有网络设备挂在poll_list上面，只要满足条件，它就会从poll_list上面将其取下来，执行该设备驱动程序所注册的poll()。poll()不断地从net_device的RingBuffer里面取出数据包，转成skb格式，并沿着网络设备子系统 -> IP协议层 -> TCP层一路调用内核里面的函数来分析和处理这个skb。从上图可以看到**skb从RingBuffer被取出来，到最后落到位于TCP层的socket接收队列里，都是在ksoftirqd这个内核线程里完成的**。这个处理过程还包括iptables的处理，路由的查询等各种费时费力的工作。所以如果iptables设置得非常多的话，会导致ksoftirqd处理每一个skb的时间变长，进而导致消费RingBuffer的速度变慢，对外的表现就是机器的吞吐量降低。
-2. 当通过veth发送数据出去（此为发送端veth，相应的另外一个叫接收端veth）的时候，不会触发硬件中断，也没有RingBuffer参与这个过程。发送端的veth在网络设备层会将skb直接塞入一个叫input_pkt_queue里，和poll_list一样，它也是位于数据结构softnet_data中。接着触发软中断使得ksoftirqd开始消费input_pkt_queue里的skb，veth1是插在bridge上的，bridge的行为类似二层交换机。在网络设备层调用 __netif_receive_skb_core 函数时，skb不会进入协议栈，而是会进入网桥处理。
+2. 在网络包的发送过程中，**用户进程（在内核态）完成了绝大部分工作**，甚至连调用驱动的工作都干了。如果发送网络包的时候 进程内核态 cpu quota用尽 或者其它进程需要cpu的时候，触发软中断 NET_TX_SOFTIRQ ，由ksoftirqd 执行net_tx_action 函数，找到发送队列，最终调用驱动程序的入口函数 dev_hard_start_xmit 
+
+![](/public/upload/network/linux_package_send.png)
 
 ## 不同的缓存方式 and 处理网络包的三个主体
 
@@ -175,7 +180,9 @@ DPDK能够绕过内核协议栈，本质上是得益于 UIO 技术，UIO技术�
 
 ## 其它
 
-无论 TCP 还是 UDP，端口号都只占 16 位，也就说其最大值也只有 65535。那是不是说，如果使用 TCP 协议，在单台机器、单个 IP 地址时，并发连接数最大也只有 65535 呢？对于这个问题，首先你要知道，Linux 协议栈，通过五元组来标志一个连接（即协议，源 IP、源端口、目的 IP、目的端口)。对客户端来说，每次发起 TCP 连接请求时，都需要分配一个空闲的本地端口，去连接远端的服务器。由于这个本地端口是独占的，所以客户端最多只能发起 65535 个连接。对服务器端来说，其通常监听在固定端口上（比如 80 端口），等待客户端的连接。根据五元组结构，我们知道，客户端的 IP 和端口都是可变的。如果不考虑 IP 地址分类以及资源限制，服务器端的理论最大连接数，可以达到 2 的 48 次方（IP 为 32 位，端口号为 16 位），远大于 65535。服务器端可支持的连接数是海量的，当然，由于 Linux 协议栈本身的性能，以及各种物理和软件的资源限制等，这么大的连接数，还是远远达不到的（实际上，C10M 就已经很难了）。
+无论 TCP 还是 UDP，端口号都只占 16 位，也就说其最大值也只有 65535。那是不是说，如果使用 TCP 协议，在单台机器、单个 IP 地址时，并发连接数最大也只有 65535 呢？对于这个问题，首先你要知道，Linux 协议栈，通过五元组来标志一个连接（即协议，源 IP、源端口、目的 IP、目的端口)。
+1. 对客户端来说，每次发起 TCP 连接请求时，都需要分配一个空闲的本地端口，去连接远端的服务器。由于这个本地端口是独占的，所以客户端最多只能发起 65535 个连接。
+2. 对服务器端来说，其通常监听在固定端口上（比如 80 端口），等待客户端的连接。根据五元组结构，我们知道，客户端的 IP 和端口都是可变的。如果不考虑 IP 地址分类以及资源限制，服务器端的理论最大连接数，可以达到 2 的 48 次方（IP 为 32 位，端口号为 16 位），远大于 65535。服务器端可支持的连接数是海量的，当然，由于 Linux 协议栈本身的性能，以及各种物理和软件的资源限制等，这么大的连接数，还是远远达不到的（实际上，C10M 就已经很难了）。
 
 ## 引用
 

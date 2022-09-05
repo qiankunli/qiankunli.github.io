@@ -42,7 +42,7 @@ Go 的类型系统不太常见，而且非常简单。内建类型包括结构�
 
 鸭子类型，是动态编程语言的一种对象推断策略，它更关注对象能如何被使用，而不是对象的类型本身。Go 语言作为一门现代静态语言，是有后发优势的。它引入了动态语言的便利，同时又会进行静态语言的类型检查。 [Go是如何判断实现了interface](https://mp.weixin.qq.com/s/qH9HDEelHGi96u-tkiOPdQ)鸭子类型使得开发者可以不使用继承体系来灵活地实现一些“约定”，尤其是使得混合不同来源、使用不同对象继承体系的代码成为可能。
 
-一个语言的类型系统 经常需要 一个“地位超然”的类型，可以表示任何类型，比如void* 或者 Object， 但真正在使用这个 类型的变量时，需要判断其真实类型，在类型转换后才能使用，所以会有类型断言的需求。
+一个语言的类型系统 经常需要 一个“地位超然”的类型，可以表示任何类型，比如`void*` 或者 Object， 但真正在使用这个 类型的变量时，需要判断其真实类型，在类型转换后才能使用，所以会有类型断言的需求。
 
 ```go
 func xx(p interface){
@@ -169,16 +169,18 @@ Note that the itable corresponds to the interface type, not the dynamic type. In
 
 `any := Stringer(b)` 用伪代码表示 就是
 
-    创建 iface struct for any
-    创建 itab struct 
-    tab := getSymAddr(`go.itab.main.Binary,main.Stringer`).(*itab)
-    tab.inter = getSymAddr(`type.main.Stringer`).(*interfacetype)
-    tab._type = getSymAddr(`type.main.Binary`).(*_type)
-    tab.fun[0] = getSymAddr(`main.(*Binary).String`).(uintptr)
+```
+创建 iface struct for any
+创建 itab struct 
+tab := getSymAddr(`go.itab.main.Binary,main.Stringer`).(*itab)
+tab.inter = getSymAddr(`type.main.Stringer`).(*interfacetype)
+tab._type = getSymAddr(`type.main.Binary`).(*_type)
+tab.fun[0] = getSymAddr(`main.(*Binary).String`).(uintptr)
+```
 
 `any.String()` 相当于 `any.tab->fun[0]`
 
-接口类型变量赋值是一个“装箱”的过程，实际就是创建一个 eface 或 iface 的过程。在将动态类型变量赋值给接口类型变量语句对应的汇编代码中，我们看到了convT2E和convT2I两个 runtime 包的函数。convT2E 用于将任意类型转换为一个 eface，convT2I 用于将任意类型转换为一个 iface。两个函数的实现逻辑相似，主要思路就是根据传入的类型信息（convT2E 的 _type 和 convT2I 的 tab._type）分配一块内存空间，并将 elem 指向的数据拷贝到这块内存空间中，最后传入的类型信息作为返回值结构中的类型信息，返回值结构中的数据指针（data）指向新分配的那块内存空间。
+**接口类型变量赋值是一个“装箱”的过程，实际就是创建一个 eface 或 iface 的过程**（PS：any 赋值就是给iface赋值，只不过我们没有显式定义 iface 而已，被隐藏掉了）。在将动态类型变量赋值给接口类型变量语句对应的汇编代码中，我们看到了convT2E和convT2I两个 runtime 包的函数。convT2E 用于将任意类型转换为一个 eface，convT2I 用于将任意类型转换为一个 iface。两个函数的实现逻辑相似，主要思路就是根据传入的类型信息（convT2E 的 _type 和 convT2I 的 tab._type）分配一块内存空间，并将 elem 指向的数据拷贝到这块内存空间中，最后传入的类型信息作为返回值结构中的类型信息，返回值结构中的数据指针（data）指向新分配的那块内存空间。
 
 ```go
 // $GOROOT/src/runtime/iface.go
@@ -262,7 +264,7 @@ func printiface(i iface) {
 
 ## 反射
 
-[Golang 中反射的应用与理解](https://mp.weixin.qq.com/s/TmzV2VTfkE8of2_zuKa0gA)反射，就是能够在运行时更新变量和检查变量的值、调用变量的方法和变量支持的内在操作，而不需要在编译时就知道这些变量的具体类型。这种机制被称为反射。Golang 的基础类型是静态的（也就是指定 int、string 这些的变量，它的 type 是 static type），在创建变量的时候就已经确定，反射主要与 Golang 的 interface 类型相关（它的 type 是 concrete type），只有运行时 interface 类型才有反射一说。当程序运行时， 我们获取到一个 interface 变量， 程序应该如何知道当前变量的类型，和当前变量的值呢？当然我们可以有预先定义好的指定类型， 但是如果有一个场景是我们需要编写一个函数，能够处理一类共性逻辑的场景，但是输入类型很多，或者根本不知道接收参数的类型是什么，或者可能是没约定好；也可能是传入的类型很多，这些类型并不能统一表示。这时反射就会用的上了，典型的例子如：json.Marshal。在 Golang 中为我们提供了两个方法，分别是 reflect.ValueOf  和 reflect.TypeOf，见名知意这两个方法分别能帮我们获取到对象的值和类型。Valueof 返回的是 Reflect.Value 对象，是一个 struct,而 typeof 返回的是 Reflect.Type 是一个接口。我们只需要简单的使用这两个进行组合就可以完成多种功能。
+[Golang 中反射的应用与理解](https://mp.weixin.qq.com/s/TmzV2VTfkE8of2_zuKa0gA)反射，就是能够在运行时更新变量和检查变量的值、调用变量的方法和变量支持的内在操作，而不需要在编译时就知道这些变量的具体类型。这种机制被称为反射。Golang 的基础类型是静态的（也就是指定 int、string 这些的变量，它的 type 是 static type），在创建变量的时候就已经确定，反射主要与 Golang 的 interface 类型相关（它的 type 是 concrete type），只有运行时 interface 类型才有反射一说。当程序运行时， 我们获取到一个 interface 变量， 程序应该如何知道当前变量的类型，和当前变量的值呢？当然我们可以有预先定义好的指定类型， 但是如果有一个场景是我们需要编写一个函数，能够处理一类共性逻辑的场景，但是输入类型很多，或者根本不知道接收参数的类型是什么，或者可能是没约定好；也可能是传入的类型很多，这些类型并不能统一表示。这时反射就会用的上了，**典型的例子如：json.Marshal**。在 Golang 中为我们提供了两个方法，分别是 reflect.ValueOf  和 reflect.TypeOf，见名知意这两个方法分别能帮我们获取到对象的值和类型。Valueof 返回的是 Reflect.Value 对象，是一个 struct,而 typeof 返回的是 Reflect.Type 是一个接口。我们只需要简单的使用这两个进行组合就可以完成多种功能。
 
 [深度解密GO语言之反射](https://juejin.im/post/5cd0d6ed6fb9a0321556f618)反射的本质是程序在运行期探知对象的类型信息和内存结构（泛化一点说，就是我想知道某个指针对应的内存里有点什么），不用反射能行吗？可以的！使用汇编语言，直接和内层打交道，什么信息不能获取？但是，当编程迁移到高级语言上来之后，就不行了！就只能通过反射来达到此项技能。
 

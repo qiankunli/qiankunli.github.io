@@ -61,6 +61,8 @@ Spring 采用的代理技术有两个：一个是 Java 的动态代理（dynamic
 
 ![](/public/upload/java/class_load_process.png)
 
+[ClassLoader提速](https://mp.weixin.qq.com/s/CTFcwer2htssKszjhnOXtQ)
+
 ### 类加载器的双亲委派模型
 
 ClassLoader源码注释：The ClassLoader class uses a delegation model to search for classes and resources. 
@@ -117,7 +119,33 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 
 磁盘表示 ：java 源码文件 ==> 磁盘表示： 字节码文件 ==> 内存的c++表示： oop-kclass struct ==> 内存的二进制表示：数据结构和方法对应的机器指令。
 
-面向对象语言将对象(数据)和方法(对象上的操作)绑定到了一起，来提供更强的封装性和多态。这些特性都依赖对象头中的类型信息来实现，Java、Python语言都是如此。Java对象在内存中的`layout=mark + kclass* + fields`。
+面向对象语言将对象(数据)和方法(对象上的操作)绑定到了一起，来提供更强的封装性和多态。这些特性都依赖对象头中的类型信息来实现，Java、Python语言都是如此。Java对象在内存中的`layout=mark + kclass* + fields`。 
+```
++-------------+
+|  mark       |
++-------------+
+|  Klass*     |
++-------------+
+|  fields     |
+|             |
++-------------+
+```
+
+mark表示了对象的状态，包括是否被加锁、GC年龄等等。而Klass*指向了描述对象类型的数据结构 InstanceKlass 。
+
+```
+//  InstanceKlass layout:
+//    [C++ vtbl pointer           ] Klass
+//    [java mirror                ] Klass
+//    [super                      ] Klass
+//    [access_flags               ] Klass
+//    [name                       ] Klass
+//    [methods                    ]
+//    [fields                     ]
+...
+```
+
+
 
 ### java 对象的C++ 类表示——oop-klass model
 
@@ -236,6 +264,9 @@ class oopDesc {
 2. 对象字段内存对齐（有六七个对齐规则），让字段只出现在同一 CPU 的缓存行中。如果字段不是对齐的，那么就有可能出现跨缓存行的字段。也就是说，该字段的读取可能需要替换两个缓存行，而该字段的存储也会同时污染两个缓存行。
 3. Java 虚拟机重新分配字段的先后顺序，以达到内存对齐的目的
 
+### CDS
+
+InstanceKlass结构比较复杂，包含了类的所有方法、field等等，方法又包含了字节码等信息。这个数据结构是通过运行时解析class文件获得的，为了保证安全性，解析class时还需要校验字节码的合法性(非通过javac产生的方法字节码很容易引起jvm crash)。CDS可以将这个解析、校验产生的数据结构存储(dump)到文件，在下一次运行时重复使用。这个dump产物叫做Shared Archive，以jsa后缀(java shared archive)。为了减少CDS读取jsa dump的开销，避免将数据反序列化到InstanceKlass的开销，jsa文件中的存储layout和InstanceKlass对象完全一样，这样在使用jsa数据时，只需要将jsa文件映射到内存，并且让对象头中的类型指针指向这块内存地址即可，十分高效。 [Alibaba Dragonwell对AppCDS的优化](https://mp.weixin.qq.com/s/CTFcwer2htssKszjhnOXtQ)
 
 ## 其它
 

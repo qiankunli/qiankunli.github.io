@@ -19,7 +19,9 @@ keywords: kubernetes security
 
 [Kubernetes 多租户集群的实践](https://mp.weixin.qq.com/s/Tsnb5GYUhRqHiRn1piLtMw)
 
-## docker 安全
+### 安全
+
+### docker 安全
 
 最典型的例子，将`/etc` 等核心文件 挂载到容器中，在容器中进行改写等。
 
@@ -43,6 +45,26 @@ Linux capabilities（有点k8s sa 的味道了）
 也可以使用User Namespace（一些组件默认不启用），User Namespace 隔离了一台 Linux 节点上的 User ID（uid）和 Group ID（gid），它给 Namespace 中的 uid/gid 的值与宿主机上的 uid/gid 值建立了一个映射关系。经过 User Namespace 的隔离，我们在 Namespace 中看到的进程的 uid/gid，就和宿主机 Namespace 中看到的 uid 和 gid 不一样了。比如`podman run -ti  -v /etc:/mnt --uidmap 0:2000:1000 centos bash`，第一个 0 是指在新的 Namespace 里 uid 从 0 开始，中间的那个 2000 指的是 Host Namespace 里被映射的 uid 从 2000 开始，最后一个 1000 是指总共需要连续映射 1000 个 uid。这个容器里的 uid 0 是被映射到宿主机上的 uid 2000 的，把容器中 root 用户（uid 0）映射成宿主机上的普通用户。
 
 rootless container 中的"rootless"不仅仅指容器中以非 root 用户来运行进程，还指以非 root 用户来创建容器，管理容器。也就是说，启动容器的时候，Docker 或者 podman 是以非 root 用户来执行的。
+
+### kubernetes security context
+
+在Dockerfile中可以通过 USER 指定启动容器进程的用户，但是，我们并不总是仅使用自定义镜像。我们还使用了许多第三方镜像，如果你使用不知名来源中的镜像，那么该镜像很可能嵌入了恶意命令，这就可能会影响集群的安全性。Kubernetes中Pod安全上下文和Pod安全策略，可以帮助我们以非root身份运行三方镜像。
+
+Kubernetes 提供了三种配置 Security Context 的方法：
+1. Container-level Security Context：应用于容器级别。限制范围包括 allowPrivilegeEscalation,capabilities,privileged,procMount
+,readOnlyRootFilesystem,runAsGroup,runAsNonRoot,runAsUser,seLinuxOptions,windowsOptions
+2. Pod-level Security Context：应用于Pod级别。限制范围包括 fsGroup,fsGroupChangePolicy,runAsGroup,runAsNonRoot,runAsUser,seLinuxOptions,supplementalGroups,sysctls,windowsOptions
+    ```
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: my-pod
+    spec:
+      securityContext:
+        runAsUser: 5000
+        runAsGroup: 5000
+    ```
+2. PodSecurityPolicy：应用于集群级别。安全策略定义了Pod必须运行的条件。换句话说，如果不满足这些条件，Kubernetes将阻止Pod运行。v1.21弃用，由PodSecurity代替。 
 
 ## k8s访问object权限控制
 

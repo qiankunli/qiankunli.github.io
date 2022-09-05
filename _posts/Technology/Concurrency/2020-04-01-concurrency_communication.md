@@ -72,6 +72,8 @@ Actor 可以创建新的 Actor，这些 Actor 最终会呈现出一个树状结�
 
 ## CSP 模型
 
+Joe Armstrong的博士论文《面对软件错误构建可靠的分布式系统》，文中提到“在构建可容错软件系统的过程中要解决的本质问题就是故障隔离。”操作系统进程本身就是一种天然的故障隔离机制，当然从另一个层面，进程间还是因为共享cpu和内存等原因相互影响。进程要想达到容错性，就不能与其他进程有共享状态；它与其他进程的唯一联系就是由内核消息系统传递的消息。 
+
 Tony Hoare提出的 CSP（Communicationing Sequential Processes，通信顺序进程）并发模型。在 Tony Hoare 眼中，一个符合 CSP 模型的并发程序应该是一组通过输入输出原语连接起来的 P 的集合。从这个角度来看，CSP 理论不仅是一个并发参考模型，也是一种并发程序的程序组织方法。
 
 Golang 中协程之间通信推荐的是使用 channel，channel 你可以形象地理解为现实世界里的管道。需要注意的是 Golang 中 channel 的容量可以是 0，容量为 0 的 channel 在 Golang 中被称为无缓冲的 channel，容量大于 0 的则被称为有缓冲的 channel。无缓冲的 channel 类似于 Java 中提供的 SynchronousQueue

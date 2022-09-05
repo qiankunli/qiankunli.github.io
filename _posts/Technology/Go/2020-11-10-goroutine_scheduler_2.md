@@ -31,7 +31,7 @@ keywords: Go goroutine scheduler
 
 ## 源码分析
 
-程序=数据结构 + 算法。调度器就是 基于 g/p/m/sched 等struct，提供初始化方法 schedinit ==> mcommoninit –> procresize –> newproc，代码go 生产g，在每个m 执行执行 mstart => mstart1 ==>  schedule 来消费g。PS： 不一定对，这个表述手法很重要。
+程序=数据结构 + 算法。调度器就是 基于 g/p/m/sched 等struct，提供初始化方法 schedinit ==> mcommoninit –> procresize –> newproc。**代码go 生产g，在每个m 执行执行 mstart => mstart1 ==>  schedule 来消费g**。PS： 不一定对，这个表述手法很重要。
 
 ### go main 函数执行
 
@@ -183,7 +183,7 @@ func park_m(gp *g) {
 }
 ```
 
-### 切换过程 `schedule()`
+### 协程切换过程 `schedule()`
 
 [从源码角度看 Golang 的调度](https://studygolang.com/articles/20651)
 
@@ -292,7 +292,6 @@ func goexit0(gp *g) {
 
 ## 图解
 
-
 ### 初始化
 
 在主线程第一次被调度起来执行第一条指令之前，主线程的函数栈如下图所示：
@@ -368,6 +367,7 @@ func schedule(){
 ```
 m 拿到 goroutine 并运行它的过程就是一个消费者消费队列的过程
 ```
+// gogo 会伪造 goexit 调用了用户协程fn，fn执行完“回到”goexit
 schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexit0()->schedule()
 ```
 
@@ -390,7 +390,14 @@ func main() {
 }
 ```
 
-Go1.14 引入抢占式调度（使用信号的异步抢占机制），sysmon 会检测到运行了 10ms 以上的 G（goroutine）。然后，sysmon 向运行 G 的 P 发送信号（SIGURG）。Go 的信号处理程序会调用P上的一个叫作 gsignal 的 goroutine 来处理该信号，将其映射到 M 而不是 G，并使其检查该信号。gsignal 看到抢占信号，停止正在运行的 G。PS： os 中断是指令完毕时，进而执行中断处理程序，重新拿到cpu使用权
+Go1.14 引入抢占式调度（使用信号的异步抢占机制）
+1. M 启动时会注册信号处理函数：sighandler。
+1. sysmon 会检测到运行了 10ms 以上的 G（goroutine）。调用preemptone，向正在运行的 goroutine 所绑定的的那个 M（也可以说是线程）发出 SIGURG 信号。
+3. G所在的M，runtime.sighandler函数就是负责处理接收到的信号的。如果收到的信号是sigPreempt，就调用doSigPreempt函数。通过pushCall向G的执行上下文中注入一个函数调用runtime.asyncPreempt（骚操作，粗略看做向当前G的PC 地址后插入CALL 指令）
+4. 当前 goroutine 执行 asyncPreempt 函数，通过 mcall 切到 g0 栈执行 gopreempt_m。最终会调用schedule函数。
+5. 被抢占的 goroutine 再次调度过来执行时，会继续原来的执行流。
+
+这个抢占机制也让垃圾回收器受益，可以用更高效的方式终止所有的协程。诚然，STW 现在非常容易，Go 仅需要向所有运行的线程发出一个信号就可以了。PS： os 中断是指令完毕时，进而执行中断处理程序，重新拿到cpu使用权
 
 ## Go的栈
 
