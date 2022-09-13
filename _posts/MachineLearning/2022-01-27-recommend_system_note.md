@@ -132,6 +132,7 @@ val samplesWithUserFeatures = addUserFeatures(samplesWithMovieFeatures)
 
 [推荐场景下融合多模态信息的内容召回模型](https://mp.weixin.qq.com/s/HqL-F7_2oCf2Cg8zL-6YDA) 未读
 深度学习推荐模型的演化关系图
+
 ![](/public/upload/machine/recsys_model_develop.png)
 
 ### 以Embedding+MLP 模型为例
@@ -144,7 +145,7 @@ Feature#1 代表的是类别型特征经过 One-hot 编码后生成的特征向�
 
 Stacking 层中文名是堆叠层，我们也经常叫它连接（Concatenate）层。它的作用比较简单，就是把不同的 Embedding 特征和数值型特征拼接在一起，形成新的包含全部特征的特征向量。
 
-MLP 层的特点是全连接，就是不同层的神经元两两之间都有连接。作用是让特征向量不同维度之间做充分的交叉，让模型能够抓取到更多的非线性特征和组合特征的信息。
+MLP 层的特点是全连接，就是不同层的神经元两两之间都有连接（**其基本形式就是矩阵乘法Matmul、矩阵加法BiasAdd及激活函数LeakyRelu**）。作用是让特征向量不同维度之间做充分的交叉，让模型能够抓取到更多的非线性特征和组合特征的信息。
 
 ![](/public/upload/machine/recsys_embedding_mlp_feature.png)
 

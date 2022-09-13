@@ -134,7 +134,7 @@ Linux 中每个进程（线程）都是用 task_struct 来表示的。每个 tas
 [彻底搞懂 Kubernetes 中的 Cgroup](https://mp.weixin.qq.com/s/bgoFj-aZo-RMh2hR5h0zrA) 几个概念
 1. task（任务），系统中的进程
 3. cgroup(控制组)，cgroups 中的资源控制都以 cgroup 为单位实现。cgroup 表示按某种资源控制标准划分而成的任务组，包含一个或多个子系统。一个任务可以加入某个 cgroup，也可以从某个 cgroup 迁移到另外一个 cgroup
-3. subsystem(子系统)，cgroups 中的 subsystem 就是一个资源调度控制器（Resource Controller）。比如 CPU 子系统可以控制 CPU 时间分配，内存子系统可以限制 cgroup 内存使用量。每个 cgroup subsystem代表一种资源，**每一个子系统都需要与内核的其他模块配合来完成资源的控制**，比如对 cpu 资源的限制是通过进程调度模块根据 cpu 子系统的配置来完成的；对内存资源的限制则是内存模块根据 memory 子系统的配置来完成的，而对网络数据包的控制则需要 Traffic Control 子系统来配合完成。
+3. subsystem(子系统)，cgroups 中的 subsystem 就是一个资源调度控制器（Resource Controller）。比如 CPU 子系统可以控制 CPU 时间分配，内存子系统可以限制 cgroup 内存使用量。每个 cgroup subsystem代表一种资源，**每一个子系统都需要与内核的其他模块配合来完成资源的控制**，比如对 cpu 资源的限制是通过进程调度模块根据 cpu 子系统的配置来完成的；对内存资源的限制则是内存模块根据 memory 子系统的配置来完成的，而对网络数据包的控制则需要 Traffic Control 子系统来配合完成。PS：**cgroup 更像是提供了一个配置内核的入口**，gpu 因为nvidia 一家独大，搞的有点黑盒，隔离效果就不如cpu做的好
 4. hierarchy（层级树），hierarchy 由一系列 cgroup 以一个树状结构排列而成，每个 hierarchy 通过绑定对应的 subsystem 进行资源调度。hierarchy 中的 cgroup 节点可以包含零或多个子节点，子节点继承父节点的属性。整个系统可以有多个 hierarchy。
 
 Linux 通过文件的方式，将 cgroups 的功能和配置暴露给用户，这得益于 Linux 的虚拟文件系统（VFS）。VFS 将具体文件系统的细节隐藏起来，给用户态提供一个统一的文件系统 API 接口，cgroups 和 VFS 之间的链接部分，称之为 cgroups 文件系统。比如挂在 cpu、cpuset、memory 三个子系统到 /cgroups/cpu_mem 目录下：`mount -t cgroup -o cpu,cpuset,memory cpu_mem /cgroups/cpu_mem`

@@ -33,7 +33,7 @@ election.RunOrDie(election.LeaderElectionConfig{
 
 ## 选主原理
 
-leaderelection 主要是利用了k8s API操作的原子性实现了一个分布式锁，在不断的竞争中进行选举。选中为leader的实体才会执行具体的业务代码。
+**leaderelection 主要是利用了k8s API操作的原子性实现了一个分布式锁**，在不断的竞争中进行选举。选中为leader的实体才会执行具体的业务代码。
 
 代码结构
 ```
@@ -92,7 +92,7 @@ type Interface interface {
     ...
 }
 ```
-kubernetes 的 update 是原子的、安全的：Kubernetes 通过定义资源版本字段实现了乐观并发控制，资源版本 (ResourceVersion)字段包含在 Kubernetes 对象的元数据 (Metadata)中。这个字符串格式的字段标识了对象的内部版本号，其取值来自 etcd 的 modifiedindex，且当对象被修改时，该字段将随之被修改。值得注意的是该字段由服务端维护
+**kubernetes 的 update 是原子的、安全的**：Kubernetes 通过定义资源版本字段实现了乐观并发控制，资源版本 (ResourceVersion)字段包含在 Kubernetes 对象的元数据 (Metadata)中。这个字符串格式的字段标识了对象的内部版本号，其取值来自 etcd 的 modifiedindex，且当对象被修改时，该字段将随之被修改。值得注意的是该字段由服务端维护
 
 ```go
 type ObjectMeta struct {
@@ -103,7 +103,7 @@ type ObjectMeta struct {
 }
 ```
 
-所谓的选主，就是看哪个follower能将自己的信息更新到 object 的annotation 上。 
+**所谓的选主，就是看哪个follower能将自己的信息更新到 object 的annotation 上**。 
 
 ### 选主逻辑
 
@@ -111,6 +111,17 @@ type ObjectMeta struct {
 2. follower 获得leadership需要的等待LeaseDuration 时间.
 
 ```go
+// client-go/tools/leaderelection/leaderelection.go
+func RunOrDie(ctx context.Context, lec LeaderElectionConfig) {
+	le, err := NewLeaderElector(lec)
+	if err != nil {
+		panic(err)
+	}
+	if lec.WatchDog != nil {
+		lec.WatchDog.SetLeaderElection(le)
+	}
+	le.Run(ctx)
+}
 // 等待，直到ctx 取消/成为leader再失去leader 后返回
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer func() {
@@ -123,7 +134,7 @@ func (le *LeaderElector) Run(ctx context.Context) {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-    go le.config.Callbacks.OnStartedLeading(ctx)
+    go le.config.Callbacks.OnStartedLeading(ctx)	// 执行业务方法
     // 成为leader后周期性续期，如果ctx 取消或失去leader 则立即返回
 	le.renew(ctx)
 }

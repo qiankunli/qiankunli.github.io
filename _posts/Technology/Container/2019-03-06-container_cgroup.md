@@ -20,6 +20,7 @@ keywords: container cpu
 [为什么不建议把数据库部署在Docker容器内](https://mp.weixin.qq.com/s/WetiMHwBEHmGzvXY6Pb-jQ)资源隔离方面，Docker确实不如虚拟机KVM，Docker是利用Cgroup实现资源限制的，**只能限制资源消耗的最大值，而不能隔绝其他程序占用自己的资源**。如果其他应用过渡占用物理机资源，将会影响容器里MySQL的读写效率。
 
 ## 观察cpu 使用
+
 ### linux 视角
 
 ![](/public/upload/container/process_top.png)
@@ -275,10 +276,6 @@ Network Namespace 隔离了哪些资源
 
 发现容器网络不通怎么办？容器中继续 ping 外网的 IP ，然后在容器的 eth0 ，容器外的 veth，docker0，宿主机的 eth0 这一条数据包的路径上运行 tcpdump。这样就可以查到，到底在哪个设备接口上没有收到 ping 的 icmp 包。
 
-## 如何避免系统被应用拖垮
 
-使用 k8s 的cpu limit 机制，在实际落地过程中，容器平台提供几种固定的规格，单个实例的资源配置 能够支持正常跑即可，项目的服务能力通过横向扩展来解决。
-
-以上内容来自对《容器实战高手课》的整理
 
 ![](/public/upload/container/container_practice.jpg)

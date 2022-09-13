@@ -190,6 +190,16 @@ spec:
 
 [腾讯邱东洋：深度模型推理加速的术与道](https://mp.weixin.qq.com/s/-PZE3OrOVGldiQ09u2qL4g)未读
 
+[淘宝逛逛ODL模型优化总结](https://mp.weixin.qq.com/s/S4YXhm90kyeS9ZWoPlEjHQ) 模型加速核心离不开裁枝、增加并行度、提升计算效率和缓存的使用。
+
+### timeline 分析
+
+[有哪些相见恨晚的 TensorFlow 小技巧？ - zhile yu的回答 - 知乎](https://www.zhihu.com/question/268375146/answer/340097912)在利用tensorflow写程序时，常常会碰到GPU利用率始终不高的情况，这时我们需要详细了解程序节点的消耗时间，tensorboard提供了一个窗口，但仍不详细，这里介绍timeline的使用，他可以更详细的给出各部分op的时间消耗，让你了解程序的瓶颈。
+
+横坐标为时间，从左到右依次为模型一次完整的forward and backward过程中，每个操作分别在cpu,gpu 0, gpu 1上消耗的时间，这些操作可以放大，非常方便观察具体每个操作在哪一个设备上消耗多少时间。
+
+1. 模型有一个PyFunc在cpu上运行，如红框所示，此时gpu在等这个结果，**没有任何操作运行**，这个操作应该要优化的。
+2. **gpu上执行的时候有很大空隙**，如黑框所示，这个导致gpu上的性能没有很好的利用起来。最后分析发现是我bn在多卡环境下没有使用正确，bn有一个参数updates_collections我设置为None 这时bn的参数mean,var是立即更新的，也是计算完当前layer的mean,var就更新，然后进行下一个layer的操作，这在单卡下没有问题的， 但是多卡情况下就会写等读的冲突，因为可能存在gpu0更新（写）mean但此时gpu1还没有计算到该层，所以gpu0就要等gpu1读完mean才能写，这样导致了 如黑框所示的空隙。
 
 ### 特点
 
