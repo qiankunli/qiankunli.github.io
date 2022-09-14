@@ -271,6 +271,8 @@ print('\n\nTest Loss {}, Test Accuracy {}'.format(test_loss, test_accuracy)
 
 假设，现在有 30 个待筛选的模型，如果所有模型都直接进入线上 A/B 测试的阶段进行测试，所需的测试样本是海量的，由于线上流量有限，测试的时间会非常长。但如果我们把测试分成两个阶段，第一个阶段先进行初筛，把 30 个模型筛选出可能胜出的 5 个，再只对这 5 个模型做线上 A/B 测试，所需的测试流量规模和测试时间长度都会大大减少。这里的初筛方法，就是我们在评估体系中提到的离线评估、离线 Replay 和在线 Interleaving 等方法。
 
+[推荐模型离线评测效果好，线上效果却不佳的原因](https://mp.weixin.qq.com/s/zXvZdMFS-BnoNMgEXqLQTw)
+
 ## 其它
 
 

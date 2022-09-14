@@ -49,6 +49,8 @@ func releaseSudog(s *sudog) {}
 
 ## channel
 
+channel是一个单向的、大小有限的管道，在goroutine之间传输类型化的信息。Go还提供了一个多路选择原语select，可以根据某channel上的通信是否可进行来控制执行。Go有提供互斥、条件变量、信号量和原子操作的库，供低级别互斥或同步使用，但channel往往是更好的选择。根据我们的经验，人们对消息传递--利用通信在goroutine之间转移所有权--的理解比对互斥和条件变量的理解更容易、更正确。早期流行的一句Go箴言是："不要通过共享内存来通信，而是通过通信来共享内存"。
+
 和切片、结构体、map 等一样，channel 也是一种复合数据类型。也就是说，我们在声明一个 channel 类型变量时，必须给出其具体的元素类型，比如`var ch chan int`。 使用操作符<-，我们还可以声明只发送 channel 类型（send-only）和只接收 channel 类型（recv-only）
 
 使用操作符<-，我们还可以声明只发送 channel 类型（send-only）和只接收 channel 类型（recv-only）

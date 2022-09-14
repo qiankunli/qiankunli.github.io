@@ -20,6 +20,8 @@ keywords: Kubernetes Service
 
 ![](/public/upload/kubernetes/kubernetes_service_access.png)
 
+[Kubernetes 网络异常分类及排错指南](https://mp.weixin.qq.com/s/5gKpnvjSkvMDU-V6Mo77dQ)一个具体的排查实例，写的非常好。 
+
 ## What is a service?
 
 Kubernetes 之所以需要 Service，一方面是因为 Pod 的 IP 不是固定的，另一方面则是因为一组 Pod 实例之间总会有负载均衡的需求。

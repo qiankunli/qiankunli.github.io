@@ -228,6 +228,7 @@ There are two main ways they do it:
 
 
 ### 配图
+
 [第6课：Kubernetes网络架构原理深度剖析（上）](https://mp.weixin.qq.com/s/LC-vrb2aWAzwcJJHrz8Yrw)
 
 ![](/public/upload/network/k8s_overlay.png)
@@ -242,19 +243,3 @@ Kubernetes 对 Pod 进行“隔离”的手段，即：NetworkPolicy，NetworkPo
 
 [Kubernetes网络策略，这一篇就够了](https://mp.weixin.qq.com/s/UuD5sDpoHibsCedkYIKfnw)
 
-## Cilium 
-
-[Cilium 容器网络的落地实践](https://mp.weixin.qq.com/s/3B1JZVpS8NI1ESkTp-PHKg)  服务网格和无服务器等新技术对 Kubernetes 底层提出了更多的定制化要求。这些新需求都有一些共同点：它们需要一个更可编程的数据平面（也就是agent），能够在不牺牲性能的情况下执行 Kubernetes 感知的网络数据操作。Cilium 项目通过引入扩展的伯克利数据包过滤器（eBPF）技术，在 Linux 内核内向网络栈暴露了可编程的钩子。使得网格数据包不需要在用户和内核空间之间来回切换就可以通过上下文快速进行数据交换操作。PS： envoy 运行在用户态，Cilium 能将所有的逻辑下沉到内核。这是一种新型的网络范式，它也是 Cilium 容器网络项目的核心思想。
-
-一种技术满足所有的 网络需求
-1. service/ingress 提供一个虚拟ip，负载均衡，访问多个pod
-2. 容器间网络通信
-2. 网络隔离
-3. metric 监控，数据可视化
-4. trace 跟踪
-
-![](/public/upload/network/cilium_network.png)
-
-[eBPF 如何简化服务网格](https://mp.weixin.qq.com/s/4Ug8OBuhkO8ExMaR57ruZQ)
-
-![](/public/upload/network/sidecar_vs_ebpf.png)

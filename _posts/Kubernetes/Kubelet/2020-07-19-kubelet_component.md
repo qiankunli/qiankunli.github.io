@@ -353,6 +353,7 @@ k8s.io/kubernetes
 
 [详解K8s资源拓扑感知调度、资源优化策略最佳实践](https://mp.weixin.qq.com/s/FNSqnc5k1s4Nt-ysqdRqAw) 专门设计了agent、scheduler plugin。
 
+GPU也存在拓扑感知调度问题。  
 
 
 ## Pod生命周期管理

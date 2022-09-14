@@ -13,7 +13,6 @@ keywords:  elastic training
 * TOC
 {:toc}
 
-
 ## 背景介绍
 
 训练任务基于k8s执行，由volcano负责调度，算法人员归属于不同的部门，一个部门对应一个volcano queue。
@@ -121,6 +120,10 @@ pytorchjob
 此外，训练任务多个worker 有角色之分：一个master（或rank=0的worker） 和多个worker，master应确保“优先创建，靠后删除”，让master 优先级大于worker 可以实现这个效果，volcano之前从Pod.Priority来获取任务优先级，这需要operator层面维护PriorityClass，不太方便，因此提供了一个pr 让volcano 可以从Pod Annotation中获取pod 优先级。 
 
 后续volcano 还可以支持配置“冷却时间”，因为训练job重启一次代价不小，所以一个job 的worker数量应尽量避免经常变动，在一次扩缩动作后，冷却一段时间再进行下一次扩缩。
+
+## 问题
+
+[弹性模型训练](https://mp.weixin.qq.com/s/yGc44Q0qseDG7zy0-PC8gg) 值得注意的是，弹性深度学习训练除了需要资源弹性能力外，还需要计算引擎和分布式通信框架的支持，还要算法、数据切分策略、训练优化器等多方面共同配合优化（找到最佳的方法保证 global batch size 和 learning rate 的适配），才能保证模型训练的精度目标和性能要求。目前业界还没有通用的手段，在普遍的模型上实现强复现的弹性训练。在一定约束下（模型特征，分布式训练方法，资源规模以及弹性幅度等），比如 32 卡GPU以内的 ResNet50，BERT 使用 Pytorch 和 Tensorflow 都有稳定的方法实现满意的弹性训练收益。
 
 ## 小结
 

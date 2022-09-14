@@ -96,6 +96,8 @@ PS：如何更快的开发部署运维一个服务？一开始是一个个中间
 
 ## 云原生如何落地
 
+[使用Kubernetes落地云原生困难重重](https://mp.weixin.qq.com/s/9XEVZcA8jwAEeS0TIaQ3xw) 值得细读
+
 [蚂蚁金服 Service Mesh 深度实践](https://mp.weixin.qq.com/s/XjbmCxdJLKVcFlEUiM7Pig)
 
 ![](/public/upload/architecture/cloud_native_practice.png)

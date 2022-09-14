@@ -61,6 +61,8 @@ keywords: project evolution
 	2. 数仓的问题。字节跳动的核心技术理念是数据驱动和敏捷开发，我们需要全面的数据平台。PS：ab 是推进数仓建设的一个重要抓手。
 	3. 底层硬件的技术探索。比如自研服务器、DPU、AI芯片、数据中心技术等等。
 
+[软件设计的中庸之道](https://mp.weixin.qq.com/s/r3eVWihhLkgjV2I9gz_ovw)Big Design Up-Front（类似于瀑布模式）和 No Design是两个极端：2001年，随着敏捷宣言（http://agilemanifesto.org/）的颁布，敏捷思想以迅雷不及掩耳之势，开始席卷整个软件行业。打着敏捷的旗号，大家都低头“冲刺（Sprint）”，**期望设计能够在后期迭代中自然涌现**，一时间，No Design的思潮甚嚣尘上。然而，事情果真有这么美好吗？期望毕竟是期望，好的软件设计从来没有因为敏捷迭代而自然涌现。相反，Agile压缩了工时，变相的压榨工程师变成了“搬砖工”，软件开发变成了特性工厂（Feature Factory）。BDUF和No Design是两个极端，我们需要”执两取中”，找到一条中间路线。比如说JEDUF（足够的提前设计，Just Enough Design Up Front )。JEDUF是说我们要做设计，但是也拥抱变化，承认信息获取是一个过程，不指望一步到位。
+
 ## 无论如何演化，每个项目都有一个内核
 
 笔者曾经负责过两个项目：配置中心和api管理

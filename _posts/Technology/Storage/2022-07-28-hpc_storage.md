@@ -43,7 +43,6 @@ keywords: hpc 对象存储 AI
 4. 第四点是对于所有存储系统的一个通用需求。对于非常重要的数据，我们有数据持久化要求，确保数据不会丢失。对于一些特殊的计算场景，这个要求可以放松，在一些多轮计算中，部分结果是中间生成的临时结果，这些临时结果可以通过计算重新生成。对于这些临时的结果，可以选择使用一些临时存储空间来存放，以换取更高的运算速度，更低的成本。这种临时存储空间需求在 HPC 和 AI HPC 中比较普遍，存储系统可以使用单副本来满足。
 
 
-
 ## 存算分离/对象存储有哪些问题
 
 [面向大数据存算分离场景的数据湖加速方案](https://mp.weixin.qq.com/s/kog8ADN6-1o9tLoPEUZ8rg)存算分离相对于存算一体有哪些优势呢？
@@ -102,6 +101,12 @@ keywords: hpc 对象存储 AI
 
 
 ## k8s下的数据集管理Fluid
+
+[如何基于 Kubernetes 构建云原生 AI 平台](https://mp.weixin.qq.com/s/yGc44Q0qseDG7zy0-PC8gg)在云上通过云原生架构运行 AI、大数据等任务，可以享受计算资源弹性的优势，但同时也会遇到，计算和存储分离架构带来的数据访问延迟和远程拉取数据带宽开销大的挑战。尤其在 GPU 深度学习训练场景中，迭代式的远程读取大量训练数据方法会严重拖慢 GPU 计算效率。另一方面，Kubernetes 只提供了异构存储服务接入和管理标准接口（CSI，Container Storage Interface），对应用如何在容器集群中使用和管理数据并没有定义。在运行训练任务时，数据科学家需要能够管理数据集版本、控制访问权限、数据集预处理、加速异构数据读取等。但是在 Kubernetes 中还没有这样的标准方案，这是云原生容器社区缺失的重要能力之一。
+
+ACK 云原生 AI 套件对“**计算任务使用数据的过程**”进行抽象，提出了弹性数据集 Dataset 的概念，并作为“first class citizen”在 Kubernetes 中实现。围绕弹性数据集 Dataset，ACK 创建了数据编排与加速系统 Fluid，来实现 Dataset 管理（CRUD 操作）、权限控制和访问加速等能力。Fluid 可以为每个 Dataset 配置缓存服务，既能在训练过程中将数据自动缓存在计算任务本地，供下轮迭代计算，也能将新的训练任务调度到已存在 Dataset 缓存数据的计算节点上运行。再加上数据集预热、缓存容量监控和弹性伸缩，可以大大降低任务远程拉取数据的开销。Fluid 可以将多个不同类存储服务作为数据源（比如 OSS，HDFS）聚合到同一个 Dataset 中使用，还可以接入不同位置的存储服务实现混合云环境下的数据管理与访问加速。
+
+![](/public/upload/storage/fluid_dataset.png)
 
 [重新定义容器化 Serverless 应用的数据访问](https://mp.weixin.qq.com/s/GN7FBxOQYJdol6rEBQ2WSA)[Fluid](https://github.com/fluid-cloudnative/fluid) is an open source Kubernetes-native Distributed Dataset Orchestrator and Accelerator for data-intensive applications, such as big data and AI applications.云原生环境与更早的大数据处理框架在设计理念和机制上存在天然分歧。深受Google三篇论文GFS、MapReduce、BigTable影响的Hadoop大数据生态，从诞生之初即信奉和实践“移动计算而不是数据”的理念。因此以Spark，Hive，MapReduce为代表的数据密集型计算框架及其应用为减少数据传输，其设计更多地考虑数据本地化架构。但随着时代的变迁，为兼顾资源扩展的灵活性与使用成本，计算和存储分离的架构在更新兴的云原生环境中大行其道。因此云原生环境里需要类似Fluid这样的一款组件来**补充大数据框架拥抱云原生以后的数据本地性的缺失**。
 

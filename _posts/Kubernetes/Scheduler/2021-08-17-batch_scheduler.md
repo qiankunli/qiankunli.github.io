@@ -199,4 +199,5 @@ pod 在k8s cluster、scheduler session（一个调度周期）、scheduler cache
 
 [网易有数机器学习平台批调度与k8s调度系统的深度解析](https://mp.weixin.qq.com/s/s-PecEMoLX-Gt5nfnibpwg)
 
+https://github.com/kubernetes-sigs/scheduler-plugins 
 

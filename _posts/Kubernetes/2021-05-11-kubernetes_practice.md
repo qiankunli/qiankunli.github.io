@@ -48,20 +48,7 @@ keywords:  Kubernetes practice
 
 [Kubernetes 两年使用经验总结](https://mp.weixin.qq.com/s/5W8NemCKXK70OMyUQUlOfg)对几乎所有人来说，开箱即用的 Kubernetes 都远远不够。Kubernetes 平台是一个学习和探索的好地方。但是您很可能需要更多基础设施组件，并将它们很好地结合在一起作为应用程序的解决方案，以使其对开发人员更有意义。通常，这一套带有额外基础设施组件和策略的 Kubernetes 被称为内部 Kubernetes 平台。有几种方法可以扩展 Kubernetes。指标、日志、服务发现、分布式追踪、配置和 secret 管理、持续集成 / 持续部署、本地开发体验、根据自定义指标自动扩展都是需要关注和做出决策的问题。配置一个基础的集群可能并不困难，而大多数问题发生在我们开始部署工作负载时。从调整集群自动伸缩器（autoscaler）到在正确的时间配置资源，再到正确配置网络以实现所需的性能，你都必须自己研究和配置。我们的学习到的是，操作 Kubernetes 是很复杂的。它有很多活动部件。而学习如何操作 Kubernetes 很可能不是你业务的核心。尽可能多地将这些工作卸载给云服务提供商 (EKS、GKE、AKS)。**你自己做这些事并不会带来价值**。
 
-## 多集群
-
-[Kubernetes 多集群项目介绍](https://mp.weixin.qq.com/s/laMfFgre8PrbC2SayxBFRQ)
-阿里：
-[还在为多集群管理烦恼吗？OCM来啦！](https://mp.weixin.qq.com/s/t1AGv3E7Q00N7LmHLbdZyA)
-[CNCF 沙箱项目 OCM Placement 多集群调度指南](https://mp.weixin.qq.com/s/_k2MV4b3hfTrLUCCOKOG8g)
-腾讯：
-[Clusternet - 新一代开源多集群管理与应用治理项目](https://mp.weixin.qq.com/s/4kBmo9v35pXz9ooixNrXdQ)
-[Clusternet v0.5.0 重磅发布： 全面解决多集群应用分发的差异化配置难题](https://mp.weixin.qq.com/s/fcLN4w_Qu8IAm2unk4B_rg)
-其它：
-[关于多集群Kubernetes的一些思考](https://mp.weixin.qq.com/s/haBM1BSDWLhRYBJH4cJHvA)
-[多云环境下的资源调度：Karmada scheduler的框架和实现](https://mp.weixin.qq.com/s/RvnEMpK7l9bqbQCrbPqBPQ)
-
-[vivo大规模 Kubernetes 集群自动化运维实践](https://mp.weixin.qq.com/s/L9z1xLXUnz52etw2jDkDkw) 未读。
+[使用Kubernetes落地云原生困难重重](https://mp.weixin.qq.com/s/9XEVZcA8jwAEeS0TIaQ3xw)容器技术解决了应用打包和部署自动化问题。微服务架构解决了复杂应用的解耦和治理问题。Kubernetes解决了应用编排和调度自动化问题。**为了实现应用管理自动化**，还有很多云原生相关的技术，像SDN（网络自动化管理）、SDS（存储自动化管理）、Helm（复杂应用交付自动化）、Service Mesh（无侵入扩展服务治理能力）、Monitoring（监控自动化）、Logging（日志自动化）、Tracing（性能分析自动化）、Chaos engineering（容错自动化）、Gateway（网关自动化）、SPIFFE （应用访问安全自动化）等等，这些技术可以跟Kubernetes结合起来使用，解决应用各个运维特征的管理自动化问题。上面这些技术主要围绕着Kubernetes，所以落地过程主要是Kubernetes落地。PS: 不懂Kubernetes实现云原生的体验
 
 ## 降本增效/FinOps
 
