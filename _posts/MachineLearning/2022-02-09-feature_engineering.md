@@ -19,6 +19,8 @@ keywords: feature engineering
 
 特征工程：使用专业背景知识和技巧处理数据，使得 特征能在机器学习算法上发挥更好的作用的过程。推荐模型本质上是一个函数，输入输出都是数字或数值型的向量，也就是用向量、矩阵或者张量的形式表示的信息。把物体表示成一个向量或矩阵的过程，就叫做特征工程（Feature Engineering）。从原始数据生成可用于模型训练的训练样本（原始特征 ==> 模型特征）。这个领域有专门的书《Feature Engineering for Machine Learning》/《面向机器学习的特征工程》。
 
+![](/public/upload/machine/feature_engineer_process2.png)
+
 ![](/public/upload/machine/feature_engineer_process.png)
 
 数据经过整理变成信息，信息能解决某个问题就是知识，知识通过反复实践形成才能，才能融会贯通就是智慧。 

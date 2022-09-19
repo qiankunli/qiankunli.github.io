@@ -160,10 +160,17 @@ Allocatable:
 5. 地域亲和性：尽管国内互联网一直在提速，但是处于带宽成本的考量，同一调用链的服务网络距离越近越好。服务的主调和被调部署在同一个地域内能够有效减少带宽成本；并且分而治之的方式让应用服务本区域的业务，也能有效缓解应用服务的压力。
 
 多集群的主要攻克的难点就是跨集群的信息同步和跨集群网络连通方式。
-2. 跨集群网络连通方式一般的处理方式就是确保不同机房的网络相互可达，这也是最简单的方式。
+1. 跨集群网络连通方式一般的处理方式就是确保不同机房的网络相互可达，这也是最简单的方式。
 2. 跨集群的信息同步。多集群的服务实例调度，需要保证在多集群的资源同步的实时，将 pod 调度不同的集群中不会 pod pending 的情况。
   1. 定义专属的 API server：通过一套统一的中心化 API 来管理多集群以及机器资源。KubeFed 就是采用的这种方法，通过扩展 k8s API 对象来管理应用在跨集群的分布。
   2. 基于 Virtual Kubelet：Virtual Kubelet 本质上是允许我们冒充 Kubelet 的行为来管理 virtual node 的机制。这个 virtual node 的背后可以是任何物件，只要 virtual  node 能够做到上报 node 状态、和 pod 的生命周期管理。
+
+多集群的服务实例调度，需要保证在多集群的资源同步的实时，将 pod 调度不同的集群中不会 pod pending 的情况。控制平面的跨集群同步主要有两类方式：
+1. 定义专属的 API server：通过一套统一的中心化 API 来管理多集群以及机器资源。
+2. 基于 Virtual Kubelet：Virtual Kubelet 本质上是允许我们冒充 Kubelet 的行为来管理 virtual node 的机制。这个 virtual node 的背后可以是任何物件，只要 virtual  node 能够做到上报 node 状态、和 pod 的生命周期管理。
+
+要解决的几个问题
+1. 应用分发模型。即用户创建的Deployment 等object最终落在哪个集群中。Clusternet 的实现就是用户事先定一个 
 
 [Kubernetes 多集群项目介绍](https://mp.weixin.qq.com/s/laMfFgre8PrbC2SayxBFRQ)
 阿里：
