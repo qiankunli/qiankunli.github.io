@@ -36,7 +36,7 @@ keywords:  集群
 要解决的几个问题（未完成）
 1. 应用分发模型。即用户创建的Deployment 等object最终落在哪个集群中，如何表达这个诉求？是优先落在一个集群，还是各个集群都摊一点。
 
-## clusternet （未完成）
+## clusternet 
 
 以创建Deployment 为例，请求url 前缀改为clusternet 的shadow api， 由clusternet 的agg apiserver 处理，agg 拿到deployment 后保存在了自定义 Manifest下（类似下图将 Namespace 对象挂在 Manifest 下），之后调度器根据 用户创建的Subscription 配置策略 决定应用分发（比如一个deployment 6个replicas，是spead 到2个集群，即按集群的空闲资源占比分配，还是binpack 到一个集群上）。hub 根据调度结果，拿到deployment 数据（底层涉及到 base 和 Description 等obj），通过目标cluster 对应的dynamic client在子集群真正的创建 deployment。
 
