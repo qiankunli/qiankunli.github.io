@@ -104,6 +104,8 @@ keywords: hpc 对象存储 AI
 
 [如何基于 Kubernetes 构建云原生 AI 平台](https://mp.weixin.qq.com/s/yGc44Q0qseDG7zy0-PC8gg)在云上通过云原生架构运行 AI、大数据等任务，可以享受计算资源弹性的优势，但同时也会遇到，计算和存储分离架构带来的数据访问延迟和远程拉取数据带宽开销大的挑战。尤其在 GPU 深度学习训练场景中，迭代式的远程读取大量训练数据方法会严重拖慢 GPU 计算效率。另一方面，Kubernetes 只提供了异构存储服务接入和管理标准接口（CSI，Container Storage Interface），对应用如何在容器集群中使用和管理数据并没有定义。在运行训练任务时，数据科学家需要能够管理数据集版本、控制访问权限、数据集预处理、加速异构数据读取等。但是在 Kubernetes 中还没有这样的标准方案，这是云原生容器社区缺失的重要能力之一。
 
+[Fluid 助力阿里云 Serverless 容器极致提速](https://mp.weixin.qq.com/s/S-PBne1BErfGV4elNAajmQ)举例来说，如果我们想将 AI 推理服务应用部署在 Serverless 架构下，每个服务应用启动前必须将存放在外部存储系统的 AI 模型首先拉取到本地内存中。考虑到近年来 AI 大模型已经成为业界主流，让我们假设这个 AI 模型的大小为 30GB，并且存储于 OSS 对象存储服务中，如果需要同时启动 100 个这样的 AI 推理服务应用，那么总共的数据读取量就是 3000GB。OSS 存储默认的数据访问限速是 10Gbps，这就意味着 100 个应用都需要等待 2400 秒（3000GB * 8 / 10Gbps）才可以真正开始对外提供服务。
+
 ACK 云原生 AI 套件对“**计算任务使用数据的过程**”进行抽象，提出了弹性数据集 Dataset 的概念，并作为“first class citizen”在 Kubernetes 中实现。围绕弹性数据集 Dataset，ACK 创建了数据编排与加速系统 Fluid，来实现 Dataset 管理（CRUD 操作）、权限控制和访问加速等能力。Fluid 可以为每个 Dataset 配置缓存服务，既能在训练过程中将数据自动缓存在计算任务本地，供下轮迭代计算，也能将新的训练任务调度到已存在 Dataset 缓存数据的计算节点上运行。再加上数据集预热、缓存容量监控和弹性伸缩，可以大大降低任务远程拉取数据的开销。Fluid 可以将多个不同类存储服务作为数据源（比如 OSS，HDFS）聚合到同一个 Dataset 中使用，还可以接入不同位置的存储服务实现混合云环境下的数据管理与访问加速。
 
 ![](/public/upload/storage/fluid_dataset.png)
@@ -112,10 +114,15 @@ ACK 云原生 AI 套件对“**计算任务使用数据的过程**”进行抽�
 
 计算和存储分离的模式使得以往我们认为非常特殊的服务可以被无状态化，可以像正常服务一样被纳入 devops 体系中，而基于 Fluid 的数据编排和加速系统，则是实践计算和存储分离的一个切口。
 
-Fluid 的实质是利用计算集群的空闲资源（CPU，Memory，Disk）和特定场景的抽象假设简化问题，通过数据分流（Data Offloading）降低中心存储的压力；就近缓存（Tiered Locality Cache）和亲和性调度（Cache Locality Scheduling）提升数据访问性能；在计算资源高并发访问数据的时候，通过自动化扩容缓存集群提供弹性 IO 吞吐能力。Fluid Dataset资源对象准备完成后（即与Alluxio实例绑定后），与该资源对象关联的PV, PVC已经由Fluid生成，应用可以通过该PVC完成远程文件在Pod中的挂载，并通过挂载目录实现远程文件访问。PS：Dataset 表述了要访问哪些数据源文件，对pod 提供了pv和pvc ，对下封装了缓存、数据集调度等能力。
+Fluid 的实质是利用计算集群的空闲资源（CPU，Memory，Disk）和特定场景的抽象假设简化问题
+1. 通过数据分流（Data Offloading）降低中心存储的压力；就近缓存（Tiered Locality Cache）和亲和性调度（Cache Locality Scheduling）提升数据访问性能；Fluid 会把需要访问的数据缓存到与应用 Pod 更近的分布式缓存系统（例如：JindoFS、JuiceFS、Alluxio 等）中，于是，与缓存系统位于同一 VPC 网络的应用 Pod，就能够以远比直接访问中心存储带宽更高的 VPC 内网带宽进行数据访问。
+2. 在计算资源高并发访问数据的时候，通过自动化扩容缓存集群提供弹性 IO 吞吐能力。由于对接的是分布式缓存系统，所以当单个缓存系统 Worker 节点提供带宽不足时，可将分布式缓存系统扩容，从而实现数据访问带宽的弹性伸缩，匹配 Serverless 场景下的计算资源弹性。
+
+Fluid Dataset资源对象准备完成后（即与Alluxio实例绑定后），与该资源对象关联的PV, PVC已经由Fluid生成，应用可以通过该PVC完成远程文件在Pod中的挂载，并通过挂载目录实现远程文件访问。PS：Dataset 表述了要访问哪些数据源文件，对pod 提供了pv和pvc ，对下封装了缓存、数据集调度等能力。
 
 ![](/public/upload/storage/fluid_overview.png)
 
+[Fluid 助力阿里云 Serverless 容器极致提速](https://mp.weixin.qq.com/s/S-PBne1BErfGV4elNAajmQ) 展示了创建Dataset 访问oss 以及进行数据预热等操作。
 
 ## 存算分离的缓存系统Alluxio
 

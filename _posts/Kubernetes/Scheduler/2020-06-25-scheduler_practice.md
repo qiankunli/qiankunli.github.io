@@ -149,38 +149,21 @@ Allocatable:
 
 [Kubernetes 资源拓扑感知调度优化](https://mp.weixin.qq.com/s/CgW1zqfQBdUQo8qDtV-57Q)
 
+## 梳理
 
-## 多集群
+[游戏业务安全实时计算集群：云原生资源优化实践](https://mp.weixin.qq.com/s/WIm7cvQMiXdBpkISnHohTg)
 
-[浅析 Kubernetes 多集群方案](https://mp.weixin.qq.com/s/1ZvqFRYd7cl8-lE_wVDuNA)为什么要有多集群调度？
-1. 单集群的容量限制：单集群的最大节点数不是一个确定值，其受到集群的部署方法和业务使用集群资源的方式的影响。在官方文档中的集群注意事项里提到单集群 5000 个节点上限，我们可以理解为推荐最大节点数。
-2. 多租户：因为容器没法做到完美的隔离，不同租户可以通过不同宿主机或者不同集群分割开。对企业内部也是如此，业务线就是租户。不同业务线对于资源的敏感程度也不同，企业也会将机器资源划分为不同集群给不同业务线用。
-3. 云爆发：云爆发是一种部署模式，通过公有云资源来满足应用高峰时段的资源需求。正常流量时期，业务应用部署在有限资源的集群里。当资源需求量增加，通过扩容到公有云来消减高峰压力。
-4. 高可用：单集群能够做到容器级别的容错，当容器异常或者无响应时，应用的副本能够较快地另一节点上重建。但是单集群无法应对网络故障或者数据中心故障导致的服务的不可用。跨地域的多集群架构能够达到跨机房、跨区域的容灾。
-5. 地域亲和性：尽管国内互联网一直在提速，但是处于带宽成本的考量，同一调用链的服务网络距离越近越好。服务的主调和被调部署在同一个地域内能够有效减少带宽成本；并且分而治之的方式让应用服务本区域的业务，也能有效缓解应用服务的压力。
+|解决方案|	资源设置不合理|	相同 Pod 资源使用有差异|	多维度空闲资源碎片化|	突发流量|	资源维度有限|
+|---|---|---|---|---|---|
+|HPA|	×|	×|	×|	√|	×|
+|反亲和性|	×|	√|	×|	×|	×|
+|在离线混布|	×|	×|	√|	×|	×|
+|Descheduler|	×|	√|	×|	×|	×|
+|Dynamic Scheduler|	×|	√|	×|	×|	×|
+|高低水位线|	×|	√|	√|	×|	×|
 
-多集群的主要攻克的难点就是跨集群的信息同步和跨集群网络连通方式。
-1. 跨集群网络连通方式一般的处理方式就是确保不同机房的网络相互可达，这也是最简单的方式。
-2. 跨集群的信息同步。多集群的服务实例调度，需要保证在多集群的资源同步的实时，将 pod 调度不同的集群中不会 pod pending 的情况。
-  1. 定义专属的 API server：通过一套统一的中心化 API 来管理多集群以及机器资源。KubeFed 就是采用的这种方法，通过扩展 k8s API 对象来管理应用在跨集群的分布。
-  2. 基于 Virtual Kubelet：Virtual Kubelet 本质上是允许我们冒充 Kubelet 的行为来管理 virtual node 的机制。这个 virtual node 的背后可以是任何物件，只要 virtual  node 能够做到上报 node 状态、和 pod 的生命周期管理。
+上述解决方案只是解决了部分问题，没有解决资源设置不合理、资源维度有限这两个问题。此外，缺少一个整体的解决方案来对上述所有问题进行统一优化。
+1. 资源设置不合理，云原生的调度方式是基于 requests 进行的，为了实现基于 predicts 调度，需要对调度器的功能进行扩展，需要添加一个过滤插件，计算节点已绑定 Pod 的 predicts 和待调度的 Pod predicts 之和，并过滤掉不满足资源需求的节点。
+2. 资源维度有限，除了 CPU、内存和磁盘大小外，磁盘 IO、网络 IO 对于业务运行也非常重要。所以在收集 Pod 监控数据时，额外收集了这两个维度的数据，在调度时也会计算在内。同时如果业务有其他额外的资源维度，也可以很方便的扩展。这样解决了资源维度有限的问题。
+3. 整体编排，以我们线上环境的重庆集群为例，当前集群使用了69个节点，在计算部署方案之后，只需要使用27个节点即可满足所有 Pod 的运行，机器成本下降**61%**。并且为了保证服务质量，计算部署方案时节点各维度资源的最高利用率设置为不超过80%，因此有进一步压缩的可能。同时各资源维度也实现了较好的均衡性。将部署方案实际应用到节点还面临两大挑战：如何将 Pod 调度到方案指定的节点；调度 Pod 时如何保证不影响业务正常运行。PS：有点像一个更复杂的Descheduler
 
-多集群的服务实例调度，需要保证在多集群的资源同步的实时，将 pod 调度不同的集群中不会 pod pending 的情况。控制平面的跨集群同步主要有两类方式：
-1. 定义专属的 API server：通过一套统一的中心化 API 来管理多集群以及机器资源。
-2. 基于 Virtual Kubelet：Virtual Kubelet 本质上是允许我们冒充 Kubelet 的行为来管理 virtual node 的机制。这个 virtual node 的背后可以是任何物件，只要 virtual  node 能够做到上报 node 状态、和 pod 的生命周期管理。
-
-要解决的几个问题
-1. 应用分发模型。即用户创建的Deployment 等object最终落在哪个集群中。Clusternet 的实现就是用户事先定一个 
-
-[Kubernetes 多集群项目介绍](https://mp.weixin.qq.com/s/laMfFgre8PrbC2SayxBFRQ)
-阿里：
-[还在为多集群管理烦恼吗？OCM来啦！](https://mp.weixin.qq.com/s/t1AGv3E7Q00N7LmHLbdZyA)
-[CNCF 沙箱项目 OCM Placement 多集群调度指南](https://mp.weixin.qq.com/s/_k2MV4b3hfTrLUCCOKOG8g)
-腾讯：
-[Clusternet - 新一代开源多集群管理与应用治理项目](https://mp.weixin.qq.com/s/4kBmo9v35pXz9ooixNrXdQ)
-[Clusternet v0.5.0 重磅发布： 全面解决多集群应用分发的差异化配置难题](https://mp.weixin.qq.com/s/fcLN4w_Qu8IAm2unk4B_rg)
-其它：
-[关于多集群Kubernetes的一些思考](https://mp.weixin.qq.com/s/haBM1BSDWLhRYBJH4cJHvA)
-[多云环境下的资源调度：Karmada scheduler的框架和实现](https://mp.weixin.qq.com/s/RvnEMpK7l9bqbQCrbPqBPQ)
-
-[vivo大规模 Kubernetes 集群自动化运维实践](https://mp.weixin.qq.com/s/L9z1xLXUnz52etw2jDkDkw) 未读。

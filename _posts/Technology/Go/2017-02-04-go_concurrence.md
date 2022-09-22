@@ -178,8 +178,7 @@ select {
 
 
 ### 为什么有 context？
-
-一个goroutine启动后是无法控制它的，大部分情况是等待它自己结束，如何主动通知它结束呢？
+[Go组件：context学习笔记！](https://mp.weixin.qq.com/s/OCpVRwtiphFRZgu9zdae5g)一个goroutine启动后是无法控制它的，大部分情况是等待它自己结束，如何主动通知它结束呢？**go的协程不支持直接从外部退出**，不像C++和Java有个线程ID可以操作。所以只能通过协程自己退出的方式。一般来说通过channel来控制是最方便的。
 
 ```go
 func main() {
@@ -201,8 +200,7 @@ func main() {
 	stop<- true
 }
 ```
-
-`chan+select`是比较优雅的结束goroutine的方式，不过这种方式也有局限性，如果有很多goroutine都需要控制结束？如果这些goroutine又衍生了其他更多的goroutine怎么办呢？goroutine的关系链导致了这些场景非常复杂
+上面的代码已经够简单了，但是还是显得有些复杂。比如每次都要在协程内部增加对channel的判断，也要在外部设置关闭条件。`channel+select`是比较优雅的结束goroutine的方式，不过这种方式也有局限性，如果有很多goroutine都需要控制结束？如果这些goroutine又衍生了其他更多的goroutine怎么办呢？goroutine的关系链导致了这些场景非常复杂。
 
 ```go
 func main() {
@@ -210,6 +208,7 @@ func main() {
 	go func(ctx context.Context) {
 		for {
 			select {
+			// 大部分工具库内置了对ctx的判断，下面的部分几乎可以省略
 			case <-ctx.Done():
 				fmt.Println("监控退出，停止了...")
 				return
@@ -224,6 +223,8 @@ func main() {
 	cancel()    // context.WithCancel 返回的cancel 方法
 }
 ```
+
+Context顾名思义是协程的上下文，主要用于跟踪协程的状态，可以做一些简单的协程控制，也能记录一些协程信息。且更为友好的是，大多数go库，如http、各种db driver、grpc等都内置了对`ctx.Done()`的判断，我们只需要将ctx传入即可。PS：感觉这才是关键，**大家都接受了拿context 作为任务取消的信号**，统一了任务取消的规范。
 
 ### 父 goroutine 创建context
 
