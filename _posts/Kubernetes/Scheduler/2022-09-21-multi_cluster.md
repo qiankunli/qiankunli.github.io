@@ -63,13 +63,13 @@ clusternet
     /scheduler   
 ```
 
-1. hub
-  1. 自定义 REST 实现了 apiserver的 Creater 等接口 `clusternet/pkg/registry/shadow/template/rest.go`，由 InstallShadowAPIGroups 注入到agg 处理逻辑中。将 shadow api  传来的 deployment 改为创建Manifest。 
-  2. feedinventoryController.handleSubscription 将 deployment 需要的资源计算出来 写入到FeedInventory
+1. hub 负责提供agg server 并维护 用户提交的obj 与内部的对象的转换，最终将用户提交的obj 分发到各个cluster 上。 
+   1. 自定义 REST 实现了 apiserver的 Creater 等接口 `clusternet/pkg/registry/shadow/template/rest.go`，由 InstallShadowAPIGroups 注入到agg 处理逻辑中。将 shadow api  传来的 deployment 改为创建Manifest。 
+   2. feedinventoryController.handleSubscription 将 deployment 需要的资源计算出来 写入到FeedInventory
 2. Scheduler 监听Subscription
-  ```go
-  clusternet/pkg/scheduler/algorithm/generic.go
-  Scheduler.Run ==> scheduleOne ==> scheduleAlgorithm.Schedule
+   ```go
+   clusternet/pkg/scheduler/algorithm/generic.go
+   Scheduler.Run ==> scheduleOne ==> scheduleAlgorithm.Schedule
     // Step 1: Filter clusters.
     feasibleClusters, diagnosis, err := g.findClustersThatFitSubscription(ctx, fwk, state, sub)
     // Step 2: Predict max available replicas if necessary.
@@ -78,12 +78,12 @@ clusternet
     priorityList, err := prioritizeClusters(ctx, fwk, state, sub, feasibleClusters, availableList)
     // selectClusters takes a prioritized list of clusters and then picks a fraction of clusters in a reservoir sampling manner from the clusters that had the highest score.
     clusters, err := g.selectClusters(ctx, state, priorityList, fwk, sub, finv)
-  最终将 targetClusters 写入到 subscription.status.bindingClusters 中
-  ```
+    最终将 targetClusters 写入到 subscription.status.bindingClusters 中
+   ```
 2. Hub， clusternet 会给每个cluster 建一个namespace，分配到 该cluster 下的obj 都会有对应的 base 和 Description 对象，也在该namespace 下。cluster-xx namespace 对象本身label 会携带一些cluster的信息。
-  1. Deployer.handleSubscription（此时调度结果 已经写入了subscription.status.bindingClusters） ==> populateBasesAndLocalizations 。为每一个cluster 创建 Subscription 对应的 Base 和 Localization
-  2. Deployer.handleManifest ==> resyncBase ==>  populateDescriptions ==> syncDescriptions。clusterId 会从 Subscription 一路传到 Description 中
-  3. Deployer.handleDescription ==> createOrUpdateDescription ==> deployer.applyResourceWithRetry。拿到对应cluster的dynamicClient （根据clusterId） 在cluster 中创建deployment 对象。 
+   1. Deployer.handleSubscription（此时调度结果 已经写入了subscription.status.bindingClusters） ==> populateBasesAndLocalizations 。为每一个cluster 创建 Subscription 对应的 Base 和 Localization
+   2. Deployer.handleManifest ==> resyncBase ==>  populateDescriptions ==> syncDescriptions。clusterId 会从 Subscription 一路传到 Description 中
+   3. Deployer.handleDescription ==> createOrUpdateDescription ==> deployer.applyResourceWithRetry。拿到对应cluster的dynamicClient （根据clusterId） 在cluster 中创建deployment 对象。 
 
 
 ```yaml
