@@ -13,8 +13,9 @@ keywords:  集群
 * TOC
 {:toc}
 
-
 ## 多集群
+
+[Kubernetes 多集群项目介绍](https://mp.weixin.qq.com/s/laMfFgre8PrbC2SayxBFRQ)
 
 [浅析 Kubernetes 多集群方案](https://mp.weixin.qq.com/s/1ZvqFRYd7cl8-lE_wVDuNA)为什么要有多集群调度？
 1. 单集群的容量限制：单集群的最大节点数不是一个确定值，其受到集群的部署方法和业务使用集群资源的方式的影响。在官方文档中的集群注意事项里提到单集群 5000 个节点上限，我们可以理解为推荐最大节点数。
@@ -33,10 +34,15 @@ keywords:  集群
 1. 定义专属的 API server：通过一套统一的中心化 API 来管理多集群以及机器资源。
 2. 基于 Virtual Kubelet：Virtual Kubelet 本质上是允许我们冒充 Kubelet 的行为来管理 virtual node 的机制。这个 virtual node 的背后可以是任何物件，只要 virtual  node 能够做到上报 node 状态、和 pod 的生命周期管理。PS: 这导致后续干预多集群调度比较难，因为进行任何改动都不能超越kubelet 所提供的能力。
 
-要解决的几个问题（未完成）
+[多云能力建设问题域总结](https://mp.weixin.qq.com/s/alWgDFawsQKc69h-EQZ0uw)要解决的几个问题
 1. 应用分发模型。即用户创建的Deployment 等object最终落在哪个集群中，如何表达这个诉求？是优先落在一个集群，还是各个集群都摊一点。
+2. 在不同的集群下发的模型怎样做到差异化？
+3. 怎样设计和解决在多集群的背景下，有状态服务的调度机制和访问机制？
 
 ## clusternet 
+
+[Clusternet - 新一代开源多集群管理与应用治理项目](https://mp.weixin.qq.com/s/4kBmo9v35pXz9ooixNrXdQ)
+[Clusternet v0.5.0 重磅发布： 全面解决多集群应用分发的差异化配置难题](https://mp.weixin.qq.com/s/fcLN4w_Qu8IAm2unk4B_rg)
 
 以创建Deployment 为例，请求url 前缀改为clusternet 的shadow api， 由clusternet 的agg apiserver 处理，agg 拿到deployment 后保存在了自定义 Manifest下（类似下图将 Namespace 对象挂在 Manifest 下），之后调度器根据 用户创建的Subscription 配置策略 决定应用分发（比如一个deployment 6个replicas，是spead 到2个集群，即按集群的空闲资源占比分配，还是binpack 到一个集群上）。hub 根据调度结果，拿到deployment 数据（底层涉及到 base 和 Description 等obj），通过目标cluster 对应的dynamic client在子集群真正的创建 deployment。
 
@@ -66,7 +72,7 @@ clusternet
 1. hub 负责提供agg server 并维护 用户提交的obj 与内部的对象的转换，最终将用户提交的obj 分发到各个cluster 上。 
    1. 自定义 REST 实现了 apiserver的 Creater 等接口 `clusternet/pkg/registry/shadow/template/rest.go`，由 InstallShadowAPIGroups 注入到agg 处理逻辑中。将 shadow api  传来的 deployment 改为创建Manifest。 
    2. feedinventoryController.handleSubscription 将 deployment 需要的资源计算出来 写入到FeedInventory
-2. Scheduler 监听Subscription
+2. Scheduler 监听Subscription，针对用户设定的应用分发策略计算cluster层面的调度结果。
    ```go
    clusternet/pkg/scheduler/algorithm/generic.go
    Scheduler.Run ==> scheduleOne ==> scheduleAlgorithm.Schedule
@@ -143,17 +149,103 @@ scheduler 如何为 deployment 选择cluster ？
     availableList, predictStatus := fwk.RunPredictPlugins(ctx, state, sub, finv, clusters, availableList)
   ```
 
-## 文章汇总
+## Karmada
 
-[Kubernetes 多集群项目介绍](https://mp.weixin.qq.com/s/laMfFgre8PrbC2SayxBFRQ)
-阿里：
-[还在为多集群管理烦恼吗？OCM来啦！](https://mp.weixin.qq.com/s/t1AGv3E7Q00N7LmHLbdZyA)
-[CNCF 沙箱项目 OCM Placement 多集群调度指南](https://mp.weixin.qq.com/s/_k2MV4b3hfTrLUCCOKOG8g)
-腾讯：
-[Clusternet - 新一代开源多集群管理与应用治理项目](https://mp.weixin.qq.com/s/4kBmo9v35pXz9ooixNrXdQ)
-[Clusternet v0.5.0 重磅发布： 全面解决多集群应用分发的差异化配置难题](https://mp.weixin.qq.com/s/fcLN4w_Qu8IAm2unk4B_rg)
-其它：
-[关于多集群Kubernetes的一些思考](https://mp.weixin.qq.com/s/haBM1BSDWLhRYBJH4cJHvA)
+[如何管理多个Kubernetes集群？](https://mp.weixin.qq.com/s/alWgDFawsQKc69h-EQZ0uw)
+
+![](/public/upload/kubernetes/karmada_object.png)
+
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+---
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: nginx-propagation
+spec:
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: nginx
+  placement:
+    clusterAffinity:
+      clusterNames:
+        - member1
+        - member2
+    replicaScheduling:
+      replicaDivisionPreference: Weighted
+      replicaSchedulingType: Divided
+      weightPreference:
+        staticWeightList:
+          - targetCluster:
+              clusterNames:
+                - member1
+            weight: 1
+          - targetCluster:
+              clusterNames:
+                - member2
+            weight: 1
+---
+apiVersion: policy.karmada.io/v1alpha1
+kind: OverridePolicy
+metadata:
+  name: example-override
+  namespace: default
+spec:
+  resourceSelectors:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: nginx
+  targetCluster:
+    clusterNames:
+      - member1
+    labelSelector:
+      matchLabels:
+        failuredomain.kubernetes.io/region: dc1
+  overriders:
+    plaintext:
+      - path: /spec/template/spec/containers/0/image
+        operator: replace
+        value: 'dc-1.registry.io/nginx:1.17.0-alpine'
+      - path: /metadata/annotations
+        operator: add
+        value:
+          foo: bar
+```
+
+### 实现分析
+
+![](/public/upload/kubernetes/karmada_overview.png)
+
+[Kubernetes多集群管理利器：Karmada 控制器](https://mp.weixin.qq.com/s/gUbq78C4JcunTKeJiui3bw)
+[K8s 多集群管理 -- Karmada 调度器](https://mp.weixin.qq.com/s/OdRMAPxV1lPGhsKivSYH_Q)
 [多云环境下的资源调度：Karmada scheduler的框架和实现](https://mp.weixin.qq.com/s/RvnEMpK7l9bqbQCrbPqBPQ)
 
+## 其它
+
+阿里：
+
+[还在为多集群管理烦恼吗？OCM来啦！](https://mp.weixin.qq.com/s/t1AGv3E7Q00N7LmHLbdZyA)
+[CNCF 沙箱项目 OCM Placement 多集群调度指南](https://mp.weixin.qq.com/s/_k2MV4b3hfTrLUCCOKOG8g)
+
+其它：
 [vivo大规模 Kubernetes 集群自动化运维实践](https://mp.weixin.qq.com/s/L9z1xLXUnz52etw2jDkDkw) 未读。

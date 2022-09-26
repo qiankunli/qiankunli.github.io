@@ -182,9 +182,16 @@ type App struct {
 
 ![](/public/upload/go/go_ioc_layer.png)
 
-[为什么依赖注入只在 Java 技术栈中流行，在 go 和 cpp 没有大量使用？](https://www.zhihu.com/question/521822847/answer/2451020694)
+[为什么依赖注入只在 Java 技术栈中流行，在 go 和 cpp 没有大量使用？](https://www.zhihu.com/question/521822847/answer/2451020694)依赖注入Dependency-Injection (DI)只是Inversion-of-Control (IoC) 的一种实现方式，IOC还有许多更常见的实现，比如callback，胖指针。为什么java选择了di而不是callback或者其他，java中定义callback的开销无异于一个实体bean。所以java走得更进一步，把bean抽取出来，使用delegation，proxy等设计模式，实现了DI。对于go或者cpp这种native语言来说，既有闭包又有函数指针，实现ioc的手段有很多，但di却是开销很大的一种，所以比较少见，大白话就是可以但没有必要。
 
-    
+```go
+http.HandleFunc("/", func(w http.ResponseWriter,r *http.Request) {
+   fmt.Fprintf(w, "Hello world!")
+}
+```
+
+[Go 语言官方依赖注入工具 Wire 使用指北](https://mp.weixin.qq.com/s/yHB9BzEGIki1fyjYojdpYQ)Wire 是一个强大的依赖注入工具。与 Inject 、Dig 等不同的是，Wire只生成代码而不是使用反射在运行时注入，不用担心会有性能损耗。
+  
 ## command line application
 
 go 可执行文件没有复杂的依赖（java依赖jvm、python 依赖python库），特别适合做一些命令行工具

@@ -160,8 +160,8 @@ Dapr 项目给我们最大的启示在于，它定义了应用跟基础设施之
 3. 最后在向用户提供服务的阶段，随着函数服务启动的速度越来越快，可以做到收到请求以后再加载运行函数，并且对它们可使用的资源进行严格精确的控制，真正做到按需计费。
 
 [Dapr 入门教程之发布订阅](https://mp.weixin.qq.com/s/lE6C1FBssgr8gu15sbim4A) 未读
-
-
+[Dapr 入门教程之消息队列](https://mp.weixin.qq.com/s/Sg4jIGm_31ZTFF8LJXU_sA) 未读
+[Dapr 可观测性之分布式追踪](https://mp.weixin.qq.com/s/8o3tCN7rnX7KSJt_g_LIYA) 未读
 
 
 ## 基础设施下沉的大趋势

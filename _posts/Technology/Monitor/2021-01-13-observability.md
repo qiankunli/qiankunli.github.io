@@ -43,6 +43,8 @@ keywords: observability
     7. SpanContext 包含自身的 Span ID、Trace ID
 所处行业不同，对可观测体系的需求也会有较大差异。比如说，电商行业可能对链路和日志监控的联动要求很高，但物联网系统可能很多不需要链路监控。
 
+[透彻理解OpenTelemetry](https://mp.weixin.qq.com/s/-BRlyuMczl01P6uVh5h9Ng) 未读
+
 ## 监控报警内在原因
 
 [蚂蚁智能监控](https://mp.weixin.qq.com/s/ZitNUki9QgMTnahy77n8XQ)在设计稳定性架构之初，我们首先应该意识到系统的运行时环境和输入都不会是稳定的。
@@ -180,6 +182,7 @@ devops基本理念：
 1. AutoMetrics，MetaFlow完整的使用了eBPF的kprobe、uprobe、tracepoints能力，也完整的使用了eBPF的前身——已经有三十年历史的BPF的能力，与AF_PACKET、Winpcap等机制结合，**实现面向任何操作系统、任意内核版本的全自动的数据采集**。也就是说，不管一个调用是发生在Application这一侧的客户端或服务端，不管是一个加密之后的HTTPS调用、编码之后的HTTP2调用，还是普通明文的HTTP、Dubbo、MySQL、Redis调用，都能自动的获取到它的每一个调用的事件详情及RED（Request、Error、Delay）性能指标。不管这个调用流经的是Pod的虚拟网卡、VM的虚拟网卡、宿主机的物理网卡，还是中间的NFV虚拟网关，或者七层API网关，只要有MetaFlow Agent部署到的地方，都可以通过eBPF/BPF技术从内核中获取到调用数据，并生成应用层面的RED指标、网络层面的吞吐、时延、异常、重传等指标。这样的指标采集是完全自动化的，它不需要我们的开发者手动做任何的埋点或插码，所有这些能力，通过部署MetaFlow Agent即可自动获取到。
 2. AutoTracing，eBPF追踪的是每个Request相关的TCP/UDP通信函数，通过挂载到这些系统调用函数中实现自动追踪，**高度完整的展示出微服务调用链**。PS：异步调用的追踪还有欠缺
 3. AutoTagging，MetaFlow Agent通过**同步K8s、服务注册中心的大量的资源、服务、API属性信息**，然后由Server进程汇总并统一插入到所有的可观测性数据上，使得我们能够无缝的、在所有数据之间关联切换，呈现应用调用的全栈性能。[基于AutoTagging构建统一的可观测性数据平台的实践](https://mp.weixin.qq.com/s/KISlJ_7aAVh55CJnfsvqcQ)
+[DeepFlow AutoTagging 之 Prometheus 标签标准化](https://mp.weixin.qq.com/s/MEMI_uE6N2K1qoWI2qOmIA) 未读。
 4. SmartEncoding，MetaFlow会为所有观测数据自动注入大量的Tag，比如在容器环境中，从客户端去访问服务端这样的双端数据，可能要注入上百个维度的标签，这些标签有可能是非常长的字符串，给我们的后端存储造成了非常大的压力。MetaFlow创新的使用SmartEncoding机制，在Agent上独立采集标签和观测数据，同步到Server端后**对标签进行独立的整形编码**，并将整形编码注入到观测数据中存储下来，使得整个标签的注入开销降低10倍。由于存储的标签都是Int编码之后的，有助于降低查询过程中的数据检索量，也能显著提升查询性能。而对于一些衍生的Tag则完全没必要存储在数据库中，MetaFlow Server通过SQL接口抽象出来底层的一个大宽表。比如在底层我们存储了40个标签，通过Server的抽象，把它延展成100个标签的虚拟大宽表。上层应用在虚拟大宽表之上进行查询，完全感受不到标签是否存储在数据中、是以Int还是String的形式存储。
 
 ## 工程

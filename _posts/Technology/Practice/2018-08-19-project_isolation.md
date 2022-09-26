@@ -41,6 +41,8 @@ keywords: test environment
 [线下环境为何不稳定？怎么破](https://mp.weixin.qq.com/s/gGg0SGGgOvMrSxVyyMYXKw) 建议细读
 [测试环境不稳定&复杂的必然性及其对策](https://mp.weixin.qq.com/s/rQSwS7kMsdUxtAvSSmTD6Q)
 
+[一站式动态多环境建设案例](https://mp.weixin.qq.com/s/7Au_DYh_WSgJM7rP9-FB0A) 未读
+
 ### 资源配置低
 
 1. 服务器 配置比较低。比如磁盘容量比较低，一个服务打满磁盘，于是同主机的其它服务 直接就挂了。因此 需要进行资源监控，至少要做到支持报警以尽快发现问题。
