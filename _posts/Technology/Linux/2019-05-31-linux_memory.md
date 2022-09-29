@@ -91,6 +91,8 @@ CPU 运行一个程序，实质就是在顺序执行该程序的机器码。一�
 2. 分桶式内存管理。分桶式内存管理采用了多个链表，对于单个链表，它内部的所有结点所对应的内存区域的大小是相同的。换句话说，相同大小的区域会挂载到同一个链表上。
 3. 伙伴系统。当系统中还有很多 8 字节的空闲块，而 4 字节的空闲块却已经耗尽，这时再有一个 4 字节的请求，伙伴系统不会直接把 8 的空闲区域分配出去，因为这样做的话，会带来巨大的浪费。它会先把 8 字节分成两个 4 字节，一个用于本次 malloc 分配，另一个则挂入到 4 字节的 free list。这种不断地把一块内存分割成更小的两块内存的做法，就是伙伴系统，这两块更小的内存就是伙伴。当释放内存时，如果系统发现与被释放的内存相邻的那个伙伴也是空闲的，就会把它们合并成一个更大的连续内存。
 
+![](/public/upload/linux/linux_virtual_address.png)
+
 ```c 
 // 持有task_struct 便可以访问进程在内存中的所有数据
 struct task_struct {
@@ -100,14 +102,25 @@ struct task_struct {
     ...
     void  *stack;                   // 指向内核栈的指针
 }
+//file:include/linux/mm_types.h
+struct mm_struct {
+    struct vm_area_struct * mmap;  /* list of VMAs */
+    struct rb_root mm_rb;
+
+    unsigned long mmap_base;  /* base of mmap area */
+    unsigned long task_size;  /* size of task vm space */
+    unsigned long start_code, end_code, start_data, end_data;   // start_code、end_code 分别指向代码段的开始与结尾，start_data 和 end_data 共同决定数据段的区域
+    unsigned long start_brk, brk, start_stack;  // start_brk 和 brk 中间是堆内存的位置、start_stack 是用户态堆栈的起始地址。
+    unsigned long arg_start, arg_end, env_start, env_end;
+}
 ```
-Linux使用mm_struct来表示进程的地址空间，该描述符表示着进程所有地址空间的信息
-
-![](/public/upload/linux/linux_virtual_address.png)
-
-在用户态，进程觉着整个空间是它独占的，没有其他进程存在。但是到了内核里面，无论是从哪个进程进来的，看到的都是同一个内核空间，看到的都是同一个进程列表。虽然内核栈是各用个的，但是如果想知道的话，还是能够知道每个进程的内核栈在哪里的。所以，**如果要访问一些公共的数据结构，需要进行锁保护**。
+Linux使用mm_struct来表示进程的地址空间，该描述符表示着进程所有地址空间的信息。进程在运行的时候，在用户态其所需要的代码，全局变量数据，以及 mmap 内存映射等全部都是通过 mm_struct 来进行内存查找和寻址的。
 
 ![](/public/upload/linux/mm_struct.png)
+
+
+在用户态，进程觉着整个空间是它独占的，没有其他进程存在。但是到了内核里面，无论是从哪个进程进来的，看到的都是同一个内核空间，看到的都是同一个进程列表（虽然内核栈是各用个的）。在内核内存区域，可以通过直接计算得出物理内存地址，并不需要复杂的页表计算。而且最重要的是所有内核进程、以及用户进程的内核态，这部分内存都是共享的。所以，**如果要访问一些公共的数据结构，需要进行锁保护**。
+
 
 ## 进程的页表
 

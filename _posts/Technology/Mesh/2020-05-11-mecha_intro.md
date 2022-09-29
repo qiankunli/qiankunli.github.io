@@ -162,7 +162,7 @@ Dapr 项目给我们最大的启示在于，它定义了应用跟基础设施之
 [Dapr 入门教程之发布订阅](https://mp.weixin.qq.com/s/lE6C1FBssgr8gu15sbim4A) 未读
 [Dapr 入门教程之消息队列](https://mp.weixin.qq.com/s/Sg4jIGm_31ZTFF8LJXU_sA) 未读
 [Dapr 可观测性之分布式追踪](https://mp.weixin.qq.com/s/8o3tCN7rnX7KSJt_g_LIYA) 未读
-
+[Dapr 可观测性之指标与日志](https://mp.weixin.qq.com/s/spuIadcBNY7q9mSk3P_qNA) 未读
 
 ## 基础设施下沉的大趋势
 

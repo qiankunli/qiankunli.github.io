@@ -19,27 +19,31 @@ keywords: linux命令
 
 ## 进程——为啥创建进程的 系统调用起名叫fork（分支） 
 
-**一句看似废话的废话：进程是进程创建出来的** PS：就好像github fork 代码一样
+**一句看似废话的废话：进程是进程创建出来的** PS：就好像github fork 代码一样，linux 和 git 都是大佬Linus的 杰作。
 
-创建进程的系统调用叫fork。这个名字很奇怪，中文叫“分支”为啥启动一个新进程叫“分支”呢？在 Linux 里，要创建一个新的进程，需要一个老的进程调用fork 来实现，其中老的进程叫作父进程（Parent Process），新的进程叫作子进程（Child Process）。当父进程调用 fork 创建进程的时候，子进程将各个子系统为父进程创建的数据结构也全部拷贝了一份，甚至连程序代码也是拷贝过来的。
+创建进程的系统调用叫fork。这个名字很奇怪，中文叫“分支”为啥启动一个新进程叫“分支”呢？在 Linux 里，要创建一个新的进程，需要一个老的进程调用fork 来实现，其中老的进程叫作父进程（Parent Process），新的进程叫作子进程（Child Process）。当父进程调用 fork 创建进程的时候，子进程将各个子系统为父进程创建的数据结构（task_struct, copy_files/copy_fs/copy_mm/copy_namespaces，还申请了 pid）全部拷贝了一份（copy_process函数），甚至连程序代码也是拷贝过来的。在 fork 创建进程的时候，地址空间 mm_struct、挂载点 fs_struct、打开文件列表 files_struct 都要是独立拥有的，所以都去申请内存并初始化了它们。如果 父子进程是同一个命名空间，所以 nsproxy 还仍然是共用的。
+
+![](/public/upload/linux/fork_impl.png)
 
 对于 fork 系统调用的返回值，如果当前进程是子进程，就返回0；如果当前进程是父进程，就返回子进程的进程号。这样首先在返回值这里就有了一个区分，然后通过 if-else 语句判断，如果是父进程，还接着做原来应该做的事情；如果是子进程，需要请求另一个系统调用execve来执行另一个程序，这个时候，子进程和父进程就彻底分道扬镳了，也即产生了一个分支（fork）了。
 
-    public static void main(String[] args) throws IOException {
-        Process process = Runtime.getRuntime().exec("/bin/sh -c ifconfig");
-        //
-        //  jvm这里隐藏了一个 父子进程  判断的过程
-        //
-        Scanner scanner = new Scanner(process.getInputStream());
-        while (scanner.hasNextLine()) {
-            System.out.println(scanner.nextLine());
-        }
-        scanner.close();
+```java
+public static void main(String[] args) throws IOException {
+    Process process = Runtime.getRuntime().exec("/bin/sh -c ifconfig");
+    //
+    //  jvm这里隐藏了一个 父子进程  判断的过程
+    //
+    Scanner scanner = new Scanner(process.getInputStream());
+    while (scanner.hasNextLine()) {
+        System.out.println(scanner.nextLine());
     }
+    scanner.close();
+}
+```
+
+当 copy_process 执行完毕的时候，表示新进程的一个新的 task_struct 对象就创建出来了。接下来内核会调用 wake_up_new_task 将这个新创建出来的子进程添加到就绪队列中等待调度。
 
 新进程 都是父进程fork出来的，那到底谁是第一个呢？这就是涉及到系统启动过程了。
-
-突然想起来，linux 和 git 都是大佬Linus的 杰作。
 
 ## 内存管理 brk和mmap
 
@@ -382,3 +386,5 @@ Linux 操作系统新添加了一个设备，且新的设备从来没有加载�
 ## debug kernel
 
 就像jvm 进程和运行时remote debug 一样，内核也可以debug。
+
+

@@ -20,12 +20,46 @@ keywords: vfs file system
 文件系统以文件和树形目录的抽象逻辑概念代替了硬盘和光盘等物理设备中的数据块的概念，用户使用文件系统来保存数据时，只需要知道文件路径而不必关心数据实际保存在硬盘的数据块地址。设备上存储空间的分配和释放由文件系统自动完成，用户只需要记住数据被存入哪个文件即可。
 
 ## IO 栈
+
 我们习惯了网络协议栈，但很少提io栈。[请描述一下文件的 io 栈？](https://mp.weixin.qq.com/s/IrZF9lWweEs1rhxuvMUCKA)
 1. IO 从用户态走系统调用进到内核，内核的路径：VFS → 文件系统 → 块层 → SCSI 层 。
 2. VFS （ Virtual File System 、Virtual FileSystem Switch ）层是 Linux **针对文件概念**封装的一层通用逻辑，它做的事情其实非常简单，就是把所有文件系统的共性的东西抽象出来，比如 file ，inode ，dentry 等结构体，**针对这些结构体抽象出通用的 api 接口**，然后具体的文件系统则只需要按照接口去实现这些接口即可，在 IO 下来的时候，VFS 层使用到文件所在的文件系统的对应接口。它的作用：为上层抽象统一的操作界面，在 IO 路径上切换不同的文件系统。
 3. 文件系统，**对上抽象一个文件的概念**，把数据按照策略存储到块设备上。文件系统管理的是一个线性的空间（分区，块设备），而用户看到的却是文件的概念，这一层的转化就是文件系统来做的。它负责把用户的数据按照自己制定的规则存储到块设备上。比如是按照 4K 切块存，还是按照 1M 切块存储，这些都是文件系统自己说了算。它这一层就是做了一层空间的映射转化，**文件的虚拟空间到实际线性设备的映射**。这层映射最关键的是 address_space 相关的接口来做。
 4. 块层，块层其实在真实的硬件之上又抽象了一层，屏蔽不同的硬件驱动，块设备看起来就是一个线性空间而已。**块层主要还是 IO 调度策略的实现**，尽可能收集批量 IO 聚合下发，让 IO 尽可能的顺序，合并 IO 请求减少 IO 次数等等；划重点：块层主要做的是 IO 调度策略的一些优化。比如最出名的电梯算法就是在这里。[Linux 块层 IO 子系统](https://mp.weixin.qq.com/s/7MyGpP8awUp5QURJb_2KGA)
 5. SCSI 层，SCSI 层这个就不用多说了，这个就是**硬件的驱动**而已，本质就是个翻译器。SCSI 层里面按照细分又会细分多层出来。它是给你的磁盘做最后一道程序，SCSI 层负责和磁盘硬件做转换，IO 交给它就能顺利的到达磁盘硬件。
+
+## 进程与文件系统
+
+进程的文件位置等信息（当前目录等）是由 fs_struct 来描述的
+
+```c
+//file:include/linux/fs_struct.h
+struct fs_struct {
+    ...
+    struct path root, pwd;
+};
+//file:include/linux/path.h
+struct path {
+    struct vfsmount *mnt;
+    struct dentry *dentry;
+};
+```
+
+进程打开的文件信息：每个进程用一个 files_struct 结构来记录文件描述符的使用情况
+
+```c
+//file:include/linux/fdtable.h
+struct files_struct {
+    ......
+    int next_fd;        //下一个要分配的文件句柄号
+    struct fdtable __rcu *fdt;     //fdtable
+}
+struct fdtable {
+    struct file __rcu **fd;     //当前的文件数组，
+    ......
+};
+```
+fdtable.fd数组的下标就是文件描述符，其中 0、1、2 三个描述符总是默认分配给标准输入、标准输出和标准错误。在数组元素中记录了当前进程打开的每一个文件的指针。这个文件是 Linux 中抽象的文件，可能是真的磁盘上的文件，也可能是一个 socket。
 
 ## vfs 
 

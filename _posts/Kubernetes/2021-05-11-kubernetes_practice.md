@@ -27,7 +27,7 @@ keywords:  Kubernetes practice
     2. 
     3. 
     4. 
-3. 提高资源利用率 [容器化计算资源利用率现象剖析](https://mp.weixin.qq.com/s/8sHsI1pVm-1RX5w1F3uWPg) [资源利用率提升工具大全](https://mp.weixin.qq.com/s/tjpSneIghbGlRpAg1qkhHA) [资源画像，让容器资源规格的填写不再纠结](https://mp.weixin.qq.com/s/8_Jtk-H86210zK_V96ESgQ)
+3. 提高资源利用率 [容器化计算资源利用率现象剖析](https://mp.weixin.qq.com/s/8sHsI1pVm-1RX5w1F3uWPg) [资源利用率提升工具大全](https://mp.weixin.qq.com/s/tjpSneIghbGlRpAg1qkhHA) [资源画像，让容器资源规格的填写不再纠结](https://mp.weixin.qq.com/s/8_Jtk-H86210zK_V96ESgQ) [资源画像，看得见的容器资源优化助手](https://mp.weixin.qq.com/s/o1gCUSPUuaF_OMduhLOytA)
 
 [美团点评Kubernetes集群管理实践](https://mp.weixin.qq.com/s/lYDYzEUlvXQhCO1xCJ7HAg) 笔者从中得到一个启发就是，整个kubernetes 的实践是分层次的。
 

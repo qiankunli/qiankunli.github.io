@@ -265,6 +265,8 @@ Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的�
 
 [Linux Disk Quota实践](https://mp.weixin.qq.com/s/c5tbrSEinYVNl9anIvyMTg)
 
+[云原生环境中的磁盘IO性能问题排查与解决](https://mp.weixin.qq.com/s/RrTjhSJOviiINsy-DURV2A)
+
 ## 网络
 
 Network Namespace 隔离了哪些资源
