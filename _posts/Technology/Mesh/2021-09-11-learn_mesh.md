@@ -83,3 +83,7 @@ SMI 和 UDPA 的关系与我在容器运行时中介绍到的 CRI 和 OCI 规范
 2. 自下而上，发动同学们深度介入探讨，使得整体的方向、方案得到大家的认可，这样大家才有干劲。
 
 [阿里巴巴在 Envoy Gateway 的演进历程浅析](https://mp.weixin.qq.com/s/ReaKB65cAw-QznUYfnSc2g)
+
+[谈谈我对服务网格的理解](https://mp.weixin.qq.com/s/Acr3h8g1jwHAeyPnVJ_4rw) 有几个配图很有感觉
+
+![](/public/upload/mesh/mesh_k8s.png)

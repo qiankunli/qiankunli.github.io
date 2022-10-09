@@ -47,6 +47,9 @@ operator 本质上不创造和提供新的服务，它只是已有 Kubernetes po
 
 **Kubernetes 集群真正的能力（mount目录、操作GPU等）要通过 Kubelet 去支持**。 
 
+
+[Ansible 在Kubernetes Operator中的使用](https://mp.weixin.qq.com/s/_6HtdY3bxlqNfnn7FIxbvw)Operator是一个Kubernetes控制器，用于部署和管理集群中的服务或应用程序。它可以自动化人类操作知识和最佳实践，以保持服务的运行和健康。输入以自定义资源的形式接收。成熟的Operator可以部署、升级、备份、修复、扩展和重新配置其管理的应用程序，Operator不仅提供了一种仅使用本机Kubernetes API部署任意服务的简单方法; 它可以实现完整的**第二天（部署后，例如更新，备份等）管理**，仅受你可以编码的内容的限制。
+
 ## 内涵
 
 ### kube-native way of managing the lifecycle of service in Kubernetes
@@ -113,6 +116,8 @@ Linux 提供了一个 vfs 接口，任何资源都是File， 提供Open/Close/Cr
 我们都知道在 Kubernetes 上安装应用可以使用 Helm 直接安装各种打包成 Chart 形式的 Kubernetes 应用，但随着 Kubernetes Operator 的流行，Kubernetes 社区又推出了 [OperatorHub](https://operatorhub.io/)，你可以在这里分享或安装 Operator：https://www.operatorhub.io。
 
 ## 示例
+
+[多云容器编排 Karmada-Operator 实践](https://mp.weixin.qq.com/s/Nzv-JG6GPLTjZ8Y7kIEy_Q) 多集群管理工具 karmada 的安装过程很复杂，并且还涉及到一些命令行操作（一部分组件不在k8s内），用operator + cr 将整个过程自动化起来。PS：真想不到还能这么用。
 
 ### 在k8s上部署一个etcd
 

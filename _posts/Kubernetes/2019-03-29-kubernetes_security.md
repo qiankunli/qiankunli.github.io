@@ -333,6 +333,10 @@ users:
     token: ${token}
 ```
 
+## 操作安全
+
+[Kubernetes Job 创建了近 3W Pod，差点导致严重事故](https://mp.weixin.qq.com/s/lXgSnQIBAkMTbEdsNwUf6A) 值得细读。
+
 ## 小结
 
 1. 有哪些资源

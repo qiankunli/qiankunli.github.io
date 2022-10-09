@@ -15,6 +15,10 @@ keywords: container network
 
 [调试Kubernetes集群中的网络停顿问题](https://mp.weixin.qq.com/s/u5aEQhZTDtLrVdC8AO_ogQ)顶级文章，建议多次拜读。
 
+容器网络是Kubernetes最复杂部分，同时也是设计精华所在：
+1. 对于相同宿主机共享底层硬件设备问题，通常是借助虚拟化技术来实现，通过虚拟设备来实现灵活的管理，再将虚拟化设备连接到真实的物理设备上实现网络通信；
+2. 	对于跨宿主机网络通信问题，采用SDN软件定义网络的思路，灵活使用底层网络通信协议，同时结合各种虚拟化隧道通信技术，实现容器集群内外部通信。
+
 [Macvlan和IPvlan基础知识](https://mp.weixin.qq.com/s/r_CuqjypaaMRDZfW-RHjxw)运行裸机服务器时，主机网络可以很简单，只需很少的以太网接口和提供外部连接的默认网关。但当我们在一个主机中运行多个虚拟机时，需要在主机内和跨主机之间提供虚拟机之间的连接。一般，单个主机中的VM数量不超过15-20个。但在一台主机上运行Containers时，单个主机上的Containers数量很容易超过100个，需要有成熟的机制来实现Containers之间的网络互联。概括地说，容器或虚拟机之间有两种通信方式。在底层网络方法中，虚拟机或容器直接暴露给主机网络，Bridge、macvlan和ipvlan网络驱动程序都可以做到。在Overlay网络方法中，容器或VM网络和底层网络之间存在额外的封装形式，如VXLAN、NVGRE等。
 
 [一文理解 K8s 容器网络虚拟化](https://mp.weixin.qq.com/s/rVf2_0yefEgAyLgJgq5-kw)

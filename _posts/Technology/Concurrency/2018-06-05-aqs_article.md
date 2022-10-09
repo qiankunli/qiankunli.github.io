@@ -27,7 +27,7 @@ abstract data type (ADT) classes 作者**将同步器 描述为一个抽象的�
 
 1. an internal synchronization state
 2. operations to update and inspect that state 
-3. at least one method that  cause a calling thread to if the state requires it, resuming when some other thread changes the synchronization state to permit it.
+3. at least one method that  cause a calling thread to block if the state requires it, resuming when some other thread changes the synchronization state to permit it.
 
 any synchronizer can be used to implement nearly any other.可以用一个同步器实现另一个同步器，就好像乘法可以换算为加法一样，但有几个问题
 
@@ -98,7 +98,38 @@ Concrete classes based on AbstractQueuedSynchronizer must define methods tryAcqu
 4. 并发/线程排队层面，CLH 
 5. 并发/线程排队层面，AQS 对CLH 的改动
 
+### 来龙去脉
+
+[Java AQS 核心数据结构-CLH 锁](https://mp.weixin.qq.com/s/jEx-4XhNGOFdCo4Nou5tqg)CLH 锁是对自旋锁的一种改良。自旋锁实现简单，同时避免了操作系统进程调度和线程上下文切换的开销，但他有两个缺点：
+
+1. 锁饥饿问题。在锁竞争激烈的情况下，可能存在一个线程一直被其他线程”插队“而一直获取不到锁的情况。
+2. 性能问题。在实际的多处理上运行的自旋锁在锁竞争激烈时性能较差。这是因为自旋锁锁状态中心化，在竞争激烈的情况下，**锁状态变更会导致多个 CPU 的高速缓存的频繁同步**，从而拖慢 CPU 效率。
+
+因此自旋锁适用于锁竞争不激烈、锁持有时间短的场景。CLH 锁是对自旋锁的一种改进，有效的解决了以上的两个缺点。首先它将线程组织成一个队列，保证先请求的线程先获得锁，避免了饥饿问题。其次锁状态去中心化，**让每个线程在不同的状态变量中自旋**，这样当一个线程释放它的锁时，只能使其后续线程的高速缓存失效，缩小了影响范围，从而减少了 CPU 的开销。
+
 ### 传统CLH 队列
+
+```java
+public class CLH {
+	private final ThreadLocal<Node> node = ThreadLocal.withInitial(Node:new);
+	private final AtomicReference<Node> tail = new AtomicReference<>(new Node());
+	private static class Node {
+		// 这个状态变量只会被持有该状态变量的线程写入，只会被队列中该线程的后驱节点对应的线程读，而且后者会轮询读取。因此，可见性问题不会影响锁的正确性。但要实现一个可以在多线程程序中正确执行的锁，还需要解决重排序问题。
+		private volatile boolean locked;
+	}
+	public void lock(){
+		Node node = this.node.get()
+		node.locked = true
+		Node pre = this.tail.getAndSet(node)
+		while (pre.locked);
+	}
+	public void unlock(){
+		final Node node = this.node.get();
+		node.locked = false
+		this.node.set(new Node())
+	}
+}
+```
 
 [The j.u.c Synchronizer Framework翻译(二)设计与实现](http://ifeve.com/aqs-2/)
 
@@ -106,27 +137,29 @@ CLH队列实际上并不那么像队列，因为它的入队和出队操作都�
 
 ![](/public/upload/java/aqs_clh.png)
 
-一个新的节点，node，通过一个原子操作入队：
+CLH 锁是一种隐式的链表队列，没有显式的维护前驱或后继指针。因为每个等待获取锁的线程只需要轮询前一个节点的状态就够了，而不需要遍历整个队列。在这种情况下，只需要使用一个局部变量保存前驱节点，而不需要显式的维护前驱或后继指针。
 
-```
-do {
-    pred = tail;
-} while(!tail.compareAndSet(pred, node));
-```
+CLH 锁作为自旋锁的改进，有以下几个优点：
 
-每一个节点的“释放”状态都保存在其前驱节点中。因此，自旋锁的“自旋”操作就如下：
-```
-while (pred.status != RELEASED); // spin
-```
-自旋后的出队操作只需将head字段指向刚刚得到锁的节点：
-```
-head = node;
-```
+1. 性能优异，获取和释放锁开销小。CLH 的锁状态不再是单一的原子变量，而是分散在每个节点的状态中，降低了自旋锁在竞争激烈时频繁同步的开销。在释放锁的开销也因为不需要使用 CAS 指令而降低了。
+2. 公平锁。先入队的线程会先得到锁。
+3. 实现简单，易于理解。
+4. 扩展性强。下面会提到 AQS 如何扩展 CLH 锁实现了 j.u.c 包下各类丰富的同步器。
+当然，它也有两个缺点：
+1. 因为有自旋操作，当锁持有时间长时会带来较大的 CPU 开销。
+2. 基本的 CLH 锁功能单一，不改造不能支持复杂的功能。
+
+
 ### AQS 对 CLH 的变动
 
-为了将CLH队列用于阻塞式同步器，需要做些额外的修改以提供一种高效的方式**定位某个节点的后继节点，因为一个节点需要显式地唤醒（unpark）其后继节点**。AQS队列的节点包含一个next链接到它的后继节点
+针对 CLH 的缺点，AQS 对 CLH 队列锁进行了一定的改造。针对第一个缺点，AQS 将自旋操作改为阻塞线程操作。针对第二个缺点，AQS 对 CLH 锁进行改造和扩展，AQS 中的对 CLH 锁数据结构的改进主要包括三方面：扩展每个节点的状态、显式的维护前驱节点和后继节点以及诸如出队节点显式设为 null 等辅助 GC 的优化。
 
-第二个对CLH队列主要的修改是将每个节点都有的状态字段用于控制阻塞而非自旋。队列节点的状态字段也用于避免没有必要的park和unpark调用。虽然这些方法跟阻塞原语一样快，但在跨越Java和JVM runtime以及操作系统边界时仍有可避免的开销。在调用park前，线程设置一个“唤醒（signal me）”位，然后再一次检查同步和节点状态。一个释放的线程会清空其自身状态。这样线程就不必频繁地尝试阻塞
+1. 因为 AQS 用阻塞等待替换了自旋操作，线程会阻塞等待锁的释放，不能主动感知到前驱节点状态变化的信息。AQS 中显式的维护前驱节点和后继节点，需要释放锁的节点会显式通知下一个节点解除阻塞。
+2. AQS 每个节点的状态 `volatile int waitStatus`，提供了该状态变量的原子读写操作
+	1. SIGNAL	表示该节点正常等待
+	2. PROPAGATE	应将 releaseShared 传播到其他节点
+	3. CONDITION	该节点位于条件队列，不能用于同步队列节点
+	4. CANCELLED	由于超时、中断或其他原因，该节点被取消
 
 从[JUC lock - AQS - CLH queue](https://programmer.help/blogs/04.juc-lock-aqs-clh-queue.html) /[【死磕Java并发】-----J.U.C之AQS：CLH同步队列](https://blog.csdn.net/chenssy/article/details/60781148) 可以看到，acquire 和 release 和一般的[无锁队列](http://qiankunli.github.io/2018/10/15/lock_free.html) 是一致的
 
@@ -169,4 +202,4 @@ Mutex 可能处于两种操作模式下：正常模式和饥饿模式
 7. 因此，使用volatile、cas 等 可以在java 层面 线程安全操作一个变量，无锁化的
 8. 同步器的三大组件，状态、阻塞/恢复线程、队列，具备这个能力就可以实现一个同步器。如果可以无锁化的更改状态、操作队列，则可以实现一个无锁化的同步器。
 
-[聊聊原子变量、锁、内存屏障那点事](http://0xffffff.org/2017/02/21/40-atomic-variable-mutex-and-memory-barrier/) 实际上无锁的代码仅仅是不需要显式的Mutex来完成，但是存在数据竞争（Data Races）的情况下也会涉及到同步（Synchronization）的问题。从某种意义上来讲，所谓的无锁，仅仅只是颗粒度特别小的“锁”罢了，从代码层面上逐渐降低级别到CPU的指令级别而已，总会在某个层级上付出等待的代价，除非逻辑上彼此完全无关
+[聊聊原子变量、锁、内存屏障那点事](http://0xffffff.org/2017/02/21/40-atomic-variable-mutex-and-memory-barrier/) 实际上无锁的代码仅仅是不需要显式的Mutex来完成，但是存在数据竞争（Data Races）的情况下也会涉及到同步（Synchronization）的问题。从某种意义上来讲，所谓的无锁，仅仅只是颗粒度特别小的“锁”罢了，从代码层面上逐渐降低级别到CPU的指令级别而已，总会在某个层级上付出等待的代价，除非逻辑上彼此完全无关。

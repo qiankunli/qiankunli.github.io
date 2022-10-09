@@ -49,6 +49,7 @@ router 和ingress 均属于和应用服务不在一起的纯代理场景，可�
 2. sidecar outbound，从当前节点发往节点外的流量。**根据协议的不同有所不同，待进一步认识**。
 3. gateway
 
+
 ### envoy sidecar 配置 与 xds
 
 Envoy是一个高性能的C++写的proxy转发器，那Envoy如何转发请求呢？需要定一些规则，然后按照这些规则进行转发。规则可以是静态的，放在配置文件中的，启动的时候加载，要想重新加载，一般需要重新启动。当然最好的方式是规则设置为动态的，放在统一的地方维护，这个统一的地方在Envoy眼中看来称为Discovery Service，Envoy过一段时间去这里拿一下配置，就修改了转发策略。无论是静态的，还是动态的，在配置里面往往会配置四个东西。
@@ -88,6 +89,8 @@ istio 的流控支持那么多功能，由用户直接 决定 给某个pod 的en
 3.  Gateway configurations are applied to standalone Envoy proxies that are running at the edge of the mesh, rather than sidecar Envoy proxies running alongside your service workloads. Istio’s Gateway resource just lets you configure layer 4-6 load balancing properties such as ports to expose, TLS settings, and so on. Then instead of adding application-layer traffic routing (L7) to the same API resource, you bind a regular Istio virtual service to the gateway. This lets you basically manage gateway traffic like any other data plane traffic in an Istio mesh. Gateway 负责4~6层，与其绑定的VirtualService 负责七层，管理gateway就像管理普通的数据面代理一样。
 
 ## 流量管理
+
+![](/public/upload/mesh/envoy_traffic.png)
 
 ![](/public/upload/mesh/traffic_manage.png)
 
