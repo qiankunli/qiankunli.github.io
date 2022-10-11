@@ -30,6 +30,9 @@ Linux 提供了cgroup 和 namespace 两大系统功能，是容器的基础，�
 3. 再往上，Docker 提供了许多 UX 增强功能（容器工作流），比如ps/system prune 这些。 UX 增强的功能并不是 Kubernetes 所必须的
 
 
+[K8s 为什么要弃用 Docker？](https://mp.weixin.qq.com/s/4Ksud5WQvg9Vwjwl6oXzNw)“弃用 Docker”对 K8s 和 Docker 的影响不大，因为它们都已经将底层改为开源containerd，原有的 Docker 镜像和容器仍然可以正常运行。唯一的变化是K8s绕过了Docker，直接调用Docker内部的containerd。然而，还是会有一些影响。如果K8s直接使用containerd来操作容器，那么它就是一个独立于Docker的工作环境，**两者都无法访问对方管理的容器和镜像**。换句话说，使用docker ps命令将不会看到K8s中运行的容器。
+这对一些人来说可能需要花一点时间来适应并使用新工具crictl。
+
 ## Docker Daemon 调用栈分析
 
 docker在 1.11 之 后，被拆分成了多个组件以适应 OCI 标准。拆分之后，其包括 docker daemon， containerd，containerd-shim 以及 runC。组件 containerd 负责集群节点上容器 的生命周期管理，并向上为 docker daemon 提供 gRPC 接口。

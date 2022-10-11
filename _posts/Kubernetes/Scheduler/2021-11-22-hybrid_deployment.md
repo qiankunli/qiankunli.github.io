@@ -92,6 +92,8 @@ Koordinator 针对智能化调度的设计思路如下：
 2. QoS 感知的重调度，当节点中 Pod 的运行时 QoS 不符合预期时，Koordinator 将智能决策抑制更低优先级的任务亦或是迁移当前收到干扰的容器，从而解决应用 QoS 不满足导致的问题。问题：重调度的细节问题很多，Pod驱逐后 集群是否有资源保证可以运行，涉及到资源预留。 
 PS：先超卖，QoS保证不了了再调整。
 
+[Koordinator v0.7: 为任务调度领域注入新活力](https://mp.weixin.qq.com/s/oOjg8j9tDBs5jOm30XjCMA)
+
 ### 在离线混部
 
 [基于Volcano的离在线业务混部技术探索](https://www.bilibili.com/video/BV1AZ4y1X7AQ) 视频未看

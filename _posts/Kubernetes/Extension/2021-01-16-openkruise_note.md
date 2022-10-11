@@ -38,12 +38,18 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 ## 对kubernetes 的扩展
 
+### 接口能力的扩展
+
 [如何基于 OpenKruise 打破原生 Kubernetes 中的容器运行时操作局限？](https://mp.weixin.qq.com/s/1nhtLc2ORBa2b0Z_ofNcSw)
 1. Kubernetes 的 API 层面限制了用户只能创建或删除 Pod ，除此之外，里面的容器只能做 Exec， Log 这样的操作。在 Kubernetes 接口层面，用户无法进行比如拉取镜像、重启容器等操作。
 2. CRI 的职责是对容器运行时以及对镜像做相关的管理，包括对容器的启停操作，对 Sandbox 容器的操作，容器 States 的数据采集，以及镜像的拉取和查询等操作。因此，CRI 提供了比较完善的容器接口
 3. Kubelet 目前没有提供任何 hook 解决 plugin 的这个操作，来让外层能去动态拓展 Kubelet 所做的事情。那是否可以加入一个与 Kubelet 类似的新组件，可以连接到 CRI API，来拓展 Kubernetes 容器进行时的操作呢？
 
   ![](/public/upload/kubernetes/kubelet_cri_extend.png)
+
+### 应用模型的扩展
+
+从工作负载层面上讲，Kubernetes 只通过 Deployment、Statefulset 等抽象描述单个组件的特征，然而多数情况下，开发人员开发出的业务系统会包含若干微服务组件。那么如何对整个业务系统进行统一的管理就变成了一个问题。解决方案之一，就是通过云原生应用平台，在单个组件之上，抽象出应用这个概念。应用应该是由人为规定的一组服务组件（workload）组成，服务组件之间具有显式或隐式的关联调用关系，彼此之间有机组合成为一个整体，作为一套完整的业务系统对外提供服务。PS：比如AI 训练任务的一系列workload
 
 ## 代码结构
 
@@ -73,6 +79,24 @@ kubebuilder 脚手架生成的项目代码 一般假设只有一个crd 和Contro
 ## 其它
 
 [OpenKruise v0.9.0 版本发布：新增 Pod 重启、删除防护等重磅功能](https://mp.weixin.qq.com/s/V4cYY2GTYwJJ_C4gZxgypA)Pod 容器重启/重建；级联删除防护；配合原地升级的镜像预热；先扩再缩的 Pod 置换方式；[sidecar 热升级功能](https://openkruise.io/zh-cn/docs/sidecarset.html) 实现原理还挺好玩的。
+
+[OpenKruise v1.3：新增自定义 Pod Probe 探针能力与大规模集群性能显著提升](https://mp.weixin.qq.com/s/b35xMbLj8IzHCkq7Ww-bHA)Kubernetes 提供了三种默认的 Pod 生命周期管理：Readiness Probe/Liveness Probe/Startup Probe。都已经限定了特定的语义以及相关的行为。除此之外，其实还是存在自定义 Probe 语义以及相关行为的需求，例如：
+GameServer 定义 Idle Probe 用来判断该 Pod 当前是否存在游戏对局，如果没有，从成本优化的角度，可以将该 Pod 缩容掉。
+
+```
+apiVersion: v1
+kind: Pod
+status:
+  conditions:
+    # podConditionType
+  - type: game.io/idle
+    # Probe State 'Succeeded' indicates 'True', and 'Failed' indicates 'False'
+    status: "True"
+    lastProbeTime: "2022-09-09T07:13:04Z"
+    lastTransitionTime: "2022-09-09T07:13:04Z"
+    # If the probe fails to execute, the message is stderr
+    message: ""
+```
 
 
 

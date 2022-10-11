@@ -53,7 +53,6 @@ Kubernetes 网络大致分为两大类，使用不同的技术
 1. 一类是 Cluster IP，是一层反向代理的虚拟ip；service/ingress，早期 kube-proxy 是采用 iptables，后来引入 IPVS 也解决了大规模容器集群的网络编排的性能问题。
 2. 一类是 Pod IP，容器间交互数据
 
-
 针对docker 跨主机通信时网络中一堆的NAT包，Kubernetes 提出IP-per-pod model ，这个 IP 是真正属于该 Pod 的，对这个 Pod IP 的访问就是真正对它的服务的访问，中间拒绝任何的变造。比如以 10.1.1.1 的 IP 去访问 10.1.2.1 的 Pod，结果到了 10.1.2.1 上发现，它实际上借用的是宿主机的 IP，而不是源 IP，这样是不被允许的。**在通信的两端Pod看来，以及整个通信链路中`<source ip,source port,dest ip,dest port>` 是不能改变的**。设计这个原则的原因是，用户不需要额外考虑如何建立Pod之间的连接，也不需要考虑如何将容器端口映射到主机端口等问题。
 
 Kubernetes 对怎么实现这个模型其实是没有什么限制的，用 underlay 网络来**控制外部路由器进行导流**是可以的；如果希望解耦，用 overlay 网络在底层网络之上再加一层叠加网，这样也是可以的。总之，只要达到模型所要求的目的即可。**因为`<source ip,source port,dest ip,dest port>`不能变，排除NAT/DAT，其实也就只剩下路由和解封包两个办法了**。
@@ -79,7 +78,7 @@ Kubernetes requires each pod to have an IP in a flat networking namespace with f
 
 ## 跨主机通信
 
-[Kubernetes 网络模型基础指南](https://mp.weixin.qq.com/s/YRHSx9FaCyB6nQGSylHPOA)通常集群中的每个节点都分配有一个 CIDR，用来指定该节点上运行的 Pod 可用的 IP 地址。一旦以 CIDR 为目的地的流量到达节点（xx技术），节点就会将流量转发到正确的 Pod（xx技术）。换个说法，**如果要求所有 Pod 具有 IP 地址，那么就要确保整个集群中的所有 Pod 的 IP 地址是唯一的**。这可以通过为每个节点分配一个唯一的子网（podCIDR）来实现，即从子网中为 Pod 分配节点 IP 地址。从 podCIDR 中的子网值为节点上的 Pod 分配了 IP 地址。由于所有节点上的 podCIDR 是不相交的子网，因此它允许为每个 pod 分配唯一的IP地址。
+[Kubernetes 网络模型基础指南](https://mp.weixin.qq.com/s/YRHSx9FaCyB6nQGSylHPOA)通常集群中的每个节点都分配有一个 CIDR，用来指定该节点上运行的 Pod 可用的 IP 地址。一旦以 CIDR 为目的地的流量到达节点（xx技术），节点就会将流量转发到正确的 Pod（xx技术）。换个说法，**如果要求所有 Pod 具有 IP 地址，那么就要确保整个集群中的所有 Pod 的 IP 地址是唯一的**。这可以通过为每个节点分配一个唯一的子网（podCIDR）来实现，即从子网中为 Pod 分配节点 IP 地址。从 podCIDR 中的子网值为节点上的 Pod 分配了 IP 地址。由于所有节点上的 podCIDR 是不相交的子网，因此它允许为每个 pod 分配唯一的IP地址。PS：理解 overlay 方案的核心就是 每个node 多有一个cidr，进而每个node 可以根据目的pod ip 找到其所在node。
 
 
 [CNI 网络方案优缺点及最终选择](https://mp.weixin.qq.com/s/pPrA_5BaYG9AwYNy4n_gKg)
@@ -126,7 +125,7 @@ overlay 网络主要有隧道 和 路由两种方式
 
 1. 容器网卡不能直接发送/接收数据，而要通过双方容器所在宿主机网卡发送/接收数据
 2. “容器在哪个主机上“ 这个信息都必须专门维护。[kubectl 创建 Pod 背后到底发生了什么？](https://mp.weixin.qq.com/s/ctdvbasKE-vpLRxDJjwVMw)**overlay 网络是一种动态同步多个主机间路由的方法**。
-3. 容器内数据包必须先发送目标容器所在的宿主机上，那么容器内原生的数据包便要进行改造（解封包或根据路由更改目标mac）
+3. 容器内数据包必须先发送目标容器所在的宿主机上（通过linux 路由机制或者 发送者node 专门进程 发给 目的node 专门进程），那么容器内原生的数据包便要进行改造（解封包或根据路由更改目标mac）
 4. 数据包到达目标宿主机上之后，目标宿主机要进行一定的操作转发到目标容器。
 
 覆盖网络如何解决connectivity and discoverability？connectivity由物理机之间解决，discoverability由**容器在物理机侧的veth** 与 宿主机eth 之间解决，一般由主机上网络协议栈具体负责（**一般网络组件除解封包外，不参与通信过程，只是负责向网络协议栈写入routes和iptables**）。

@@ -15,6 +15,10 @@ keywords: mosn detail
 
 [服务网格在百度核心业务大规模落地实践](https://mp.weixin.qq.com/s/sQvs03oDeZsuX-TTz9qg8g) 具体细节倒还好，比较有价值的就是提出了落地图景和理想化状态。
 
+[云原生时代的DevOps平台设计之道](https://mp.weixin.qq.com/s/oxeNq4GHE85NUBIDcgixcg)大胆设想一下，开发人员只需要在两个服务组件之间拖动一条表征微服务调用关系的线，就可以生成对应的微服务配置。这样的操作体验完全可以使注册中心、控制平面这种微服务领域中复杂的概念对开发人员屏蔽。本质上讲，维护注册中心或者控制平面也是运维人员需要关心的工作。PS：配置文件 + 业务client sdk ==> 无配置化 + 业务client sdk  ==> 无配置 + 通用sdk
+
+## 问题
+
 [蚂蚁集团 Service Mesh 进展回顾与展望](https://mp.weixin.qq.com/s/eh0Jz7YeF27bXqdBMd4MPw) 提供了演进脉络。
 
 ![](/public/upload/mesh/mesh_arch.png)
@@ -87,3 +91,4 @@ SMI 和 UDPA 的关系与我在容器运行时中介绍到的 CRI 和 OCI 规范
 [谈谈我对服务网格的理解](https://mp.weixin.qq.com/s/Acr3h8g1jwHAeyPnVJ_4rw) 有几个配图很有感觉
 
 ![](/public/upload/mesh/mesh_k8s.png)
+
