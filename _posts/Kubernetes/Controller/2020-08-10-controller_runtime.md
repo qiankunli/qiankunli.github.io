@@ -39,6 +39,57 @@ for {
 ```
 controller-runtime 的核心是Manager 驱动 Controller 进而驱动 Reconciler。kubebuiler 用Manager.start 作为驱动入口， Reconciler 作为自定义入口（变的部分），Controller 是不变的部分。
 
+## 用法
+
+```go
+kubeClient = kubernetes.NewForConfigOrDie(opt.Config)
+podInformer = informers.NewSharedInformerFactory(pod.kubeClient, 0).Core().V1().Pods()
+podLister = pod.podInformer.Lister()
+podSynced = pod.podInformer.Informer().HasSynced
+podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	AddFunc:    AddPod,
+	DeleteFunc: DeletePod,
+	UpdateFunc: UpdatePod,
+})
+
+// 启动informer
+podInformer.Informer().Run(stopCh)
+cache.WaitForCacheSync(stopCh, podSynced)
+```
+
+单纯基于 client-go informer 可以监听 object 变化并做出处理，但仍然有很多问题，还需进一步的封装，于是引出了controller-runtime。
+1. 多个object 的informer 与 多个worklaod 的reconcile 可能具有多对多关系
+	1. 一个workload 可能需要针对多个 object 的event 进行reconcile
+	2. 多个workload，每一个workload 都持有 podInformer 会有重复的问题，为解决这个问题，需要一个独立的对象（比如叫cache）持有所有用到的informer（一个object 一个informer），**向informer 注册eventhandler 也应改为向 cache 注册eventhandler**。
+2. reconcile 时失败、延迟重试等功能
+
+
+[Controller Runtime 的四种使用姿势](https://mp.weixin.qq.com/s/zWvxbO1C2QrZY7iqvGtMGA)
+```go
+func start() {
+  	scheme := runtime.NewScheme()
+  	_ = corev1.AddToScheme(scheme)
+  	// 1. init Manager	初始化 Manager，同时生成一个默认配置的 Cache
+  	mgr, _ := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+    	Scheme: scheme,
+    	Port:   9443,
+  	})
+  	// 2. init Reconciler（Controller）
+  	_ = ctrl.NewControllerManagedBy(mgr).
+    	For(&corev1.Pod{}).				// 指定 watch 的资源类型
+		// .Owns()						// 表示某资源是我关心资源的从属，其 event 也会进去 Controller 的队列中；
+    	Complete(&ApplicationReconciler{})	// 将用户的 Reconciler 注册进 Controller，并生成 watch 资源的默认 eventHandler，同时执行 Controller 的 watch 函数；
+  	// 3. start Manager
+  	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+  	}
+}
+type ApplicationReconciler struct {
+}
+func (a ApplicationReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+  	return reconcile.Result{}, nil
+}
+```
+
 ## 整体设计
 
 Manager 管理多个Controller 的运行，并提供 数据读（cache）写（client）等crudw基础能力。
@@ -50,9 +101,9 @@ Manager 管理多个Controller 的运行，并提供 数据读（cache）写（c
 
 ![](/public/upload/kubernetes/controller_runtime_logic.png)
 
-A Controller manages a work queue fed reconcile.Requests from source.Sources.  Work is performed through the reconcile.Reconciler for each enqueued item. Work typically is reads and writes Kubernetes objects to make the system state match the state specified in the object Spec. 
+Cache 顾名思义就是缓存，用于建立 Informer 对 ApiServer 进行连接 watch 资源，并将 watch 到的 object 推入队列；Controller 一方面会向 Informer 注册 eventHandler，另一方面会从队列中拿数据并执行用户侧 Reconciler 的函数。A Controller manages a work queue fed reconcile.Requests from source.Sources.  Work is performed through the reconcile.Reconciler for each enqueued item. Work typically is reads and writes Kubernetes objects to make the system state match the state specified in the object Spec. 
 
-当我们观察Manager/Contronller/Reconciler Interface 的时候，接口定义是非常清晰的，但是为了实现接口定义的 能力（方法）要聚合很多struct，初始化时要为它们赋值，这个部分代码实现的比较负责，可能是go 缺少类似ioc 工具带来的问题。 
+当我们观察Manager/Contronller/Reconciler Interface 的时候，接口定义是非常清晰的，但是为了实现接口定义的 能力（方法）要聚合很多struct，初始化时要为它们赋值，这个部分代码实现的比较复杂，可能是go 缺少类似ioc 工具带来的问题。 
 
 ## 启动流程
 
@@ -120,6 +171,14 @@ func New(name string, mgr manager.Manager, options Options) (Controller, error) 
 
 ## Controller
 
+Controller 逻辑主要有两个（任何Controller 都是如此），对应两个函数是 Watch 与 Start
+1. 监听 object 事件并加入到 queue 中。
+	1. Controller 会先向 Informer 注册特定资源的 eventHandler；然后 Cache 会启动 Informer，Informer 向 ApiServer 发出请求，建立连接；当 Informer 检测到有资源变动后，使用 Controller 注册进来的 eventHandler 判断是否推入队列中；
+	1. 为提高扩展性 Controller 将这个职责独立出来交给了 Source 组件，不只是监听apiserver，任何外界资源变动 都可以通过 Source 接口加入 到Reconcile 逻辑中。
+2. 从queue 中取出object event 执行Reconcile 逻辑。 
+
+![](/public/upload/kubernetes/controller_runtime_controller.png)
+
 [controller-runtime 之控制器实现](https://mp.weixin.qq.com/s/m-eNII-h-Gq74bMZ3fQLKg)
 
 ```go
@@ -151,9 +210,7 @@ func New(name string, mgr manager.Manager, options Options) (Controller, error) 
 	return c, mgr.Add(c)
 }
 ```
-Controller 逻辑主要有两个（任何Controller 都是如此），对应两个函数是 Watch 与 Start
-1. 监听 object 事件并加入到 queue 中。为提高扩展性 Controller 将这个职责独立出来交给了 Source 组件，不只是监听apiserver，任何外界资源变动 都可以通过 Source 接口加入 到Reconcile 逻辑中。
-2. 从queue 中取出object event 执行Reconcile 逻辑。 
+
 
 ### watch
 
@@ -184,7 +241,7 @@ func (c *Controller) Watch(src source.Source, evthdler handler.EventHandler, prc
 	return src.Start(c.ctx, evthdler, c.Queue, prct...)
 }
 ```
-Source 是事件的源，使用 Kind 来处理来自集群的事件（如 Pod 创建、Pod 更新、Deployment 更新）；使用 Channel 来处理来自集群外部的事件（如 GitHub Webhook 回调、轮询外部 URL）。
+Source 是事件的源，struct 实现 Kind 来处理来自集群的事件（如 Pod 创建、Pod 更新、Deployment 更新）；struct 实现 Channel 来处理来自集群外部的事件（如 GitHub Webhook 回调、轮询外部 URL）。
 ```go
 // Kind 用于提供来自集群内部的事件源，这些事件来自于 Watches（例如 Pod Create 事件）
 type Kind struct {
@@ -338,6 +395,7 @@ ApplicationReconciler 持有Client，便有能力对 相关资源进行 crud
 1. 从request 中资源name ，进而通过client 获取资源obj
 2. 处理完毕后，通过Result 告知是Requeue 下次重新处理，还是处理成功开始下一个
 
+
 ## 其它
 
 ### 依赖注入
@@ -400,10 +458,6 @@ func (a *ReplicaSetReconciler) InjectClient(c client.Client) error {
 
 controller-runtime 暴露 handler.EventHandler接口，EventHandlers map an Event for one object to trigger Reconciles for either the same object or different objects。这个接口实现了Create,Update,Delete,Generic方法，用来在资源实例的不同生命阶段，进行判断与入队。 
 
-### 其它
 
-
-
-![](/public/upload/kubernetes/controller_runtime_object.png)
 
 

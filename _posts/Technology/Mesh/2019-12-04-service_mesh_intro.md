@@ -45,6 +45,8 @@ SideCar的一种实现[MOSN](https://www.sofastack.tech/projects/sofa-mosn/overv
 
 李云 Service Mesh 带来的变化与发展机遇：阿里巴巴在分布式应用的开发和治理的整体解决方案的探索有超过10年的历程，且探索过程持续的通过双11这样的严苛场景做检验和孵化，采用单一的Java语言打造了一整套技术。即便如此，**应对分布式应用的规模问题依然不轻松，体现于因为缺乏顶层设计而面临体系性不足**，加之对技术产品自身的用户体验缺乏重视，最终导致运维成本和技术门槛都偏高。
 
+[去哪儿网 Service Mesh 落地实践：100%容器化打底，业务友好是接入关键](https://mp.weixin.qq.com/s/2PRhh91tkCtr9RpKCuIFUQ)Service Mesh 不是一个很新的概念，它的本质就是解耦，具体实现起来就是语言 SDK 负责编码以及与 sidecar 的通信，这部分比较固定，不包含治理功能。虽然还是多个（语言）实现，但是复杂度降低了一个量级，从而将更多的功能实现，抽离到独立的 sidecar 进程，只需要实现一次。
+
 ### 传统微服务架构
 
 ![](/public/upload/practice/traditional_micro_service.png)

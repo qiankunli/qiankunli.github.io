@@ -41,7 +41,7 @@ for {
 
 ## 整体架构
 
-《programming kubernetes》 Kubernetes **控制平面**大量使用事件和松散耦合的组件。其它分布式系统使用rpc 来触发行为。但Kubernetes 并没有这么做（**纯粹依赖事件来进行多组件协同，许多独立的控制循环只通过 api server 上对象的变化进行通信**，有点事件驱动架构的意思，根据对象变动采取动作，所谓采取动作也是cud对象）。Kubernetes controller 监听api server 中的Kubernetes 对象操作：添加、删除、更新。当发生此类事件时，controller 将执行其业务逻辑。监听事件 是通过api server 和controller 之间的http 长连接发送，从而驱动informer
+《programming kubernetes》 Kubernetes **控制平面**大量使用事件和松散耦合的组件。其它分布式系统使用rpc 来触发行为，但Kubernetes 并没有这么做（**纯粹依赖事件来进行多组件协同，许多独立的控制循环只通过 api server 上对象的变化进行通信**，有点事件驱动架构的意思，根据对象变动采取动作，所谓采取动作也是cud对象）。Kubernetes controller 监听api server 中的Kubernetes 对象操作：添加、删除、更新。当发生此类事件时，controller 将执行其业务逻辑。监听事件 是通过api server 和controller 之间的http 长连接发送，从而驱动informer
 
 ![](/public/upload/kubernetes/k8s_custom_controller.png)
 

@@ -66,6 +66,8 @@ struct task_struct {
 
 ![](/public/upload/linux/thread_sturct_relation.png)
 
+
+
 ### 进程部分
 
 ![](/public/upload/linux/linux_task_struct_data.png)
@@ -427,7 +429,20 @@ static __always_inline struct rq *context_switch(struct rq *rq, struct task_stru
 
 ## 其它
 
-应用：CFS的抢占，其实是不那么暴力的抢占。目前互联网企业都拥有海量的服务器，其中大部分只运行交互类延时敏感的在线业务，使CPU利用率非常低，造成资源的浪费（据统计全球服务器CPU利用率不足20%）。为提高服务器CPU的利用率，需要在运行在线业务的服务器上，混合部署一些高CPU消耗且延时不敏感的离线业务。为了使得在离线互相不影响，需要在在线业务CPU使用率低的时候，可以运行一些离线业务，而当在线业务CPU利用率高的时候，可以对离线业务快速抢占。如果在离线业务都使用不暴力的CFS调度器，现有的混部方案没办法做到及时抢占的。在同调度类优先级的进程，互相抢占的时候，需要满足两个条件。第一个是抢占进程的虚拟时间要小于被抢占进程，第二是被抢占进程已经运行的实际要大于最小运行时间。如果两个条件不能同时满足，就会导致无法抢占。基于这种考虑，开发了针对离线业务的新调度算法[bt](https://github.com/Tencent/TencentOS-kernel)，该算法可以保证在线业务优先运行。
+### 进程和线程的区别
+
+[聊聊Linux中线程和进程的联系与区别](https://mp.weixin.qq.com/s/--S94B3RswMdBKBh6uxt0w)Linux进程和线程的相同点要远远大于不同点，本质上是同一个东西，都是一个 task_struct。每一个 task_struct 都需要被唯一的标识，它的 pid 就是唯一标识号。对于进程来说，这个 pid 就是我们平时常说的进程 pid。对于线程来说，我们假如一个进程下创建了多个线程出来。那么每个线程的 pid 都是不同的。但是我们一般又需要记录线程是属于哪个进程的，通过 tgid 字段来表示自己所归属的进程 ID。
+1. 进程创建 fork ==> fork ==> do_fork ==> copy_process
+2. 线程创建 pthread_create ==> do_clone ==> clone ==> do_fork ==> copy_process
+可见和创建进程时使用的 fork 系统调用相比，创建线程的 clone 系统调用几乎和 fork 差不多，也一样使用的是内核里的 do_fork 函数，最后走到 copy_process 来完整创建。不过创建过程的区别是二者在调用 do_fork 时传入的 clone_flags 里的标记不一样！。
+1. 创建进程时的 flag：仅有一个 SIGCHLD
+2. 创建线程时的 flag：包括 CLONE_VM(新 task 和父进程共享地址空间)、CLONE_FS(新 task 和父进程共享文件系统信息)、CLONE_FILES(新 task 和父进程共享文件描述符表)、CLONE_SIGNAL、CLONE_SETTLS、CLONE_PARENT_SETTID、CLONE_CHILD_CLEARTID、CLONE_SYSVSEM。
+
+![](/public/upload/linux/process_vs_thread.png)
+
+对于线程来讲，其地址空间 mm_struct、目录信息 fs_struct、打开文件列表 files_struct 都是和创建它的任务共享的。但是对于进程来讲，地址空间 mm_struct、挂载点 fs_struct、打开文件列表 files_struct 都要是独立拥有的，都需要去申请内存并初始化它们。
+
+### 其它它
 
 cpu 就是不端从pc 找活儿（指令）干，加上scheduler + task list之后就是不断从task list找个活儿（task_struct）干，跟java executor 不断从队列找活儿（runnable）干是一样的。又比如go中，用户逻辑包在goroutine中，goroutine 放在P中，M 不断从P 中取出G 来干活儿。 就好像网络包，一层套一层，符合一定的格式才可以收发和识别。
 

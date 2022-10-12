@@ -191,3 +191,5 @@ kafka 因为有更明确地业务规则，有一个专门的coordinator，选举
 [条分缕析分布式：到底什么是一致性？](https://mp.weixin.qq.com/s/qnvl_msvw0XL7hFezo2F4w)在证明CAP定理的原始论文Brewer’s Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web，C指的是linearizable consistency，也就是「线性一致性」。更精简的英文表达则是linearizability。而很多人在谈到CAP时，则会把这个C看成是强一致性（strong consistency）。这其实也没错，因为线性一致性的另一个名字，就是强一致性。只不过，相比「线性一致性」来说，「强一致性」并不是一个好名字。因为，从这个名字你看不出来它真实的含义（到底「强」在哪？）
 
 [分布式一致性技术是如何演进的？](https://mp.weixin.qq.com/s/KSpsa1viYz9K_-DYYQkmKA)分布式一致性，简单的说就是在一个或多个进程提议了一个值后，使系统中所有进程对这个值达成一致。
+
+[并发扣款，如何保证一致性？](https://mp.weixin.qq.com/s/Mp1SH33BCabrsQrkHrTwow) 很有意思。
