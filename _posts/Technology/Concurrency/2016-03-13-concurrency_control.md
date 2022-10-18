@@ -308,6 +308,8 @@ void up(struct semaphore *sem)
 [并发场景下的幂等问题——分布式锁详解](https://mp.weixin.qq.com/s/uupgv50JN7AGWp2VjsCRuQ)
 
 [聊聊分布式锁](https://mp.weixin.qq.com/s/-N4x6EkxwAYDGdJhwvmZLw)未读。
+
+[聊一聊分布式锁的设计模型](https://mp.weixin.qq.com/s/uA26VVmYMTfs-dWcLOY04w)
 		
 ## 一个博客系列的整理
 

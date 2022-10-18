@@ -27,6 +27,8 @@ keywords: serverless
 
 ![](/public/upload/architecture/serverless_design.png)
 
+毕玄：Serverless 面临的核心难题是什么？主要是弹性的速度。比如 Serverless 我要拉起一个系统，这不是几秒就能拉得起来的，但对在线业务来讲，你不可能点一下几秒都出不来，大家能接受的都是几毫秒。所以 Serverless 都只是拿来做一些像计算这种后期的事情，以前可能是一些离线的事情，都是对响应时间可以忍受的。
+
 ## 为什么Serverless 会火
 
 Kubernetes 虽然提供了容器应用的全生命周期管理，但是太丰富、太复杂、太灵活，这既是一种优势，有时候也是一种劣势。容器和 Kubernetes 并非一定要捆绑使用。
