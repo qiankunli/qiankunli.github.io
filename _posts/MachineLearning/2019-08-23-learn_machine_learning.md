@@ -138,7 +138,7 @@ ML 是一个通过算法和统计模型从数据中学习知识的学科，当�
 
 1. 数据侧：数据整理、数据标注系统
 2. 训练侧：集群管理、分布式训练，更快、利用率高更高
-2. 推理侧：对训练得到的模型剪枝、蒸馏、量化、压缩，更换算子等 [携程AI推理性能的自动化优化实践](https://mp.weixin.qq.com/s/jVnNMQNo_MsX3uSFRDmevA)
+2. 推理侧：对训练得到的模型剪枝、蒸馏、量化、压缩，更换算子等 [携程AI推理性能的自动化优化实践](https://mp.weixin.qq.com/s/jVnNMQNo_MsX3uSFRDmevA) [百度大模型与小模型联动及落地](https://mp.weixin.qq.com/s/iHO8zy6oKikgGHIamkam5w)
 
 最终目标就是，缩短算法工程师训练一个模型的时间。
 

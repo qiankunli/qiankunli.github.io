@@ -59,4 +59,8 @@ Kubernetes和Mesos调度的最大区别在于资源调度请求的方式
 
 [揭开阿里巴巴复杂任务资源混合调度技术面纱](https://mp.weixin.qq.com/s/wj0hrHIRHnBUNZZXnRm5xg)
 
+## 资源调度的复杂性
 
+[没有银弹，只有取舍 - Serverless Kubernetes 的思考与征程（一）](https://mp.weixin.qq.com/s/1aMalQs-AE2L1aA5X20gJA)
+
+![](/public/upload/kubernetes/resource_scheduler_overview.png)
