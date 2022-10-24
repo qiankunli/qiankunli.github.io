@@ -33,6 +33,8 @@ controllermanager.Run ==> ResourceDetector.Reconcile
 
 ## 代码分析
 
+resourceinterpreter 相关的目录结构
+
 ```
 karmada
   /examples
