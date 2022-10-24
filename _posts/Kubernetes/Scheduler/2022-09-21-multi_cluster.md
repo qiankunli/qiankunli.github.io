@@ -35,7 +35,7 @@ keywords:  集群
 2. 基于 Virtual Kubelet：Virtual Kubelet 本质上是允许我们冒充 Kubelet 的行为来管理 virtual node 的机制。这个 virtual node 的背后可以是任何物件，只要 virtual  node 能够做到上报 node 状态、和 pod 的生命周期管理。PS: 这导致后续干预多集群调度比较难，因为进行任何改动都不能超越kubelet 所提供的能力。
 
 [多云能力建设问题域总结](https://mp.weixin.qq.com/s/alWgDFawsQKc69h-EQZ0uw)要解决的几个问题
-1. 应用分发模型。即用户创建的Deployment 的多个pod最终落在哪个集群中，如何表达这个诉求？是优先落在一个集群，还是各个集群都摊一点。
+1. 应用分发模型。即用户创建的Deployment 的多个pod最终落在哪个集群中，如何表达这个诉求？是优先落在一个集群，还是各个集群都摊一点。用户创建的Deployment 存在哪里？假如deployment有10个pod，两个cluster 分别运行2/8 个pod，用户创建的deployment 的status 等字段如何感知真实情况？
 2. 在不同的集群下发的模型怎样做到差异化？
 3. 怎样设计和解决在多集群的背景下，有状态服务的调度机制和访问机制？
 
