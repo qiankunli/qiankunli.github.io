@@ -15,6 +15,8 @@ keywords:  集群
 
 ## 背景
 
+In the progress of propagating a resource from karmada-apiserver to member clusters, Karmada needs to know the resource definition. For Kubernetes native resources, Karmada knows how to parse them, but for custom resources defined by CRD, as lack of the knowledge of the resource structure, they can only be treated as normal resources. Therefore, the advanced scheduling algorithms cannot be used for them.The [Resource Interpreter Framework](https://karmada.io/docs/next/userguide/globalview/customizing-resource-interpreter/)is designed for interpreting resource structure. 
+
 karmada 从 karmada-apiserver 向多个cluster 分发crd的过程中，一边是用户创建的、存在于karmada-apiserver 的crd，一边是运行在各个cluster 的crd，对于两边的crd 需要进行各种操作和状态同步。
 1. 比如使用GetReplicas 获取crd的副本数，计算完cluster1 应负责的crd 的replica1 之后，向cluster1 创建 replica=replica1 的crd。
 2. 假如deployment有10个pod，两个cluster 分别运行2/8 个pod，用户创建的deployment 的status 等字段 也应该能感知到真实情况。
@@ -30,6 +32,8 @@ controllermanager.Run ==> ResourceDetector.Reconcile
 			d.ResourceInterpreter.GetReplicas(object)
 		controllerutil.CreateOrUpdate(context.TODO(), d.Client, bindingCopy...)
 ```
+
+
 
 ## 代码分析
 
@@ -65,13 +69,17 @@ karmada
 |GetReplicas|创建ResourceBinding 时获取karmada-apiserver  crd的replica|ResourceDetector.Reconcile ==> ApplyPolicy ==> BuildResourceBinding|
 |ReviseReplica|分发到每个 cluster 时调整 cluster内crd的replica |ResourceBindingController.syncBinding ==> ensureWork|
 |GetDependencies|比如对于  deployment 来说 configmap/secret/serviceaccount/pvc 即为 dependency|DependenciesDistributor.ReconcileResourceBinding|
-|Retain|将用户对karmada-apiserver  object 的变更（比如label、annotation等）同步到各个cluster|objectWatcherImpl.retainClusterFields|
+|Retain|将用户对karmada-apiserver  object 的变更（比如label、annotation等）同步到各个cluster的object|objectWatcherImpl.retainClusterFields|
 |ReflectStatus|解析 各个cluster 下crd 的status 并汇总到所属work 的status下|WorkStatusController.RunWorkQueue ==> syncWorkStatus|
 |AggregateStatus| 将分发到各个cluster 的object 的状态（从worker.status）汇总并更新到 karmada-apiserver  crd status上|ResourceBindingController.syncBinding ==> AggregateResourceBindingWorkStatus + updateResourceStatus|
 
-### webhook 侧
+[Design Details](https://github.com/karmada-io/karmada/tree/master/docs/proposals/resource-interpreter-webhook)
 
-webhook 本质就是一个简单的 webserver
+![](/public/upload/kubernetes/karmada_interpreter_operation.png)
+
+### interpreter webhook 侧
+
+webhook 本质就是一个简单的 webserver，The webhook handles the ResourceInterpreterRequest request sent by the Karmada components (such as karmada-controller-manager), and sends back its decision as an ResourceInterpreterResponse.
 
 ```go
 // karmada/examples/customresourceinterpreter/webhook/app/webhook.go

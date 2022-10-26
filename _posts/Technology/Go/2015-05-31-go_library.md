@@ -243,4 +243,4 @@ func (i *IPNet) Version() int {
 func ParseCIDR(c string) (*IP, *IPNet, error) {...}
 ```
 
-
+[探究 Go database/sql 包的设计模式](https://mp.weixin.qq.com/s/CtKjgQ2C459Ns1ZNGwWXFw)

@@ -16,8 +16,6 @@ keywords: tf_operator,tensorflow,kubeflow
 
 [炼丹师的工程修养之五：KubeFlow介绍和源码分析](https://zhuanlan.zhihu.com/p/98889237)
 
-KubeFlow是运行在K8S之上的一套技术栈。这套技术栈包含了很多组件，组件之间的关系比较松散，我们可以配合起来用，也可以单独用其中的一部分。比如Jupyter Notebook本身可以单机运行，但是和K8S结合之后就能组建一个分布式的Jupyter Notebook服务，供多个用户同时使用。
-
 KubeFlow不是什么
 1. KubeFlow不是机器学习框架，跟TensorFlow，PyTorch，XGBoost不是一个层次的东西
 2. KubeFlow不负责调度，他还是要依赖K8S来调度，但是可以在KubeFlow这个层次上，使用K8S提供的机制针对机器学习来调整资源调度的策略和算法
@@ -86,8 +84,10 @@ syncTFJob 是 tf-operator 管理对象的核心逻辑实现，内部对不同 Re
 
 2020.9.23 实现crd 有两派思路，tf-operator 都有体现：
 1. tf-operator.v1 是目前在用的版本，基于 informer 和 client 裸写的。
-2. training-operator.v1 是下一个大版本的设计，还不太稳定，没有发布出去。training-operator.v1 是基于 controller-runtime 写的
-当然都有大量的复用部分，因此抽了一个 `github.com/kubeflow/commmon`。`kubeflow/commmon` 不仅用于tf-operator 自身的迭代，也用于整合其它机器学习framework的operator。对于机器学习任务来说，一般都是运行多个进程，ps/master 进程负责协调，worker 进程负责干活儿，所有进程运行同一段代码，相互之间互相访问， 并共享一些全局信息，所以整体上各个operator（tf/pytorch/mpi 等）都是很像的。
+2. training-operator.v1 是下一个大版本的设计，还不太稳定，没有发布出去。training-operator.v1 是基于 controller-runtime 写的，
+当然都有大量的复用部分，因此抽了一个 `github.com/kubeflow/commmon`。`kubeflow/commmon` 不仅用于tf-operator 自身的迭代，也用于整合其它机器学习framework的operator。
+
+对于机器学习任务来说，一般都是运行多个进程，ps/master 进程负责协调，worker 进程负责干活儿，所有进程运行同一段代码，相互之间互相访问， 并共享一些全局信息，所以整体上各个operator（tf/pytorch/mpi 等）都是很像的。
 
 以下分析以老版 tf-operator.v1 为主。
 
@@ -322,15 +322,37 @@ func (jc *JobController) SyncPodGroup(job metav1.Object, pgSpec v1beta1.PodGroup
 ```
 `kubeflow/common` 定义了 JobController，JobController.ReconcileJobs 是 Reconcile 逻辑的入口：为xxjob 创建对应的pod 和service（为pod 之间互通），并根据pod 运行状态更新xxjob 状态。这个过程中要获取 job/pod/service 的信息，要Reconcile Pods/Services。
 
-JobController 类似模板类，需要实现核心逻辑，又要留有足够的扩展性，Get 方法自己做不了需要 嵌入 ControllerInterface 以使用Getxx 方法，ReconcilePods/Service 既要实现**又 不能直接调用（否则上层业务方还扩展个啥）**。
+```go
+func (jc *JobController) ReconcileJobs(job interface{},...,jobStatus apiv1.JobStatus,runPolicy *apiv1.RunPolicy){
+	pods, err := jc.Controller.GetPodsForJob(job)
+	services, err := jc.Controller.GetServicesForJob(job)
+	// 如果已经成功或失败
+	if commonutil.IsSucceeded(jobStatus) || commonutil.IsFailed(jobStatus) {
+		...
+	}
+	// 如果超出limit
+	if jobExceedsLimit {
 
+	}else{	
+		if jc.Config.EnableGangScheduling {
 
-1. TFJobReconciler 聚合了 JobController，这样可以使用 JobController.ReconcileJobs 触发Reconcile 逻辑（即实现 Reconcile interface） 
-2. TFJobReconciler 又实现了ControllerInterface ，**JobController 通过 ControllerInterface 实现聚合TFJobReconciler 的效果**， 可以调用Get 方法获取信息，也可以调用 Reconcile 方法执行上层自定义扩展逻辑。
+		}
+		for rtype, spec := range replicas {
+			err := jc.Controller.ReconcilePods(metaObject, &jobStatus, pods, rtype, spec, replicas)
+			err = jc.Controller.ReconcileServices(metaObject, services, rtype, spec)
+		}
+	}
+	err = jc.Controller.UpdateJobStatus(job, replicas, &jobStatus)
+	return nil
+}
+```
+
+JobController 类似模板类，实现了核心逻辑，又要留有足够的扩展性
+
+1. TFJobReconciler 聚合了 JobController，这样可以使用 JobController.ReconcileJobs 触发Reconcile 核心逻辑
+2. TFJobReconciler 又实现了ControllerInterface ，**JobController 通过 ControllerInterface 实现聚合TFJobReconciler 的效果**， 可以调用Get 方法获取信息，也可以调用 ReconcileXX 方法执行上层自定义扩展逻辑。
 
 ![](/public/upload/kubernetes/kubeflow_common.png)
-
-为啥 TFJobReconciler 和 JobController要相互（直接或间接）聚合呢？可以认为，如果不是想把 所有逻辑都缩在 TFJobReconciler 中，完全可以 实现一个 TFJobControllerInterface 代替TFJobReconciler 实现ControllerInterface 接口，TFJobReconciler.Reconcile ==> JobController.ReconcileJobs ==> TFJobControllerInterface.Getxx/Reconcilexx
 
 ```go
 // github.com/kubeflow/tf-operator/pkg/controller.v1/tensorflow/tfjob_controller.go
@@ -340,5 +362,11 @@ type TFJobReconciler struct {
 	Scheme   *runtime.Scheme
 	...
 }
-func (r *TFJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {}
+func (r *TFJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	tfjob := &kubeflowv1.TFJob{}
+	err := r.Get(ctx, req.NamespacedName, tfjob)
+	needReconcile := util.SatisfiedExpectations(r.Expectations, jobKey, replicaTypes)
+	err = r.ReconcileJobs(tfjob, tfjob.Spec.TFReplicaSpecs, tfjob.Status, &tfjob.Spec.RunPolicy)
+	return ctrl.Result{}, nil
+}
 ```

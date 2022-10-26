@@ -17,6 +17,8 @@ apiserver 核心职责
 1. 提供Kubernetes API
 2. 代理集群组件，比如Kubernetes dashboard、流式日志、`kubectl exec` 会话
 
+[字节跳动 kube-apiserver 高可用方案 KubeGateway](https://mp.weixin.qq.com/s/sDxkXPmgtCknwtnwvg2EMw) 很好玩的一个项目。
+
 ## 声明式API
 
 1. 命令式命令行操作，比如直接 `kubectl run`

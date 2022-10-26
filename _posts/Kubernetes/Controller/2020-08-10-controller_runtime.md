@@ -41,6 +41,8 @@ controller-runtime 的核心是Manager 驱动 Controller 进而驱动 Reconciler
 
 ## 用法
 
+单纯使用 client-go informer 机制 监听 某个object的写法。
+
 ```go
 kubeClient = kubernetes.NewForConfigOrDie(opt.Config)
 podInformer = informers.NewSharedInformerFactory(pod.kubeClient, 0).Core().V1().Pods()
@@ -75,13 +77,42 @@ func start() {
     	Port:   9443,
   	})
   	// 2. init Reconciler（Controller）
-  	_ = ctrl.NewControllerManagedBy(mgr).
+  	_ = ctrl.NewControllerManagedBy(mgr).	// 使用了builder 模式
     	For(&corev1.Pod{}).				// 指定 watch 的资源类型
 		// .Owns()						// 表示某资源是我关心资源的从属，其 event 也会进去 Controller 的队列中；
     	Complete(&ApplicationReconciler{})	// 将用户的 Reconciler 注册进 Controller，并生成 watch 资源的默认 eventHandler，同时执行 Controller 的 watch 函数；
   	// 3. start Manager
   	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
   	}
+}
+type ApplicationReconciler struct {
+}
+func (a ApplicationReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+  	return reconcile.Result{}, nil
+}
+```
+上述代码经过了builder 模式的封装，相对底层的 样子如下
+```go
+func start() {
+  scheme := runtime.NewScheme()
+  _ = corev1.AddToScheme(scheme)
+  // 1. init Manager
+  mgr, _ := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+    Scheme: scheme,
+    Port:   9443,
+  })
+  // 2. init Reconciler（Controller）
+  c, _ := controller.New("app", mgr, controller.Options{
+	Reconciler: &ApplicationReconciler{},
+  })
+  _ = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+    CreateFunc: func(event event.CreateEvent) bool {...},
+    UpdateFunc: func(updateEvent event.UpdateEvent) bool {...},
+    DeleteFunc: func(deleteEvent event.DeleteEvent) bool {...},
+  })
+  // 3. start Manager
+  if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+  }
 }
 type ApplicationReconciler struct {
 }
@@ -175,7 +206,7 @@ Controller 逻辑主要有两个（任何Controller 都是如此），对应两�
 1. 监听 object 事件并加入到 queue 中。
 	1. Controller 会先向 Informer 注册特定资源的 eventHandler；然后 Cache 会启动 Informer，Informer 向 ApiServer 发出请求，建立连接；当 Informer 检测到有资源变动后，使用 Controller 注册进来的 eventHandler 判断是否推入队列中；
 	1. 为提高扩展性 Controller 将这个职责独立出来交给了 Source 组件，不只是监听apiserver，任何外界资源变动 都可以通过 Source 接口加入 到Reconcile 逻辑中。
-2. 从queue 中取出object event 执行Reconcile 逻辑。 
+2. 从queue 中取出object event 执行Reconcile 逻辑。 PS：**一个controller 持有了一个queue，一手包办了queue的生产和消费**。
 
 ![](/public/upload/kubernetes/controller_runtime_controller.png)
 
