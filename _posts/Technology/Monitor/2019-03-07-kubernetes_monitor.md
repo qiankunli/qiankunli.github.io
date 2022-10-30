@@ -13,28 +13,6 @@ keywords: Kubernetes monitor
 * TOC
 {:toc}
 
-## 监控平台的整体设计
-
-[Kubernetes监控在小米的落地](https://mp.weixin.qq.com/s/ewwD6A3-ClbotdfFmYY3KA) 为了更方便的管理容器，Kubernetes对Container进行了封装，拥有了Pod、Deployment、Namespace、Service等众多概念。与传统集群相比，Kubernetes集群监控更加复杂：
-
-1. 监控维度更多，除了传统物理集群的监控，还包括核心服务监控（apiserver，etcd等）、容器监控、Pod监控、Namespace监控等。
-2. 监控对象动态可变，在集群中容器的销毁创建十分频繁，无法提前预置。
-3. 监控指标随着容器规模爆炸式增长，如何处理及展示大量监控数据。
-4. 随着集群动态增长，监控系统必须具备动态扩缩的能力。
-
-[基于 eBPF 的 Kubernetes 一站式可观测性系统](https://mp.weixin.qq.com/s/npQg0lOjFVrIpEtu90ycZQ)
-1. 复杂度是永恒的，我们只能找到方法来管理它，无法消除它，云原生技术的引入虽然减少了业务应用的复杂度，但是在整个软件栈中，他只是将复杂度下移到容器虚拟化层，并没有消除。
-  ![](/public/upload/monitor/k8s_monitor.png)
-2. 我们以容器为核心，采集关联的 Kubernetes 可观测数据，与此同时，**向下**采集容器相关进程的系统和网络可观测数据，**向上**采集容器相关应用的性能数据，**通过关联关系将其串联起来，完成端到端可观测数据的覆盖**。
-3. 我们的数据类型包含了指标，日志和链路，采用了 open telemetry collector 方案支持统一的数据传输。背靠 ARMS 已有的基础设施，指标通过 ARMS Prometheus 进行存储，日志/链路通过 XTRACE 进行存储。PS： 应该是一个agent 支持采集日志、metrics、trace
-4. 使用路径：核心场景上支持架构感知、错慢请求分析、资源消耗分析、DNS 解析性能分析、外部性能分析、服务连通性分析和网络流量分析。支持这些场景的基础是产品在设计上遵循了从整体到个体的原则：**先从全局视图入手，发现异常的服务个体**，如某个 Service，定位到这个 Service 后查看这个 Service 的黄金指标、关联信息、Trace等进行进一步关联分析。
-5. datadog 的 CEO 在一次采访中直言 datadog 的产品策略不是支持越多功能越好，而是思考怎样在不同团队和成员之间架起桥梁，尽可能把信息放在同一个页面中（to bridge the gap between the teams and get everything on the same page）
-
-[在阿里巴巴，我们如何先于用户发现和定位 Kubernetes 集群问题？](https://mp.weixin.qq.com/s/MAgCortf5zXmWIAAIWjIow) 探测、巡检、根因分析。
-
-[基于 eBPF 的 Kubernetes 问题排查全景图](https://mp.weixin.qq.com/s/lK4yXuZOy6bS6qPe2pxD7A) 监测工具不是功能越多功能越好，而是要思考怎样在不同团队和成员之间架起桥梁，尽可能把信息放在同一个页面中。那么具体怎么关联呢？信息怎么组织呢？主要从两方面来看：
-1. 横向，端到端：展开说就是应用到应用，服务到服务，两者调用关系是关联的基础，因为调用才产生了联系。
-2. 纵向，以 Pod 为媒介，Kubernetes 层面关联 Workload、Service 等对象，基础设施层面可以关联节点、存储设备、网络等，应用层面关联日志、调用链路等。
 
 ## 能搞到哪些metric
 
@@ -304,6 +282,10 @@ cAdvisor中提供的内存指标是从node_exporter公开的43个内存指标的
 8. container_memory_failures_total-内存 分配失败的累积计数。
 
 
+### 网络
+
+[使用 k8spacket 与 Grafana 可视化 K8s Tcp流量](https://mp.weixin.qq.com/s/1GwHpSTQG6RTSwNEfEd7Yg)
+
 ## 监控平台设计
 
 [基于Prometheus的云原生监控系统架构演进](https://mp.weixin.qq.com/s/SBqYGeWDMQwmente8JBaHA)
@@ -350,9 +332,16 @@ Grafana 官方有一个 [dashboard 市场](https://grafana.com/grafana/dashboard
 
 [KubeEye：Kubernetes 集群自动巡检工具](https://segmentfault.com/a/1190000039173086)
 
-## 理解监控
+## k8s监控平台
 
 [容器监控实践—K8S常用指标分析](http://www.xuyasong.com/?p=1717)
+
+[Kubernetes监控在小米的落地](https://mp.weixin.qq.com/s/ewwD6A3-ClbotdfFmYY3KA) 为了更方便的管理容器，Kubernetes对Container进行了封装，拥有了Pod、Deployment、Namespace、Service等众多概念。与传统集群相比，Kubernetes集群监控更加复杂：
+
+1. 监控维度更多，除了传统物理集群的监控，还包括核心服务监控（apiserver，etcd等）、容器监控、Pod监控、Namespace监控等。
+2. 监控对象动态可变，在集群中容器的销毁创建十分频繁，无法提前预置。
+3. 监控指标随着容器规模爆炸式增长，如何处理及展示大量监控数据。
+4. 随着集群动态增长，监控系统必须具备动态扩缩的能力。
 
 [监控 Pod 时，我们在监控什么](https://mp.weixin.qq.com/s/ggeSvRbsfEKCS5Sa6WgTtQ)Kubernetes 和 KVM 的区别在不同组件存在区别：
 1. CPU 区别最大，这是 Kubernetes 技术本质决定的
@@ -394,6 +383,22 @@ Kubernetes 对于内存使用暴露了不同的值：
 2. WorkingSet：比 memUsed 小一些，移除了一些“冷数据”，即长期没有访问的 cache 内存
 3. RSS：移除了 cache 的内存
 一般情况下，我们认为 WorkingSet 是比较合理的内存使用量指标
+
+### 整体设计
+
+[基于 eBPF 的 Kubernetes 一站式可观测性系统](https://mp.weixin.qq.com/s/npQg0lOjFVrIpEtu90ycZQ)
+1. 复杂度是永恒的，我们只能找到方法来管理它，无法消除它，云原生技术的引入虽然减少了业务应用的复杂度，但是在整个软件栈中，他只是将复杂度下移到容器虚拟化层，并没有消除。
+  ![](/public/upload/monitor/k8s_monitor.png)
+2. 我们以容器为核心，采集关联的 Kubernetes 可观测数据，与此同时，**向下**采集容器相关进程的系统和网络可观测数据，**向上**采集容器相关应用的性能数据，**通过关联关系将其串联起来，完成端到端可观测数据的覆盖**。
+3. 我们的数据类型包含了指标，日志和链路，采用了 open telemetry collector 方案支持统一的数据传输。背靠 ARMS 已有的基础设施，指标通过 ARMS Prometheus 进行存储，日志/链路通过 XTRACE 进行存储。PS： 应该是一个agent 支持采集日志、metrics、trace
+4. 使用路径：核心场景上支持架构感知、错慢请求分析、资源消耗分析、DNS 解析性能分析、外部性能分析、服务连通性分析和网络流量分析。支持这些场景的基础是产品在设计上遵循了从整体到个体的原则：**先从全局视图入手，发现异常的服务个体**，如某个 Service，定位到这个 Service 后查看这个 Service 的黄金指标、关联信息、Trace等进行进一步关联分析。
+5. datadog 的 CEO 在一次采访中直言 datadog 的产品策略不是支持越多功能越好，而是思考怎样在不同团队和成员之间架起桥梁，尽可能把信息放在同一个页面中（to bridge the gap between the teams and get everything on the same page）
+
+[在阿里巴巴，我们如何先于用户发现和定位 Kubernetes 集群问题？](https://mp.weixin.qq.com/s/MAgCortf5zXmWIAAIWjIow) 探测、巡检、根因分析。
+
+[基于 eBPF 的 Kubernetes 问题排查全景图](https://mp.weixin.qq.com/s/lK4yXuZOy6bS6qPe2pxD7A) 监测工具不是功能越多功能越好，而是要思考怎样在不同团队和成员之间架起桥梁，尽可能把信息放在同一个页面中。那么具体怎么关联呢？信息怎么组织呢？主要从两方面来看：
+1. 横向，端到端：展开说就是应用到应用，服务到服务，两者调用关系是关联的基础，因为调用才产生了联系。
+2. 纵向，以 Pod 为媒介，Kubernetes 层面关联 Workload、Service 等对象，基础设施层面可以关联节点、存储设备、网络等，应用层面关联日志、调用链路等。
 
 ## 其它
 

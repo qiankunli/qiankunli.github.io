@@ -63,6 +63,8 @@ ip link add link DEVICE [ name ] NAME
 
 ### netfilter 
 
+![](/public/upload/network/netfilter_location.png)
+
 [深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)Netfilter 是 Linux Kernel 的一种 hook 机制，**围绕网络层（IP 协议）的周围**埋下了五个钩子（Hooks），每当有数据包流到网络层，经过这些钩子时，就会自动触发由内核模块注册在这里的回调函数，程序代码就能够通过回调来干预 Linux 的网络通信。 5 个hook分别是 pre-routing、input、forword、output、post-routing。处理数据包的能力主要包括修改、跟踪、打标签、过滤等。一些要点:
 1. 主机上的所有数据包都将通过 netfilter 框架
 2. 在 netfilter 框架中有5个钩子点: PRE_ROUTING, INPUT, FORWARD, OUTPUT, POST_ROUTING

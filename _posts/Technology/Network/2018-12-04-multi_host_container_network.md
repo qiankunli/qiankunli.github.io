@@ -17,7 +17,7 @@ keywords: container network
 
 容器网络是Kubernetes最复杂部分，同时也是设计精华所在：
 1. 对于相同宿主机共享底层硬件设备问题，通常是借助虚拟化技术来实现，通过虚拟设备来实现灵活的管理，再将虚拟化设备连接到真实的物理设备上实现网络通信；
-2. 	对于跨宿主机网络通信问题，采用SDN软件定义网络的思路，灵活使用底层网络通信协议，同时结合各种虚拟化隧道通信技术，实现容器集群内外部通信。
+2. 对于跨宿主机网络通信问题，采用SDN软件定义网络的思路，灵活使用底层网络通信协议，同时结合各种虚拟化隧道通信技术，实现容器集群内外部通信。
 
 [Macvlan和IPvlan基础知识](https://mp.weixin.qq.com/s/r_CuqjypaaMRDZfW-RHjxw)运行裸机服务器时，主机网络可以很简单，只需很少的以太网接口和提供外部连接的默认网关。但当我们在一个主机中运行多个虚拟机时，需要在主机内和跨主机之间提供虚拟机之间的连接。一般，单个主机中的VM数量不超过15-20个。但在一台主机上运行Containers时，单个主机上的Containers数量很容易超过100个，需要有成熟的机制来实现Containers之间的网络互联。概括地说，容器或虚拟机之间有两种通信方式。在底层网络方法中，虚拟机或容器直接暴露给主机网络，Bridge、macvlan和ipvlan网络驱动程序都可以做到。在Overlay网络方法中，容器或VM网络和底层网络之间存在额外的封装形式，如VXLAN、NVGRE等。
 
@@ -49,14 +49,6 @@ keywords: container network
 
 ## Kubernetes IP-per-pod model
 
-Kubernetes 网络大致分为两大类，使用不同的技术
-1. 一类是 Cluster IP，是一层反向代理的虚拟ip；service/ingress，早期 kube-proxy 是采用 iptables，后来引入 IPVS 也解决了大规模容器集群的网络编排的性能问题。
-2. 一类是 Pod IP，容器间交互数据
-
-针对docker 跨主机通信时网络中一堆的NAT包，Kubernetes 提出IP-per-pod model ，这个 IP 是真正属于该 Pod 的，对这个 Pod IP 的访问就是真正对它的服务的访问，中间拒绝任何的变造。比如以 10.1.1.1 的 IP 去访问 10.1.2.1 的 Pod，结果到了 10.1.2.1 上发现，它实际上借用的是宿主机的 IP，而不是源 IP，这样是不被允许的。**在通信的两端Pod看来，以及整个通信链路中`<source ip,source port,dest ip,dest port>` 是不能改变的**。设计这个原则的原因是，用户不需要额外考虑如何建立Pod之间的连接，也不需要考虑如何将容器端口映射到主机端口等问题。
-
-Kubernetes 对怎么实现这个模型其实是没有什么限制的，用 underlay 网络来**控制外部路由器进行导流**是可以的；如果希望解耦，用 overlay 网络在底层网络之上再加一层叠加网，这样也是可以的。总之，只要达到模型所要求的目的即可。**因为`<source ip,source port,dest ip,dest port>`不能变，排除NAT/DAT，其实也就只剩下路由和解封包两个办法了**。
-
 [深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)主机A上的实例(容器、VM等)如何与主机B上的另一个实例通信?有很多解决方案:
 
 1. 直接路由: BGP等
@@ -67,7 +59,6 @@ Kubernetes 对怎么实现这个模型其实是没有什么限制的，用 under
 3. NAT: 例如docker的桥接网络模式
 4. 其它方式
 
-
 Rather than prescribing a certain networking solution, Kubernetes only states three fundamental requirements:
 
 * Containers can communicate with all other containers without NAT.
@@ -75,6 +66,16 @@ Rather than prescribing a certain networking solution, Kubernetes only states th
 * The IP a container sees itself is the same IP as others see it. each pod has its own IP address that other pods can find and use. 很多业务启动时会将自己的ip 发出去（比如注册到配置中心），这个ip必须是外界可访问的。 学名叫：flat address space across the cluster.
 
 Kubernetes requires each pod to have an IP in a flat networking namespace with full connectivity to other nodes and pods across the network. This IP-per-pod model yields a backward-compatible way for you to treat a pod almost identically to a VM or a physical host（**ip-per-pod 的优势**）, in the context of naming, service discovery, or port allocations. The model allows for a smoother transition from non–cloud native apps and environments.  这样就 no need to manage port allocation
+
+
+Kubernetes 网络大致分为两大类，使用不同的技术
+1. 一类是 Cluster IP，是一层反向代理的虚拟ip；service/ingress，早期 kube-proxy 是采用 iptables，后来引入 IPVS 也解决了大规模容器集群的网络编排的性能问题。
+2. 一类是 Pod IP，容器间交互数据
+
+针对docker 跨主机通信时网络中一堆的NAT包，Kubernetes 提出IP-per-pod model ，这个 IP 是真正属于该 Pod 的，对这个 Pod IP 的访问就是真正对它的服务的访问，中间拒绝任何的变造。比如以 10.1.1.1 的 IP 去访问 10.1.2.1 的 Pod，结果到了 10.1.2.1 上发现，它实际上借用的是宿主机的 IP，而不是源 IP，这样是不被允许的。**在通信的两端Pod看来，以及整个通信链路中`<source ip,source port,dest ip,dest port>` 是不能改变的**。设计这个原则的原因是，用户不需要额外考虑如何建立Pod之间的连接，也不需要考虑如何将容器端口映射到主机端口等问题。
+
+Kubernetes 对怎么实现这个模型其实是没有什么限制的，用 underlay 网络来**控制外部路由器进行导流**是可以的；如果希望解耦，用 overlay 网络在底层网络之上再加一层叠加网，这样也是可以的。总之，只要达到模型所要求的目的即可。**因为`<source ip,source port,dest ip,dest port>`不能变，排除NAT/DAT，其实也就只剩下路由和解封包两个办法了**。
+
 
 ## 跨主机通信
 

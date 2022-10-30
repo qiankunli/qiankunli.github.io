@@ -217,6 +217,34 @@ The pattern to follow is `APPNAME VERB NOUN --ADJECTIVE`. or `APPNAME COMMAND AR
 
 A flag is a way to modify the behavior of a command 这句说的很有感觉
 
+## pprof
+
+```go
+import (
+    ... ...
+    "net/http"
+    _ "net/http/pprof"
+    ... ...
+)
+... ...
+func main() {
+    go func() {
+        http.ListenAndServe(":6060", nil)
+    }()
+    ... ...
+}
+
+```
+以空导入的方式导入 net/http/pprof 包，并在一个单独的 goroutine 中启动一个标准的 http 服务，就可以实现对 pprof 性能剖析的支持。pprof 工具可以通过 6060 端口采样到我们的 Go 程序的运行时数据。
+```sh
+// 192.168.10.18为服务端的主机地址
+$go tool pprof -http=:9090 http://192.168.10.18:6060/debug/pprof/profile
+Fetching profile over HTTP from http://192.168.10.18:6060/debug/pprof/profile
+Saved profile in /Users/tonybai/pprof/pprof.server.samples.cpu.004.pb.gz
+Serving web UI on http://localhost:9090
+```
+debug/pprof/profile 提供的是 CPU 的性能采样数据。CPU 类型采样数据是性能剖析中最常见的采样数据类型。一旦启用 CPU 数据采样，Go 运行时会每隔一段短暂的时间（10ms）就中断一次（由 SIGPROF 信号引发），并记录当前所有 goroutine 的函数栈信息。它能帮助我们识别出代码关键路径上出现次数最多的函数，而往往这个函数就是程序的一个瓶颈。
+
 ## 其它
 
 组合一个struct 以方便我们给它加方法。比如 net.IP 是go 库的struct，想对ip 做一些扩充。就可以提供两个ip 的转换方法，以及扩充方法。

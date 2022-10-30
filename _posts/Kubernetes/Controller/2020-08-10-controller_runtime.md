@@ -57,6 +57,7 @@ podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 // 启动informer
 podInformer.Informer().Run(stopCh)
 cache.WaitForCacheSync(stopCh, podSynced)
+// 此处没有使用workqueue，但一般都是会用workqueue 增强处理逻辑的
 ```
 
 单纯基于 client-go informer 可以监听 object 变化并做出处理，但仍然有很多问题，还需进一步的封装，于是引出了controller-runtime。

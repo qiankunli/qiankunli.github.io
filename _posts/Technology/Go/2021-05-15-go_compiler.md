@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: go编译器
+title: go编译器以及defer实现
 category: 技术
 tags: Go
-keywords: go compiler
+keywords: go compiler defer
 
 ---
 
@@ -23,6 +23,7 @@ keywords: go compiler
 SSA-IR（Single Static Assignment）是一种介于高级语言和汇编语言的中间形态的伪语言，从高级语言角度看，它是（伪）汇编；而从真正的汇编语言角度看，它是（伪）高级语言。顾名思义，SSA（Single Static Assignment）的两大要点是：
 1. Static：每个变量只能赋值一次（因此应该叫常量更合适）；
 2. Single：每个表达式只能做一个简单运算，对于复杂的表达式a*b+c*d要拆分成："t0=a*b; t1=c*d; t2=t0+t1;"三个简单表达式；
+
 
 ## go编译器
 
@@ -169,6 +170,7 @@ type g struct {
 }
 ```
 ### 栈上分配
+
 在栈上创建 defer， 直接在函数调用帧上使用编译器来初始化 _defer 记录
 ```go
 func main() {
@@ -179,6 +181,7 @@ func main() {
     return
 }
 ```
+
 ### 开放编码式
 
 允许进行 defer 的开放编码的主要条件：没有禁用编译器优化，即没有设置 -gcflags "-N"；存在 defer 调用；函数内 defer 的数量不超过 8 个、且返回语句与延迟语句个数的乘积不超过 15；没有与 defer 发生在循环语句中。
@@ -330,30 +333,33 @@ func gopanic(e interface{}) {
 
 首先是确定 panic 是否可恢复（一系列条件），对可恢复panic，创建一个 _panic 实例，保存在 goroutine 链表中先前的 panic 链表，接下来开始逐一调用当前 goroutine 的 defer 方法， 检查用户态代码是否需要对 panic 进行恢复，如果某个包含了 recover 的调用（即 gorecover 调用）被执行，这时 _panic 实例 p.recovered 会被标记为 true， 从而会通过 mcall 的方式来执行 recovery 函数来重新进入调度循环，如果所有的 defer 都没有指明显式的 recover，那么这时候则直接在运行时抛出 panic 信息
 
-## pprof
 
-```go
-import (
-    ... ...
-    "net/http"
-    _ "net/http/pprof"
-    ... ...
-)
-... ...
-func main() {
-    go func() {
-        http.ListenAndServe(":6060", nil)
-    }()
-    ... ...
+
+## 其它
+
+### build tag
+
+在Go中，build tag是添加到我们的代码中第一行，来标识编译相关的信息。其决定了当前文件是否会被当前 package 所包含。用于限制一整个文件是否应该被编译入最终的二进制文件，而不是一个文件中的部分代码片段。
+
+```
+project
+	main.go
+	dev.go
+	prod.go
+	test.go
+
+# dev.go
+// +build dev
+package main
+func init() {
+    configArr = append(configArr, "mysql dev")
 }
+# prod.go
+// +build prod
+package main
+func init() {
+    configArr = append(configArr, "mysql prod")
+}
+```
 
-```
-以空导入的方式导入 net/http/pprof 包，并在一个单独的 goroutine 中启动一个标准的 http 服务，就可以实现对 pprof 性能剖析的支持。pprof 工具可以通过 6060 端口采样到我们的 Go 程序的运行时数据。
-```sh
-// 192.168.10.18为服务端的主机地址
-$go tool pprof -http=:9090 http://192.168.10.18:6060/debug/pprof/profile
-Fetching profile over HTTP from http://192.168.10.18:6060/debug/pprof/profile
-Saved profile in /Users/tonybai/pprof/pprof.server.samples.cpu.004.pb.gz
-Serving web UI on http://localhost:9090
-```
-debug/pprof/profile 提供的是 CPU 的性能采样数据。CPU 类型采样数据是性能剖析中最常见的采样数据类型。一旦启用 CPU 数据采样，Go 运行时会每隔一段短暂的时间（10ms）就中断一次（由 SIGPROF 信号引发），并记录当前所有 goroutine 的函数栈信息。它能帮助我们识别出代码关键路径上出现次数最多的函数，而往往这个函数就是程序的一个瓶颈。
+使用`go build  -tags "dev"`，执行二进制文件，会输出 `mysql dev`。

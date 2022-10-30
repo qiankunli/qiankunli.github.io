@@ -371,4 +371,6 @@ golang设计思路为，值和类型划分的非常清晰，两条腿走路。Go
 
 ## 其它
 
+我们经常看到结构体字段后面，会跟一个反引号括起来的键值对字符串，格式是：`key:"value"`，并且可以使用多个，中间用空格隔开，信息内容是任意定义的。这种语法在Golang中叫做标签Tag，**类似其他语言中的注解（Annotation）**，可以通过Golang的反射机制（reflect.StructTag）来解析。
+
 ![](/public/upload/go/go_interface_object.png)

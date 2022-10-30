@@ -35,9 +35,13 @@ keywords:  集群
 2. 基于 Virtual Kubelet：Virtual Kubelet 本质上是允许我们冒充 Kubelet 的行为来管理 virtual node 的机制。这个 virtual node 的背后可以是任何物件，只要 virtual  node 能够做到上报 node 状态、和 pod 的生命周期管理。PS: 这导致后续干预多集群调度比较难，因为进行任何改动都不能超越kubelet 所提供的能力。
 
 [多云能力建设问题域总结](https://mp.weixin.qq.com/s/alWgDFawsQKc69h-EQZ0uw)要解决的几个问题
-1. 应用分发模型。即用户创建的Deployment 的多个pod最终落在哪个集群中，如何表达这个诉求？是优先落在一个集群，还是各个集群都摊一点。用户创建的Deployment 存在哪里？假如deployment有10个pod，两个cluster 分别运行2/8 个pod，用户创建的deployment 的status 等字段如何感知真实情况？
+1. 应用分发模型。
+  1. 用户创建的Deployment 存在哪里？比如kubefed v2 部署Kubernetes资源需要熟悉一套的全新API，例如FederatedDeployment。
+  1. 即用户创建的Deployment 的多个pod最终落在哪个集群中，如何表达这个诉求？是优先落在一个集群，还是各个集群都摊一点。
+  3. 假如deployment有10个pod，两个cluster 分别运行2/8 个pod，用户创建的deployment 的status 等字段如何感知真实情况？如何方便的查看 deployment 当前在各个cluster的分布与状态。
 2. 在不同的集群下发的模型怎样做到差异化？
 3. 怎样设计和解决在多集群的背景下，有状态服务的调度机制和访问机制？
+4. 多集群监控 [阿里云注册集群+Prometheus 解决多云容器集群运维痛点](https://mp.weixin.qq.com/s/Sud0TtLWk6lQUKmCPMN12A)
 
 ## clusternet 
 
@@ -151,6 +155,8 @@ scheduler 如何为 deployment 选择cluster ？
 
 ## Karmada
 
+[K8S多集群管理很难？试试Karmada ](https://mp.weixin.qq.com/s/B4GXregwfaLNWoIr0-0s9g)
+
 [如何管理多个Kubernetes集群？](https://mp.weixin.qq.com/s/alWgDFawsQKc69h-EQZ0uw)
 
 ![](/public/upload/kubernetes/karmada_overview.png)
@@ -232,14 +238,23 @@ spec:
           foo: bar
 ```
 
-### 实现分析
+### 整体设计
+
+karmada 分发资源到成员集群涉及的相关资源资源可分为：
+1. 用于设定策略的资源：PropagationPolicy，OverridePolicy。
+2. 执行策略相关的资源：ResourceBinding，ClusterResourceBinding， Work。
 
 ![](/public/upload/kubernetes/karmada_object.png)
 
 1. Cluster Controller: attaches kubernetes clusters to Karmada for managing the lifecycle of the clusters by creating cluster objects.
 2. Policy Controller: watches PropagationPolicy objects. When a PropagationPolicy object is added, the controller selects a group of resources matching the resourceSelector and create ResourceBinding with each single resource object.
-3. Binding Controller: watches ResourceBinding objects and create a Work object corresponding to each cluster with a single resource manifest.
+3. Binding Controller: watches ResourceBinding objects and create a Work object corresponding to each cluster with a single resource manifest. 
 4. Execution Controller: watches Work objects. When Work objects are created, the controller will distribute the resources to member clusters.
+
+karmada 会为每一个分发的资源每个目标成员集群的执行命名空间（karmada-es-*)中创建一个 work。具体的说，BindingController 根据 Resource Binging 资源内容创建 work 资源到各个成员集群的执行命名空间, work 中描述了要分到目标集群的资源列表。被分发的资源不区分是自定义资源还是 kubernetes 内置资源先被转化为 Unstructured 类型的数据，然后在 woker 中以 JSON 字节流的形式保存，然后在 execution_controller 中再反序列化，解析出 GVR，通过 dynamicClusterClient 在目标成员集群中创建指定分发资源。
+
+
+### 源码分析
 
 ResourceDetector 组件监听 用户创建的object，查找 object 匹配的 PropagationPolicy 并创建ResourceBinding
 ```
@@ -279,6 +294,78 @@ ResourceBindingController.Reconcile ==> syncBinding
 [Kubernetes多集群管理利器：Karmada 控制器](https://mp.weixin.qq.com/s/gUbq78C4JcunTKeJiui3bw)
 [K8s 多集群管理 -- Karmada 调度器](https://mp.weixin.qq.com/s/OdRMAPxV1lPGhsKivSYH_Q)
 [多云环境下的资源调度：Karmada scheduler的框架和实现](https://mp.weixin.qq.com/s/RvnEMpK7l9bqbQCrbPqBPQ)
+
+### 集群调度
+
+[karmada调度策略想要实现，这三个组件必须了解](https://mp.weixin.qq.com/s/5GjeIiCRA9oql1wwweT13Q)karmada-scheduler 的主要作用就是将 k8s 原生 API 资源对象（包含 CRD 资源）调度到成员集群上。
+
+```
+karmada
+  /cmd
+    /scheduler
+      /main.go
+  /pkg
+    /scheduler
+      /cache
+      /core
+      /framework
+      /metrics
+      /event_handler.go
+      /scheduler.go
+```
+
+
+Scheduler.Run ==> worker ==> scheduleNext ==> doSchedule ==> doScheduleBinding，ClusterResourceBindings/ResourceBindings 的add和update，ClusterPropagationPolicies/PropagationPolicies 的update，Clusters的add/update/delete 事件都会 找到事件相关的 ClusterResourceBindings/ResourceBinding 加入到workqueue 来触发Schedule。
+
+```go
+// karmada/pkg/scheduler/scheduler.go
+func (s *Scheduler) doScheduleBinding(namespace, name string) (err error) {
+	rb, err := s.bindingLister.ResourceBindings(namespace).Get(name)
+	policyPlacement, policyPlacementStr, err := s.getPlacement(rb)  // 作为下面几种情况的判断了解
+  // policy placement changed, need schedule
+  err = s.scheduleResourceBinding(rb)
+  // binding replicas changed, need reschedule
+	// Duplicated resources should always be scheduled. Note: non-workload is considered as duplicated even if scheduling type is divided.
+	// TODO(dddddai): reschedule bindings on cluster change
+	klog.V(3).Infof("Don't need to schedule ResourceBinding(%s/%s)", namespace, name)
+	return nil
+}
+func (s *Scheduler) scheduleResourceBinding(resourceBinding *workv1alpha2.ResourceBinding) (err error) {
+	placement, placementStr, err := s.getPlacement(resourceBinding)
+	scheduleResult, err := s.Algorithm.Schedule(context.TODO(), &placement, &resourceBinding.Spec, &core.ScheduleAlgorithmOption{EnableEmptyWorkloadPropagation: s.enableEmptyWorkloadPropagation})
+	return s.patchScheduleResultForResourceBinding(resourceBinding, placementStr, scheduleResult.SuggestedClusters)
+}
+```
+
+
+```go
+// karmada/pkg/scheduler/core/generic_scheduler.go
+func (g *genericScheduler) Schedule(..., placement *policyv1alpha1.Placement, spec *.ResourceBindingSpec, scheduleAlgorithmOption) (ScheduleResult, error) {
+	clusterInfoSnapshot := g.schedulerCache.Snapshot()
+	if clusterInfoSnapshot.NumOfClusters() == 0 {
+		return result, fmt.Errorf("no clusters available to schedule")
+	}
+  // filter 逻辑
+	feasibleClusters, err := g.findClustersThatFit(ctx, g.scheduleFramework, placement, spec, clusterInfoSnapshot)
+	if len(feasibleClusters) == 0 {
+		return result, fmt.Errorf("no clusters fit")
+	}
+	klog.V(4).Infof("feasible clusters found: %v", feasibleClusters)
+  // score 逻辑
+	clustersScore, err := g.prioritizeClusters(ctx, g.scheduleFramework, placement, spec, feasibleClusters)
+	klog.V(4).Infof("feasible clusters scores: %v", clustersScore)
+  // selects the cluster set based the GroupClustersInfo,placement and spreadConstraint
+	clusters, err := g.selectClusters(clustersScore, placement, spec)
+	klog.V(4).Infof("selected clusters: %v", clusters)
+  // 根据分发策略 计算 选中的cluster 分领几个replica
+	clustersWithReplicas, err := g.assignReplicas(clusters, placement.ReplicaScheduling, spec)
+	if scheduleAlgorithmOption.EnableEmptyWorkloadPropagation {
+		clustersWithReplicas = attachZeroReplicasCluster(clusters, clustersWithReplicas)
+	}
+	result.SuggestedClusters = clustersWithReplicas
+	return result, nil
+}
+```
 
 ## 其它
 

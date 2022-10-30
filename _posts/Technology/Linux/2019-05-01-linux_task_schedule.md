@@ -182,7 +182,7 @@ struct task_struct{
 }
 ```
 
-CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，task_struct.sched_entity里面有一个重要的变量vruntime，来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的。PS， vruntime 正是理解 docker --cpu-shares 的钥匙。
+CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，task_struct.sched_entity里面有一个重要的变量vruntime，来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的。PS：vruntime 正是理解 docker --cpu-shares 的钥匙。
 
 ```c
 /*
