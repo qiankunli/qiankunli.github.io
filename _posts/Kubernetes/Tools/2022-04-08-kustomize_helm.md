@@ -42,7 +42,7 @@ k8s
 
 ## helm
 
-Helm 一开始的目标就很明确：如果说 Kubernetes 是云原生操作系统的话，那 Helm 就要成为这个操作系统上面的应用商店与包管理工具。如 Debian 系的 apt-get 命令与 dpkg 格式、RHEL 系的 yum 命令与 rpm 格式，Helm 主要用来管理 Chart 包，Helm Chart 包中包含一系列 YAML 格式的 Kubernetes 资源/object定义文件，以及这些资源的配置，可以通过 Helm Chart 包来整体维护这些资源。
+Helm 一开始的目标就很明确：如果说 Kubernetes 是云原生操作系统的话，那 **Helm 就要成为这个操作系统上面的应用商店与包管理工具**。如 Debian 系的 apt-get 命令与 dpkg 格式、RHEL 系的 yum 命令与 rpm 格式，Helm 主要用来管理 Chart 包，Helm Chart 包中包含一系列 YAML 格式的 Kubernetes 资源/object定义文件，以及这些资源的配置，可以通过 Helm Chart 包来整体维护这些资源。
 
 [Kubernetes应用管理深度剖析](https://mp.weixin.qq.com/s/9o2m03veD5hP7mUbCirftg)完整的应用通常不只是简单的deployment，StatefulSet等负载资源，通常还包括配套的service, PV/PVC, configmap等一系列资源。我们在进行实例下发、升级、更新换代等一系列生命周期操作时，这些资源都需要统筹考虑。Kubernetes只面向Kubernetes资源对象，而Helm则真正意义上定义了Kuberentes App的边界。
 

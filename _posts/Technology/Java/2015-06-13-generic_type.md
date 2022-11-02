@@ -146,9 +146,4 @@ Playground.java:12: error: name clash: sayHello(ArrayList<Integer>) and sayHello
 
 [java泛型（一）、泛型的基本介绍和使用][]
     
-
-
-
-
-
 [java泛型（一）、泛型的基本介绍和使用]: http://blog.csdn.net/lonelyroamer/article/details/7864531

@@ -315,7 +315,10 @@ karmada
 ```
 
 
-Scheduler.Run ==> worker ==> scheduleNext ==> doSchedule ==> doScheduleBinding，ClusterResourceBindings/ResourceBindings 的add和update，ClusterPropagationPolicies/PropagationPolicies 的update，Clusters的add/update/delete 事件都会 找到事件相关的 ClusterResourceBindings/ResourceBinding 加入到workqueue 来触发Schedule。
+Scheduler.Run ==> worker ==> scheduleNext ==> doSchedule ==> doScheduleBinding，ClusterResourceBindings/ResourceBindings 的add和update，ClusterPropagationPolicies/PropagationPolicies 的update，Clusters的add/update/delete 事件都会 找到事件相关的 ClusterResourceBindings/ResourceBinding 加入到workqueue 来触发Schedule。实现了三种场景的调度：
+1. 分发资源时选择目标集群的规则变了
+2. 副本数变了，即扩缩容调度
+3. 故障恢复调度，当被调度的成员集群状态不正常时会触发重新调度
 
 ```go
 // karmada/pkg/scheduler/scheduler.go
@@ -337,6 +340,33 @@ func (s *Scheduler) scheduleResourceBinding(resourceBinding *workv1alpha2.Resour
 }
 ```
 
+对于一个 PropagationPolicy 示例
+
+```yaml
+apiVersion: policy.karmada.io/v1alpha1
+kind: PropagationPolicy
+metadata:
+  name: test-propagation
+spec:
+  ...
+  placement:
+    clusterAffinity:
+      clusterNames:
+        - member1
+        - member2
+  spreadConstraints:	## 限定调度结果只能在 1 个cluster 上
+  - spreadByField: cluster
+    maxGroups: 1
+    minGroups: 1
+  replicaScheduling:
+    replicaDivisionPreference: Weighted #划分副本策略
+    replicaSchedulingType: Divided  #调度副本策略
+```
+调度过程除了通用的预选、优选外，包括集群调度特有的 分发限制 和 副本拆分策略。
+1. 预选/过滤，已有插件：APIInstalled/ClusterAffinity/SpreadConstraint/TaintToleration
+2. 优选/打分，已有插件：ClusterLocality
+3. 考虑 SpreadConstraint，选择资源足够运行crd 的 cluster集合，且满足 spreadConstraint的要求， 比如应用最多分发到2个cluster上。
+4. 考虑 ReplicaSchedulingStrategy，如果配了divided 分发策略，决定如何将crd 拆分到各个cluster的具体 replica
 
 ```go
 // karmada/pkg/scheduler/core/generic_scheduler.go
@@ -354,7 +384,7 @@ func (g *genericScheduler) Schedule(..., placement *policyv1alpha1.Placement, sp
   // score 逻辑
 	clustersScore, err := g.prioritizeClusters(ctx, g.scheduleFramework, placement, spec, feasibleClusters)
 	klog.V(4).Infof("feasible clusters scores: %v", clustersScore)
-  // selects the cluster set based the GroupClustersInfo,placement and spreadConstraint
+  // selectClusters 先用 ReplicaEstimator 计算每一个cluster.AvailableReplicas，选择出一个cluster集合可以运行 crd，且满足 spreadConstraint的要求
 	clusters, err := g.selectClusters(clustersScore, placement, spec)
 	klog.V(4).Infof("selected clusters: %v", clusters)
   // 根据分发策略 计算 选中的cluster 分领几个replica

@@ -45,6 +45,9 @@ Span 的数据结构应该足够简单，以便于能放在日志或者网络协
 
 [分布式链路追踪在字节跳动的实践](https://mp.weixin.qq.com/s/a0Pm26-8toNKz0brrRVG4Q) 未读
 
+[一文看懂分布式链路监控系统](https://mp.weixin.qq.com/s/3ONVrA2_UmM9qbOPdGOrxA) 未读
+
 [企业如何从 0 到 1 构建整套全链路追踪体系](https://mp.weixin.qq.com/s/wzf3J3dljfESg4X9hS8UKQ)
+
 
 

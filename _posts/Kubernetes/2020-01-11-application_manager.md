@@ -3,7 +3,7 @@
 layout: post
 title: 以应用为中心
 category: 架构
-tags: Architecture
+tags: Kubernetes
 keywords: application
 
 ---
@@ -15,11 +15,13 @@ keywords: application
 
 [解读容器 2019：把“以应用为中心”进行到底](https://www.kubernetes.org.cn/6408.html)云原生的本质是一系列最佳实践的结合；更详细的说，云原生为实践者指定了一条低心智负担的、能够以可扩展、可复制的方式最大化地利用云的能力、发挥云的价值的最佳路径。这种思想，以一言以蔽之，就是“以应用为中心”。正是因为以应用为中心，云原生技术体系才会无限强调**让基础设施能更好的配合应用**、以更高效方式为应用“输送”基础设施能力，而不是反其道而行之。而相应的， Kubernetes 、Docker、Operator 等在云原生生态中起到了关键作用的开源项目，就是让这种思想落地的技术手段。
 
+脉络：可扩展性 ==> oam(比如如何定义能力之间的冲突关系与协作关系)
+
 ## k8s 的问题
 
 ### K8s 的 API 没有“应用”的概念
 
-[上 Kubernetes 有什么业务价值？](https://mp.weixin.qq.com/s/a3NE5fSpZIM9qlOofGTMWQ)Kubernetes 作为一个面向基础设施工程师的系统级项目，主要负责提供松耦合的基础设施语义。 K8s 不是一个 PaaS 或者应用管理的平台。实际上它是一个标准化的能力接入层。实际上通过 Kubernetes 对用户暴露出来的是一组声明式 API，这些声明式 API 无论是 Pod 还是 Service 都是对底层基础设施的一个抽象。比如 Pod 是对一组容器的抽象，而 Deployment 是对一组 pod 的抽象。而 **Service 作为 Pod 的访问入口，实际上是对集群基础设施：网络、网关、iptables 的一个抽象**。Node 是对宿主机的抽象。Kubernetes 还提供了我们叫做 CRD（也就是 Custom Resource）的自定义对象。让你自己能够自定义底层基础设施的一个抽象。Kubernetes 他的专注点是“如何标准化的接入来自于底层，无论是容器、虚机、负载均衡各种各样的一个能力，然后通过声明式 API 的方式去暴露给用户”。
+[上 Kubernetes 有什么业务价值？](https://mp.weixin.qq.com/s/a3NE5fSpZIM9qlOofGTMWQ)Kubernetes 作为一个面向基础设施工程师的系统级项目，主要负责提供松耦合的基础设施语义。 **K8s 不是一个 PaaS 或者应用管理的平台**。实际上它是一个标准化的能力接入层。实际上通过 Kubernetes 对用户暴露出来的是一组声明式 API，这些声明式 API 无论是 Pod 还是 Service 都是对底层基础设施的一个抽象。比如 Pod 是对一组容器的抽象，而 Deployment 是对一组 pod 的抽象。而 **Service 作为 Pod 的访问入口，实际上是对集群基础设施：网络、网关、iptables 的一个抽象**。Node 是对宿主机的抽象。Kubernetes 还提供了我们叫做 CRD（也就是 Custom Resource）的自定义对象。让你自己能够自定义底层基础设施的一个抽象。Kubernetes 他的专注点是“如何标准化的接入来自于底层，无论是容器、虚机、负载均衡各种各样的一个能力，然后通过声明式 API 的方式去暴露给用户”。
 
 ![](/public/upload/kubernetes/kubernetes_fault.png)
 
@@ -37,6 +39,8 @@ Kubernetes 实际上是面向平台开发者，而不是面向研发和应用运
 
 ## Open Application Model （OAM）
 
+### 为什么
+
 [给 K8s API “做减法”：阿里巴巴云原生应用管理的挑战和实践](https://mp.weixin.qq.com/s/u3CxlpBYk4Fw3L3l1jxh-Q)
 
 Kubernetes 的核心 API 资源比如 Service、Deployment 等，实际上只是应用中的不同组成部分，并不能代表一个应用的全部。也许我们可以通过像 Helm charts 这样的方式来尝试表达一个可部署的应用，可一旦部署起来，实际运行的应用中却依旧缺乏以应用为中心的约束模型。这些问题都反映出，Kubernetes 以及云原生技术栈需要一种以应用为中心的 API 资源来提供一个专注于应用管理的、标准的、高度一致的模型，**这个 API 资源可以代表完整运行的应用本身**，而不仅仅是应用模板或者一个应用的几个组成部分，这就是今天阿里云与微软联合宣布推出开放应用模型 Open Application Model （OAM）的原因。
@@ -44,6 +48,8 @@ Kubernetes 的核心 API 资源比如 Service、Deployment 等，实际上只是
 [KubeVela：标准化的云原生平台构建引擎](KubeVela：标准化的云原生平台构建引擎)
 
 ![](/public/upload/kubernetes/kubevela_application.png)
+
+### oam 应用模型
 
 与 PaaS 应用模型相比，OAM 有很多独有的特点，其中最重要一点是：平台无关性。虽然我们目前发布的 OAM 实现是基于 Kubernetes 的，但 Open Application Model 与 Kubernetes 并没有强耦合。
 
@@ -58,10 +64,8 @@ OAM 支持  Kubernetes 内置的工作负载，那什么时候该使用 Deployme
 2. 为 Kubernetes 项目**带来了应用定义**。站在 Kubernetes 项目的角度来讲，OAM 是一个 Kubernetes 原生的标准的“应用定义”项目，同时也是一个专注于封装、组织和管理 Kubernetes 中各种“运维能力”、以及连接“运维能力”与“应用”的平台层框架。OAM 基于 Kubernetes API 资源模型（Kubernetes Resource Model）来标准化应用定义的规范，它强调一个现代应用是多个组件的集合，而非一个简单的工作负载或者 K8s Operator。所以在 OAM 的语境中，一个 PHP 容器和它所依赖的数据库，以及它所需要使用的各种云服务，都是一个“电商网站”应用的组成部分。更进一步的，OAM 把这个应用所需的“运维策略”也认为是一个应用的一部分，比如这个 PHP 容器所需的 HPA（水平自动扩展策略）
 3. 基于 OAM 暴露出来的新的 API 之后，上层的UI（也可以认为是应用平台）构建起来会非常简单。 OAM 天然分为工作负载和运维特征两类， UI 这层可以直接去对接了，会减少很多前端的工作。因为 GitOps 也好，持续集成也好，是不想管你的 pod 或者是 Deployment 怎么生成的，这个应用怎么运维，怎么 run 起来，还是要靠 Kubernetes 插件或者内置能力去做的。这些能力都被定义到一个自包含的文件，适用于所有集群。这就会使得你的 GitOps 和持续集成变得简单。**这样的系统真正做到了标准，自运维**，一个以应用为中心和用户为中心的 Kubernetes 平台。
 
-
 [如何构建以应用为中心的“Kubernetes”?](https://mp.weixin.qq.com/s/ql_AIFc0s5HwZgsML63zQA)Application Configuration 就像是一个信封，将 Traits 绑定给 Component，这个是显式绑定的。**OAM 里面不建议去使用 Label 这样的松耦合的方式去关联你的工作负载**。建议通过这种结构化的方式，通过 CRD 去显式的绑定你的特征和工作负载。这样的好处是我的绑定关系是可管理的。可以通过 kubectl get 看到这个绑定关系。作为管理员或者用户，就非常容易的看到某一个组件绑定的所有运维能力有哪些，这是可以直接展示出来的，如果通过 label 是很难做到的。同时 Label 本身有个问题是，本身不是版本化的，不是结构体，很难去升级，很难去扩展。通过这么结构化定义，后面的升级扩展将会变得非常简单。 
 
-[KubeVela 是如何将 appfile 转换为 K8s 特定资源对象的](https://mp.weixin.qq.com/s/xXuewzEZQgwXfqMI4mhVow)
 
 ## 未来
 
