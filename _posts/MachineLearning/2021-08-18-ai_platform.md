@@ -284,6 +284,11 @@ https://github.com/tencentmusic/cube-studio/wiki
 3. 弹性伸缩
 4. GPU 共享调度、GPU 拓扑感知调度。对于使用梯度下降优化的算法，多 GPU 卡之间需要频繁传输数据，数据通信带宽往往成为限制 GPU 计算性能的瓶颈。GPU 拓扑感知调度功能，通过获取计算节点上所有 GPU 卡间连接拓扑结构，调度器为多卡训练任务选择 GPU 资源时，根据拓扑信息考虑 NVLINK，PCIe Switch，QPI 以及 RDMA 网卡等所有互联链路，自动选择出能够提供最大通信带宽的 GPU 卡组合，避免带宽限制影响 GPU 计算效率。
 
+### 依托平台
+
+[Serverless 架构下的 AI 应用开发](https://mp.weixin.qq.com/s/g9qYbG0A2JZajv6JCdpkwQ) 
+
+[基于 KubeVela 的机器学习实践](https://mp.weixin.qq.com/s/g9qYbG0A2JZajv6JCdpkwQ)
 
 ## 其它
 

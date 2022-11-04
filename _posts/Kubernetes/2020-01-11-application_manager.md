@@ -15,7 +15,7 @@ keywords: application
 
 [解读容器 2019：把“以应用为中心”进行到底](https://www.kubernetes.org.cn/6408.html)云原生的本质是一系列最佳实践的结合；更详细的说，云原生为实践者指定了一条低心智负担的、能够以可扩展、可复制的方式最大化地利用云的能力、发挥云的价值的最佳路径。这种思想，以一言以蔽之，就是“以应用为中心”。正是因为以应用为中心，云原生技术体系才会无限强调**让基础设施能更好的配合应用**、以更高效方式为应用“输送”基础设施能力，而不是反其道而行之。而相应的， Kubernetes 、Docker、Operator 等在云原生生态中起到了关键作用的开源项目，就是让这种思想落地的技术手段。
 
-脉络：可扩展性 ==> oam(比如如何定义能力之间的冲突关系与协作关系)
+脉络：k8s yaml太多 ==> kustomize/helm（helm values.yaml太随意了） ==> 弄一个paas平台封装一下k8s==> 可扩展性（封装的标准化、可复用） ==> OAM
 
 ## k8s 的问题
 
@@ -27,7 +27,7 @@ keywords: application
 
 [给 K8s API “做减法”：阿里巴巴云原生应用管理的挑战和实践](https://mp.weixin.qq.com/s/u3CxlpBYk4Fw3L3l1jxh-Q)Kubernetes API 的设计把研发、运维还有基础设施关心的事情全都糅杂在一起了。这导致研发觉得 K8s 太复杂，运维觉得 K8s 的能力非常凌乱、零散，不好管理。很多 PaaS 平台只允许开发填 Deployment 的极个别字段。为什么允许填的字段这么少？是平台能力不够强吗？其实不是的，本质原因在于业务开发根本不想理解这众多的字段。归根到底，Kubernetes 是一个 Platform for Platform 项目，**它的设计是给基础设施工程师用来构建其他平台用的（比如 PaaS 或者 Serverless），而不是直面研发和运维同学的**。从这个角度来看，Kubernetes 的 API，其实可以类比于 Linux Kernel 的 System Call，这跟研发和运维真正要用的东西（Userspace 工具）完全不是一个层次上的。
 
-K8s 实在是太灵活了，插件太多了，各种人员开发的 Controller 和 Operator 也非常多
+K8s 实在是太灵活了，插件太多了，各种人员开发的 Controller 和 Operator 也非常多，上k8s带来的成本已经超过带来的业务效率的提升了。
 
 ### 基于k8s 做一个应用管理平台
 
@@ -35,7 +35,11 @@ Kubernetes 实际上是面向平台开发者，而不是面向研发和应用运
 
 ![](/public/upload/kubernetes/application_manager_based_on_k8s.png)
 
-几乎所有的 PaaS 都会存在这么一个问题：它往上暴露的是一个用户友好的API，但是不可扩展的，是个有限集。有自己的一套 API，自己的理念，自己的模型，自己的使用方式。跟 Kubernetes 都是不太一样的，会把 K8s 的能力完全遮住。我们能不能抛弃传统 PaaS 的一个做法，基于 K8s 打造高可扩展的应用管理平台。我们想办法能把 K8s 能力无缝的透给用户，同时又能提供传统 PaaS 比较友好的面向研发运维的使用体验呢？我们不是说要在 Kubernetes 上盖一个 PaaS，因为 K8s 本身可以扩展，可以写一组 CRD，把我们要的 API 给装上去。
+几乎所有的 PaaS 都会存在这么一个问题：它往上暴露的是一个用户友好的API，但是不可扩展的，是个有限集。有自己的一套 API，自己的理念，自己的模型，自己的使用方式。跟 Kubernetes 都是不太一样的，会把 K8s 的能力完全遮住。
+
+![](/public/upload/kubernetes/multi_pass.png)
+
+我们能不能抛弃传统 PaaS 的一个做法，基于 K8s 打造高可扩展的应用管理平台。我们想办法能把 K8s 能力无缝的透给用户，同时又能提供传统 PaaS 比较友好的面向研发运维的使用体验呢？我们不是说要在 Kubernetes 上盖一个 PaaS，因为 K8s 本身可以扩展，可以写一组 CRD，把我们要的 API 给装上去。
 
 ## Open Application Model （OAM）
 

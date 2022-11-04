@@ -215,27 +215,32 @@ runit 工作原理
 
 supervisord.conf
 
-	[supervisord]
-	nodaemon=true
-	logfile=/dev/stdout
-	loglevel=debug
-	logfile_maxbytes=0
-	
-	[program:pinggoogle]
-	command=ping admatic.in
-	autostart=true
-	autorestart=true
-	startsecs=5
-	stdout_logfile=NONE
-	stderr_logfile=NONE
+```
+[supervisord]
+nodaemon=true
+logfile=/dev/stdout
+loglevel=debug
+logfile_maxbytes=0
+
+[program:pinggoogle]
+command=ping admatic.in
+autostart=true
+autorestart=true
+startsecs=5
+stdout_logfile=NONE
+stderr_logfile=NONE
+```
 	
 Dockerfile
 	
-	FROM ubuntu
-	...
-	COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-	...
-	CMD ["/usr/bin/supervisord"]
+```
+FROM ubuntu
+...
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+...
+CMD ["/usr/bin/supervisord"]
+```
+
 ## 其它
 
 ### Docker-friendliness image
@@ -259,9 +264,9 @@ github 有一个 [phusion/baseimage-docker](https://github.com/phusion/baseimage
 
 ### 和ssh的是是非非
 
-2020.07.17 补充：随着web console 工具（底层由kubectl exec支持）不及，ssh 渐渐没有必要了。
+随着web console 工具（底层由kubectl exec支持）不及，ssh 渐渐没有必要了。[K8S 故障排错新手段：kubectl debug实战](https://mp.weixin.qq.com/s/G5w4dmsk0jnUn19o0EI5Qg)
 
-2018.12.01 补充： [ssh连接远程主机执行脚本的环境变量问题](http://feihu.me/blog/2014/env-problem-when-ssh-executing-command-on-remote/)
+[ssh连接远程主机执行脚本的环境变量问题](http://feihu.me/blog/2014/env-problem-when-ssh-executing-command-on-remote/)
 
 背景：
 
