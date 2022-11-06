@@ -15,7 +15,7 @@ keywords: application
 
 [解读容器 2019：把“以应用为中心”进行到底](https://www.kubernetes.org.cn/6408.html)云原生的本质是一系列最佳实践的结合；更详细的说，云原生为实践者指定了一条低心智负担的、能够以可扩展、可复制的方式最大化地利用云的能力、发挥云的价值的最佳路径。这种思想，以一言以蔽之，就是“以应用为中心”。正是因为以应用为中心，云原生技术体系才会无限强调**让基础设施能更好的配合应用**、以更高效方式为应用“输送”基础设施能力，而不是反其道而行之。而相应的， Kubernetes 、Docker、Operator 等在云原生生态中起到了关键作用的开源项目，就是让这种思想落地的技术手段。
 
-脉络：k8s yaml太多 ==> kustomize/helm（helm values.yaml太随意了） ==> 弄一个paas平台封装一下k8s==> 可扩展性（封装的标准化、可复用） ==> OAM
+脉络：直接操作物理机细节太多，k8s 给了我们机会 将一切操作api化 ==> k8s yaml太多，且不同workload不统一，不同云厂商不一定统一 ==> kustomize/helm（helm values.yaml太随意了） ==> 弄一个paas平台封装一下k8s ==> 可扩展性（封装的标准化、可复用） ==> OAM
 
 ## k8s 的问题
 
@@ -52,6 +52,22 @@ Kubernetes 的核心 API 资源比如 Service、Deployment 等，实际上只是
 [KubeVela：标准化的云原生平台构建引擎](KubeVela：标准化的云原生平台构建引擎)
 
 ![](/public/upload/kubernetes/kubevela_application.png)
+
+[Why Open Application Model?](https://github.com/oam-dev/spec) PS: 所有对应用的操作 用一个配置文件描述，命令行 ==> api ==> IaC
+
+![](/public/upload/kubernetes/oam_overview.png)
+
+In today's hybrid deployment environments, delivering applications without application context is hard:
+
+1. Developers spend time on infrastructure details instead of apps - clusters, ingresses, labels, DNS, etc, and learning how the infrastructure is implemented in different environments
+2. Inextensible - upper layer platform may be introduced, but it's almost certain that the needs of your app will outgrow the capabilities of that platform soon.
+3. Vendor lock-in - app deployment is tightly coupled with service provider and infrastructure, which heavily impact on how you configure, develop and operate the app across hybrid environments.
+
+In Open Application Model, we propose an app-centric approach instead:
+
+1. Application first - define the app deployment with a self-contained model, where **operational behaviors as part of app definition**, free of infrastructure, simply deploy.
+2. Clarity and extensibility - an open standard to modularize app delivery into reusable pieces, assemble them into a **deployment plan** per your own needs, fully self-service.
+3. Vendor agnostic - a consistent yet higher level abstraction to model app delivery across on-prem clusters, cloud providers or even edge devices. Zero lock-in.
 
 ### oam 应用模型
 

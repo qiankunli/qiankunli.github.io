@@ -8,7 +8,7 @@ keywords: spring cloud
 
 ---
 
-## 前言（未完成）
+## 前言
 
 官方英文 [Spring Cloud](http://cloud.spring.io/spring-cloud-static/Dalston.SR2/#_spring_cloud_config)
 
