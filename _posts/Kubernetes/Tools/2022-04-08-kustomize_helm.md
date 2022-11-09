@@ -17,6 +17,28 @@ keywords:  Kubernetes 混部
 
 这些困难的实质是源于 Docker 容器镜像封装了单个服务，而 Kubernetes 通过资源封装了服务集群，**却没有一个载体真正封装整个应用**，封装应用的方法没能将开发、运维、平台等各种角色的关注点恰当地分离。但是，既然在微服务时代，应用的形式已经不再局限于单个进程，那就也该到了重新定义“以应用为中心的封装”这句话的时候了。**至于具体怎样的封装才算是正确的**，其实到今天也还没有特别权威的结论，不过经过人们的尝试探索，已经能够窥见未来容器应用的一些雏形了。Kustomize 和 Helm是封装“无状态应用”的典型代表，Operator 与 OAM 是支持有状态应用的封装方式。
 
+
+## PodPreset
+
+开发人员习惯的写的，是最简单的pod
+
+	apiVersion: v1
+	kind: Pod
+	metadata: 
+		name: website 
+		labels:
+			app: website 
+			role: frontend
+	spec: 
+		containers: 
+			- name:website 
+			  image: nginx
+			  ports: 
+				- containerPort:80
+
+但对运维来说，在实际环境中还需添加大量的配置，此时，运维可以事先定义一个PodPreset.yaml，并创建一个PodPreset`kubectl create -f preset.yaml`。 之后开发创建的pod（有一个规则匹配） 都会自动加上 preset.yaml 指定的配置。
+
+
 ## Kustomize
 
 一旦开始处理多种资源类型，Kubernetes 资源的配置文件就会真正开始泛滥，尤其是当环境之间的差异很小时，例如开发与生产环境。直接通过 kubectl 来管理一个应用，你会发现这十分蛋疼。

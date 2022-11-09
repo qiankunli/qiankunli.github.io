@@ -406,3 +406,43 @@ func (g *genericScheduler) Schedule(..., placement *policyv1alpha1.Placement, sp
 
 其它：
 [vivo大规模 Kubernetes 集群自动化运维实践](https://mp.weixin.qq.com/s/L9z1xLXUnz52etw2jDkDkw) 未读。
+
+
+
+## 手动访问多个kubernetes 集群
+
+1. 一般情况，kubernetes 单独搭建在一个集群上，开发者通过开发机 或某一个跳板机上 通过kubectl 操作kubernetes，kubectl 会读取`~/.kube/config` 文件读取集群信息
+2. kubernetes 一般会有多个集群：测试环境（运行公司测试环境的服务），开发环境（用来验证新功能）==> developer 需要在本机 上使用kubectl 访问多个k8s集群
+
+[配置对多集群的访问](https://kubernetes.io/zh/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
+
+`~/.kube/config` 是一个yaml 文件，可以配置多个集群的信息
+
+    apiVersion: v1
+    kind: Config
+    clusters:
+    users:
+    contexts:
+
+可以看到 几个核心配置都是数组
+
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - cluster:
+    name: development
+    - cluster:
+    name: scratch
+    users:
+    - name: developer
+    - name: experimenter
+    contexts:
+    - context:
+        cluster: development
+        user: developer
+      name: dev-frontend
+    name: dev-frontend
+    - context:
+        cluster: scratch
+        user: experimenter
+      name: exp-scratch

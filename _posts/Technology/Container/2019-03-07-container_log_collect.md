@@ -17,6 +17,8 @@ keywords: container log collect
 
 [Kubernetes日志收集的那些套路](https://mp.weixin.qq.com/s/XSTvxCrZPJUbATlXGscttA)
 
+[一文详解K8s环境下Job类日志采集方案](https://mp.weixin.qq.com/s/vn7o2zwwqeDMVlFPiHXEMg) 未读
+
 ## 采集方式
 
 ![](/public/upload/container/collect_log.png)
