@@ -39,6 +39,7 @@ keywords:  集群
   1. 用户创建的Deployment 存在哪里？比如kubefed v2 部署Kubernetes资源需要熟悉一套的全新API，例如FederatedDeployment。
   1. 即用户创建的Deployment 的多个pod最终落在哪个集群中，如何表达这个诉求？是优先落在一个集群，还是各个集群都摊一点。
   3. 假如deployment有10个pod，两个cluster 分别运行2/8 个pod，用户创建的deployment 的status 等字段如何感知真实情况？如何方便的查看 deployment 当前在各个cluster的分布与状态。
+  4. 分发时要考虑集群当前的可用资源情况， [Karmada v1.3 新特性解读: 自定义资源模型](https://mp.weixin.qq.com/s/AsHB4elcCBD3kcI8wFO9Rw)
 2. 在不同的集群下发的模型怎样做到差异化？
 3. 怎样设计和解决在多集群的背景下，有状态服务的调度机制和访问机制？
 4. 多集群监控 [阿里云注册集群+Prometheus 解决多云容器集群运维痛点](https://mp.weixin.qq.com/s/Sud0TtLWk6lQUKmCPMN12A)

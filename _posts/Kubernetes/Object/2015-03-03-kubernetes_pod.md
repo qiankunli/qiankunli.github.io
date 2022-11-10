@@ -107,6 +107,10 @@ pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads
 4. Failed, Pod内所有容器均已退出，但至少有一个容器退出为失败状态。
 5. Unknown,  For some reason the state of the Pod could not be obtained, typically due to an error in communicating with the host of the Pod. 用户可以执行 `kubectl delete pods <pod> --grace-period=0 --force` 强制删除 Pod
 
+[解读 K8s Pod 的 13 种异常](https://mp.weixin.qq.com/s/cEEdH7npkSHmVHSXLbH6uQ)
+
+![](/public/upload/kubernetes/pod_exception.png)
+
 ### 容器状态及其它状态
 
 restartPolicy 和 Pod 里容器的状态，以及Pod 状态的对应关系（最终体现在`kube get pod pod_name` 时 status 的状态） [有一系列复杂的情况](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#example-states) ，可以概括为两条基本原则：
