@@ -398,8 +398,40 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 }
 ```
 
-核心是理解 type=deploy的step，关键步骤在  Parser.GenerateAppFile 中
+核心是理解 type=deploy的step，其对应的 WorkflowStepDefinition 定义如下
 
+```
+import (
+	"vela/op"
+)
+
+deploy: {
+	alias: ""
+	annotations: {}
+	attributes: {}
+	description: "A powerful and unified deploy step for components multi-cluster delivery with policies."
+	labels: {}
+	type: "workflow-step"
+}
+template: {
+	deploy: op.#Deploy & {
+		policies:                 parameter.policies
+		parallelism:              parameter.parallelism
+		ignoreTerraformComponent: parameter.ignoreTerraformComponent
+	}
+	parameter: {
+		//+usage=If set to false, the workflow will suspend automatically before this step, default to be true.
+		auto: *true | bool
+		//+usage=Declare the policies that used for this deployment. If not specified, the components will be deployed to the hub cluster.
+		policies?: [...string]
+		//+usage=Maximum number of concurrent delivered components.
+		parallelism: *5 | int
+		//+usage=If set false, this step will apply the components with the terraform workload.
+		ignoreTerraformComponent: *true | bool
+	}
+}
+```
+为支持 Parser.GenerateAppFile 也包含了很多 构建workflowstep的逻辑，也就是step 不只workflow 明面上的那些。
 ```
 Parser.GenerateAppFile(ctx context.Context, app *v1beta1.Application)
   GenerateAppFileFromApp(ctx context.Context, app *v1beta1.Application)
