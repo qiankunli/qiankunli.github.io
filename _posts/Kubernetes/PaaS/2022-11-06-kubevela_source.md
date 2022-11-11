@@ -196,8 +196,6 @@ xxDefinition 主要是管理 用户 定义的cue 模版，核心逻辑是 applic
 2. 中点：ApplicationConfiguration, Component
 3. 终点：Deployment, Service
 
-
-
 ### 根据 Application 创建ApplicationConfiguration和Component
 
 ```go
@@ -397,6 +395,29 @@ func (e *engine) steps(ctx monitorContext.Context, taskRunners []types.TaskRunne
 	return nil
 }
 ```
+引入workflow之前，主要由applicationconfiguration controller 负责创建workload。if you only use components in the Application and do not declare a workflow, KubeVela will automatically create a default workflow for deploying the components when running the Application.
+```
+Parser.GenerateAppFile(ctx context.Context, app *v1beta1.Application)
+  GenerateAppFileFromApp(ctx context.Context, app *v1beta1.Application)
+    appfile := Parser.newAppfile(appName, ns, app)
+    for _, comp := range app.Spec.Components {
+      wd, err := Parser.parseWorkload(ctx, comp)
+      ...
+    }
+    Parser.parseWorkflowSteps(ctx, appfile)
+      Parser.loadWorkflowToAppfile(ctx, af)
+        af.WorkflowSteps, err = step.NewChainWorkflowStepGenerator(
+		    &step.RefWorkflowStepGenerator{Client: af.WorkflowClient(p.client), Context: ctx},
+		    &step.DeployWorkflowStepGenerator{},
+		    &step.Deploy2EnvWorkflowStepGenerator{},
+		    &step.ApplyComponentWorkflowStepGenerator{},
+		    &step.DeployPreApproveWorkflowStepGenerator{},
+	).Generate(af.app, af.WorkflowSteps)
+      for _, workflowStep := range af.WorkflowSteps {
+        parseWorkflowStep(ctx, af, workflowStep.Type)
+      }
+    ...
+```
 
 核心是理解 type=deploy的step，其对应的 WorkflowStepDefinition 定义如下
 
@@ -431,26 +452,4 @@ template: {
 	}
 }
 ```
-为支持 Parser.GenerateAppFile 也包含了很多 构建workflowstep的逻辑，也就是step 不只workflow 明面上的那些。
-```
-Parser.GenerateAppFile(ctx context.Context, app *v1beta1.Application)
-  GenerateAppFileFromApp(ctx context.Context, app *v1beta1.Application)
-    appfile := Parser.newAppfile(appName, ns, app)
-    for _, comp := range app.Spec.Components {
-      wd, err := Parser.parseWorkload(ctx, comp)
-      ...
-    }
-    Parser.parseWorkflowSteps(ctx, appfile)
-      Parser.loadWorkflowToAppfile(ctx, af)
-        af.WorkflowSteps, err = step.NewChainWorkflowStepGenerator(
-		    &step.RefWorkflowStepGenerator{Client: af.WorkflowClient(p.client), Context: ctx},
-		    &step.DeployWorkflowStepGenerator{},
-		    &step.Deploy2EnvWorkflowStepGenerator{},
-		    &step.ApplyComponentWorkflowStepGenerator{},
-		    &step.DeployPreApproveWorkflowStepGenerator{},
-	).Generate(af.app, af.WorkflowSteps)
-      for _, workflowStep := range af.WorkflowSteps {
-        parseWorkflowStep(ctx, af, workflowStep.Type)
-      }
-    ...
-```
+
