@@ -155,6 +155,8 @@ https://github.com/tencentmusic/cube-studio/wiki
 
 ![](/public/upload/machine/meituan_ai.png)
 
+[美团图灵机器学习平台性能起飞的秘密（一）](https://mp.weixin.qq.com/s/d4FLgVuZhA03oOlChBcRYA) 用spark实现的。
+
 
 ## 基础设施
 

@@ -97,7 +97,7 @@ spec:
 	// +patchStrategy=retainKeys
 	patch: spec: replicas: parameter.replicas
 }</pre></td>
-  <td></td>
+  <td>将parameter.replicas patch到deployment的spec.replicas上</td>
   </tr>
   <tr>
     <td>topology</td>
@@ -126,24 +126,23 @@ spec:
 </table>
 
 
-
 ## 源码结构
 
 ```
 kubevela
   /cmd
-    /core
+    /core                               ## controller-runtime manager 启动
   /pkg
     /controller
       /standard.oam.dev
         /v1alpha1
           /rollout
       /core.oam.dev
-        /v1alpha2
-          /application
-            /application_controller.go
+        /v1alpha2       
+          /application                  ## Application controller
+            /application_controller.go  
           /applicationconfiguration
-          /core
+          /core                         ## XXDefinition controller
             /components
             /policies
             /scopes
@@ -152,10 +151,9 @@ kubevela
 
 ```
 
-
-
 ## 启动
 
+controller-runtime manager 启动的的常见风格
 
 ```go
 // kubevela/cmd/core/main.go
@@ -196,6 +194,8 @@ xxDefinition 主要是管理 用户 定义的cue 模版，核心逻辑是 applic
 2. 中点：ApplicationConfiguration, Component
 3. 终点：Deployment, Service
 
+![](/public/upload/kubernetes/kubevela_model.png)
+
 ### 根据 Application 创建ApplicationConfiguration和Component
 
 ```go
@@ -216,7 +216,9 @@ func (r *Reconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 	// build template to applicationconfig & component
 	ac, comps, err := appParser.GenerateApplicationConfiguration(generatedAppfile, app.Namespace)
+  // apply application revision & component to the cluster
   handler.apply(ctx, appRev, ac, comps)
+  ...
 	return ctrl.Result{}, r.UpdateStatus(ctx, app)
 }
 ```
@@ -291,7 +293,7 @@ func (r *components) renderComponent(..., ac *v1alpha2.ApplicationConfiguration,
 func (r *components) renderTrait(..., ac *v1alpha2.ApplicationConfiguration) (*unstructured.Unstructured, *v1alpha2.TraitDefinition, error) {
 ```
 有的trait是对workload的 patch，有的trait对应的独立的crd。通过trait.spec.workloadRefPath 建立trait与workload 之间的关系。
-当trait 是patch时，kubevela 负责将patch 和 workload 做merge 然后apply 到k8s。
+当trait 是patch时，kubevela 负责将patch 和 workload 做strategy merge 然后apply 到k8s。
 ```
 workloads,... := components.Render(ctx context.Context, ac *v1alpha2.ApplicationConfiguration) 
   for _, acc := range ac.Spec.Components {
@@ -425,7 +427,6 @@ Parser.GenerateAppFile(ctx context.Context, app *v1beta1.Application)
 import (
 	"vela/op"
 )
-
 deploy: {
 	alias: ""
 	annotations: {}

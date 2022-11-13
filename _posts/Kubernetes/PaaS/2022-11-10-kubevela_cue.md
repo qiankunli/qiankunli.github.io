@@ -18,8 +18,13 @@ keywords:  kubevela cue
 
 [数据约束语言 CUE 简易教程](https://mp.weixin.qq.com/s/yWKdXsfAZvwc5Y1aao6XAw)
 
+BCL 全名 Borg Configuration Language，是 Google 内部基于 GCL (Generic Configuration Language) 在 Borg 场景的实践。**用户通过 BCL 描述对 Borg 的使用需求**，通过基于 BCL 的抽象省去对 Borg 复杂配置细节的感知提高单位效率，通过工程化手段满足可抽象、可复用、可测试的协作方式提高团队效率和稳定性，并在其上建立了相应的生态平台，作为 Borg 生态的重要抽象层在 Google 内部服务了超过 10 年，帮助 Google 内部数万开发者更好的使用 Infra。CUE 是一种服务于云化配置的**强类型配置语言**，由 Go team 成员 Marcel van Lohiuzen 结合 BCL 及多种其他语言研发并开源，可以说是 BCL 思路的开源版实现。PS：大家都对直接使用yaml 的方式不满意
 
 ## 基本使用
+
+### 数据类型
+
+cue 的基本数据类型
 
 ```
 // first.cue
@@ -33,6 +38,21 @@ g: {
 }
 e: "abc"
 ```
+
+如何自定义 CUE 类型？使用 # 符号来指定一些表示 CUE 类型的变量
+
+```
+#abc: {
+  x: int
+  y: string
+  z: {
+    a: float
+    b: bool
+  }
+}
+```
+
+### 渲染
 
 ```
 $ cue eval first.cue
@@ -80,7 +100,6 @@ e: abc
 ## 与k8s结合
 
 ```
-
 // deployment.cue
 parameter:{
    name: "mytest"
@@ -108,9 +127,24 @@ template: {
 
 `cue export deployment.cue -e template --out yaml` 导出指定template变量的结果。
 
-## kubevela 中使用
+### 导入包
 
-### 描述 Component/Trait/Policy等Definition
+可以在 CUE 模版中通过 `kube/<apiVersion>` 导入 kubernetes 的包，就像使用 CUE 内部包一样。
+
+```
+import (
+   apps "kube/apps/v1"
+)
+parameter: {
+    name:  string
+}
+output: apps.#Deployment                ## output 的类型是 deployment
+output: {
+    metadata: name: parameter.name      ## 给output 的metadata.name 字段赋值
+}
+```
+
+## kubevela 中使用
 
 ```
 kubevela
@@ -129,6 +163,43 @@ kubevela
       /step
       /template
       /workflow.go
+```
+
+### 描述 Component/Trait/Policy等Definition
+
+
+webservice ComponetDefinition 内容
+```
+import (
+	"strconv"
+)
+webservice: {...}
+template: {
+  mountsArray: {...}  # 根据 parameter.volumeMounts 计算mount 相关的内容，最终会被output 使用
+  volumesList: {...}
+  ...
+  output: {            # deployment yaml的核心部分
+    apiVersion: "apps/v1"
+		kind:       "Deployment"
+		spec: {...}
+  }         
+  exposePorts: {}
+  outputs: {
+    if len(exposePorts) != 0 {
+      webserviceExpose: {
+				apiVersion: "v1"
+				kind:       "Service"
+				metadata: name: context.name
+				spec: {
+					selector: "app.oam.dev/component": context.name
+					ports: exposePorts
+					type:  parameter.exposeType
+				}
+			}
+    }
+  }
+  parameter: {...}    # template的参数部分
+}
 ```
 
 ```go
@@ -197,5 +268,57 @@ evalWorkloadWithContext
 k8s patch语法参考 [Update API Objects in Place Using kubectl patch](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/)
 
 ### 描述WorkflowStepDefinition（未完成）
+
+deploy step 示例
+
+```
+import (
+	"vela/op"
+)
+deploy: {
+	alias: ""
+	annotations: {}
+	attributes: {}
+	description: "A powerful and unified deploy step for components multi-cluster delivery with policies."
+	labels: {}
+	type: "workflow-step"
+}
+
+template: {
+	deploy: op.#Deploy & {
+		policies:                 parameter.policies
+		parallelism:              parameter.parallelism
+		ignoreTerraformComponent: parameter.ignoreTerraformComponent
+	}
+	parameter: {
+		//+usage=If set to false, the workflow will suspend automatically before this step, default to be true.
+		auto: *true | bool
+		//+usage=Declare the policies that used for this deployment. If not specified, the components will be deployed to the hub cluster.
+		policies?: [...string]
+		//+usage=Maximum number of concurrent delivered components.
+		parallelism: *5 | int
+		//+usage=If set false, this step will apply the components with the terraform workload.
+		ignoreTerraformComponent: *true | bool
+	}
+}
+```
+
+suspend step 示例
+
+```
+suspend: {
+	alias: ""
+	annotations: {}
+	attributes: {}
+	description: "Suspend the current workflow, it can be resumed by 'vela workflow resume' command."
+	labels: {}
+	type: "workflow-step"
+}
+
+template: parameter: {
+	// +usage=Specify the wait duration time to resume workflow such as "30s", "1min" or "2m15s"
+	duration?: string
+}
+```
 
 ### provider 机制 （未完成）
