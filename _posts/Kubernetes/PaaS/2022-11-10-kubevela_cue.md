@@ -157,16 +157,17 @@ kubevela
       /process
       /task
       utils.go
-    /workflow
+    /workflow             # 工作流相关
       /operation
       /providers
       /step
       /template
       /workflow.go
+    /stdlib
+      /op.cue
 ```
 
 ### 描述 Component/Trait/Policy等Definition
-
 
 webservice ComponetDefinition 内容
 ```
@@ -267,7 +268,7 @@ evalWorkloadWithContext
 
 k8s patch语法参考 [Update API Objects in Place Using kubectl patch](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/update-api-object-kubectl-patch/)
 
-### 描述WorkflowStepDefinition（未完成）
+### 描述WorkflowStepDefinition
 
 deploy step 示例
 
@@ -302,6 +303,35 @@ template: {
 	}
 }
 ```
+`kubevela/pkg/providers` 设计了一套机制，当workflow executor 执行deploy step时，executor.doSteps 首先从 template.deploy 的  `#provider` 和 `#do` 中拿到 provider和 do，接着执行exec.Handle(...,provider,do) ==> handler := providers.GetHandler(provider,do);handler()。
+
+```
+// kubevela/pkg/stdlib/op.cue
+#Deploy: multicluster.#Deploy
+// kubevela/pkg/stdlib/pkgs/multicluster.cue
+#Deploy: {
+	#provider: "multicluster"
+	#do:       "deploy"
+	policies: [...string]
+	parallelism:              int
+	ignoreTerraformComponent: bool
+}
+// kubevela/pkg/workflow/providers/multicluster/multicluster.go
+// Install register handlers to provider discover.
+func Install(p wfTypes.Providers, c client.Client, app *v1beta1.Application, af *appfile.Appfile,...) {
+	prd := &provider{Client: c, app: app, af: af, apply: apply, healthCheck: healthCheck, renderer: renderer}
+	p.Register(ProviderName, map[string]wfTypes.Handler{
+		"read-placement-decisions":              prd.ReadPlacementDecisions,
+		"make-placement-decisions":              prd.MakePlacementDecisions,
+		"patch-application":                     prd.PatchApplication,
+		"list-clusters":                         prd.ListClusters,
+		"get-placements-from-topology-policies": prd.GetPlacementsFromTopologyPolicies,
+		"deploy":                                prd.Deploy,
+	})
+}
+```
+
+从效果看，根据 op.Deploy ==>  multicluster.#Deploy 可以找到 `kubevela/pkg/workflow/providers/multicluster/multicluster.go` 的Deploy 方法。换句话说，workflow/provider 实现了一些通用的能力函数，加上stdlib 等机制，我们在workflowStep cue 模版中可以直接使用这些函数。
 
 suspend step 示例
 
