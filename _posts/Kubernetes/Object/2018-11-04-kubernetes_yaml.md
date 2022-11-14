@@ -121,7 +121,7 @@ metadata 中包含Label 和 Annotation，作用差不多，但有两个区别
 
 **当用户对某个资源对象提交一个 patch 请求时，kube-apiserver 不会考虑版本问题**，而是“无脑”地接受用户的请求（只要请求发送的 patch 内容合法），也就是将 patch 打到对象上、同时更新版本号。不过，patch 的复杂点在于，目前 K8s 提供了 4 种 patch 策略：json patch、merge patch、strategic merge patch、apply patch（从 K8s 1.14 支持 server-side apply 开始）。通过 `kubectl patch -h` 命令可以看到这个策略选项（默认采用 strategic）。
 
-1. json patch。要指定操作类型，比如 add 新增还是 replace 替换，另外在修改 containers 列表时要通过元素序号来指定容器。这样一来，如果我们 patch 之前这个对象已经被其他人修改了，那么我们的 patch 有可能产生非预期的后果。比如在执行 app 容器镜像更新时，我们指定的序号是 0，但此时 containers 列表中第一个位置被插入了另一个容器，则更新的镜像就被错误地插入到这个非预期的容器中。
+1. json patch。**是一系列操作的集合**。要指定操作类型，比如 add 新增还是 replace 替换，另外在修改 containers 列表时要通过元素序号来指定容器。这样一来，如果我们 patch 之前这个对象已经被其他人修改了，那么我们的 patch 有可能产生非预期的后果。比如在执行 app 容器镜像更新时，我们指定的序号是 0，但此时 containers 列表中第一个位置被插入了另一个容器，则更新的镜像就被错误地插入到这个非预期的容器中。
 	```
 	kubectl patch deployment/foo --type='json' -p \
   	'[
@@ -132,36 +132,40 @@ metadata 中包含Label 和 Annotation，作用差不多，但有两个区别
 		}
 	]'
   	```
-2. merge patch。无法单独更新一个列表中的某个元素，因此不管我们是要在 containers 里新增容器、还是修改已有容器的 image、env 等字段，都要用整个 containers 列表来提交 patch。显然，这个策略并不适合我们对一些列表深层的字段做更新，更适用于大片段的覆盖更新。不过对于 labels/annotations 这些 map 类型的元素更新，merge patch 是可以单独指定 key-value 操作的，相比于 json patch 方便一些，写起来也更加直观。
-	```
-	kubectl patch deployment/foo --type='merge' -p \
-  	'{
-		"spec":{
-			"template":{
-				"spec":{
-					"containers":[
-						{
-							"name":"app",
-							"image":"app-image:v2"
-						},
-						{
-							"name":"nginx",
-							"image":"nginx:alpline"}
-					]
+2. json merge patch。一系列差异的集合。
+	1. 对于 labels/annotations 这些 map 类型的元素更新，merge patch 是可以单独指定 key-value 操作的，相比于 json patch 方便一些，写起来也更加直观。
+		```
+		kubectl patch deployment/foo --type='merge' -p 
+		'{
+			"metadata":{
+				"labels":{
+					"test-key":"foo"
 				}
 			}
-		}
-	}'
-	kubectl patch deployment/foo --type='merge' -p 
-	'{
-		"metadata":{
-			"labels":{
-				"test-key":"foo"
+		}'
+		```
+	2. 数组需要提供全量的。无法单独更新一个列表中的某个元素，因此不管我们是要在 containers 里新增容器、还是修改已有容器的 image、env 等字段，都要用整个 containers 列表来提交 patch。显然，这个策略并不适合我们对一些列表深层的字段做更新，更适用于大片段的覆盖更新。
+		```
+		kubectl patch deployment/foo --type='merge' -p \
+		'{
+			"spec":{
+				"template":{
+					"spec":{
+						"containers":[
+							{
+								"name":"app",
+								"image":"app-image:v2"
+							},
+							{
+								"name":"nginx",
+								"image":"nginx:alpline"}
+						]
+					}
+				}
 			}
-		}
-	}'
-	```
-3. strategic merge patch
+		}'
+		```
+3. strategic merge patch，patchStrategy 有replace/merge/retainKeys
 	```
 	在 K8s 原生资源的数据结构定义中额外定义了一些的策略注解，比如下面patchMergeKey 就代表了 containers 列表使用 strategic merge patch 策略更新时，会把下面每个元素中的 name 字段看作 key。
 	// ...

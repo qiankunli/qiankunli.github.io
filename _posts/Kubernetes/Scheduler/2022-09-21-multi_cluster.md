@@ -13,6 +13,8 @@ keywords:  集群
 * TOC
 {:toc}
 
+[硅谷技术新焦点：摆脱缝合怪的多云设计，才是云计算的归宿](https://mp.weixin.qq.com/s/IZYekMXvDEwOzGpzE41GqQ)
+
 ## 多集群
 
 [Kubernetes 多集群项目介绍](https://mp.weixin.qq.com/s/laMfFgre8PrbC2SayxBFRQ)

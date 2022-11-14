@@ -24,6 +24,9 @@ keywords: functional programming
 
 因此，**函数式编程的流行，跟语言的发展有关系，以前不流行，不是不想，是语言暂时没办法提供那个抽象能力**。[函数式编程](http://qiankunli.github.io/2018/09/12/functional_programming.html) [函数式思维和函数式编程](http://www.vaikan.com/programming-thinking-functional-way/)
 
+[深入理解函数式编程（上）](https://mp.weixin.qq.com/s/XTXnTPAbK1ipaHIsUD2kBQ) 未细读
+[深入理解函数式编程（下）](https://mp.weixin.qq.com/s/2a2PZkGq0eKd7ee7HnHpoQ)
+
 ## 编程范式异同
 
 ### 声明式与命令式
