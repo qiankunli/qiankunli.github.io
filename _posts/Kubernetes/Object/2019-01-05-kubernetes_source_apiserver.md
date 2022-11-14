@@ -19,6 +19,8 @@ apiserver 核心职责
 
 [字节跳动 kube-apiserver 高可用方案 KubeGateway](https://mp.weixin.qq.com/s/sDxkXPmgtCknwtnwvg2EMw) 很好玩的一个项目。
 
+[字节跳动高性能 Kubernetes 元信息存储方案探索与实践](https://mp.weixin.qq.com/s/lxukeguHP1l0BGKbAa89_Q)
+
 ## 声明式API
 
 1. 命令式命令行操作，比如直接 `kubectl run`

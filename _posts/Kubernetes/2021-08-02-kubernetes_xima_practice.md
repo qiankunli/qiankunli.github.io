@@ -100,6 +100,8 @@ k8s-sync 同时也将 pod 信息同步到mysql 中，方便开发根据项目名
 
 [解决微服务架构下流量有损问题的实践和探索](https://mp.weixin.qq.com/s/eQzy3zvvEokNXYL637LNCg)总结的很全面。中间件的云原生化就是中间件基于k8s的场景进行各种适配。
 
+[K8s 有损发布问题探究](https://mp.weixin.qq.com/s/9RxsOTinekPfUc4rKcL82g)
+
 [微服务与K8s生命周期对齐](https://mp.weixin.qq.com/s/ahqtXp56o4943wmJp6x4zg)
 
 
