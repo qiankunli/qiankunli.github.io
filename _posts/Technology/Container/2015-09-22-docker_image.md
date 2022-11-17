@@ -134,27 +134,43 @@ RUN \
 
 ### 多阶段构建
 
-[Use multi-stage builds](https://docs.docker.com/develop/develop-images/multistage-build/) **multi-stage builds 的重点不是multi-stage  而是 builds**
+在一个Dockerfile中使用多个FROM指令，每个FROM都可以使用不同的基镜像。在多阶段构建中，我们可以将资源从一个阶段复制到另一个阶段，在最终镜像中只保留我们所需要的内容。
 
-先使用docker 将go文件编译为可执行文件
+```
+#阶段1
+FROM golang:1.16
+WORKDIR /go/src
+COPY app.go ./
+RUN go build app.go -o myapp
+#阶段2
+FROM scratch
+WORKDIR /server
+COPY --from=0 /go/src/myapp ./          ## 通过--from=0指定资源来源，这里的0即是指第一阶段。
+CMD ["./myapp"]
+```
 
-	FROM golang:1.7.3
-	WORKDIR /go/src/github.com/alexellis/href-counter/
-	COPY app.go .
-	RUN go get -d -v golang.org/x/net/html \
-	  && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
-	  
-因为笔者一直是直接做镜像，所以没这种感觉。不过这么做倒有一点好处：可执行文件的实际运行环境 可以不用跟 开发机相同。学名叫同构/异构镜像构建。
+默认情况下构建阶段没有名称，我们可以通过整数0~N来引用，即第一个from从0开始。其实我们还可以在FROM指令中添加`AS <NAME>` 来命名构建阶段，接着在COPY指令中通过`<NAME>`引用。
 
-然后将可执行文件 做成镜像
+```
+#阶段1命名为builder
+FROM golang:1.16 as builder
+WORKDIR /go/src
+COPY app.go ./
+RUN go build app.go -o myapp
+#阶段2
+FROM scratch
+WORKDIR /server
+#通过名称引用
+COPY --from=builder /go/src/myapp ./
+CMD ["./myapp"]
+```
 
-	FROM alpine:latest  
-	RUN apk --no-cache add ca-certificates
-	WORKDIR /root/
-	COPY app .
-	CMD ["./app"]  
+1. 只构建某个阶段，构建镜像时，您不一定需要构建整个 Dockerfile，我们可以通过--target参数指定某个目标阶段构建，比如我们开发阶段我们只构建builder阶段进行测试。`docker build --target builder -t builder_app:v2 .`
+2. 使用外部镜像，可以使用COPY --from指令从单独的镜像复制，如本地镜像名称、本地或 Dockerhub上可用的标签或标签 ID。Docker 客户端在必要时会拉取需要的镜像到本地。`COPY --from  httpd:latest /usr/local/apache2/conf/httpd.conf ./httpd.conf`
+
 
 ### entrypoint 和 cmd
+
 [Dockerfile: ENTRYPOINT vs CMD](https://www.ctl.io/developers/blog/post/dockerfile-entrypoint-vs-cmd/)
 1. ENTRYPOINT和CMD都是让用户指定一个可执行程序，这个可执行程序在container启动后自动启动。
 2. 在写Dockerfile时，ENTRYPOINT或者CMD命令会自动覆盖之前镜像的ENTRYPOINT或者CMD命令。

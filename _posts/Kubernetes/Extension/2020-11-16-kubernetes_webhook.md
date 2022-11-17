@@ -13,18 +13,15 @@ keywords:  Kubernetes webhook
 * TOC
 {:toc}
 
-![](/public/upload/kubernetes/admission_controller.png)
-
-Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个设计和各类 Web 框架中的 Filter  很像，就是一个插件化的责任链，责任链中的每个插件针对 apiserver 收到的请求做一些操作或校验。分类
-
-2. MutatingWebhookConfiguration，在对象持久化之前，修改对象的内容或者拒绝请求。 会对request的resource，进行转换，比如填充默认的request/limit。因为对象的字段可能被不同的准入控制器修改多次，所以准入控制器链的顺序就尤其重要。
-1. ValidatingWebhookConfiguration，在对象持久化之前，校验对象的内容或者拒绝请求。 比如校验Pod副本数必须大于2。
-
-使用场景：[使用 Admission Webhook 机制实现多集群资源配额控制](https://mp.weixin.qq.com/s/i3KtTSfab2JrjeFR4tdy_A)未读
-
 ## Admission Controller
 
+Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个设计和各类 Web 框架中的 Filter  很像，就是一个插件化的责任链，责任链中的每个插件针对 apiserver 收到的请求做一些操作或校验。
+
+![](/public/upload/kubernetes/webhook_admission_controller.jpg)
+
 [为什么需要 Kubernetes 准入控制器](https://mp.weixin.qq.com/s/TjvIdKY6EJMVx6TiagM7Jg)
+
+![](/public/upload/kubernetes/admission_controller.png)
 
 准入控制器是kubernetes 的API Server上的一个链式Filter，它根据一定的规则决定是否允许当前的请求生效，并且有可能会改写资源声明。比如
 
@@ -41,6 +38,9 @@ The problem with admission controllers are:
 K8s支持30多种admission control 插件，其中有两个具有强大的灵活性，即ValidatingAdmissionWebhooks和MutatingAdmissionWebhooks，这两种控制变换和准入以Webhook的方式提供给用户使用，大大提高了灵活性，用户可以在集群创建自定义的AdmissionWebhookServer进行调整准入策略。
 
 ## 配置apiserver 发起webhook
+
+2. MutatingWebhookConfiguration，在对象持久化之前，修改对象的内容或者拒绝请求。 会对request的resource，进行转换，比如填充默认的request/limit。因为对象的字段可能被不同的准入控制器修改多次，所以准入控制器链的顺序就尤其重要。
+1. ValidatingWebhookConfiguration，在对象持久化之前，校验对象的内容或者拒绝请求。 比如校验Pod副本数必须大于2。
 
 ```yaml
 apiVersion: admissionregistration.k8s.io/v1
@@ -88,7 +88,7 @@ clientConfig 描述如何调用webhook
             port: 1234
     ```
 
-在volcano 的webhook中，ValidatingWebhookConfiguration 的配置是通过代码写入到 apiserver 的。对于volcano 这种大型框架，可能包含多个crd，每个crd 都会注册一个VatingWebhookConfiguration，adminssion webhook 本身就要统一管理（有一个集中的 adminssion webhook map或slice） 就像controller 之于controller manager。具体到实现某个crd 的adminssion webhook时，只需要在crd 对应的包 init 方法里注册下 就可以，如果是自己写的话，yaml 文件要写五六个。
+
 
 ## 请求响应参数
 
@@ -140,7 +140,55 @@ Webhook 禁止请求的最简单响应示例：
 }
 ```
 
-## ValidatingWebhookConfiguration 妙用
+## 实现
+
+webhook 是一个http server，是一个限制了请求与响应格式（AdmissionReview/AdmissionResponse）的http server
+
+一个最简单的web server
+```go
+http.HandleFunc("/", func (w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "hello world")
+})
+http.ListenAndServe(":8000", nil)
+```
+volcano  自己从0 开始写webhook，设计了一个AdmissionService 抽象，一个crd 对应一个AdmissionService，之后将 注册的所有 AdmissionService 封装为一个http server。
+
+```go
+// volcano/pkg/webhooks/router/interface.go
+type AdmitFunc func(admissionv1.AdmissionReview) *admissionv1.AdmissionResponse
+type AdmissionService struct {
+	Path    string                  // 请求路径
+	Func    AdmitFunc               // 处理函数
+	Handler AdmissionHandler        // 会有工具函数将 Func 转为 http.handler
+    // Webhook 对应的配置，volcano webhook pod 启动时自动注册到apiserver中
+	ValidatingConfig *whv1.ValidatingWebhookConfiguration
+	MutatingConfig   *whv1.MutatingWebhookConfiguration
+	Config *AdmissionServiceConfig
+}
+```
+
+在volcano 的webhook中，ValidatingWebhookConfiguration 的配置是通过代码写入到 apiserver 的。对于volcano 这种大型框架，可能包含多个crd，每个crd 都会注册一个VatingWebhookConfiguration，如果是自己写的话，yaml 文件要写五六个。
+
+karmara 则使用了controller-runtime 库，一个 crd 对应一个webhook，仅需实现 `Handle(context.Context, admission.Request) admission.Response` 方法，框架负责将其转为 http.handler
+
+```go
+// karmada-io/karmada/cmd/webhook/app/webhook.go
+func Run(ctx context.Context, opts *options.Options) error {
+    hookManager, err := controllerruntime.NewManager(config, controllerruntime.Options{...})
+    hookServer := hookManager.GetWebhookServer()
+    hookServer.Register("/mutate-propagationpolicy", &webhook.Admission{Handler: propagationpolicy.NewMutatingHandler(
+		opts.DefaultNotReadyTolerationSeconds, opts.DefaultUnreachableTolerationSeconds)})
+    hookServer.Register("/validate-propagationpolicy", &webhook.Admission{Handler: &propagationpolicy.ValidatingAdmission{}})
+    ...
+    hookManager.Start(ctx)
+}
+```
+
+## 应用场景
+
+使用场景：[使用 Admission Webhook 机制实现多集群资源配额控制](https://mp.weixin.qq.com/s/i3KtTSfab2JrjeFR4tdy_A)集群分配给多个用户使用时，需要使用配额以限制用户的资源使用，包括 CPU 核数、内存大小、GPU 卡数等，以防止资源被某些用户耗尽，造成不公平的资源分配。大多数情况下，集群原生的 ResourceQuota 机制可以很好地解决问题。但随着集群规模扩大，以及任务类型的增多，我们对配额管理的规则需要进行调整：
+1. ResourceQuota 针对单集群设计，但实际上，开发/生产中经常使用 多集群 环境。
+2. 集群大多数任务通过比如deployment、mpijob 等 高级资源对象 进行提交，我们希望在高级资源对象的 提交阶段 就能对配额进行判断。但 ResourceQuota 计算资源请求时以 pod 为粒度，从而无法满足此需求。
 
 [Kubernetes 中如何保证优雅地停止 Pod](https://mp.weixin.qq.com/s/NwJbBLhomaHBhCkIDR1KWA)利用 ValidatingAdmissionWebhook，在重要的 Pod 收到删除请求时，先在 webhook server 上请求集群进行下线前的清理和准备工作，并直接返回拒绝。这时候重点来了，Control Loop 为了达到目标状态（比如说升级到新版本），会不断地进行 reconcile，尝试删除 Pod，而我们的 webhook 则会不断拒绝，除非集群已经完成了所有的清理和准备工作。
 

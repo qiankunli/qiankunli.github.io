@@ -292,6 +292,8 @@ https://github.com/tencentmusic/cube-studio/wiki
 
 [基于 KubeVela 的机器学习实践](https://mp.weixin.qq.com/s/g9qYbG0A2JZajv6JCdpkwQ)
 
+[从神经搜索到多模态应用](https://mp.weixin.qq.com/s/GM4rFcKreWyLxQki318O1A)
+
 ## 其它
 
 深度学习平台的搭建，将遇到诸多挑战，主要体现在以下方面：
