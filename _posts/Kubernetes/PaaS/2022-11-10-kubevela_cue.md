@@ -167,7 +167,7 @@ kubevela
       /op.cue
 ```
 
-kubevela 可扩展的的核心是复用，主要复用两方面的能力
+**kubevela 可扩展的的核心是复用，主要复用两方面的能力**
 1. component/trait 主要复用 crd 的能力，由ComponentDefinition/TraitDefinition 使用cue 来定义crd 模版，Application controller 负责渲染出 真实crd
 2. workflow 复用http/email/k8s(apply等) 等能力，由 WorkflowStepDefinition 使用cue 来定义对底层provider 能力/函数的调用（provider 函数被封装为taskRunner），executor 从 WorkflowStepDefinition 拿到 provider+op（底层能力标识） “渲染”为taskRunner 并调用执行。
 

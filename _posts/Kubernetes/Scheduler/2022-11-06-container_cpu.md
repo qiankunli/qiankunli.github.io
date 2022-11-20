@@ -54,13 +54,17 @@ d64e482d2843        mesos-705b5dc6-7169-42e8-a143-6a7dc2e32600   0.18%          
 
 ## Linux的CPU管理——CFS 
 
-在 Linux 里面，进程大概可以分成两种：实时进程和 普通进程。每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列 rt_rq 和一个 CFS 运行队列 cfs_rq，在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进程需要运行。
+在 Linux 里面，进程大概可以分成两种：实时进程和 普通进程。每个 CPU 都有自己的 struct rq 结构（一个cpu一个运行队列），其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列 rt_rq 和一个 CFS 运行队列 cfs_rq，在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进程需要运行。
 
 cgroup 是 调度器 暴露给外界操作 的接口，对于 进程cpu 相关的资源配置 RT（realtime调度器） 和CFS 均有实现。本文主要讲  CFS，CFS 也是在不断发展的。
 
 ### CFS 基于虚拟运行时间的调度
 
 [What is the concept of vruntime in CFS](https://stackoverflow.com/questions/19181834/what-is-the-concept-of-vruntime-in-cfs/19193619)vruntime is a measure of the "runtime" of the thread - the amount of time it has spent on the processor. The whole point of CFS is to be fair to all; hence, the algo kind of boils down to a simple thing: (among the tasks on a given runqueue) the task with the lowest vruntime is the task that most deserves to run, hence select it as 'next'. CFS（完全公平调度器）是Linux内核2.6.23版本开始采用的进程调度器，具体的细节蛮复杂的，整体来说是保证每个进程运行的虚拟时间一致， **每次选择vruntime 较少的进程来执行**。
+
+另外两个细节
+1. 进程上下文切换会导致额外的 CPU 浪费。假如被选中的进程刚运行没多久，它的虚拟时间时间就比另一个进程小了。这时候难道要马上换另一个进程处理么？出于减少频繁切换进程所带来的成本考虑，Linux 会保证选择到的进程一个最短的运行时间，这个时间由 sched_min_granularity_ns 这个内核参数来控制。当然了，如果进程因为等待网络、磁盘等资源时主动放弃那另算。
+2. 在实践中可能确实有进程需要多分配一点运行时间。Linux 采用的做法在是上述绝对公平算法基础上再为进程引入一个权重。这个权重就是 Linux 进程的 nice 值，也就是我们平时 top 命令结果中看到的 ni 这一列。nice 范围为 -20（最高权重）到 19（最低权重）。
 
 vruntime就是根据权重、优先级（留给上层介入的配置）等将实际运行时间标准化。在内核中通过prio_to_weight数组进行nice值和权重的转换。
 

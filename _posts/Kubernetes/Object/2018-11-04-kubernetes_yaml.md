@@ -113,6 +113,12 @@ metadata 中包含Label 和 Annotation，作用差不多，但有两个区别
 1. 在 update 请求中，我们需要将整个修改后的对象提交给 K8s；
 2. 对于 patch 请求，我们只需要将对象中某些字段的修改提交给 K8s。
 
+	```yaml
+	# patch.yaml
+	spec:
+  	  replicas: 2
+	```
+
 **K8s 要求用户 update 请求中提交的对象必须带有 resourceVersion**，也就是说我们提交 update 的数据必须先来源于 K8s 中已经存在的对象。因此，一次完整的 update 操作流程是：
 1. 首先，从 K8s 中拿到一个已经存在的对象（可以选择直接从 K8s 中查询；如果在客户端做了 list watch，推荐从本地 informer 中获取）；
 2. 然后，基于这个取出来的对象做一些修改，比如将 Deployment 中的 replicas 做增减，或是将 image 字段修改为一个新版本的镜像；
@@ -198,14 +204,45 @@ metadata 中包含Label 和 Annotation，作用差不多，但有两个区别
 kubectl 为了给命令行用户提供良好的交互体感，设计了较为复杂的内部执行逻辑，诸如 apply、edit 这些常用操作其实背后并非对应一次简单的 update 请求。毕竟 update 是有版本控制的，如果发生了更新冲突对于普通用户并不友好。在使用默认参数执行 apply 时，触发的是 client-side apply。kubectl 逻辑如下：
 
 1. 首先解析用户提交的数据（YAML/JSON）为一个对象 A；然后调用 Get 接口从 K8s 中查询这个资源对象：
-2. 如果查询结果不存在，kubectl 将本次用户提交的数据记录到对象 A 的 annotation 中（key 为 `kubectl.kubernetes.io/last-applied-configuration`），最后将对象 A提交给 K8s 创建；
+2. 如果查询结果不存在，kubectl 将本次用户提交的数据记录到对象 A 的 annotation 中（key 为 `kubectl.kubernetes.io/last-applied-configuration`），最后将对象 A提交给 K8s 创建；PS：也就是如果某个资源一直都是通过apply来更新，那么ast-apply-configuration与对象一致，非`kubectl apply` 操作更新crd 时不会更新这个 annotation。
 3. 如果查询到 K8s 中已有这个资源，假设为对象 B：
 	1. kubectl 尝试从对象 B 的 annotation 中取出 `kubectl.kubernetes.io/last-applied-configuration` 的值（对应了上一次 apply 提交的内容）；
 	2. kubectl 根据前一次 apply 的内容和本次 apply 的内容计算出 diff（默认为 strategic merge patch 格式，如果非原生资源则采用 merge patch）；
-	3. 将 diff 中添加本次的 `kubectl.kubernetes.io/last-applied-configuration` annotation，最后用 patch 请求提交给 K8s 做更新。
+	3. 将 diff 添加本次的 `kubectl.kubernetes.io/last-applied-configuration` annotation，最后用 patch 请求提交给 K8s 做更新。
 
 这里只是一个大致的流程梳理，真实的逻辑会更复杂一些，而从 K8s 1.14 之后也支持了 [server-side apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/)，字面地理解为将 kubectl apply的工作（read + update）迁移到 Server 端来进行，此外Server-Side Apply 利用 managedFields 字段，追踪了各个字段的归属，并且能在更新的时候提供冲突检测(manager不匹配)，并提供更为准确的提示。
 
+
+[kubectl apply源码分析](https://www.cnblogs.com/orchidzjl/p/15086579.html)patch容易出现字段冲突：比如将readiness probe的类型从tcp修改为httpGet，patch时希望修改probe类型但被认为是一种追加动作，导致apiserver端验证错误不允许为一种类型的probe指定多个handler。当然，处理方式可以在patch数据中为要删除的readiness tcp probe加一个删除标记，这样patch请求到达apiserver的时候就可以被正确处理达到替换的目的：
+
+```json
+"spec": {
+   "containers":[
+      {
+         "name":"xxx",
+         "readinessProbe":{
+            "exec":nil, // delete
+            "httpGet":{ // add
+            }
+         }
+      }
+   }]
+}
+```
+本质是，patch时应明确的表达增删改， 否则apiserver 无法工作，kubectl apply时为什么就没这个问题呢？kubectl apply使用3-way patch
+1. 根据current和modified计算出那些字段是新增的，计算增量时忽略哪些要被删除的字段，
+2. 根据original（last-apply-configuration annotaion）和modified计算出哪些字段是要删除的，忽略增加的字段。这么做有效的前提是：更新crd 的字段值可以通过kubectl 或 operator，但是删除crd字段 一定要通过 `kubectl apply` 操作，所以 `kubectl.kubernetes.io/last-applied-configuration` 虽然从值上不一定是最新的，但是 字段（schema） 一定是最新的。
+
+```go
+// k8s.io/apimachinery/pkg/util/strategicpatch/patch.go
+func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{},...) ([]byte, error) {...}
+// original时集群中当前资源的LastAppliedConfigAnnotation数据
+// modified是此次需要apply放入数据
+// current是集群中当前的资源数据
+func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupPatchMeta, ...) ([]byte, error) {...}
+```
+
+
 ### edit
 
-kubectl edit 逻辑上更简单一些。在用户执行命令之后，kubectl 从 K8s 中查到当前的资源对象，并打开一个命令行编辑器（默认用 vi）为用户提供编辑界面。当用户修改完成、保存退出时，kubectl 并非直接把修改后的对象提交 update（避免 Conflict，如果用户修改的过程中资源对象又被更新），而是会把修改后的对象和初始拿到的对象计算 diff，最后将 diff 内容用 patch 请求提交给 K8s。
+`kubectl edit` 逻辑上更简单一些。在用户执行命令之后，kubectl 从 K8s 中查到当前的资源对象，并打开一个命令行编辑器（默认用 vi）为用户提供编辑界面。当用户修改完成、保存退出时，kubectl 并非直接把修改后的对象提交 update（避免 Conflict，如果用户修改的过程中资源对象又被更新），而是会把修改后的对象和初始拿到的对象计算 diff，最后将 diff 内容用 patch 请求提交给 K8s。

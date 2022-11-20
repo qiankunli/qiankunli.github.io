@@ -25,8 +25,6 @@ keywords: linux 进程调度
 
 ## 数据结构
 
-
-
 我们知道应用程序由源代码编译而成，**没有运行之前它是一个文件**，直到它被装入内存中运行、操作数据执行相应的计算，完成相应的输入输出。在计算机中，CPU、内存、网络、各种输入、输出设备甚至文件数据都可以看成是资源，操作系统就是这些资源的管理者。应用程序要想使用这些“资本”，就要向操作系统申请。比方说，应用程序占用了多少内存，使用了多少网络链接和通信端口，打开多少文件等，**这些使用的资源通通要记录在案**。记录在哪里比较合适呢？当然是代表一个应用程序的活动实体——进程之中最为稳妥。
 
 ![](/public/upload/linux/task_struct_part.png)
@@ -78,19 +76,13 @@ struct task_struct {
 一个进程的运行竟然要保存这么多信息，这些信息都可以通过命令行取出来。fork 进程时， 创建一个空的task_struct 结构之后，这些信息也将被一一复制。
 
 ```c
-long _do_fork(unsigned long clone_flags,
-        unsigned long stack_start,
-        unsigned long stack_size,
-        int __user *parent_tidptr,
-        int __user *child_tidptr,
-        unsigned long tls){
+long _do_fork(unsigned long clone_flags,unsigned long stack_start,unsigned long stack_size,int __user *parent_tidptr,int __user *child_tidptr,unsigned long tls){
     struct task_struct *p;
     int trace = 0;
     long nr;
     ......
     // 复制结构
-    p = copy_process(clone_flags, stack_start, stack_size,
-            child_tidptr, NULL, trace, tls, NUMA_NO_NODE);
+    p = copy_process(clone_flags, stack_start, stack_size,child_tidptr, NULL, trace, tls, NUMA_NO_NODE);
     ......
     if (!IS_ERR(p)) {
         struct pid *pid;
@@ -121,7 +113,9 @@ long _do_fork(unsigned long clone_flags,
 
 SMP 系统的出现，对应用软件没有任何影响，因为应用软件始终看到是一颗 CPU，然而这却给操作系统带来了麻烦，操作系统必须使每个 CPU 都正确地执行进程。
 1. 操作系统要开发更先进的同步机制，解决数据竞争问题。比如原子变量、自旋锁、信号量等高级的同步机制。
-2. 进程调度问题，需要使得多个 CPU 尽量忙起来，否则多核还是等同于单核。为此，操作系统需要对进程调度模块进行改造。单核 CPU 一般使用全局进程队列，系统所有进程都挂载到这个队列上，进程调度器每次从该队列中获取进程让 CPU 执行。多核心系统下，每个 CPU 一个进程队列，虽然提升了进程调度的性能，但同时又引发了另一个问题——每个 CPU 的压力各不相同。这是因为进程暂停或者退出，会导致各队列上进程数量不均衡，有的队列上很少或者没有进程，有的队列上进程数量则很多，间接地出现一部分 CPU 太忙吃不消，而其他 CPU 太闲（处于饥饿空闲状态）的情况。怎么解决呢？这就需要操作系统时时查看各 CPU 进程队列上的进程数量，做出动态调整，把进程多的队列上的进程迁移到较少进程的队列上，使各大进程队列上的进程数量尽量相等，使 CPU 之间能为彼此分担压力。这就叫负载均衡，这种机制能提升系统的整体性能。
+2. 进程调度问题，需要使得多个 CPU 尽量忙起来，否则多核还是等同于单核。为此，操作系统需要对进程调度模块进行改造。
+    1. 单核 CPU 一般使用全局进程队列，系统所有进程都挂载到这个队列上，进程调度器每次从该队列中获取进程让 CPU 执行。**多核心系统下，每个 CPU 一个进程队列**，虽然提升了进程调度的性能，但同时又引发了另一个问题——每个 CPU 的压力各不相同。这是因为进程暂停或者退出，会导致各队列上进程数量不均衡，有的队列上很少或者没有进程，有的队列上进程数量则很多，间接地出现一部分 CPU 太忙吃不消，而其他 CPU 太闲（处于饥饿空闲状态）的情况。
+    2. 怎么解决呢？这就需要操作系统时时查看各 CPU 进程队列上的进程数量，做出动态调整，把进程多的队列上的进程迁移到较少进程的队列上，使各大进程队列上的进程数量尽量相等，使 CPU 之间能为彼此分担压力。这就叫负载均衡，这种机制能提升系统的整体性能。
 
 linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
 
@@ -129,15 +123,18 @@ linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的�
 2. struct rq，为每一个CPU都创建一个队列来保存可以在这个CPU上运行的任务，这里面包括一个实时进程队列rt_rq和一个CFS运行队列cfs_rq ，task_struct就是用sched_entity这个成员变量将自己挂载到某个CPU的队列上的。
     ![](/public/upload/linux/cpu_runqueue.jpg)
 
-进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，将这个进程放进某个CPU的队列上来，虽然不一定马上运行，但是说明可以在这个CPU上被调度上去运行了。
+进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，**将这个进程放进某个CPU的队列上来**。选择CPU，CPU 调度是在缓存性能和空闲核心两个点之间做权衡，同等条件下会尽量优先考虑缓存命中率，选择同 L1/L2 的核，其次会选择同一个物理 CPU 上的（共享 L3），最坏情况下去选择另外一个物理 CPU 上的核心。
 
-在 x86 体系结构中，提供了一种以硬件的方式进行进程切换的模式，对于每个进程，x86 希望在内存里面维护一个 TSS（Task State Segment，任务状态段）结构。这里面有所有的寄存器。另外，还有一个特殊的寄存器 TR（Task Register，任务寄存器），指向某个进程的 TSS。更改 TR 的值，将会触发硬件保存 CPU 所有寄存器的值到当前进程的 TSS 中，然后从新进程的 TSS 中读出所有寄存器值，加载到 CPU 对应的寄存器中。
+
+### 进程切换
+
+在 x86 体系结构中，提供了一种以硬件的方式进行进程切换的模式，对于每个进程，x86 希望在内存里面维护一个 TSS（Task State Segment，任务状态段）结构。这里面有所有的寄存器。另外，还有一个特殊的寄存器 TR（Task Register，任务寄存器），指向某个进程的 TSS。
+1. 更改 TR 的值，将会触发硬件保存 CPU 所有寄存器的值到当前进程的 TSS 中
+2. 然后从新进程的 TSS 中读出所有寄存器值，加载到 CPU 对应的寄存器中。
 
 但是这样有个缺点。我们做进程切换的时候，没必要每个寄存器都切换，这样每个进程一个 TSS，就需要全量保存，全量切换，动作太大了。于是，Linux 操作系统想了一个办法。还记得在系统初始化的时候，会调用 cpu_init 吗？这里面会给每一个CPU 关联一个 TSS，然后将 TR 指向这个 TSS，然后在操作系统的运行过程中，TR 就不切换了，永远指向这个TSS
 
-在 Linux 中，真的参与进程切换的寄存器很少，主要的就是栈顶寄存器
-
-所谓的进程切换，就是将某个进程的 thread_struct里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。
+在 Linux 中，真的参与进程切换的寄存器很少，主要的就是栈顶寄存器。所谓的进程切换，就是将某个进程的 thread_struct里面的寄存器的值，写入到 CPU 的 TR 指向的 tss_struct，对于 CPU 来讲，这就算是完成了切换。
 
 ![](/public/upload/linux/cpu_rq.png)
 
@@ -149,9 +146,7 @@ shell 实现的功能有别于其它应用，它的功能是接受用户输入�
 
 [万字详解Linux内核调度器及其妙用](https://mp.weixin.qq.com/s/gkZ0kve8wOrV5a8Q2YeYPQ) 整个Linux系统的第一个用户态进程就是这样运行起来的。Linux系统启动的时候，先初始化的肯定是内核，当内核初始化结束了，会创建第一个用户态进程，1号进程。创建的方式是在内核态运行do_execve，来运行"/sbin/init"，"/etc/init"，"/bin/init"，"/bin/sh"中的一个，不同的Linux版本不同。
 
-写过Linux程序的我们都知道，execve是一个系统调用，它的作用是运行一个执行文件。加一个do_的往往是内核系统调用的实现。
-
-在do_execve中，会有一步是设置struct pt_regs，主要设置的是ip和sp，指向第一个进程的起始位置，这样调用iret就可以从系统调用中返回。这个时候会从pt_regs恢复寄存器。指令指针寄存器IP恢复了，指向用户态下一个要执行的语句。函数栈指针SP也被恢复了，指向用户态函数栈的栈顶。所以，下一条指令，就从用户态开始运行了。
+写过Linux程序的我们都知道，execve是一个系统调用，它的作用是运行一个执行文件。加一个do_的往往是内核系统调用的实现。在do_execve中，会有一步是设置struct pt_regs，主要设置的是ip和sp，指向第一个进程的起始位置，这样调用iret就可以从系统调用中返回。这个时候会从pt_regs恢复寄存器。指令指针寄存器IP恢复了，指向用户态下一个要执行的语句。函数栈指针SP也被恢复了，指向用户态函数栈的栈顶。所以，下一条指令，就从用户态开始运行了。
 
 接下来所有的用户进程都是这个1号进程的徒子徒孙了。如果要创建新进程，是某个用户态进程调用fork，fork是系统调用会调用到内核，在内核中子进程会复制父进程的几乎一切，包括task_struct，内存空间等。这里注意的是，fork作为一个系统调用，是将用户态的当前运行状态放在pt_regs里面了，IP和SP指向的就是fork这个函数，然后就进内核了。
 
@@ -168,7 +163,7 @@ shell 实现的功能有别于其它应用，它的功能是接受用户输入�
 
 ## 进程调度
 
-**进程调度第一定律**：所有进程的调度最终是通过正在运行的进程调用__schedule 函数实现
+**进程调度第一定律**：所有进程的调度最终是通过正在运行的进程调用`__schedule` 函数实现
 
 ![](/public/upload/linux/process_schedule.png)
 
@@ -182,7 +177,7 @@ struct task_struct{
     int prio, static_prio, normal_prio;
     unsigned int rt_priority;
     ...
-    const struct sched_class *sched_class; // 调度策略的执行逻辑
+    const struct sched_class *sched_class; // 调度策略的执行逻辑，实现了调取器类中要求的添加任务队列、删除任务队列、从队列中选择进程等方法。
 }
 ```
 
@@ -192,28 +187,26 @@ CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，tas
 /*
  * Update the current task's runtime statistics.
  */
-static void update_curr(struct cfs_rq *cfs_rq)
-{
+static void update_curr(struct cfs_rq *cfs_rq){
   struct sched_entity *curr = cfs_rq->curr;
   u64 now = rq_clock_task(rq_of(cfs_rq));
   u64 delta_exec;
-......
+  ......
   delta_exec = now - curr->exec_start;
-......
+  ......
   curr->exec_start = now;
-......
+  ......
   curr->sum_exec_runtime += delta_exec;
-......
+  ......
   curr->vruntime += calc_delta_fair(delta_exec, curr);
   update_min_vruntime(cfs_rq);
-......
+  ......
 }
 
 /*
  * delta /= w
  */
-static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
-{
+static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se){
   if (unlikely(se->load.weight != NICE_0_LOAD))
         /* delta_exec * weight / lw.weight */
     delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
@@ -233,7 +226,7 @@ struct task_struct{
 }
 ```
 
-每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。这样保证了实时任务的优先级永远大于普通任务。
+每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。**这样保证了实时任务的优先级永远大于普通任务**。
 
 ```c
 // Pick up the highest-prio task:
@@ -252,7 +245,7 @@ static inline struct task_struct *pick_next_task(struct rq *rq, struct task_stru
 }
 ```
 
-CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的每一个节点都是一个 sched_entity（说白了每个节点是一个进/线程），每个 sched_entity 都属于一个 task_struct，task_struct 里面有指针指向这个进程属于哪个调度类。
+CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的每一个节点都是一个 sched_entity（说白了每个节点是一个进/线程），每个 sched_entity 都属于一个 task_struct，task_struct 里面有指针指向这个进程属于哪个调度类。如何获取下一个待执行任务的呢？**其实就是从当前任务队列的红黑树节点将运行虚拟时间最小的节点（最左侧的节点）选出来而已**。
 
 <div class="class=width:100%;height:auto;">
     <img src="/public/upload/linux/process_schedule_impl.jpeg"/>
@@ -272,7 +265,7 @@ struct task_struct{
 
 ![](/public/upload/linux/schedule_class.png)
 
-sched_class结构体类似面向对象中的基类啊,通过函数指针类型的成员指向不同的函数，实现了多态。
+sched_class结构体类似面向对象中的基类啊，通过函数指针类型的成员指向不同的函数，实现了多态。
 
 ### 主动调度
 
