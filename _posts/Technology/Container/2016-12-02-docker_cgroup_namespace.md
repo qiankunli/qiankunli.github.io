@@ -131,6 +131,8 @@ Linux 中每个进程（线程）都是用 task_struct 来表示的。每个 tas
 
 [彻底搞懂容器技术的基石： cgroup](https://mp.weixin.qq.com/s/6Ts6-aZDr8qOdnaNUqwTFQ)
 
+[一文带你搞懂 Docker 容器的核心基石 Cgroups](https://mp.weixin.qq.com/s/uvtuaXIDoCyy7-JO4qYY8Q) 未细读。在 Linux 里，一直以来就有对进程进行分组的概念和需求，并在分组的基础上对进程进行监控和资源控制管理等。
+
 [彻底搞懂 Kubernetes 中的 Cgroup](https://mp.weixin.qq.com/s/bgoFj-aZo-RMh2hR5h0zrA) 几个概念
 1. task（任务），系统中的进程
 3. cgroup(控制组)，cgroups 中的资源控制都以 cgroup 为单位实现。cgroup 表示按某种资源控制标准划分而成的任务组，包含一个或多个子系统。一个任务可以加入某个 cgroup，也可以从某个 cgroup 迁移到另外一个 cgroup

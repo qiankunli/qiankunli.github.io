@@ -45,6 +45,7 @@ keywords:  集群
 2. 在不同的集群下发的模型怎样做到差异化？
 3. 怎样设计和解决在多集群的背景下，有状态服务的调度机制和访问机制？
 4. 多集群监控 [阿里云注册集群+Prometheus 解决多云容器集群运维痛点](https://mp.weixin.qq.com/s/Sud0TtLWk6lQUKmCPMN12A)
+5. 多集群故障迁移 [Karmada跨集群优雅故障迁移特性解析](https://mp.weixin.qq.com/s/Bnrc3OCO-mBUD1vj6OsuLw) 主要包括发现故障、故障迁移、如何优雅故障迁移。
 
 ## clusternet 
 

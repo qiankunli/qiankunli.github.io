@@ -43,6 +43,8 @@ Koordinator，名字取自 coordinator，K for Kubernetes，发音相同。语�
 1. 混部pod会占用原生的资源配额（例如cpu request），这会导致在线任务发布的时候没有可用资源；PS：把离线业务调到在线集群节点，得调的上去，调上去之后不能影响在线业务pod调度。 
 2. 原生调度本质是静态调度，没有考虑机器实际负载，因此没法有效地将混部任务调度到实际负载有空闲的机器上。PS：得感知实际的机器负载。得调的上去，调上去之后要有措施防止出事。
 
+[字节跳动 YARN 云原生化演进实践](https://mp.weixin.qq.com/s/a6P1ZrIoy6xlHrTG2-GNKQ)
+
 ### 可观测性体系
 
 ### 节点层面：操作系统级/资源隔离
@@ -176,6 +178,13 @@ LAR的设计目标是在保障服务质量的同时提升整体资源的利用�
   1. 单机调度主要是扩展了 Kubernetes 的单机资源管控：资源的微拓扑结构感知和资源的分配策略，主要解决了如何让不同 cores 形态的 Pod 统一运行在一个节点之上。
   2. 集群中心调度器需要解决的核心问题是如何让不同形态的应用在整个集群里自由地调度。需要满足不同的调度语义细粒度的要求，充分降低集群空置率。在调度性能方面，同时要满足低频次和批式的大吞吐的调度场景。针对各种应用场景提升调度场景的质量也是集群中心调度器需要解决的问题。
   3. 全局调度，考虑到字节跳动的整体规模，单一的集群能力不足以满足管理字节全球数据中心的需求，并且在应用之间的隔离、多区域的容灾以及算力的标准化问题上字节也有更加细粒度的调度要求。
+
+[后 Hadoop 时代，字节跳动如何打造云原生计算平台](https://mp.weixin.qq.com/s/T9XhiU1rhdP7pVYe9QBkUA)调度系统融合后，在 Kubernetes 集群的基础上增加三个组件：
+1. Yodel：模拟实现 YARN 的 ResourceManager，支持 YARN API 及其 AM 管理、Quota 管理、权限管理等功能。
+2. Unified Scheduler：高性能调度器，取代 Kubernetes 原生调度器，提供了强大的多租户资源隔离能力，以及更丰富的调度策略。
+3. BigData Plugin：单机大数据插件，用于辅助 Kubelet 完成大数据作业的 Localization、Shuffle 等工作。
+在离线业务都统一使用同一个融合集群。具有多租户资源隔离和管控的 Unified Scheudler 统一对集群中所有 Pod 进行调度，统一管控了在离线资源的动态划分。在线服务按照原有接口，提交到 API Server；离线作业按照 YARN 接口，提交到 Yodel，无需任何改动。Yodel 具有和 YARN ResourceManager 一样的功能，并且可以把 YARN Resource Request 转换成 Kubernetes Pod，再转换成 YARN Container。在单机上，所有 Pod 统一由 Kubelet 启动和管理。原来 YARN NodeManager 具有的大数据特有功能移植到 BigData Plugin，辅助 Kubelet 完成，比如为大数据作业提前下载 Jar 包，这个过程又称为 Localization。
+
 
 ## 统一调度的渊源
 

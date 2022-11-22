@@ -169,7 +169,7 @@ type AdmissionService struct {
 
 在volcano 的webhook中，ValidatingWebhookConfiguration 的配置是通过代码写入到 apiserver 的。对于volcano 这种大型框架，可能包含多个crd，每个crd 都会注册一个VatingWebhookConfiguration，如果是自己写的话，yaml 文件要写五六个。
 
-karmara 则使用了controller-runtime 库，一个 crd 对应一个webhook，仅需实现 `Handle(context.Context, admission.Request) admission.Response` 方法，框架负责将其转为 http.handler
+openkruise/karmara 则使用了controller-runtime 库，一个 crd 对应一个webhook，仅需实现 `Handle(context.Context, admission.Request) admission.Response` 方法，框架负责将其转为 http.handler
 
 ```go
 // karmada-io/karmada/cmd/webhook/app/webhook.go

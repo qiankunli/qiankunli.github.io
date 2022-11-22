@@ -213,7 +213,7 @@ kubectl 为了给命令行用户提供良好的交互体感，设计了较为复
 这里只是一个大致的流程梳理，真实的逻辑会更复杂一些，而从 K8s 1.14 之后也支持了 [server-side apply](https://kubernetes.io/docs/reference/using-api/server-side-apply/)，字面地理解为将 kubectl apply的工作（read + update）迁移到 Server 端来进行，此外Server-Side Apply 利用 managedFields 字段，追踪了各个字段的归属，并且能在更新的时候提供冲突检测(manager不匹配)，并提供更为准确的提示。
 
 
-[kubectl apply源码分析](https://www.cnblogs.com/orchidzjl/p/15086579.html)patch容易出现字段冲突：比如将readiness probe的类型从tcp修改为httpGet，patch时希望修改probe类型但被认为是一种追加动作，导致apiserver端验证错误不允许为一种类型的probe指定多个handler。当然，处理方式可以在patch数据中为要删除的readiness tcp probe加一个删除标记，这样patch请求到达apiserver的时候就可以被正确处理达到替换的目的：
+[kubectl apply源码分析](https://www.cnblogs.com/orchidzjl/p/15086579.html)patch容易出现字段冲突：比如将readiness probe的类型从tcp修改为httpGet，patch时希望修改probe类型，但被认为是一种追加动作，导致apiserver端验证错误不允许为一种类型的probe指定多个handler。当然，处理方式可以在patch数据中为要删除的readiness tcp probe加一个删除标记，这样patch请求到达apiserver的时候就可以被正确处理达到替换的目的：
 
 ```json
 "spec": {
@@ -229,9 +229,13 @@ kubectl 为了给命令行用户提供良好的交互体感，设计了较为复
    }]
 }
 ```
-本质是，patch时应明确的表达增删改， 否则apiserver 无法工作，kubectl apply时为什么就没这个问题呢？kubectl apply使用3-way patch
+本质是，patch时应明确的表达 增删改， 否则apiserver 无法工作。
+
+kubectl apply时为什么就没这个问题呢？kubectl apply使用3-way patch
 1. 根据current和modified计算出那些字段是新增的，计算增量时忽略哪些要被删除的字段，
-2. 根据original（last-apply-configuration annotaion）和modified计算出哪些字段是要删除的，忽略增加的字段。这么做有效的前提是：更新crd 的字段值可以通过kubectl 或 operator，但是删除crd字段 一定要通过 `kubectl apply` 操作，所以 `kubectl.kubernetes.io/last-applied-configuration` 虽然从值上不一定是最新的，但是 字段（schema） 一定是最新的。
+2. 根据original（last-apply-configuration annotaion）和modified计算出哪些字段是要删除的，忽略增加的字段。
+
+这么做有效的前提是：更新crd 的字段值可以通过kubectl 或 operator，但是删除crd字段 一定要通过 `kubectl apply` 操作，所以 `kubectl.kubernetes.io/last-applied-configuration` 虽然从值上不一定是最新的，但是 字段（schema） 一定是最新的，并且因为即将删除，所以值新不新也就不重要了。original 代表的最新的schema，current 代表最新的值。
 
 ```go
 // k8s.io/apimachinery/pkg/util/strategicpatch/patch.go
@@ -239,7 +243,19 @@ func CreateTwoWayMergePatch(original, modified []byte, dataStruct interface{},..
 // original时集群中当前资源的LastAppliedConfigAnnotation数据
 // modified是此次需要apply放入数据
 // current是集群中当前的资源数据
-func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupPatchMeta, ...) ([]byte, error) {...}
+// schema 作用是获取用户打的注解
+func CreateThreeWayMergePatch(original, modified, current []byte, schema LookupPatchMeta, ...) ([]byte, error) {
+	originalMap := json.Unmarshal(original, &originalMap)
+	modifiedMap := json.Unmarshal(modified, &modifiedMap)
+	currentMap := json.Unmarshal(current, &currentMap)
+	deltaMap, err := diffMaps(currentMap, modifiedMap, schema, ...)
+	deletionsMap, err := diffMaps(originalMap, modifiedMap, schema, ...)
+
+	patchMap, err := mergeMap(deletionsMap, deltaMap, schema, ...)
+	return json.Marshal(patchMap)
+}
+func StrategicMergePatch(original, patch []byte, ...) ([]byte, error)
+// patch.go 提供了两类方法：计算patch,将patch 合并到某个 original 得到一个新的merged。用户可以直接patch(aptch)，也可以update(merged)
 ```
 
 
