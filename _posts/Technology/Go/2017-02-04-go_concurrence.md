@@ -10,17 +10,11 @@ keywords: Go Concurrence
 
 ## 一 前言
 
-本文算是对《Go并发编程实战》一书的小结。
 
-我们谈go的优点时，并发编程是最重要的一块。因为go基于新的并发编程模型：不用共享内存的方式来通信，作为替代，以通信作为手段来共享内存。（goroutine共享channel，名为管道，实为内存）。
 
-为解释这个优势，本文提出了四个概念：交互方式、手段、类型、目的（不一定对，只是为了便于描述）。并在不同的并发粒度上（进程、线程、goroutine）对这几个概念进行了梳理。
+我们谈go的优点时，并发编程是最重要的一块。因为go基于新的并发编程模型：不用共享内存的方式来通信，作为替代，以通信作为手段来共享内存。（goroutine共享channel，名为管道，实为内存）。为解释这个优势，本文提出了四个概念：交互方式、手段、类型、目的（不一定对，只是为了便于描述）。并在不同的并发粒度上（进程、线程、goroutine）对这几个概念进行了梳理。
 
 Go 语言的并发模型是 fork-join 型的。使用 go 关键字启动子协程工作，使用 sync.Wait 和 channel 来收集结果。
-
-Go 并没有彻底放弃基于共享内存的并发模型，而是在提供 CSP 并发模型原语的同时，还通过标准库的 sync 包，提供了针对传统的、基于共享内存并发模型的低级同步原语，包括：互斥锁（sync.Mutex）、读写锁（sync.RWMutex）、条件变量（sync.Cond）等，并通过 atomic 包提供了原子操作原语等等。显然，基于共享内存的并发模型在 Go 语言中依然有它的“用武之地”。sync 包低级同步原语可以用在哪？
-1. 在 Go 中，channel 并发原语也可以用于对数据对象访问的同步，我们可以把 channel 看成是一种高级的同步原语，它自身的实现也是建构在低级同步原语之上的。也正因为如此，**channel 自身的性能与低级同步原语相比要略微逊色**，开销要更大。
-2. 在不想转移结构体对象所有权，但又要保证结构体内部状态数据的同步访问的场景。
 
 ## 原子操作
 
@@ -34,6 +28,10 @@ Go 并没有彻底放弃基于共享内存的并发模型，而是在提供 CSP 
 **互斥锁是用来保护一段逻辑，原子操作用于对一个变量的更新保护。原子操作由底层硬件支持，这些指令在执行的过程中是不允许中断的，而锁则由操作系统的调度器实现**，G1 操作变量时，其它操作变量的G 不允许被调度执行（跟允许被中断一个味道）。Mutex的底层实现也用到了原子操作中的CAS实现的。
 
 ## 同步原语
+
+Go 并没有彻底放弃基于共享内存的并发模型，而是在提供 CSP 并发模型原语的同时，还通过标准库的 sync 包，提供了针对传统的、基于共享内存并发模型的低级同步原语，包括：互斥锁（sync.Mutex）、读写锁（sync.RWMutex）、条件变量（sync.Cond）等，并通过 atomic 包提供了原子操作原语等等。显然，基于共享内存的并发模型在 Go 语言中依然有它的“用武之地”。sync 包低级同步原语可以用在哪？
+1. 在 Go 中，channel 并发原语也可以用于对数据对象访问的同步，我们可以把 channel 看成是一种高级的同步原语，它自身的实现也是建构在低级同步原语之上的。也正因为如此，**channel 自身的性能与低级同步原语相比要略微逊色**，开销要更大。
+2. 在不想转移结构体对象所有权，但又要保证结构体内部状态数据的同步访问的场景。
 
 [Go 语言设计与实现-同步原语与锁](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-sync-primitives/)Go 语言在 sync 包中提供了用于同步的一些基本原语，包括常见的 sync.Mutex、sync.RWMutex、sync.WaitGroup、sync.Once 和 sync.Cond。这些基本原语提高了较为基础的同步功能，但是它们是一种相对原始的同步机制，在多数情况下，我们都应该使用**抽象层级的更高的** Channel 实现同步。 [觉得WaitGroup不好用？试试ErrorGroup吧！](https://mp.weixin.qq.com/s/077qtC19cRMmaKWVL0qqaQ)
 
@@ -165,6 +163,38 @@ select {
 }
 ```
 
+### waitGroup/errGroup
+
+```go
+// 启动多个goroutine
+for i:=0;i<10;i++{
+    go func(){
+        ...
+    }()
+}
+// 使用waitGroup
+wg := sync.WaitGroup{}
+for i:=0;i<10;i++{
+    wg.Add(1)
+    go func(){
+    defer wg.wg.Done()
+        ...
+    }()
+}
+wg.Wait()
+// 当我们想要知道某个goroutine报什么错误的时候发现很难，因为我们是直接go func(){}出去的，并没有返回值，因此对需要接受返回值做进一步处理的需求就无法满足了
+eg, _ := errgroup.WithContext(context.Background())
+eg.Go(func() error {
+    defer func() {
+        //recover
+    }()
+    //TODO:真正逻辑
+})
+if err := group.Wait(); err != nil {
+    return nil, err
+}
+```
+
 
 ## 取消/中断goroutine 执行的工具——context
 
@@ -178,6 +208,7 @@ select {
 
 
 ### 为什么有 context？
+
 [Go组件：context学习笔记！](https://mp.weixin.qq.com/s/OCpVRwtiphFRZgu9zdae5g)一个goroutine启动后是无法控制它的，大部分情况是等待它自己结束，如何主动通知它结束呢？**go的协程不支持直接从外部退出**，不像C++和Java有个线程ID可以操作。所以只能通过协程自己退出的方式。一般来说通过channel来控制是最方便的。
 
 ```go

@@ -81,8 +81,8 @@ spec:
   ports:
   - name: default
     protocol: TCP
-    port: 80
-    targetPort: 9376
+    port: 80              # 通过Service暴露出来的一个Port，可以在Cluster内进行访问。
+    targetPort: 9376      # Pod和Container监听的Port.
 ```
 
 一旦它被提交给 Kubernetes，那么 kube-proxy 就可以通过 Service 的 Informer 感知到这样一个 Service 对象的添加。而作为对这个事件的响应，它就会在宿主机上创建这样一条 iptables 规则
@@ -169,7 +169,7 @@ metadata:
 spec:
   type: NodePort
   ports:
-  - nodePort: 8080
+  - nodePort: 8080          # Cluster向外网暴露出来的端口，可以让外网能够访问到Pod/Container.
     targetPort: 80
     protocol: TCP
     name: http

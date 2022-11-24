@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Kubernetes webhook
+title:  Admission Controller 与  Admission Webhook 
 category: 架构
 tags: Kubernetes
 keywords:  Kubernetes webhook
@@ -13,15 +13,9 @@ keywords:  Kubernetes webhook
 * TOC
 {:toc}
 
-## Admission Controller
-
-Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个设计和各类 Web 框架中的 Filter  很像，就是一个插件化的责任链，责任链中的每个插件针对 apiserver 收到的请求做一些操作或校验。
-
-![](/public/upload/kubernetes/webhook_admission_controller.jpg)
+## Admission Controller 以及为什么需要 webhook
 
 [为什么需要 Kubernetes 准入控制器](https://mp.weixin.qq.com/s/TjvIdKY6EJMVx6TiagM7Jg)
-
-![](/public/upload/kubernetes/admission_controller.png)
 
 准入控制器是kubernetes 的API Server上的一个链式Filter，它根据一定的规则决定是否允许当前的请求生效，并且有可能会改写资源声明。比如
 
@@ -29,7 +23,7 @@ Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个�
 2. applying pre-create checks
 3. setting up default values for missing fields.
 
-The problem with admission controllers are:
+Kubernetes 的 apiserver 一开始就有 AdmissionController 的设计，这个设计和各类 Web 框架中的 Filter  很像，就是一个插件化的责任链，责任链中的每个插件针对 apiserver 收到的请求做一些操作或校验。The problem with admission controllers are:
 
 1. **They’re compiled into Kubernetes**: If what you’re looking for is missing, you need to fork Kubernetes, write the admission plugin and keep maintaining a fork yourself.
 2. You need to enable each admission plugin by passing its name to --admission-control flag of kube-apiserver. In many cases, this means redeploying a cluster.
@@ -38,6 +32,8 @@ The problem with admission controllers are:
 K8s支持30多种admission control 插件，其中有两个具有强大的灵活性，即ValidatingAdmissionWebhooks和MutatingAdmissionWebhooks，这两种控制变换和准入以Webhook的方式提供给用户使用，大大提高了灵活性，用户可以在集群创建自定义的AdmissionWebhookServer进行调整准入策略。
 
 ## 配置apiserver 发起webhook
+
+![](/public/upload/kubernetes/admission_controller.png)
 
 2. MutatingWebhookConfiguration，在对象持久化之前，修改对象的内容或者拒绝请求。 会对request的resource，进行转换，比如填充默认的request/limit。因为对象的字段可能被不同的准入控制器修改多次，所以准入控制器链的顺序就尤其重要。
 1. ValidatingWebhookConfiguration，在对象持久化之前，校验对象的内容或者拒绝请求。 比如校验Pod副本数必须大于2。
@@ -92,7 +88,7 @@ clientConfig 描述如何调用webhook
 
 ## 请求响应参数
 
-webhook本身是一个约定接口的**web server**。
+webhook本身是一个约定接口的**http callback/web server**。
 
 ```go
 type AdmissionReview struct {
@@ -141,6 +137,42 @@ Webhook 禁止请求的最简单响应示例：
 ```
 
 ## 实现
+
+### apiserver调用
+
+```
+apiserver
+  /pkg
+     /addmission
+       /plugin
+          /namespace
+          /resourcequota
+          /webhook
+    /authentication
+    /authorization
+    /registry
+    /server
+    /storage
+```
+
+![](/public/upload/kubernetes/webhook_admission_controller.jpg)
+
+```go
+// apiserver/pkg/admission/plugin/webhook/mutating/plugin.go
+func (a *Plugin) Admit(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
+	return a.Webhook.Dispatch(ctx, attr, o)
+}
+Webhook.Dispatch
+    hooks := a.hookSource.Webhooks()
+    mutatingDispatcher/validatingDispatcher.Dispatch(ctx, attr, o, hooks)
+        for i, hook := range hooks {
+            invocation, statusErr := a.plugin.ShouldCallHook(hook, attrForCheck, o)
+            hook, ok := invocation.Webhook.GetMutatingWebhook()
+            changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, o, round, i)
+        }
+```
+
+### webhook 自身实现
 
 webhook 是一个http server，是一个限制了请求与响应格式（AdmissionReview/AdmissionResponse）的http server
 

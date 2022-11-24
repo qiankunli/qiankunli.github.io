@@ -17,9 +17,9 @@ keywords:  kubernetes client-go
 1. 命令行 kubectl
 2. http k8s REST API
 2. 代码库 client-go
-    1. ClientSet
-    2. Dynamic Client
-    3. RESTClient 
+	1. RESTClient ，其它客户端都是基于它实现的。
+    1. ClientSet，在RESTClient的基础上封装了对Resource和Version的管理方法，即预先实现了每种Resource和Version的操作，因此只能够处理Kubernetes内置资源（即Client集合内的资源），要访问CRD需要通过client-gen代码生成器自动生成CRD操作相关的接口。
+    2. Dynamic Client，用于处理Unstructured数据结构（即无法提前预知数据结构）
     4. informer
 
 [Kubernetes的client-go库介绍](https://mp.weixin.qq.com/s/eYJ0rT6jmq3JvBqyHn2xgg)client-go是一个调用kubernetes集群资源对象**http API的客户端**(是一个典型的web服务客户端库)，即通过client-go实现对kubernetes集群中资源对象（包括deployment、service、ingress、replicaSet、pod、namespace、node等）的增删改查等操作。
@@ -210,7 +210,16 @@ nodes, err := nodeInformer.Lister().List(labels.NewSelector())
 
 ### Dynamic client 
 
-Dynamic client 是一种动态的 client，它能处理 kubernetes 所有的资源。不同于 clientset，dynamic client 对GVK 一无所知， 返回的对象unstructured.Unstructured（在k8s.io/apimachinery 中定义，并注册到了schema 中） 是一个 `map[string]interface{}`，如果一个 controller 中需要控制所有的 API，可以使用dynamic client，目前它在 garbage collector 和 namespace controller中被使用。
+Dynamic client 是一种动态的 client，它能处理 kubernetes 所有的资源。不同于 clientset，dynamic client 对GVK 一无所知， 返回的对象unstructured.Unstructured（在k8s.io/apimachinery 中定义，并注册到了schema 中） 是一个 `map[string]interface{}`
+
+```go 
+type Unstructured struct {
+ 	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or map[string]interface{} children.
+ 	Object map[string]interface{}
+}
+```
+
+如果一个 controller 中需要控制所有的 API，可以使用dynamic client，目前它在 garbage collector 和 namespace controller中被使用。
 
 ```
 k8s.io/client-go

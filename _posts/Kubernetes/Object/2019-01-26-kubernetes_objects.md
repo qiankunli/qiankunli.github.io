@@ -62,7 +62,15 @@ schema struct 将golang object 映射为可能的GVK。一个GVK 到一个GVR �
 
 ![](/public/upload/kubernetes/kubernetes_type.png)
 
-[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)**http server 或者 rpc server 要解决的一个问题是：如何解析用户的请求数据，并把他反序列化为语言中的一个具体的类型**。以一个 EchoService 为例，decode 程序需要从用户请求（如 post http://echo ） 文本或者二进制数据中创建出  EchoRequestV1，提供给上层处理，同时这个 decode 函数需要足够通用，他返回的是可能是一个 Message Interface, 里面是 EchoRequestV1，decode 相关的细节要么通过代码生成的技术提供给 decoder，要么在 二进制或者文本请求数据（或者 header等元数据）中携带这部分信息。解决这个问题有两种方式Protobuf Unmarshal/Kubernetes Scheme
+[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)**http server 或者 rpc server 要解决的一个问题是：如何解析用户的请求数据，并把他反序列化为语言中的一个具体的类型**。以一个 EchoService 为例，decode 程序需要从用户请求（如 post http://echo ） 文本或者二进制数据中创建出  EchoRequestV1，提供给上层处理，同时这个 decode 函数需要足够通用，他返回的是可能是一个 Message Interface（包含通用rpc 字段）, 具体内容是 EchoRequestV1。decode 相关的细节要么通过代码生成的技术提供给 decoder，要么在 二进制或者文本请求数据（或者 header等元数据）中携带这部分信息。解决这个问题有两种方式Protobuf Unmarshal/Kubernetes Scheme
+
+||rpc|k8s|
+|---|---|---|
+||二进制|http|
+|定位|header 里包含 groupName.serviceName|GVR：http://xx/pods/xx|
+|编解码|Protobuf/thrift|GVK：Kubernetes Scheme|
+|其它|框架底层可能定义一些Message 之类的对象|Obejct/Unstructured|
+
 
 ### Protobuf Unmarshal
 
@@ -226,7 +234,7 @@ type Deployment struct {
 } 
 ```
 
-[Kubernetes 资源对象序列化实现](https://mp.weixin.qq.com/s/fJf1mtCR49XO7BOUn2FRTg)序列化和反序列化在很多项目中都有应用，Kubernetes也不例外。Kubernetes中定义了大量的API对象，为此还单独设计了一个包(https://github.com/kubernetes/api)，方便多个模块引用。**API对象在不同的模块之间传输(尤其是跨进程)可能会用到序列化与反序列化，不同的场景对于序列化个格式又不同，比如grpc协议用protobuf，用户交互用yaml(因为yaml可读性强)，etcd存储用json**。Kubernetes反序列化API对象不同于我们常用的json.Unmarshal()函数(需要传入对象指针)，Kubernetes需要解析对象的类型(Group/Version/Kind)，根据API对象的类型构造API对象，然后再反序列化。因此，Kubernetes定义了Serializer接口(https://github.com/kubernetes/apimachinery/blob/release-1.21/pkg/runtime/interfaces.go#L86)，专门用于API对象的序列化和反序列化。PS： rest path ==> gvr ==> decoder.decode(gvk) ==> object.
+[Kubernetes 资源对象序列化实现](https://mp.weixin.qq.com/s/fJf1mtCR49XO7BOUn2FRTg)序列化和反序列化在很多项目中都有应用，Kubernetes也不例外。Kubernetes中定义了大量的API对象，为此还单独设计了一个包(https://github.com/kubernetes/api)，方便多个模块引用。**API对象在不同的模块之间传输(尤其是跨进程)可能会用到序列化与反序列化，不同的场景对于序列化个格式又不同，比如grpc协议用protobuf，用户交互用yaml(因为yaml可读性强)，etcd存储用json**。Kubernetes反序列化API对象不同于我们常用的`json.Unmarshal()`函数(需要传入对象指针)，Kubernetes需要解析对象的类型(Group/Version/Kind)，根据API对象的类型构造API对象，然后再反序列化。因此，Kubernetes定义了Serializer接口(https://github.com/kubernetes/apimachinery/blob/release-1.21/pkg/runtime/interfaces.go#L86)，专门用于API对象的序列化和反序列化。PS： rest path ==> gvr ==> decoder.decode(gvk) ==> object.
 
 
 ## kubernetes 对象

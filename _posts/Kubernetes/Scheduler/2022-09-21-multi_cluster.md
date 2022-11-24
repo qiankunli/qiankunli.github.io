@@ -44,7 +44,7 @@ keywords:  集群
   4. 分发时要考虑集群当前的可用资源情况， [Karmada v1.3 新特性解读: 自定义资源模型](https://mp.weixin.qq.com/s/AsHB4elcCBD3kcI8wFO9Rw)
 2. 在不同的集群下发的模型怎样做到差异化？
 3. 怎样设计和解决在多集群的背景下，有状态服务的调度机制和访问机制？
-4. 多集群监控 [阿里云注册集群+Prometheus 解决多云容器集群运维痛点](https://mp.weixin.qq.com/s/Sud0TtLWk6lQUKmCPMN12A)
+4. 多集群监控 [阿里云注册集群+Prometheus 解决多云容器集群运维痛点](https://mp.weixin.qq.com/s/Sud0TtLWk6lQUKmCPMN12A) [分布式云场景下的多集群监控方案最佳实践](https://mp.weixin.qq.com/s/M3S0kkJj7vn-QG7mw1hdUA)
 5. 多集群故障迁移 [Karmada跨集群优雅故障迁移特性解析](https://mp.weixin.qq.com/s/Bnrc3OCO-mBUD1vj6OsuLw) 主要包括发现故障、故障迁移、如何优雅故障迁移。
 
 ## clusternet 
