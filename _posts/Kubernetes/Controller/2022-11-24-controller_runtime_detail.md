@@ -7,7 +7,7 @@ tags: Kubernetes
 keywords: controller-runtime 
 ---
 
-## 简介
+## 简介（未完成）
 
 * TOC
 {:toc}
@@ -27,6 +27,95 @@ keywords: controller-runtime
 
 ## client
 
+使用：client.Get 可以根据 obj 获取到对应的 gvk client，然后获取到 obj的真实数据，赋值给 obj。
+
+```go
+pod := &core.Pod{}
+err := r.Client.Get(ctx, req.namesapce, pod); 
 ```
-cli, err := client.New(restConf, client.Options{Scheme: scheme.Scheme,})
+
+初始化
+
+```
+// controller-runtime/pkg/manager/manager.go
+func New(config *rest.Config, options Options) (Manager, error) 
+	// controller-runtime/pkg/cluster/cluster.go
+	func New(config *rest.Config, opts ...Option) (Cluster, error) 
+		cache, err := options.NewCache(config, ...）
+		cli, err := client.New(restConf, client.Options{Scheme: scheme.Scheme,})
+			func newClient(config *rest.Config, options Options) (*client, error)
+```
+Get 实现
+```go
+// controller-runtime/pkg/client/client.go
+func (c *client) Get(ctx context.Context, key ObjectKey, obj Object, opts ...GetOption) error {
+	switch obj.(type) {
+	case *unstructured.Unstructured:
+		return c.unstructuredClient.Get(ctx, key, obj, opts...)
+	case *metav1.PartialObjectMetadata:
+		// Metadata only object should always preserve the GVK coming in from the caller.
+		defer c.resetGroupVersionKind(obj, obj.GetObjectKind().GroupVersionKind())
+		return c.metadataClient.Get(ctx, key, obj, opts...)
+	default:
+		return c.typedClient.Get(ctx, key, obj, opts...)
+	}
+}
+// controller-runtime/pkg/client/typed_client.go
+func (c *typedClient) Get(ctx context.Context, key ObjectKey, obj Object, opts ...GetOption) error {
+	r, err := c.cache.getResource(obj)
+	getOpts := GetOptions{}
+	getOpts.ApplyOptions(opts)
+	return r.Get().
+		NamespaceIfScoped(key.Namespace, r.isNamespaced()).
+		Resource(r.resource()).
+		VersionedParams(getOpts.AsGetOptions(), c.paramCodec).
+		Name(key.Name).Do(ctx).Into(obj)
+}
+```
+clientCache  是 k8s teype与client 的cache，不是数据的cache。
+```go
+// controller-runtime/pkg/client/client_cache.go
+// clientCache creates and caches rest clients and metadata for Kubernetes types.
+type clientCache struct {
+	config *rest.Config			// config is the rest.Config to talk to an apiserver
+	scheme *runtime.Scheme		// scheme maps go structs to GroupVersionKinds	
+	mapper meta.RESTMapper		// mapper maps GroupVersionKinds to Resources
+	codecs serializer.CodecFactory		// codecs are used to create a REST client for a gvk
+	structuredResourceByType map[schema.GroupVersionKind]*resourceMeta		// structuredResourceByType caches structured type metadata
+	unstructuredResourceByType map[schema.GroupVersionKind]*resourceMeta	// unstructuredResourceByType caches unstructured type metadata
+	mu                         sync.RWMutex
+}
+// resourceMeta caches state for a Kubernetes type.
+type resourceMeta struct {
+	// client is the rest client used to talk to the apiserver
+	rest.Interface
+	// gvk is the GroupVersionKind of the resourceMeta
+	gvk schema.GroupVersionKind
+	// mapping is the rest mapping
+	mapping *meta.RESTMapping
+}
+// getResource returns the resource meta information for the given type of object.If the object is a list, the resource represents the item's type instead.
+func (c *clientCache) getResource(obj runtime.Object) (*resourceMeta, error) {
+	gvk, err := apiutil.GVKForObject(obj, c.scheme)
+	_, isUnstructured := obj.(*unstructured.Unstructured)
+	_, isUnstructuredList := obj.(*unstructured.UnstructuredList)
+	isUnstructured = isUnstructured || isUnstructuredList
+	// It's better to do creation work twice than to not let multiple people make requests at once
+	c.mu.RLock()
+	resourceByType := c.structuredResourceByType
+	if isUnstructured {
+		resourceByType = c.unstructuredResourceByType
+	}
+	r, known := resourceByType[gvk]
+	c.mu.RUnlock()
+	if known {
+		return r, nil
+	}
+	// Initialize a new Client
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	r, err = c.newResource(gvk, meta.IsListType(obj), isUnstructured)
+	resourceByType[gvk] = r
+	return r, err
+}
 ```

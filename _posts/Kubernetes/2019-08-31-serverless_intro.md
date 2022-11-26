@@ -245,6 +245,8 @@ FaaS 与应用托管 PaaS（**应用托管平台**） 平台对比，**最大的
 
 [Serverless Kubernetes 的 流派](https://mp.weixin.qq.com/s/1aMalQs-AE2L1aA5X20gJA) 需要继续整理。
 
+[腾讯 Nodeless 弹性容器技术演进和实践](https://www.infoq.cn/article/2JPIXj7aGW8murb40QA7) 启动一个虚拟机，做成pod的感觉。
+
 ## 其它
 
 Serverless 架构和之前的架构相比，最大的差异是：业务服务不再是固定的常驻进程，而是真正按需启动和关闭的服务实例。

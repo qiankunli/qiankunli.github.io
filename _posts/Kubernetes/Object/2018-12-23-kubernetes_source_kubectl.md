@@ -28,21 +28,18 @@ keywords: kubernetes 源码分析 kubectl
 
 ### package结构
 
-[Go 常用的一些库](http://qiankunli.github.io/2015/05/31/go_library.html) 在介绍 [spf13/cobra](https://github.com/spf13/cobra)会提到 一个command line application 的推荐结构
+大部分golang 应用 都可以以command line application 的结构来组织，[Go 常用的一些库](http://qiankunli.github.io/2015/05/31/go_library.html) 在介绍 [spf13/cobra](https://github.com/spf13/cobra)提到 一个command line application 的推荐结构
 
-  	appName/
-    	cmd/
-        	add.go
-        	your.go
-        	commands.go
-        	here.go
-      	main.go
+```
+appName/
+	cmd/
+		add.go
+		your.go
+		commands.go
+		here.go
+	main.go
+```
       	
-但我们要注意几个问题
-
-1. 其实大部分golang 应用 都可以以command line application 的结构来组织
-2. k8s 是由 多个command line application 组成的集合，所以其package 结构又有一点不一样。`pkg/kubectl` 是根据 cobra 推荐样式来的，main.go 的角色由`pkg/kubectl/cmd.go` 来承担（cmd.go 的方法被`cmd/kubectl/kubectl.go` 引用），kubectl 具体命令实现在 `pkg/kubectl/cmd` 下
-
 ## Builders and Visitors 
 
 ### 背景
@@ -64,12 +61,18 @@ keywords: kubernetes 源码分析 kubectl
 
 Visitor 接口
 
-	type VisitorFunc func(*Info, error) error
-	// Visitor lets clients walk a list of resources.
-	type Visitor interface {
-		Visit(VisitorFunc) error
-	}
+```
+type VisitorFunc func(*Info, error) error
+// Visitor lets clients walk a list of resources.
+type Visitor interface {
+	Visit(VisitorFunc) error
+}
+```
 
+[重新认识访问者模式：从实践到本质](https://mp.weixin.qq.com/s/-6-70CliuEvIpcI9i8lzwg)正常情况下，对对象的某个成员 赋值或者 干点别的，需要为对象新增一个方法。访问者模式本质上就是将复杂的类层级结构中成员方法全部都抽象到VisitorFunc 中去，**访问者模式实现的所有功能本质上都可以通过给每个对象增加新的成员方法实现**，在编写的时候看起来区别不大，只有当需要添加修改功能的时候才能显现出他们的天壤之别，假设现在我们要给每个类增加一个新操作：
+1. 成员函数实现方式：需要给类层级结构的每个类增加一个实现，需要修改原来的代码，不符合开闭原则
+2. 访问者实现方式：新建一个访问者即可，完全不影响原来的代码。占优。
+软件工程没有银弹，我们也要根据特性和场景决定是采用面向对象的抽象，还是访问者的抽象。更多的时候需要两者混用，**将部分核心方法作为对象成员，利用访问者模式实现应用层的那些琐碎杂乱的需求**。
 
 ### visitor 模式
 
