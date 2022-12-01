@@ -27,14 +27,147 @@ keywords: controller-runtime
 
 ## client
 
-使用：client.Get 可以根据 obj 获取到对应的 gvk client，然后获取到 obj的真实数据，赋值给 obj。
+使用：client.Get 可以根据 obj 获取到 gvk对应的  client 或informer ，进而获取到 obj的真实数据，赋值给 obj。client的厉害之处就在于 无论带缓存（informer） 还是不带缓存（直连apiserver/restclient） ，都屏蔽了 gvk 的差异。
 
 ```go
-pod := &core.Pod{}
-err := r.Client.Get(ctx, req.namesapce, pod); 
+pod := &core.Pod{}		// 底层 通过反射获取 到pod 类型，进而获取到 pod gvk，拿到对应的client 或informer，再根据 objName 获取真实数据。
+err := r.Client.Get(ctx, req.podName, pod); 
 ```
 
-初始化
+### 初始化
+
+manager.Manager 聚合了 cluster.Cluster，对应的 controllerManager聚合了 cluster。manager 除了健康检查、选主之外，**主要的能力是cluster 提供的**，即manager.GetXX ==> manager.client.GetXX
+
+```
+ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{ Scheme: scheme,...})
+	cluster, err := cluster.New(config, func(clusterOptions *cluster.Options)
+		mapper, err := options.MapperProvider(config)
+		cache, err := options.NewCache(config, ...)
+		apiReader, err := client.New(config, clientOptions)
+		writeObj, err := options.NewClient(cache, config, clientOptions, options.ClientDisableCacheFor...)	// 即DefaultNewClient
+			c, err := client.New(config, options)
+			return client.NewDelegatingClient(client.NewDelegatingClientInput{
+				CacheReader:     cache,
+				Client:          c,
+				UncachedObjects: uncachedObjects,
+			})
+		return &cluster{
+			config:           config,
+			scheme:           options.Scheme,
+			cache:            cache,
+			fieldIndexes:     cache,
+			client:           writeObj,
+			apiReader:        apiReader,
+			mapper:           mapper,
+		}, nil
+```
+其中 apiReader 是直连apiserver的client， writeObj 即包装了缓存后的client
+
+### 带缓存
+
+带缓存的实现，主力是delegatingClient
+
+```go
+type delegatingClient struct {
+	Reader
+	Writer
+	StatusClient
+
+	scheme *runtime.Scheme
+	mapper meta.RESTMapper
+}
+func NewDelegatingClient(in NewDelegatingClientInput) (Client, error) {
+	uncachedGVKs := map[schema.GroupVersionKind]struct{}{}
+	for _, obj := range in.UncachedObjects {
+		gvk, err := apiutil.GVKForObject(obj, in.Client.Scheme())
+		uncachedGVKs[gvk] = struct{}{}
+	}
+
+	return &delegatingClient{
+		scheme: in.Client.Scheme(),
+		mapper: in.Client.RESTMapper(),
+		Reader: &delegatingReader{
+			CacheReader:       in.CacheReader,	// 实际为cache
+			ClientReader:      in.Client,
+			scheme:            in.Client.Scheme(),
+			uncachedGVKs:      uncachedGVKs,
+			cacheUnstructured: in.CacheUnstructured,
+		},
+		Writer:       in.Client,
+		StatusClient: in.Client,
+	}, nil
+}
+```
+以 Get 方法为例，如果 对象是缓存的，则把请求转发到 cache.Get
+```go
+func (d *delegatingReader) Get(ctx context.Context, key ObjectKey, obj Object, opts ...GetOption) error {
+	if isUncached, err := d.shouldBypassCache(obj); err != nil {
+		return err
+	} else if isUncached {	// 直连apiserver 读取
+		return d.ClientReader.Get(ctx, key, obj, opts...)
+	}
+	return d.CacheReader.Get(ctx, key, obj, opts...)	// 执行cache.Get
+}
+```
+### cache 是如何实现的
+
+cache 实现了 client.Reader 接口，具体实现是  informerCache，它聚合了 InformersMap
+```go
+type Cache interface {
+	// Cache acts as a client to objects stored in the cache.
+	client.Reader
+	// Cache loads informers and adds field indices.
+	Informers
+}
+// controller-runtime/pkg/cache/informer_cache.go
+func (ip *informerCache) Get(ctx context.Context, key client.ObjectKey, out client.Object, opts ...client.GetOption) error {
+	gvk, err := apiutil.GVKForObject(out, ip.Scheme)
+	started, cache, err := ip.InformersMap.Get(ctx, gvk, out)
+		specificInformersMap.Get(ctx,gvk,obj)	// 返回MapEntry，有informer 则返回，无则创建
+			i, ok := ip.informersByGVK[gvk]
+			if !ok {
+				ip.addInformerToMap(gvk, obj)
+				lw, err := ip.createListWatcher(gvk, ip)
+				ni := cache.NewSharedIndexInformer(lw, obj,...,cache.Indexers{...})
+				go i.Informer.Run(ip.stop)
+			}
+			cache.WaitForCacheSync(...)
+	return cache.Reader.Get(ctx, key, out)		// CacheReader.Get
+		storeKey := objectKeyToStoreKey(key)
+		obj, exists, err := c.indexer.GetByKey(storeKey)
+		outVal := reflect.ValueOf(out)
+		objVal := reflect.ValueOf(obj)
+		reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
+}
+```
+InformersMap create and caches Informers for (runtime.Object, schema.GroupVersionKind) pairs. 如果informer 已经存在则返回informer，否则新建一个 informer 并加入到map中，后续的Get 就交给 informer 了。 
+```go
+type InformersMap struct {
+	structured   *specificInformersMap
+	unstructured *specificInformersMap
+	metadata     *specificInformersMap
+
+	// Scheme maps runtime.Objects to GroupVersionKinds
+	Scheme *runtime.Scheme
+}
+// Get will create a new Informer and add it to the map of InformersMap if none exists.  Returns the Informer from the map.
+func (m *InformersMap) Get(ctx context.Context, gvk schema.GroupVersionKind, obj runtime.Object) (bool, *MapEntry, error) {
+	switch obj.(type) {
+	case *unstructured.Unstructured:
+		return m.unstructured.Get(ctx, gvk, obj)
+	case *unstructured.UnstructuredList:
+		return m.unstructured.Get(ctx, gvk, obj)
+	case *metav1.PartialObjectMetadata:
+		return m.metadata.Get(ctx, gvk, obj)
+	case *metav1.PartialObjectMetadataList:
+		return m.metadata.Get(ctx, gvk, obj)
+	default:
+		return m.structured.Get(ctx, gvk, obj)
+	}
+}
+```
+
+### 不带缓存Get 实现
 
 ```
 // controller-runtime/pkg/manager/manager.go
@@ -45,7 +178,7 @@ func New(config *rest.Config, options Options) (Manager, error)
 		cli, err := client.New(restConf, client.Options{Scheme: scheme.Scheme,})
 			func newClient(config *rest.Config, options Options) (*client, error)
 ```
-Get 实现
+
 ```go
 // controller-runtime/pkg/client/client.go
 func (c *client) Get(ctx context.Context, key ObjectKey, obj Object, opts ...GetOption) error {

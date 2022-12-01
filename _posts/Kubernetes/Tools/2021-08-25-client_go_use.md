@@ -210,15 +210,6 @@ nodes, err := nodeInformer.Lister().List(labels.NewSelector())
 
 ### Dynamic client 
 
-Dynamic client 是一种动态的 client，它能处理 kubernetes 所有的资源。不同于 clientset，dynamic client 对GVK 一无所知， 返回的对象unstructured.Unstructured（在k8s.io/apimachinery 中定义，并注册到了schema 中） 是一个 `map[string]interface{}`
-
-```go 
-type Unstructured struct {
- 	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or map[string]interface{} children.
- 	Object map[string]interface{}
-}
-```
-
 如果一个 controller 中需要控制所有的 API，可以使用dynamic client，目前它在 garbage collector 和 namespace controller中被使用。
 
 ```
@@ -227,6 +218,15 @@ k8s.io/client-go
         /dynamicinformer
         /dynamiclister
         /interface.go
+```
+
+Dynamic client 是一种动态的 client，它能处理 kubernetes 所有的资源。不同于 clientset，dynamic client 对GVK 一无所知， 返回的对象unstructured.Unstructured（在k8s.io/apimachinery 中定义，并注册到了schema 中） 是一个 `map[string]interface{}`
+
+```go 
+type Unstructured struct {
+ 	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or map[string]interface{} children.
+ 	Object map[string]interface{}
+}
 ```
 
 ```go

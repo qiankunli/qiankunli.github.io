@@ -42,6 +42,8 @@ ML的迭代属性意味着， 如果没有完备的自动更新流程，想要�
 
 ## 业界实践
 
+[2022年8个好用的MLOps工具和平台](https://mp.weixin.qq.com/s/IdJqiXSl4vcsN3etWdWrig) 未读
+
 ### 虎牙
 
 [互动直播场景下的AI基础设施建设](https://time.geekbang.org/qconplus/detail/100059720)

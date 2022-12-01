@@ -409,3 +409,7 @@ Go1.14 引入抢占式调度（使用信号的异步抢占机制）
 4. 栈会根据大小的不同从不同的位置进行分配。
     1. 小栈内存分配。从 stackpool 分配栈空间，否则从 mcache 中获取。如果 mcache 对应的 stackcache 获取不到，那么调用 stackcacherefill 从堆上申请一片内存空间填充到 stackcache 中。
     2. 大栈内存分配。运行时会查看 stackLarge 中是否有剩余的空间，如果不存在剩余空间，它也会调用 mheap_.allocManual 从堆上申请新的内存。
+
+## goroutine泄露
+
+如果你启动了一个 goroutine，但并没有符合预期的退出，直到程序结束，此goroutine才退出，这种情况就是 goroutine 泄露。当 goroutine 泄露发生时，该 goroutine 的栈(一般 2k 内存空间起)一直被占用不能释放，goroutine 里的函数在堆上申请的空间也不能被 垃圾回收器 回收。这样，在程序运行期间，内存占用持续升高，可用内存越来也少，最终将导致系统崩溃。

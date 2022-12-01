@@ -323,7 +323,7 @@ class GenericService {
             value: cn-shenzhen       # 参数值
         ```
     2. 给 Workload 打标签：
-        ```
+        ```yaml
         apiVersion: traffic.opensergo.io/v1alpha1
         kind: WorkloadLabelRule
         metadata:
@@ -357,7 +357,58 @@ class GenericService {
 
 如果是同步发送请求，客户端需要等待服务端返回响应，服务端处理这个请求需要花多长时间，客户端就要等多长时间。这实际上是一个天然的背压机制（Back pressure），服务端处理速度会天然地限制客户端请求的速度。但是在异步请求中，客户端异步发送请求并不会等待服务端，缺少了这个天然的背压机制，如果服务端的处理速度跟不上客户端的请求速度，客户端的发送速度也不会因此慢下来，就会出现在途的请求越来越多，这些请求堆积在服务端的内存中，内存放不下就会一直请求失败。服务端处理不过来的时候，客户端还一直不停地发请求显然是没有意义的。为了避免这种情况，我们需要增加一个背压机制，在服务端处理不过来的时候限制一下客户端的请求速度。这个背压机制的实现也在 InFlightRequests （`map<requestId,responseFuture>`）类中，在这里面我们定义了一个信号量：`private final Semaphore semaphore = new Semaphore(10);`这个信号量有 10 个许可，我们每次往 inFlightRequest 中加入一个 ResponseFuture 的时候，需要先从信号量中获得一个许可，如果这时候没有许可了，就会阻塞当前这个线程，也就是发送请求的这个线程，直到有人归还了许可，才能继续发送请求。我们每结束一个在途请求，就归还一个许可，这样就可以保证在途请求的数量最多不超过 10 个请求，积压在服务端正在处理或者待处理的请求也不会超过 10 个。这样就实现了一个简单有效的背压机制。
 
-[算法实战（四）：剖析微服务接口鉴权限流背后的数据结构和算法](https://time.geekbang.org/column/article/80388#previewimg)开放、通用的、面向分布式服务架构、覆盖全链路异构化生态的服务治理标准 OpenSergo。在 OpenSergo 中，对流控降级与容错场景的实现抽象出标准的 CRD，只要微服务框架适配了 OpenSergo，即可通过统一 CRD 的方式来进行流控降级等治理。PS： Sentinel 是阿里巴巴开源的，面向分布式服务架构的流量控制组件，主要以流量为切入点，从流量控制、流量整形、熔断降级、系统自适应保护等多个维度来帮助开发者保障微服务的稳定性， OpenSergo 可以理解为是一个商业化版本的Sentinel。一流企业定标准。
+[算法实战（四）：剖析微服务接口鉴权限流背后的数据结构和算法](https://time.geekbang.org/column/article/80388#previewimg)开放、通用的、面向分布式服务架构、覆盖全链路异构化生态的服务治理标准 OpenSergo。在 OpenSergo 中，**对流控降级与容错场景的实现抽象出标准的 CRD**，只要微服务框架适配了 OpenSergo，即可通过统一 CRD 的方式来进行流控降级等治理。PS： Sentinel 是阿里巴巴开源的，面向分布式服务架构的流量控制组件，主要以流量为切入点，从流量控制、流量整形、熔断降级、系统自适应保护等多个维度来帮助开发者保障微服务的稳定性， OpenSergo 可以理解为是一个商业化版本的Sentinel。一流企业定标准。
+
+[“天猫双11”背后的流量治理技术与标准实践](https://mp.weixin.qq.com/s/oR0NEOARGhges-09wOoYAA)在 OpenSergo 中，我们结合 Sentinel 等框架的场景实践对流量防护与容错抽出标准 CRD。一个容错治理规则 (FaultToleranceRule) 由以下三部分组成：
+1. Target: 针对什么样的请求。可以通过通用的 resourceKey（Sentinel 中即为资源名的概念）来标识，也可以用细化的规则来标识（如具有某个特定 HTTP header 的请求）
+2. Strategy: 容错或控制策略，如流控、熔断、并发控制、自适应过载保护、离群实例摘除等
+3. FallbackAction: 触发后的 fallback 行为，如返回某个错误或状态码
+
+无论是 Java 还是 Go 还是 Mesh 服务，无论是 HTTP 请求还是 RPC 调用，还是数据库 SQL 访问，我们都可以用这统一的容错治理规则 CRD 来给微服务架构中的每一环配置容错治理，来保障我们服务链路的稳定性。只要微服务框架适配了 OpenSergo，即可通过统一 CRD 的方式来进行流量防护等治理。
+
+以下 YAML CR 示例定义的规则针对 path 为 `/foo` 的 HTTP 请求（用资源名标识）配置了一条流控策略，全局不超过 10 QPS。当策略触发时，被拒绝的请求将根据配置的 fallback 返回 429 状态码，返回信息为 Blocked by Sentinel，同时返回 header 中增加一个 header，key 为 X-Sentinel-Limit, value 为 foo。
+
+```yaml
+apiVersion: fault-tolerance.opensergo.io/v1alpha1
+kind: RateLimitStrategy
+metadata:
+  name: rate-limit-foo
+spec:
+  metricType: RequestAmount
+  limitMode: Global
+  threshold: 10
+  statDuration: "1s"
+---
+apiVersion: fault-tolerance.opensergo.io/v1alpha1
+kind: HttpRequestFallbackAction
+metadata:
+  name: fallback-foo
+spec:
+  behavior: ReturnProvidedResponse
+  behaviorDesc:
+    # 触发策略控制后，HTTP 请求返回 429 状态码，同时携带指定的内容和 header.
+    responseStatusCode: 429
+    responseContentBody: "Blocked by Sentinel"
+    responseAdditionalHeaders:
+      - key: X-Sentinel-Limit
+        value: "foo"
+---
+apiVersion: fault-tolerance.opensergo.io/v1alpha1
+kind: FaultToleranceRule
+metadata:
+  name: my-rule
+  namespace: prod
+  labels:
+    app: my-app
+spec:
+  selector:
+    app: foo-app # 规则配置生效的服务名
+  targets:
+    - targetResourceName: '/foo'
+  strategies: 
+    - name: rate-limit-foo
+  fallbackAction: fallback-foo
+```
 
 ## 微服务不是银弹
 

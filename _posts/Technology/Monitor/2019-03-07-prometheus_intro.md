@@ -275,7 +275,7 @@ Time series Selectors 从time series 中选择需要的数据
 
 [光速入门Prometheus+Grafana](https://tkedocs.finops.cc/#/prome) 未读
 
-## rules
+### rules
 
 Prometheus uses rules to create new time series and to generate alerts. rule 分为两种类型：RecordingRule 和 AlertingRule
 
@@ -293,3 +293,9 @@ groups:
 1. level 表示聚合级别，以及规则的输出标签
 2. metric 是指标名称
 3. operations 应用于指标的操作列表
+
+### 长期存储
+
+[一文读懂 Prometheus 长期存储主流方案](https://mp.weixin.qq.com/s/uGvcxwvC_QDkFKU-Bcxgww) 
+1. VictoriaMetrics可以作为Prometheus的长期远程存储方案，当然VictoriaMetrics也可以完全取代Prometheus，因为VictoriaMetrics基本支持Prometheus配置文件、PromQL、各类API、数据格式等等。
+

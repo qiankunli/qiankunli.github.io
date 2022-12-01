@@ -123,15 +123,7 @@ gvk := schema.GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "Job"}
 obj := api.Scheme.New(gvk)  // 根据API对象的类型构造API对象
 codec := api.Codecs.LegacyCodec(gvk.GroupVersion())
 codec.Decode(reqBody, gvk, obj)    // 假设reqBody 是一段json，则需要 通过reflect 获取个字段的类型并为字段赋值的
-type Job struct {  
-    metav1.TypeMeta     ---> type TypeMeta struct { Kind string; APIVersion string }
-    metav1.ObjectMeta   ---> type ObjectMeta struct { Name string...}
-    Spec JobSpec
-    Status JobStatus 
-}
 ```
-
-
 
 ### go struct
 
