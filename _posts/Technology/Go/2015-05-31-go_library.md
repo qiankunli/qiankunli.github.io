@@ -245,7 +245,7 @@ func main() {
 
 ```sh
 // 192.168.10.18为服务端的主机地址
-$go tool pprof -http=:9090 http://192.168.10.18:6060/debug/pprof/profile
+$ go tool pprof -http=:9090 http://192.168.10.18:6060/debug/pprof/profile?seconds=30
 Fetching profile over HTTP from http://192.168.10.18:6060/debug/pprof/profile
 Saved profile in /Users/tonybai/pprof/pprof.server.samples.cpu.004.pb.gz
 Serving web UI on http://localhost:9090

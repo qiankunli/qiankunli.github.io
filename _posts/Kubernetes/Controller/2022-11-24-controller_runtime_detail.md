@@ -27,12 +27,12 @@ keywords: controller-runtime
 
 ## client
 
-使用：client.Get 可以根据 obj 获取到 gvk对应的  client 或informer ，进而获取到 obj的真实数据，赋值给 obj。client的厉害之处就在于 无论带缓存（informer） 还是不带缓存（直连apiserver/restclient） ，都屏蔽了 gvk 的差异。
-
 ```go
 pod := &core.Pod{}		// 底层 通过反射获取 到pod 类型，进而获取到 pod gvk，拿到对应的client 或informer，再根据 objName 获取真实数据。
 err := r.Client.Get(ctx, req.podName, pod); 
 ```
+
+使用：client.Get 可以根据 obj 获取到 gvk对应的  client 或informer ，进而获取到 obj的真实数据，赋值给 obj。client的厉害之处就在于 无论带缓存（informer） 还是不带缓存（直连apiserver/restclient） ，都屏蔽了 gvk 的差异。用户只要提供一个 空的go struct 以及 资源name ，client 即可为 空的go struct 赋值。
 
 ### 初始化
 
@@ -109,63 +109,7 @@ func (d *delegatingReader) Get(ctx context.Context, key ObjectKey, obj Object, o
 	return d.CacheReader.Get(ctx, key, obj, opts...)	// 执行cache.Get
 }
 ```
-### cache 是如何实现的
 
-cache 实现了 client.Reader 接口，具体实现是  informerCache，它聚合了 InformersMap
-```go
-type Cache interface {
-	// Cache acts as a client to objects stored in the cache.
-	client.Reader
-	// Cache loads informers and adds field indices.
-	Informers
-}
-// controller-runtime/pkg/cache/informer_cache.go
-func (ip *informerCache) Get(ctx context.Context, key client.ObjectKey, out client.Object, opts ...client.GetOption) error {
-	gvk, err := apiutil.GVKForObject(out, ip.Scheme)
-	started, cache, err := ip.InformersMap.Get(ctx, gvk, out)
-		specificInformersMap.Get(ctx,gvk,obj)	// 返回MapEntry，有informer 则返回，无则创建
-			i, ok := ip.informersByGVK[gvk]
-			if !ok {
-				ip.addInformerToMap(gvk, obj)
-				lw, err := ip.createListWatcher(gvk, ip)
-				ni := cache.NewSharedIndexInformer(lw, obj,...,cache.Indexers{...})
-				go i.Informer.Run(ip.stop)
-			}
-			cache.WaitForCacheSync(...)
-	return cache.Reader.Get(ctx, key, out)		// CacheReader.Get
-		storeKey := objectKeyToStoreKey(key)
-		obj, exists, err := c.indexer.GetByKey(storeKey)
-		outVal := reflect.ValueOf(out)
-		objVal := reflect.ValueOf(obj)
-		reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
-}
-```
-InformersMap create and caches Informers for (runtime.Object, schema.GroupVersionKind) pairs. 如果informer 已经存在则返回informer，否则新建一个 informer 并加入到map中，后续的Get 就交给 informer 了。 
-```go
-type InformersMap struct {
-	structured   *specificInformersMap
-	unstructured *specificInformersMap
-	metadata     *specificInformersMap
-
-	// Scheme maps runtime.Objects to GroupVersionKinds
-	Scheme *runtime.Scheme
-}
-// Get will create a new Informer and add it to the map of InformersMap if none exists.  Returns the Informer from the map.
-func (m *InformersMap) Get(ctx context.Context, gvk schema.GroupVersionKind, obj runtime.Object) (bool, *MapEntry, error) {
-	switch obj.(type) {
-	case *unstructured.Unstructured:
-		return m.unstructured.Get(ctx, gvk, obj)
-	case *unstructured.UnstructuredList:
-		return m.unstructured.Get(ctx, gvk, obj)
-	case *metav1.PartialObjectMetadata:
-		return m.metadata.Get(ctx, gvk, obj)
-	case *metav1.PartialObjectMetadataList:
-		return m.metadata.Get(ctx, gvk, obj)
-	default:
-		return m.structured.Get(ctx, gvk, obj)
-	}
-}
-```
 
 ### 不带缓存Get 实现
 
@@ -250,5 +194,63 @@ func (c *clientCache) getResource(obj runtime.Object) (*resourceMeta, error) {
 	r, err = c.newResource(gvk, meta.IsListType(obj), isUnstructured)
 	resourceByType[gvk] = r
 	return r, err
+}
+```
+
+## cache 是如何实现的
+
+cache 实现了 client.Reader 接口，具体实现是  informerCache，它聚合了 InformersMap
+```go
+type Cache interface {
+	// Cache acts as a client to objects stored in the cache.
+	client.Reader
+	// Cache loads informers and adds field indices.
+	Informers
+}
+// controller-runtime/pkg/cache/informer_cache.go
+func (ip *informerCache) Get(ctx context.Context, key client.ObjectKey, out client.Object, opts ...client.GetOption) error {
+	gvk, err := apiutil.GVKForObject(out, ip.Scheme)
+	started, cache, err := ip.InformersMap.Get(ctx, gvk, out)
+		specificInformersMap.Get(ctx,gvk,obj)	// 返回MapEntry，有informer 则返回，无则创建
+			i, ok := ip.informersByGVK[gvk]
+			if !ok {
+				ip.addInformerToMap(gvk, obj)
+				lw, err := ip.createListWatcher(gvk, ip)
+				ni := cache.NewSharedIndexInformer(lw, obj,...,cache.Indexers{...})
+				go i.Informer.Run(ip.stop)
+			}
+			cache.WaitForCacheSync(...)
+	return cache.Reader.Get(ctx, key, out)		// CacheReader.Get
+		storeKey := objectKeyToStoreKey(key)
+		obj, exists, err := c.indexer.GetByKey(storeKey)
+		outVal := reflect.ValueOf(out)
+		objVal := reflect.ValueOf(obj)
+		reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
+}
+```
+InformersMap create and caches Informers for (runtime.Object, schema.GroupVersionKind) pairs. 如果informer 已经存在则返回informer，否则新建一个 informer 并加入到map中，后续的Get 就交给 informer 了。 
+```go
+type InformersMap struct {
+	structured   *specificInformersMap
+	unstructured *specificInformersMap
+	metadata     *specificInformersMap
+
+	// Scheme maps runtime.Objects to GroupVersionKinds
+	Scheme *runtime.Scheme
+}
+// Get will create a new Informer and add it to the map of InformersMap if none exists.  Returns the Informer from the map.
+func (m *InformersMap) Get(ctx context.Context, gvk schema.GroupVersionKind, obj runtime.Object) (bool, *MapEntry, error) {
+	switch obj.(type) {
+	case *unstructured.Unstructured:
+		return m.unstructured.Get(ctx, gvk, obj)
+	case *unstructured.UnstructuredList:
+		return m.unstructured.Get(ctx, gvk, obj)
+	case *metav1.PartialObjectMetadata:
+		return m.metadata.Get(ctx, gvk, obj)
+	case *metav1.PartialObjectMetadataList:
+		return m.metadata.Get(ctx, gvk, obj)
+	default:
+		return m.structured.Get(ctx, gvk, obj)
+	}
 }
 ```

@@ -41,6 +41,50 @@ Go 并没有彻底放弃基于共享内存的并发模型，而是在提供 CSP 
 
 ### Mutex
 
+[深入理解 golang 的互斥锁](https://mp.weixin.qq.com/s/i1N9bmVSW1lGfOezvhcD7g) 未细读。Golang 的 Mutex 实现一直在改进，到目前为止，主要经历了 4 个版本:
+
+1. V1: 简单实现的版本
+2. V2: 新的 goroutine 参加锁的竞争
+3. V3: 新的 goroutines 更多参与竞争的机会
+4. V4: 解决老 goroutine 饥饿的问题
+
+
+v1版本
+```go
+func cas(val *int32, old, new int32) bool
+func semacquire(*int32)
+func semrelease(*int32)
+// The structure of the mutex, containing two fields
+type Mutex struct {
+  key int32  // Indication of whether the lock is held. 表示有几个 gorutines 正在使用或准备使用该锁
+  sema int32 // Semaphore dedicated to block/wake up goroutine
+}
+// 基于 cas 的加减法函数, Guaranteed to successfully increment the value of delta on val
+func xadd(val *int32, delta int32) (new int32) {
+    for {
+        v := *val
+        if cas(val, v, v+delta) {
+            return v + delta
+     }
+    }
+    panic("unreached")
+}
+// request lock
+func (m *Mutex) Lock() {
+    if xadd(&m.key, 1) == 1 { // Add 1 to the ID, if it is equal to 1, the lock is successfully acquired
+    	return
+	}
+    semacquire(&m.sema) // Otherwise block waiting
+}
+func (m *Mutex) Unlock() {
+    if xadd(&m.key, -1) == 0 { // Subtract 1 from the flag, if equal to 0, there are no other waiters
+		return
+	}
+    semrelease(&m.sema) // Wake up other blocked goroutines
+}
+```
+v4版本
+
 ```go
 type Mutex struct {
 	state int32     // 表示当前互斥锁的状态，最低三位分别表示 mutexLocked、mutexWoken 和 mutexStarving，剩下的位置用来表示当前有多少个 Goroutine 等待互斥锁的释放
