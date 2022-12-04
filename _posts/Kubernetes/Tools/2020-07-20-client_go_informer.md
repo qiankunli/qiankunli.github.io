@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: client-go源码分析
+title: client-go informer源码分析
 category: 架构
 tags: Kubernetes
 keywords:  kubernetes client-go
@@ -40,6 +40,8 @@ k8s.io/client-go
 	3. 对象序列化为JSON、YAML或Protobuf
 	4. API错误处理
 
+Kubernetes Controller能够知道资源对象的当前状态，通常需要访问API Server才能获得资源对象，当Controller越来越多时，会导致API Server负载过大。Kubernetes使用Informer代替Controller去访问API Server，Controller的所有操作都和Informer进行交互，而Informer并不会每次都去访问API Server。Informer使用ListAndWatch的机制，在Informer首次启动时，会调用LIST API获取所有最新版本的资源对象，然后再通过WATCH API来监听这些对象的变化，并将事件信息维护在一个只读的缓存队列中提升查询的效率，同时**降低API Server的负载**。除了ListAndWatch，Informer还可以注册相应的事件，之后如果监听到的事件变化就会调用对应的EventHandler，**实现回调**。
+
 ## 整体设计
 
 [Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)Kubernetes offers these powerful structures to get a local representation of the API server's resources.The **Informer just a convenient wrapper** to  automagically syncs the upstream data to a downstream store and even offers you some handy event hooks.
@@ -55,7 +57,7 @@ k8s.io/client-go
 informer 机制主要两个流程
 
 1. Reflector 通过ListWatcher 同步apiserver 数据（只启动时搞一次），并watch apiserver ，将event 加入到 delta Queue 中。PS：reflector 大部分时间都是在watch event/delta
-2. controller 从 delta Queue中获取event，更新存储，并触发Processor 业务层注册的 ResourceEventHandler
+2. controller 从 delta Queue中取出event，调用Indexer进行缓存并建立索引，并触发Processor 业务层注册的 ResourceEventHandler。即processLoop。
 
 ![](/public/upload/kubernetes/informer_overview.png)
 
@@ -161,7 +163,9 @@ Reflector.Run ==> pager.List + listerWatcher.Watch ==> Reflector.watchHandler ==
 
 ResourceVersion（资源版本号）非常重要，Kubernetes 中所有的资源都拥有该字段，它标识当前资源对象的版本号，每次修改（CUD）当前资源对象时，Kubernetes API Server 都会更改 ResourceVersion，这样 client-go 执行 Watch 操作时可以根据ResourceVersion 来确定当前资源对象是否发生了变化。
 
-DeltaFIFO 和 FIFO 一样也是一个队列，DeltaFIFO里面的元素是一个个 Delta。DeltaFIFO实现了Store和 Queue Interface。生产者为Reflector，消费者为 Pop() 函数。
+## DeltaFIFO
+
+DeltaFIFO 和 FIFO 一样也是一个队列，**DeltaFIFO里面的元素是一个个 Delta**。DeltaFIFO实现了Store和 Queue Interface。生产者为Reflector，消费者为 Pop() 函数。
 
 ```go
 // k8s.io/client-go/tools/cache/delta_fifo.go
@@ -174,14 +178,23 @@ type DeltaFIFO struct {
     queue []string      	// key的队列，提供Queue能力
     ...
 }
+func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {...}
+// Get returns the complete list of deltas for the requested item
+func (f *DeltaFIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {...}
 ```
 
-疑问：DeltaFIFO 是用来传递delta/event的，不是为了来传递obj 的，watch 得到 event 用queue 缓冲一些可以理解，为何底层要搞那么复杂呢？
 
 [Kubernetes client-go 源码分析 - DeltaFIFO](https://mp.weixin.qq.com/s/140YOECmektc_HxQbVkpjA)
 
 ![](/public/upload/kubernetes/delta_queue.jpg)
 
+疑问：DeltaFIFO 是用来传递delta/event的，不是为了来传递obj 的，watch 得到 event 用queue 缓冲一些可以理解，为何底层要搞那么复杂呢？从设计看，**evnet 在队列里可能对堆积**，比如一个 add event 新增key=a，之后又有一个update event 将key=a改为b，其实此时可以 直接合并为一个 add event 即key=b。堆积之后 仍然让 消费者依次处理所有event(`Pop()`)，还是告诉它所有的event(`Get()`)，还是自动帮它做合并？PS: 很多能力 因为封装的太好，以至于不知道
+
+## Indexer（未完成）
+
+因为etcd存储的缘故，k8s的性能 没有那么优秀，假设集群有几w个pod，list 就是一个巨耗时的操作，有几种优化方式
+1. list 时加上 label 限定范围。k8s 支持根据 label 对object 进行检索
+2. 使用client-go 本地cache，再进一步，根据经常查询的label/field 建立本地index。PS：apiserver 确实对label 建了索引，但是本地并没有自动建立。
 
 [Kubernetes client-go 源码分析 - Indexer & ThreadSafeStore](https://mp.weixin.qq.com/s/YVl4z0Yr0cDp3dFg6Kwg5Q) 未细读
 

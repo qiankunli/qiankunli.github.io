@@ -85,6 +85,8 @@ err = restClient.Get().
 
 ### ClientSet 方式
 
+Clientset是所有Group、Version组成的客户端集合，每个GV客户端底层由RestClient实现。但ClientSet只能处理pod、deployment等事先已确定好GVR的Kubernetes内置资源。自定义的CR无法提前知道其GV信息和数据结构，无法使用ClientSet进行处理。
+
 类似于 `/core/v1` 和 `/extensions/v1beta1` 这些GroupVersion 在 `k8s.io/client-go`  和 `k8s.io/api` 都有对应目录。 
 
 ```go
@@ -192,7 +194,7 @@ client-go 包含了 k8s 一些核心对象的访问，此外一些非核心对�
 
 #### informer 方式
 
-[“高冷”的 Kubernetes Informer 一探究竟](https://mp.weixin.qq.com/s/3vlclIP-rSbWH4bplduexA)为了让 Client-go 更快地返回 List/Get 请求的结果、减少对 Kubenetes API 的直接调用，**Informer 被设计实现为一个依赖（并且只依赖） Kubernetes List/Watch API 、可监听事件并触发回调函数的二级缓存工具包**。PS：这点zk/etcd 等client 也提供类似能力，只是zk/etcd client 存储的是通用数据，没有封装资源对象。
+[“高冷”的 Kubernetes Informer 一探究竟](https://mp.weixin.qq.com/s/3vlclIP-rSbWH4bplduexA)为了让 Client-go 更快地返回 List/Get 请求的结果、减少对 Kubenetes API 的直接调用，**Informer 被设计实现为一个依赖（并且只依赖） Kubernetes List/Watch API 、可监听事件并触发回调函数的二级缓存工具包**。PS：这点zk/etcd 等client 也提供类似**本地缓存**能力，只是zk/etcd client 存储的是通用数据，没有封装资源对象。
 
 Informer是一个带有本地缓存和索引机制的、可以注册 EventHandler 的 client，本地缓存被称为 Store，索引被称为 Index。使用 informer 的目的是为了减轻 apiserver 数据交互的压力而抽象出来的一个 cache 层, 客户端对 apiserver 数据的 “读取” 和 “监听” 操作都通过本地 informer 进行（相对于直接监听apiserver`resp, err := http.Get("http://apiserver:8080/api/v1/watch/pods?watch=yes")`）。Informer 实例的Lister()方法可以直接查找缓存在本地内存中的数据。
 
@@ -220,14 +222,36 @@ k8s.io/client-go
         /interface.go
 ```
 
-Dynamic client 是一种动态的 client，它能处理 kubernetes 所有的资源。不同于 clientset，dynamic client 对GVK 一无所知， 返回的对象unstructured.Unstructured（在k8s.io/apimachinery 中定义，并注册到了schema 中） 是一个 `map[string]interface{}`
+Dynamic client 是一种动态的 client，它能处理 kubernetes 所有的资源。不同于 clientset，dynamic client 对GVK 一无所知， 返回的对象unstructured.Unstructured（在k8s.io/apimachinery 中定义，并注册到了schema 中），本质是一个 `map[string]interface{}`。
 
 ```go 
+type Object interface {
+	GetObjectKind() schema.ObjectKind
+	DeepCopyObject() Object
+}
+type Unstructured interface {
+	Object
+}
 type Unstructured struct {
  	// Object is a JSON compatible map with string, float, int, bool, []interface{}, or map[string]interface{} children.
  	Object map[string]interface{}
 }
+func (obj *Unstructured) GetObjectKind() schema.ObjectKind { return obj }
+func (u *Unstructured) GetAPIVersion() string {...}
+func (u *Unstructured) GetNamespace() string {...}
+func (u *Unstructured) GetName() string {...}
+func (u *Unstructured) GetOwnerReferences() []metav1.OwnerReference {...}
+func (u *Unstructured) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	err := UnstructuredJSONScheme.Encode(u, &buf)
+	return buf.Bytes(), err
+}
+func (u *Unstructured) UnmarshalJSON(b []byte) error {
+	_, _, err := UnstructuredJSONScheme.Decode(b, nil, u)
+	return err
+}
 ```
+Unstructured 虽然不是具体的资源类型，**但是获取 TypeMeta 这些基本信息还是可以的**。Unstructed和具体资源类型如Pod直接的转化由runtime.unstructuredConverter的FromUnstructured和ToUnstructured方法分别实现。
 
 ```go
 dynamicClient, err := dynamic.NewForConfig(config)
@@ -261,7 +285,6 @@ func (c *dynamicResourceClient) Get(ctx context.Context, name string, opts metav
 	return uncastObj.(*unstructured.Unstructured), nil
 }
 ```
-
 
 ## 其它
 

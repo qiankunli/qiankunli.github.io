@@ -254,3 +254,9 @@ func (m *InformersMap) Get(ctx context.Context, gvk schema.GroupVersionKind, obj
 	}
 }
 ```
+
+##  index（未完成）
+
+因为存储的缘故，k8s的性能 没有那么优秀，假设集群有几w个pod，list 就是一个巨耗时的操作，有几种优化方式
+1. list 时加上 label 限定范围。k8s 支持根据 label 对object 进行检索
+2. 使用client-go 本地cache，再进一步，建立本地index。PS：apiserver 确实对label 建了索引，但是本地并没有。

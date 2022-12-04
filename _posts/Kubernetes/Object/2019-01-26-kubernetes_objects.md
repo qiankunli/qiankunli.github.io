@@ -18,6 +18,19 @@ keywords: kubernetes Apimachinery
 2. api 库，这个库依赖 apimachinery，提供了k8s的内置资源，以及注册到 Scheme 的接口，这些资源比如：Pod、Service、Deployment、Namespace
 3. client-go 库，这个库依赖前两个库，提供了访问k8s 内置资源的sdk，最常用的就是 clientSet。底层通过 http 请求访问k8s 的 api-server，从etcd获取资源信息
 
+##  从api 到 go struct
+
+[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)**http server 或者 rpc server 要解决的一个问题是：如何解析用户的请求数据，并把他反序列化为语言中的一个具体的类型**。以一个 EchoService 为例，decode 程序需要从用户请求（如 post http://echo ） 文本或者二进制数据中创建出  EchoRequestV1，提供给上层处理，同时这个 decode 函数需要足够通用，他返回的是可能是一个 Message Interface（包含通用rpc 字段）, 具体内容是 EchoRequestV1。decode 相关的细节要么通过代码生成的技术提供给 decoder，要么在 二进制或者文本请求数据（或者 header等元数据）中携带这部分信息。解决这个问题有两种方式Protobuf Unmarshal/Kubernetes Scheme
+
+![](/public/upload/kubernetes/kubernetes_type.png)
+
+||rpc|k8s|
+|---|---|---|
+||二进制|http|
+|定位|header 里包含 groupName.serviceName|GVR：http://xx/pods/xx|
+|编解码|Protobuf/thrift|GVK：Kubernetes Scheme|
+|其它|框架底层可能定义一些Message 之类的对象，定义一些公共header|Obejct/Unstructured |
+
 ## k8s api
 
 Kubernetes API是一个HTTP形式的API，主要有三种形式
@@ -41,7 +54,7 @@ Kubernetes API是一个HTTP形式的API，主要有三种形式
 
 ## Kubernetes 基础类型系统
 
-api machinery 代码库实现了 Kubernetes 基础类型系统（实际指的是kinds）。kinds被分为 group 和verison，因此api machinery 代码中的核心术语是 GroupVersionKind，简称GVK。 与kinds 同级概念的是 resource，也按group 和version 划分，因此有术语GroupVersionResource 简称GVR，**每个GVR 对应一个http 路径**，用于标识 Kubernetes API的REST 接口
+api machinery 代码库实现了 Kubernetes 基础类型系统（实际指的是kinds）。kinds被分为 group 和verison，因此api machinery 代码中的核心术语是 GroupVersionKind，简称GVK。 与kinds 同级概念的是 resource，也按group 和version 划分，因此有术语GroupVersionResource 简称GVR，**每个GVR 对应一个http 路径**，用于标识 Kubernetes API的REST 接口，比如 ` /api/v1/namespaces/{namespace}/pods`，使用`kubectl api-resources`命令可查看支持的Resource。
 
 ```go
 // k8s.io/apimachinery/pkg/runtime/schema/group_version.go
@@ -60,17 +73,15 @@ type GroupVersionKind struct {
 ```
 schema struct 将golang object 映射为可能的GVK。一个GVK 到一个GVR 的映射被称为 REST mapping,  RESTMapper interface/ RESTMapping struct 来完成转换。
 
-![](/public/upload/kubernetes/kubernetes_type.png)
-
-[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)**http server 或者 rpc server 要解决的一个问题是：如何解析用户的请求数据，并把他反序列化为语言中的一个具体的类型**。以一个 EchoService 为例，decode 程序需要从用户请求（如 post http://echo ） 文本或者二进制数据中创建出  EchoRequestV1，提供给上层处理，同时这个 decode 函数需要足够通用，他返回的是可能是一个 Message Interface（包含通用rpc 字段）, 具体内容是 EchoRequestV1。decode 相关的细节要么通过代码生成的技术提供给 decoder，要么在 二进制或者文本请求数据（或者 header等元数据）中携带这部分信息。解决这个问题有两种方式Protobuf Unmarshal/Kubernetes Scheme
-
-||rpc|k8s|
-|---|---|---|
-||二进制|http|
-|定位|header 里包含 groupName.serviceName|GVR：http://xx/pods/xx|
-|编解码|Protobuf/thrift|GVK：Kubernetes Scheme|
-|其它|框架底层可能定义一些Message 之类的对象，定义一些公共header|Obejct/Unstructured |
-
+```go
+// k8s.io/apimachinery/pkg/api/meta/interface.go
+type RESTMapper interface {
+    // gvr ==> gvk
+	KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
+    ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error)
+    ...
+}
+```
 
 ### Protobuf Unmarshal
 
@@ -216,13 +227,6 @@ Scheme defines methods for serializing and deserializing API objects, a type reg
 
 
 ```go
-// k8s.io/apimachinery/pkg/api/meta/interface.go
-type RESTMapper interface {
-    // gvr ==> gvk
-	KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
-    ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error)
-    ...
-}
 // k8s.io/apimachinery/pkg/runtime/scheme.go
 type Scheme struct {
     // a Type is a particular Go struct，比如k8s.io/api/apps/v1.StatefulSet
