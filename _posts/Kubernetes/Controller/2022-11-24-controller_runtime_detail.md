@@ -32,11 +32,25 @@ pod := &core.Pod{}		// 底层 通过反射获取 到pod 类型，进而获取到
 err := r.Client.Get(ctx, req.podName, pod); 
 ```
 
-使用：client.Get 可以根据 obj 获取到 gvk对应的  client 或informer ，进而获取到 obj的真实数据，赋值给 obj。client的厉害之处就在于 无论带缓存（informer） 还是不带缓存（直连apiserver/restclient） ，都屏蔽了 gvk 的差异。用户只要提供一个 空的go struct 以及 资源name ，client 即可为 空的go struct 赋值。
+使用：client.Get 可以根据 obj 获取到 gvk对应的  client 或informer ，进而获取到 obj的真实数据，赋值给 obj。client的厉害之处就在于 **无论带缓存（informer） 还是不带缓存（直连apiserver/restclient） ，都屏蔽了 gvk 的差异**。用户只要提供一个 空的go struct 以及 资源name ，client 即可为 空的go struct 赋值。
+
+```
+controller-runtime
+	/pkg
+		/cache
+			/cache.go					# 定义了Cache interface
+			/informer_cache.go
+			/multi_namespace_cache.go	
+		/client
+			/split.go
+			/interfaces.go				# 定义了Reader interface
+			/type_client.go
+			/unstructured_client.go
+```
 
 ### 初始化
 
-manager.Manager 聚合了 cluster.Cluster，对应的 controllerManager聚合了 cluster。manager 除了健康检查、选主之外，**主要的能力是cluster 提供的**，即manager.GetXX ==> manager.client.GetXX
+manager.Manager interface 聚合了 cluster.Cluster interface，对应的 controllerManager struct聚合了 cluster struct。manager 除了健康检查、选主之外，**主要的能力是cluster 提供的**，即manager.GetXX ==> manager.client.GetXX
 
 ```
 ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{ Scheme: scheme,...})
@@ -63,9 +77,9 @@ ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{ Scheme: scheme,...})
 ```
 其中 apiReader 是直连apiserver的client， writeObj 即包装了缓存后的client
 
-### 带缓存
+### 请求分发
 
-带缓存的实现，主力是delegatingClient
+请求分发主力是delegatingClient
 
 ```go
 type delegatingClient struct {
@@ -98,7 +112,7 @@ func NewDelegatingClient(in NewDelegatingClientInput) (Client, error) {
 	}, nil
 }
 ```
-以 Get 方法为例，如果 对象是缓存的，则把请求转发到 cache.Get
+以 Get 方法为例，如果对象 shouldBypassCache，则分发给 ClientReader，如果对象是缓存的，则把请求转发到 cache.Get。
 ```go
 func (d *delegatingReader) Get(ctx context.Context, key ObjectKey, obj Object, opts ...GetOption) error {
 	if isUncached, err := d.shouldBypassCache(obj); err != nil {
@@ -110,18 +124,9 @@ func (d *delegatingReader) Get(ctx context.Context, key ObjectKey, obj Object, o
 }
 ```
 
-
 ### 不带缓存Get 实现
 
-```
-// controller-runtime/pkg/manager/manager.go
-func New(config *rest.Config, options Options) (Manager, error) 
-	// controller-runtime/pkg/cluster/cluster.go
-	func New(config *rest.Config, opts ...Option) (Cluster, error) 
-		cache, err := options.NewCache(config, ...）
-		cli, err := client.New(restConf, client.Options{Scheme: scheme.Scheme,})
-			func newClient(config *rest.Config, options Options) (*client, error)
-```
+为了支持多种类型，非缓存client 包含 unstructuredClient/typedClient。
 
 ```go
 // controller-runtime/pkg/client/client.go
@@ -255,8 +260,64 @@ func (m *InformersMap) Get(ctx context.Context, gvk schema.GroupVersionKind, obj
 }
 ```
 
-##  index（未完成）
+## option 花样多
 
-因为存储的缘故，k8s的性能 没有那么优秀，假设集群有几w个pod，list 就是一个巨耗时的操作，有几种优化方式
-1. list 时加上 label 限定范围。k8s 支持根据 label 对object 进行检索
-2. 使用client-go 本地cache，再进一步，建立本地index。PS：apiserver 确实对label 建了索引，但是本地并没有。
+使用示例
+
+```go
+out := corev1.PodList{}
+cache.List(context.Background(), &out, client.Limit(10))
+```
+ListOption 是一个interface，可以修改ListOptions，Limit 是一个ListOption 实现，CacheReader.List 可以传入多个 ListOption 用来按需修改ListOptions。  
+```go
+// controller-runtime/pkg/client/interfaces.go
+type Reader interface {
+	Get(ctx context.Context, key ObjectKey, obj Object, opts ...GetOption) error
+	List(ctx context.Context, list ObjectList, opts ...ListOption) error
+}
+// controller-runtime/pkg/cache/internal/cache_reader.go
+func (c *CacheReader) List(_ context.Context, out client.ObjectList, opts ...client.ListOption) error {
+	var objs []interface{}
+	var err error
+
+	listOpts := client.ListOptions{}
+	listOpts.ApplyOptions(opts)
+	...
+}
+// controller-runtime/pkg/client/options.go
+type ListOption interface {
+	ApplyToList(*ListOptions)
+}
+type ListOptions struct {
+	LabelSelector labels.Selector
+	FieldSelector fields.Selector
+	Namespace string
+	Limit int64
+	Continue string
+	UnsafeDisableDeepCopy *bool
+	Raw *metav1.ListOptions
+}
+type Limit int64
+func (l Limit) ApplyToList(opts *ListOptions) {
+	opts.Limit = int64(l)
+}
+```
+
+## client.Object 
+
+golang的鸭子类型 给了框架设计很多灵活性，比如先定义具体实现后定义扩展。Pod 等k8s core object 绝对是先出的，controller-runtime 是后出的，但因为 Pod 实现了 metav1.Object 和 runtime.Object，Pod 也就实现了 controller-runtime Object，controller-runtime 就可以拿着Object 去指代 任意k8s 对象了。
+
+```go
+// controller-runtime/pkg/client/object.go
+type Object interface {
+	metav1.Object           // interface k8s.io/apimachinery/pkg/runtime/interfaces.go
+	runtime.Object          // interface k8s.io/apimachinery/pkg/apis/meta/v1/meta.go
+}
+// k8s.io/api/core/v1/types.go
+type Pod struct {
+	metav1.TypeMeta 
+	metav1.ObjectMeta 
+	Spec PodSpec 
+	Status PodStatus 
+}
+```

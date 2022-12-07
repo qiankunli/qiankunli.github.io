@@ -48,6 +48,7 @@ keywords: kubernetes autoscaler
 
 [Kubernetes 垂直自动伸缩走向何方?](https://mp.weixin.qq.com/s/ykWgx1WJxBFSPidD1To53Q)垂直自动伸缩（VPA，Vertical Pod Autoscaler） 是一个基于历史数据、集群可使用资源数量和实时的事件（如 OMM， 即 out of memory）来自动设置Pod所需资源并且能够在运行时自动调整资源基础服务。
 
+[K8s降本增效之VPA上篇](https://mp.weixin.qq.com/s/HZ9AQToOShD1e6USXzFBrA) 值得看一下。
 
 ### 示例
 

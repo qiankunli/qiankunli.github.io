@@ -210,3 +210,5 @@ devops基本理念：
 [日志在可观测场景下的应用](https://mp.weixin.qq.com/s/ahZSjcL0-VJtqAYszKgNCg)以故障发现和故障定位为目的使用日志场景可大致分为日志搜索和日志分析两类：
 1. 日志搜索：通过日志关键字搜索日志；通过线程名、类名搜索日志；结合 Trace 上下文信息，衍生出根据 TraceID、根据 spanName、parentSpanName、serviceName、parentServiceName 搜索日志。
 2. 日志分析：查看、分析指定日志数量的趋势；根据日志内容生成指标（比如每次交易成功打印一条日志，可以生成关于交易额的一个指标）；自动识别日志模式（比如查看不同模式的日志数量的变化，占比）。
+
+[Continuous Profiling 实践解析](https://mp.weixin.qq.com/s/yiwq81ZHB0nSTcYSjOeyZg) 对cpu 利用率高、频繁gc 等进行更细致的分析。

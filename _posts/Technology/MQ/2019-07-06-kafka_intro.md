@@ -55,6 +55,8 @@ A streaming platform has three key capabilities:
 
 ![](/public/upload/scala/kafka_framework_2.jpg)
 
+[使用 Prometheus 监控 Kafka，我们该关注哪些指标](https://mp.weixin.qq.com/s/oNPMUCcSEAtfei3Ocd62BQ) 未读。
+
 ## 代码使用
 
     <dependency>
