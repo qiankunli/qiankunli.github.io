@@ -209,6 +209,8 @@ select {
 
 ### waitGroup/errGroup
 
+WaitGroup可以等待多个Goroutine执行结束。很多时候并发执行多个任务，如果其中一个任务出错那么整体失败，需要直接返回，这种情况下我们可以使用ErrGroup。
+
 ```go
 // 启动多个goroutine
 for i:=0;i<10;i++{

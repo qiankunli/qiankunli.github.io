@@ -74,15 +74,11 @@ func Copy(dst Writer, src Reader)(written int64, err error)
 1. 在语法层面提供了并发原语支持。在提供了开销较低的 goroutine 的同时，Go 还在语言层面内置了辅助并发设计的原语：channel 和 select。开发者可以通过语言内置的 channel 传递消息或实现同步，并通过 select 实现多路 channel 的并发控制。相较于传统复杂的线程并发模型，Go 对并发的原生支持将大大降低开发人员在开发并发程序时的心智负担。
 2. 并发与组合的哲学是一脉相承的，并发是一个更大的组合的概念，它在程序设计的全局层面对程序进行拆解组合，再映射到程序执行层面上：goroutines 各自执行特定的工作，通过 channel+select 将 goroutines 组合连接起来。并发的存在鼓励程序员在程序设计时进行独立计算的分解，而对并发的原生支持让 Go 语言也更适应现代计算环境。
 
-## 其它
 
-Go 不是一门面向对象的语言，但它可以模拟面向对象语言的某些功能。
+## 鸭子类型和小接口
 
-[go语言设计哲学](https://studygolang.com/articles/2944)go 没有像JAVA一样，宗教式的完全面向对象设计；
-1. 完全面向对象设计就是一刀切的宗教式的设计，但其并不能很好的表述这个世界，这就导致其表现力不足，最后通过设计模式和面向切面等设计技巧来弥补语言方面的缺陷； JAVA就好比：手里握着是锤子，看什么都是钉子，什么都是类的对象，这个和现实世界不符，类表示单个事物还可以，一旦表示多个事物及其交互，其表现力也就会遇到各种挑战。
-2. go是面向工程的实用主义者，其糅合了面向对象的设计，函数式设计和过程式设计的优点；原来通过各种设计模式的设计通过函数、接口、组合等简单方式就搞定了；go有更多胶水的东西比如：全局变量、常量，函数，闭包等等，可以轻松的的把模块衔接和驱动起来；
+Go 语言之父 Rob Pike 说过“接口越大，抽象程度越弱”。越偏向业务层，抽象难度就越高。所以Go 标准库小接口（1~3 个方法）占比略高于 Docker 和 Kubernetes 的原因。**Go 接口是构建 Go 应用骨架（对应血肉）的重要元素**。抽象的时机：在实际真正需要的时候才对程序进行抽象。再通俗一些来讲，就是不要为了抽象而抽象。接口的确可以实现解耦，但它也会引入“抽象”的副作用，或者说接口这种抽象也不是免费的，是有成本的，除了会造成运行效率的下降之外，也会影响代码的可读性。
 
-[Is Go an object-oriented language?](https://golang.org/doc/faq#Is_Go_an_object-oriented_language)Yes and no. Although Go has types and methods and allows an object-oriented style of programming, there is no type hierarchy. The concept of “interface” in Go provides a different approach that we believe is easy to use and in some ways more general. There are also ways to embed types in other types to provide something analogous—but not identical—to subclassing. Moreover, methods in Go are more general than in C++ or Java: they can be defined for any sort of data, even built-in types such as plain, “unboxed” integers. They are not restricted to structs (classes).
 
 与常见编程语言的不同之处：
 
@@ -97,11 +93,59 @@ Go 不是一门面向对象的语言，但它可以模拟面向对象语言的�
     }
     ```
 
+Go 的类型系统不太常见，而且非常简单。内建类型包括结构体、函数和接口。 任何实现了接口的方法的类型都可以称为实现了该接口。类型可以被隐式的从表达式中推导， 而且不需要被显式的指定。 有关接口的特殊处理以及隐式的类型推导使得 Go 看起来**像是**一种轻量级的动态类型语言。
+
+鸭子类型，是动态编程语言的一种对象推断策略，它更关注对象能如何被使用，而不是对象的类型本身。Go 语言作为一门现代静态语言，是有后发优势的。它引入了动态语言的便利，同时又会进行静态语言的类型检查。 [Go是如何判断实现了interface](https://mp.weixin.qq.com/s/qH9HDEelHGi96u-tkiOPdQ)鸭子类型使得开发者可以不使用继承体系来灵活地实现一些“约定”，尤其是使得混合不同来源、使用不同对象继承体系的代码成为可能。
+
+[万字长文复盘导致Go语言成功的那些设计决策](https://mp.weixin.qq.com/s/Ca72d8-A0UoiIv-EquT8rA)避免接口和实现之间的显式关联，允许Go程序员定义小型、灵活以及临时性的接口，而不是将它们作为复杂类型层次结构的基础构件。**它鼓励捕捉开发过程中出现的关系和操作，而不是需要提前计划和定义它们**。这对大型程序尤其有帮助，因为在刚开始开发时，最终的结构是很难看清楚的。初次学习Go的开发者常常担心一个类型会意外地实现一个接口。虽然很容易建立起这样的假设，但在实践中，不太可能为两个不兼容的操作选择相同的名称和签名，而且我们从未在实际的Go程序中看到这种情况发生。
+
+[深入剖析对 Go 的成功作出巨大贡献的设计决策](https://mp.weixin.qq.com/s/zXOjaIuvu4XrWSGRqndOiw)
+1. Go 不定义类，但允许将方法绑定到任何类型，包括结构、数组、slice、map 甚至是整数等基本类型。它没有类型的层次结构；我们认为继承往往会使程序在成长过程中更难适应。相反，Go 鼓励类型的组合。Go 通过其接口类型提供了面向对象的多态性。
+2. 避免接口和实现之间的显式关联允许 Go 程序员定义小的、灵活的、通常是 ad hoc 接口，而不是将它们用作复杂类型层次结构中的基础块。它鼓励在开发过程中捕获关系和操作，而不需要提前计划和定义它们。这尤其有助于大型程序，在这些程序中，**刚开始开发时，最终的结构更加难以看清**。无需声明实现的方式鼓励使用精确的、一种或两种方法的接口，例如 Writer、Reader、Stringer（类似于 Java 的 toString 方法）等，这些接口遍布标准库。PS： 写代码的时候，觉得A这里可能会扩展，就定一个interface 先用着（可能只有一个方法），觉得BC需要扩展也类似，后续实现上，如果ABC 可以联动，就定义一个struct 实现ABC，也可以定义一个struct 实现A，另一个struct 实现BC。**一段程序确定的逻辑写成代码，不确定的逻辑留出interface**，自由实现和扩展。从这个视角看，interface 是扩展的手段，而不是在设计阶段就充分使用。
+
+还有一种 先定义具体实现，后定义扩展的情况，比如k8s生态里，Pod 等core object 绝对是先出的，controller-runtime 是后出的，但因为 Pod 实现了 metav1.Object 和 runtime.Object，Pod 也就实现了 controller-runtime Object，controller-runtime 就可以拿着Object 去指代 任意k8s 对象了。
+
+```go
+// controller-runtime/pkg/client/object.go
+type Object interface {
+	metav1.Object           // interface k8s.io/apimachinery/pkg/runtime/interfaces.go
+	runtime.Object          // interface k8s.io/apimachinery/pkg/apis/meta/v1/meta.go
+}
+// k8s.io/api/core/v1/types.go
+type Pod struct {
+	metav1.TypeMeta 
+	metav1.ObjectMeta 
+	Spec PodSpec 
+	Status PodStatus 
+}
+```
+
+## 不得不提的面向对象
+
+Go 不是一门面向对象的语言，但它可以模拟面向对象语言的某些功能。
+
+[go语言设计哲学](https://studygolang.com/articles/2944)go 没有像JAVA一样，宗教式的完全面向对象设计；
+1. 完全面向对象设计就是一刀切的宗教式的设计，但其并不能很好的表述这个世界，这就导致其表现力不足，最后通过设计模式和面向切面等设计技巧来弥补语言方面的缺陷； JAVA就好比：手里握着是锤子，看什么都是钉子，什么都是类的对象，这个和现实世界不符，类表示单个事物还可以，一旦表示多个事物及其交互，其表现力也就会遇到各种挑战。
+2. **go是面向工程的实用主义者**，其糅合了面向对象的设计，函数式设计和过程式设计的优点；原来通过各种设计模式的设计通过函数、接口、组合等简单方式就搞定了；go有更多胶水的东西比如：全局变量、常量，函数，闭包等等，可以轻松的的把模块衔接和驱动起来；
+
+[Is Go an object-oriented language?](https://golang.org/doc/faq#Is_Go_an_object-oriented_language)Yes and no. Although Go has types and methods and allows an object-oriented style of programming, there is no type hierarchy. The concept of “interface” in Go provides a different approach that we believe is easy to use and in some ways more general. There are also ways to embed types in other types to provide something analogous—but not identical—to subclassing. Moreover, methods in Go are more general than in C++ or Java: they can be defined for any sort of data, even built-in types such as plain, “unboxed” integers. They are not restricted to structs (classes).
+
+
 [程序员技术选型：写Go还是Java？](https://mp.weixin.qq.com/s/v1jMd875d9hvfY2Y-AJO4Q)Go 不是面向对象编程语言。Go 没有类似 Java 的继承机制，因为它没有通过继承实现传统的多态性。实际上，它没有对象，只有结构体。它可以通过接口和让结构体实现接口来模拟一些面向对象特性。此外，你可以在结构体中嵌入结构体，但内部结构体无法访问外部结构体的数据和方法。Go 使用组合而不是继承将一些行为和数据组合在一起。
 
 Go 是一种命令式语言，Java 是一种声明式语言。Go 没有依赖注入，我们需要显式地将所有东西包装在一起。因此，**在使用 Go 时尽量少用“魔法”之类的东西**。一切代码对于代码评审人员来说都应该是显而易见的。Go 程序员应该了解 Go 代码如何使用内存、文件系统和其他资源。Java 要求开发人员更多地地关注程序的业务逻辑，知道如何创建、过滤、修改和存储数据。系统底层和数据库方面的东西都是通过配置和注解来完成的（比如通过 Spring Boot 等通用框架）。我们尽可能把枯燥乏味的东西留给框架去做。这样做很方便，但控制也反转了，限制了我们优化整个过程的能力。
 
-![](/public/upload/go/go_first_class.jpg)
+### 《Go codding in java way》 
+
+评价好坏的标准只有两条：系统是不是稳定，是不是能快速响应变化。
+1. go 版threadlocal
+2. web开发：全局ExceptionHandler，Requestmapping
+3. Stream programing
+4. 不要尝试在golang中用面向对象的方法写你的业务代码。现在是微服务当道的年代，服务已经代替了类成为主要的建模工具，现在很少关注一个服务里面是不是按照ddd拆分的，类是贫血的还是充血的，接到的业务代码最后都写成了pipeline。 PS：单个模块的复杂度降低了。其次是，如果你有足够强的数据库、缓存等等，其实业务代码没多少的。
+5. goburrow/cache 类似 java的guava cache
+6. go-funk 类似CollectonUtils/MapUtils
+
+## 其它
 
 [一些设计模式的Go实现](https://mp.weixin.qq.com/s/S1BQ55yZgBlB4AkfPX-gIg)
 
@@ -113,3 +157,7 @@ Go 是一种命令式语言，Java 是一种声明式语言。Go 没有依赖注
 [Docker 之父：Go、Rust 为什么会成为云原生的主导语言？](https://mp.weixin.qq.com/s/yg_gqi7bMldhi95ZAIR9fA)
 1. 我们之前都是用 Python 和 C 编写分布式系统的开发人员，对 Python 在实际生产中的应用已经非常熟悉了，所以大家都很讨厌 Python 的类型问题。最终，这些本该被早点发现的问题就暴露在运行时中，再也没法更改。
 2. 我们设想中的 Docker 不仅会是款成功的工具，还会是个成功的开源项目，因此语言的选择对于后期建立社区非常重要。比方说，我们得保证选择的语言有足够高的人气，保证语言本身不会成为理解源代码、贡献新代码的障碍。Go 的好处就是它的语法比较平易近人，会写 C 或者 Python 的人肯定能很快上手 Go。
+
+
+
+![](/public/upload/go/go_first_class.jpg)

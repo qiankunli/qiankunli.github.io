@@ -302,6 +302,44 @@ func (l Limit) ApplyToList(opts *ListOptions) {
 	opts.Limit = int64(l)
 }
 ```
+Options 里不仅包含了很多字段，有些字段还是 函数类型的，比如下面的NewCache，直接 cache.New 创建一个 cache 不好嘛？其实Cache 有多种实现，且cache.New 也包含 ache.Options （很明显花样很多）。
+```go
+// controller-runtime/pkg/cluster/cluster.go
+func New(config *rest.Config, opts ...Option) (Cluster, error) {
+	options := Options{}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	options = setOptionsDefaults(options)
+	...
+	cache, err := options.NewCache(config, cache.Options{Scheme: options.Scheme, Mapper: mapper, Resync: options.SyncPeriod, Namespace: options.Namespace})
+	...
+}
+
+func setOptionsDefaults(options Options) Options {
+	...
+	if options.NewCache == nil {
+		options.NewCache = cache.New
+	}
+	...
+}
+type Options struct {
+	...
+	NewCache cache.NewCacheFunc
+	NewClient NewClientFunc
+}
+```
+
+使用 NewCacheFunc ，可以让我们灵活的调整 构造Cache的方式，比如
+
+```go
+cluster.New(config,func (options *Options){
+	options.NewCache = func(config *rest.Config, opts cache.Options) (Cache, error){
+		opts = xx						// 对cache.Optiosn 做一些调整
+		return cache.New(config,opts)	// 调整Cache 的构造方式
+	}
+})
+```
 
 ## client.Object 
 

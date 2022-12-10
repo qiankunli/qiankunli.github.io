@@ -217,47 +217,6 @@ The pattern to follow is `APPNAME VERB NOUN --ADJECTIVE`. or `APPNAME COMMAND AR
 
 A flag is a way to modify the behavior of a command 这句说的很有感觉
 
-## pprof
-
-pprof 是用于可视化和分析性能分析数据的工具。
-
-Profiling 这个词比较难翻译，一般译成画像。比如在案件侦破的时候会对嫌疑人做画像，从犯罪现场的种种证据，找到嫌疑人的各种特征，方便对嫌疑人进行排查；还有就是互联网公司会对用户信息做画像，通过了解用户各个属性（年龄、性别、消费能力等），方便为用户推荐内容或者广告。在计算机性能调试领域里，profiling 就是对应用的画像，这里画像就是应用使用 CPU 和内存的情况。也就是说应用使用了多少 CPU 资源？都是哪些部分在使用？每个函数使用的比例是多少？有哪些函数在等待 CPU 资源？知道了这些，我们就能对应用进行规划，也能快速定位性能瓶颈。
-
-
-![](/public/upload/go/pprof.png)
-
-```go
-import (
-    ... ...
-    "net/http"
-    _ "net/http/pprof"  // 会自动注册handler到http server，方便通过http 接口获取程序运行采样报告
-    ... ...
-)
-... ...
-func main() {
-    go func() {
-        http.ListenAndServe(":6060", nil)
-    }()
-    ... ...
-}
-
-```
-以空导入的方式导入 net/http/pprof 包，并在一个单独的 goroutine 中启动一个标准的 http 服务，就可以实现对 pprof 性能剖析的支持。pprof 工具可以通过 6060 端口采样到我们的 Go 程序的运行时数据。然后就可以通过 `http://192.168.10.18:6060/debug/pprof` 查看程序的采样信息，但是可读性非常差，需要借助pprof 的辅助工具来分析。
-
-
-```sh
-// 192.168.10.18为服务端的主机地址
-$ go tool pprof -http=:9090 http://192.168.10.18:6060/debug/pprof/profile?seconds=30
-Fetching profile over HTTP from http://192.168.10.18:6060/debug/pprof/profile
-Saved profile in /Users/tonybai/pprof/pprof.server.samples.cpu.004.pb.gz
-Serving web UI on http://localhost:9090
-```
-
-CPU Profiling 是如何工作的？stack trace + statistics 的模型。当我们准备进行 CPU Profiling 时，通常需要选定某一**时间窗口**，在该窗口内，CPU Profiler 会向目标程序注册一个定时执行的 hook（有多种手段，譬如 SIGPROF 信号），在这个 hook 内我们每次会获取业务线程此刻的 **stack trace**。我们将 hook 的执行频率控制在特定的数值，譬如 100hz，这样就做到每 10ms 采集一个业务代码的调用栈样本。当时间窗口结束后，我们将采集到的所有样本进行聚合，最终得到每个函数被采集到的次数，相较于总样本数也就得到了每个函数的**相对占比**。借助此模型我们可以发现占比较高的函数，进而定位 CPU 热点。
-
-Heap Profiling 也是stack trace + statistics 的模型。数据采集工作并非简单通过定时器开展，而是需要侵入到内存分配路径内，即直接将自己集成在内存分配器内，当应用程序进行内存分配时拿到当前的 stack trace，最终将所有样本聚合在一起，这样我们便能知道每个函数直接或间接地内存分配数量了。由于 Heap Profiling 也是采样的（默认每分配 512k 采样一次），所以**展示的内存大小要小于实际分配的内存大小**。同 CPU Profiling 一样，这个数值仅仅是用于计算**相对占比**，进而定位内存分配热点。
-
-
 ## 其它
 
 组合一个struct 以方便我们给它加方法。比如 net.IP 是go 库的struct，想对ip 做一些扩充。就可以提供两个ip 的转换方法，以及扩充方法。

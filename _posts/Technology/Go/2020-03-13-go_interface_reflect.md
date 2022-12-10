@@ -17,13 +17,10 @@ interface，接口，restful接口，SQL 也是一种接口
 
 从编码的角度看：**Interfaces give programs structure**. Interfaces encourage design by composition. You must do your best to understand what could change and use interfaces to decouple.
 
-Go 语言之父 Rob Pike 说过“接口越大，抽象程度越弱”。越偏向业务层，抽象难度就越高。所以Go 标准库小接口（1~3 个方法）占比略高于 Docker 和 Kubernetes 的原因。**Go 接口是构建 Go 应用骨架（对应血肉）的重要元素**。抽象的时机：在实际真正需要的时候才对程序进行抽象。再通俗一些来讲，就是不要为了抽象而抽象。接口的确可以实现解耦，但它也会引入“抽象”的副作用，或者说接口这种抽象也不是免费的，是有成本的，除了会造成运行效率的下降之外，也会影响代码的可读性。
 
 [如何让 Go 反射变快](https://mp.weixin.qq.com/s/8aFSgJeDKgMD2r125c_UWg) 未读
 
 ## Go 自定义类型系统
-
-
 
 ### struct
 

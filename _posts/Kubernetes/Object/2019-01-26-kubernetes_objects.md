@@ -20,16 +20,10 @@ keywords: kubernetes Apimachinery
 
 ##  从api 到 go struct
 
-[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)**http server 或者 rpc server 要解决的一个问题是：如何解析用户的请求数据，并把他反序列化为语言中的一个具体的类型**。以一个 EchoService 为例，decode 程序需要从用户请求（如 post http://echo ） 文本或者二进制数据中创建出  EchoRequestV1，提供给上层处理，同时这个 decode 函数需要足够通用，他返回的是可能是一个 Message Interface（包含通用rpc 字段）, 具体内容是 EchoRequestV1。decode 相关的细节要么通过代码生成的技术提供给 decoder，要么在 二进制或者文本请求数据（或者 header等元数据）中携带这部分信息。解决这个问题有两种方式Protobuf Unmarshal/Kubernetes Scheme
-
 ![](/public/upload/kubernetes/kubernetes_type.png)
 
-||rpc|k8s|
-|---|---|---|
-||二进制|http|
-|定位|header 里包含 groupName.serviceName|GVR：http://xx/pods/xx|
-|编解码|Protobuf/thrift|GVK：Kubernetes Scheme|
-|其它|框架底层可能定义一些Message 之类的对象，定义一些公共header|Obejct/Unstructured |
+[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)**http server 或者 rpc server 要解决的一个问题是：如何解析用户的请求数据，并把他反序列化为语言中的一个具体的类型**。以一个 EchoService 为例，decode 程序需要从用户请求（如 post http://echo ） 文本或者二进制数据中创建出  EchoRequestV1，提供给上层处理，同时这个 decode 函数需要足够通用，他返回的是可能是一个 Message Interface（包含通用rpc 字段）, 具体内容是 EchoRequestV1。decode 相关的细节要么通过代码生成的技术提供给 decoder，要么在 二进制或者文本请求数据（或者 header等元数据）中携带这部分信息。解决这个问题有两种方式Protobuf Unmarshal/Kubernetes Scheme
+
 
 ## k8s api
 
