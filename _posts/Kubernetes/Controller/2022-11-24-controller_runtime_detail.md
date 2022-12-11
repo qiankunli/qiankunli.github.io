@@ -7,7 +7,7 @@ tags: Kubernetes
 keywords: controller-runtime 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -19,20 +19,23 @@ keywords: controller-runtime
 2. Controller，Kubebuidler 为我们生成的脚手架文件，我们只需要实现 Reconcile 方法即可。
 3. Clients，在实现 Controller 的时候不可避免地需要对某些资源类型进行创建/删除/更新，就是通过该 Clients 实现的，其中查询功能实际查询是本地的 Cache，写操作直接访问 Api Server。
 4. Index，由于 Controller 经常要对 Cache 进行查询，Kubebuilder 提供 Index utility 给 Cache 加索引提升查询效率。
-5. Finalizer，在一般情况下，如果资源被删除之后，我们虽然能够被触发删除事件，但是这个时候从 Cache 里面无法读取任何被删除对象的信息，这样一来，导致很多垃圾清理工作因为信息不足无法进行，K8s 的 Finalizer 字段用于处理这种情况。在 K8s 中，**只要对象 ObjectMeta 里面的 Finalizers 不为空，对该对象的 delete 操作就会转变为 update 操作**，具体说就是 update deletionTimestamp 字段，其意义就是告诉 K8s 的 GC“在deletionTimestamp 这个时刻之后，只要 Finalizers 为空，就立马删除掉该对象”。所以一般的使用姿势是
-    1. 在DeletionTimestamp 为空时， 若对象没有Finalizers 就把 Finalizers 设置好（任意 string），
-    2. 在DeletionTimestamp 不为空时， 根据 Finalizers 的值执行完所有的 pre-delete hook（此时可以在 Cache 里面读取到被删除对象的任何信息），之后将 Finalizers 置为空。
-    一个使用场景时：正常情况下 A 创建B，则B的 ownerreference 指向A，删除A时会自动删除B。但 ownerreference 不能跨ns，因此在对 跨ns 进行级联删除时，可以使用
 6. OwnerReference，K8s GC 在删除一个对象时，任何 ownerReference 是该对象的对象都会被清除，与此同时，Kubebuidler 支持所有对象的变更都会触发 Owner 对象 controller 的 Reconcile 方法。
+5. Finalizer，在一般情况下，如果资源被删除之后，我们虽然能够被触发删除事件，但是这个时候从 Cache 里面无法读取任何被删除对象的信息，这样一来，导致很多垃圾清理工作因为信息不足无法进行，K8s 的 Finalizer 字段用于处理这种情况。在 K8s 中，**只要对象 ObjectMeta 里面的 Finalizers 不为空，则delete只是 update deletionTimestamp 字段**。删掉 Finalizers 后，Finalizers 为空且deletionTimestamp不为空时，K8s 的 GC会立马删除掉该对象”。所以一般的使用姿势是
+    1. 在DeletionTimestamp 为空时， 若对象没有Finalizers 就把 Finalizers 设置好，
+    2. 在DeletionTimestamp 不为空时， 根据 Finalizers 的值执行完所有的 pre-delete hook（此时可以在 Cache 里面读取到被删除对象的任何信息），之后将 Finalizers 置为空。
+    一个使用场景时：正常情况下 A 创建B，则B的 ownerreference 指向A，删除A时会自动删除B。但 ownerreference 不能跨ns，因此在对 跨ns 进行级联删除时，可以使用Finalizer
+
 
 ## client
+
+使用示例
 
 ```go
 pod := &core.Pod{}		// 底层 通过反射获取 到pod 类型，进而获取到 pod gvk，拿到对应的client 或informer，再根据 objName 获取真实数据。
 err := r.Client.Get(ctx, req.podName, pod); 
 ```
 
-使用：client.Get 可以根据 obj 获取到 gvk对应的  client 或informer ，进而获取到 obj的真实数据，赋值给 obj。client的厉害之处就在于 **无论带缓存（informer） 还是不带缓存（直连apiserver/restclient） ，都屏蔽了 gvk 的差异**。用户只要提供一个 空的go struct 以及 资源name ，client 即可为 空的go struct 赋值。
+使用：client.Get 可以根据 obj 获取到 gvk对应的  client 或informer ，进而获取到 obj的真实数据，赋值给 obj。client的厉害之处就在于 **无论从informer 缓存取数据 还是直连apiserver/restclient 取数据 ，都屏蔽了 gvk 的差异**。用户只要提供一个 空的go struct 以及 资源name ，client 即可为 空的go struct 赋值。
 
 ```
 controller-runtime
@@ -77,7 +80,7 @@ ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{ Scheme: scheme,...})
 ```
 其中 apiReader 是直连apiserver的client， writeObj 即包装了缓存后的client
 
-### 请求分发
+### 请求分发：从cache中读取还是直连
 
 请求分发主力是delegatingClient
 
@@ -124,7 +127,7 @@ func (d *delegatingReader) Get(ctx context.Context, key ObjectKey, obj Object, o
 }
 ```
 
-### 不带缓存Get 实现
+### 直连apiserver 取数据：根据gvk分发restclient
 
 为了支持多种类型，非缓存client 包含 unstructuredClient/typedClient。
 
@@ -154,7 +157,9 @@ func (c *typedClient) Get(ctx context.Context, key ObjectKey, obj Object, opts .
 		Name(key.Name).Do(ctx).Into(obj)
 }
 ```
+
 clientCache  是 k8s teype与client 的cache，不是数据的cache。
+
 ```go
 // controller-runtime/pkg/client/client_cache.go
 // clientCache creates and caches rest clients and metadata for Kubernetes types.
@@ -202,7 +207,7 @@ func (c *clientCache) getResource(obj runtime.Object) (*resourceMeta, error) {
 }
 ```
 
-## cache 是如何实现的
+## 从cache中取数据：根据gvk分发informer
 
 cache 实现了 client.Reader 接口，具体实现是  informerCache，它聚合了 InformersMap
 ```go
@@ -226,11 +231,6 @@ func (ip *informerCache) Get(ctx context.Context, key client.ObjectKey, out clie
 			}
 			cache.WaitForCacheSync(...)
 	return cache.Reader.Get(ctx, key, out)		// CacheReader.Get
-		storeKey := objectKeyToStoreKey(key)
-		obj, exists, err := c.indexer.GetByKey(storeKey)
-		outVal := reflect.ValueOf(out)
-		objVal := reflect.ValueOf(obj)
-		reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
 }
 ```
 InformersMap create and caches Informers for (runtime.Object, schema.GroupVersionKind) pairs. 如果informer 已经存在则返回informer，否则新建一个 informer 并加入到map中，后续的Get 就交给 informer 了。 
@@ -257,6 +257,33 @@ func (m *InformersMap) Get(ctx context.Context, gvk schema.GroupVersionKind, obj
 	default:
 		return m.structured.Get(ctx, gvk, obj)
 	}
+}
+```
+因为不确定调用方是否会更改out 的数据，cache.Get 时会对 cache中的数据做deepcopy 再赋值给out。对于List 操作 且object 数据量很大时，deepcopy 可能会成为性能瓶颈。
+```go
+// sigs.k8s.io/controller-runtime/pkg/cache/internal/cache_reader.go
+// Get checks the indexer for the object and writes a copy of it if found.
+func (c *CacheReader) Get(_ context.Context, key client.ObjectKey, out client.Object) error {
+	storeKey := objectKeyToStoreKey(key)
+	// Lookup the object from the indexer cache
+	obj, exists, err := c.indexer.GetByKey(storeKey)
+	if c.disableDeepCopy {
+		// skip deep copy which might be unsafe you must DeepCopy any object before mutating it outside
+	} else {
+		// deep copy to avoid mutating cache
+		obj = obj.(runtime.Object).DeepCopyObject()
+	}
+	// Copy the value of the item in the cache to the returned value
+	outVal := reflect.ValueOf(out)
+	objVal := reflect.ValueOf(obj)
+	if !objVal.Type().AssignableTo(outVal.Type()) {
+		return fmt.Errorf("cache had type %s, but %s was asked for", objVal.Type(), outVal.Type())
+	}
+	reflect.Indirect(outVal).Set(reflect.Indirect(objVal))
+	if !c.disableDeepCopy {
+		out.GetObjectKind().SetGroupVersionKind(c.groupVersionKind)
+	}
+	return nil
 }
 ```
 
@@ -343,7 +370,7 @@ cluster.New(config,func (options *Options){
 
 ## client.Object 
 
-golang的鸭子类型 给了框架设计很多灵活性，比如先定义具体实现后定义扩展。Pod 等k8s core object 绝对是先出的，controller-runtime 是后出的，但因为 Pod 实现了 metav1.Object 和 runtime.Object，Pod 也就实现了 controller-runtime Object，controller-runtime 就可以拿着Object 去指代 任意k8s 对象了。
+golang的鸭子类型 给了框架设计很多灵活性，比如**先定义子类后定义父类**。Pod 等k8s core object 绝对是先出现的，controller-runtime 是后出的，但因为 Pod 实现了 metav1.Object 和 runtime.Object，Pod 也就实现了 controller-runtime 定义的Object，controller-runtime 就可以拿着Object 去指代 任意k8s 对象了。
 
 ```go
 // controller-runtime/pkg/client/object.go

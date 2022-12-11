@@ -244,8 +244,12 @@ spec:
 
 ### 整体设计
 
-karmada 分发资源到成员集群涉及的相关资源资源可分为：
-1. 用于设定策略的资源：PropagationPolicy，OverridePolicy。
+karmada 对象部署相关的 crd 可分为
+1. 控制集群定义一个标准的k8s中原生API对象deployment，在member集群中实际部署的deployment会以此为模板进行创建。PS：因为控制集群没有 部署deploymentController，所以deployment 在控制集群就是表达一个静态数据。
+1. 用于设定策略的资源：PropagationPolicy，OverridePolicy（定义在特定member集群中具体修改deployment对象）。
+  1. PropagationPolicy.spec.placement.clusterAffinity.clusterNames决定了对象需要被部署到哪些集群；
+  2. PropagationPolicy.spec.resourceSelectors绑定需要部署的资源对象；
+  3. PropagationPolicy.spec.replicaScheduling定义了deployment在集群中分发的方式
 2. 执行策略相关的资源：ResourceBinding，ClusterResourceBinding， Work。
 
 ![](/public/upload/kubernetes/karmada_object.png)
@@ -256,6 +260,8 @@ karmada 分发资源到成员集群涉及的相关资源资源可分为：
 4. Execution Controller: watches Work objects. When Work objects are created, the controller will distribute the resources to member clusters.
 
 karmada 会为每一个分发的资源每个目标成员集群的执行命名空间（karmada-es-*)中创建一个 work。具体的说，BindingController 根据 Resource Binging 资源内容创建 work 资源到各个成员集群的执行命名空间, work 中描述了要分到目标集群的资源列表。被分发的资源不区分是自定义资源还是 kubernetes 内置资源先被转化为 Unstructured 类型的数据，然后在 woker 中以 JSON 字节流的形式保存，然后在 execution_controller 中再反序列化，解析出 GVR，通过 dynamicClusterClient 在目标成员集群中创建指定分发资源。
+
+[Karmada资源对象部署的设计与实现](https://mp.weixin.qq.com/s/8lWuaNVZJTF1LpqXUd6H5A)
 
 
 ### 源码分析

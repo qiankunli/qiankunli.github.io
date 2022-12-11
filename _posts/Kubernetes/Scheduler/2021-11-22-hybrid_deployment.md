@@ -65,6 +65,11 @@ keywords:  Kubernetes 混部
 
 ## 技术要求
 
+给在线集群部署更多任务
+1. 如何保证服务质量，脱离了服务质量则混部无意义。又分为动态和静态
+2. 如何从在线集群里“拿到”弹性资源
+3. 把弹性资源分配给离线任务
+
 ### 多种工作负载的混部成为常态
 
 [Koordinator 0.6：企业级容器调度系统解决方案，引入 CPU 精细编排、资源预留与全新的重调度框架](https://mp.weixin.qq.com/s/YdoxVxz_91ZFemF8JuxRvQ)当企业的应用越来越多，为每一种类型的应用单独规划集群，在运维成本和资源成本上将不再可行。企业管理不同业务类型的方式逐步从切分集群到共享集群，从切分节点池到共享节点池这样的方式演进。
@@ -142,7 +147,9 @@ PS：先分级，再给低优 原本高优的资源，QoS保证不了了再重�
 [Koordinator v0.7: 为任务调度领域注入新活力](https://mp.weixin.qq.com/s/oOjg8j9tDBs5jOm30XjCMA)
 
 QoS 表示应用在节点上运行时得到的物理资源质量，包含了 LSR（Latency-Sensitive Reserved）、LS（Latency-Sensitive）和 BE（Best Effort），保障策略
-1. CPU 方面，通过内核自研的 Group Identity 机制，针对不同 QoS 等级设置内核调度的优先级，优先保障 LSR/LS 的 cpu 调度，允许抢占 BE 的 CPU 使用，以达到最小化在线应用调度延迟的效果；对于 LS 应用的突发流量，提供了 CPU Burst 策略以规避非预期的 CPU 限流。
+1. CPU 方面
+  1. 通过内核自研的 Group Identity 机制，针对不同 QoS 等级设置内核调度的优先级，优先保障 LSR/LS 的 cpu 调度，允许抢占 BE 的 CPU 使用，以达到最小化在线应用调度延迟的效果；PS：龙蜥操作系统（Anolis OS） 通过配置不同的 Group Identity **启用两套进程调度**（就像Linux原有的实时调度和cfs调度一样），一套作为在线业务的调度器，另一套作为离线任务的调度器，在线业务优先级整体高于离线任务。
+  2. 对于 LS 应用的突发流量，提供了 CPU Burst 策略以规避非预期的 CPU 限流。
 2. 内存方面，由于容器 cgroup 级别的直接内存回收会带来一定延时，LS 应用普遍开启了容器内存异步回收能力，规避同步回收带来的响应延迟抖动。除此之外，针对末级缓存（Last-Level Cache，LLC）这种共享资源，为了避免大数据等 BE 应用大量刷 Cache 导致 LS/LSR 应用的 Cache Miss Rate 异常增大，降低流水线执行效率，引入了 RDT 技术来限制 BE 应用可分配的 Cache 比例，缩小其争抢范围。
 
 [阿里云容器服务差异化 SLO 混部技术实践](https://mp.weixin.qq.com/s/fkX_lStva96HEbmPbR6iZw)
