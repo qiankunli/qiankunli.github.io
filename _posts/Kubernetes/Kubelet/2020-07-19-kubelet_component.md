@@ -422,3 +422,4 @@ func (m *kubeGenericRuntimeManager) RunInContainer(id kubecontainer.ContainerID,
 3. eviction manager, 磁盘/内存/cpu 变化时触发 `managerImpl.synchronize` 拿到一个 需要被驱逐的pod（对当前所有Pod排序，找最前面那个，不同的资源紧张时 使用的排序规则不同） 数据并使用`Kubelet.podResourcesAreReclaimed `处理一下。[K8s单机侧驱逐流程和进程选择策略](https://mp.weixin.qq.com/s/C2wcj9E3wu3ADLOa-d0yVw)
 
     ![](/public/upload/kubernetes/kubelet_eviction_object.png)
+4. 使用docker私有镜像仓库时，如需要拉取镜像，需要docker login进行登录，才能进行镜像拉取，如果使用kubernetes进行容器化部署，如果再使用docker login在每台宿主机去做镜像仓库登录授权，就操作比较繁琐了，正确姿势应该使用什么呢？imagePullSecrets

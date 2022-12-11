@@ -324,7 +324,7 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 [如何为 Kubernetes 实现原地升级？](https://mp.weixin.qq.com/s/CNLf8MHYGs_xeD4PxChR4A)
 [如何在Kubernetes中实现容器原地升级](https://cloud.tencent.com/developer/article/1413743)一个Pod中可能包含了主业务容器，还有不可剥离的依赖业务容器，以及SideCar组件容器等，如果因为要更新其中一个SideCar Container而继续按照ReCreate Pod的方式进行整个Pod的重建，那负担还是很大的。更新一个轻量的SideCar却导致了分钟级的单个Pod的重建过程，因此，我们迫切希望能实现，只升级Pod中的某个Container，而不用重建整个Pod。
 
-Kubernetes把容器原地升级的能力只做在Kubelet这一层，并没有暴露在Deployment、StatefulSet等Controller中直接提供给用户，原因很简单，还是建议大家把Pod作为完整的部署单元。为了实现容器原地升级，我们更改Pod.Spec中对应容器的Image，就会生成kubetypes.UPDATE类型的事件，kubelet 将容器优雅终止。旧的容器被杀死之后，kubelet启动新的容器，如此即完成Pod不重建的前提下实现容器的原地升级。
+Kubernetes把容器原地升级的能力只做在Kubelet这一层，**并没有暴露在Deployment、StatefulSet等Controller中直接提供给用户**，原因很简单，还是建议大家把Pod作为完整的部署单元。为了实现容器原地升级，我们更改Pod.Spec中对应容器的Image，就会生成kubetypes.UPDATE类型的事件，kubelet 将容器优雅终止。旧的容器被杀死之后，kubelet启动新的容器，如此即完成Pod不重建的前提下实现容器的原地升级。
 
  不过这样可能存在的几个风险：
  1. 容器 升级时 有一段时间服务不可用，但k8s 组件 无法感知，这用到了 [readinessGates](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/)Your application can inject extra feedback or signals into PodStatus: Pod readiness. To use this, set readinessGates in the Pod's spec to specify a list of additional conditions that the kubelet evaluates for Pod readiness.Readiness gates are determined by the current state of status.condition fields for the Pod. If Kubernetes cannot find such a condition in the status.conditions field of a Pod, the status of the condition is defaulted to "False". 当一个 Pod 被原地升级时，控制器会先利用 readinessGates 把 Pod status 中修改为 not-ready 状态，然后再更新 Pod spec 中的 image 字段来触发 Kubelet 重建对应的容器。

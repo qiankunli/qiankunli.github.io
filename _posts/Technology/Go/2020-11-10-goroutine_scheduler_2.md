@@ -23,7 +23,7 @@ keywords: Go goroutine scheduler
 
 1. 操作系统的代码位于内核地址空间，而CPU在执行用户代码时特权等级很低，无权访问需要最高优先级才能访问的内核地址空间的代码和数据，所以**不能通过简单的call指令直接调用操作系统提供的函数**，而需要使用特殊的指令进入操作系统内核完成指定的功能。
 2. 用户代码调用操作系统API不是根据函数名直接调用，而是需要根据操作系统为每个API提供的一个**整型编号**来调用，AMD64 Linux平台约定在进行系统调用时使用rax寄存器存放系统调用编号（PS：还有专门的寄存器），同时约定使用rdi, rsi, rdx, r10, r8和r9来传递前6个系统调用参数。
-3. 函数调用只需要切换PC 及栈寄存器等几个寄存器，系统调用则涉及到整个cpu上下文（所有寄存器）的切换。不过并不会涉及到虚拟内存等进程用户态的资源，也不会切换进程。系统调用属于**同进程内的 CPU 上下文切换**，进程的上下文切换就比系统调用时多了一步：在保存内核态资源（当前进程的内核状态和 CPU 寄存器）之前，需要先把该进程的用户态资源（虚拟内存、栈等）保存下来；而加载了下一进程的内核态后，还需要刷新进程的虚拟内存和用户栈。
+3. 函数调用只需要切换PC 及栈寄存器 SP等几个寄存器，系统调用则涉及到整个cpu上下文（所有寄存器）的切换。不过并不会涉及到虚拟内存等进程用户态的资源，也不会切换进程。系统调用属于**同进程内的 CPU 上下文切换**，进程的上下文切换就比系统调用时多了一步：在保存内核态资源（当前进程的内核状态和 CPU 寄存器）之前，需要先把该进程的用户态资源（虚拟内存、栈等）保存下来；而加载了下一进程的内核态后，还需要刷新进程的虚拟内存和用户栈。
 
 线程调度：操作系统什么时候会发起调度呢？总体来说操作系统必须要得到CPU的控制权后才能发起调度，那么**当用户程序在CPU上运行时如何才能让CPU去执行操作系统代码从而让内核获得控制权呢？**一般说来在两种情况下会从执行用户程序代码转去执行操作系统代码：
 1. 用户程序使用系统调用进入操作系统内核；
@@ -136,52 +136,6 @@ func newproc1(fn *funcval, argp *uint8, narg int32, callergp *g, callerpc uintpt
 }
 ```
 
-### 有哪些调度入口
-
-协程切换的原因一般有以下几种情况：
-
-1. 系统调用；Go 语言通过 Syscall 和 Rawsyscall 等使用汇编语言编写的方法封装了操作系统提供的所有系统调用
-2. 同步和编排；如果原子、互斥量或通道操作调用将导致 Goroutine 阻塞，调度器可以将之切换到一个新的 Goroutine 去运行。一旦 Goroutine 可以再次运行，它就可以重新排队，并最终在M上切换回来。
-3. 抢占式调度时间片结束；
-4. 垃圾回收
-
-![](/public/upload/go/goroutine_schedule.png)
-
-就好像linux 进程会主动调用schedule() 触发调度让出cpu 控制权，只是linux 多了时间片中断主动触发调度而已。
-
-```go
-func gopark(unlockf func(*g, unsafe.Pointer) bool, lock unsafe.Pointer, reason waitReason, traceEv byte, traceskip int) {
-    mp := acquirem()
-    gp := mp.curg
-    mp.waitlock = lock
-    mp.waitunlockf = unlockf
-    gp.waitreason = reason
-    mp.waittraceev = traceEv
-    mp.waittraceskip = traceskip
-    releasem(mp)
-    mcall(park_m)
-}
-```
-
-gopark 函数中会更新当前处理器(mp)的状态并在处理器上设置该 Goroutine 的等待原因。gopark中调用的 park_m 函数会将当前 Goroutine 的状态从 _Grunning 切换至 _Gwaiting 并调用 waitunlockf 函数进行解锁
-
-```go
-func park_m(gp *g) {
-    _g_ := getg()
-    casgstatus(gp, _Grunning, _Gwaiting)
-    dropg()
-    if fn := _g_.m.waitunlockf; fn != nil {
-        ok := fn(gp, _g_.m.waitlock)
-        _g_.m.waitunlockf = nil
-        _g_.m.waitlock = nil
-        if !ok {
-            casgstatus(gp, _Gwaiting, _Grunnable)
-            execute(gp, true) // Schedule it back, never returns.
-        }
-    }
-    schedule()
-}
-```
 
 ### 协程切换过程 `schedule()`
 
@@ -262,7 +216,7 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
     JMP	BX
 ```
 
-runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器和待执行函数的程序计数器，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**(所以goroutine 没有返回值)。runtime.goexit ==> runtime·goexit1 ==> mcall(goexit0) ==> goexit0，goexit0 会对 G 进行复位操作，解绑 M 和 G 的关联关系，将其 放入 gfree 链表中等待其他的 go 语句创建新的 g。在最后，goexit0 会重新调用 schedule触发新一轮的调度。PS：就切换几个寄存器，所以协程的切换成本更低
+runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器和待执行函数的程序计数器，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**(所以goroutine 没有返回值)。runtime.goexit ==> runtime·goexit1 ==> mcall(goexit0) ==> goexit0，goexit0 会对 G 进行复位操作，解绑 M 和 G 的关联关系，将其 放入 gfree 链表中等待其他的 go 语句创建新的 g。在最后，goexit0 会重新调用 schedule触发新一轮的调度。PS：就切换几个寄存器（PC和SP），所以协程的切换成本更低
 
 ![](/public/upload/go/routine_switch_after.jpg)
 
@@ -350,6 +304,10 @@ func main() {
 
 ### “M的”调度循环
 
+从 `go func(){...}` 创建goroutine 到调度循环。
+
+![](/public/upload/go/schedule_cycle.jpg)
+
 M 是 Go 代码运行的真实载体，包括 Goroutine 调度器自身的逻辑也是在 M 中运行的。M在绑定有效的 P 后，进入一个调度循环，而调度循环的机制大致是从 P 的本地运行队列以及全局队列中获取 G，切换到 G 的执行栈上并执行 G 的函数，调用 goexit 做清理工作并回到 M，如此反复。
 
 伪代码
@@ -375,11 +333,34 @@ schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexi
 
 ![](/public/upload/go/go_scheduler_cycle.jpg)
 
-## 调度策略——抢占——防止一个G长时间运行
+## 调度策略
 
-[Go 的抢占式调度](https://mp.weixin.qq.com/s/d7FdGBc0S0V3S4aRL4EByA)有两种主要的多任务调度方法：“协作”和“抢占”。协作式多任务处理也称为“非抢占”。在协作式多任务处理中，程序的切换方式取决于程序本身。“协作”一词是指这样一个事实：程序应设计为可互操作的，并且它们必须彼此“协作”。在抢占式多任务处理中，程序的切换交给操作系统。调度是基于某种算法的，例如基于优先级，FCSV，轮询等。
+协程切换的原因一般有以下几种情况：
 
-那么现在，goroutine 的调度是协作式还是抢占式的？至少在 Go1.13 之前，它是协作式的。当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中（Go 编译器在每个函数或方法的入口处加上了一段额外的代码 runtime.morestack_noctxt），**当 G 进行函数调用时**，G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。
+1. 系统调用；Go 语言通过 Syscall 和 Rawsyscall 等使用汇编语言编写的方法封装了操作系统提供的所有系统调用
+2. 同步和编排；如果原子、互斥量或通道操作调用将导致 Goroutine 阻塞，调度器可以将之切换到一个新的 Goroutine 去运行。一旦 Goroutine 可以再次运行，它就可以重新排队，并最终在M上切换回来。
+3. 抢占式调度时间片结束；
+4. 垃圾回收
+
+![](/public/upload/go/goroutine_schedule.png)
+
+[Go 的抢占式调度](https://mp.weixin.qq.com/s/d7FdGBc0S0V3S4aRL4EByA)有两种主要的多任务调度方法：“协作”和“抢占”。
+1. 协作式多任务处理也称为“非抢占”。在协作式多任务处理中，程序的切换方式取决于程序本身。“协作”一词是指这样一个事实：程序应设计为可互操作的，并且它们必须彼此“协作”。
+    1. 主动用户让权，通过runtime.Gosched 调用主动让出执行机会
+    2. 主动调度弃权，函数调用时执行栈分段检查自身的抢占标记， 决定是否继续执行
+2. 在抢占式多任务处理中，程序的切换交给操作系统。调度是基于某种算法的，例如基于优先级，FCSV，轮询等。
+    1. 被动监控抢占， 当G 执行时间过长时，sysmon会抢占G
+    2. 被动GC抢占，当需要进行垃圾回收时，强制停止所有G
+
+![](/public/upload/go/go_signal_preempt.jpg)
+
+类似的，linux 进程会主动调用schedule() 触发调度让出cpu 控制权。
+
+### 协作式的抢占
+
+在 Go1.13 之前，它是协作式的。当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中（Go 编译器在每个函数或方法的入口处加上了一段额外的代码 runtime.morestack_noctxt），**当 G 进行函数调用时**，G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。
+
+但有个漏洞
 
 ```go
 func main() {
@@ -390,14 +371,52 @@ func main() {
 }
 ```
 
-Go1.14 引入抢占式调度（使用信号的异步抢占机制）
+### 基于信号的异步抢占机制
+
+Go1.14 引入抢占式调度
 1. M 启动时会注册信号处理函数：sighandler。
 1. sysmon 会检测到运行了 10ms 以上的 G（goroutine）。调用preemptone，向正在运行的 goroutine 所绑定的的那个 M（也可以说是线程）发出 SIGURG 信号。
 3. G所在的M，runtime.sighandler函数就是负责处理接收到的信号的。如果收到的信号是sigPreempt，就调用doSigPreempt函数。通过pushCall向G的执行上下文中注入一个函数调用runtime.asyncPreempt（骚操作，粗略看做向当前G的PC 地址后插入CALL 指令）
-4. 当前 goroutine 执行 asyncPreempt 函数，通过 mcall 切到 g0 栈执行 gopreempt_m。最终会调用schedule函数。
+4. 当前 goroutine 执行 asyncPreempt 函数，通过 mcall 切到 g0 栈执行 gopreempt_m。最终会调用schedule函数。PS：拿到go struct 对象就可以拿到对应的stack、gobuf结构，**改变pc、sp 等值，就可以给 goroutine 强塞一个代码里没写的函数执行**。 
 5. 被抢占的 goroutine 再次调度过来执行时，会继续原来的执行流。
 
-这个抢占机制也让垃圾回收器受益，可以用更高效的方式终止所有的协程。诚然，STW 现在非常容易，Go 仅需要向所有运行的线程发出一个信号就可以了。PS： os 中断是指令完毕时，进而执行中断处理程序，重新拿到cpu使用权
+这个抢占机制也让垃圾回收器受益，可以用更高效的方式终止所有的协程。诚然，STW 现在非常容易，Go 仅需要向所有运行的线程发出一个信号就可以了。PS： linux 多了时间片硬件中断，中断是指令完毕时，进而执行中断处理程序，os重新拿到cpu使用权（继而执行Schedule），golang 用信号机制 接近模拟了这个过程，其实还是用 了linux 机制才能拦住执行流。
+
+### 从 gopark 到 schedule
+
+```go
+func gopark(unlockf func(*g, unsafe.Pointer) bool, lock unsafe.Pointer, reason waitReason, traceEv byte, traceskip int) {
+    mp := acquirem()
+    gp := mp.curg
+    mp.waitlock = lock
+    mp.waitunlockf = unlockf
+    gp.waitreason = reason
+    mp.waittraceev = traceEv
+    mp.waittraceskip = traceskip
+    releasem(mp)
+    mcall(park_m)
+}
+```
+
+gopark 函数中会更新当前处理器(mp)的状态并在处理器上设置该 Goroutine 的等待原因。gopark中调用的 park_m 函数会将当前 Goroutine 的状态从 _Grunning 切换至 _Gwaiting 并调用 waitunlockf 函数进行解锁
+
+```go
+func park_m(gp *g) {
+    _g_ := getg()
+    casgstatus(gp, _Grunning, _Gwaiting)
+    dropg()
+    if fn := _g_.m.waitunlockf; fn != nil {
+        ok := fn(gp, _g_.m.waitlock)
+        _g_.m.waitunlockf = nil
+        _g_.m.waitlock = nil
+        if !ok {
+            casgstatus(gp, _Gwaiting, _Grunnable)
+            execute(gp, true) // Schedule it back, never returns.
+        }
+    }
+    schedule()
+}
+```
 
 ## Go的栈
 
@@ -409,3 +428,7 @@ Go1.14 引入抢占式调度（使用信号的异步抢占机制）
 4. 栈会根据大小的不同从不同的位置进行分配。
     1. 小栈内存分配。从 stackpool 分配栈空间，否则从 mcache 中获取。如果 mcache 对应的 stackcache 获取不到，那么调用 stackcacherefill 从堆上申请一片内存空间填充到 stackcache 中。
     2. 大栈内存分配。运行时会查看 stackLarge 中是否有剩余的空间，如果不存在剩余空间，它也会调用 mheap_.allocManual 从堆上申请新的内存。
+
+## goroutine泄露
+
+如果你启动了一个 goroutine，但并没有符合预期的退出，直到程序结束，此goroutine才退出，这种情况就是 goroutine 泄露。当 goroutine 泄露发生时，该 goroutine 的栈(一般 2k 内存空间起)一直被占用不能释放，goroutine 里的函数在堆上申请的空间也不能被 垃圾回收器 回收。这样，在程序运行期间，内存占用持续升高，可用内存越来也少，最终将导致系统崩溃。

@@ -122,7 +122,7 @@ WordPress
 
 ![](/public/upload/kubernetes/helm_template.png)
 
-Helm Chart 中的 YAML 文件是使用 Helm 的模板语言开发的，下面是由 helm create 生成的被模板化的 ingress 描述示例，提供了几个变量，用来定义和配置 ingress 资源，包括是否应该创建 ingress 资源。
+Helm Chart 中的 YAML 文件是使用 Helm 的模板语言开发的，其中的双大括号包扩起来的部分是Go template，其中的Values是在values.yaml文件中定义的。下面是由 helm create 生成的被模板化的 ingress 描述示例，提供了几个变量，用来定义和配置 ingress 资源，包括是否应该创建 ingress 资源。
 
 ```yaml
 {{- if or (eq .Values.controller.kind "Deployment") (eq .Values.controller.kind "Both") -}}

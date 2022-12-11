@@ -10,17 +10,11 @@ keywords: Go Concurrence
 
 ## 一 前言
 
-本文算是对《Go并发编程实战》一书的小结。
 
-我们谈go的优点时，并发编程是最重要的一块。因为go基于新的并发编程模型：不用共享内存的方式来通信，作为替代，以通信作为手段来共享内存。（goroutine共享channel，名为管道，实为内存）。
 
-为解释这个优势，本文提出了四个概念：交互方式、手段、类型、目的（不一定对，只是为了便于描述）。并在不同的并发粒度上（进程、线程、goroutine）对这几个概念进行了梳理。
+我们谈go的优点时，并发编程是最重要的一块。因为go基于新的并发编程模型：不用共享内存的方式来通信，作为替代，以通信作为手段来共享内存。（goroutine共享channel，名为管道，实为内存）。为解释这个优势，本文提出了四个概念：交互方式、手段、类型、目的（不一定对，只是为了便于描述）。并在不同的并发粒度上（进程、线程、goroutine）对这几个概念进行了梳理。
 
 Go 语言的并发模型是 fork-join 型的。使用 go 关键字启动子协程工作，使用 sync.Wait 和 channel 来收集结果。
-
-Go 并没有彻底放弃基于共享内存的并发模型，而是在提供 CSP 并发模型原语的同时，还通过标准库的 sync 包，提供了针对传统的、基于共享内存并发模型的低级同步原语，包括：互斥锁（sync.Mutex）、读写锁（sync.RWMutex）、条件变量（sync.Cond）等，并通过 atomic 包提供了原子操作原语等等。显然，基于共享内存的并发模型在 Go 语言中依然有它的“用武之地”。sync 包低级同步原语可以用在哪？
-1. 在 Go 中，channel 并发原语也可以用于对数据对象访问的同步，我们可以把 channel 看成是一种高级的同步原语，它自身的实现也是建构在低级同步原语之上的。也正因为如此，**channel 自身的性能与低级同步原语相比要略微逊色**，开销要更大。
-2. 在不想转移结构体对象所有权，但又要保证结构体内部状态数据的同步访问的场景。
 
 ## 原子操作
 
@@ -35,6 +29,10 @@ Go 并没有彻底放弃基于共享内存的并发模型，而是在提供 CSP 
 
 ## 同步原语
 
+Go 并没有彻底放弃基于共享内存的并发模型，而是在提供 CSP 并发模型原语的同时，还通过标准库的 sync 包，提供了针对传统的、基于共享内存并发模型的低级同步原语，包括：互斥锁（sync.Mutex）、读写锁（sync.RWMutex）、条件变量（sync.Cond）等，并通过 atomic 包提供了原子操作原语等等。显然，基于共享内存的并发模型在 Go 语言中依然有它的“用武之地”。sync 包低级同步原语可以用在哪？
+1. 在 Go 中，channel 并发原语也可以用于对数据对象访问的同步，我们可以把 channel 看成是一种高级的同步原语，它自身的实现也是建构在低级同步原语之上的。也正因为如此，**channel 自身的性能与低级同步原语相比要略微逊色**，开销要更大。
+2. 在不想转移结构体对象所有权，但又要保证结构体内部状态数据的同步访问的场景。
+
 [Go 语言设计与实现-同步原语与锁](https://draveness.me/golang/docs/part3-runtime/ch06-concurrency/golang-sync-primitives/)Go 语言在 sync 包中提供了用于同步的一些基本原语，包括常见的 sync.Mutex、sync.RWMutex、sync.WaitGroup、sync.Once 和 sync.Cond。这些基本原语提高了较为基础的同步功能，但是它们是一种相对原始的同步机制，在多数情况下，我们都应该使用**抽象层级的更高的** Channel 实现同步。 [觉得WaitGroup不好用？试试ErrorGroup吧！](https://mp.weixin.qq.com/s/077qtC19cRMmaKWVL0qqaQ)
 
 首次使用 Mutex 等 sync 包中定义的结构类型后，我们不应该再对它们进行复制操作。我们推荐通过闭包方式，或者是传递类型实例（或包裹该类型的类型实例）的地址（指针）的方式进行。
@@ -42,6 +40,50 @@ Go 并没有彻底放弃基于共享内存的并发模型，而是在提供 CSP 
 互斥锁（Mutex）和读写锁（RWMutex）。它们都是**零值可用**的数据类型，sync.Mutex 的零值是一个未锁定的 Mutex。[Golang: 让你的零值更有用](https://mp.weixin.qq.com/s/tfGG0TQqbHM0DYm11C1kNg)
 
 ### Mutex
+
+[深入理解 golang 的互斥锁](https://mp.weixin.qq.com/s/i1N9bmVSW1lGfOezvhcD7g) 未细读。Golang 的 Mutex 实现一直在改进，到目前为止，主要经历了 4 个版本:
+
+1. V1: 简单实现的版本
+2. V2: 新的 goroutine 参加锁的竞争
+3. V3: 新的 goroutines 更多参与竞争的机会
+4. V4: 解决老 goroutine 饥饿的问题
+
+
+v1版本
+```go
+func cas(val *int32, old, new int32) bool
+func semacquire(*int32)
+func semrelease(*int32)
+// The structure of the mutex, containing two fields
+type Mutex struct {
+  key int32  // Indication of whether the lock is held. 表示有几个 gorutines 正在使用或准备使用该锁
+  sema int32 // Semaphore dedicated to block/wake up goroutine
+}
+// 基于 cas 的加减法函数, Guaranteed to successfully increment the value of delta on val
+func xadd(val *int32, delta int32) (new int32) {
+    for {
+        v := *val
+        if cas(val, v, v+delta) {
+            return v + delta
+     }
+    }
+    panic("unreached")
+}
+// request lock
+func (m *Mutex) Lock() {
+    if xadd(&m.key, 1) == 1 { // Add 1 to the ID, if it is equal to 1, the lock is successfully acquired
+    	return
+	}
+    semacquire(&m.sema) // Otherwise block waiting
+}
+func (m *Mutex) Unlock() {
+    if xadd(&m.key, -1) == 0 { // Subtract 1 from the flag, if equal to 0, there are no other waiters
+		return
+	}
+    semrelease(&m.sema) // Wake up other blocked goroutines
+}
+```
+v4版本
 
 ```go
 type Mutex struct {
@@ -165,6 +207,40 @@ select {
 }
 ```
 
+### waitGroup/errGroup
+
+WaitGroup可以等待多个Goroutine执行结束。很多时候并发执行多个任务，如果其中一个任务出错那么整体失败，需要直接返回，这种情况下我们可以使用ErrGroup。
+
+```go
+// 启动多个goroutine
+for i:=0;i<10;i++{
+    go func(){
+        ...
+    }()
+}
+// 使用waitGroup
+wg := sync.WaitGroup{}
+for i:=0;i<10;i++{
+    wg.Add(1)
+    go func(){
+    defer wg.wg.Done()
+        ...
+    }()
+}
+wg.Wait()
+// 当我们想要知道某个goroutine报什么错误的时候发现很难，因为我们是直接go func(){}出去的，并没有返回值，因此对需要接受返回值做进一步处理的需求就无法满足了
+eg, _ := errgroup.WithContext(context.Background())
+eg.Go(func() error {
+    defer func() {
+        //recover
+    }()
+    //TODO:真正逻辑
+})
+if err := group.Wait(); err != nil {
+    return nil, err
+}
+```
+
 
 ## 取消/中断goroutine 执行的工具——context
 
@@ -178,6 +254,7 @@ select {
 
 
 ### 为什么有 context？
+
 [Go组件：context学习笔记！](https://mp.weixin.qq.com/s/OCpVRwtiphFRZgu9zdae5g)一个goroutine启动后是无法控制它的，大部分情况是等待它自己结束，如何主动通知它结束呢？**go的协程不支持直接从外部退出**，不像C++和Java有个线程ID可以操作。所以只能通过协程自己退出的方式。一般来说通过channel来控制是最方便的。
 
 ```go
@@ -224,7 +301,7 @@ func main() {
 }
 ```
 
-Context顾名思义是协程的上下文，主要用于跟踪协程的状态，可以做一些简单的协程控制，也能记录一些协程信息。且更为友好的是，大多数go库，如http、各种db driver、grpc等都内置了对`ctx.Done()`的判断，我们只需要将ctx传入即可。PS：感觉这才是关键，**大家都接受了拿context 作为任务取消的信号**，统一了任务取消的规范。
+Context顾名思义是协程的上下文，主要用于跟踪协程的状态，可以做一些简单的协程控制，也能记录一些协程信息。且更为友好的是，大多数go库，如http、各种db driver、grpc等都内置了对`ctx.Done()`的判断，我们只需要将ctx传入即可。PS：感觉这才是关键，**大家都接受了拿context 作为任务取消的信号**，统一了任务取消的规范。反过来说，这导致很多方法不管用到用不到 都弄了一个ctx 参数，因为保不齐 下游函数用到了。
 
 ### 父 goroutine 创建context
 

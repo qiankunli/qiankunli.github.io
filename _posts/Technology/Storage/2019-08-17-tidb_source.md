@@ -15,7 +15,7 @@ keywords: TIDB
 
 [TiDB 源码阅读系列文章（一）序](https://zhuanlan.zhihu.com/p/34109413) 是tidb 官方出发的 源码分析系列文章，前几章是综述，后面的章节是具体模块的源码分析。
 
-
+[一条 select 语句在 TiDB Server 层都发生了什么](https://mp.weixin.qq.com/s/t3SErHZ1-TeLaaTAsJQI4A) 未读。
 
 ## 包的划分
 

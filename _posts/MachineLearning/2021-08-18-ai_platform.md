@@ -42,6 +42,8 @@ ML的迭代属性意味着， 如果没有完备的自动更新流程，想要�
 
 ## 业界实践
 
+[2022年8个好用的MLOps工具和平台](https://mp.weixin.qq.com/s/IdJqiXSl4vcsN3etWdWrig) 未读
+
 ### 虎牙
 
 [互动直播场景下的AI基础设施建设](https://time.geekbang.org/qconplus/detail/100059720)
@@ -201,10 +203,11 @@ https://github.com/tencentmusic/cube-studio/wiki
 2. 模型结构基本确认，仅根据每日数据更新模型参数。
 探索时可以随便搞，但纳入日常调度的任务，应该标准化流程（样本生成，特征工程，训练），这样才能各个阶段进行优化。
 
+[火山引擎数据调度实例的 DAG 优化方案](https://mp.weixin.qq.com/s/TIW1sh_dG_O-jtGoXAqIvQ) DAG 优化也有这么多花活儿。
+
 ### 模板市场
 
 [腾讯音乐cube-studio开源一站式云原生机器学习平台](https://mp.weixin.qq.com/s/6uaUFS01W2lxnM-SU4PsfQ)直接使用airflow/argo等调度组件，但没有编排界面，直接编辑yaml也很麻烦。所以我们单独开发了**模板市场**和pipeline编排工具，并在开源中提供多种分布式模板。用户通过拖拉拽方式编排pipeline，配置执行参数（模板需要设置参数）后就可运行。模板市场的模板是注册进去的，用户和平台都可操作。流程比较简单：准备镜像，标注清楚该镜像的参数、类型、限制条件、用户提示等，使用标准化的注册流程注册至平台后，平台用户就可使用该模板。模板开发者多为平台方或使用方组织架构内特定工程人员。PS：**pipeline 和模板是分不开的**。ai工作流的模板一般分为四类：数据导入；分布式训练；模型校验；模型部署。
-
 
 
 ### 存储
@@ -291,6 +294,10 @@ https://github.com/tencentmusic/cube-studio/wiki
 [Serverless 架构下的 AI 应用开发](https://mp.weixin.qq.com/s/g9qYbG0A2JZajv6JCdpkwQ) 
 
 [基于 KubeVela 的机器学习实践](https://mp.weixin.qq.com/s/g9qYbG0A2JZajv6JCdpkwQ)
+
+[从神经搜索到多模态应用](https://mp.weixin.qq.com/s/GM4rFcKreWyLxQki318O1A)
+
+[阿里云机器学习平台 PAI 的云原生实践与落地](https://mp.weixin.qq.com/s/9gZ89svBOUoumwRUXwOM8g) 讲了产品设计和架构设计
 
 ## 其它
 

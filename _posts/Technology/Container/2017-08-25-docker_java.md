@@ -13,6 +13,8 @@ keywords: Docker java
 * TOC
 {:toc}
 
+[Java 应用容器化指北](https://mp.weixin.qq.com/s/w-mEBTYwLFqzQ_LBMTwP6A) 未读
+
 ## 容器有时会莫名其妙重启
 
 环境：marathon + mesos + docker 集群

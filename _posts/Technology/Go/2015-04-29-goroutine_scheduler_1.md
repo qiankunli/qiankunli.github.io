@@ -13,6 +13,7 @@ keywords: Go goroutine scheduler
 * TOC
 {:toc}
 
+传统的C/C++ 等的并发实际上是基于操作系统的调度，即程序负责创建线程，操作系统负责调度。但它们存在编程模型难以理解、创建线程代价高等缺 点。
 
 [调度的本质](https://mp.weixin.qq.com/s/5E5V56wazp5gs9lrLvtopA)Go 调度的本质是一个生产-消费流程，生产端是正在运行的 goroutine 执行 `go func(){}()` 语句生产出 goroutine 并塞到三级队列中去（包含P的runnext），消费端则是 Go 进程中的 m 在不断地执行调度循环。运行时(runtime)能够将goroutine多路复用到一个小的线程池中。这个观点非常新颖，这种熟悉加意外的效果其实就是你成长的时机。
 
@@ -36,13 +37,13 @@ keywords: Go goroutine scheduler
 
 ## 调度模型的演化
 
-[Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952) **go调度就是创建一个操作系统线程执行schedule函数**。
+[Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952) **go调度就是创建一个操作系统线程执行schedule函数**。N个线程会执行 N 个 schedule函数。
 
 ```go
 // 程序启动时的初始化代码
 ......
-for i := 0; i < N; i++{ // 创建N个操作系统线程执行schedule函数
-    create_os_thread(schedule) // 创建一个操作系统线程执行schedule函数
+for i := 0; i < N; i++{         // 创建N个操作系统线程执行schedule函数
+    create_os_thread(schedule)  // 创建一个操作系统线程执行schedule函数
 }
 //schedule函数实现调度逻辑
 func schedule() {
@@ -136,7 +137,7 @@ P 的数量决定了系统内最大可并行的 G 的数量（前提：物理 CP
 
 [Go语言goroutine调度器概述(11)](https://zhuanlan.zhihu.com/p/64447952)系统线程对goroutine的调度与内核对系统线程的调度原理是一样的，实质都是通过**保存和修改CPU寄存器的值**来达到切换线程/goroutine的目的。为了实现对goroutine的调度，需要引入一个数据结构来保存CPU寄存器的值（具体的说就是栈指针、pc指针）以及goroutine的其它一些状态信息。调度器代码可以通过g对象来对goroutine进行调度，当goroutine被调离CPU时，调度器代码负责把CPU寄存器的值保存在g对象的成员变量之中，当goroutine被调度起来运行时，调度器代码又负责把g对象的成员变量所保存的寄存器的值恢复到CPU的寄存器。PS：函数不是并发执行体，所以函数切换只需要保留栈指针就可以了。
 
-G是goroutine实现的核心结构，G维护了goroutine需要的栈、程序计数器以及它所在的M等信息。一个协程代表了一个执行流，执行流有需要执行的函数(startpc)，有函数的入参，有当前执行流的状态和进度(对应 CPU 的 PC 寄存器和 SP 寄存器)，当然也需要有保存状态的地方，用于执行流恢复。 每个协程都拥有自己的寄存器上下文和栈。协程调度切换时，将寄存器上下文和栈保存到其他地方，在切回来的时候，恢复先前保存的寄存器上下文和栈。**栈切换的核心就是栈指针 rsp 寄存器的切换**，只要我们想办法把 rsp 切换了就相当于换了执行单元的上下文环境。
+G是goroutine实现的核心结构，G维护了goroutine需要的栈、程序计数器以及它所在的M等信息。一个协程代表了一个执行流，执行流有需要执行的函数(startpc)，有函数的入参，有当前执行流的状态和进度(对应 CPU 的 PC 寄存器和 SP 寄存器)，当然也需要有保存状态的地方（gobuf strcut），用于执行流恢复。 每个协程都拥有自己的寄存器上下文和栈。协程调度切换时，将寄存器上下文和栈保存到其他地方，在切回来的时候，恢复先前保存的寄存器上下文和栈。**栈切换的核心就是栈指针 rsp 寄存器的切换**，只要我们想办法把 rsp 切换了就相当于换了执行单元的上下文环境。
 
 ```go
 type g struct {
@@ -154,6 +155,10 @@ type g struct {
     // defer 和 panic 相关
     _panic       *_panic // 最内侧的 panic 结构体
     _defer       *_defer // 最内侧的延迟函数结构体
+}
+type stack struct{
+    lo uintptr          // 栈低地址
+    hi uintptr          // 栈高地址
 }
 type gobuf struct {     // 让出cpu 时，将寄存器信息保留在这里。即将获得cpu时，将这里的信息加载到寄存器
     sp   uintptr        // 栈指针（Stack Pointer）
@@ -280,7 +285,7 @@ g0  g                   // m0的g0，也就是m0.g0 = &g0
 
 ## G0
 
-[关于Go并发编程，你不得不知的“左膀右臂”——并发与通道！](https://mp.weixin.qq.com/s/BvIPDCKuCbe7Xd9oI6BvjQ)运行时系统中的每个M都会拥有一个特殊的G，一般称为M的g0。M的g0不是由Go程序中的代码间接生成的，而是由Go运行时系统在初始化M时创建并分配给该M的。M的g0一般用于执行调度、垃圾回收、栈管理等方面的任务。M还会拥有一个专用于处理信号的G，称为gsignal。除了g0和gsignal之外，其他由M运行的G都可以视为用户级别的G，简称用户G，g0和gsignal可称为**系统G**。Go运行时系统会进行切换，以使**每个M都可以交替运行用户G和它的g0**。PS：g0 就是M 的代码逻辑 `g1 ->  g0 -> g2 -> g0 -> g3`
+[关于Go并发编程，你不得不知的“左膀右臂”——并发与通道！](https://mp.weixin.qq.com/s/BvIPDCKuCbe7Xd9oI6BvjQ)运行时系统中的**每个M都会拥有一个特殊的G，一般称为M的g0**。M的g0不是由Go程序中的代码间接生成的，而是由Go运行时系统在初始化M时创建并分配给该M的。M的g0一般用于执行调度（提供栈来跑schedule函数）、垃圾回收、栈管理等方面的任务。M还会拥有一个专用于处理信号的G，称为gsignal。除了g0和gsignal之外，其他由M运行的G都可以视为用户级别的G，简称用户G，g0和gsignal可称为**系统G**。Go运行时系统会进行切换，以使**每个M都可以交替运行用户G和它的g0**。PS：g0 就是M 的代码逻辑 `g1 ->  g0 -> g2 -> g0 -> g3`
 
 [聊聊 g0](https://mp.weixin.qq.com/s/Ie8niOb_0C9z2kACNvWCtg)linux 执行调度任务：cpu 发生时间片中断，正在执行的线程 被剥离cpu，cpu 执行调度 程度寻找下一个线程并执行。 调度程度 的运行依托 栈、寄存器等上下文环境。对于go 来说，每一个线程/M 一直在执行一个 调度循环`schedule()->execute()->gogo()->g2()->goexit()->goexit1()->mcall()->goexit0()->schedule()` ，每个被调度的协程 有自己的栈 等 空间，那么先后执行的 两个协程之间 运行 schedule 这些逻辑时，也需要一些栈空间，这些都归属于g0。
 

@@ -35,9 +35,13 @@ client-go 只提供了rest api和 dynamic client来操作第三方资源，需�
 5. conversion-gen是用于自动生成在内部和外部类型之间转换的函数的工具
 6. defaulter-gen 用于生产Defaulter函数
 7. openapi-gen  生成openAPI定义
-code-generator还专门整合了这些gen，形成了generate-groups.sh和generate-internal-groups.sh这两个脚本。 PS：原来client/informer/lister 这些代码都是自动生成的
 
-一般带有crd 项目会有 hack 目录 包含 update-codegen.sh  脚本文件（执行code-generator） 或包含Makefile 用来支持根据 crd struct 生成相关的deepcopy/defaults/client(clientset/informer/lister)/kustomize(包含crd yaml定义)文件。
+code-generator还专门整合了这些gen，形成了generate-groups.sh和generate-internal-groups.sh这两个脚本。 PS：原来client/informer/lister 这些代码都是自动生成的。
+
+在使用Code-generator之前，首先需要初始化doc.go,register.go,types.go三个文件。[Code-generator](https://mp.weixin.qq.com/s/itNbhuYYF873Ff-RbBnZTw)
+1. doc.go主要是用来声明要使用deepcopy-gen以及groupName。
+2. types.go主要是定义crd资源对应的go中的结构。
+3. register.go注册资源。
 
 ```
 crd-project
@@ -56,6 +60,7 @@ crd-project
     /Makefile
 ```
 
+一般带有crd 项目会有 hack 目录 包含 update-codegen.sh  脚本文件（执行code-generator） 或包含Makefile 用来支持根据 crd struct 生成相关的deepcopy/defaults/client(clientset/informer/lister)/kustomize(包含crd yaml定义)文件。
 
 ## 和controller-runtime 的关系
 
@@ -77,21 +82,11 @@ type Reconciler interface {
 [kubebuilder](https://github.com/kubernetes-sigs/kubebuilder) 是一个用来帮助用户快速实现 Kubernetes CRD Operator 的 SDK。当然，kubebuilder 也不是从0 生成所有controller 代码，k8s 提供给一个 [Kubernetes controller-runtime Project](https://github.com/kubernetes-sigs/controller-runtime)  a set of go libraries for building Controllers. controller-runtime 在Operator SDK中也有被用到。
 
 
-以下部分是kubebuilder的框架性组件
-
-1. Cache，Kubebuilder 的核心组件，负责在 Controller 进程里面根据 Scheme 同步 Api Server 中所有该 Controller 关心 GVKs 的 GVRs，其核心是 GVK -> Informer 的映射，Informer 会负责监听对应 GVK 的 GVRs 的创建/删除/更新操作，以触发 Controller 的 Reconcile 逻辑。
-2. Controller，Kubebuidler 为我们生成的脚手架文件，我们只需要实现 Reconcile 方法即可。
-3. Clients，在实现 Controller 的时候不可避免地需要对某些资源类型进行创建/删除/更新，就是通过该 Clients 实现的，其中查询功能实际查询是本地的 Cache，写操作直接访问 Api Server。
-4. Index，由于 Controller 经常要对 Cache 进行查询，Kubebuilder 提供 Index utility 给 Cache 加索引提升查询效率。
-5. Finalizer，在一般情况下，如果资源被删除之后，我们虽然能够被触发删除事件，但是这个时候从 Cache 里面无法读取任何被删除对象的信息，这样一来，导致很多垃圾清理工作因为信息不足无法进行，K8s 的 Finalizer 字段用于处理这种情况。在 K8s 中，只要对象 ObjectMeta 里面的 Finalizers 不为空，对该对象的 delete 操作就会转变为 update 操作，具体说就是 update deletionTimestamp 字段，其意义就是告诉 K8s 的 GC“在deletionTimestamp 这个时刻之后，只要 Finalizers 为空，就立马删除掉该对象”。所以一般的使用姿势就是在创建对象时把 Finalizers 设置好（任意 string），然后处理 DeletionTimestamp 不为空的 update 操作（实际是 delete），根据 Finalizers 的值执行完所有的 pre-delete hook（此时可以在 Cache 里面读取到被删除对象的任何信息）之后将 Finalizers 置为空即可。
-6. OwnerReference，K8s GC 在删除一个对象时，任何 ownerReference 是该对象的对象都会被清除，与此同时，Kubebuidler 支持所有对象的变更都会触发 Owner 对象 controller 的 Reconcile 方法。
-
-
 kubebuilder 依赖于 controller-runtime 实现 controller 整个处理流程，在此工程中，controller 对资源的监听依赖于 Informer 机制，controller-runtime 在此机制上又封装了一层，其整体流程入下图
 
 ![](/public/upload/kubernetes/kubebuilder_reconcile.png)
 
-其中 Informer 已经由kubebuilder和contorller-runtime 实现，监听到的资源的事件（创建、删除、更新）都会放在 Informer 中。然后这个事件会经过 predict()方法进行过滤，经过interface enqueue进行处理，最终放入 workqueue中。我们创建的 controller 则会依次从workqueue中拿取事件，并调用我们自己实现的 Recontile() 方法进行业务处理。
+其中 Informer 已经由kubebuilder和contorller-runtime 实现，监听到的资源的事件（创建、删除、更新）都会放在 Informer 中。然后这个事件会经过 `predict()`方法进行过滤，经过interface enqueue进行处理，最终放入 workqueue中。我们创建的 controller 则会依次从workqueue中拿取事件，并调用我们自己实现的 Recontile() 方法进行业务处理。
 
 ## 示例demo
 

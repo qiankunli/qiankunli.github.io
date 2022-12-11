@@ -26,7 +26,7 @@ Linux 提供了cgroup 和 namespace 两大系统功能，是容器的基础，�
 1. runC是最常用的 容器低层运行时，不包含镜像管理，它假定容器的文件包已经从镜像里解压出来并存放于文件系统中。runC 创建的容器需要手动配置网络才能与其他容器或者网络节点连通。 ——**镜像并不是运行容器所必须的**。要运行一个容器，运行时需要一个 bundle，其中包括：
     1. 一个 config.json 文件，里面包含了与容器有关的参数（例如可执行文件的路径、环境变量，等等）；
     2. 包含可执行文件及其相关文件（如果有的话）的目录。
-2. containerd是最常用的 容器高层运行时，提供镜像下载、解压等功能， 不包含镜像构建、上传等功能。 
+2. containerd是最常用的 容器高层运行时，提供镜像下载、解压等功能， 不包含镜像构建、上传等功能。 [Containerd深度剖析-runtime篇](https://mp.weixin.qq.com/s/F9-ZtsKBsrPLmtexCnaCmg) [Containerd深度剖析-NRI篇](https://mp.weixin.qq.com/s/2LrWqOtqIfbIzWG9fv5ANA)
 3. 再往上，Docker 提供了许多 UX 增强功能（容器工作流），比如ps/system prune 这些。 UX 增强的功能并不是 Kubernetes 所必须的
 
 

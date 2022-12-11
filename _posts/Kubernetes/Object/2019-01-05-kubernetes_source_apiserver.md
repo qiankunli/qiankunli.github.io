@@ -16,8 +16,7 @@ keywords: kubernetes 源码分析 apiserver
 apiserver 核心职责
 1. 提供Kubernetes API
 2. 代理集群组件，比如Kubernetes dashboard、流式日志、`kubectl exec` 会话
-
-[字节跳动 kube-apiserver 高可用方案 KubeGateway](https://mp.weixin.qq.com/s/sDxkXPmgtCknwtnwvg2EMw) 很好玩的一个项目。
+3. 缓存etcd 数据
 
 ## 声明式API
 
@@ -142,6 +141,20 @@ type Interface interface {
 [K8s 如何提供更高效稳定的编排能力？K8s Watch 实现机制浅析](https://mp.weixin.qq.com/s/0H0sYPBT-9JKOle5Acd_IA)
 
 ![](/public/upload/kubernetes/apiserver_etcd.png)
+
+[K8s apiserver watch 机制浅析](https://mp.weixin.qq.com/s/jp9uVNyd8jyz6dwT_niZuA)为了减轻etcd的压力，kube-apiserver本身对etcd实现了list-watch机制，将所有对象的最新状态和最近的事件存放到cacher里，所有外部组件对资源的访问都经过cacher。
+
+```go
+type Cacher struct {
+  incoming chan watchCacheEvent  // incoming 事件管道, 会被分发给所有的watchers
+  storage storage.Interface  //storage 的底层实现
+  objectType reflect.Type   // 对象类型
+  watchCache *watchCache   // watchCache 滑动窗口，维护了当前kind的所有的资源，和一个基于滑动窗口的最近的事件数组 
+  reflector  *cache.Reflector  // reflector list并watch etcd 并将事件和资源存到watchCache中 
+  watchersBuffer []*cacheWatcher   // watchersBuffer 代表着所有client-go客户端跟apiserver的连接
+  ....
+}
+```
 
 ### registry 层
 
@@ -398,5 +411,23 @@ spec:
 
 上述配置 会让 apiserver 收到 v1alpha1.wardle.k8s.io  请求时 转给 namespace=wardle 下名为 api 的服务。PS：估计是
 `http://apiserver/apis/v1alpha1.wardle.k8s.io/v1alpha1/abc` 转给 `http://serviceIp:servicePort/abc`
+
+## 性能优化
+
+大规模部署时潜在的问题，对于 `    podList, err := Client().CoreV1().Pods("").List(ctx(), ListOptions{FieldSelector: "spec.nodeName=node1"})`，以一个 4000 node，10w pod 的集群为例，全量 pod 数据量：
+
+1. etcd 中：紧凑的非结构化 KV 存储，在 1GB 量级；
+2. apiserver 缓存中：已经是结构化的 golang objects，在 2GB 量级（ TODO：需进一步确认）；
+3. apiserver 返回：client 一般选择默认的 json 格式接收， 也已经是结构化数据。全量 pod 的 json 也在 2GB 量级。
+可以看到，某些请求看起来很简单，只是客户端一行代码的事情，但背后的数据量是惊人的。指定按 nodeName 过滤 pod 可能只返回了 500KB 数据，但 apiserver 却需要过滤 2GB 数据 —— 最坏的情况，etcd 也要跟着处理 1GB 数据。
+
+[字节跳动 kube-apiserver 高可用方案 KubeGateway](https://mp.weixin.qq.com/s/sDxkXPmgtCknwtnwvg2EMw) 很好玩的一个项目。
+
+[字节跳动高性能 Kubernetes 元信息存储方案探索与实践](https://mp.weixin.qq.com/s/lxukeguHP1l0BGKbAa89_Q)
+
+[K8s 集群稳定性：LIST 请求源码分析、性能评估与大规模基础服务部署调优](https://mp.weixin.qq.com/s/EsBPAXXZJKAViTqE2deMDQ)
+1. 对于 Ceph 对象存储来说，每个 LIST bucket 请求都需要去多个磁盘中捞出这个 bucket 的全部数据；不仅自身很慢，还影响了同一时间段内的其他普通读写请求，因为 IO 是共享的，导致响应延迟上升乃至超时。如果 bucket 内的对象非常多（例如用作 harbor/docker-registry 的存储后端），LIST 操作甚至都无法在常规时间内完成（ 因而依赖 LIST bucket 操作的 registry GC 也就跑不起来）。
+2. 相比于 Ceph，一个实际 etcd 集群存储的数据量可能很小（几个 ~ 几十个 GB），甚至足够缓存到内存中。但与 Ceph 不同的是，它的并发请求数量可能会高 几个量级，比如它是一个 ~4000 nodes 的 k8s 集群的 etcd。单个 LIST 请求可能只需要 返回几十 MB 到上 GB 的流量，但并发请求一多，etcd 显然也扛不住，所以最好在前面有 一层缓存，这就是 apiserver 的功能（之一）。K8s 的 LIST 请求大部分都应该被 apiserver 挡住，从它的本地缓存提供服务，但如果使用不当，就会跳过缓存直接到达 etcd，有很大的稳定性风险。
+
 
 

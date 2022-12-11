@@ -172,7 +172,7 @@ Prometheus 通过与 Kubernetes API 集成主要支持5种服务发现模式：
 
 We need to grant some permissions to Prometheus to access pods, endpoints, and services running in your cluster. We can do this via the ClusterRole resource that defines an RBAC policy. prometheus 使用 kubernetes_sd_configs 发现k8s object 时 需要授权，运行在 k8s 内的prometheus 可以使用 sa，k8s 集群外的 prometheus 则需要指定 ca_file 和  bearer_token_file。
 
-#### 与prometheus 整合
+#### 如何让Prometheus抓取
 
 ```yaml
 - job_name: 'kubernetes-service-endpoints'

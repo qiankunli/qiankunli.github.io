@@ -45,6 +45,7 @@ controller-runtime 的核心是Manager 驱动 Controller 进而驱动 Reconciler
 
 ```go
 kubeClient = kubernetes.NewForConfigOrDie(opt.Config)
+// 基于GVK 操作资源，假设需要操作数十种不同资源时，我们需要为每一种资源实现各自的函数
 podInformer = informers.NewSharedInformerFactory(pod.kubeClient, 0).Core().V1().Pods()
 podLister = pod.podInformer.Lister()
 podSynced = pod.podInformer.Informer().HasSynced
@@ -106,6 +107,7 @@ func start() {
   c, _ := controller.New("app", mgr, controller.Options{
 	Reconciler: &ApplicationReconciler{},
   })
+  // 监控Pod变动并将key写入workqueue
   _ = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
     CreateFunc: func(event event.CreateEvent) bool {...},
     UpdateFunc: func(updateEvent event.UpdateEvent) bool {...},
@@ -116,15 +118,38 @@ func start() {
   }
 }
 type ApplicationReconciler struct {
+	...
 }
 func (a ApplicationReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-  	return reconcile.Result{}, nil
+  	// 初始化log
+	log := log.FromContext(ctx)
+	// 从缓存中获取Pod
+	pod := &corev1.Pod{}
+	err := r.client.Get(ctx, request.NamespacedName, rs)	// 使用controller-runtime的Client时，我们只需要提供资源名（Namespace/Name）、资源类型（结构体指针），即可开始CRUD操作。
+	if errors.IsNotFound(err) {
+		log.Error(nil, "Could not find Pod")
+		return reconcile.Result{}, nil
+	}
+	if err != nil {
+		return reconcile.Result{}, fmt.Errorf("could not fetch Pod: %+v", err)
+	}
+	// 打印Pod
+	log.Info("Reconciling Pod", "pod name", pod.Name)
+	return reconcile.Result{}, nil
 }
 ```
 
+我们可以看到，原先复杂的准备工作现在已经简化为几个步骤：
+
+1. 创建manager
+2. 创建controller，添加需要监控的资源
+1. 实现Reconcile方法，处理资源变动
+
 ## 整体设计
 
-Manager 管理多个Controller 的运行，并提供 数据读（cache）写（client）等crudw基础能力。
+![](/public/upload/kubernetes/controller_runtime_overview.jpg)
+
+Manager 管理多个Controller 的运行，并提供 数据读（cache）写（client）等crudw基础能力，或者说 Manager 负责初始化cache、clients 等公共依赖，并提供个runnbale 使用。
 
 ![](/public/upload/kubernetes/controller_runtime.png)
 
@@ -432,6 +457,30 @@ ApplicationReconciler 持有Client，便有能力对 相关资源进行 crud
 
 ### 依赖注入
 
+类比spring ioc，“受体” 想要自己的某个field 被赋值，应该支持 setXX 方法。controller-runtimey类似，“受体”想要cache 成员被赋值，即需要实现 InjectCache 方法（也就实现了 Cache interface）。
+
+```go
+// controller-runtime/pkg/runtime/inject/inject.go
+type Cache interface {	// 很像spring 中的XXAware
+	InjectCache(cache cache.Cache) error
+}
+func CacheInto(c cache.Cache, i interface{}) (bool, error) {
+	if s, ok := i.(Cache); ok {
+		return true, s.InjectCache(c)
+	}
+	return false, nil
+}
+type Config interface {
+	InjectConfig(*rest.Config) error
+}
+type Client interface {
+	InjectClient(client.Client) error
+}
+type Scheme interface {
+	InjectScheme(scheme *runtime.Scheme) error
+}
+...
+```
 controllerManager  持有了Config/Client/APIReader/Scheme/Cache/Injector/StopChannel/Mapper 实例，将这些数据通过 SetFields 注入到Controller 中。Controller 再转手 将部分实例注入到 Source 中（Source 需要监听apiserver）
 
 ```go
@@ -455,20 +504,6 @@ func (cm *controllerManager) SetFields(i interface{}) error {
 	if _, err := inject.MapperInto(cm.mapper, i); err != nil {return err}
 	return nil
 }
-```
-以注入client 为例，Client interface 很像spring 中的XXAware ，受体声明和实现自己可以/需要注入啥，注入方根据受体的type 进行注入
-
-```go
-// sigs.k8s.io/controller-runtime/pkg/runtime/inject/inject.go
-func ClientInto(client client.Client, i interface{}) (bool, error) {
-	if s, ok := i.(Client); ok {
-		return true, s.InjectClient(client)
-	}
-	return false, nil
-}
-type Client interface {
-	InjectClient(client.Client) error
-}
 // ReplicaSetReconciler 实现了 Client 接口
 type ReplicaSetReconciler struct {
 	client.Client
@@ -479,16 +514,18 @@ func (a *ReplicaSetReconciler) InjectClient(c client.Client) error {
 }
 ```
 
+
 ### 入队器
 
-一般一个crd 对应一个 reconciler。以Application crd为例，可能需要根据pod 变化采取动作，因此Application Controller 需要监听  Application及关联的pod的变更，有两类方法
+一般一个crd 对应一个 reconciler。以Application crd为例，可能需要根据pod 变化采取动作，因此Application Controller 需要监听  Application及关联的pod的变更。
 
-1. Reconcile 方法可以收到 Application 和 Pod object 的变更。此时实现`Reconciler.Reconcile(Request) (Result, error)` 要注意区分 Request 中的object 类型。
-    1. 构建Application Controller时，Watch Pod
-    2. 用更hack的手段去构建，可能对源码造成入侵。
-2. 添加自定义的入队器。比如 当pod 变更时，则找到与pod 相关的Application  加入队列 。这样pod 和Application 变更均可以触发 Application 的Reconciler.Reconcile 逻辑。
+Watch函数支持三种资源监听类型，通过定义 eventhandler 实现：
 
-controller-runtime 暴露 handler.EventHandler接口，EventHandlers map an Event for one object to trigger Reconciles for either the same object or different objects。这个接口实现了Create,Update,Delete,Generic方法，用来在资源实例的不同生命阶段，进行判断与入队。 
+1. EnqueueRequestForObject：资源变动时将资源key加入workqueue，例如直接监听Pod变动
+2. EnqueueRequestForOwner：资源变动时将资源owner的key加入workqueue，例如在Pod变动时，若Pod的Owner为ReplicaSet，则通知ReplicaSet发生了资源变动
+3. EnqueueRequestsFromMapFunc：定义一个关联函数，资源变动时生成一组reconcile.Request，例如在集群扩容时添加了Node，通知一组对象发生了资源变动
+
+此外还可以自定义 predicates，用于过滤资源，例如只监听指定命名空间、包含指定注解或标签的资源。
 
 
 

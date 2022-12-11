@@ -22,6 +22,8 @@ keywords: Kubernetes Service
 
 [Kubernetes 网络异常分类及排错指南](https://mp.weixin.qq.com/s/5gKpnvjSkvMDU-V6Mo77dQ)一个具体的排查实例，写的非常好。 
 
+[Kubernetes 集群中流量暴露的几种方案](https://mp.weixin.qq.com/s/0jUVHrZx0k2SmHFmHlBz2w) 侧重于南北流量。 
+
 ## What is a service?
 
 Kubernetes 之所以需要 Service，一方面是因为 Pod 的 IP 不是固定的，另一方面则是因为一组 Pod 实例之间总会有负载均衡的需求。
@@ -81,8 +83,8 @@ spec:
   ports:
   - name: default
     protocol: TCP
-    port: 80
-    targetPort: 9376
+    port: 80              # 通过Service暴露出来的一个Port，可以在Cluster内进行访问。
+    targetPort: 9376      # Pod和Container监听的Port.
 ```
 
 一旦它被提交给 Kubernetes，那么 kube-proxy 就可以通过 Service 的 Informer 感知到这样一个 Service 对象的添加。而作为对这个事件的响应，它就会在宿主机上创建这样一条 iptables 规则
@@ -169,7 +171,7 @@ metadata:
 spec:
   type: NodePort
   ports:
-  - nodePort: 8080
+  - nodePort: 8080          # Cluster向外网暴露出来的端口，可以让外网能够访问到Pod/Container.
     targetPort: 80
     protocol: TCP
     name: http

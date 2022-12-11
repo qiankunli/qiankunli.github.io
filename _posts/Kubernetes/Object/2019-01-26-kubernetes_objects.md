@@ -18,6 +18,13 @@ keywords: kubernetes Apimachinery
 2. api 库，这个库依赖 apimachinery，提供了k8s的内置资源，以及注册到 Scheme 的接口，这些资源比如：Pod、Service、Deployment、Namespace
 3. client-go 库，这个库依赖前两个库，提供了访问k8s 内置资源的sdk，最常用的就是 clientSet。底层通过 http 请求访问k8s 的 api-server，从etcd获取资源信息
 
+##  从api 到 go struct
+
+![](/public/upload/kubernetes/kubernetes_type.png)
+
+[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)**http server 或者 rpc server 要解决的一个问题是：如何解析用户的请求数据，并把他反序列化为语言中的一个具体的类型**。以一个 EchoService 为例，decode 程序需要从用户请求（如 post http://echo ） 文本或者二进制数据中创建出  EchoRequestV1，提供给上层处理，同时这个 decode 函数需要足够通用，他返回的是可能是一个 Message Interface（包含通用rpc 字段）, 具体内容是 EchoRequestV1。decode 相关的细节要么通过代码生成的技术提供给 decoder，要么在 二进制或者文本请求数据（或者 header等元数据）中携带这部分信息。解决这个问题有两种方式Protobuf Unmarshal/Kubernetes Scheme
+
+
 ## k8s api
 
 Kubernetes API是一个HTTP形式的API，主要有三种形式
@@ -41,7 +48,7 @@ Kubernetes API是一个HTTP形式的API，主要有三种形式
 
 ## Kubernetes 基础类型系统
 
-api machinery 代码库实现了 Kubernetes 基础类型系统（实际指的是kinds）。kinds被分为 group 和verison，因此api machinery 代码中的核心术语是 GroupVersionKind，简称GVK。 与kinds 同级概念的是 resource，也按group 和version 划分，因此有术语GroupVersionResource 简称GVR，**每个GVR 对应一个http 路径**，用于标识 Kubernetes API的REST 接口
+api machinery 代码库实现了 Kubernetes 基础类型系统（实际指的是kinds）。kinds被分为 group 和verison，因此api machinery 代码中的核心术语是 GroupVersionKind，简称GVK。 与kinds 同级概念的是 resource，也按group 和version 划分，因此有术语GroupVersionResource 简称GVR，**每个GVR 对应一个http 路径**，用于标识 Kubernetes API的REST 接口，比如 ` /api/v1/namespaces/{namespace}/pods`，使用`kubectl api-resources`命令可查看支持的Resource。
 
 ```go
 // k8s.io/apimachinery/pkg/runtime/schema/group_version.go
@@ -60,9 +67,15 @@ type GroupVersionKind struct {
 ```
 schema struct 将golang object 映射为可能的GVK。一个GVK 到一个GVR 的映射被称为 REST mapping,  RESTMapper interface/ RESTMapping struct 来完成转换。
 
-![](/public/upload/kubernetes/kubernetes_type.png)
-
-[kubernetes-api-machinery](https://cloud.tencent.com/developer/article/1519826)**http server 或者 rpc server 要解决的一个问题是：如何解析用户的请求数据，并把他反序列化为语言中的一个具体的类型**。以一个 EchoService 为例，decode 程序需要从用户请求（如 post http://echo ） 文本或者二进制数据中创建出  EchoRequestV1，提供给上层处理，同时这个 decode 函数需要足够通用，他返回的是可能是一个 Message Interface, 里面是 EchoRequestV1，decode 相关的细节要么通过代码生成的技术提供给 decoder，要么在 二进制或者文本请求数据（或者 header等元数据）中携带这部分信息。解决这个问题有两种方式Protobuf Unmarshal/Kubernetes Scheme
+```go
+// k8s.io/apimachinery/pkg/api/meta/interface.go
+type RESTMapper interface {
+    // gvr ==> gvk
+	KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
+    ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error)
+    ...
+}
+```
 
 ### Protobuf Unmarshal
 
@@ -105,75 +118,20 @@ func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error{
 ```
 ### Kubernetes Scheme
 
-GVK 是一个 Object 概念，而 GVR 代表一个 Http Path。反序列化使用 api.Scheme + gvk，而 gvk 中的信息可以从 request中获取
+GVK 是一个 Object 概念，而 GVR 代表一个 Http Path。PS： rest path ==> gvr ==> gvk ==> empty go struct ==>  decoder.decode(empty go struct) ==> go struct.
+
+[Kubernetes 资源对象序列化实现](https://mp.weixin.qq.com/s/fJf1mtCR49XO7BOUn2FRTg)序列化和反序列化在很多项目中都有应用，Kubernetes也不例外。Kubernetes中定义了大量的API对象，为此还单独设计了一个包(https://github.com/kubernetes/api)，方便多个模块引用。**API对象在不同的模块之间传输(尤其是跨进程)可能会用到序列化与反序列化，不同的场景对于序列化个格式又不同，比如grpc协议用protobuf，用户交互用yaml(因为yaml可读性强)，etcd存储用json**。Kubernetes反序列化API对象不同于我们常用的`json.Unmarshal()`函数(需要传入对象指针)，Kubernetes需要解析对象的类型(Group/Version/Kind)，根据API对象的类型构造API对象，然后再反序列化。 
+
 
 ```go
 gvk := schema.GroupVersionKind{Group: "batch", Version: "v2alpha1", Kind: "Job"} 
-obj := api.Scheme.New(gvk)
+obj := api.Scheme.New(gvk)  // 根据API对象的类型构造API对象
 codec := api.Codecs.LegacyCodec(gvk.GroupVersion())
-codec.Decode(reqBody, gvk, obj)
-type Job struct {  
-    metav1.TypeMeta     ---> type TypeMeta struct { Kind string; APIVersion string }
-    metav1.ObjectMeta   ---> type ObjectMeta struct { Name string...}
-    Spec JobSpec
-    Status JobStatus 
-}
+codec.Decode(reqBody, gvk, obj)    // 假设reqBody 是一段json，则需要 通过reflect 获取个字段的类型并为字段赋值的
 ```
 
-Scheme defines methods for serializing and deserializing API objects, a type registry for converting group, version, and kind information to and from Go schemas, and mappings between Go schemas of different versions. **A scheme is the foundation for a versioned API and versioned configuration over time**.
+### go struct
 
-
-```go
-// k8s.io/apimachinery/pkg/api/meta/interface.go
-type RESTMapper interface {
-	KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error)
-    ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, error)
-    ...
-}
-// k8s.io/apimachinery/pkg/runtime/scheme.go
-type Scheme struct {
-    // a Type is a particular Go struct，比如k8s.io/api/apps/v1.StatefulSet
-	gvkToType map[schema.GroupVersionKind]reflect.Type
-    typeToGVK map[reflect.Type][]schema.GroupVersionKind
-    ...
-}
-func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error) {...}
-func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
-	if t, exists := s.gvkToType[kind]; exists {
-		return reflect.New(t).Interface().(Object), nil
-	}
-    ...
-	return nil, NewNotRegisteredErrForKind(s.schemeName, kind)
-}
-```
-为了使 scheme正常工作，必须将golang 类型注册到 scheme 中。对于Kubernetes 核心类型，在`k8s.io/client-go/kubernetes/scheme` 包中 均已预先注册
-
-```go
-// k8s.io/client-go/kubernetes/scheme/register.go
-var Scheme = runtime.NewScheme()
-var AddToScheme = localSchemeBuilder.AddToScheme
-func init(){
-    v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
-    utilruntime.Must(AddToScheme(Scheme))
-}
-var localSchemeBuilder = runtime.SchemeBuilder{
-    corev1.AddToScheme,
-    appsv1.AddToScheme,
-}
-// k8s.io/api/core/v1/register.go
-var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
-)
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Pod{},
-        &PodList{},
-        &Service{},
-    )
-    ...
-}
-```
 kubernetes object 在go 中是struct（`k8s.io/api/core/v1/types.go`），struct 的filed 当然不同， 但也共用一些结构 runtime.Object。用来约定：可以set/get GroupVersionKind 和 deepCopy，即**k8s object 存储其类型并允许克隆**。
 
 ```go
@@ -226,7 +184,61 @@ type Deployment struct {
 } 
 ```
 
-[Kubernetes 资源对象序列化实现](https://mp.weixin.qq.com/s/fJf1mtCR49XO7BOUn2FRTg)序列化和反序列化在很多项目中都有应用，Kubernetes也不例外。Kubernetes中定义了大量的API对象，为此还单独设计了一个包(https://github.com/kubernetes/api)，方便多个模块引用。**API对象在不同的模块之间传输(尤其是跨进程)可能会用到序列化与反序列化，不同的场景对于序列化个格式又不同，比如grpc协议用protobuf，用户交互用yaml(因为yaml可读性强)，etcd存储用json**。Kubernetes反序列化API对象不同于我们常用的json.Unmarshal()函数(需要传入对象指针)，Kubernetes需要解析对象的类型(Group/Version/Kind)，根据API对象的类型构造API对象，然后再反序列化。因此，Kubernetes定义了Serializer接口(https://github.com/kubernetes/apimachinery/blob/release-1.21/pkg/runtime/interfaces.go#L86)，专门用于API对象的序列化和反序列化。PS： rest path ==> gvr ==> decoder.decode(gvk) ==> object.
+### 注册go struct 到schema
+
+为了使 scheme正常工作，必须将golang struct 注册到 scheme 中。对于Kubernetes 核心类型，在`k8s.io/client-go/kubernetes/scheme` 包中 均已预先注册
+
+```go
+// k8s.io/client-go/kubernetes/scheme/register.go
+var Scheme = runtime.NewScheme()
+var AddToScheme = localSchemeBuilder.AddToScheme
+func init(){
+    v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
+    utilruntime.Must(AddToScheme(Scheme))
+}
+var localSchemeBuilder = runtime.SchemeBuilder{
+    corev1.AddToScheme,
+    appsv1.AddToScheme,
+}
+// k8s.io/api/core/v1/register.go
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&Pod{},
+        &PodList{},
+        &Service{},
+    )
+    ...
+}
+```
+
+### 使用schema 进行序列化和序列化
+
+Scheme defines methods for serializing and deserializing API objects, a type registry for converting group, version, and kind information to and from Go schemas, and mappings between Go schemas of different versions. **A scheme is the foundation for a versioned API and versioned configuration over time**.
+
+
+```go
+// k8s.io/apimachinery/pkg/runtime/scheme.go
+type Scheme struct {
+    // a Type is a particular Go struct，比如k8s.io/api/apps/v1.StatefulSet
+	gvkToType map[schema.GroupVersionKind]reflect.Type
+    typeToGVK map[reflect.Type][]schema.GroupVersionKind
+    ...
+}
+// go struct ==> gvk
+func (s *Scheme) ObjectKinds(obj Object) ([]schema.GroupVersionKind, bool, error) {...}
+// gvk ==> go struct
+func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
+	if t, exists := s.gvkToType[kind]; exists {
+		return reflect.New(t).Interface().(Object), nil
+	}
+    ...
+	return nil, NewNotRegisteredErrForKind(s.schemeName, kind)
+}
+```
 
 
 ## kubernetes 对象

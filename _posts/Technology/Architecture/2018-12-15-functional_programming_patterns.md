@@ -253,23 +253,53 @@ In object-oriented programming the Visitor pattern is commonly used when it is r
 	        .on(Circle.class).then( c -> Math.PI * c.radius * c.radius )
 	        .on(Rectangle.class).then( r -> r.height * r.width );
 
-### 关于访问者模式的一点感觉
+## 策略模式
 
-**理解角色的分离是理解大部分设计模式的关键**
+```java
+interface Strategy {
+    void doSomething();
+}
 
-[访问者模式详解（伪动态双分派）](https://www.cnblogs.com/zuoxiaolong/p/pattern23.html)
+class AStrategy implements Strategy {
+    //... 代码省略
+}
+class BStrategy implements Strategy {
+    //... 代码省略
+}
+及
+// 业务代码
+class AService {
+    private Map<String, Strategy> strategyMap;
+    
+    public void doSomething(String strategy) {
+        strategyMap.get(strategy).doSomething();
+    }
+}
+```
 
-1. 静态单分派，方法重载
-2. 动态单分派，多态
-2. 动态双分派，依据两个实际类型去判断一个方法的运行行为
+我们新建了好多类，一旦日后反悔，迁移的成本非常高。而使用函数式策略模式，我们可以将他们暂且全部写在一起：
+```java
+class AService {
+    private Map<String, Runnable> strategyMap;
 
-		for (Bill bill : billList) {
-	    	bill.accept(viewer);
-	   	}
-	   	
-	Bill 可能是信用卡账单，也可能是支付宝账单；viewer可能是保存，也可能是打印。假设Bill 有3种，viewer 有2种，则Bill 和 viewer 只实现一个接口，便可以达到 2*3=6 的组合效果。
+    static {
+        strategyMap.put("a", this::aStrategy);
+        strategyMap.put("b", this::bStrategy);
+    }
 
-
+    public void doSomething(String strategy) {
+        strategyMap.get(strategy).run();
+    } 
+    
+    private void aStrategy() {
+        //...
+    }
+    private void bStrategy() {
+        //...
+    }
+}
+```
+可以看到设计模式的函数式版本，相比面向对象版本，在隔离和封装上相对差些，但是便捷性好一些。所以我们可以在业务不稳定的初期先使用函数式设计模式，利用它的便捷性快速演进，等到业务逐渐成熟，模式确定之后，再改成封装性更好的面向对象设计模式。
 
 ## 小结
 

@@ -275,7 +275,7 @@ Time series Selectors 从time series 中选择需要的数据
 
 [光速入门Prometheus+Grafana](https://tkedocs.finops.cc/#/prome) 未读
 
-## rules
+### rules
 
 Prometheus uses rules to create new time series and to generate alerts. rule 分为两种类型：RecordingRule 和 AlertingRule
 
@@ -293,3 +293,42 @@ groups:
 1. level 表示聚合级别，以及规则的输出标签
 2. metric 是指标名称
 3. operations 应用于指标的操作列表
+
+### 长期存储
+
+[一文读懂 Prometheus 长期存储主流方案](https://mp.weixin.qq.com/s/uGvcxwvC_QDkFKU-Bcxgww) 
+1. VictoriaMetrics可以作为Prometheus的长期远程存储方案，当然VictoriaMetrics也可以完全取代Prometheus，因为VictoriaMetrics基本支持Prometheus配置文件、PromQL、各类API、数据格式等等。
+
+## Prometheus 与 OpenTelemetry
+
+[Prometheus与OpenTelemetry该选哪个？](https://mp.weixin.qq.com/s/uB3ZB4uUhdIOtGCweeHBlQ)
+
+1. Prometheus提供指标收集、存储和查询。它通常通过一个简单的爬虫系统收集指标，从主机中提取数据。Prometheus数据库存储这些数据，然后你可以用Prometheus查询语言PromQL来查询。
+2. OpenTelemetry的领域要小得多。它通过推送或拉动，使用统一的API收集指标（以及链路追踪和日志），可能会对它们进行转换，并将它们发送到其他系统进行存储或查询。**只关注可观测性中与应用程序交互的部分**（与Log、Trace、Metric等的创建与存储、查询问题解耦），这意味着OpenTelemetry的指标往往最终会回到Prometheus或与Prometheus兼容的系统中。
+
+
+OpenTelemetry-collector 配置文件分为两个部分
+1. 先通过 exporters /extensions/processors/receivers 配置细节
+2. collector通过pipeline处理service中启用的数据，一般包括 receivers ==> processors ==> exporters
+
+```
+exporters:
+    opencensus: xx
+    zipkin: xx
+extensions:
+processors:
+    batch: xx
+    queued_retry: xx
+receivers:
+    opencensus: xx
+    prometheus: xx
+service:        # pipelines有两类 metrics 和 traces
+  pipelines:    # 一个pipeline是一组 receivers, processors, 和exporters的集合。
+    metrics:
+      receivers: [opencensus, prometheus]
+      exporters: [opencensus, prometheus]
+    traces:
+      receivers: [opencensus, jaeger]
+      processors: [batch, queued_retry]
+      exporters: [opencensus, zipkin]
+```

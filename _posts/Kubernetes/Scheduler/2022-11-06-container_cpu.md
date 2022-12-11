@@ -54,13 +54,17 @@ d64e482d2843        mesos-705b5dc6-7169-42e8-a143-6a7dc2e32600   0.18%          
 
 ## Linux的CPU管理——CFS 
 
-在 Linux 里面，进程大概可以分成两种：实时进程和 普通进程。每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列 rt_rq 和一个 CFS 运行队列 cfs_rq，在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进程需要运行。
+在 Linux 里面，进程大概可以分成两种：实时进程和 普通进程。每个 CPU 都有自己的 struct rq 结构（一个cpu一个运行队列），其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列 rt_rq 和一个 CFS 运行队列 cfs_rq，在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进程需要运行。
 
 cgroup 是 调度器 暴露给外界操作 的接口，对于 进程cpu 相关的资源配置 RT（realtime调度器） 和CFS 均有实现。本文主要讲  CFS，CFS 也是在不断发展的。
 
 ### CFS 基于虚拟运行时间的调度
 
 [What is the concept of vruntime in CFS](https://stackoverflow.com/questions/19181834/what-is-the-concept-of-vruntime-in-cfs/19193619)vruntime is a measure of the "runtime" of the thread - the amount of time it has spent on the processor. The whole point of CFS is to be fair to all; hence, the algo kind of boils down to a simple thing: (among the tasks on a given runqueue) the task with the lowest vruntime is the task that most deserves to run, hence select it as 'next'. CFS（完全公平调度器）是Linux内核2.6.23版本开始采用的进程调度器，具体的细节蛮复杂的，整体来说是保证每个进程运行的虚拟时间一致， **每次选择vruntime 较少的进程来执行**。
+
+另外两个细节
+1. 进程上下文切换会导致额外的 CPU 浪费。假如被选中的进程刚运行没多久，它的虚拟时间时间就比另一个进程小了。这时候难道要马上换另一个进程处理么？出于减少频繁切换进程所带来的成本考虑，Linux 会保证选择到的进程一个最短的运行时间，这个时间由 sched_min_granularity_ns 这个内核参数来控制。当然了，如果进程因为等待网络、磁盘等资源时主动放弃那另算。
+2. 在实践中可能确实有进程需要多分配一点运行时间。Linux 采用的做法在是上述绝对公平算法基础上再为进程引入一个权重。这个权重就是 Linux 进程的 nice 值，也就是我们平时 top 命令结果中看到的 ni 这一列。nice 范围为 -20（最高权重）到 19（最低权重）。
 
 vruntime就是根据权重、优先级（留给上层介入的配置）等将实际运行时间标准化。在内核中通过prio_to_weight数组进行nice值和权重的转换。
 
@@ -233,9 +237,9 @@ cgroup
 
 如果两个条件不能同时满足，就会导致无法抢占。基于这种考虑，开发了针对离线业务的新调度算法[bt](https://github.com/Tencent/TencentOS-kernel)，该算法可以保证在线业务优先运行。
 
-[资源隔离技术之CPU隔离](https://mp.weixin.qq.com/s/q-O2L-6_DMwhjCjGVAvmrg) 建议先复习下linux 的抢占调度机制
+[资源隔离技术之CPU隔离](https://mp.weixin.qq.com/s/q-O2L-6_DMwhjCjGVAvmrg) 建议先复习下linux 的抢占调度机制：每个CPU都有一个运行队列rq，每个rq会有一个cfs_rq运行队列，该结构包含一棵红黑树rb_tree，用来链接调度实体se，每次只能调度一个se到cpu上去运行。**如果想要在任意时刻cfs_rq上的se运行时间都尽可能的接近，那么就需要不停地切换se上cpu运行**，但是频繁的切换会有开销，想要减小这种开销，就需要减少切换的次数。为了可以减小开销还能保证时间上的统一，内核便给cfs_rq的se进行排序，让他们按照时间顺序挂在rb_tree上，这样每次取红黑树最左边的se，就可以得到运行时间的最小的那个。但实际上，se又会有优先级的概念，不同优先级的se所分配到的cpu时间片是不一样的。内核便经过一系列公式的转换，可以得到一样的值，这个转换后的值称作虚拟运行时间vruntime，**CFS实际上只需要保证每个任务运行的虚拟时间是相等的即可**。每次挑选se上cpu运行，当分配的时间片用完，就会将它再放回到cfs_rq中，挂在红黑树的适当位置。
 1. 内核CFS设置有两种最小时间粒度保护：sched_min_granularity_ns 和 sched_wakeup_granularity_ns，实际效果并不那么理想。在离线业务的混跑，当在线和离线任务分别调度到一个核上，相互抢执行时间，意味着**离线一旦抢占，便可以持续运行一个最小粒度的时间sched_min_granularity_ns**，在线任务的唤醒延迟可能达sched_wakeup_granularity_ns，即在线业务的调度延迟可能会很大，导致在线业务的性能下降。另外，如果在离线业务跑到相互对应的一对HT上，还将面临超线程干扰的问题，虽然有core scheduling技术，但是其设计初衷并非为了混部，设计和实现开销较大，这些都将直接影响在线业务的性能。
-2. 每个CPU都有一个运行队列rq，每个rq会有一个cfs_rq运行队列，该结构包含一棵红黑树rb_tree，用来链接调度实体se，每次只能调度一个se到cpu上去运行。**如果想要在任意时刻cfs_rq上的se运行时间都尽可能的接近，那么就需要不停地切换se上cpu运行**，但是频繁的切换会有开销，想要减小这种开销，就需要减少切换的次数。为了可以减小开销还能保证时间上的统一，内核便给cfs_rq的se进行排序，让他们按照时间顺序挂在rb_tree上，这样每次取红黑树最左边的se，就可以得到运行时间的最小的那个。但实际上，se又会有优先级的概念，不同优先级的se所分配到的cpu时间片是不一样的。内核便经过一系列公式的转换，可以得到一样的值，这个转换后的值称作虚拟运行时间vruntime，**CFS实际上只需要保证每个任务运行的虚拟时间是相等的即可**。每次挑选se上cpu运行，当分配的时间片用完，就会将它再放回到cfs_rq中，挂在红黑树的适当位置。当然也有可能会碰到运行过程中，时间片还未用完，但主动放弃运行的情况，如睡眠（TASK_INTERRUPTIBLE）或等待某种资源（TASK_UNINTERRUPTIBLE），这时就需要出列等待，进到“小黑屋”，直至相应事件发生才会再次放到红黑树中等待调度。等待后重新放入红黑树的se，如果休眠时间比较长，vruntime可能会非常小，便会迅速得到运行。为了避免其疯狂地执行，cfs_rq上会维护min_vruntime，如果新唤醒的vruntime(se) < vruntime (cfs_rq→min_vruntime)，会将se的vruntime修正至接近min_vruntime，这样就可以保证此类se优先执行，但是又不会疯狂执行。
+2. 当然也有可能会碰到运行过程中，时间片还未用完，但主动放弃运行的情况，如睡眠（TASK_INTERRUPTIBLE）或等待某种资源（TASK_UNINTERRUPTIBLE），这时就需要出列等待，进到“小黑屋”，直至相应事件发生才会再次放到红黑树中等待调度。等待后重新放入红黑树的se，如果休眠时间比较长，vruntime可能会非常小，便会迅速得到运行。为了避免其疯狂地执行，cfs_rq上会维护min_vruntime，如果新唤醒的vruntime(se) < vruntime (cfs_rq→min_vruntime)，会将se的vruntime修正至接近min_vruntime，这样就可以保证此类se优先执行，但是又不会疯狂执行。
 3. 调度器每次唤醒的是 vruntime 最小的task，task 一定获取cpu 除非主动放弃， 调度器会保证其至少可以执行sched_min_granularity_ns。这些都可能导致 高优任务 ready时因为cpu在执行低优任务而无法被立即执行。 
   1. group identity特性相对于upstream kernel的CFS设计，新增一棵低优先级红黑树，用于存放低优先级任务。能做到 当高优任务ready时，立即抢占低优任务，哪怕此时低优任务 尚未执行够 sched_min_granularity_ns。
 
