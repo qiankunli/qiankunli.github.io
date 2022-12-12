@@ -15,6 +15,8 @@ keywords: ml framework
 
 [手把手教你如何自己设计实现一个深度学习框架（附代码实现）](https://mp.weixin.qq.com/s/LKhxaX9_qRNzb6UMZyhmiA) 对机器学习在工程上的实现和抽象说的比较透。[tinynn](https://github.com/borgwang/tinynn) 只是一个「玩具」版本的深度学习框架，一个成熟的深度学习框架至少还需要：支持自动求导、高运算效率（静态语言加速、支持 GPU 加速）、提供丰富的算法实现、提供易用的接口和详细的文档等等。
 
+[从 0 到 1 实现神经网络（Python）](https://mp.weixin.qq.com/s/YDyNr91IveU01oyd0kPNNw) 未读。
+
 ## 抽象层
 
 ### 组件抽象

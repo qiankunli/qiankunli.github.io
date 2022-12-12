@@ -12,7 +12,7 @@ keywords: Docker image Dockerfile
 * TOC
 {:toc}
 
-2013 年，Docker 出现了，工程师可以第一次到软件生产环境中定义，通过 Docker image 完成**单机**软件的交付和分发。
+2013 年，Docker 出现了，工程师可以第一次到软件生产环境中定义，通过 Docker image 完成**单机**软件的交付和分发。Docker 不完全是基础设施即代码，但 Dockerfiles 确实允许您将应用程序运行时定义为 git 存储库中的一个简单文件。
 
 [自下而上学习容器](https://mp.weixin.qq.com/s/1jpgYUU6J1W1brihJRnzKQ)对于熟悉 runc 是如何启动容器的人来说，他们都知道镜像并非是必需的。那我们为什么还要有容器镜像？当每一个容器都包含根文件系统的一个数兆字节那么大的拷贝副本时，所需的磁盘空间就会急剧增加。因此，镜像的存在是为了有效地解决存储和发行问题。
 
