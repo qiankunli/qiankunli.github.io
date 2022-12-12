@@ -193,7 +193,7 @@ func (f *DeltaFIFO) Get(obj interface{}) (item interface{}, exists bool, err err
 ## Indexer（未完成）
 
 因为etcd存储的缘故，k8s的性能 没有那么优秀，假设集群有几w个pod，list 就是一个巨耗时的操作，有几种优化方式
-1. list 时加上 label 限定范围。k8s 支持根据 label 对object 进行检索
+1. list 时加上 label 限定查询范围。k8s apiserver 支持根据 label 对object 进行检索
 2. 使用client-go 本地cache，再进一步，根据经常查询的label/field 建立本地index。PS：apiserver 确实对label 建了索引，但是本地并没有自动建立。
 
 [Kubernetes client-go 源码分析 - Indexer & ThreadSafeStore](https://mp.weixin.qq.com/s/YVl4z0Yr0cDp3dFg6Kwg5Q) 未细读
