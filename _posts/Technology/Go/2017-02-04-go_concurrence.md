@@ -10,11 +10,19 @@ keywords: Go Concurrence
 
 ## 一 前言
 
-
-
 我们谈go的优点时，并发编程是最重要的一块。因为go基于新的并发编程模型：不用共享内存的方式来通信，作为替代，以通信作为手段来共享内存。（goroutine共享channel，名为管道，实为内存）。为解释这个优势，本文提出了四个概念：交互方式、手段、类型、目的（不一定对，只是为了便于描述）。并在不同的并发粒度上（进程、线程、goroutine）对这几个概念进行了梳理。
 
 Go 语言的并发模型是 fork-join 型的。使用 go 关键字启动子协程工作，使用 sync.Wait 和 channel 来收集结果。
+
+data race
+1. 原因：多个goroutine 同时接触一个变量，行为不可预知
+2. 认定条件：两个及以上 goroutine 同时接触一个变量，其中至少一个goroutine 为写操作
+3. 检测方案：`go run -race` 或者 `go test -race`
+4. 解决方案：使用atomic 库或者sync.Mutex 等工具限制访问顺序 
+	1. 单个变量一写多读 -> atomic
+	2. 单个变量多写多读 -> sync.Mutex
+	3. 多个变量多写多读 -> sync.Mutex
+
 
 ## 原子操作
 

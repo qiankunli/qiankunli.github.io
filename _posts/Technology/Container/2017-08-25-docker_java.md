@@ -15,6 +15,8 @@ keywords: Docker java
 
 [Java 应用容器化指北](https://mp.weixin.qq.com/s/w-mEBTYwLFqzQ_LBMTwP6A) 未读
 
+[Java应用容器化的那些坑](https://mp.weixin.qq.com/s/7mLZms4JAGx8NG6IUnhL7w) 非常精彩。
+
 ## 容器有时会莫名其妙重启
 
 环境：marathon + mesos + docker 集群
