@@ -15,6 +15,10 @@ keywords: go 设计哲学
 
 [深入剖析对 Go 的成功作出巨大贡献的设计决策](https://mp.weixin.qq.com/s/zXOjaIuvu4XrWSGRqndOiw)
 
+个人感受
+1. golang 太多的匿名函数、函数套函数，缺点是不好懂，优点是用匿名函数消掉了很多类，大部分可以塞到一个struct里，十个八个struct就能实现一个 功能还算复杂的框架。
+
+
 ## 组合
 
 《Go语言第一课》在 Go 语言设计层面，Go 设计者为开发者们提供了正交的语法元素，以供后续组合使用

@@ -329,7 +329,9 @@ func (l Limit) ApplyToList(opts *ListOptions) {
 	opts.Limit = int64(l)
 }
 ```
-Options 里不仅包含了很多字段，有些字段还是 函数类型的，比如下面的NewCache，直接 cache.New 创建一个 cache 不好嘛？其实Cache 有多种实现，且cache.New 也包含 ache.Options （很明显花样很多）。
+在java 中，假如一个类包含多个 成员类， 每个成员都有多个构造方法（比如参数数量不一样），那这个类 的构造方法也会非常多。 Go 里有什么招儿嘛？
+
+Options 里不仅包含了很多字段，有些字段还是 函数类型的，比如下面的NewCache，直接 cache.New 创建一个 cache 不好嘛？其实Cache 有多种实现，且cache.New 也包含 cache.Options （很明显花样很多）。
 ```go
 // controller-runtime/pkg/cluster/cluster.go
 func New(config *rest.Config, opts ...Option) (Cluster, error) {

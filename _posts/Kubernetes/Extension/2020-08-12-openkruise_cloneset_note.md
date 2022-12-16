@@ -134,9 +134,10 @@ cloneset作者提到：cloneset partition其实是继承了原生 statefulset �
 ### 整体逻辑
 
 背景知识
+1. Kubernetes v1.7 之后添加了一个 API 对象，名叫 ControllerRevision，专门用来记录某种 crd 对象的版本
 1. CloneSet Owned 三个资源：ControllerRevision、Pod、PVC。
 2. 控制器会为每次更新过的 spec.template 计算一个 revision hash 值并上报到 CloneSet status 中
-3. 比如上文中提到的 nginx，在创建之初拥有的第一个 template 版本，会创建一个对应的 ControllerRevision。而当修改了 image 版本之后，CloneSet Controller 会创建一个新的 ControllerRevision，可以理解为每一个 ControllerRevision 对应了每一个版本的 Template，也对应了每一个版本的 ControllerRevision hash。通过ControllerRevision，CloneSet  可以很方便地管理不同版本的 template 模板，**还原 CloneSet**。
+3. 比如上文中提到的 nginx，在创建之初拥有的第一个 template 版本，会创建一个对应的 ControllerRevision。而当修改了 image 版本之后，CloneSet Controller 会创建一个新的 ControllerRevision。通过ControllerRevision，CloneSet  可以很方便地管理不同版本，**还原 CloneSet**。
 4. Pod label 中定义的 ControllerRevision hash（label name = "controller-revision-hash"），就是 ControllerRevision 的名字
 
 ```go

@@ -17,6 +17,8 @@ keywords: Docker java
 
 [Java应用容器化的那些坑](https://mp.weixin.qq.com/s/7mLZms4JAGx8NG6IUnhL7w) 非常精彩。
 
+[Kubernetes 中 JVM 故障问题排查心得总结](https://mp.weixin.qq.com/s/5y3amYd9ga-gFOx6Ba4o8Q) 涉及到 Exit Code/感知CGroup/MaxDirectMemorySize。
+
 ## 容器有时会莫名其妙重启
 
 环境：marathon + mesos + docker 集群
