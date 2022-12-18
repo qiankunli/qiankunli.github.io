@@ -114,13 +114,13 @@ Action 实现了调度机制（mechanism），Plugin 实现了调度的不同策
 
 action负责管理核心逻辑和流程，xxFns 是流程里暴露出来的hook，一个plugin（扩展需求）通过一个或多个Fns 组合来实现，这就很像default-scheduler 中的 Scheduling Framework 了。[Volcano火山：容器与批量计算的碰撞](https://bbs.huaweicloud.com/blogs/205045)action 和plugin 的关系
 1. action是第一级插件，定义了调度周期内需要的各个动作；默认提供 enqueue、allocate、 preempt和backfill四个action。比如allocate 为pod 分配node ，preempt 实现抢占。
-2. plugin是第二级插件，定义了action需要的各个算法；比如如何为job排序，为node排序，优先抢占谁。
+2. plugin是第二级插件，根据不同场景提供了action 中算法的具体实现细节；比如如何为job排序，为node排序，优先抢占谁。
 
 
 
 ## 调度流程
 
-Volcano Scheduler是负责Pod调度的组件，它由一系列action和plugin组成。action定义了调度各环节中需要执行的动作；plugin根据不同场景提供了action 中算法的具体实现细节。
+调度器在启动之后，便会周期性的开启一个调度会话，同时将当前集群的整体资源视图保存在会话的快照中，然后依次执行入队->资源分配->资源回收->资源抢占->回填等几个 action，每个 action 在执行时又会根据插件集合中不同的调度算法，对准备调度的 PodGroup 进行资源分配。
 
 每次调用 `Scheduler.runOnce` 的过程如下面调度流程图所示：
 

@@ -17,6 +17,7 @@ keywords: go 设计哲学
 
 个人感受
 1. golang 太多的匿名函数、函数套函数，缺点是不好懂，优点是用匿名函数消掉了很多类，大部分可以塞到一个struct里，十个八个struct就能实现一个 功能还算复杂的框架。
+2. 给go 很多函数 起一个 xxFactory 等面向对象意义的名字，真的让人很错乱。
 
 
 ## 组合
@@ -121,6 +122,35 @@ type Pod struct {
 	metav1.ObjectMeta 
 	Spec PodSpec 
 	Status PodStatus 
+}
+```
+更绝得是，一个map 给扩展实现了  Registry interface。
+```go
+// kubernetes/pkg/scheduler/framework/runtime/registry.go
+type Registry map[string]PluginFactory
+// Register adds a new plugin to the registry. If a plugin with the same name exists, it returns an error.
+func (r Registry) Register(name string, factory PluginFactory) error {
+	if _, ok := r[name]; ok {
+		return fmt.Errorf("a plugin named %v already exists", name)
+	}
+	r[name] = factory
+	return nil
+}
+// Unregister removes an existing plugin from the registry. If no plugin with the provided name exists, it returns an error.
+func (r Registry) Unregister(name string) error {
+	if _, ok := r[name]; !ok {
+		return fmt.Errorf("no plugin named %v exists", name)
+	}
+	delete(r, name)
+	return nil
+}
+```
+也因此呢，go 很多代码里，`var _ framework.FilterPlugin = &Sample{} ` 声明一个变量，又不用，一般是干什么作用呢？就是开发的时候验证下 Sample struct有没有完全实现 FilterPlugin/PreBindPlugin接口。
+```go
+var _ framework.FilterPlugin = &Sample{}
+var _ framework.PreBindPlugin = &Sample{}
+type Sample struct {
+	handle framework.Handle
 }
 ```
 

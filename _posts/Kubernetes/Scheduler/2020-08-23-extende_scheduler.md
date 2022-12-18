@@ -12,6 +12,9 @@ keywords: Scheduler Extender
 * TOC
 {:toc}
 
+
+## Scheduler extender
+
 [Scheduler extender](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/scheduler_extender.md) 扩展Scheduler 的三种方式
 
 1. by adding these rules to the scheduler and recompiling, [described here](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-scheduling/scheduler.md) 改源码
@@ -22,9 +25,9 @@ This approach is needed for use cases where scheduling decisions need to be made
 
 [一篇读懂Kubernetes Scheduler扩展功能](https://mp.weixin.qq.com/s/e4VfnUpEOmVxx_zwXOMCPg)
 
-## scheduler 调用 SchedulerExtender 
+### 使用
 
-### 调用过程
+scheduler 调用 SchedulerExtender  
 
 ![](/public/upload/kubernetes/scheduler_extender.png)
 
@@ -112,7 +115,7 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, filtered []*v
 }
 ```
 
-## 示例实现
+### 示例实现
 
 SchedulerExtender 首先是一个 http server，为了不影响scheduler 的调度， 应确保 http 接口响应时间不要过长。
 
@@ -154,4 +157,193 @@ func podFitsOnNode(pod *v1.Pod, node v1.Node) (bool, []string, error) {
 }
 ```
 
+## 自定义实现
 
+scheduler 既然提供了那么多扩展的plugin，我们可以自定义实现一个调度器，调度器的本质就是监听pending pod，并给pod 设置node
+1. 从0 到1 自己实现，插件 机制自己写
+    1. 自己基于controller-runtime 实现
+    2. 自己使用client-go 原生实现，比如karmada 集群调度器（调度的不是pod）
+2. 复用k8s scheduler 的整体设计，自己只是扩展插件，比如[cnych/sample-scheduler-framework](https://github.com/cnych/sample-scheduler-framework)
+
+### 使用
+
+需要设置一个 ConfigMap ，用于存放调度器的配置文件
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scheduler-config
+  namespace: kube-system
+data:
+  scheduler-config.yaml: |
+    apiVersion: kubescheduler.config.k8s.io/v1beta3
+    kind: KubeSchedulerConfiguration
+    leaderElection:
+      leaderElect: true
+      lockObjectName: scheduler-framework-sample
+      lockObjectNamespace: kube-system
+    profiles:
+    - schedulerName: scheduler-framework-sample
+      plugins:
+        filter:
+          enabled:
+          - name: "sample"
+        preBind:
+          enabled:
+          - name: "sample"  # enable 才能保证该扩展点运行了你的插件
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduler-framework-sample
+spec:
+  replicas: 1
+  template:
+    spec:
+      volumes:
+      - name: scheduler-config
+        configMap:
+          name: scheduler-config
+      containers:
+      - name: scheduler-ctrl
+        args:
+        - scheduler-framework-sample
+        - --config=/scheduler/scheduler-config.yaml
+        - --v=3
+        volumeMounts:
+        - name: scheduler-config
+          mountPath: /scheduler
+```
+
+### 源码分析
+
+```
+sample-scheduler-framework
+  /cmd
+    /scheduler
+      /main.go
+  /pkg
+    /plugins
+      /sample
+        /sample.go
+```
+
+`k8s.io/kubernetes/cmd/kube-scheduler/app` 提供了 NewSchedulerCommand 
+1. app.WithPlugin 即可将 自定义plugin 注入到 默认scheduler 中
+2. cmd.Execute 即可直接启动 默认scheduler 的代码。 
+
+```go
+// main.go
+import (
+	"fmt"
+	"math/rand"
+	"os"
+	"time"
+	"github.com/angao/scheduler-framework-sample/pkg/plugins/sample"
+	"k8s.io/component-base/logs"
+	"k8s.io/kubernetes/cmd/kube-scheduler/app"
+)
+func main() {
+    ...
+	cmd := app.NewSchedulerCommand(
+		app.WithPlugin(sample.Name, sample.New),
+	)
+	if err := cmd.Execute(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+}
+
+```
+app.WithPlugin 如何让自定义 plugin 被默认 scheduler 调用呢？
+```go
+// kubernetes/cmd/kube-scheduler/app/server.go
+func WithPlugin(name string, factory runtime.PluginFactory) Option {
+	return func(registry runtime.Registry) error {
+		return registry.Register(name, factory)
+	}
+}
+// kubernetes/pkg/scheduler/framework/runtime/registry.go
+type Registry map[string]PluginFactory
+func (r Registry) Register(name string, factory PluginFactory) error {
+	r[name] = factory
+	return nil
+}
+func (r Registry) Unregister(name string) error {
+	delete(r, name)
+	return nil
+}
+```
+自定义plugin 先是被保存到了 Registry 中，最后经由 Configurator 传递给 Scheduler.Profiles
+```go
+// kubernetes/pkg/scheduler/scheduler.go
+func Setup(ctx context.Context, opts *options.Options, ...){
+    ...
+    outOfTreeRegistry := make(runtime.Registry)
+    for _, option := range outOfTreeRegistryOptions {
+		if err := option(outOfTreeRegistry); err != nil {
+			return nil, nil, err
+		}
+	}
+    sched, err := scheduler.New(cc.Client,
+        ...
+        scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
+    )
+    ...
+}
+func WithFrameworkOutOfTreeRegistry(registry frameworkruntime.Registry) Option {
+	return func(o *schedulerOptions) {
+		o.frameworkOutOfTreeRegistry = registry
+	}
+}
+func New(client clientset.Interface,...)(*Scheduler, error){
+    ...
+    registry := frameworkplugins.NewInTreeRegistry()
+	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
+		return nil, err
+	}
+    ...
+    configurator := &Configurator{
+		registry:                 registry,
+		extenders:                options.extenders,
+        ...
+	}
+}
+```
+自定义插件实现例子
+
+```go
+// sample.go
+const (
+	// Name is plugin name
+	Name = "sample"
+)
+
+var _ framework.FilterPlugin = &Sample{}
+var _ framework.PreBindPlugin = &Sample{}
+
+type Sample struct {
+	handle framework.Handle
+}
+func New(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+	return &Sample{
+		handle: handle,
+	}, nil
+}
+func (s *Sample) Name() string {
+	return Name
+}
+func (s *Sample) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, node *framework.NodeInfo) *framework.Status {
+	klog.V(2).Infof("filter pod: %v", pod.Name)
+	return framework.NewStatus(framework.Success, "")
+}
+
+func (s *Sample) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+	nodeInfo, err := s.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return framework.NewStatus(framework.Error, err.Error())
+	}
+	klog.V(2).Infof("prebind node info: %+v", nodeInfo.Node())
+	return framework.NewStatus(framework.Success, "")
+}
+```

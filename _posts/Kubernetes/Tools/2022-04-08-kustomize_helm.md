@@ -93,6 +93,8 @@ Helm 一开始的目标就很明确：如果说 Kubernetes 是云原生操作系
 3. 钩子机制可以在部署生命周期的不同阶段注入特定于用例的代码
 4. 部署测试框架
 
+[使用 helmfile 声明式部署 Helm Chart](https://mp.weixin.qq.com/s/5SAth6TjyvbLmDjHcxTWgw) 未理解。
+
 
 ### 原理
 

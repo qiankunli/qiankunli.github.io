@@ -18,7 +18,7 @@ keywords: kubernetes scheduler
 
 2. Kubernetes 调度本身的演化 [从 Kubernetes 资源控制到开放应用模型，控制器的进化之旅](https://mp.weixin.qq.com/s/AZhyux2PMYpNmWGhZnmI1g)
 3. 调度器的原理， [How Kubernetes Initializers work](https://ahmet.im/blog/initializers/)
-the scheduler is yet another controller, watching for Pods to show up in the API server and assigns each of them to a Node [How does the Kubernetes scheduler work?](https://jvns.ca/blog/2017/07/27/how-does-the-kubernetes-scheduler-work/).
+the scheduler is yet another controller, watching for Pods to show up in the API server and assigns each of them to a Node [How does the Kubernetes scheduler work?](https://jvns.ca/blog/2017/07/27/how-does-the-kubernetes-scheduler-work/). PS：确实有直接基于controller-runtime 写调度器的
 
 ```
 while True:
@@ -33,8 +33,7 @@ while True:
 [Create a custom Kubernetes scheduler](https://developer.ibm.com/technologies/containers/articles/creating-a-custom-kube-scheduler/#)
 
 1. The default scheduler starts up according to the parameters given.
-2. It watches on apiserver, and puts pods where its `spec.nodeName` is empty into its internal scheduling queue.
-It pops out a pod from the scheduling queue and starts a standard scheduling cycle.
+2. It watches on apiserver, and puts pods where its `spec.nodeName` is empty into its internal scheduling queue. It pops out a pod from the scheduling queue and starts a standard scheduling cycle.
 3. It retrieves “hard requirements” (like cpu/memory requests, nodeSelector/nodeAffinity) from the pod’s API spec. Then the predicates phase occurs where it calculates to give a node candidates list which satisfies those requirements.
 4. It retrieves “soft requirements” from the pod’s API spec and also applies some default soft “policies” (like the pods prefer to be more packed or scattered across the nodes). It finally gives a score for each candidate node, and picks up the final winner with the highest score.
 5. It talks to the apiserver (by issuing a bind call) and sets
@@ -170,8 +169,8 @@ Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的
 
 明确了 Kubernetes 中的各个调度阶段，提供了设计良好的基于插件的接口。调度框架认为 Kubernetes 中目前存在调度（Scheduling）和绑定（Binding）两个循环：
 
-1. 调度循环在多个 Node 中为 Pod 选择最合适的 Node；
-2. 绑定循环将调度决策应用到集群中，包括绑定 Pod 和 Node、绑定持久存储等工作；
+1. **调度循环**在多个 Node 中为 Pod 选择最合适的 Node；
+2. **绑定循环**将调度决策应用到集群中，包括绑定 Pod 和 Node、绑定持久存储等工作；
 
 除了两个大循环之外，调度框架中还包含 QueueSort、PreFilter、Filter、PostFilter、Score、Reserve、Permit、PreBind、Bind、PostBind 和 Unreserve 11 个扩展点（Extension Point），这些扩展点会在调度的过程中触发，它们的运行顺序如下：
 
@@ -249,7 +248,6 @@ func main() {
 
 [How does the Kubernetes scheduler work?](https://jvns.ca/blog/2017/07/27/how-does-the-kubernetes-scheduler-work/) 
 
-![](/public/upload/kubernetes/scheduler_object.png)
 
 ```go
 sched, err := scheduler.New(cc.Client,
@@ -284,6 +282,29 @@ sched, err := scheduler.New(cc.Client,
 4. 在本地缓存中，绑定Node，原因类似
 5. 通过API Server的客户端做真正的绑定，是异步操作
 
+```
+runCommand(cmd, opts, registryOptions...)
+  Setup
+  Run
+  	sched.Run(ctx)
+  	  wait.UntilWithContext(ctx, sched.scheduleOne, 0)
+  	  	podInfo := sched.NextPod()
+  	  	fwk, err := sched.frameworkForPod(pod)
+  	  	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, fwk, state, pod)
+  	  	  feasibleNodes, diagnosis, err := g.findNodesThatFitPod(ctx, fwk, state, pod)
+  	  	  	fwk.RunPreFilterPlugins(ctx, state, pod)
+  	  	  	...
+  	  	  priorityList, err := g.prioritizeNodes(ctx, fwk, state, pod, feasibleNodes)
+  	  	  host, err := g.selectHost(priorityList)
+  	  	fwk.RunReservePluginsReserve
+  	  	fwk.RunPermitPlugins
+  	  	go func() {
+  	  	  fwk.RunPreBindPlugins
+  	  	  sched.bind
+  	  	  fwk.RunPostBindPlugins
+  	  	}()
+```
+
 接下来我们来看调度算法的Schedule函数，Schedule算法做了以下的事情：
 1. findNodesThatFitPod：根据所有预选算法过滤符合的node列表
 2. prioritizeNodes: 对符合的节点进行优选评分，一个排序的列表
@@ -291,3 +312,35 @@ sched, err := scheduler.New(cc.Client,
 
 ![](/public/upload/kubernetes/scheduler_sequence.png)
 
+各种插件在哪呢？如何发挥作用呢？
+
+```go
+// kubernetes/pkg/scheduler/framework/runtime/framework.go
+type frameworkImpl struct {
+	registry              Registry
+	pluginNameToWeightMap map[string]int
+	queueSortPlugins      []framework.QueueSortPlugin
+	preFilterPlugins      []framework.PreFilterPlugin
+	filterPlugins         []framework.FilterPlugin
+	postFilterPlugins     []framework.PostFilterPlugin
+	preScorePlugins       []framework.PreScorePlugin
+	scorePlugins          []framework.ScorePlugin
+	reservePlugins        []framework.ReservePlugin
+	preBindPlugins        []framework.PreBindPlugin
+	bindPlugins           []framework.BindPlugin
+	postBindPlugins       []framework.PostBindPlugin
+	permitPlugins         []framework.PermitPlugin
+	extenders []framework.Extender
+	...
+}
+func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (status *framework.Status) {
+	startTime := time.Now()
+	for _, pl := range f.preFilterPlugins {
+		status = f.runPreFilterPlugin(ctx, pl, state, pod)
+		if !status.IsSuccess() {
+			...
+		}
+	}
+	return nil
+}
+```
