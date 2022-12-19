@@ -333,6 +333,7 @@ type frameworkImpl struct {
 	extenders []framework.Extender
 	...
 }
+// CycleState ，表示调度的上下文，其实是一个 map 的封装，结构体内部通过读写锁实现了并发安全，开发者可以通过 CycleState 来实现多个调度插件直接的数据传递，也就是多个插件可以共享状态或通过此机制进行通信。
 func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (status *framework.Status) {
 	startTime := time.Now()
 	for _, pl := range f.preFilterPlugins {

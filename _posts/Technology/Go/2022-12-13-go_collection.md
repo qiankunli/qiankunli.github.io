@@ -14,8 +14,6 @@ keywords: Go io
 {:toc}
 
 
-## Data Structures
-
 ||go|java|
 |---|---|---|
 |list|slice|ArrayList|
@@ -23,10 +21,9 @@ keywords: Go io
 |线程安全map|sync.Map|ConcurrentHashMap|
 |对象池|对带缓冲的channel进行封装|commons-pool中的ObjectPool|
 
+hashmap和sync.Map都是unscalable，即参与的cpu越多，性能越差。
 
-golang为什么将method写在类外? go表达的就是函数就是函数，数据就是数据。与数据绑定的函数提供t.foo()这种写法。但也仅此而已了。不要用面向对象语言的思想去学go，用c的思路去学go，golang之所以叫struct不叫class，go没有类，只是模拟它
-
-### 数组
+## 数组
 
 [Deep Dive into Pointers, Arrays & Slice](https://medium.com/@dwdraju/deep-dive-into-pointers-arrays-slice-309a843c63ad)Go’s arrays are values rather than memory address.
 
@@ -44,7 +41,7 @@ fmt.Println(&myarr)
 1. 相同维数且包含相同个数元素的数组才可以比较
 2. 每个元素都相同的才相等
 
-### slice
+## slice
 
 ![](/public/upload/go/slice.png)
 
@@ -113,7 +110,7 @@ func main() {
 }
 ```
 
-### map
+## map
 
 ```go
 type hmap struct {
@@ -188,7 +185,7 @@ map是由 Go **编译器与运行时联合实现的**。Go 编译器在编译阶
 
 ![](/public/upload/go/go_map_overview.png)
 
-### string
+## string
 
 Go**原生支持**字符串（比如底层结构有专门字段存储字符串长度），string 类型的数据是不可变的，string 是值类型， 其默认初始化值为空字符串，不是nil
 

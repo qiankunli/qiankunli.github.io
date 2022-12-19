@@ -174,6 +174,8 @@ koordinator
 
 ### koordlet
 
+![](/public/upload/kubernetes/koordlet_overview.jpg)
+
 ```
 koordinator
   /cmd

@@ -17,6 +17,12 @@ keywords: mosn detail
 
 [云原生时代的DevOps平台设计之道](https://mp.weixin.qq.com/s/oxeNq4GHE85NUBIDcgixcg)大胆设想一下，开发人员只需要在两个服务组件之间拖动一条表征微服务调用关系的线，就可以生成对应的微服务配置。这样的操作体验完全可以使注册中心、控制平面这种微服务领域中复杂的概念对开发人员屏蔽。本质上讲，维护注册中心或者控制平面也是运维人员需要关心的工作。PS：配置文件 + 业务client sdk ==> 无配置化 + 业务client sdk  ==> 无配置 + 通用sdk
 
+## 缘起
+
+[分布式微服务时代的 TCP ——  service mesh](https://www.infoq.cn/article/nquw3jfptyvbbryp1grv)随着业务的不断发展，微服务的数量越来越多，微服务间的通信网络也变得十分复杂，在这个角度看，服务间通信已经不在是端到端的调用了，而是"多个节点访问多个节点"的关系了。在处理分布式微服务架构中"多个节点"的互相通信上，需要解决很多通用的问题，service mesh 要做微服务时代的 TCP，也就是在解决上述问题的基础上，还要做到通用化、标准化，解耦合业务进程与 mesh。
+
+![](/public/upload/mesh/tcp_vs_mesh.jpg)
+
 ## 问题
 
 [蚂蚁集团 Service Mesh 进展回顾与展望](https://mp.weixin.qq.com/s/eh0Jz7YeF27bXqdBMd4MPw) 提供了演进脉络。

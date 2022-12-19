@@ -56,6 +56,14 @@ type ReadWriter interface {
     Writer
 }
 ```
+比如很多tcp 的网络库会基于  net.Conn 提供自己的 Conn strurt。框架能力就是通过 “嵌入”层层堆叠起来的，这也是我们理解go 框架的突破口。
+```go
+type Conn interface {
+	net.Conn
+	Reader
+	Writer
+}
+```
 
 ### 水平组合
 

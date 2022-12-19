@@ -260,6 +260,8 @@ RPC 服务
 2. 在服务端的业务逻辑中创建一个返回值 CompletableFuture 对象，之后服务端真正的业务逻辑完全可以在一个线程池中异步处理，业务逻辑完成之后再调用这个 CompletableFuture 对象的 complete 方法，完成异步通知；
 3. 调用端在收到服务端发送过来的响应之后，RPC 框架再自动地调用调用端拿到的那个返回值 CompletableFuture 对象的 complete 方法，这样一次异步调用就完成了。
 
+合并部署：**微服务过微**，传输和序列化开销越来越大，将亲和性强的服务实例尽可能调度到同一个物理机，远程rpc 调用优化为本地rpc调用。
+
 ### 扩展性设计
 
 ![](/public/upload/rpc/rpc_spi.png)
