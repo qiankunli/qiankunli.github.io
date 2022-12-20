@@ -144,7 +144,7 @@ type hmap struct {
     ```
 
 3. Go的内置集合中没有Set实现， 可以`map[type]bool`
-4. map 类型对 value 的类型没有限制，但是**对 key 的类型却有严格要求**，因为 map 类型要保证 key 的唯一性。Go 语言中要求，key 的类型必须支持“==”和“!=”两种比较操作符。
+4. map 类型对 value 的类型没有限制，但是**对 key 的类型却有严格要求**，因为 map 类型要保证 key 的唯一性。Go 语言中要求，key 的类型必须支持“==”和“!=”两种比较操作符。PS：类似java 的hashmap key支持equal 和 hashcode
 5. map 实例不是并发写安全的，也不支持并发读写。Go 1.9 版本中引入了支持并发写安全的 sync.Map 类型
 6. 考虑到 map 可以自动扩容，map 中数据元素的 value 位置可能在这一过程中发生变化，所以 Go 不允许获取 map 中 value 的地址，这个约束是在编译期间就生效的。
 

@@ -126,7 +126,19 @@ defer 使用的几个注意事项
 	_ = append(sl, 11)
 	}()
 	```
-3. defer 关键字后面的表达式，是在将 deferred 函数注册到 deferred 函数栈的时候进行求值的。
+3. 有时候为了 明确defer的作用域，可能故意在函数中使用匿名函数。常见于 缩小锁的作用域。
+	```go
+	func someFunc(){
+		...
+		func(){
+			mu.Lock()
+			defer mu.Unlock()
+			...
+		}
+		... 	// 这里很长
+	}
+	```
+4. defer 关键字后面的表达式，是在将 deferred 函数注册到 deferred 函数栈的时候进行求值的。
 
 三种实现方案
 

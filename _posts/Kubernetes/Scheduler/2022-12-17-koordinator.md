@@ -8,7 +8,7 @@ keywords:  Kubernetes 混部
 
 ---
 
-## 简介（未完成）
+## 简介
 
 * TOC
 {:toc}
@@ -171,7 +171,6 @@ koordinator
 1. k8s scheduler本身代码抽象比较好，对外提供`	"k8s.io/kubernetes/cmd/kube-scheduler/app"` 包，直接 `cmd := app.NewSchedulerCommand(...);cmd.Execute()` 即可启动一个调度器，koord-scheduler  主要提供了 plugin 实现，注册到 plugin  regisry 中即可。
 2. 各个plugin 代码按需求分开看即可，后续的有 看到感兴趣的技术点持续补充
 
-
 ### koordlet
 
 ![](/public/upload/kubernetes/koordlet_overview.jpg)
@@ -187,10 +186,12 @@ koordinator
       /pleg
       /qosmanager
       /resmanager
+        /cpu_burst.go
+        /cpu_evict.go
+        /memory_evict.go
       /koordlet.go
 ```
-koordlet 依次启动各个组件
-
+koordlet 依次启动各个组件，各个组件又由多个组件/plugin 组成，每个组件运行一个小型control loop。比如 resManager 包含 cpu burst 组件，就是check 下node 上所有pod，有需要 cpu burst，就向pod 及container 对应cgroup 目录写入一个文件。
 ```
 daemon, err := agent.NewDaemon(cfg)
 daemon.Run(stopCtx.Done())
@@ -206,25 +207,99 @@ daemon.Run(stopCtx.Done())
   ...
 ```
 
-以qos 组件为例
+以resManager 组件为例
 
 ```go
-func (m *qosManager) Run(stopCh <-chan struct{}) error {
-	for fgStr, enable := range m.cfg.FeatureGates {
-		if !enable {
-			continue
-		}
-		fg := featuregate.Feature(fgStr)
-		pluginCtx := &plugins.PluginContext{...}
-		pluginFactory, found := config.QoSPluginFactories[fg]
-		if !found {
-			return fmt.Errorf("PluginFactory for %v not found", fg)
-    }
-		m.plugins[fg] = pluginFactory(pluginCtx)
-	}
-	for fg, pl := range m.plugins {
-		pl.Start()
-	}
+func (r *resmanager) Run(stopCh <-chan struct{}) error {
+	defer utilruntime.HandleCrash()
+	klog.Info("Starting resmanager")
+
+	r.podsEvicted.Run(stopCh)
+	go configextensions.RunQOSGreyCtrlPlugins(r.kubeClient, stopCh)
+
+	util.RunFeature(r.reconcileBECgroup, ...)
+
+	cgroupResourceReconcile := NewCgroupResourcesReconcile(r)
+	util.RunFeatureWithInit(..., cgroupResourceReconcile.reconcile,...)
+
+	cpuSuppress := NewCPUSuppress(r)
+	util.RunFeature(cpuSuppress.suppressBECPU, ...)
+
+	cpuBurst := NewCPUBurst(r)
+	util.RunFeatureWithInit(..., cpuBurst.start,...)
+
+	cpuEvictor := NewCPUEvictor(r)
+	util.RunFeature(cpuEvictor.cpuEvict, ...)
+
+	memoryEvictor := NewMemoryEvictor(r)
+	util.RunFeature(memoryEvictor.memoryEvict, ...)
+
+	rdtResCtrl := NewResctrlReconcile(r)
+	util.RunFeatureWithInit(...,rdtResCtrl.reconcile,...)
+
+	klog.Infof("start resmanager extensions")
+	plugins.SetupPlugins(r.kubeClient, r.metricCache, r.statesInformer)
+	utilruntime.Must(plugins.StartPlugins(r.config.QOSExtensionCfg, stopCh))
+
+	klog.Info("Starting resmanager successfully")
+	<-stopCh
 	return nil
 }
 ```
+以cpu burst 为例
+
+```go
+func (b *CPUBurst) start() {
+	// sync config from node slo
+	nodeSLO := b.resmanager.getNodeSLOCopy()
+	b.nodeCPUBurstStrategy = nodeSLO.Spec.CPUBurstStrategy
+	podsMeta := b.resmanager.statesInformer.GetAllPods()
+
+	// get node state by node share pool usage
+	nodeState := b.getNodeStateForBurst(*b.nodeCPUBurstStrategy.SharePoolThresholdPercent, podsMeta)
+	for _, podMeta := range podsMeta {
+		// ignore non-burstable pod, e.g. LSR, BE pods
+		// merge burst config from pod and node
+		cpuBurstCfg := genPodBurstConfig(podMeta.Pod, &b.nodeCPUBurstStrategy.CPUBurstConfig)
+		b.applyCPUBurst(cpuBurstCfg, podMeta) // set cpu.cfs_burst_us for containers
+		b.applyCFSQuotaBurst(cpuBurstCfg, podMeta, nodeState) // scale cpu.cfs_quota_us for pod and containers
+	}
+	b.Recycle()
+}
+
+// set cpu.cfs_burst_us for containers
+func (b *CPUBurst) applyCPUBurst(burstCfg *slov1alpha1.CPUBurstConfig, podMeta *statesinformer.PodMeta) {
+	pod := podMeta.Pod
+	containerMap := make(map[string]*corev1.Container)
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		containerMap[container.Name] = container
+	}
+
+	podCFSBurstVal := int64(0)
+	for i := range pod.Status.ContainerStatuses {
+		containerStat := &pod.Status.ContainerStatuses[i]
+		container, exist := containerMap[containerStat.Name]
+		
+		containerCFSBurstVal := calcStaticCPUBurstVal(container, burstCfg)
+		containerDir, burstPathErr := koordletutil.GetContainerCgroupPathWithKube(podMeta.CgroupDir, containerStat)
+		
+		if system.ValidateResourceValue(&containerCFSBurstVal, containerDir, system.CPUBurst) {
+			podCFSBurstVal += containerCFSBurstVal
+			ownerRef := executor.ContainerOwnerRef(pod.Namespace, pod.Name, container.Name)
+			containerCFSBurstValStr := strconv.FormatInt(containerCFSBurstVal, 10)
+			updater := executor.NewCommonCgroupResourceUpdater(ownerRef, containerDir, system.CPUBurst, containerCFSBurstValStr)
+			updated, err := b.executor.UpdateByCache(updater)
+		}
+	} // end for containers
+
+	podDir := koordletutil.GetPodCgroupDirWithKube(podMeta.CgroupDir)
+	if system.ValidateResourceValue(&podCFSBurstVal, podDir, system.CPUBurst) {
+		ownerRef := executor.PodOwnerRef(pod.Namespace, pod.Name)
+		podCFSBurstValStr := strconv.FormatInt(podCFSBurstVal, 10)
+		updater := executor.NewCommonCgroupResourceUpdater(ownerRef, podDir, system.CPUBurst, podCFSBurstValStr)
+		updated, err := b.executor.UpdateByCache(updater)
+	}
+}
+```
+executor.UpdateByCache 实质是 特定cgroup 目录写入一个文件。

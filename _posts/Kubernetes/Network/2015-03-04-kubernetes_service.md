@@ -26,6 +26,8 @@ keywords: Kubernetes Service
 
 ## What is a service?
 
+kube-proxy 运行在所有节点上，它监听 apiserver 中 service 和 endpoint 的变化情况，创建路由规则以提供服务 IP 和负载均衡功能。简单理解此进程是 Service 的透明代理兼负载均衡器，其核心功能是将到某个 Service 的访问请求转发到后端的多个 Pod 实例上。PS：service 相当于是 kube-proxy工作的配置文件。
+
 Kubernetes 之所以需要 Service，一方面是因为 Pod 的 IP 不是固定的，另一方面则是因为一组 Pod 实例之间总会有负载均衡的需求。
 
 [一文读懂容器网络发展](https://mp.weixin.qq.com/s/fAThT7hKxDYXvFGJvqO42g)一句话概括 Service 的原理就是：**Service = kube-proxy + iptables 规则**。当一个 Service 创建时，K8s 会为其分配一个 Cluster IP 地址。这个地址其实是个 VIP，并没有一个真实的网络对象存在。这个 IP 只会存在于 iptables 规则里，对这个 VIP:VPort 的访问使用 iptables 的随机模式规则指向了一个或者多个真实存在的 Pod 地址（DNAT，将原本访问 `ClusterIP:Port`的数据包 DNAT 成 Service 的某个 Endpoint (`PodIP:Port`)，然后内核将连接信息插入 conntrack 表以记录连接，目的端回包的时候内核从 conntrack 表匹配连接并反向 NAT，这样原路返回形成一个完整的连接链路），这个是 Service 最基本的工作原理。那 kube-proxy 做什么？kube-proxy 监听 Pod 的变化，负责在宿主机上生成这些 NAT 规则。这个模式下 kube-proxy 不转发流量，kube-proxy 只是负责疏通管道。

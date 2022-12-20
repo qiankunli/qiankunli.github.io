@@ -57,12 +57,14 @@ Go 并没有彻底放弃基于共享内存的并发模型，而是在提供 CSP 
 4. V4: 解决老 goroutine 饥饿的问题
 
 
-v1版本
+#### v1版本
+
 ```go
 func cas(val *int32, old, new int32) bool
 func semacquire(*int32)
 func semrelease(*int32)
 // The structure of the mutex, containing two fields
+// 函数传递只能传锁的指针
 type Mutex struct {
   key int32  // Indication of whether the lock is held. 表示有几个 gorutines 正在使用或准备使用该锁
   sema int32 // Semaphore dedicated to block/wake up goroutine
@@ -91,7 +93,7 @@ func (m *Mutex) Unlock() {
     semrelease(&m.sema) // Wake up other blocked goroutines
 }
 ```
-v4版本
+#### v4版本
 
 ```go
 type Mutex struct {
@@ -142,18 +144,23 @@ func park_m(gp *g) {
 }
 ```
 
-**Mutex.Lock 有一个类似jvm 锁膨胀的过程**（go 调度器运行在 用户态，因此实现比java synchronized 关键字更简单），Goroutine 会先自旋、实在不行休眠自己，修改 mutex 的state。也有普通/饥饿模式对应aqs 的公平锁和非公平锁机制。
+|state|31~3|2|1|0|
+|---|---|---|---|---|
+|用途|等待队列长度|0=正常<br>1=饥饿|0=无唤醒<br>1=有唤醒|0=解锁<br>1=上锁|
 
 Goroutine修改自己的行为/状态
 
 1. 锁空闲则加锁；
 2. 锁占用  + 普通模式则执行 `sync.runtime_doSpin`进入自旋，执行30次PAUSE 指令消耗CPU时间；
-3. 锁占用  + 饥饿模式则执行 `sync.runtime_SemacquireMutex`进入休眠状态
-
-Goroutine修改 mutex 的状态
-
 1. 如果当前 Goroutine 等待锁的时间超过了 1ms，当前 Goroutine 会将互斥锁切换到饥饿模式
+3. 锁占用  + 饥饿模式则执行 `sync.runtime_SemacquireMutex`进入休眠状态
 2. 如果当前 Goroutine 是互斥锁上的最后一个等待的协程或者等待的时间小于 1ms，当前 Goroutine 会将互斥锁切换回正常模式；
+
+
+**Mutex.Lock 有一个类似jvm 锁膨胀的过程**（go 调度器运行在 用户态，因此实现比java synchronized 关键字更简单），Goroutine 会先自旋、实在不行休眠自己，修改 mutex 的state（int32 是一个bit field，有点类似 jvm object的 mark word）。也有普通/饥饿模式对应aqs 的公平锁和非公平锁机制。
+
+![](/public/upload/go/go_mutex_bloat.jpg)
+
 
 [Go精妙的互斥锁设计](https://mp.weixin.qq.com/s/YYvoeDfPMm8Y2kFu9uesGw)
 [sync.Once 的前世今生](https://mp.weixin.qq.com/s/VoBHdLUdFjFDDv24-PggeQ)
