@@ -144,7 +144,7 @@ func park_m(gp *g) {
 }
 ```
 
-|state|31~3|2|1|0|
+|state bits|31~3|2|1|0|
 |---|---|---|---|---|
 |用途|等待队列长度|0=正常<br>1=饥饿|0=无唤醒<br>1=有唤醒|0=解锁<br>1=上锁|
 
@@ -161,6 +161,45 @@ Goroutine修改自己的行为/状态
 
 ![](/public/upload/go/go_mutex_bloat.jpg)
 
+#### semaphore 实现
+
+[semaphore 的原理与实现](https://mp.weixin.qq.com/s/GB649snXQ5rDF2BXO9V55Q) Go 语言中暴露的 semaphore 实现，不要认为这些是信号量，把这里的东西看作 sleep 和 wakeup 实现的一种方式。
+
+```go
+// /go/1.19.3/libexec/src/sync/runtime.go
+func runtime_Semacquire(s *uint32)
+func runtime_SemacquireMutex(s *uint32, lifo bool, skipframes int)
+func runtime_Semrelease(s *uint32, handoff bool, skipframes int)
+
+// go/1.19.3/libexec/src/runtime/sema.go
+//go:linkname sync_runtime_Semacquire sync.runtime_Semacquire
+func sync_runtime_Semacquire(addr *uint32) {
+	semacquire1(addr, false, semaBlockProfile, 0)
+}
+//go:linkname sync_runtime_Semrelease sync.runtime_Semrelease
+func sync_runtime_Semrelease(addr *uint32, handoff bool, skipframes int) {
+	semrelease1(addr, handoff, skipframes)
+}
+//go:linkname sync_runtime_SemacquireMutex sync.runtime_SemacquireMutex
+func sync_runtime_SemacquireMutex(addr *uint32, lifo bool, skipframes int) {
+	semacquire1(addr, lifo, semaBlockProfile|semaMutexProfile, skipframes)
+}
+
+var semtable semTable
+type semTable [semTabSize]struct {
+	root semaRoot
+	pad  [cpu.CacheLinePadSize - unsafe.Sizeof(semaRoot{})]byte
+}
+type semaRoot struct {
+	lock  mutex
+	treap *sudog // root of balanced tree of unique waiters.
+	nwait uint32 // Number of waiters. Read w/o the lock.
+}
+```
+
+1. 有一个全局的 semtable，持有一个数组，元素是 semaRoot，每一个sema/addr 哈希计算一个 数组位置， 一个位置一个。 PS：数组加链表
+2. 对同一个 mutex 上锁的 g，会阻塞在同一个sema/addr上，这些阻塞在同一个地址上的 **goroutine 会被打包成 sudog**，组成一个链表。用 sudog 的 waitlink 相连。从 semaRoot 的视角(其实就是 lock 的 addr)来看，sudo 链表 是个二叉搜索树。
+3. 类似于 linux 的 socket 和 golang的channel，都会自己持有一个等待队列，存储访问自己时 因“没有数据” 而阻塞的 执行体。golang 中一般将阻塞的 执行体封装为 sudog，进而拼成链表。 sema 看着像一个孤零零的 int32，实际上 等待队列是挂在 全局semtable 上了。
 
 [Go精妙的互斥锁设计](https://mp.weixin.qq.com/s/YYvoeDfPMm8Y2kFu9uesGw)
 [sync.Once 的前世今生](https://mp.weixin.qq.com/s/VoBHdLUdFjFDDv24-PggeQ)

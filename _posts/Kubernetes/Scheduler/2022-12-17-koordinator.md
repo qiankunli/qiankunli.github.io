@@ -202,8 +202,10 @@ koordinator
         /memory_evict.go
       /koordlet.go
 ```
-koordlet 依次启动各个组件，各个组件又由多个组件/plugin 组成，每个组件运行一个小型control loop。比如 resManager 包含 cpu burst 组件，就是check 下node 上所有pod，有需要 cpu burst，就向pod 及container 对应cgroup 目录写入一个文件。
-```
+koordlet 依次启动各个组件，各个组件又由多个功能模块/plugin 组成，每个功能模块运行一个小型control loop。比如 resManager 包含 cpu burst 模块，大致实现是check 所在node 上的所有pod，有需要 cpu burst的pod，就向pod 及container 对应cgroup 目录写入一个文件/配置。
+
+```go
+// koordlet 依次启动各个组件
 daemon, err := agent.NewDaemon(cfg)
 daemon.Run(stopCtx.Done())
 	go func() {
@@ -221,6 +223,7 @@ daemon.Run(stopCtx.Done())
 以resManager 组件为例
 
 ```go
+// resManager 启动各个功能模块
 func (r *resmanager) Run(stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 	klog.Info("Starting resmanager")
@@ -257,7 +260,7 @@ func (r *resmanager) Run(stopCh <-chan struct{}) error {
 	return nil
 }
 ```
-以cpu burst 为例
+以cpu burst 为例，找到 需要 burst 的pod，更新其cgroup 配置。
 
 ```go
 func (b *CPUBurst) start() {
@@ -291,7 +294,6 @@ func (b *CPUBurst) applyCPUBurst(burstCfg *slov1alpha1.CPUBurstConfig, podMeta *
 	for i := range pod.Status.ContainerStatuses {
 		containerStat := &pod.Status.ContainerStatuses[i]
 		container, exist := containerMap[containerStat.Name]
-		
 		containerCFSBurstVal := calcStaticCPUBurstVal(container, burstCfg)
 		containerDir, burstPathErr := koordletutil.GetContainerCgroupPathWithKube(podMeta.CgroupDir, containerStat)
 		
@@ -303,7 +305,7 @@ func (b *CPUBurst) applyCPUBurst(burstCfg *slov1alpha1.CPUBurstConfig, podMeta *
 			updated, err := b.executor.UpdateByCache(updater)
 		}
 	} // end for containers
-
+f
 	podDir := koordletutil.GetPodCgroupDirWithKube(podMeta.CgroupDir)
 	if system.ValidateResourceValue(&podCFSBurstVal, podDir, system.CPUBurst) {
 		ownerRef := executor.PodOwnerRef(pod.Namespace, pod.Name)
