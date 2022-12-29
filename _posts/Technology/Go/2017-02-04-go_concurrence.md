@@ -157,7 +157,7 @@ Goroutine修改自己的行为/状态
 2. 如果当前 Goroutine 是互斥锁上的最后一个等待的协程或者等待的时间小于 1ms，当前 Goroutine 会将互斥锁切换回正常模式；
 
 
-**Mutex.Lock 有一个类似jvm 锁膨胀的过程**（go 调度器运行在 用户态，因此实现比java synchronized 关键字更简单），Goroutine 会先自旋、实在不行休眠自己，修改 mutex 的state（int32 是一个bit field，有点类似 jvm object的 mark word）。也有普通/饥饿模式对应aqs 的公平锁和非公平锁机制。
+**Mutex.Lock 有一个类似jvm 锁膨胀的过程**（go 调度器运行在 用户态，因此实现比java synchronized 关键字更简单），Goroutine 会先自旋、实在不行休眠自己，修改 mutex 的state（int32 是一个bit field，有点类似 jvm object的 mark word）。也有普通/饥饿模式对应aqs 的公平锁和非公平锁机制。PS：go mutex 没有引入 os 内核锁
 
 ![](/public/upload/go/go_mutex_bloat.jpg)
 
@@ -174,7 +174,7 @@ func runtime_Semrelease(s *uint32, handoff bool, skipframes int)
 // go/1.19.3/libexec/src/runtime/sema.go
 //go:linkname sync_runtime_Semacquire sync.runtime_Semacquire
 func sync_runtime_Semacquire(addr *uint32) {
-	semacquire1(addr, false, semaBlockProfile, 0)
+	semacquire1(addr, false, semaBlockProfile, 0)	
 }
 //go:linkname sync_runtime_Semrelease sync.runtime_Semrelease
 func sync_runtime_Semrelease(addr *uint32, handoff bool, skipframes int) {
@@ -197,9 +197,11 @@ type semaRoot struct {
 }
 ```
 
-1. 有一个全局的 semtable，持有一个数组，元素是 semaRoot，每一个sema/addr 哈希计算一个 数组位置， 一个位置一个。 PS：数组加链表
+1. 有一个全局的 semtable（runtime层级的变量），持有一个数组，元素是 semaRoot，每一个sema/addr 哈希计算一个 数组位置， 一个位置一个。 PS：数组加链表
 2. 对同一个 mutex 上锁的 g，会阻塞在同一个sema/addr上，这些阻塞在同一个地址上的 **goroutine 会被打包成 sudog**，组成一个链表。用 sudog 的 waitlink 相连。从 semaRoot 的视角(其实就是 lock 的 addr)来看，sudo 链表 是个二叉搜索树。
 3. 类似于 linux 的 socket 和 golang的channel，都会自己持有一个等待队列，存储访问自己时 因“没有数据” 而阻塞的 执行体。golang 中一般将阻塞的 执行体封装为 sudog，进而拼成链表。 sema 看着像一个孤零零的 int32，实际上 等待队列是挂在 全局semtable 上了。
+4. 将goroutine 加入等待队列之后，semacquire1 ==> goparkunlock ==> gopark，变更groutine的状态，让出M
+
 
 [Go精妙的互斥锁设计](https://mp.weixin.qq.com/s/YYvoeDfPMm8Y2kFu9uesGw)
 [sync.Once 的前世今生](https://mp.weixin.qq.com/s/VoBHdLUdFjFDDv24-PggeQ)

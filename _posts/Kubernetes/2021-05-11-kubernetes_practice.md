@@ -50,6 +50,8 @@ keywords:  Kubernetes practice
 
 [使用Kubernetes落地云原生困难重重](https://mp.weixin.qq.com/s/9XEVZcA8jwAEeS0TIaQ3xw)容器技术解决了应用打包和部署自动化问题。微服务架构解决了复杂应用的解耦和治理问题。Kubernetes解决了应用编排和调度自动化问题。**为了实现应用管理自动化**，还有很多云原生相关的技术，像SDN（网络自动化管理）、SDS（存储自动化管理）、Helm（复杂应用交付自动化）、Service Mesh（无侵入扩展服务治理能力）、Monitoring（监控自动化）、Logging（日志自动化）、Tracing（性能分析自动化）、Chaos engineering（容错自动化）、Gateway（网关自动化）、SPIFFE （应用访问安全自动化）等等，这些技术可以跟Kubernetes结合起来使用，解决应用各个运维特征的管理自动化问题。上面这些技术主要围绕着Kubernetes，所以落地过程主要是Kubernetes落地。PS: 不懂Kubernetes实现云原生的体验
 
+[vivo 云原生容器探索和落地实践](https://mp.weixin.qq.com/s/ux5z-EXmlN_2Qie6w9101g) 梳理的很全面。
+
 ## 降本增效/FinOps
 
 [阿里云易立：云原生如何破解企业降本提效难题？](https://mp.weixin.qq.com/s/RohPKC9db1lk5_hqHnUsvg)受访者表示所在企业过去一年在 Kubernetes 环境的计算资源成本有所增加。这背后的原因是什么？我们发现企业目前面临五大难题：

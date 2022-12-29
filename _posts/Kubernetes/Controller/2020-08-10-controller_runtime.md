@@ -322,6 +322,7 @@ watch 在 controller 初始化时调用，明确了 Controller 监听哪些Type�
 start 由manager.Start 触发，消费workqueue，和 一般控制器中启动控制循环比较类似
 
 ```go
+// sigs.k8s.io/controller-runtime/pkg/internal/controller/controller.go
 func (c *Controller) Start(stop <-chan struct{}) error {
 	err := func() error {
         ...

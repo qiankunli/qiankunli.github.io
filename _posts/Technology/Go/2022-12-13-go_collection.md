@@ -61,9 +61,12 @@ func growslice(et *_type, old slice, cap int) slice {...}
 func slicecopy(to, fm slice, width uintptr) int {...}
 func slicestringcopy(to []byte, fm string) int {...}
 ```
-扩容的本质过程：扩容实际上就是重新分配一块更大的内存，将原先的Slice数据拷贝到新的Slice中，然后返回新Slice，扩容后再将数据追加进去。
 
 与java ArrayList相比，slice 本身不提供类似 Add/Set/Remove方法。只有一个builtin 的append和切片功能，因为不提供crud方法，**slice 更多作为一个“受体”**，与数组更近，与“ArrayList”更远。
+
+### 扩容
+
+扩容的本质过程：扩容实际上就是重新分配一块更大的内存，将原先的Slice数据拷贝到新的Slice中，然后返回新Slice，扩容后再将数据追加进去。
 
 ```go
 // $GOROOT/src/builtin/builtin.go
@@ -73,35 +76,16 @@ func slicestringcopy(to []byte, fm string) int {...}
 func append(slice []Type, elems ...Type) []Type
 ```
 
-对于所有的 range 循环，Go 语言都会在编译期将原切片或者数组（下例中的arr）赋值给一个新的变量 ha，在赋值的过程中就发生了拷贝，**所以我们遍历的切片已经不是原始的切片变量（arr）了**。
-
-```go
-func main() {
-	arr := []int{1, 2, 3}
-	for _, v := range arr {
-		arr = append(arr, v)
-	}
-	fmt.Println(arr)
-}
-$ go run main.go
-1 2 3 1 2 3
-```
-
-之前将java 中的代码优化思路用到了 go 上，以为`ss := make([]string, 5)` 就是一个预分配了长度为5 的list，go 中这行代码 不仅分配了长度为5的空间，元素也赋值好了。
-
-```go
-ss := make([]string, 5) 
-ss = append(ss, "abc")
-fmt.Println(len(strs))  // 输出6
-```
+### slice 作为函数参数
 
 在 Go 语言中，数组更多是“退居幕后”，承担的是底层存储空间的角色。**切片之于数组就像是文件描述符之于文件**。也正是因为这一特性，切片才能在函数参数传递时避免较大性能开销。因为我们传递的并不是数组本身，而是数组的“描述符”，而这个描述符的大小是固定的
 
-**Go中slice作为函数参数丢失修改的问题**：根据我们的直觉，向s中append了一个元素1，s应该是`[1, 2, 1]`，实际上，我们对slice的append的操作的确发生了，这里slice的cap不够，需要进行扩容，数组会被搬迁到一个新的位置，函数中s中的array指针也被赋值了，但是main 函数的s.array 还是指向原来的位置。
+**Go中slice作为函数参数丢失修改的问题**：根据我们的直觉，向s中append了一个元素1，s应该是`[1, 2, 1]`，实际上，我们对slice的append的操作的确发生了，这里slice的cap不够，需要进行扩容，数组会被搬迁到一个新的位置，函数中s中的array指针也被赋值了，但是main 函数的s.array 还是指向原来的位置，s.len 也不会变。
 
-```
+```go
 func appendToSlice(s []int) {   // 传参的时候实际上传的是 struct{unsafe.Pointer}
   s = append(s, 1)
+  s[0] = 1024
 }
 func main() {
   s := []int{1,2}
@@ -110,25 +94,9 @@ func main() {
 }
 ```
 
+对于所有的 range 循环，Go 语言都会在编译期将原切片或者数组（下例中的arr）赋值给一个新的变量 ha，在赋值的过程中就发生了拷贝，**所以我们遍历的切片已经不是原始的切片变量（arr）了**。
+
 ## map
-
-```go
-type hmap struct {
-   // map中存入元素的个数， golang中调用len(map)的时候直接返回该字段
-   count     int
-   // 状态标记位，通过与定义的枚举值进行&操作可以判断当前是否处于这种状态
-   flags     uint8
-   B         uint8  // 2^B 表示bucket的数量， B 表示取hash后多少位来做bucket的分组
-   noverflow uint16 // overflow bucket 的数量的近似数
-   hash0     uint32 // hash seed （hash 种子） 一般是一个素数
-
-   buckets    unsafe.Pointer // 共有2^B个 bucket ，但是如果没有元素存入，这个字段可能为nil
-   oldbuckets unsafe.Pointer // 在扩容期间，将旧的bucket数组放在这里， 新buckets会是这个的两倍大
-   nevacuate  uintptr        // 表示已经完成扩容迁移的bucket的指针， 地址小于当前指针的bucket已经迁移完成
-
-   extra *mapextra // optional fields
-}
-```
 
 与常见编程语言的不同之处：
 
@@ -147,6 +115,8 @@ type hmap struct {
 4. map 类型对 value 的类型没有限制，但是**对 key 的类型却有严格要求**，因为 map 类型要保证 key 的唯一性。Go 语言中要求，key 的类型必须支持“==”和“!=”两种比较操作符。PS：类似java 的hashmap key支持equal 和 hashcode
 5. map 实例不是并发写安全的，也不支持并发读写。Go 1.9 版本中引入了支持并发写安全的 sync.Map 类型
 6. 考虑到 map 可以自动扩容，map 中数据元素的 value 位置可能在这一过程中发生变化，所以 Go 不允许获取 map 中 value 的地址，这个约束是在编译期间就生效的。
+7. map 存的是值，put 和 get 操作都是会发生copy的，所以不要放很大的 value。
+8. map delete key后不会自动缩容。
 
 对于slice 来说， index, value 可以视为一个kv
 
@@ -155,7 +125,29 @@ for k,v := range map{}
 for i,v := range slice{}
 ```
 
-map是由 Go **编译器与运行时联合实现的**。Go 编译器在编译阶段会将语法层面的 map 操作，重写为运行时对应的函数调用。语法层面 map 类型变量一一对应的是 runtime.hmap 的实例。
+### 实现
+
+[深度解密 Go 语言之 map](https://qcrao.com/post/dive-into-go-map/) 未读。
+
+map是由 Go **编译器与运行时联合实现的**。Go 编译器在编译阶段会将语法层面的 map 操作，重写为运行时对应的函数调用。语法层面 map 类型变量一一对应的是 runtime.hmap 的实例。`m := make(map[string]string)` 中 m 是一个 `*hmap` 类型，所以map 不用担心像slice 一样当函数参数且扩容后有丢失修改的问题。 
+
+```go
+type hmap struct {
+   // map中存入元素的个数， golang中调用len(map)的时候直接返回该字段
+   count     int
+   // 状态标记位，通过与定义的枚举值进行&操作可以判断当前是否处于这种状态
+   flags     uint8
+   B         uint8  // 2^B 表示bucket的数量， B 表示取hash后多少位来做bucket的分组
+   noverflow uint16 // overflow bucket 的数量的近似数
+   hash0     uint32 // hash seed （hash 种子） 一般是一个素数
+
+   buckets    unsafe.Pointer // 共有2^B个 bucket ，但是如果没有元素存入，这个字段可能为nil
+   oldbuckets unsafe.Pointer // 在扩容期间，将旧的bucket数组放在这里， 新buckets会是这个的两倍大
+   nevacuate  uintptr        // 表示已经完成扩容迁移的bucket的指针， 地址小于当前指针的bucket已经迁移完成
+
+   extra *mapextra // optional fields
+}
+```
 
 ![](/public/upload/go/go_map_structure.png)
 

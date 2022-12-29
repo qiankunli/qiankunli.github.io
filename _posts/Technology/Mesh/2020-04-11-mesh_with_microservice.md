@@ -84,6 +84,9 @@ keywords: mesh microservice
 以支付宝移动网关为例，在过去十年间，网关经历了从单体到微服务，从中心化到去中心化，从共享的 gateway.jar 包到利用 MOSN 实现网关 Mesh 化/ Sidecar 化，最终演变成了（gateway sidecar 与bff sidecar合并，前提：BFF 完全收口外部流量） [K8s 网关选型初判：Nginx 还是 Envoy?](https://mp.weixin.qq.com/s/yy08xJmoFgzIZ2Y2eSjwMw) 未读
 
 ![](/public/upload/mesh/mesh_gateway.png)
+
+[流量路由技术解析](https://mp.weixin.qq.com/s/EiOAvP1e9MS7LFDCvMUF7A) 未细读
+
 ## 部署架构
 
 ## 其它

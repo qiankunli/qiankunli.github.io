@@ -85,13 +85,40 @@ struct nsproxy {
 
 ![](/public/upload/linux/linux_namespace_object.png)
 
+
 ### pid namespace
 
-进程是树结构的，每个namespace 理解的 根不一样，pid root namespace  最终提供完整视图
+[Docker容器里进程的 pid 是如何申请出来的？](https://mp.weixin.qq.com/s/LDu6s1eZw6_xEwfa6pMM-A) 宜细读
 
-![](/public/upload/linux/pid_namespace.png)
+```c
+struct pid_namespace{
+    pidmap  // 是一个 bitmap，一个 bit 如果为 1，就表示当前序号的 pid 已经分配出去了
+    int level   // 默认命名空间的 level 初始化是 0，如果有多个命名空间创建出来，它们之间会组成一棵树。level 表示树在第几层。根节点的 level 是 0。
+}
+```
+在 create_pid_namespace 真正申请了新的 pid 命名空间，为它的 pidmap 申请了内存（在 create_pid_cachep 中申请的），也进行了初始化。另外还有一点比较重要的是新命名空间和旧命名空间通过 parent、level 等字段组成了一棵树。
+
+
+```c
+static struct task_struct *copy_process(...){
+    ...
+    //2.1 拷贝进程的命名空间 nsproxy
+    retval = copy_namespaces(clone_flags, p);
+    //2.2 申请 pid 
+    pid = alloc_pid(p->nsproxy->pid_ns);
+    //2.3 记录 pid 
+    p->pid = pid_nr(pid);
+    p->tgid = p->pid;
+    attach_pid(p, PIDTYPE_PID, pid);
+    ...
+}
+```
+1. 支持namespace 之前，很多数据结构比如pidmap，都是进程全局共享的（或者说就是 全局变量），支持了namespace之后，都变成了 per-namespace的，每个task_struct 都有个ns_proxy 去引用它们。pidmap（或者说包裹它的pid_namespace）自己也组成了树状结构。
+2. 创建进程的核心是在于 copy_process 函数。是先 copy_namespaces，把新的namespace struct 都创建好之后，再从这些数据结构里 走申请 资源（pid号等）逻辑
 
 ### mount namespace
+
+![](/public/upload/linux/pid_namespace.png)
 
 mount 也是有树的，每个namespace 理解的根 不一样, 挂载点目录彼此看不到. task_struct  ==> nsproxy 包括 mnt_namespace。
 

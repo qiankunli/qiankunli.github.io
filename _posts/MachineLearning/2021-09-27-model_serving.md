@@ -192,6 +192,8 @@ spec:
 
 [腾讯邱东洋：深度模型推理加速的术与道](https://mp.weixin.qq.com/s/-PZE3OrOVGldiQ09u2qL4g)未读
 
+[AI推理加速原理解析与工程实践分享](https://mp.weixin.qq.com/s/MPSa-whByMiknN92Kx8Kyw) 未读
+
 [淘宝逛逛ODL模型优化总结](https://mp.weixin.qq.com/s/S4YXhm90kyeS9ZWoPlEjHQ) 模型加速核心离不开裁枝、增加并行度、提升计算效率和缓存的使用。
 
 ### timeline 分析
