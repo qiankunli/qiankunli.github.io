@@ -17,6 +17,8 @@ keywords: ml framework
 
 [从 0 到 1 实现神经网络（Python）](https://mp.weixin.qq.com/s/YDyNr91IveU01oyd0kPNNw) 未读。
 
+[手把手教你如何自己设计实现一个深度学习框架](https://mp.weixin.qq.com/s/0bDyrSjg_VmUgAenNuysqg) 未读
+
 ## 抽象层
 
 ### 组件抽象

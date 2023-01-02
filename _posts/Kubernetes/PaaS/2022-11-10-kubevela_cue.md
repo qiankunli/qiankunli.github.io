@@ -171,6 +171,8 @@ kubevela
 1. component/trait 主要复用 crd 的能力，由ComponentDefinition/TraitDefinition 使用cue 来定义crd 模版，Application controller 负责渲染出 真实crd
 2. workflow 复用http/email/k8s(apply等) 等能力，由 WorkflowStepDefinition 使用cue 来定义对底层provider 能力/函数的调用（provider 函数被封装为taskRunner），executor 从 WorkflowStepDefinition 拿到 provider+op（底层能力标识） “渲染”为taskRunner 并调用执行。
 
+你可以通过 在StepDefinition 中引用cue 官方以及KubeVela内置的包，来使用HTTP 请求、crud 资源、配置日志来源、条件等待、使当前步骤失败等函数，从而通过配置的方式来覆盖你的业务场景，极大提升 Step的可扩展性。 
+
 ### 描述 Component/Trait/Policy等Definition
 
 webservice ComponetDefinition 内容
@@ -356,3 +358,4 @@ template: parameter: {
 ```
 
 ### provider 机制 （未完成）
+

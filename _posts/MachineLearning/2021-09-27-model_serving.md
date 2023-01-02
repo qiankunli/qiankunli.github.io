@@ -90,8 +90,6 @@ Exporting trained model to /tmp/mnist/2
 预估 url `http://localhost:9000/v1/tmp/mnist:predict`
 
 
-
-
 ## 部署实践
 
 AI 模型在线推理服务的弹性，以及服务化运维，与微服务和 Web 应用是比较类似。很多云原生已有技术都可以直接用在在线推理服务上。但是 AI 模型推理依然有很多特殊之处，模型优化方法、流水线服务化、精细化的调度编排、异构运行环境适配等等方面都有专门诉求和处理手段。
@@ -195,6 +193,16 @@ spec:
 [AI推理加速原理解析与工程实践分享](https://mp.weixin.qq.com/s/MPSa-whByMiknN92Kx8Kyw) 未读
 
 [淘宝逛逛ODL模型优化总结](https://mp.weixin.qq.com/s/S4YXhm90kyeS9ZWoPlEjHQ) 模型加速核心离不开裁枝、增加并行度、提升计算效率和缓存的使用。
+
+[字节跳动模型大规模部署实战](https://mp.weixin.qq.com/s/Aya7V8yomSDqLHA2n1zwbQ)
+
+PyTorch/TensorFlow 等框架相对已经解决了模型的训练/推理统一的问题，因此模型计算本身不存在训推一体的问题了。完整的服务通常还存在大量的预处理/后处理等业务逻辑，这类逻辑通常是把各种输入经过加工处理转变为 Tensor，再输入到模型，之后模型的输出 Tensor 再加工成目标格式。核心要解决的问题就是：**预处理和后处理需要提供高性能训推一体的方案**。
+
+![](/public/upload/machine/pre_after_process.jpg)
+
+在深度学习算法开发中，开发者通常使用 Python 进行快速迭代和实验，同时使用 C++ 开发高性能的线上服务，其中正确性校验和服务开发都会成为较重负担！MatxScript（https://github.com/bytedance/matxscript） 是一个 Python 子语言的 AOT 编译器，可以自动化将 Python 翻译成 C++，并提供一键打包发布功能。基于 MATXScript，我们可以训练和推理使用同一套代码，大大降低了模型部署的成本。同时，架构和算法得到了解耦，算法同学完全使用 Python 工作即可，架构同学专注于编译器开发及 Runtime 优化。PS：推广搜一般不需要算法写代码，由平台提供DAG，预处理和后处理 定义了一套dsl（主要用于数据转换），由java引擎执行，训练时 交给spark 执行，推理时由java库执行。
+
+[CPU 推理优化](https://mp.weixin.qq.com/s/LQ6xjHqv0YYDRXtQTB5qPw)  直接使用 TensorFlow 提供的 C++ 接口调用 Session::Run，无法实现多 Session 并发处理 Request，导致单 Session 无法实现 CPU 的有效利用。如果通过多 Instance 方式（多进程），无法共享底层的 Variable，导致大量使用内存，并且每个 Instance 各自加载一遍模型，严重影响资源的使用率和模型加载效率。为了提高 CPU 使用率，也尝试多组 Session Intra/Inter，均会导致 latency升高，服务可用性降低。
 
 ### timeline 分析
 

@@ -106,16 +106,17 @@ spec:
 打造现代化的云原生调度系统，Koordinator 坚持了如下的设计思路：
 
 1. 拥抱 Kubernetes 上游标准，基于 Scheduler-Framework 来构建调度能力，而不是实现一个全新的调度器。构建标准形成共识是困难的，但破坏是容易的，Koordinator 社区与 Kubernetes sig-scheduling 社区相向而行。
-2. **QoS 是系统的一等公民**，与业界大多数调度器更多的关注编排结果（静态）不同，Koordinator **更关注 Pod 运行时质量（QoS）**，因为对于调度系统的用户而言，运行时稳定性是其业务成功的关键。
+2. **QoS 是系统的一等公民**，与业界大多数调度器更多的关注编排结果（静态）不同，Koordinator **更关注 Pod 运行时质量（QoS）**，因为对于调度系统的用户而言，运行时稳定性是其业务成功的关键。主要表现为使用的隔离参数不同，**以Pod Label 的形式声明**。
 3. 状态自闭环，Koordinator 认为调度必须是一个完整的闭环系统，才能满足企业级应用要求。因此，我们在第一个版本就引入了状态反馈回路，节点会根据运行时状态调优容器资源，中心会根据节点运行时状态反馈做调度决策。
     1. 中心调度 + 单机调度联合决策，中心调度看到全局视角，其决策可以找到集群中最适合应用需求的节点，而单机调度可以在节点侧做一定的灵活度，以应对应用突发的流量颠簸。
     2. 调度 + 重调度密切配合，调度解决 Pod 一次性放置的问题，而重调度才是驱动集群资源编排长期保持最优化的关键。Koordinator 将建设面向 SLO 的重调度能力，持续的驱动应用的编排符合预定义的 SLO。
 4. 智能化、简单化，Koordinator 并不是就所有的选择暴露把问题留给客户，而是根据应用特征智能的为用户提供优化配置建议，简化用户使用 Kubernetes 的成本。   
     1. 调度系统不止于解决调度、重调度、弹性伸缩等领域问题，一个完整的调度系统，需要具备**基于历史数据驱动的自我迭代演进的能力**。为工作负载的运行历史状态建立数据仓库，基于这些运行历史的大数据分析，持续的改进应用间在各个维度的的亲和、互斥关系，才能在用户运行时体验、集群资源利用效率同时达到最佳状态。
- 
+
 Koordinator 针对智能化调度的设计思路如下：
-1. 智能资源超卖，**超卖的基本思想是去利用那些已分配但未使用的资源来运行低优先级的任务**。Koordinator 首先解决的是节点资源充分利用的问题，通过分析节点容器的运行状态计算可超卖的资源量，并结合 QoS 的差异化诉求将超卖的资源分配给不同类型的任务，大幅提高集群的资源利用率。 PS：已分配但未使用的资源，对应下图灰色和深蓝色之间的部分。
+1. 优先级：智能资源超卖，**超卖的基本思想是去利用那些已分配但未使用的资源来运行低优先级的任务**。Koordinator 首先解决的是节点资源充分利用的问题，通过分析节点容器的运行状态计算可超卖的资源量，并结合 QoS 的差异化诉求将超卖的资源分配给不同类型的任务，大幅提高集群的资源利用率。资源优先级策略的激进与保守，决定了集群资源的超卖容量，与资源稳定性的高低成反相关，**以k8s PriorityClass声明**，分为Product、Mid、Batch、Free四个等级，表现为 超卖资源从PriorityClass 高的Pod来，用到低的地方去。 PS：已分配但未使用的资源，对应下图灰色和深蓝色之间的部分。
   ![](/public/upload/kubernetes/koordinator_resource_model.jpg)
+2. Priority 和 QoS 是两个正交的维度，可以排列组合使用，部分排列组合不合法。
 2. QoS 感知的重调度，当节点中 Pod 的运行时 QoS 不符合预期时，Koordinator 将智能决策抑制更低优先级的任务亦或是迁移当前受到干扰的容器，从而解决应用 QoS 不满足导致的问题。干扰检测和优化的过程可以分为以下几个过程：
   1. 干扰指标的采集和分析：选取干扰检测使用的指标需要考虑通用性和相关性，并尽量避免引入过多额外的资源开销。
   2. 干扰识别模型及算法：分为横向和纵向两个维度，横向是指分析同一应用中不同容器副本的指标表现，纵向是指分析在时间跨度上的数据表现，识别异常并确定“受害者”和“干扰源”。
@@ -124,9 +125,13 @@ Koordinator 针对智能化调度的设计思路如下：
 
 [Koordinator v0.7: 为任务调度领域注入新活力](https://mp.weixin.qq.com/s/oOjg8j9tDBs5jOm30XjCMA)
 
-QoS 表示应用在节点上运行时得到的物理资源质量，包含了 LSR（Latency-Sensitive Reserved）、LS（Latency-Sensitive）和 BE（Best Effort），保障策略
+QoS 表示应用在节点上运行时得到的物理资源质量，包含了System、LS、BE三类，LS又细分为LSE（Latency-Sensitive Excluded）、LSR（Latency-Sensitive Reserved）、LS（Latency-Sensitive）和 LS（Best Effort），保障策略
 1. CPU 方面，通过内核自研的 Group Identity 机制，针对不同 QoS 等级设置内核调度的优先级，优先保障 LSR/LS 的 cpu 调度，允许抢占 BE 的 CPU 使用，以达到最小化在线应用调度延迟的效果；对于 LS 应用的突发流量，提供了 CPU Burst 策略以规避非预期的 CPU 限流。
 2. 内存方面，由于容器 cgroup 级别的直接内存回收会带来一定延时，LS 应用普遍开启了容器内存异步回收能力，规避同步回收带来的响应延迟抖动。除此之外，针对末级缓存（Last-Level Cache，LLC）这种共享资源，为了避免大数据等 BE 应用大量刷 Cache 导致 LS/LSR 应用的 Cache Miss Rate 异常增大，降低流水线执行效率，引入了 RDT 技术来限制 BE 应用可分配的 Cache 比例，缩小其争抢范围。
+
+![](/public/upload/kubernetes/koordinator_qos.jpg)
+
+Koordinator 将各优先级资源以标准的extend-resource 形式更新到Node信息中。
 
 [阿里云容器服务差异化 SLO 混部技术实践](https://mp.weixin.qq.com/s/fkX_lStva96HEbmPbR6iZw)
 1. CPU 资源质量
@@ -139,7 +144,6 @@ QoS 表示应用在节点上运行时得到的物理资源质量，包含了 LSR
     1. 时延敏感型业务（LS）和资源消耗型（BE）任务共同部署时，资源消耗型任务时常会瞬间申请大量的内存，使得系统的空闲内存触及全局最低水位线（global wmark_min），引发系统所有任务进入直接内存回收的慢速路径，进而导致延敏感型业务的性能抖动。
     2. 后台异步回收，当容器内存使用超过 memory.wmark_ratio 时，内核将自动启用异步内存回收机制，提前于直接内存回收，改善服务的运行质量。
 
-![](/public/upload/kubernetes/koordinator_qos.jpg)
 
 ## 源码分析
 
@@ -147,10 +151,10 @@ QoS 表示应用在节点上运行时得到的物理资源质量，包含了 LSR
 koordinator
   /cmd
     /koord-descheduler   
-    /koord-manager       
+    /koord-manager       #  中心管控
     /koord-runtime-proxy #  充当 Kubelet 和 Containerd 之间的代理，它用于拦截 CRI 请求，并应用一些资源管理策略， 如混合工作负载编排场景下按实例优先级设置不同的 cgroup 参数，针对最新的 Linux 内核、CPU 架构应用新的隔离策略等。
     /koord-scheduler     
-    /koordlet
+    /koordlet     
   /pkg
 ```
 
@@ -182,7 +186,25 @@ koordinator
   ``` 
 2. 各个plugin 代码按需求分开看即可，后续的有 看到感兴趣的技术点持续补充
 
+
+```yaml
+apiVersion: v1
+kind: Node
+metadata:
+  name: node-1
+status:
+  allocatable:
+    cpu: 64
+    memory: 256Gi
+    kubernetes.io/batch-cpu: "500"    # 节点可以超卖的资源总量
+    kubernetes.io/batch-memory: 50Gi   
+```
+
 ### koordlet
+
+1. 细粒度的容器指标采集，包括资源消耗、容器进程性能等
+2. 面向不同QoS等级Pod的干扰检测和调节策略能力
+3. 提供一系列的Runtime Proxy 插件，支持精细化的QoS 参数注入
 
 ![](/public/upload/kubernetes/koordlet_overview.jpg)
 

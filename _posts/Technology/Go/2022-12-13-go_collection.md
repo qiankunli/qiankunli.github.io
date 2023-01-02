@@ -43,7 +43,6 @@ fmt.Println(&myarr)
 
 ## slice
 
-![](/public/upload/go/slice.png)
 
 切片与数组的关系非常密切，切片引入了一个**抽象层**，提供了对数组中部分片段的引用，我们可以在运行区间可以修改它的长度，如果底层的数组长度不足就会触发扩容机制，切片中的数组就会发生变化，不过在上层看来切片是没有变化的，上层只需要与切片打交道不需要关心底层的数组变化。
 
@@ -54,13 +53,19 @@ type slice struct {
 	len   int                   // 可以用下标访问的元素个数
 	cap   int                   // 底层数组长度
 }
+```
+![](/public/upload/go/slice.png)
+
+```
 func makeslice(et *_type, len, cap int) unsafe.Pointer {...}
 func makeslice64(et *_type, len64, cap64 int64) unsafe.Pointer {...}
 // growslice handles slice growth during append.It is passed the slice element type, the old slice, and the desired new minimum capacity,and it returns a new slice with at least that capacity, with the old data copied into it.
 func growslice(et *_type, old slice, cap int) slice {...}
 func slicecopy(to, fm slice, width uintptr) int {...}
 func slicestringcopy(to []byte, fm string) int {...}
+
 ```
+`s2 := s1[2:4]` （slice 截取） s1 和s2 共用底层数组。
 
 与java ArrayList相比，slice 本身不提供类似 Add/Set/Remove方法。只有一个builtin 的append和切片功能，因为不提供crud方法，**slice 更多作为一个“受体”**，与数组更近，与“ArrayList”更远。
 
@@ -171,7 +176,7 @@ type hmap struct {
     2. key 和 value 分开存储，而不是采用一个 kv 接着一个 kv 的 kv 紧邻方式存储，这带来的其实是算法上的复杂性，但却减少了因内存对齐带来的内存浪费。例如，有这样一个类型的 map：`map[int64]int8`，如果按照 `key/value/key/value/...` 这样的模式存储，那在每一个 key/value 对之后都要额外 padding 7 个字节；而将所有的 key，value 分别绑定到一起，这种形式 `key/key/.../value/value/...`，则只需要在最后添加 padding。
     3. 当我们声明一个 map 类型变量，比如 `var m map[string]int` 时，Go 运行时就会为这个变量对应的特定 map 类型，生成一个 runtime.maptype 实例。 存储key value 类型及类型大小等信息，用以辅助 key value 的定位
 3. 如果 key 或 value 的数据长度大于一定数值，那么运行时不会在 bucket 中直接存储数据，而是会存储 key 或 value 数据的指针。
-4. 对于新老bucket，扩容时 真正的排空和迁移工作是在 assign 和 delete 时逐步进行的。
+4. 对于新老bucket，扩容时 真正的排空和迁移工作是在 assign 和 delete 时逐步进行的。在rehash的过程中，oldbuckets到newbuckets是值拷贝，这样开销会比较大。
 
 [Golang 中 map 探究](https://mp.weixin.qq.com/s/UT8tydajjOUJkfc-Brcblw)
 

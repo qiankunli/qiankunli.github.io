@@ -160,6 +160,14 @@ emb = tf.feature_column.input_layer(ids, [W])
 
 **总结一下涉及到哪些问题**： 稀疏参数的表示（开始由Variable 表示 ，各种框架提供EmbeddingVariable 表示）、存储(ps，底层是分布式hashmap)、通信（只通信部分，数据存在gpu + gpu 直接通信）、优化（稀疏参数的优化器与稠密参数的优化器不兼容） 和 稀疏参数的梯度的表示、通信（由IndexedSlices 表示）、优化
 
+[TensorFlow 原生 Embedding Layer 存在以下问题](https://mp.weixin.qq.com/s/LQ6xjHqv0YYDRXtQTB5qPw)
+1. 静态 Embedding OOV 问题。在构建 Embedding Layer 的时候，TensorFlow 需要首先构建一个静态 shape[Vocab_size, Embedding size ] 的 Variable，然后利用 Lookup 的算子将特征值的 Embedding 向量查询出。在增量或者流式训练中，会出现 OOV 的问题。
+2. 静态 Embedding hash 特征冲突。为了规避上述的 OOV 问题，通常做法是将特征值 hash 到一定的范围，但是又会引入 hash 冲突的问题，导致不同的特征值共用同一个 Embedding，会造成信息丢失，对模型训练是有损的。
+3. 静态 Embedding 内存浪费。为了缓解 hash 冲突，通常会设置比真实的特征值个数 N 大一到两倍的 hash 范围，而这又会强行地增加模型的体积。
+4. 低频特征冗余。在引入稀疏特征时，出现频次较低以及许久未出现的特征 ID 对于模型而言是冗余的。此外，交叉特征占据了大量的存储，可以在不影响训练效果的前提下过滤掉这些特征 ID。因此，迫切需求特征淘汰以及准入机制。
+
+![](/public/upload/machine/tensorflow_embedding.jpg)
+
 ## 嵌入层的优化
 
 DL 推荐模型的嵌入层是比较特殊的：它们为模型贡献了大量参数，但几乎不需要计算，而计算密集型denser layers的参数数量则要少得多。所以对于推荐系统，嵌入层的优化十分重要。
