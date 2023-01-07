@@ -112,7 +112,7 @@ systemd 收集器的数据，比如node_systemd_unit_state， 包括标签name �
 
 元数据风格的 指标，许多现有的exporter 使用“元数据”模式来提供额外的状态信息，比如cadvisor_version_info，包含标签 cadvisorRevision/dockerVersion/instance/job/kernelVersion/osVersion
 
-不只是node-exporter，mysql-exporter 等也有很多的收集器可选
+不只是node-exporter，mysql-exporter 等也有很多的收集器可选。[如何使用 Prometheus 监控 MySQL](https://mp.weixin.qq.com/s/9IEwcYKUy4DeDg6E2hVLTw)
 
 ## 可靠性与可扩展性
 

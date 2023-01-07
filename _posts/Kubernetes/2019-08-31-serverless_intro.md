@@ -249,6 +249,8 @@ FaaS 与应用托管 PaaS（**应用托管平台**） 平台对比，**最大的
 
 [Serverless 背后核心的技术——microVMM](https://mp.weixin.qq.com/s/YgbosbOGJs7L46VCNEHd0Q)
 
+其它：实例基于 kata container 运行时设计，每个实例对应一个VM，在每个VM 内都会有个 kata agent，用于执行容器的启停、监控指标手机等动作。kata containers 可以使用普通的容器镜像以MicroVM 的形式创建容器，有更好的隔离性和安全性，精简了guest kernel 和 hypervisor，有快速启动和部署的优点。
+
 ## 其它
 
 Serverless 架构和之前的架构相比，最大的差异是：业务服务不再是固定的常驻进程，而是真正按需启动和关闭的服务实例。

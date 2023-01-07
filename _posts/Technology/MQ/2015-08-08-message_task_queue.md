@@ -41,7 +41,7 @@ keywords: 消息队列 rabbitmq kafka
 [案例分析（三）：高性能队列Disruptor](https://time.geekbang.org/column/article/98134)
 
 
-2. ArrayBlockingQueue 使用数组作为底层的数据存储，Disruptor 是使用 RingBuffer 作为数据存储。RingBuffer 本质上也是数组，仅仅将数据存储从数组换成 RingBuffer 并不能提升性能。生产者线程向 ArrayBlockingQueue 增加一个元素，每次增加元素 E 之前，都需要创建一个对象 E，如下图所示，ArrayBlockingQueue 内部有 6 个元素，这 6 个元素都是由生产者线程创建的，由于创建这些元素的时间基本上是离散的，所以这些元素的内存地址大概率也不是连续的。RingBuffer 这个数组中的所有元素在**初始化时是一次性全部创建的**，所以这些元素的内存地址大概率是连续的。生产者线程通过 `publishEvent()` 发布 Event 的时候，并不是创建一个新的 Event，而是通过 event.set() 方法修改 Event， 也就是说 RingBuffer 创建的 Event 是可以循环利用的，这样还能避免频繁创建、删除 Event 导致的频繁 GC 问题。
+2. ArrayBlockingQueue 使用数组作为底层的数据存储，Disruptor 是使用 RingBuffer 作为数据存储。RingBuffer 本质上也是数组，仅仅将数据存储从数组换成 RingBuffer 并不能提升性能。生产者线程向 ArrayBlockingQueue 增加一个元素，每次增加元素 E 之前，都需要创建一个对象 E，如下图所示，ArrayBlockingQueue 内部有 6 个元素，这 6 个元素都是由生产者线程创建的，由于创建这些元素的时间基本上是离散的，所以这些元素的内存地址大概率也不是连续的。RingBuffer 这个数组中的所有元素在**初始化时是一次性全部创建的**，所以这些元素的内存地址大概率是连续的。生产者线程通过 `publishEvent()` 发布 Event 的时候，并不是创建一个新的 Event，而是通过 `event.set()` 方法修改 Event， 也就是说 RingBuffer 创建的 Event 是可以循环利用的，这样还能避免频繁创建、删除 Event 导致的频繁 GC 问题。
 3. 解决伪共享。对于 ArrayBlockingQueue，当 CPU 从内存中加载 takeIndex 的时候，会同时将 putIndex 以及 count 都加载进 Cache。假设线程 A 运行在 CPU-1 上，执行入队操作，入队操作会修改 putIndex，而修改 putIndex 会导致其所在的所有核上的缓存行均失效；此时假设运行在 CPU-2 上的线程执行出队操作，出队操作需要读取 takeIndex，由于 takeIndex 所在的缓存行已经失效，所以 CPU-2 必须从内存中重新读取。入队操作本不会修改 takeIndex，但是由于 takeIndex 和 putIndex 共享的是一个缓存行，就导致出队操作不能很好地利用 Cache，这其实就是伪共享。简单来讲，伪共享指的是由于共享缓存行导致缓存无效的场景。如何避免伪共享呢？缓存行填充。每个变量独占一个缓存行、不共享缓存行就可以了。
 
     ```java
@@ -71,8 +71,6 @@ keywords: 消息队列 rabbitmq kafka
 
 	* 环形数组（ring buffer），这里环形不是首位相顾，数组通过下标访问，Disruptor的“下标”会一直递增，通过“下标%数组长度”得到实际的数组index。数组长度2^n
 	* 假设ring buffer长度为length，则还有一个length bit的数组available buffer，用于标记ring buffer 对应下标的元素是否被生产者占用。意图就是，java内置队列加锁，同一时刻数组只能被一个线程访问。而ring buffer允许多个线程同时访问，通过检查 available buffer是否被其他线程捷足先登（**通过新增数据结构，来感知竞争激烈程度**），然后重试。**将加锁  改为 探测-重试**
-
-
 
 ## 消息队列中间件
 

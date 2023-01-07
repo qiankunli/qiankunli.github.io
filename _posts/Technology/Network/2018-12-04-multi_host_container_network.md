@@ -163,7 +163,7 @@ Flannel 支持三种后端实现，分别是： VXLAN；host-gw； UDP。而 UDP
 |calico + Node-to-Node Mesh |宿主机|bgp 更新路由 |宿主机二层连通|
 |calico + 网关bgp |网关|bgp 更新路由 |宿主机三层连通|
 
-1. flannel + udp/flannel + vxlan（tcp数据包），udp 和tcp 数据包首部大致相同
+1. flannel + udp/flannel + vxlan（tcp数据包），udp 和tcp 数据包首部大致相同 [从 Flannel 学习 Kubernetes overlay 网络](https://mp.weixin.qq.com/s/1NsdEUdxv5l7Mr4kKemQOw)
 
 
 	<table>

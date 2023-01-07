@@ -85,6 +85,13 @@ Saved profile in /Users/tonybai/pprof/pprof.server.samples.cpu.004.pb.gz
 Serving web UI on http://localhost:9090
 ```
 
+## 性能优化流程
+
+1. 理清待优化代码的常用逻辑与场景
+2. 根据实际场景编写压测用例
+3. 使用pprof 或者火焰图等工具取得数据
+4. 找到热点代码重点优化
+
 ## 其它
 
 Linux perf 使用 PMU（Performance Monitor Unit）计数器进行采样。你指示 PMU 在某些事件发生 N 次后产生一个中断。一个例子，可能是每 1000 个 CPU 时钟周期进行一次采样。一旦数据收集回调被定期触发，剩下的就是收集堆栈痕迹并适当地汇总。Linux perf 使用 `perf_event_open(PERF_SAMPLE_STACK_USER,...)` 来获取堆栈追踪信息。捕获的堆栈痕迹通过 mmap'd 环形缓冲区写到用户空间。

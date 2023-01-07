@@ -13,6 +13,7 @@ keywords: mysql innodb
 * TOC
 {:toc}
 
+
 《mysql技术内幕》 主要讲存储引擎部分。
 
 ![](/public/upload/storage/run_sql.png)

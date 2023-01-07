@@ -17,35 +17,7 @@ Go 对并发的原生支持可不是仅仅停留在口号上的，Go 在语法�
 
 [通信原语](https://golang.design/under-the-hood/zh-cn/part1basic/ch03lang/chan/)Go 语言中 Channel 与 Select 语句受到 1978 年 CSP 原始理论的启发。 语言设计中，Goroutine 就是 CSP 理论中的并发实体， 而 Channel 则对应 CSP 中输入输出指令的消息信道，**Select 语句则是 CSP 中守卫和选择指令的组合**。Channel 与 Select 是 Go 语言中提供的**语言级的**、基于消息传递的同步原语。
 
-## 背景知识
-
-在 g 对象中，有一个名字为 waiting 的 sudog* 指针，它表示这个 goroutine 正在等待什么东西或者正在等待哪些东西。sudog 是一个链表形式的类型，waitlink 表示它的下一个节点。
-
-```go
-type g struct {
-  // ...
-  atomicstatus   uint32  // 表示 goroutine 的状态
-  param          unsafe.Pointer // 唤醒时参数
-  waiting        *sudog // 等待队列，goroutine ready之前，会waiting做一些检查，waiting不为空是不能运行的。
-  // ...
-}
-// sudog is necessary because the g ↔ synchronization object relation is many-to-many. 
-type sudog struct {
-	// ....
-	isSelect bool
-	elem     unsafe.Pointer // data element (may point to stack)      
-	waitlink    *sudog // g.waiting list or semaRoot
-	c           *hchan // channel
-	g 			*g
-}
-// sudogs are allocated from a special pool. Use acquireSudog and releaseSudog to allocate and free them.
-func acquireSudog() *sudog {}
-func releaseSudog(s *sudog) {}
-```
-
-1. gopark 将当前的 goroutine 修改成等待状态，然后等待被唤醒。
-2. goready 函数用来唤醒一个 goroutine，它将 goroutine 的状态修改为可运行状态，随后会被调度器运行。
-3. 当被调度时，对应的 gopark 函数返回。
+[深度解密 Go 语言之 channel](https://qcrao.com/post/dive-into-go-channel/) 未读。
 
 ## channel
 
@@ -241,6 +213,7 @@ func fibonacci(c, quit chan int) {
             return
         default:
 		    println("default")
+			break   // select 中的break 只对select 有效，实际上根本无用，无法跳出for 循环
 		}
 	}
 }
@@ -347,6 +320,39 @@ func selectgo(cas0 *scase, order0 *uint16, ncases int) (int, bool){
 	// 说明被某个 channel 唤醒了
 }
 ```
+
+
+## 背景知识——sudog
+
+在 g 对象中，有一个名字为 waiting 的 sudog* 指针，它表示这个 goroutine 正在等待什么东西或者正在等待哪些东西。sudog 是一个链表形式的类型，waitlink 表示它的下一个节点。
+
+```go
+type g struct {
+  // ...
+  atomicstatus   uint32  // 表示 goroutine 的状态
+  param          unsafe.Pointer // 唤醒时参数
+  waiting        *sudog // 等待队列，goroutine ready之前，会waiting做一些检查，waiting不为空是不能运行的。
+  // ...
+}
+// sudog is necessary because the g ↔ synchronization object relation is many-to-many. 
+type sudog struct {
+	// ....
+	isSelect bool
+	elem     unsafe.Pointer // data element (may point to stack)      
+	waitlink    *sudog // g.waiting list or semaRoot
+	c           *hchan // channel
+	g 			*g
+}
+// sudogs are allocated from a special pool. Use acquireSudog and releaseSudog to allocate and free them.
+func acquireSudog() *sudog {}
+func releaseSudog(s *sudog) {}
+```
+
+1. gopark 将当前的 goroutine 修改成等待状态，然后等待被唤醒。
+2. goready 函数用来唤醒一个 goroutine，它将 goroutine 的状态修改为可运行状态，随后会被调度器运行。
+3. 当被调度时，对应的 gopark 函数返回。
+
+
 ## 应用
 
 ![](/public/upload/go/channel_state.png)

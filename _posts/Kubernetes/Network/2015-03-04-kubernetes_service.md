@@ -214,6 +214,8 @@ Ingress和Pod、Servce等等类似，被定义为kubernetes的一种资源。本
 
 ### Ingress Controller 部署和实现
 
+[从 Nginx Ingress 窥探云原生网关选型](https://mp.weixin.qq.com/s/-M_8zq9egbepd_Mm2-XzCg) 值得细读。
+
 部署 Nginx Ingress Controller [Installation with Manifests](https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-manifests/#deploy-the-ingress-controller)  简单安装可以使用 helm [Installation with Helm](https://docs.nginx.com/nginx-ingress-controller/installation/installation-with-helm/) 注意处理下google 的镜像源问题。nginx ingress 会安装一个 Deployment：ingress-nginx-controller  在 ingress-nginx namespace 下（helm 安装的好像不是 这个namespace），这个 Pod 本身就是一个监听 Ingress 对象以及它所代理的后端 Service 变化的控制器。
 
 当一个新的 Ingress 对象由用户创建后，nginx-ingress-controller 就会根据Ingress 对象里定义的内容，生成一份对应的 Nginx 配置文件（`/etc/nginx/nginx.conf`），并使用这个配置文件启动一个 Nginx 服务。而一旦 Ingress 对象被更新，nginx-ingress-controller 就会更新这个配置文件。如果这里只是被代理的 Service 对象被更新，nginx-ingress-controller 所管理的 Nginx 服务是不需要重新加载（reload）的，因为其通过Nginx Lua方案实现了 Nginx Upstream 的动态配置。

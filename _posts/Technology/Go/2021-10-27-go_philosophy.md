@@ -116,7 +116,7 @@ Go 的类型系统不太常见，而且非常简单。内建类型包括结构�
 1. Go 不定义类，但允许将方法绑定到任何类型，包括结构、数组、slice、map 甚至是整数等基本类型。它没有类型的层次结构；我们认为继承往往会使程序在成长过程中更难适应。相反，Go 鼓励类型的组合。Go 通过其接口类型提供了面向对象的多态性。
 2. 避免接口和实现之间的显式关联允许 Go 程序员定义小的、灵活的、通常是 ad hoc 接口，而不是将它们用作复杂类型层次结构中的基础块。它鼓励在开发过程中捕获关系和操作，而不需要提前计划和定义它们。这尤其有助于大型程序，在这些程序中，**刚开始开发时，最终的结构更加难以看清**。无需声明实现的方式鼓励使用精确的、一种或两种方法的接口，例如 Writer、Reader、Stringer（类似于 Java 的 toString 方法）等，这些接口遍布标准库。PS： 写代码的时候，觉得A这里可能会扩展，就定一个interface 先用着（可能只有一个方法），觉得BC需要扩展也类似，后续实现上，如果ABC 可以联动，就定义一个struct 实现ABC，也可以定义一个struct 实现A，另一个struct 实现BC。**一段程序确定的逻辑写成代码，不确定的逻辑留出interface**，自由实现和扩展。从这个视角看，interface 是扩展的手段，而不是在设计阶段就充分使用。
 
-还有一种 先定义具体实现，后定义扩展的情况，比如k8s生态里，Pod 等core object 绝对是先出的，controller-runtime 是后出的，但因为 Pod 实现了 metav1.Object 和 runtime.Object，Pod 也就实现了 controller-runtime Object，controller-runtime 就可以拿着Object 去指代 任意k8s 对象了。
+还有一种 先定义具体实现，后定义扩展的情况，比如k8s生态里，Pod 等core object 绝对是先出的，controller-runtime 是后出的，但因为 Pod 实现了 metav1.Object 和 runtime.Object，Pod 也就实现了 controller-runtime Object，controller-runtime 就可以拿着Object 去指代 任意k8s 对象了。PS：或者说，在go里，一般由调用方定义接口（只有调用方知道使用什么方法，**interface 按调用方需要定义**），定义方（被调用方）提供struct 实现。比如标准库中 net/http/fs.go 中需要使用文件系统，定义了File 和 FileSystem 两个interface，os包只有File struct（os包没有提供 File 和 FileSystem interface）
 
 ```go
 // controller-runtime/pkg/client/object.go
