@@ -111,6 +111,18 @@ pod的生命周期 [Pod Lifecycle](https://kubernetes.io/docs/concepts/workloads
 
 ![](/public/upload/kubernetes/pod_exception.png)
 
+[What the heck are Conditions in Kubernetes controllers?](https://maelvls.dev/kubernetes-conditions/) 值得细读。
+1. The conditions array is a set of types (Ready, PodScheduled…) with a status (True, False or Unknown) that make up the ‘computed state’ of a Pod at any time.  the ‘conditions’ array is considered to be containing all the ‘ground truth’. **The ‘phase’ just an abstraction of these conditions**.
+2. Although conditions are a good way to convey information to the user, they also serve as a way of communicating between components (e.g., between kube-scheduler and apiserver) but also to external components (e.g. a custom controller that wants to trigger something as soon as a pod becomes ‘Unschedulable’, and maybe order more VMs to the cloud provider and add it as a node.
+3. The status of a Pod is not updated by a single Sync loop: it is updated by multiple components: the kubelet, and the kube-scheduler. Here is a list of the condition types per component:
+	|Possible condition types for a Pod|	Component that updates this condition type|
+	|---|---|
+	|PodScheduled|	scheduleOne (kube-scheduler)|
+	|Unschedulable|	scheduleOne (kube-scheduler)|
+	|Initialized|	syncPod (kubelet)|
+	|ContainersReady|	syncPod (kubelet)|
+	|Ready|	syncPod (kubelet)|
+
 ### 容器状态及其它状态
 
 restartPolicy 和 Pod 里容器的状态，以及Pod 状态的对应关系（最终体现在`kube get pod pod_name` 时 status 的状态） [有一系列复杂的情况](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#example-states) ，可以概括为两条基本原则：

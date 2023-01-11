@@ -163,6 +163,10 @@ Crane 提供了 Request 推荐、副本数推荐、HPA 推荐以及 EPA 等业�
 
 ### 字节
 
+[字节跳动大规模K8s集群管理实践](https://mp.weixin.qq.com/s/P3-CrOVSSaVAT5tH9m06EA)  值得细读。单集群支持运行各种负载，上面联邦层管理，最上面给用户一个paas平台，资源可以在集群范围内腾挪。每个任务出费用单；下调某类、部门的资源用量 腾挪给突发活动等。基本上理清了一个公司 paas 的终态。
+
+![](/public/upload/kubernetes/bd_k8s.jpg)
+
 [后 Hadoop 时代，字节跳动如何打造云原生计算平台](https://mp.weixin.qq.com/s/T9XhiU1rhdP7pVYe9QBkUA)调度系统融合后，在 Kubernetes 集群的基础上增加三个组件：
 1. Yodel：模拟实现 YARN 的 ResourceManager，支持 YARN API 及其 AM 管理、Quota 管理、权限管理等功能。
 2. Unified Scheduler：高性能调度器，取代 Kubernetes 原生调度器，提供了强大的多租户资源隔离能力，以及更丰富的调度策略。

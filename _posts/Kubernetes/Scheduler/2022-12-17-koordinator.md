@@ -157,6 +157,8 @@ QoS 表示应用在节点上运行时得到的物理资源质量，包含了Syst
 1. CPICollector：用于控制 CPI 指标采集器。CPI：Cycles Per Instruction。指令在计算机中执行所需要的平均时钟周期数。CPI 采集器基于 Cycles 和 Instructions 这两个 Kernel PMU（Performance Monitoring Unit）事件以及 perf_event_open(2) 系统调用实现。
 2. PSICollector：用于控制 PSI 指标采集器。PSI：Pressure Stall Information。表示容器在采集时间间隔内，因为等待 cpu、内存、IO 资源分配而阻塞的任务数。使用 PSI 采集器前，需要在 Anolis OS 中开启 PSI 功能，您可以参考文档获取开启方法。
 
+腾讯云：存量 Pod 在节点上也有可能发生高负载，这时我们在节点上部署 Pod-Problem-Detecor、NodeProblem-Detecor，检测出哪个 Pod 会导致节点高负载，哪些 Pod 属于敏感 Pod，通过事件上报告诉API Server，让调度器将异常 Pod、敏感 Pod 重新调度到空闲节点。
+
 ## 源码分析
 
 ```

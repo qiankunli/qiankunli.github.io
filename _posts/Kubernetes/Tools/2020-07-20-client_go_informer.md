@@ -459,7 +459,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 
 从上面对 Delta FIFO 的队列处理源码可看出，如果是从 Resync 重新同步到 Delta FIFO 队列的事件，会分发到 updateNotification 中触发 onUpdate 的回调。
 
-
+腾讯云：K8s 的 Controller 里有定时历史对账机制，会将所有的 Pod 对象全部入队列。我们需要将实时和定时的事件分开，这样既能够解决定时对账，又能解决实时处理需求。这里面有一个细节问题，两个不同队列可能在同一个时刻会有同一个事件要处理，这就需要相互感知的能力避免这种情况发生。
 
 
 ## 其他

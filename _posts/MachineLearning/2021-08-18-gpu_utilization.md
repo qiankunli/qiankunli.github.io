@@ -13,6 +13,8 @@ keywords:  gpu
 {:toc}
 
 
+
+
 ## gpu 共享
 
 2. 支持共享gpu，按卡和按显存调度共存（主要针对推理和开发集群）。通过共享gpu 的方式提高资源利用率，将多应用容器部署在一张 GPU 卡上。 Kubernetes对于GPU这类扩展资源的定义仅仅支持整数粒度的加加减减， it's impossible for a user to ask for 0.5 GPU in a Kubernetes cluster。需要支持 以显存为调度标尺，按显存和按卡调度的方式可以在集群内并存，但是同一个节点内是互斥的，不支持二者并存；要么是按卡数目，要么是按显存分配。可以使用 [Volcano GPU共享特性设计和使用](https://mp.weixin.qq.com/s/byVNvnm_NiMuwiRwxZ_gpA) 和 [AliyunContainerService/gpushare-scheduler-extender](https://github.com/AliyunContainerService/gpushare-scheduler-extender) 等开源实现
@@ -79,6 +81,13 @@ GPU计算单元类似于CPU中的核，用来进行数值计算。衡量计算�
 1*2+3                  1 flop
 1*2 + 3*4 + 4*5        3 flop
 ```
+
+[AI推理加速原理解析与工程实践分享](https://mp.weixin.qq.com/s/MPSa-whByMiknN92Kx8Kyw)从硬件上看，GPU 的强大算力来源于多 SM 处理器，每个 SM 中包含多个 ALU 计算单元和专有的 Tensor Core 处理单元。对 GPU 来说，当所有 SM 上的所有计算单元都在进行计算时，我们认为其算力得到了充分的发挥。GPU 无法自己独立工作，其工作任务还是由 CPU 进行触发的。
+整体的工作流程可以看做是 CPU 将需要执行的计算任务异步的交给 GPU，GPU 拿到任务后，会将 Kernel 调度到相应的 SM 上，而 SM 内部的线程则会按照任务的描述进行执行。当 CPU 不发起新的任务时，则 GPU 的处理单元就处在空闲状态。
+
+通过这两个层面的分析，我们知道要想将 GPU 的算力充分发挥，其核心就是保持GPU 上有任务，同时对单个 GPU 计算任务，使其可以尽量充分的用好 SM 处理器。针对这两个层面的使用情况，NVIDIA 提供了相应的牵引指标 GPU 利用率和 SM 利用率：
+1. GPU 利用率被定义为在采样间隔内，GPU 上有任务在执行的时间。
+2. SM 利用率则被定义为在采样间隔内，每个 SM 有 warp 活跃时间的平均值。
 
 ### 显存
 

@@ -153,6 +153,7 @@ vendor属性就是让go编译时，优先从项目源码树根目录下的vendor
 
 [一文读懂Go Modules原理](https://mp.weixin.qq.com/s/FhUty8prexpxggXkkumDdw)
 [手把手教你如何创建及使用Go module](https://mp.weixin.qq.com/s/JpE5aIl2Lu0T1mEwksKw_Q)
+[Go Modules 依赖管理，这篇总结的挺全](https://mp.weixin.qq.com/s/7HGJaHaBjStKuVxecNi-QA)
 
 ### 版本
 
@@ -200,6 +201,7 @@ go.mod
 [这一次，彻底掌握go mod](https://mp.weixin.qq.com/s/e4yGVxN8-NocIdguCrpTBA)
 1. replace 只在 main module 里面有效。什么叫 main module? 打个比方，项目 A 的 module 用 replace 替换了本地文件，那么当项目 B 引用项目 A 后，项目 A 的 replace 会失效，此时对 replace 而言，项目 A 就是 main module。因为对于包进行替换后，通常不能保证兼容性，对于一些使用了这个包的第三方module来说可能意味着潜在的缺陷
 2. replace 指定中需要替换的包及其版本号必须出现在 require 列表中才有效。replace命令只能管理顶层依赖（无法管理间接依赖）
+3. 假如存在 `replace golang.org/x/text => github.com/golang/text`，代码 import 的还是`golang.org/x/text`。
 
 ```
 replace (
