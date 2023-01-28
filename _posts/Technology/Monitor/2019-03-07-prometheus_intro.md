@@ -296,7 +296,9 @@ groups:
 
 ### 长期存储
 
-[Prometheus 数据存储那些事儿](https://mp.weixin.qq.com/s/wk9OZu4zAbLm1F6YSO87LQ) 讲了Prometheus本身的磁盘存储原理。 
+[Prometheus 数据存储那些事儿](https://mp.weixin.qq.com/s/wk9OZu4zAbLm1F6YSO87LQ) 讲了Prometheus本身的磁盘存储原理。
+
+[Prometheus 存储引擎原理分析](https://mp.weixin.qq.com/s/pvQCpYTBbaERlZjkuKoDOQ)
 
 [一文读懂 Prometheus 长期存储主流方案](https://mp.weixin.qq.com/s/uGvcxwvC_QDkFKU-Bcxgww) 
 1. VictoriaMetrics可以作为Prometheus的长期远程存储方案，当然VictoriaMetrics也可以完全取代Prometheus，因为VictoriaMetrics基本支持Prometheus配置文件、PromQL、各类API、数据格式等等。

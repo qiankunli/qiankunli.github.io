@@ -178,6 +178,8 @@ kubebuilder 生成的 controller-runtime 代码相对晦涩一些，很多时候
 ```go
 func main() {
 	...
+	// manager -> controller -> reconciler 的对象层级结构
+	// 主体分为两部分，一是配置manager，二是启动manager
     // 1. init Manager 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,		// 要将你监听的crd 加入到scheme 中
@@ -225,6 +227,71 @@ func New(name string, mgr manager.Manager, options Options) (Controller, error) 
 }
 ```
 
+## Manager 启动
+
+[controller-runtime 之 manager 实现](https://mp.weixin.qq.com/s/3i3t-PBP3UN8W9quEhAQDQ)
+Manager interface 充分体现了它的作用：添加Controller 并Start 它们。 
+
+![](/public/upload/kubernetes/manager_controller.png)
+
+manager中可以设置多个controller，但是一个controller中只有一个Reconciler。
+
+```go
+// Manager 初始化共享的依赖关系，比如 Caches 和 Client，并将他们提供给 Runnables
+type Manager interface {
+ 	// Add 将在组件上设置所需的依赖关系，并在调用 Start 时启动组件
+  	// Add 将注入接口的依赖关系 - 比如 注入 inject.Client
+  	// 根据 Runnable 是否实现了 LeaderElectionRunnable 接口判断Runnable 可以在非 LeaderElection 模式（始终运行）或 LeaderElection 模式（如果启用了 LeaderElection，则由 LeaderElection 管理）下运行
+  	Add(Runnable) error
+ 	// SetFields 设置对象上的所有依赖关系，而该对象已经实现了 inject 接口
+  	// 比如 inject.Client
+ 	SetFields(interface{}) error
+ 	// Start 启动所有已注册的控制器，并一直运行，直到停止通道关闭
+  	// 如果使用了 LeaderElection，则必须在此返回后立即退出二进制，否则需要 Leader 选举的组件可能会在 Leader 锁丢失后继续运行
+ 	Start(<-chan struct{}) error
+ 	...
+}
+```
+
+Manager 可以管理 Runnable的生命周期（添加/启动），**Controller  只是 Runnable 的一个特例**。
+1. 持有Runnable共同的依赖：client、cache、scheme 等。
+2. 提供了object getter(例如GetClient())，还有一个简单的依赖注入机制(runtime/inject)，
+3. 支持领导人选举，提供了一个用于优雅关闭的信号处理程序。PS：所以哪怕 不是处理crd，普通的一个 服务端程序如果需要选主，也可以使用Manager
+
+```go
+func (cm *controllerManager) Start(stop <-chan struct{}) error {
+    // 启动metric 组件供Prometheus 拉取数据
+    go cm.serveMetrics(cm.internalStop)
+    // 启动健康检查探针
+	go cm.serveHealthProbes(cm.internalStop)
+	go cm.startNonLeaderElectionRunnables()
+	if cm.resourceLock != nil {
+		if err := cm.startLeaderElection(); err != nil{...}
+	} else {
+		go cm.startLeaderElectionRunnables()
+	}
+    ...
+}
+type controllerManager struct {
+    ...
+	// leaderElectionRunnables is the set of Controllers that the controllerManager injects deps into and Starts.
+	// These Runnables are managed by lead election.
+	leaderElectionRunnables []Runnable
+}
+// 启动cache/informer 及 Controller
+func (cm *controllerManager) startLeaderElectionRunnables() {
+    // 核心是启动Informer, waitForCache ==> cm.startCache = cm.cache.Start ==> InformersMap.Start ==> 
+    // InformersMap.structured/unstructured.Start ==> Informer.Run
+	cm.waitForCache()
+	for _, c := range cm.leaderElectionRunnables {
+		ctrl := c
+		go func() {
+            // 启动Controller
+			if err := ctrl.Start(cm.internalStop); err != nil {...}
+		}()
+	}
+}
+```
 
 ## Controller
 
@@ -367,64 +434,6 @@ func (c *Controller) reconcileHandler(obj interface{}) bool {
 }
 ```
 
-## Manager 启动
-
-[controller-runtime 之 manager 实现](https://mp.weixin.qq.com/s/3i3t-PBP3UN8W9quEhAQDQ)
-Manager interface 充分体现了它的作用：添加Controller 并Start 它们。 
-
-```go
-// Manager 初始化共享的依赖关系，比如 Caches 和 Client，并将他们提供给 Runnables
-type Manager interface {
- 	// Add 将在组件上设置所需的依赖关系，并在调用 Start 时启动组件
-  	// Add 将注入接口的依赖关系 - 比如 注入 inject.Client
-  	// 根据 Runnable 是否实现了 LeaderElectionRunnable 接口判断Runnable 可以在非 LeaderElection 模式（始终运行）或 LeaderElection 模式（如果启用了 LeaderElection，则由 LeaderElection 管理）下运行
-  	Add(Runnable) error
- 	// SetFields 设置对象上的所有依赖关系，而该对象已经实现了 inject 接口
-  	// 比如 inject.Client
- 	SetFields(interface{}) error
- 	// Start 启动所有已注册的控制器，并一直运行，直到停止通道关闭
-  	// 如果使用了 LeaderElection，则必须在此返回后立即退出二进制，否则需要 Leader 选举的组件可能会在 Leader 锁丢失后继续运行
- 	Start(<-chan struct{}) error
- 	...
-}
-```
-
-Manager 可以管理 Runnable/Controller 的生命周期（添加/启动），持有Controller共同的依赖：client、cache、scheme 等。提供了object getter(例如GetClient())，还有一个简单的依赖注入机制(runtime/inject)，还支持领导人选举，提供了一个用于优雅关闭的信号处理程序。
-
-```go
-func (cm *controllerManager) Start(stop <-chan struct{}) error {
-    // 启动metric 组件供Prometheus 拉取数据
-    go cm.serveMetrics(cm.internalStop)
-    // 启动健康检查探针
-	go cm.serveHealthProbes(cm.internalStop)
-	go cm.startNonLeaderElectionRunnables()
-	if cm.resourceLock != nil {
-		if err := cm.startLeaderElection(); err != nil{...}
-	} else {
-		go cm.startLeaderElectionRunnables()
-	}
-    ...
-}
-type controllerManager struct {
-    ...
-	// leaderElectionRunnables is the set of Controllers that the controllerManager injects deps into and Starts.
-	// These Runnables are managed by lead election.
-	leaderElectionRunnables []Runnable
-}
-// 启动cache/informer 及 Controller
-func (cm *controllerManager) startLeaderElectionRunnables() {
-    // 核心是启动Informer, waitForCache ==> cm.startCache = cm.cache.Start ==> InformersMap.Start ==> 
-    // InformersMap.structured/unstructured.Start ==> Informer.Run
-	cm.waitForCache()
-	for _, c := range cm.leaderElectionRunnables {
-		ctrl := c
-		go func() {
-            // 启动Controller
-			if err := ctrl.Start(cm.internalStop); err != nil {...}
-		}()
-	}
-}
-```
 ## Reconciler 开发模式
 
 ```go
@@ -514,7 +523,6 @@ func (a *ReplicaSetReconciler) InjectClient(c client.Client) error {
 	return nil
 }
 ```
-
 
 ### 入队器
 

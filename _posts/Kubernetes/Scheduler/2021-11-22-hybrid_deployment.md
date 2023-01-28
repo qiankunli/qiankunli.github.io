@@ -163,7 +163,7 @@ Crane 提供了 Request 推荐、副本数推荐、HPA 推荐以及 EPA 等业�
 
 ### 字节
 
-[字节跳动大规模K8s集群管理实践](https://mp.weixin.qq.com/s/P3-CrOVSSaVAT5tH9m06EA)  值得细读。单集群支持运行各种负载，上面联邦层管理，最上面给用户一个paas平台，资源可以在集群范围内腾挪。每个任务出费用单；下调某类、部门的资源用量 腾挪给突发活动等。基本上理清了一个公司 paas 的终态。
+[字节跳动大规模K8s集群管理实践](https://mp.weixin.qq.com/s/P3-CrOVSSaVAT5tH9m06EA)  值得细读。单集群支持运行各种负载，上面联邦层管理，最上面给用户一个paas平台，资源可以在集群范围内腾挪。每个任务出费用单；下调某类、部门的资源用量 腾挪给突发活动等。基本上理清了一个公司 paas 的终态。datacenters as a computer。
 
 ![](/public/upload/kubernetes/bd_k8s.jpg)
 

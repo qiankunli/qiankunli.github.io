@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 多集群及clusternet学习
+title: 多集群管理
 category: 架构
 tags: Kubernetes
 keywords:  集群

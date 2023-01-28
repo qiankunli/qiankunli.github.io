@@ -13,10 +13,6 @@ keywords:  gpu
 {:toc}
 
 
-[使用 Elastic GPU 管理 Kubernetes GPU 资源](https://mp.weixin.qq.com/s/MBOTPiAtPqIJcpJUwAeG7g)在 GPU 场景，还是存在以下不足：
-1. 集群 GPU 资源缺少全局视角。没有直观方式可获取集群层面 GPU 信息，比如 Pod / 容器与 GPU 卡绑定关系、已使用 GPU 卡数等。
-2. 不能很好支持多 GPU 后端。各种 GPU 技术（nvidia docker、qGPU、vCUDA、gpu share、GPU 池化）均需独立部署组件，无法统一调度和管理。
-腾讯云参考 PV/PVC/StorageClass 提出了ElasticGPU/ElasticGPUClaim/EGPUClass。
 
 ## 上报/调度/容器创建
 
@@ -57,8 +53,8 @@ Status:
 
 1. 对于每一种硬件设备，都需要有它所对应的 Device Plugin 进行管理，这些 Device Plugin，都通过 gRPC 的方式同 kubelet 连接起来。以 NVIDIA GPU 为例，它对应的插件叫作NVIDIA GPU device plugin。DevicePlugin 注册一个socket 文件到 `/var/lib/kubelet/device-plugins/` 目录下，Kubelet 通过这个目录下的socket 文件向对应的 DevicePlugin 发送gRPC 请求。PS： 通过目录做服务发现。
 2. Device Plugin 会通过一个叫作 ListAndWatch 的 API，定期向 kubelet 汇报该 Node 上 GPU 的列表。比如，在上图的例子里，一共有三个 GPU（GPU0、GPU1 和 GPU2）。这样，kubelet 在拿到这个列表之后，就可以直接在它向 APIServer 发送的心跳里，以 Extended Resource 的方式，加上这些 GPU 的数量，比如nvidia.com/gpu=3。
-3. 当 kubelet 发现这个 Pod 的容器请求一个 GPU 的时候，kubelet 就会从自己持有的 GPU 列表里，为这个容器分配一个 GPU。此时，kubelet 就会向本机的 Device Plugin 发起一个 Allocate() 请求。这个请求携带的参数，正是即将分配给该容器的设备 ID 列表。
-4. 当 Device Plugin 收到 Allocate 请求之后，它就会根据 kubelet 传递过来的设备 ID，从 Device Plugin 里找到这些设备对应的设备路径和驱动目录。比如，在 NVIDIA Device Plugin 的实现里，它会定期访问 nvidia-docker 插件，从而获取到本机的 GPU 信息。而被分配 GPU 对应的设备路径和驱动目录信息被返回给 kubelet 之后，kubelet 就完成了为一个容器分配 GPU 的操作。接下来，kubelet 会把这些信息追加在创建该容器所对应的 CRI 请求当中。这样，当这个 CRI 请求发给 Docker 之后，Docker 为你创建出来的容器里，就会出现这个 GPU 设备，并把它所需要的驱动目录挂载进去。
+3. 当 kubelet 发现这个 Pod 的容器请求一个 GPU 的时候，kubelet 就会从自己持有的 GPU 列表里，为这个容器分配一个 GPU。此时，kubelet 就会向本机的 Device Plugin 发起一个 `Allocate()` 请求。这个请求携带的参数，正是即将分配给该容器的设备 ID 列表。
+4. 当 Device Plugin 收到 Allocate 请求之后，它就会根据 kubelet 传递过来的设备 ID，从 Device Plugin 里**找到这些设备对应的设备路径和驱动目录**。比如，在 NVIDIA Device Plugin 的实现里，它会定期访问 nvidia-docker 插件，从而获取到本机的 GPU 信息。而被分配 GPU 对应的设备路径和驱动目录信息被返回给 kubelet 之后，kubelet 就完成了为一个容器分配 GPU 的操作。接下来，kubelet 会把这些信息追加在创建该容器所对应的 CRI 请求当中。这样，当这个 CRI 请求发给 Docker 之后，Docker 为你创建出来的容器里，就会出现这个 GPU 设备，并把它所需要的驱动目录挂载进去。
 
 ```go
 service DevicePlugin {
@@ -109,3 +105,20 @@ Allocatable:
 3. 集群部署 gpu device plugin （对接kubelet）
 3. 部署 dcgm-exporter 监控gpu 使用
 为此， nvidia 开源了 nvidia-gpu-exporter 自动化管理上述组件
+
+## 云原生方式管理GPU资源
+
+[GPU共享资源隔离方案](https://mp.weixin.qq.com/s/luuc4Vj3je0g0Nmjhmp5Zw)
+1. gpu share。阿里GPU Share Device Plugin。不支持共享资源的隔离
+1. 截获CUDA库转发，如vCUDA。
+2. 截获驱动转发，如阿里云cGPU、腾讯云qGPU。
+3. 截获GPU硬件访问，如NVIDIA GRID vGPU。
+
+[使用 Elastic GPU 管理 Kubernetes GPU 资源](https://mp.weixin.qq.com/s/MBOTPiAtPqIJcpJUwAeG7g)在 GPU 场景，还是存在以下不足：
+1. 集群 GPU 资源缺少全局视角。没有直观方式可获取集群层面 GPU 信息，比如 Pod / 容器与 GPU 卡绑定关系、已使用 GPU 卡数等。
+2. 不能很好支持多 GPU 后端。各种 GPU 技术（nvidia docker、qGPU、vCUDA、gpu share、GPU 池化）均需独立部署组件，无法统一调度和管理。
+
+每种方案都有自己独立的一套 Kubernetes 集成实现方式，通常是由调度器 + device plugin 组成。这些方案相互独立，没有统一标准，无法共通。这导致用户在单个集群中很难同时使用多种 GPU 后端技术，同时也没有一个全局的视角获取集群层面 GPU 信息。腾讯云参考 PV/PVC/StorageClass 提出了ElasticGPU/ElasticGPUClaim/EGPUClass。
+1. ElasticGPU：ElasticGPU 是集群中一个实际可使用的 GPU 资源，可以是一块本地 GPU 物理卡、一个 GPU 切片资源（ GPU 算力 / 显存 的组合）、一个远端 GPU 设备。
+2. ElasticGPUClaim：ElasticGPUClaim 是用户对 ElasticGPU 资源的申领，可以申请整卡数量，申请 GPU 核数 / 显存，或者申请 TFLOPS 算力。
+3. EGPUClass：EGPUClass 提供了生产和挂载 ElasticGPU 的方式，可以使用 qGPU 虚拟化、vCUDA、或是 GPU 远端池化的技术。

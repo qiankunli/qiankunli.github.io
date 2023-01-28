@@ -160,6 +160,9 @@ keywords: test environment
 1. 链路上各个组件和服务能够根据请求流量特征进⾏动态路由。此外，需要引⼊⼀个中⼼化的流量治理平台，⽅便各个业务线的开发者定义⾃⼰的全链路灰度规则。
 	![](/public/upload/practice/service_traffic_management.png)
 
+
+流量染色，如果不走灰度标识的全链路透传（需要链路上的所有 服务都支持，包括mq 等），实现方式是不是可以理解为：每个pod打了anno，`<podIp,流量标识>`会被记录下来。一个pod 在收到请求时，根据请求来源podip 即可获取请求的流量标识，这样省得在框架里去透传流量标识了。PS：还不清晰，有没有可能实现，在实例外部做流量染色
+
 ## service mesh
 
 [使用service mesh进行流量隔离](https://mp.weixin.qq.com/s/J34ujEMq5V-5ADZnxOsELw)

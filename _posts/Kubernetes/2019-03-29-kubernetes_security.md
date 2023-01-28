@@ -72,6 +72,8 @@ Kubernetes 提供了三种配置 Security Context 的方法：
 
 [一文读懂 TKE 及 Kubernetes 访问权限控制](https://mp.weixin.qq.com/s/oijt_iqhMAe6JRJGTypKGw)
 
+[深入理解 Kubernetes 中的用户与身份认证授权](https://mp.weixin.qq.com/s/sW7eMXoOCbwrcjfbU0AO4g)
+
 ### 认证/Authentication
 
 #### 面向对象

@@ -21,7 +21,7 @@ keywords: Spark
 1. 本地运行，一般在开发测试时使用，通过在本地的一个JVM进程中同时运行driver和1个executor进程，实现Spark任务的本地运行。
 
 	![](/public/upload/compute/spark_local.png)
-2. 集群运行，在集群中运行时，Spark当前可以在Spark Standalone集群、YARN集群、Mesos集群、Kubernetes集群中运行。其实现的本质都是考虑如何将Spark的Driver进程和Executor进程在集群中调度，并实现Dirver和Executor进行通信。如果解决了这两大问题，也就解决了Spark任务在集群中运行的大部分问题。每一个Spark的Application都会有一个Driver和一个或多个Executor。**在集群中运行时，多个Executor一定是在集群中运行的**。而Driver程序，可以在集群中运行，也可以在集群之外运行，即在提交Spark任务的机器上运行。当Driver程序运行在集群中时，被称为cluster模式。当Driver程序运行在集群之外时，称为client模式。
+2. 集群运行，在集群中运行时，Spark当前可以在Spark Standalone集群、YARN集群、Mesos集群、Kubernetes集群中运行。其实现的本质都是考虑如何将Spark的Driver进程和Executor进程在集群中调度，并实现Dirver和Executor进行通信。如果解决了这两大问题，也就解决了Spark任务在集群中运行的大部分问题。每一个Spark的Application都会有一个Driver和一个或多个Executor。**在集群中运行时，多个Executor一定是在集群中运行的。而Driver程序，可以在集群中运行，也可以在集群之外运行，即在提交Spark任务的机器上运行**。当Driver程序运行在集群中时，被称为cluster模式。当Driver程序运行在集群之外时，称为client模式。
 
 	![](/public/upload/compute/spark_cluster.png)
 
@@ -574,7 +574,7 @@ TaskScheduler 接收到 DAGScheduler 创建的 TaskSet 后，创建 TaskSetManag
 
 回顾一下drvier流程： Actions 算子触发 SparkContext.runJob ==> DAGScheduler.runJob ==> DAGScheduler.submitJob == EventProcessLoop/ JobSubmitted event ==> DAGScheduler.handleJobSubmitted 创建所有stage ==> DAGScheduler.submitStage ==> DAGScheduler.submitMissingTasks 创建TaskSet ==> TaskScheduler.submitTasks ==> 为TaskSet 创建TaskSetManager 并加入任务队列，向SchedulerBackend 请求资源，拿到 Worker Offers ==> 计算TaskDescriptions 并发给 SchedulerBackend，SchedulerBackend 分发TaskDescriptions 中的任务代码到 Executors 上。
 
-Executors在接收到 LaunchTask 消息后立即调用 Executor 的 launchTask 方法开始干活。launchTask 首先把 TaskDescription 封装为 TaskRunner（TaskRunner 实现了 Java Runnable 接口，用于多线程并发），随即将封装好的 TaskRunner 交由 Executor 线程池，线程池则调用 TaskRunner 的 run 方法来执行任务。TaskRunner 先对 TaskDescription 中的 serializedTask 进行反序列化得到 Task；然后，为该 Task 指定内存管理器 MemoryManager，MemoryManager 维护一个 Executor 中所有 Tasks 的内存占用以及回收情况。接着调用 Task 的 run 方法来执行任务并获取任务结果，TaskRunner 最终将任务结果封装为 DirectTaskResult 或 IndirectTaskResult 并通过调用 ExecutorBackend 的 statusUpdate 方法将执行状态和结果返回。
+Executors在接收到 LaunchTask 消息后立即调用 Executor 的 launchTask 方法开始干活。launchTask 首先把 TaskDescription 封装为 TaskRunner（TaskRunner 实现了 Java Runnable 接口，用于多线程并发），随即将封装好的 TaskRunner 交由 Executor 线程池，线程池则调用 TaskRunner 的 run 方法来执行任务。**TaskRunner 先对 TaskDescription 中的 serializedTask 进行反序列化得到 Task**；然后，为该 Task 指定内存管理器 MemoryManager，MemoryManager 维护一个 Executor 中所有 Tasks 的内存占用以及回收情况。接着调用 Task 的 run 方法来执行任务并获取任务结果，TaskRunner 最终将任务结果封装为 DirectTaskResult 或 IndirectTaskResult 并通过调用 ExecutorBackend 的 statusUpdate 方法将执行状态和结果返回。
 
 
 ## 与tf 对比起来看
@@ -583,4 +583,6 @@ Executors在接收到 LaunchTask 消息后立即调用 Executor 的 launchTask �
 2. tf 每一个worker 可能跑的是完整的graphDef （数据并行模式下），spark 的每一个executor 只跑一个Stage 下的Task。
 3. tf 下的每一个op 只是一个名字，具体实现worker 根据名字找到 对应的kernel 执行，spark 则直接将 task 序列化分发到 executor（毕竟java 对象只是一个`byte[]`）
 
+## 其它
 
+[基于 Kubernetes 的企业级大数据平台，EMR on ACK 技术初探](https://mp.weixin.qq.com/s/pPLkCxJsRFYqzRgSqs_GuA) spark 跑在 k8s 上，然后跟ai、业务做在离线混部，这个过程要解决存算分离、shuffle 等问题（毕竟node可能没有本地硬盘）。

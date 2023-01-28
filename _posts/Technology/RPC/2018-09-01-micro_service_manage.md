@@ -236,6 +236,8 @@ RPC 服务
 
 [超复杂调用网下的服务治理新思路](https://mp.weixin.qq.com/s/PodJSjdGxJP8wTU3oBeesA)
 
+[波司登云原生微服务治理探索](https://mp.weixin.qq.com/s/GYSuVW-N1uvyA-KEW9YXkQ)
+
 ### 高性能设计
 
 使用netty

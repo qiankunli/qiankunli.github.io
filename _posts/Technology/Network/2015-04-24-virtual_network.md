@@ -230,8 +230,12 @@ VLAN 有两个明显的缺陷
 
 [Virtual Extensible LAN](https://en.wikipedia.org/wiki/Virtual_Extensible_LAN)
 
-2. vlan 和vxlan 都是 virtual lan(局域网)，但vlan 是隔离出来的，借助了交换机的支持（或者说推出太久了，以至于交换机普遍支持），vxlan 是虚拟出来的，交换机无感知。
-3. VXLAN 对网络基础设施的要求很低，不需要专门的硬件提供特别支持，只要三层可达的网络就能部署 VXLAN。VLAN修改了原始的Ethernet Header，而VXLAN是将原始的Ethernet Frame隐藏在UDP数据里面。VXLAN 网络的每个边缘入口上，布置有一个 VTEP（VXLAN Tunnel Endpoints）设备，它既可以是物理设备，也可以是虚拟化设备，主要负责 VXLAN 协议报文的封包和解包。经过VTEP封装之后，在网络线路上看起来只有VTEP之间的UDP数据传递，原始的网络数据包被掩盖了。
+1. vlan 和vxlan 都是 virtual lan(局域网)，但vlan 是隔离出来的，借助了交换机的支持（或者说推出太久了，以至于交换机普遍支持），vxlan 是虚拟出来的，交换机无感知。
+2. VXLAN 对网络基础设施的要求很低，**不需要专门的硬件提供特别支持**，只要三层可达的网络就能部署 VXLAN。
+3. **VLAN修改了原始的Ethernet Header，而VXLAN是将原始的Ethernet Frame隐藏在UDP数据里面**。VxLAN将 L2 的以太网帧（Ethernet frames）封装成 L4 的 UDP 数据包，然后在 L3 的网络中传输，效果就像 L2 的以太网帧在一个广播域中传输一样，实际上是跨越了 L3 网络，但却感知不到 L3 网络的存在。
+4. VXLAN 网络的每个边缘入口上，布置有一个 VTEP（VXLAN Tunnel Endpoints）设备，它既可以是物理设备，也可以是虚拟化设备，主要负责 VXLAN 协议报文的封包和解包。经过VTEP封装之后，在网络线路上看起来只有VTEP之间的UDP数据传递，原始的网络数据包被掩盖了。
+
+PS：应用进程本来发出 L2 包，通过路由规则发给 VTEP设备，VTEP 负责转为 UDP 重新发给 物理网卡。有点类似于 文件系统fuse的感觉。
 
 **使用报文解耦二三层**
 

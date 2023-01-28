@@ -10,7 +10,14 @@ keywords: mysql mybatis
 
 ## 前言
 
-What is MyBatis?
+
+orm 的几个基本功能
+1. 生成SQL。 难点：同样功能不同数据库 语句不同，如何支持偏门一点的SQL 语句。
+  1. `db.Where("age > ?",35).Limit(100).Order("age desc").Find(&user)`。 前面的方法称为 Chain method，最后一个Find方式称为 Finisher Method，决定了sql 的类型（crud） 并真正执行。
+2. 数据库连接池
+2. 插件/扩展机制，比如执行每个sql 时自动加一个 过滤条件，比如支持多数据库、读写分离（根据操作类型 选择db连接）。 
+
+## What is MyBatis?
 
 MyBatis is a first **class persistence framework** with support for custom SQL, stored procedures and advanced mappings. MyBatis eliminates almost all of the JDBC code and manual setting of parameters and retrieval of results. MyBatis can use simple XML or Annotations for configuration and map primitives, Map interfaces and Java POJOs (Plain Old Java Objects) to database records.
 

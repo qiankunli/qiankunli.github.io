@@ -26,6 +26,11 @@ keywords:  gpu
 
 [TKE qGPU 通过两层调度解决 GPU 资源碎片问题](https://mp.weixin.qq.com/s/ycGLxFxO2OQ7HC18bXJHUA) [TKE qGPU 通过 CRD 管理集群 GPU 卡资源](https://mp.weixin.qq.com/s/mIgh689r7-1veyAQ2DeU0Q)
 
+[GPU共享资源隔离方案](https://mp.weixin.qq.com/s/luuc4Vj3je0g0Nmjhmp5Zw)
+1. 截获CUDA库转发，如vCUDA。
+2. 截获驱动转发，如阿里云cGPU、腾讯云qGPU。
+3. 截获GPU硬件访问，如NVIDIA GRID vGPU。
+
 ## 虚拟化
 
 当前 GPU 原生的的隔离机制在灵活性和分配力度上都无法满足云原生场景下的使用需求。实现资源虚拟化隔离，首先需要资源在时间或空间维度是可分的，在用户视角看来就是多个任务可以并发（concurrent）或并行（parallel）地执行。namespace 和 cgroup 都是内核提供的机制，本质上还要依赖于硬件提供的相关能力。这一点在目前 GPU 上是不存在的，GPU 目前并长期是闭源状态，这些能够 upstream 到内核主线的功能只有硬件提供商有能力提供。当前三方的方案都是在用户态或内核态做的非标准实现，暂时还没有办法纳入 namespace 和 cgroup 范畴。但可以认为 GPU 虚拟化要实现的就是这些接口下面对应的机制，至于是否能标准化是另外一个更大的问题。
@@ -88,6 +93,8 @@ GPU计算单元类似于CPU中的核，用来进行数值计算。衡量计算�
 通过这两个层面的分析，我们知道要想将 GPU 的算力充分发挥，其核心就是保持GPU 上有任务，同时对单个 GPU 计算任务，使其可以尽量充分的用好 SM 处理器。针对这两个层面的使用情况，NVIDIA 提供了相应的牵引指标 GPU 利用率和 SM 利用率：
 1. GPU 利用率被定义为在采样间隔内，GPU 上有任务在执行的时间。
 2. SM 利用率则被定义为在采样间隔内，每个 SM 有 warp 活跃时间的平均值。
+
+[教你如何继续压榨GPU的算力——MPS](https://zhuanlan.zhihu.com/p/346389176) 
 
 ### 显存
 

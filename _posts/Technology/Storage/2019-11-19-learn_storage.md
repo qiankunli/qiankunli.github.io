@@ -75,3 +75,5 @@ On the other hand, ACID’s consistency refers to data integrity guarantees that
 ## 其它
 
 [图数据库存储技术及实践](https://mp.weixin.qq.com/s/NCvw1P5AXWIsDdi2tc5J7Q)
+
+[图数据库的发展脉络与技术演进](https://mp.weixin.qq.com/s/8MHQT6J-ah3KElx5ZtmHwA) 未读。

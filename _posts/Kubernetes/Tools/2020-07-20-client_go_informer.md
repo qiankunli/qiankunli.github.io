@@ -334,6 +334,7 @@ func (p *processorListener) run() {
 1. chan的功能过于单一，无法满足各类场景的需求，workqueue除了一个缓冲机制外，还有错误重试、限速等机制。
 2. 利用了Indexer本地缓存机制，queue里面只包括 key就行。数据indexer里有
 
+[Kubernetes之controller-runtime事件再处理](https://mp.weixin.qq.com/s/NTRog9zrSv3en9MV5_nJuQ) 值得细读一下。
 
 ## 细节
 

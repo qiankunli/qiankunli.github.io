@@ -102,6 +102,8 @@ public class App {
 
 [容器jvm最佳实践](https://www.kubeclub.cn/kubernetes/163.html) 非常好，提到了 UseAdaptiveSizePolicy 参数，可以使用 `jstat -gc $pid 2s` 查看真实的jvm 各个区域大小 及回收次数，rtt 值跟younggc 时间和频次有很大关系。
 
+[解读 Java 云原生实践中的内存问题](https://mp.weixin.qq.com/s/OUO5oeSVnMuvPMgXk1KV5Q)
+
 ## cpu
 
 [有赞容器化实践](https://segmentfault.com/a/1190000016551255)
