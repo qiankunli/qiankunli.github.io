@@ -32,3 +32,7 @@ keywords: 实时训练
 
 在线/实时训练其实输出的是一个模型的更新数据流，这里其实是最近上一批次产生的对模型造成变化被实时的发布到在线。离线其实会做批量天级别的训练，会发布一个全量的迁移参数模型，同时更回到线上。
 
+
+[如何增强推荐系统模型更新的「实时性」？](https://mp.weixin.qq.com/s/DzsS7Q1hqH2YwRTvKFVh6w) 未读。
+
+[天下武功，唯快不破，论推荐系统的「 实时性」](https://mp.weixin.qq.com/s/ZZoQynG8XYzhtgwqorBUyg) 未读。

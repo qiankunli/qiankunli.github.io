@@ -275,7 +275,7 @@ print('\n\nTest Loss {}, Test Accuracy {}'.format(test_loss, test_accuracy)
 
 ## 其它
 
-
+[推荐系统中比模型结构更重要的是什么？](https://mp.weixin.qq.com/s/I1ylBlPfqrToezs2Ml-Dtw) 未读。
 
 [推荐工程系统架构演进](https://mp.weixin.qq.com/s/lDexQSVrBWvil-2PsMPFrQ) 偏中工程问题的梳理和解决
 

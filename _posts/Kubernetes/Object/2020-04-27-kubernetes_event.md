@@ -259,3 +259,9 @@ func NewEventWatcher(config *rest.Config, fn EventHandler) *EventWatcher {
 	return watcher
 }
 ```
+
+## 其它
+
+[当 Pod 崩溃后如何在报警信息中获取对应的日志信息？](https://mp.weixin.qq.com/s/N9s0P_hF16k1p_xf0zTtQg)
+
+![](/public/upload/kubernetes/pod_crash_alert.jpg)

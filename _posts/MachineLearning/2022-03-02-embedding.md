@@ -13,6 +13,8 @@ keywords: embedding
 * TOC
 {:toc}
 
+[Embedding在深度推荐系统中的3大应用方向](https://mp.weixin.qq.com/s/oxGqzC5FbwBrzeeRxW9uBQ) 未读。
+
 ## 基本概念及原理
 
 一种表述：Embedding 是个英文术语，如果非要找一个中文翻译对照的话，我觉得“向量化”（Vectorize）最合适。Embedding 的过程，就是把数据集合映射到向量空间，进而**把数据进行向量化**的过程。Embedding 的目标，就是找到一组合适的向量，来刻画现有的数据集合。
@@ -211,6 +213,12 @@ with open("./meta_graph_def.pbtxt", "w") as f:
 3. 压缩Embedding向量数
 4. 压缩Embedding向量维度
 5. 量化压缩
+
+[如何解决深度推荐系统中的Embedding冷启动问题？](https://mp.weixin.qq.com/s/xUBK-x4TiTzJaOilWXIbQw) 未读。
+
+[Airbnb如何解决Embedding的数据稀疏问题？](https://mp.weixin.qq.com/s/y31rEOlI_xc532Z-ifq_dw) 未读。
+
+[深度学习中不得不学的Graph Embedding方法](https://mp.weixin.qq.com/s/lLpBDyMZI2WibTFVRqhd-w) 未读。
 
 ### 工程上
 

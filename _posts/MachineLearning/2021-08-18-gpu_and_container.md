@@ -114,6 +114,8 @@ Allocatable:
 2. 截获驱动转发，如阿里云cGPU、腾讯云qGPU。
 3. 截获GPU硬件访问，如NVIDIA GRID vGPU。
 
+如果哪一天，gpu 也可以支持类似于cpu的cgroup 接口，gpu的池化就很爽了。现在的各种vgpu 方案，直接对接k8s 有点不太统一了。如果有一个通用的gpu cgroup 配置标准，大家都去对接 cgroup。k8s/kubelet 只是对接 cgroup。就可以上层调度 和  下层虚拟化方案 分开发展了。难点：gpu 驱动不统一，所以在 cg 这层很难统一。k8s 社区现在搞了个 dynamic resource manager，想在 k8s 侧统一 extender resource。
+
 [使用 Elastic GPU 管理 Kubernetes GPU 资源](https://mp.weixin.qq.com/s/MBOTPiAtPqIJcpJUwAeG7g)在 GPU 场景，还是存在以下不足：
 1. 集群 GPU 资源缺少全局视角。没有直观方式可获取集群层面 GPU 信息，比如 Pod / 容器与 GPU 卡绑定关系、已使用 GPU 卡数等。
 2. 不能很好支持多 GPU 后端。各种 GPU 技术（nvidia docker、qGPU、vCUDA、gpu share、GPU 池化）均需独立部署组件，无法统一调度和管理。
