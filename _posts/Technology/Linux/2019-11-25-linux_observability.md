@@ -84,6 +84,8 @@ Linux**Load Average= 可运行队列进程平均数 + 休眠队列中不可打�
 3. 如果 1min 平均值低于 5min 或 15min 平均值，则负载正在减少；
 4. 如果它们高于系统 CPU 的数量，那么系统很可能遇到了性能问题（视情况而定）。
 
+[Linux 中的负载高低和 CPU 开销并不完全对应](https://mp.weixin.qq.com/s/1Pl4tT_Nq-fEZrtRpILiig) 
+
 ### 如何排查用户态 CPU 使用率高？
 
 [一文说清linux system load](https://mp.weixin.qq.com/s/DQrsdroZUAFvtZ9bdPiPTA)导致load 飙高的原因，说简单也简单，无非就是runnable 或者 uninterruptible 的task 增多了。但是说复杂也复杂，因为导致task进入uninterruptible状态的路径非常多（粗略统计，可能有400-500条路径）。PS：

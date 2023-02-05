@@ -16,9 +16,7 @@ keywords: clean code
 
 将本书与《重构...》《设计模式...》 一起看，相互印证，会有豁然开朗的感觉。比如要重构一段代码，重构、使其符合某个设计模式、使代码更整洁，这些都是统一的。
 
-高水平的代码具有某种一目了然的简单性。专家能够弄清什么是不可简化的复杂性，可以识别和消除大部分意外的复杂性。当系统复杂性增加时，为系统增加更多价值的成本保持不变。
-
-所谓优雅，相对应的是坑。只有见过足够多的坑，才会形成自己的编码理念。
+高水平的代码具有某种一目了然的简单性。专家能够弄清什么是不可简化的复杂性，可以识别和消除大部分意外的复杂性。当系统复杂性增加时，为系统增加更多价值的成本保持不变。PS： 代码或架构要体现一种设计感（得有设计），让新手/生手很快可以找到一种“填代码”的感觉，而不是怎么写好像都可以。
 
 《clean code》 主要为我们分享：
 
@@ -28,6 +26,8 @@ keywords: clean code
 Erlang 的作者之一 Joe Armstrong:"Make it work, then make it beautiful, then if you really, really have to, make it fast. 90 percent of the time, if you make it beautiful, it will already be fast. So really, just make it beautiful!"
 
 ## 什么是不好的代码
+
+所谓优雅，相对应的是坑。只有见过足够多的坑，才会形成自己的编码理念。
 
 1. 改动一个需求，涉及的类很多
 2. 不能主要通过新增代码，甚至是新增类解决 新需求，而需要更改现有代码/类

@@ -362,6 +362,8 @@ class GenericService {
 
 如果是同步发送请求，客户端需要等待服务端返回响应，服务端处理这个请求需要花多长时间，客户端就要等多长时间。这实际上是一个天然的背压机制（Back pressure），服务端处理速度会天然地限制客户端请求的速度。但是在异步请求中，客户端异步发送请求并不会等待服务端，缺少了这个天然的背压机制，如果服务端的处理速度跟不上客户端的请求速度，客户端的发送速度也不会因此慢下来，就会出现在途的请求越来越多，这些请求堆积在服务端的内存中，内存放不下就会一直请求失败。服务端处理不过来的时候，客户端还一直不停地发请求显然是没有意义的。为了避免这种情况，我们需要增加一个背压机制，在服务端处理不过来的时候限制一下客户端的请求速度。这个背压机制的实现也在 InFlightRequests （`map<requestId,responseFuture>`）类中，在这里面我们定义了一个信号量：`private final Semaphore semaphore = new Semaphore(10);`这个信号量有 10 个许可，我们每次往 inFlightRequest 中加入一个 ResponseFuture 的时候，需要先从信号量中获得一个许可，如果这时候没有许可了，就会阻塞当前这个线程，也就是发送请求的这个线程，直到有人归还了许可，才能继续发送请求。我们每结束一个在途请求，就归还一个许可，这样就可以保证在途请求的数量最多不超过 10 个请求，积压在服务端正在处理或者待处理的请求也不会超过 10 个。这样就实现了一个简单有效的背压机制。
 
+## 微服务治理标准OpenSergo 
+
 [算法实战（四）：剖析微服务接口鉴权限流背后的数据结构和算法](https://time.geekbang.org/column/article/80388#previewimg)开放、通用的、面向分布式服务架构、覆盖全链路异构化生态的服务治理标准 OpenSergo。在 OpenSergo 中，**对流控降级与容错场景的实现抽象出标准的 CRD**，只要微服务框架适配了 OpenSergo，即可通过统一 CRD 的方式来进行流控降级等治理。PS： Sentinel 是阿里巴巴开源的，面向分布式服务架构的流量控制组件，主要以流量为切入点，从流量控制、流量整形、熔断降级、系统自适应保护等多个维度来帮助开发者保障微服务的稳定性， OpenSergo 可以理解为是一个商业化版本的Sentinel。一流企业定标准。
 
 [“天猫双11”背后的流量治理技术与标准实践](https://mp.weixin.qq.com/s/oR0NEOARGhges-09wOoYAA)在 OpenSergo 中，我们结合 Sentinel 等框架的场景实践对流量防护与容错抽出标准 CRD。一个容错治理规则 (FaultToleranceRule) 由以下三部分组成：
@@ -414,6 +416,10 @@ spec:
     - name: rate-limit-foo
   fallbackAction: fallback-foo
 ```
+
+[OpenSergo & Spring Cloud Alibaba 带来的服务治理能力](https://mp.weixin.qq.com/s/smJx2gD776K5Yn8Dr-3EgA)
+
+![](/public/upload/rpc/opensergo_overview.jpg)
 
 ## 微服务不是银弹
 

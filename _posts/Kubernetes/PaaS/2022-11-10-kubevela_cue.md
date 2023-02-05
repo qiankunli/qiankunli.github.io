@@ -18,7 +18,7 @@ keywords:  kubevela cue
 
 [数据约束语言 CUE 简易教程](https://mp.weixin.qq.com/s/yWKdXsfAZvwc5Y1aao6XAw)
 
-BCL 全名 Borg Configuration Language，是 Google 内部基于 GCL (Generic Configuration Language) 在 Borg 场景的实践。**用户通过 BCL 描述对 Borg 的使用需求**，通过基于 BCL 的抽象省去对 Borg 复杂配置细节的感知提高单位效率，通过工程化手段满足可抽象、可复用、可测试的协作方式提高团队效率和稳定性，并在其上建立了相应的生态平台，作为 Borg 生态的重要抽象层在 Google 内部服务了超过 10 年，帮助 Google 内部数万开发者更好的使用 Infra。CUE 是一种服务于云化配置的**强类型配置语言**，由 Go team 成员 Marcel van Lohiuzen 结合 BCL 及多种其他语言研发并开源，可以说是 BCL 思路的开源版实现。PS：大家都对直接使用yaml 的方式不满意
+BCL 全名 Borg Configuration Language，是 Google 内部基于 GCL (Generic Configuration Language) 在 Borg 场景的实践。**用户通过 BCL 描述对 Borg 的使用需求**，通过基于 BCL 的抽象省去对 Borg 复杂配置细节的感知提高单位效率，通过工程化手段满足可抽象、可复用、可测试的协作方式提高团队效率和稳定性，并在其上建立了相应的生态平台，作为 Borg 生态的重要抽象层在 Google 内部服务了超过 10 年，帮助 Google 内部数万开发者更好的使用 Infra。CUE 是一种服务于云化配置的**强类型配置语言**，由 Go team 成员 Marcel van Lohiuzen 结合 BCL 及多种其他语言研发并开源，可以说是 BCL 思路的开源版实现。PS：大家都对直接使用yaml 的方式不满意。
 
 ## 基本使用
 
@@ -51,6 +51,8 @@ e: "abc"
   }
 }
 ```
+
+[开放性和封闭性](https://cuetorials.com/zh/deep-dives/closedness/) 未读。
 
 ### 渲染
 
@@ -276,7 +278,142 @@ k8s patch语法参考 [Update API Objects in Place Using kubectl patch](https://
 
 ### 描述WorkflowStepDefinition
 
-deploy step 示例
+[自定义工作流](https://www.bookstack.cn/read/kubevela-1.5-zh/5aed23036bb4523c.md)比如以下场景：使用 Helm 部署一个 Tomcat，并在部署完成后自动向 Slack 发送消息通知。
+
+```yaml
+apiVersion: core.oam.dev/v1beta1
+kind: Application
+metadata:
+  name: first-vela-workflow
+  namespace: default
+spec:
+  components:
+  - name: tomcat
+    type: helm
+  workflow:
+    steps:
+      - name: tomcat
+        type: my-helm # 指定步骤类型
+        outputs:
+          - name: msg
+            # 将 my-helm 中读取到的 deployment status 作为信息导出
+            valueFrom: resource.value.status.conditions[0].message
+      - name: send-message
+        type: webhook-notification
+```
+
+我们可以使用 vela def 通过编写 Cue template 来定义工作流步骤。 KubeVela 提供了一些 **CUE 操作类型**用于编写工作流步骤。这些操作均由 `vela/op` 包提供。比如以下 3 个 CUE 操作：
+
+|操作名|	说明|	参数|
+|---|---|---|
+|ApplyApplication|	部署应用中的所有资源|	-|
+|Read|	读取 Kubernetes 集群中的资源。|	value: 描述需要被读取资源的元数据，比如 kind、name 等，操作完成后，集群中资源的数据会被填充到 value 上。
+<br>err: 如果读取操作发生错误，这里会以字符串的方式指示错误信息。|
+|ConditionalWait|	会让 Workflow Step 处于等待状态，直到条件被满足。|	continue: 当该字段为 true 时，Workflow Step 才会恢复继续执行。|
+
+部署 Tomcat 步骤 my-helm WorkflowStepDefinition 实现步骤
+
+1. 通过 vela def init 来生成一个 WorkflowStepDefinition 模板： 
+    ```
+    $ vela def init my-helm -t workflow-step --desc "Apply helm charts and wait till it's running." -o my-helm.cue
+    # 得到以下结果
+    $ cat my-helm.cue
+    "my-helm": {
+        annotations: {}
+        attributes: {}
+        description: "Apply helm charts and wait till it's running."
+        labels: {}
+        type: "workflow-step"
+    }
+    template: {
+    }
+    ```
+2. 引用 vela/op 包，并将 Cue 代码补充到 template 中：
+    ```
+    import (
+      "vela/op"
+    )
+    "my-helm": {
+        annotations: {}
+        attributes: {}
+        description: "Apply helm charts and wait till it's running."
+        labels: {}
+        type: "workflow-step"
+    }
+    template: {
+      // 部署应用中的所有资源
+      apply: op.#ApplyApplication & {}
+      resource: op.#Read & {
+        value: {
+          kind: "Deployment"
+          apiVersion: "apps/v1"
+          metadata: {
+            name: "tomcat"
+            // 可以使用 context 来获取该 Application 的任意元信息
+            namespace: context.namespace
+          }
+        }
+      }
+      workload: resource.value
+      // 等待 helm 的 deployment 可用
+      wait: op.#ConditionalWait & {
+        continue: workload.status.readyReplicas == workload.status.replicas && workload.status.observedGeneration == workload.metadata.generation
+      }
+    }
+    ```
+3. 部署到集群中：
+    ```
+    $ vela def apply my-helm.cue
+    WorkflowStepDefinition my-helm in namespace vela-system updated.
+    ```
+
+## WorkflowStepDefinition 深入理解
+
+### 实现 Operator 效果
+
+[开源工作流引擎如何支撑企业级 Serverless 架构？](https://mp.weixin.qq.com/s/ypXynPXOGZ1iN-3CMrAmlQ)比如 工作流中新增一个镜像预热的节点，以往多集群中下发 ImagePullJob 工作负载为例，你不仅需要管理多集群的配置，还需要 Watch 工作负载（CRD）的状态，直到工作负载的状态变成 Ready，才继续下一步。而这个流程其实对应了一个简单的 Kubernetes Operator 的 Reconcile 逻辑：先是创建或者更新一个资源，如果这个资源的状态符合了预期，则结束此次 Reconcile，如果不符合，则继续等待。**难道我们运维操作中每新增一种资源的管理，就需要实现一个 Operator 吗？**
+
+```
+template: {
+  // 第一步：从指定集群中读取资源
+  read: op.#Read & {
+    value: {
+      apiVersion: parameter.apiVersion
+      kind: parameter.kind
+      metadata: {
+        name: parameter.name
+        namespace: parameter.namespace
+      }
+    }
+    cluster: parameter.cluster
+  }
+  // 第二步：直到资源状态 Ready，才结束等待，否则步骤会一直等待
+  wait: op.#ConditionalWait & {
+    continue: read.value.status != _|_ && read.value.status.phase == "Ready"
+  }
+  // 第三步（可选）：如果资源 Ready 了，那么...
+  // 其他逻辑...
+
+  // 定义好的参数，用户在使用该步骤类型时需要传入
+  parameter: {
+    apiVersion: string
+    kind: string
+    name: string
+    namespace: *context.namespace | string
+    cluster: *"" | string
+   }
+}
+```
+
+对应到当前这个场景就是：
+
+1. 读取指定集群（如：上海集群）中的 ImagePullJob 状态。
+2. 如果 ImagePullJob Ready，镜像已经预热完毕，则当前步骤成功，执行下一个步骤。
+3. 当 ImagePullJob Ready 后，清理集群中的 ImagePullJob。
+
+通过这样自定义的方式，不过后续在运维场景下新增了多少 Region 的集群或是新类型的资源，都可以先将集群的 KubeConfig 纳管到 KubeVela Workflow 的管控中后，再使用已经定义好的步骤类型，通过传入不同的集群名或者资源类型，来达到一个简便版的 Kubernetes Operator Reconcile 的过程，从而极大地降低开发成本。
+
+### 官方 deploy step 示例
 
 ```
 import (
@@ -358,4 +495,6 @@ template: parameter: {
 ```
 
 ### provider 机制 （未完成）
+
+
 
