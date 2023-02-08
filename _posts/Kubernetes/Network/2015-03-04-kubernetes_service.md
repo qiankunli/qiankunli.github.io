@@ -366,6 +366,10 @@ etcd-endpoints.json
 
 那么在pod中，就可以通过myetcd的`serviceip:80`来访问master主机上的etcd服务了。
 
+## 跨集群通信
+
+[基于隧道的Kubernetes跨集群通讯](https://mp.weixin.qq.com/s/_tVtXUVNIDcp4E1pdOF4Tg) 
+
 ## 其它
 
 [Kubernetes networking 101 – Services](http://www.dasblinkenlichten.com/kubernetes-networking-101-services/)
