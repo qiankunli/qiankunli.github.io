@@ -240,7 +240,7 @@ Maven Enforcer 插件
 
 ## 其它
 
-Jenkins主要用作异步任务驱动，携程只有编译系统使用Jenkins
+Jenkins主要用作异步任务驱动，携程只有编译系统使用Jenkins。[vivo 自研Jenkins资源调度系统设计与实践](https://mp.weixin.qq.com/s/wEmheHwTA8m8LHr_5LVSyg) 未读。	
 
 
 ![](/public/upload/docker/continuous_delivery_36_post.JPG)

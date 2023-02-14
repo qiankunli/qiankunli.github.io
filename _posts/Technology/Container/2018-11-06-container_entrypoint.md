@@ -76,6 +76,8 @@ panic("No working init found.  Try passing init= option to kernel. "
 2. 根据linux进程回收的原理，孤儿进程都会被init进程接管，并由init进程来回收。那在docker容器自己创建出来的 PID Namespace 中，孤儿进程的父进程都会变成 entrypoint 进程。很多entrypoint都不具备主动回收僵尸进程的能力，那一个会产生僵尸进程的容器，里面的僵尸进程就一直得不到回收。
 3. 知道了原理，预防方式就比较简单：让具备僵尸进程回收能力的进程充当容器的init进程。
 
+[容器产生僵尸进程](https://mp.weixin.qq.com/s/YyTRrPItCaXFpxSVR1--AQ) 值得细读，提到containerd-shim 和 pid=0 的关系问题。
+
 ## 传递 SIGTERM 信号
 
 linux 信号机制

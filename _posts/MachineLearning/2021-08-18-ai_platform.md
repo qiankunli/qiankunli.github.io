@@ -158,6 +158,8 @@ https://github.com/tencentmusic/cube-studio/wiki
 
 ![](/public/upload/machine/cube_studio_overview.png)
 
+[腾讯广告模型基于"太极"的训练成本优化实践](https://mp.weixin.qq.com/s/nLGgtmOEy1v1Er_dQDq9hg)
+
 ### 美团
 
 [美团外卖特征平台的建设与实践](https://mp.weixin.qq.com/s/CWY7RQcfidkvAAQCI5kRKg)

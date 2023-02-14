@@ -13,6 +13,8 @@ keywords: Gotty
 * TOC
 {:toc}
 
+[容器产生僵尸进程](https://mp.weixin.qq.com/s/YyTRrPItCaXFpxSVR1--AQ) web shell 可能引起僵尸进程过多。
+
 ## 手感
 
 [容器Web Console技术实现](https://cloud.tencent.com/developer/article/1416063)
