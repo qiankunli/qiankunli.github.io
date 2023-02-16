@@ -158,39 +158,6 @@ type Pool struct {
     New func() interface{}
 }
 ```
-
-## Go代码中的依赖注入
-
-[深入浅出依赖注入及其在抖音直播中的应用](https://mp.weixin.qq.com/s/Zp-OqCVVr9CbDv1Y1zWN-w)在软件工程中，依赖注入（dependency injection）的意思为：给予调用方它所需要的事物。“注入”是指将“依赖”传递给调用方的过程。在“注入”之后，调用方才会调用该“依赖”。传递依赖给调用方，而不是让让调用方直接获得依赖，这个是该设计的根本需求。该设计的目的是为了分离调用方和依赖方，从而实现代码的高内聚低耦合，提高可读性以及重用性。
-
-[Go中的依赖注入](https://www.jianshu.com/p/cb3682ad34a7) 推荐使用 [uber-go/dig](https://github.com/uber-go/dig) 
-A reflection based dependency injection toolkit for Go.
-
-[Alibaba/IOC-golang 正式开源 ——打造服务于go开发者的IOC框架](https://mp.weixin.qq.com/s/Ar-JdkrQ5NnCWcGOoCuVgg)在面向对象编程的思路下，开发者需要直接关心对象之间的依赖关系、对象的加载模型、对象的生命周期等等问题。对于较为复杂的业务应用系统，随着对象数目增长，**对象之间的拓扑关系呈指数级增加**，如果这些逻辑全部由开发人员手动设计和维护，将会在应用内保存较多业务无关的冗余代码，影响开发效率，提高代码学习成本，增加了模块之间的耦合度，容易产生循环依赖等等问题。按照常规的应用开发模式，在一个“开发单元”内，开发者需要关注哪些事情？我们习惯于编写一个构造函数返回需要的对象，这个构造函数的入参，**包含了一些参数以及下游依赖**，我们在构造函数中会把这些对象和参数拼接成一个结构，再执行初始化逻辑，最后返回。
-
-```go
-// +ioc:autowire=true
-// +ioc:autowire:type=singleton
-type App struct {
-    ServiceImpl1  ServiceInterface   `singleton:"main.ServiceImpl1"` // inject ServiceInterface 's ServiceImpl1 implementation
-}
-```
-
-依赖注入是你的组件（比如go语言中的structs）在创建时应该接收它的依赖关系。PS：这个理念在java、spring 已经普及多年。这与在初始化期间构建其自己的依赖关系的组件的相关反模式相反。
-
-**设计模式分为创建、结构和行为三大类，如果自己构造依赖关系， 则创建 与 行为 两个目的的代码容易耦合在一起， 代码较长，给理解造成困难。**
-
-![](/public/upload/go/go_ioc_layer.png)
-
-[为什么依赖注入只在 Java 技术栈中流行，在 go 和 cpp 没有大量使用？](https://www.zhihu.com/question/521822847/answer/2451020694)依赖注入Dependency-Injection (DI)只是Inversion-of-Control (IoC) 的一种实现方式，IOC还有许多更常见的实现，比如callback，胖指针。为什么java选择了di而不是callback或者其他，java中定义callback的开销无异于一个实体bean。所以java走得更进一步，把bean抽取出来，使用delegation，proxy等设计模式，实现了DI。对于go或者cpp这种native语言来说，既有闭包又有函数指针，实现ioc的手段有很多，但di却是开销很大的一种，所以比较少见，大白话就是可以但没有必要。
-
-```go
-http.HandleFunc("/", func(w http.ResponseWriter,r *http.Request) {
-   fmt.Fprintf(w, "Hello world!")
-}
-```
-
-[Go 语言官方依赖注入工具 Wire 使用指北](https://mp.weixin.qq.com/s/yHB9BzEGIki1fyjYojdpYQ)Wire 是一个强大的依赖注入工具。与 Inject 、Dig 等不同的是，Wire只生成代码而不是使用反射在运行时注入，不用担心会有性能损耗。
   
 ## command line application
 
