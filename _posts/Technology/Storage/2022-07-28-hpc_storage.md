@@ -140,6 +140,8 @@ keywords: hpc 对象存储 AI
 
 [B站基于Iceberg + Alluxio 助力湖仓一体项目落地实践](https://mp.weixin.qq.com/s/ydGwr3ehOty2EwqiSm_A6w) 未读
 
+[Alluxio在蚂蚁集团大规模训练中的应用](https://mp.weixin.qq.com/s/VF3vmVlcpDLH4ML0BvVWDw) 主要讲了 蚂蚁对Alluxio 本身的一些优化。 
+
 ## 其它
 
 [面向大数据存算分离场景的数据湖加速方案](https://mp.weixin.qq.com/s/kog8ADN6-1o9tLoPEUZ8rg) 未读

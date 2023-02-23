@@ -346,3 +346,9 @@ bug是免不了的
 3. 出现问题后，可一键回退/关闭/清空等。面向故障编程
 
 从[案例：百度的评论系统是怎么设计的？](https://mp.weixin.qq.com/s/wveq1JA4AzHNJVpws6lJhA)来看，我做好多系统的深度是不够的。
+
+## API 管理
+
+[B站微服务API管理](https://mp.weixin.qq.com/s/WAXKw9hLnQZz6-bce-18TA) 值得细读。**首先需要保证接口元信息完备性和准确性**
+1. 我做的时候吃了大亏，一直在想办法做maven 插件，一键生成api，通过降低维护成本的方式让大家用。有的厂 是让大家提供rpc 服务，有工具自动将rpc 服务转为http 服务，而rpc 一般就有idl 文件，接口数据就最规范、最全了。 
+2. b 站对java 应用的做法是，使用 swagger 的注解。

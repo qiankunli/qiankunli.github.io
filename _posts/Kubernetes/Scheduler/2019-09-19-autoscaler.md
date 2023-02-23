@@ -50,6 +50,11 @@ keywords: kubernetes autoscaler
 
 [K8s降本增效之VPA上篇](https://mp.weixin.qq.com/s/HZ9AQToOShD1e6USXzFBrA) 值得看一下。
 
+[B站容器云平台VPA技术实践](https://mp.weixin.qq.com/s/LFytnn2m732aOwbHEtc1Mg) VPA一般需要具备以下三种关键能力：
+1. 容器资源规格推荐。基于应用的真实负载，根据特定的算法计算出容器的合理资源规格。
+2. 对于新创建的Pod，需要基于k8s webhook，在创建Pod对象的过程中将资源规格修改为推荐值。
+3. 对于已经创建的Pod，需要定时动态调整容器的资源规格。很多业务不希望VPA调整资源配额时发生pod驱逐，因此业界也有部分公司选择修改K8S源代码来支持in-place VPA的能力，从而实现动态修改容器资源规格。K8S社区对于 in-place VPA已经有相关issue讨论。
+
 ### 示例
 
 [Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
