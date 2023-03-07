@@ -295,7 +295,8 @@ func (cm *controllerManager) startLeaderElectionRunnables() {
 
 ## Controller
 
-Controller 逻辑主要有两个（任何Controller 都是如此），对应两个函数是 Watch 与 Start
+
+Controller 管理一个工作队列，并从 source.Sources 中获取 reconcile.Requests 加入队列， 通过执行 reconcile.Reconciler 来处理队列中的每项 reconcile.Requests。Controller 逻辑主要有两个，对应两个函数是 Watch 与 Start
 1. 监听 object 事件并加入到 queue 中。
 	1. Controller 会先向 Informer 注册特定资源的 eventHandler；然后 Cache 会启动 Informer，Informer 向 ApiServer 发出请求，建立连接；当 Informer 检测到有资源变动后，使用 Controller 注册进来的 eventHandler 判断是否推入队列中；
 	1. 为提高扩展性 Controller 将这个职责独立出来交给了 Source 组件，不只是监听apiserver，任何外界资源变动 都可以通过 Source 接口加入 到Reconcile 逻辑中。
@@ -309,8 +310,7 @@ Controller 逻辑主要有两个（任何Controller 都是如此），对应两�
 type Controller interface {
 	// Reconciler is called to reconcile an object by Namespace/Name
 	reconcile.Reconciler
-	// Watch takes events provided by a Source and uses the EventHandler to
-	// enqueue reconcile.Requests in response to the events.
+	// Watch takes events provided by a Source and uses the EventHandler to enqueue reconcile.Requests in response to the events.
 	Watch(src source.Source, eventhandler handler.EventHandler, predicates ...predicate.Predicate) error
 	// Start starts the controller.  Start blocks until the context is closed or a controller has an error starting.
 	Start(ctx context.Context) error
@@ -365,8 +365,15 @@ func (c *Controller) Watch(src source.Source, evthdler handler.EventHandler, prc
 	return src.Start(c.ctx, evthdler, c.Queue, prct...)
 }
 ```
-Source 是事件的源，struct 实现 Kind 来处理来自集群的事件（如 Pod 创建、Pod 更新、Deployment 更新）；struct 实现 Channel 来处理来自集群外部的事件（如 GitHub Webhook 回调、轮询外部 URL）。
+Source 抽象了事件源，event 由 具体实现提供，将其加入到  workqueue。
+1.  Kind 来处理来自集群的事件（如 Pod 创建、Pod 更新、Deployment 更新）；
+2.  Channel 来处理来自集群外部的事件（如 GitHub Webhook 回调、轮询外部 URL）。
 ```go
+// pkg/source/source.go
+type Source interface {  
+   // Start() 是 Controller-runtime 的内部⽅法，应该仅由 Controller 调⽤
+   Start(context.Context, handler.EventHandler, workqueue.RateLimitingInterface, ...predicate.Predicate) error  
+}
 // Kind 用于提供来自集群内部的事件源，这些事件来自于 Watches（例如 Pod Create 事件）
 type Kind struct {
  	// Type 是 watch 对象的类型，比如 &v1.Pod{}

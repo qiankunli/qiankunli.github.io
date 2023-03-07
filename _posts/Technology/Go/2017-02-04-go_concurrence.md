@@ -297,6 +297,7 @@ if err := group.Wait(); err != nil {
 }
 ```
 
+waitGroup 使用的时候太麻烦，可以参考[Go语言实现的可读性更好的「高并发神库」](https://mp.weixin.qq.com/s/_iV4tFE0zFh7Xo2o7mvLmQ) 
 
 ## 取消/中断goroutine 执行的工具——context
 

@@ -162,6 +162,10 @@ kube_state_metrics_watch_total{resource="*v1beta1.Ingress",result="success"} 1
 
 [有道 Kubernetes 容器API监控系统设计和实践](https://mp.weixin.qq.com/s/K6UJnnpbhciHyvrACo1xAw)
 
+[通过 kube-state-metrics 添加 CRD 状态指标](https://mp.weixin.qq.com/s/OfJMZE0ioQUOieveWxVWDA)
+
+[kube-state-metrics 在大规模集群下的优化](https://mp.weixin.qq.com/s/8R55Holzrf0wNVD8DLJnAg)
+
 ### 以pod 方式运行的业务的 metric
 
 [Kubernetes 集群监控 kube-prometheus 自动发现](https://cloud.tencent.com/developer/article/1802679)

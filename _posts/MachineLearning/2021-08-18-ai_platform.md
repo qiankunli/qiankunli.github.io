@@ -152,7 +152,7 @@ PS：让pod 资源尽量匹配真实需求这个事儿，业务pod 使用vpa等�
 
 [腾讯般若系统](https://mp.weixin.qq.com/s/NISDTSjrHCRSHbjkH5b-Bg)
 
-[cube-studio](https://github.com/tencentmusic/cube-studio)腾讯音乐直接开源的一个ai训练平台。
+[cube-studio](https://github.com/tencentmusic/cube-studio)腾讯音乐直接开源的一个ai训练平台。 [QQ音乐推荐系统算法架构实践](https://mp.weixin.qq.com/s/Si-zxdfcxaw2lmU9_qgOrw)
 
 https://github.com/tencentmusic/cube-studio/wiki
 
@@ -190,6 +190,9 @@ https://github.com/tencentmusic/cube-studio/wiki
     1. GPU 容器虚拟化，提供了 1/4、1/2，甚至更细力度的这种容器的使用能力。PS：GpU 隔离能力越好，才能够支持GPU 在离线混部。
     2. 远程 GPU，打破了单机层面 CPU 和 GPU 资源的硬配比的一个限制； 让间歇式的任务在需要的时候去挂载，在不需要的时候就释放；根据任务的本身的需求动态的去调整算力和显存的隔离能力与资源的分配；透明容错：当后端的 GPU 发现故障的时候，我们会将 GPU 上的任务透明化，让业务无感的迁移到一个新的 GPU 上继续运行。
 
+[AI 训练加速原理解析与工程实践分享](https://mp.weixin.qq.com/s/OMdXk7S07CjxTTgyLQl30w)
+
+[AI推理加速原理解析与工程实践分享](https://mp.weixin.qq.com/s/MPSa-whByMiknN92Kx8Kyw)
 
 ## 基础设施
 

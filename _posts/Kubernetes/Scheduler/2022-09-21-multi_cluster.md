@@ -15,6 +15,8 @@ keywords:  集群
 
 [硅谷技术新焦点：摆脱缝合怪的多云设计，才是云计算的归宿](https://mp.weixin.qq.com/s/IZYekMXvDEwOzGpzE41GqQ)
 
+[CNStack 多集群服务：基于 OCM 打造完善的集群管理能力](https://mp.weixin.qq.com/s/eYo7ZYOISkpb_9l_uKPZeg)
+
 ## 多集群
 
 [Kubernetes 多集群项目介绍](https://mp.weixin.qq.com/s/laMfFgre8PrbC2SayxBFRQ)
@@ -263,6 +265,9 @@ karmada 会为每一个分发的资源每个目标成员集群的执行命名空
 
 [Karmada资源对象部署的设计与实现](https://mp.weixin.qq.com/s/8lWuaNVZJTF1LpqXUd6H5A)
 
+[Karmada 资源传播详解](https://mp.weixin.qq.com/s/17GB27M7VYKdtr4gvO5RoA)
+
+![](/public/upload/kubernetes/karmada_propagation.jpg)
 
 ### 源码分析
 
