@@ -422,6 +422,8 @@ func (g *genericScheduler) Schedule(..., placement *policyv1alpha1.Placement, sp
 其它：
 [vivo大规模 Kubernetes 集群自动化运维实践](https://mp.weixin.qq.com/s/L9z1xLXUnz52etw2jDkDkw) 未读。
 
+[跨集群运行 StatefulSet](https://mp.weixin.qq.com/s/Py0LB7W19ASB8crBkrhBiA)
+
 
 
 ## 手动访问多个kubernetes 集群

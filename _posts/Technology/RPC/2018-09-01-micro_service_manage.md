@@ -10,6 +10,9 @@ keywords: dubbo micro service
 
 ## 简介
 
+
+[微服务进入深水区后该何去何从](https://mp.weixin.qq.com/s/uEcoUE_LSoNqB8-FvaHOdA)
+
 [跨不同开发语言和技术框架，微服务治理规范OpenSergo项目正式开源](https://mp.weixin.qq.com/s/_WQcfyH3H2p7vuT3Keik3Q)
 
 ![](/public/upload/architecture/micro_service.png)

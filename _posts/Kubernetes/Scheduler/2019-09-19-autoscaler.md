@@ -155,6 +155,8 @@ updatePolicy
 目前 VPA 在生产中的最佳方式是在**推荐模式**下使用，这有助于我们了解最佳的资源请求值是多少，以及随着时间推移它们是如何变化的。
 一旦配置了，我们就可以通过获取这些 metrics 指标，并将其发送到监控工具中去，比如 Prometheus 和 Grafana 或者 ELK 技术栈。然后可以利用这些数据来调整 Pods 的大小。
 
+[Pod 原地垂直伸缩 - 一个四年的KEP和两年的PR](https://mp.weixin.qq.com/s/1WTH4te8i2iiWB-jTz9QBw) 讲了具体实现和原理，值得细读。
+
 ## Cluster Auto Scaler 
 
 [Airbnb 如何实现 Kubernetes 集群动态扩展](https://mp.weixin.qq.com/s/aSPnXtmaudGjjbBuI9a77Q) 提到了对CA的扩展。

@@ -76,6 +76,8 @@ keywords:  Kubernetes 混部
   1. 分级可靠地资源超卖，满足差异化的QoS需求
   2. 及时识别干扰源，避免影响LS应用
 
+[Kubernetes解决Noisy Neighbors场景的探索](https://mp.weixin.qq.com/s/g28ett0Z5LR0sHTyOljCRg) RDT机制 按照应用程序和线程的服务分类来限制和分配其使用的L1/L2/L3缓存。
+
 ## 技术要求
 
 ### 多种工作负载的混部成为常态

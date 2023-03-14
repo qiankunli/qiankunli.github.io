@@ -147,3 +147,5 @@ keywords: hpc 对象存储 AI
 [面向大数据存算分离场景的数据湖加速方案](https://mp.weixin.qq.com/s/kog8ADN6-1o9tLoPEUZ8rg) 未读
 
 [9年演进史：字节跳动 10EB 级大数据存储实战](https://mp.weixin.qq.com/s/NuWvR8LMLMiTfH6hD-LfiA) 未细读。从 HDFS 发展历程入手，介绍发展路径上的重大挑战及解决方案。
+
+[从资源弹性到数据弹性，乾象如何将云上量化研究效率提升40%？](https://mp.weixin.qq.com/s/V-jaTmh0Mv6tFGFZXBEuFg)
