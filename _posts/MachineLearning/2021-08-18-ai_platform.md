@@ -73,6 +73,8 @@ AI平台的定位：面向算法工程师，围绕AI 模型的全生命周期去
 
 ![](/public/upload/machine/tecent_platform_2.png)
 
+[腾讯自研机器学习平台“太极”八年进化之路](https://mp.weixin.qq.com/s/vzZduEkbiuINRSRWKql3TQ)
+
 ### 阿里
 
 [KubeDL 加入 CNCF Sandbox，加速 AI 产业云原生化](https://mp.weixin.qq.com/s/7SUhnW4cnk_3G9Q7lIytcA)

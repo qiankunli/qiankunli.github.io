@@ -181,7 +181,14 @@ Serverfull 就是服务端运维全由我们自己负责，Serverless 则是服�
 
 ## 实现
 
-[Serverless Kubernetes 的 流派](https://mp.weixin.qq.com/s/1aMalQs-AE2L1aA5X20gJA) 需要继续整理。
+[Serverless Kubernetes 的 流派](https://mp.weixin.qq.com/s/1aMalQs-AE2L1aA5X20gJA) 
+1. Nodeless Kubernetes。pod运行在node上。集群节点池/节点对用户不可见，也无法登录进行运维。用户为应用申请的资源付费，而不是为底层资源进行付费。用户无需进行容量管理，调度和计费单位是Pod，但是扩容的单位仍然是节点实例。当用户部署/扩容应用时，GKE 会先尝试调度到已有节点中；如果资源不足，GKE服务根据 Pending Pod 来动态创建相应节点池/节点来适配应用；同理当应用删除/缩容时，GKE服务也会根据情况缩容节点池来释放实际使用资源。
+2. Serverless Container。每一个Pod运行在一个独立的安全沙箱之中，采用虚拟化技术实现资源隔离和安全隔离，不再有节点概念。
+
+  ![](/public/upload/kubernetes/eci_overview.png)
+
+[破茧成蝶 - Serverless Kubernetes 的思考与征程（二）](https://mp.weixin.qq.com/s/tNgVraNGxPlH9WQva7CF3Q)
+
 
 [腾讯 Nodeless 弹性容器技术演进和实践](https://www.infoq.cn/article/2JPIXj7aGW8murb40QA7) 启动一个虚拟机，做成pod的感觉。
 
@@ -258,6 +265,16 @@ FaaS 与应用托管 PaaS（**应用托管平台**） 平台对比，**最大的
 [阿里云 FaaS 架构设计与创新实践](https://mp.weixin.qq.com/s/MQzdC1UT5w42oHYY4TwYEQ) 未读
 
 [从云计算到函数计算](https://mp.weixin.qq.com/s/OBAiJg8ujAAvKmBc7qitkA)
+
+FaaS实例执行时，至少包括3层结构：容器层、运行层和代码层
+1. 容器层，如何进行应用程序的调度与弹性伸缩问题？这些正是K8S的核心能力，因此，开源社区的Serverless/FaaS产品基本都是基于K8S实现的
+2. 运行层，函数如何加载到Runtime？函数Runtime是可用于加载&运行函数的某个版本的编程语言或框架。比如Python 、Java、Golang运行时，他们各自负责加载以及运行语言相关的函数。对于函数如何加载到Runtime中，社区中有两个方向：
+  1. 镜像部署函数模式。将函数和Runtime编译成镜像。如OpenFaas在创建函数时会将其编译成镜像，然后使用Deployment部署。
+  2. 函数动态加载模式。Runtime在运行时将函数代码下载到本地，并使用编程语言提供的动态加载机制将函数加载到内存中。PS：不是所有语言都能使用这种方式。
+
+冷启动问题如何解决？FaaS 中的冷启动是指从调用函数开始到函数实例准备完成的整个过程。
+1. 在镜像部署函数的模式下，只能尽量减少Pod的启动时间，其优化方向如下：提高镜像拉取速度；镜像预拉取；减少镜像体积。但在Kubernetes作为技术底座 + 镜像部署函数的模式中，无论怎么优化，冷启动都还是比较大的。对于敏感的函数，也是不推荐将实例数缩容到0的。
+2. 函数动态加载模式下，会为支持的每种编程语言创建一个Pod池，当某个函数需要调用时，则从语言相关的池子中选中一个Pod，在触发Pod中的Runtime容器下载函数并动态加载到内存中。
 
 ## 其它
 
