@@ -106,6 +106,8 @@ NICE_0_LOAD = 1024
 
 ## 容器 与 CFS
 
+**Linux 容器中所谓的核并不是真正的 CPU 核，而是转化成了执行时间的概念**。在容器进程调度的时候给其满足一定的 CPU 执行时间，而不是真正的分配逻辑核。
+
 `/sys/fs/cgroup/cpu`
 
 [Kubernetes中的CPU节流：事后分析](https://mp.weixin.qq.com/s/2lcX3-QBYFP5UnPw-b-Rvg)几乎所有的容器编排器都依赖于内核控制组（cgroup）机制来管理资源约束。在容器编排器中设置硬CPU限制后，内核将使用完全公平调度器（CFS）Cgroup带宽控制来实施这些限制。CFS-Cgroup带宽控制机制使用两个设置来管理CPU分配：配额（quota）和周期（period）。当应用程序在给定时间段内使用完其分配的CPU配额时，此时它将受到CPU节流，直到下一个周期才能被调度。

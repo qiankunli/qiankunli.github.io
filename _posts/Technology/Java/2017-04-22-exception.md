@@ -10,6 +10,8 @@ keywords: JAVA exception
 
 ## 前言
 
+[Java异常处理和最佳实践（含案例分析）](https://mp.weixin.qq.com/s/7MbgphfBDBHWLx9nx5lHqA) 未读。
+
 异常有两种：
 
 1. 非运行时异常（Checked Exception）: 这种异常必须在方法声明的throws语句指定，或者在方法体内捕获。例如：IOException和ClassNotFoundException。**《clean code》建议在写代码时不使用Checked Exception，因为catch语句和抛出异常语句经常隔的很远，而你必须在它们之间的每个方法签名中声明该异常。**

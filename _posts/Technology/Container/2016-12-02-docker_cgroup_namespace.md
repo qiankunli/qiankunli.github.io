@@ -180,38 +180,61 @@ Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的�
 
 ![](/public/upload/container/cgroup_v2.jpeg)
 
-### 整体实现（可能过时了）
+## cgroups 整体实现
 
-[cgroup 原理与实现](https://mp.weixin.qq.com/s/yXJxTR_sPdEMt56cf7JPhQ) 写的很清晰了
+[内核是如何给容器中的进程分配CPU资源的？](https://mp.weixin.qq.com/s/rUQLM8WfjMqa__Nvhjhmxw)
 
-![](/public/upload/linux/cgroup_struct.png)
+![](/public/upload/linux/cgroup_struct.jpg)
 
-1. 包含哪些数据结构
-2. CGroup 的挂载
-3. 向 CGroup 添加要进行资源控制的进程（写文件 ==> 数据结构间建立关联关系）
-4. 如何 限制 CGroup 的资源使用
+1. 包含哪些数据结构/内核对象
+    1. 一个 cgroup 对象中可以指定对 cpu、cpuset、memory 等一种或多种资源的限制。每个 cgroup 都有一个 cgroup_subsys_state 类型的数组 subsys，其中的每一个元素代表的是一种资源控制，如 cpu、cpuset、memory 等等。
+    2. 其实 cgroup_subsys_state 并不是真实的资源控制统计信息结构，对于 CPU 子系统真正的资源控制结构是 task_group，对于内存子系统控制统计信息结构是 mem_cgroup，其它子系统也类似。它是 cgroup_subsys_state 结构的扩展，类似父类和子类的概念，当 task_group 需要被当成cgroup_subsys_state 类型使用的时候，只需要强制类型转换就可以。
+    3. 和 cgroup 和多个子系统关联定义类似，task_struct 中也定义了一个 cgroup_subsys_state 类型的数组 subsys，来表达这种一对多的关系。
+    4. 无论是进程、还是 cgroup 对象，最后都能找到和其关联的具体的 cpu、内存等资源控制子系统的对象。
+2. 通过创建目录来创建 cgroup 对象。在 `/sys/fs/cgroup/cpu,cpuacct` 创建一个目录 test，实际上内核是创建了 cgroup、task_group 等内核对象。
+3. 在目录中设置 cpu 的限制情况。在 task_group 下有个核心的 cfs_bandwidth 对象，用户所设置的 cfs_quota_us 和 cfs_period_us 的值最后都存到它下面了。
+4. 将进程添加到 cgroup 中进行资源管控。当在 cgroup 的 cgroup.proc 下添加进程 pid 时，实际上是将该进程加入到了这个新的 task_group 调度组了。
 
-![](/public/upload/linux/linux_cgroup_object.png)
+### cpu cgroups生效
 
-### 从右向左 ==> 和docker run放在一起看 
+```c
+//file:kernel/sched/core.c
+struct task_group root_task_group;  // 所有的 task_group 都是以 root_task_group 为根节点组成了一棵树。
+//file:kernel/sched/sched.h
+struct task_group {
+ struct cgroup_subsys_state css;
+ ...
 
-![](/public/upload/linux/linux_cgroup_docker.png)
+ // task_group 树结构
+ struct task_group   *parent;
+ struct list_head    siblings;
+ struct list_head    children;
 
-### 从左向右 ==> 从 task 结构开始找到 cgroup 结构
+ //task_group 持有的 N 个调度实体(N = CPU 核数)
+ struct sched_entity **se;
+ //task_group 自己的 N 个公平调度队列(N = CPU 核数)
+ struct cfs_rq       **cfs_rq;
 
-[Docker 背后的内核知识——cgroups 资源限制](https://www.infoq.cn/article/docker-kernel-knowledge-cgroups-resource-isolation/)
+ //公平调度带宽限制
+ struct cfs_bandwidth    cfs_bandwidth;
+ ...
+}
+```
 
-在图中使用的回环箭头，均表示可以通过该字段找到所有同类结构
+假如当前系统有两个逻辑核，那么一个 task_group 树和 cfs_rq 的简单示意图大概是下面这个样子。PS：task_group.cfs_rq 何时挂到了 cpu 的cfs_rq上。 
 
-![](/public/upload/linux/linux_task_cgroup.png)
+![](/public/upload/linux/linux_cgroup_schedule.jpg)
 
-### 从右向左 ==> 查看一个cgroup 有哪些task
+Linux 中的进程调度是一个层级的结构。对于容器来讲，**宿主机中进行进程调度的时候，先调度到的实际上不是容器中的具体某个进程，而是一个 task_group**。然后接下来再进入容器 task_group 的调度队列 cfs_rq 中进行调度，才能最终确定具体的进程 pid。
 
-![]()(/public/upload/linux/linux_task_cgroup.png)
+当cgroup cpu 子系统创建完成后，内核的 period_timer 会根据 task_group->cfs_bandwidth 下用户设置的 period 定时给可执行时间 runtime 上加上 quota 这么多的时间（相当于按月发工资），以供 task_group 下的进程执行（消费）的时候使用。
 
-为什么要使用cg_cgroup_link结构体呢？因为 task 与 cgroup 之间是多对多的关系。熟悉数据库的读者很容易理解，在数据库中，如果两张表是多对多的关系，那么如果不加入第三张关系表，就必须为一个字段的不同添加许多行记录，导致大量冗余。通过从主表和副表各拿一个主键新建一张关系表，可以提高数据查询的灵活性和效率。
+在完全公平器调度的时候，每次 pick_next_task_fair 时会做两件事情
+1. 将从 cpu 上拿下来的进程所在的运行队列进行执行时间的更新与申请。会将 cfs_rq 的 runtime_remaining 减去已经执行了的时间。如果减为了负数，则从 cfs_rq 所在的 task_group 下的 cfs_bandwidth 去申请一些。
+2. 判断 cfs_rq 上是否申请到了可执行时间，如果没有申请到，需要将这个队列上的所有进程都从完全公平调度器的红黑树上取下。这样再次调度的时候，这些进程就不会被调度了。
+当 period_timer 再次给 task_group 分配时间的时候，或者是自己有申请时间没用完回收后触发 slack_timer 的时候，被限制调度的进程会被解除调度限制，重新正常参与运行。这里要注意的是，一般 period_timer 分配时间的周期都是 100 ms 左右。假如说你的进程前 50 ms 就把 cpu 给用光了，那你收到的请求可能在后面的 50 ms 都没有办法处理，对请求处理耗时会有影响。这也是为啥在关注 CPU 性能的时候要关注对容器 throttle 次数和时间的原因了。
 
-### 使cgroups 数据生效
+### 内存 cgroups生效
 
 我们知道， 任何内存申请都是从缺页中断开始的，`handle_pte_fault ==> do_anonymous_page ==> mem_cgroup_newpage_charge（不同linux版本方法名不同） ==> mem_cgroup_charge_common ==> __mem_cgroup_try_charge`
 
@@ -237,6 +260,28 @@ struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p){
     return mem_cgroup_from_css(task_subsys_state(p, mem_cgroup_subsys_id));
 }
 ```
+### 查看配置
+
+从右向左 ==> 和docker run放在一起看 
+
+[cgroup 原理与实现](https://mp.weixin.qq.com/s/yXJxTR_sPdEMt56cf7JPhQ) 写的很清晰了
+
+![](/public/upload/linux/linux_cgroup_docker.png)
+
+从左向右 ==> 从 task 结构开始找到 cgroup 结构
+
+[Docker 背后的内核知识——cgroups 资源限制](https://www.infoq.cn/article/docker-kernel-knowledge-cgroups-resource-isolation/)
+
+在图中使用的回环箭头，均表示可以通过该字段找到所有同类结构
+
+![](/public/upload/linux/linux_task_cgroup.png)
+
+从右向左 ==> 查看一个cgroup 有哪些task
+
+![]()(/public/upload/linux/linux_task_cgroup.png)
+
+为什么要使用cg_cgroup_link结构体呢？因为 task 与 cgroup 之间是多对多的关系。熟悉数据库的读者很容易理解，在数据库中，如果两张表是多对多的关系，那么如果不加入第三张关系表，就必须为一个字段的不同添加许多行记录，导致大量冗余。通过从主表和副表各拿一个主键新建一张关系表，可以提高数据查询的灵活性和效率。
+
 
 
 
