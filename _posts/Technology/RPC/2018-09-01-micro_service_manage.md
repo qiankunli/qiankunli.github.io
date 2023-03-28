@@ -241,6 +241,8 @@ RPC 服务
 
 [波司登云原生微服务治理探索](https://mp.weixin.qq.com/s/GYSuVW-N1uvyA-KEW9YXkQ)
 
+[如何轻松应对偶发异常](https://mp.weixin.qq.com/s/-gA-38sg0oy80TgpyDJmTA) 未读。
+
 ### 高性能设计
 
 使用netty

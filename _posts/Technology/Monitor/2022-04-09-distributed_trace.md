@@ -49,6 +49,8 @@ Span 的数据结构应该足够简单，以便于能放在日志或者网络协
 
 [企业如何从 0 到 1 构建整套全链路追踪体系](https://mp.weixin.qq.com/s/wzf3J3dljfESg4X9hS8UKQ)
 
+[链路追踪（Tracing）其实很简单](https://mp.weixin.qq.com/s/00aiWY5bX6RnAKL8UpAZyw) 未读
+
 ## 其它
 
 

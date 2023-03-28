@@ -221,11 +221,11 @@ struct task_group {
 }
 ```
 
-假如当前系统有两个逻辑核，那么一个 task_group 树和 cfs_rq 的简单示意图大概是下面这个样子。PS：task_group.cfs_rq 何时挂到了 cpu 的cfs_rq上。 
+假如当前系统有两个逻辑核，那么一个 task_group 树和 cfs_rq 的简单示意图大概是下面这个样子。
 
 ![](/public/upload/linux/linux_cgroup_schedule.jpg)
 
-Linux 中的进程调度是一个层级的结构。对于容器来讲，**宿主机中进行进程调度的时候，先调度到的实际上不是容器中的具体某个进程，而是一个 task_group**。然后接下来再进入容器 task_group 的调度队列 cfs_rq 中进行调度，才能最终确定具体的进程 pid。
+Linux 中的进程调度是一个层级的结构，进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，将这个进程放进某个CPU的队列上来。默认有一个根group，也就是，创建普通进程后（没有配置cgroup）加入percpu.rq 实质是加入到了一个默认的task_group中。对于容器来讲，**宿主机中进行进程调度的时候，先调度到的实际上不是容器中的具体某个进程，而是一个 task_group**。然后接下来再进入容器 task_group 的调度队列 cfs_rq 中进行调度，才能最终确定具体的进程 pid。
 
 当cgroup cpu 子系统创建完成后，内核的 period_timer 会根据 task_group->cfs_bandwidth 下用户设置的 period 定时给可执行时间 runtime 上加上 quota 这么多的时间（相当于按月发工资），以供 task_group 下的进程执行（消费）的时候使用。
 

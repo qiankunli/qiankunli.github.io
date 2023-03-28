@@ -90,13 +90,44 @@ $ go tool pprof -http=:9090 http://192.168.10.18:6060/debug/pprof/profile?second
 Fetching profile over HTTP from http://192.168.10.18:6060/debug/pprof/profile
 Saved profile in /Users/tonybai/pprof/pprof.server.samples.cpu.004.pb.gz
 Serving web UI on http://localhost:9090
+```
 
 ### 实现
 
-[深究 Go CPU profiler](https://mp.weixin.qq.com/s/DRQWcU2dN-FycoyFZfnklA)在Linux中，Go runtime 使用setitimer/timer_create/timer_settime API 来设置 SIGPROF 信号处理器。这个处理器在runtime.SetCPUProfileRate 控制的周期内被触发，默认为100Mz（10ms）。一旦 pprof.StartCPUProfile 被调用，Go runtime 就会在特定的时间间隔产生SIGPROF 信号。内核向应用程序中的一个运行线程发送 SIGPROF 信号。**由于 Go 使用非阻塞式 I/O，等待 I/O 的 goroutines 不被计算为运行**，Go CPU profiler 不捕获这些。顺便提一下：这是实现 fgprof 的基本原因。fgprof 使用 runtime.GoroutineProfile来获得等待和非等待的 goroutines 的 profile 数据。
+cpu采样
+1. 采样对象： 函数调用和它们占用的时间
+2. 采样率：100次/秒，固定值
+3. 采样时间：从手动启动到手动结束
 
-一旦一个随机运行的 goroutine 收到 SIGPROF 信号，它就会被中断，然后信号处理器的程序开始运行。被中断的 goroutine 的堆栈追踪在这个信号处理器的上下文中被检索出来，然后和当前的 profiler 标签一起被保存到一个无锁的日志结构中（每个捕获的堆栈追踪都可以和一个自定义的标签相关联，你可以用这些标签在以后做过滤）。这个特殊的无锁结构被命名为 profBuf ，它被定义在 runtime/profbuf.go 中，它是一个单一写、单一读的无锁环形缓冲 结构，与这里发表的结构相似。writer 是 profiler 的信号处理器，reader 是一个 goroutine(profileWriter)，定期读取这个缓冲区的数据，并将结果汇总到最终的 hashmap。这个最终的 hashmap 结构被命名为 profMap，并在 runtime/pprof/map.go中定义。PS：goroutine 堆栈信息 ==> sigProfHandler ==write==> profBuf ==read==> profWriter ==> profMap
-```
+[深究 Go CPU profiler](https://mp.weixin.qq.com/s/DRQWcU2dN-FycoyFZfnklA)在Linux中，Go runtime 使用`setitimer/timer_create/timer_settime` API来设置SIGPROF 信号处理器。这个处理器在runtime.SetCPUProfileRate 控制的周期内被触发，默认为100Mz（10ms）。一旦 pprof.StartCPUProfile 被调用，Go runtime 就会在特定的时间间隔产生SIGPROF 信号。内核向应用程序中的一个运行线程发送 SIGPROF 信号。**由于 Go 使用非阻塞式 I/O，等待 I/O 的 goroutines 不被计算为运行**，Go CPU profiler 不捕获这些。顺便提一下：这是实现 fgprof 的基本原因。fgprof 使用 runtime.GoroutineProfile来获得等待和非等待的 goroutines 的 profile 数据。
+
+一旦一个随机运行的goroutine 收到 SIGPROF 信号，它就会被中断，然后信号处理器的程序开始运行。被中断的 goroutine 的堆栈 在这个信号处理器的上下文中被检索出来，然后和当前的 profiler 标签一起被保存到一个无锁的日志结构中（每个捕获的堆栈追踪都可以和一个自定义的标签相关联，你可以用这些标签在以后做过滤）。这个特殊的无锁结构被命名为 profBuf ，它被定义在 runtime/profbuf.go 中，它是一个单一写、单一读的无锁环形缓冲 结构，与这里发表的结构相似。writer 是 profiler 的信号处理器，reader 是一个 goroutine(profileWriter)，定期读取这个缓冲区的数据，并将结果汇总到最终的 hashmap。这个最终的 hashmap 结构被命名为 profMap，并在 runtime/pprof/map.go中定义。PS：goroutine 堆栈信息 ==> sigProfHandler ==write==> profBuf ==read==> profWriter ==> profMap
+
+heap 采样
+1. 采样程序通过内存分配器 在堆上分配和释放内存，记录分配/释放的大小和数量
+2. 采样率：每分配512KB 记录一次，可在运行开头修改，1为每次分配均记录。
+3. 采样时间：从程序运行开始到结束
+4. 采样指标：alloc_space,alloc_objects,inuse_space,inuse_objects
+5. 计算方式： inuse = alloc - free
+
+goroutine
+1. 记录所有用户发起且在运行中的goroutine（即入口非runtime开头的）的调用栈信息
+2. runtime.main 的调用栈信息
+3. 采样方式：stop the world ==> 遍历 allg slice ==> 输出创建g的堆栈 ==> start the world
+ThreadCreate
+1. 记录程序创建的所有系统线程信息
+2. 采样方式：stop the world ==> 遍历 allm 链表 ==> 输出创建m的堆栈 ==> start the world
+
+block
+1. 采样阻塞操作的次数和耗时
+2. 采样率：阻塞耗时超过阈值的才会被记录。1 为每次阻塞均记录
+2. 采样方式：阻塞操作 ==> Profiler 上报调用栈和消耗时间（时间未到阈值则丢弃） ==> 遍历阻塞记录  ==> 统计阻塞次数和耗时
+
+锁竞争
+1. 采样争抢锁的次数和耗时
+2. 采样率：只记录固定比例的锁操作，1 为每次加锁均记录
+2. 采样方式：阻塞操作 ==> Profiler 上报调用栈和消耗时间（比例未命中则丢弃） ==> 遍历锁记录  ==> 统计锁竞争次数和耗时
+
 
 ## trace
 

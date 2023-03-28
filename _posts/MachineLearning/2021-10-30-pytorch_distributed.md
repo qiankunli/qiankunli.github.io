@@ -13,6 +13,8 @@ keywords:  pytorch distributed
 * TOC
 {:toc}
 
+
+
 ## 整体思路
 
 ![](/public/upload/machine/data_parallel_train.png)
@@ -427,5 +429,11 @@ self.module.state_dict() = {OrderedDict: 4}
  'net2.weight' = {Tensor: 5} tensor([[ 0.1922, -0.0148, -0.1884,  0.2124, -0.1361,  0.0172, -0.2371,  0.1946,\n          0.2047, -0.2697],\n        [-0.2690,  0.1372,  0.2269,  0.0436, -0.1353, -0.2054, -0.2418, -0.2300,\n          0.1987,  0.0007],\n        [ 0.0995, -0.2659, -0.2374, -0
  'net2.bias' = {Tensor: 5} tensor([0.1488, 0.0791, 0.1667, 0.1449, 0.0545])
 ```
+
+
+[基于阿里云弹性GPU服务的神龙AI加速引擎，无缝提升AI训练性能](https://mp.weixin.qq.com/s/MIHUVoT3pJLD19PKjlXvXQ) 云上场景的 分布式训练优化
+1. 在 AI 框架层，软件代码称为 Acspeed。Acspeed 使用 Pytorch 从 c10d-plugin 的接口与对应的 wrapper，实现对 Pytorch ddp 使用方式的无感支持与 bucket 层级的优化；对使用 Tensorflow 的用户，Acspeed 同样提供 horovo-api 的兼容层。
+2. 在集合通信算法层，Acspeed 使用集合通信编译器的技术，在 nccl runtime 的基础上，针对 nvlink/nvswitch/PCIe/NIC 交换机等互联信息进行自适应的拓扑感知与算法优化
+3. 针对 Pytorch 训练计算图进行了编译优化，软件代码为 Agspeed，用户侧 Pytorch eager API 使用场景不变。
 
 
