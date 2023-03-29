@@ -412,20 +412,6 @@ func (g *genericScheduler) Schedule(..., placement *policyv1alpha1.Placement, sp
 }
 ```
 
-## 其它
-
-阿里：
-
-[还在为多集群管理烦恼吗？OCM来啦！](https://mp.weixin.qq.com/s/t1AGv3E7Q00N7LmHLbdZyA)
-[CNCF 沙箱项目 OCM Placement 多集群调度指南](https://mp.weixin.qq.com/s/_k2MV4b3hfTrLUCCOKOG8g)
-
-其它：
-[vivo大规模 Kubernetes 集群自动化运维实践](https://mp.weixin.qq.com/s/L9z1xLXUnz52etw2jDkDkw) 未读。
-
-[跨集群运行 StatefulSet](https://mp.weixin.qq.com/s/Py0LB7W19ASB8crBkrhBiA)
-
-
-
 ## 手动访问多个kubernetes 集群
 
 1. 一般情况，kubernetes 单独搭建在一个集群上，开发者通过开发机 或某一个跳板机上 通过kubectl 操作kubernetes，kubectl 会读取`~/.kube/config` 文件读取集群信息
@@ -463,3 +449,17 @@ func (g *genericScheduler) Schedule(..., placement *policyv1alpha1.Placement, sp
         cluster: scratch
         user: experimenter
       name: exp-scratch
+
+## 其它
+
+阿里：
+
+[还在为多集群管理烦恼吗？OCM来啦！](https://mp.weixin.qq.com/s/t1AGv3E7Q00N7LmHLbdZyA)
+[CNCF 沙箱项目 OCM Placement 多集群调度指南](https://mp.weixin.qq.com/s/_k2MV4b3hfTrLUCCOKOG8g)
+
+其它：
+[vivo大规模 Kubernetes 集群自动化运维实践](https://mp.weixin.qq.com/s/L9z1xLXUnz52etw2jDkDkw) 未读。
+
+[跨集群运行 StatefulSet](https://mp.weixin.qq.com/s/Py0LB7W19ASB8crBkrhBiA)
+
+[B站多云管理平台建设](https://code.byted.org/epscp/apphub/merge_requests/698) 多云管理不只是 多k8s 集群管理。
