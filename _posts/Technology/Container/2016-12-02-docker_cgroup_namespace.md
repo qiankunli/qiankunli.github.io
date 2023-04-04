@@ -227,7 +227,7 @@ struct task_group {
 
 Linux 中的进程调度是一个层级的结构，进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，将这个进程放进某个CPU的队列上来。默认有一个根group，也就是，创建普通进程后（没有配置cgroup）加入percpu.rq 实质是加入到了一个默认的task_group中。对于容器来讲，**宿主机中进行进程调度的时候，先调度到的实际上不是容器中的具体某个进程，而是一个 task_group**。然后接下来再进入容器 task_group 的调度队列 cfs_rq 中进行调度，才能最终确定具体的进程 pid。
 
-当cgroup cpu 子系统创建完成后，内核的 period_timer 会根据 task_group->cfs_bandwidth 下用户设置的 period 定时给可执行时间 runtime 上加上 quota 这么多的时间（相当于按月发工资），以供 task_group 下的进程执行（消费）的时候使用。
+系统会定期在每个 cpu 核上发起 timer interrupt，在时钟中断中处理的事情包括 cpu 利用率的统计，以及周期性的进程调度等。当cgroup cpu 子系统创建完成后，内核的 period_timer 会根据 task_group->cfs_bandwidth 下用户设置的 period 定时给可执行时间 runtime 上加上 quota 这么多的时间（相当于按月发工资），以供 task_group 下的进程执行（消费）的时候使用。
 
 在完全公平器调度的时候，每次 pick_next_task_fair 时会做两件事情
 1. 将从 cpu 上拿下来的进程所在的运行队列进行执行时间的更新与申请。会将 cfs_rq 的 runtime_remaining 减去已经执行了的时间。如果减为了负数，则从 cfs_rq 所在的 task_group 下的 cfs_bandwidth 去申请一些。

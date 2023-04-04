@@ -75,6 +75,7 @@ keywords:  Kubernetes 混部
 3. 批处理任务
   1. 分级可靠地资源超卖，满足差异化的QoS需求
   2. 及时识别干扰源，避免影响LS应用
+4. 资源抽象：Kubernetes 原生 QoS 分级无法满足大规模生产环境的要求
 
 [Kubernetes解决Noisy Neighbors场景的探索](https://mp.weixin.qq.com/s/g28ett0Z5LR0sHTyOljCRg) RDT机制 按照应用程序和线程的服务分类来限制和分配其使用的L1/L2/L3缓存。
 
@@ -94,7 +95,7 @@ Koordinator，名字取自 coordinator，K for Kubernetes，发音相同。语�
 1. 混部pod会占用原生的资源配额（例如cpu request），这会导致在线任务发布的时候没有可用资源；PS：把离线业务调到在线集群节点，得调的上去，调上去之后不能影响在线业务pod调度。 
 2. 原生调度本质是静态调度，没有考虑机器实际负载，因此没法有效地将混部任务调度到实际负载有空闲的机器上。PS：得感知实际的机器负载。得调的上去，调上去之后要有措施防止出事。
 
-[字节跳动 YARN 云原生化演进实践](https://mp.weixin.qq.com/s/a6P1ZrIoy6xlHrTG2-GNKQ)
+[字节跳动开源 Katalyst：在离线混部调度，成本优化升级](https://mp.weixin.qq.com/s/A5_1h3RLmDNazmAddbhYaA)提供资源超卖的能力，充分利用集群中 “**已经售卖但未充分使用的资源**” 部署更多低优业务，同时在系统侧完善 CPU、内存、磁盘、网络等多维度的资源隔离机制，并且智能预测、感知各类服务的负载变化，结合服务的分级机制，通过分钟级的指标感知和调控策略，保证服务的稳定性。
 
 ### 可观测性体系
 
@@ -165,6 +166,8 @@ Crane 提供了 Request 推荐、副本数推荐、HPA 推荐以及 EPA 等业�
 
 ### 字节
 
+[字节跳动 YARN 云原生化演进实践](https://mp.weixin.qq.com/s/a6P1ZrIoy6xlHrTG2-GNKQ)
+
 [字节跳动大规模K8s集群管理实践](https://mp.weixin.qq.com/s/P3-CrOVSSaVAT5tH9m06EA)  值得细读。单集群支持运行各种负载，上面联邦层管理，最上面给用户一个paas平台，资源可以在集群范围内腾挪。每个任务出费用单；下调某类、部门的资源用量 腾挪给突发活动等。基本上理清了一个公司 paas 的终态。datacenters as a computer。
 
 ![](/public/upload/kubernetes/bd_k8s.jpg)
@@ -201,6 +204,7 @@ Crane 提供了 Request 推荐、副本数推荐、HPA 推荐以及 EPA 等业�
   2. 集群中心调度器需要解决的核心问题是如何让不同形态的应用在整个集群里自由地调度。需要满足不同的调度语义细粒度的要求，充分降低集群空置率。在调度性能方面，同时要满足低频次和批式的大吞吐的调度场景。针对各种应用场景提升调度场景的质量也是集群中心调度器需要解决的问题。
   3. 全局调度，考虑到字节跳动的整体规模，单一的集群能力不足以满足管理字节全球数据中心的需求，并且在应用之间的隔离、多区域的容灾以及算力的标准化问题上字节也有更加细粒度的调度要求。‍
   
+[字节跳动开源 Katalyst：在离线混部调度，成本优化升级](https://mp.weixin.qq.com/s/A5_1h3RLmDNazmAddbhYaA)
 
 ### 美团
 

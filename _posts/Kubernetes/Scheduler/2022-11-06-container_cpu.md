@@ -267,3 +267,10 @@ Kubernetes 原本的资源模型存在局限性（引入动态资源视图）。
 ![](/public/upload/container/container_schedule.png)
 
 某些时候要对pod做绑核处理，或者是保护这个业务进程，或者是避免这个业务频繁切换干扰其它业务进程。尽量将同一个物理核上的逻辑核同时绑定给一个业务使用。否则，如果在线任务和混部任务分别跑在一个物理核的两个逻辑核上，在线任务还是有可能受到“noisy neighbor”干扰。
+
+## 其它
+
+[如何正确获取容器的CPU利用率？](https://mp.weixin.qq.com/s/nKedQRFxmIgPBxtlIJasZw)
+1. 如何正确地获取容器中的 cpu 利用率？
+  1. 使用 lxcfs，将容器中的 /proc/stat 替换掉。这样 top 等命令就不再显示的是宿主机的 cpu 利用率了，而是容器的。
+  2. 直接使用 cgroup 提供的伪文件来进行统计（libcontain），这些伪文件一般位于 `/sys/fs/cgroup/...` 路径。kubelet 中集成的 cadvisor 就是采用上述方案来上报容器 cpu 利用率的打点信息的。cadvisor 具体访问 cgroup 目录是通过调用 libcontainer 获取的。

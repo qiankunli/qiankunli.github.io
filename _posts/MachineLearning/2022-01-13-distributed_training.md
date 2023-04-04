@@ -80,6 +80,11 @@ RDMA本身指的是一种技术，具体协议层面，包含Infiniband（IB）�
 
 [系列解读SMC-R：透明无感提升云上TCP应用网络性能](https://mp.weixin.qq.com/s/Zz0qTbG9ZbRT53LHPJ_koQ)Shared Memory Communication over RDMA (SMC-R) 是一种基于 RDMA 技术、兼容 socket 接口的内核网络协议，由 IBM 提出并在 2017 年贡献至 Linux 内核。SMC-R 能够帮助 TCP 网络应用程序透明使用 RDMA，获得高带宽、低时延的网络通信服务。
 
+[基于阿里云 eRDMA 的 GPU 实例如何大幅提升多机训练性能](https://mp.weixin.qq.com/s/ayUzcrukvxuOqr7ppBz1kQ)eRDMA 技术由阿里云在 2021 年云栖大会发布，与 RDMA 生态完全兼容。
+1. 在服务器节点间的数据通信过程中，CPU 仅负责指定 RDMA 通信的源及目的物理地址，并触发通信动作，其余工作全部由物理网卡上的 DMA 引擎负责完成。相比传统的 TCP 通信，近端及远端的物理网卡通过协作可以直接将本地的内存数据写入远端的内存地址空间，或从远端的物理内存空间读取数据到本地内存，待数据传输全部完成后，再通知 CPU 进行下一步动作，将数据传输和计算分开，从而实现高效的并行计算处理。
+2. DMA 引擎同样可以对设备地址进行直接访问。在异构计算的应用场景中，服务器节点间同步的不仅是内存的数据，还有 GPU 显存的数据。GDR 便是为了实现物理绑卡**在服务节点间直接搬移 GPU 显存的数据**而实现。为了支持该功能，NVIDIA 的 GPU 驱动提供了一套标准接口，用于获取应用层申请的显存对应的物理地址。物理网卡可以使用这一物理地址完成 DMA 的直接访问。
+3. eRDMA 基于阿里云的 VPC 网络，因此不论是纯粹的 CPU 服务器还 GPU 服务器，均可以通过添加 eRDMA 设备激活 eRDMA 功能。在神龙底层的实现上，它由神龙 CIPU 模拟出 VirtIO 网卡设备和 ERI 设备，通过神龙的虚拟化层分配给弹性服务器。在用户视角有两个设备，分别为 VirtIO 和 ERI，底层物理设备的访问对用户完全透明，用户仅需要安装阿里云提供的 eRDMA 驱动即可使用。
+
 ### GPU 卡间通信
 
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
