@@ -269,6 +269,8 @@ karmada 会为每一个分发的资源每个目标成员集群的执行命名空
 
 ![](/public/upload/kubernetes/karmada_propagation.jpg)
 
+[如何使用 Karmada 更高效地实现故障转移](https://mp.weixin.qq.com/s/JooV-4YYUsjTWUBNbzfsMg)
+
 ### 源码分析
 
 ResourceDetector 组件监听 用户创建的object，查找 object 匹配的 PropagationPolicy 并创建ResourceBinding

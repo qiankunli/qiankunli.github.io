@@ -101,6 +101,10 @@ e: abc
 
 ## 与k8s结合
 
+在 KubeVela 中，抽象层由 CUE 支持，这是一种新颖的配置编程语言，可以描述复杂的渲染逻辑，它在使用层面与 JSON 一致，是 JSON 的超集。抽象层简化了 Kubernetes 中资源的配置，隐藏了实现的细节，并仅向业务开发人员暴露有限参数。使用 KubeVela 应用程序，开发人员可以轻松地专注于应用程序的中心逻辑，例如应该使用哪个容器镜像以及如何访问服务。为了实现这一目标，使用 Kubernetes 原生资源的最佳实践被总结到 KubeVela X-Definitions 中，并使用 CUE 提供资源的渲染模板。PS: 开发一个paas平台，一个核心工作就是将项目、应用（包括使用xxcpu、xx内存）保存到db中，在发布时将这些信息 转换为Deployment 发给k8s apiserver，这个转换过程可以 代码手动一个字段一个字段转换为apps.Deployment，也可以是 `apps.Deployment = 参数 + apps.Deployment模版` 渲染得到。 
+
+![](/public/upload/kubernetes/kubevela_cue.jpg)
+
 ```
 // deployment.cue
 parameter:{

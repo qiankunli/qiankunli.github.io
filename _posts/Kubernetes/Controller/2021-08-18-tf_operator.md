@@ -29,6 +29,8 @@ Kubeflow 支持两种不同的 Tensorflow 框架分布式训练方法。
 1. Tensorflow 架构/ PS 模式，它依赖于集中式参数服务器来实现工作线程之间的协调。
 2. 分散式方法/mpi allreduce 模式，工作线程通过 MPI AllReduce 原语直接相互通信，不使用参数服务器。NVIDIA 的 NCCL 库已经在GPU 上有效地执行了大部分 MPI 原语，而 Uber 的Horovod 让使用 TensorFlow 执行多 GPU 和多节点训练变得轻而易举。与参数服务器相比，第二种方法可以更好地优化带宽和更好地扩展。
 
+[蚂蚁开源大规模智能分布式训练系统](https://mp.weixin.qq.com/s/VTqYGNefgbnALsRUoWNM_Q)我们希望设计并实现一个系统，让用户完全摆脱资源配置的束缚，专注于模型训练本身。**在没有任何资源配置输入的情况下，DLRover 仍然可以为每个训练作业提供最佳资源配置**。考虑到用户可能会以不同的方式运行他们的训练作业，DLRover 除了面向训练平台进行作业统一管理的 Cluster Mode，也提供 Single-Job Mode 方便独立的算法开发者也能享受到弹性容错等基本特性。
+
 ## 案例
 
 官方文档 [TensorFlow Training (TFJob)](https://www.bookstack.cn/read/kubeflow-1.3-en/10609d8d54cc9ad7.md)

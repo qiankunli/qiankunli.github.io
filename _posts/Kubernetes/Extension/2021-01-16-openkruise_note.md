@@ -51,6 +51,8 @@ docker 让镜像和容器融合在一起，`docker run` 扣动扳机，实现镜
 
 从工作负载层面上讲，Kubernetes 只通过 Deployment、Statefulset 等抽象描述单个组件的特征，然而多数情况下，开发人员开发出的业务系统会包含若干微服务组件。那么如何对整个业务系统进行统一的管理就变成了一个问题。解决方案之一，就是通过云原生应用平台，在单个组件之上，抽象出应用这个概念。应用应该是由人为规定的一组服务组件（workload）组成，服务组件之间具有显式或隐式的关联调用关系，彼此之间有机组合成为一个整体，作为一套完整的业务系统对外提供服务。PS：比如AI 训练任务的一系列workload
 
+[Kruise Rollout v0.3.0：教你玩转 Deployment 分批发布和流量灰度](https://mp.weixin.qq.com/s/rziqq_30-UtyEOgOcVhoFA) 未读
+
 ## 代码结构
 
 [Kruise 控制器分类指引](http://openkruise.io/zh-cn/blog/blog1.html)Controller 命名惯例

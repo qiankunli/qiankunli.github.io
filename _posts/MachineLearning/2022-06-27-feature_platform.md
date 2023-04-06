@@ -83,7 +83,7 @@ Andrew认为，在搭建模型时，特征生产与模型训练的时间占比�
 6. t5时刻，实际仅Top10商品向用户曝光并触发了用户点击，曝光和点击日志回传到服务后端
 7. t6时刻，根据曝光和点击日志，构建样本，以对排序模型进行再训练或增量训练
 
-样本生成的要求：当生成样本时，特征的时刻要与事件的时刻匹配，不能过早也不能过晚，否则将导致特征穿越。以如上时间线为例，t2时刻发生了实际的模型推理，这一事件在t6时刻转化成训练样本时，关联的应是t2时刻的特征值，即所谓的Point-in-Time Correct。
+为了用特征去做训练，通常需要将特征拼接到用户带有 Label 的一些数据集上。样本生成的要求：当样本拼接时，**特征的时刻要与事件的时刻匹配**，不能过早也不能过晚，否则将导致特征穿越。以如上时间线为例，t2时刻发生了实际的模型推理，这一事件在t6时刻转化成训练样本时，关联的应是t2时刻的特征值，即所谓的Point-in-Time Correct。 [point-in-time correct 语义](https://mp.weixin.qq.com/s/43Gh-rl7oiCKEmePhNuHHA)
 
 t6时刻构建样本时，有几种方案
 
@@ -111,7 +111,7 @@ t6时刻构建样本时，有几种方案
 
 [华为商城特征平台建设实践，特征平台-最佳的AI数据监控落脚点](https://www.bilibili.com/video/BV1CY4y1G7E6?is_story_h5=false&p=1&share_from=ugc&share_medium=iphone&share_plat=ios&share_session_id=70CB31B9-E4F4-4AA1-91B6-8BFB466A9951&share_source=WEIXIN&share_tag=s_i&timestamp=1661353284&unique_k=eeTT3CT)
 
-1. 特征计算难
+1. 特征计算难. 特征计算本质是一个特征的 ETL
     1. 多种数据源组件
     2. 大数据场景下的SQL。 
     3. 近线/实时计算
@@ -290,6 +290,30 @@ Feast用python 代码来描述上述过程，Feature AS Code 的方式也便于�
 [5年迭代5次，抖音推荐系统演进历程](https://mp.weixin.qq.com/s/_c_YtNFOuOpcyWInQowgCw)特征生产的链路分为数据源抽取 / 拼接、状态存储、计算三个阶段，Flink SQL 完成特征数据的抽取和流式拼接，Flink State 完成特征计算的中间状态存储。
 
 ![](/public/upload/machine/bytedance_ai_platform.png)
+
+[字节跳动湖平台在批计算和特征场景的实践](https://mp.weixin.qq.com/s/gTPpNrq4nqZz3lx22ttOCg) 未读
+
+### 阿里 
+
+[流批一体的实时特征工程平台建设实践](https://mp.weixin.qq.com/s/43Gh-rl7oiCKEmePhNuHHA) FeatHub 代码开源，做的比较全，值得细读。**基本把特征平台要解决的问题、概念、工作流、架构说清楚了**。PS：挺佩服这个抽象的，把复杂事情说清楚了。
+
+FeatHub 的基本价值是提供 SDK 来方便用户开发特征，并且提供执行引擎来计算特征。用python 作为dsl 描述了特征来源、转换/计算、存储。
+
+![](/public/upload/machine/featurehub_arch1.jpg)
+
+![](/public/upload/machine/featurehub_arch2.jpg)
+
+核心概念（建议细读原文，将特征转换的各个场景做了分类和抽象）
+
+![](/public/upload/machine/featurehub_model.jpg)
+
+![](/public/upload/machine/featurehub_process.jpg)
+
+示例
+
+![](/public/upload/machine/featurehub_example1.jpg)
+
+![](/public/upload/machine/featurehub_example2.jpg)
 
 ## 其它
 

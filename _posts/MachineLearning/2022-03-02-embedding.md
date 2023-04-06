@@ -226,3 +226,5 @@ embedding部分的难点在于存储和检索。DNN这部分主要是稠密计�
 1. 把嵌入层分布在多个 GPU 和多个节点上
 3. Embedding 层模型并行，dense 层数据并行。
 
+[微信基于 PyTorch 的大规模推荐系统训练实践](https://mp.weixin.qq.com/s/CH-L-RfvHtGEj06_z-8xXQ) 值得细读。
+

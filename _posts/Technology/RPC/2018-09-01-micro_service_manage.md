@@ -10,11 +10,6 @@ keywords: dubbo micro service
 
 ## 简介
 
-
-[微服务进入深水区后该何去何从](https://mp.weixin.qq.com/s/uEcoUE_LSoNqB8-FvaHOdA)
-
-[跨不同开发语言和技术框架，微服务治理规范OpenSergo项目正式开源](https://mp.weixin.qq.com/s/_WQcfyH3H2p7vuT3Keik3Q)
-
 ![](/public/upload/architecture/micro_service.png)
 
 容器和 Kubernetes 降低了服务（应用）的部署和升级成本，在微服务中，会直接把单个服务拆分成多个服务，服务之间用 API 调用。这里也可以看到，在微服务中，架构设计的重要性降低，API 设计的重要性提高。随着微服务的发展，服务变得太多了，管理负责度又上升了，比如怎么去解决服务发现的问题、怎么控制流量、服务之间怎么做隔离，服务状态怎么观测等等。这时候又出现了「服务治理」的概念。
@@ -286,6 +281,8 @@ class GenericService {
 }
 ```
 
+[Kitex 泛化调用案例：基于 API 网关的支付开放平台](https://mp.weixin.qq.com/s/eMquyq4Qt-X8oZxZuCAVWA) 未细读。
+
 ### 可靠性设计
 
 [Rpc框架的可靠性设计](https://www.infoq.cn/article/BZEKAR1WxqG-2DpARE9o)
@@ -369,6 +366,8 @@ class GenericService {
 
 ## 微服务治理标准OpenSergo 
 
+[跨不同开发语言和技术框架，微服务治理规范OpenSergo项目正式开源](https://mp.weixin.qq.com/s/_WQcfyH3H2p7vuT3Keik3Q)
+
 [算法实战（四）：剖析微服务接口鉴权限流背后的数据结构和算法](https://time.geekbang.org/column/article/80388#previewimg)开放、通用的、面向分布式服务架构、覆盖全链路异构化生态的服务治理标准 OpenSergo。在 OpenSergo 中，**对流控降级与容错场景的实现抽象出标准的 CRD**，只要微服务框架适配了 OpenSergo，即可通过统一 CRD 的方式来进行流控降级等治理。PS： Sentinel 是阿里巴巴开源的，面向分布式服务架构的流量控制组件，主要以流量为切入点，从流量控制、流量整形、熔断降级、系统自适应保护等多个维度来帮助开发者保障微服务的稳定性， OpenSergo 可以理解为是一个商业化版本的Sentinel。一流企业定标准。
 
 [“天猫双11”背后的流量治理技术与标准实践](https://mp.weixin.qq.com/s/oR0NEOARGhges-09wOoYAA)在 OpenSergo 中，我们结合 Sentinel 等框架的场景实践对流量防护与容错抽出标准 CRD。一个容错治理规则 (FaultToleranceRule) 由以下三部分组成：
@@ -431,6 +430,8 @@ spec:
 20200527 补充：一些比较好的解决方法 [如何提升微服务的幸福感](https://mp.weixin.qq.com/s/y0tsSbigbRe2AyqaAIzeSQ)
 
 [微服务治理平台化探索](https://mp.weixin.qq.com/s/7DlmcIh9ShKdOdpnWe33VA)
+
+[微服务进入深水区后该何去何从](https://mp.weixin.qq.com/s/uEcoUE_LSoNqB8-FvaHOdA)
 
 ### 带来的问题
 
