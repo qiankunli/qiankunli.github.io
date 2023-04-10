@@ -25,13 +25,13 @@ keywords: application
 
 ![](/public/upload/kubernetes/kubernetes_fault.png)
 
-[给 K8s API “做减法”：阿里巴巴云原生应用管理的挑战和实践](https://mp.weixin.qq.com/s/u3CxlpBYk4Fw3L3l1jxh-Q)Kubernetes API 的设计把研发、运维还有基础设施关心的事情全都糅杂在一起了。这导致研发觉得 K8s 太复杂，运维觉得 K8s 的能力非常凌乱、零散，不好管理。很多 PaaS 平台只允许开发填 Deployment 的极个别字段。为什么允许填的字段这么少？是平台能力不够强吗？其实不是的，本质原因在于业务开发根本不想理解这众多的字段。归根到底，Kubernetes 是一个 Platform for Platform 项目，**它的设计是给基础设施工程师用来构建其他平台用的（比如 PaaS 或者 Serverless），而不是直面研发和运维同学的**。从这个角度来看，Kubernetes 的 API，其实可以类比于 Linux Kernel 的 System Call，这跟研发和运维真正要用的东西（Userspace 工具）完全不是一个层次上的。
+[给 K8s API “做减法”：阿里巴巴云原生应用管理的挑战和实践](https://mp.weixin.qq.com/s/u3CxlpBYk4Fw3L3l1jxh-Q)Kubernetes API 的设计把研发、运维还有基础设施关心的事情全都糅杂在一起了。这导致研发觉得 K8s 太复杂，运维觉得 K8s 的能力非常凌乱、零散，不好管理。很多 PaaS 平台只允许开发填 Deployment 的极个别字段。为什么允许填的字段这么少？是平台能力不够强吗？其实不是的，本质原因在于业务开发根本不想理解这众多的字段。归根到底，Kubernetes 是一个 Platform for Platform 项目，**它的设计是给基础设施工程师用来构建其他平台用的（比如 PaaS 或者 Serverless），而不是直面研发和运维同学的**。从这个角度来看，**Kubernetes 的 API，其实可以类比于 Linux Kernel 的 System Call，这跟研发和运维真正要用的东西（Userspace 工具）完全不是一个层次上的**。
 
 K8s 实在是太灵活了，插件太多了，各种人员开发的 Controller 和 Operator 也非常多，上k8s带来的成本已经超过带来的业务效率的提升了。
 
 ### 基于k8s 做一个应用管理平台
 
-Kubernetes 实际上是面向平台开发者，而不是面向研发和应用运维的这么一个项目。要基于 Kubernetes 去构建应用管理平台。去更好的服务研发和运维，这也是一个非常自然的选择。不是说必须使用 K8s 去服务你的用户。如果你的用户都是 K8s 专家，这是没问题的。如果不是的话，你去做这样一个应用平台是非常自然的事情。
+Kubernetes 实际上是面向平台开发者，而不是面向研发和应用运维的这么一个项目。要基于 Kubernetes 去构建应用管理平台。去更好的服务研发和运维，这也是一个非常自然的选择。不是说必须使用 K8s 去服务你的用户。**如果你的用户都是 K8s 专家，这是没问题的**（社区正在迫使他们成为 Kubernetes 专家才能使事情正常运行）。如果不是的话，你去做这样一个应用平台是非常自然的事情。
 
 ![](/public/upload/kubernetes/application_manager_based_on_k8s.png)
 
@@ -42,6 +42,8 @@ Kubernetes 实际上是面向平台开发者，而不是面向研发和应用运
 我们能不能抛弃传统 PaaS 的一个做法，基于 K8s 打造高可扩展的应用管理平台。我们想办法能把 K8s 能力无缝的透给用户，同时又能提供传统 PaaS 比较友好的面向研发运维的使用体验呢？我们不是说要在 Kubernetes 上盖一个 PaaS，因为 K8s 本身可以扩展，可以写一组 CRD，把我们要的 API 给装上去。
 
 ## Open Application Model （OAM）
+
+由微软和阿里云支持的开放应用程序模型（OAM），其目标是为云原生应用程序应该是什么样子提供一个理论模型。它**最初被设计为不与 Kubernetes 绑定**，并且倾向于为操作应用程序提供统一的接口。OAM 提出了组件和特性的概念，以对应用程序架构进行抽象。PS：就好像Serverless 是一种理念，FaaS 是实现这个理念的一种落地实践，只是在k8s和oam这里，是先有的k8s，再提取的理念oam。
 
 ### 为什么
 
@@ -71,7 +73,7 @@ In Open Application Model, we propose an app-centric approach instead:
 
 ### oam 应用模型
 
-与 PaaS 应用模型相比，OAM 有很多独有的特点，其中最重要一点是：平台无关性。虽然我们目前发布的 OAM 实现是基于 Kubernetes 的，但 Open Application Model 与 Kubernetes 并没有强耦合。
+与 PaaS 应用模型相比，OAM 有很多独有的特点，其中最重要一点是：平台无关性。虽然我们目前发布的 OAM 实现是基于 Kubernetes 的，但 Open Application Model 与 Kubernetes 并没有强耦合。PS： 如果marathon 等还在的话，OAM 确实是一个很不错的抽象。
 
 OAM 支持  Kubernetes 内置的工作负载，那什么时候该使用 Deployment、什么时候该使用ContainerizedWorkload 来作为 OAM 的工作负载呢？如果你的用户希望看到一个极简的、没有一些”乱七八糟“字段的 Deployment 的话；或者，你希望对你的用户屏蔽掉 Deployment 里面与用户无关的字段（比如：不想允许研发自行设置 PodSecurityPolicy），那你就应该给用户暴露 ContainerizedWorkload。这时候，这个工作负载需要的运维操作和策略，则是由另一个 OAM 对象 Traits（运维特征） 来定义的，比如 ManualScalerTrait。
 

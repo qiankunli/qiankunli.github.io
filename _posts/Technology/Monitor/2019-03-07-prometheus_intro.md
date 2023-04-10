@@ -303,6 +303,8 @@ groups:
 [一文读懂 Prometheus 长期存储主流方案](https://mp.weixin.qq.com/s/uGvcxwvC_QDkFKU-Bcxgww) 
 1. VictoriaMetrics可以作为Prometheus的长期远程存储方案，当然VictoriaMetrics也可以完全取代Prometheus，因为VictoriaMetrics基本支持Prometheus配置文件、PromQL、各类API、数据格式等等。
 
+[优化云原生监控体验：VictoriaMetrics入门指南](https://mp.weixin.qq.com/s/vFgBwmRfl1PNVIDLg1audg) 未读
+
 ## Prometheus 与 OpenTelemetry
 
 [Prometheus与OpenTelemetry该选哪个？](https://mp.weixin.qq.com/s/uB3ZB4uUhdIOtGCweeHBlQ)
