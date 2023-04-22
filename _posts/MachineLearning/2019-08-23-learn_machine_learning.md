@@ -55,6 +55,9 @@ ML 是一个通过算法和统计模型从数据中学习知识的学科，当�
 
 [人工智能是不是走错了方向？](https://mp.weixin.qq.com/s/tUva9bOOCV8NNurEnd9LWg)
 
+李宏毅： 机器学习就是让机器找一个函数f。
+![](/public/upload/machine/deep_learning_step.jpg)
+
 ## 机器学习的数学基础
 
 [分层的概念——认知的基石](https://mp.weixin.qq.com/s?__biz=MzA4NTg1MjM0Mg==&mid=2657261549&idx=1&sn=350d445acf339ce19e7aab1ff19d92d0&chksm=84479e34b3301722aea0aaaa6f74656dd3e9509d70bf5719fb3992d744312bdd1484fc0c1852&mpshare=1&scene=23&srcid=1105hMUVZrVwuoX8KbtS0Vl0%23rd)

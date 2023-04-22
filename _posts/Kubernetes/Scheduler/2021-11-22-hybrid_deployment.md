@@ -135,6 +135,17 @@ Koordinator，名字取自 coordinator，K for Kubernetes，发音相同。语�
 
 ## 各个公司实现
 
+### 规范NRI（发展中）
+
+[NRI：下一代节点细粒度资源控制方案](https://mp.weixin.qq.com/s/gwww7Is2_lG7m20wdAeWSg)为了满足不同业务应用场景的需求，特别是在在线任务与离线任务混布的场景下，在提高资源利用率的同时，也要保证延迟敏感服务可以得到充分的资源保证，这就需要 Kubernetes 提供更加细粒度的资源管理功能，增强容器的隔离性，减少容器之间的互相干扰。例如，CPU 编排，内存分层，缓存管理，IO 管理等。目前有很多方案，但是都有其一定的局限性。
+1. Proxy 模式，在客户端(Kubelet)和 CRI Runtime(containerd,CRI-O 等) 之间增加一个 CRI Proxy **中继请求和响应**，在 Proxy 中劫持 Pod 以及 Container 的创建/更新/删除事件，对 Pod 的 Spec 进行修改或者完善，将硬件感知的资源分配策略应用于容器中。缺点：增加了 Pod 创建管理流程的链路以及部署和维护成本
+2. Standalone 模式，在每一个 Work Node 上创建一个 Agent，当这个 Agent 监听到在本节点的 Pod 创建或者修改事件的时候，再根据 Pod Spec 中的 annotation，转换成细粒度资源配置的 Spec，然后调用 CRI Runtime 实现对 Pod 的更新。缺点：在侦听到 Pod 创建以及修改的事件后，才会对 Pod 进行更新，会有一定的延迟。
+
+NRI(Node Resource Interface), 是用于控制节点资源的公共接口, 是 CRI 兼容的容器运行时插件扩展的通用框架。它为扩展插件提供了跟踪容器状态，并对其配置进行有限修改的基本机制。
+
+![](/public/upload/kubernetes/nri.jpg)
+
+
 ### 腾讯
 
 [Crane如何做到利用率提升3倍稳定性还不受损？](https://mp.weixin.qq.com/s/yE-qyxW0TlklrjlSb8M03Q)
