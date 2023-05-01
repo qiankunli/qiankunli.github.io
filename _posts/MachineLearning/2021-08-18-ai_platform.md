@@ -196,6 +196,10 @@ https://github.com/tencentmusic/cube-studio/wiki
 
 [AI推理加速原理解析与工程实践分享](https://mp.weixin.qq.com/s/MPSa-whByMiknN92Kx8Kyw)
 
+## 字节
+
+[字节跳动正式开源分布式训练调度框架 Primus](https://mp.weixin.qq.com/s/QCuRWn435ewcsrsqLXftxg) 支持yarn 和 k8s任务统一调度，会为每一个任务生成一个Application Manager，
+
 ## 基础设施
 
 功能侧从下到上：异构资源；异构workload；工作流。

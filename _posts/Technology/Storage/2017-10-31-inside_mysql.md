@@ -18,6 +18,8 @@ keywords: mysql innodb
 
 ![](/public/upload/storage/run_sql.png)
 
+[慢SQL是如何拖垮数据库的？](https://mp.weixin.qq.com/s/XmPdG7E8xGXdZVBg7M81_w) 学以致用。
+
 ## 基本架构
 
 ![](/public/upload/storage/mysql_architecture.png)

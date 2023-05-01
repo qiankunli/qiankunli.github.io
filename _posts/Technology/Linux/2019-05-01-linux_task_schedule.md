@@ -226,7 +226,7 @@ struct task_struct{
 }
 ```
 
-每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。**这样保证了实时任务的优先级永远大于普通任务**。
+每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。**这样保证了实时任务的优先级永远大于普通任务**。PS： [离线调度算法(BT)](https://github.com/Tencent/TencentOS-kernel) 为了支持在混部，支持了bt_rq。
 
 ```c
 // Pick up the highest-prio task:
