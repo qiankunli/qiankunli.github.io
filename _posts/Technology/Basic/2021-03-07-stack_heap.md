@@ -48,9 +48,10 @@ AMD64 Linux平台下，栈是从高地址向低地址方向生长的，为什么
 
 ![](/public/upload/basic/stack_heap_overview.png)
 
+
 ## 为什么需要栈
 
-《揭秘Java虚拟机》
+栈是支持程序运行的基本数据结构，它跟计算机硬件（call、ret、push、pop 等指令），比如 CPU 的栈指针寄存器、操作系统息息相关，还跟编译器关系密切（我们在函数中定义的局部变量，就是放在栈中的，函数的调用和返回，也是依赖于栈）。《揭秘Java虚拟机》
 1. 函数内部会定义局部变量，变量要占内存，由于位于同一函数中，很自然的想法是将其内存空间放在一起，有利于整体申请和释放。所以栈帧首先是一个容器。
 2. 一个函数一帧，多个函数多个帧。如何组织呢？ PS： 散列不行，所以选择了线性，队列不合适，选择了栈。
     1. 散列。一个函数的栈帧随意在内存中分配，栈帧地址与函数名建立关联关系 ==> 调用方与被调用方要保存对方的堆栈空间地址。
@@ -126,10 +127,10 @@ jump 和call 的区别是：jump 之后不用回来，而call（也就是函数�
 所以操作系统对线程的调度可以简单的理解为内核调度器对不同线程所使用的寄存器和栈的切换。最后，我们对操作系统线程下一个简单且不准确的定义：操作系统线程是由内核负责调度且**拥有自己私有的一组寄存器值和栈的执行流**。
 
 
+
 ## 为什么需要堆？
 
-Heap is used for dynamic memory allocation(data with dynamic size ) and unlike stack, the program needs to look up the data in heap using pointers.  
-
+Heap is used for dynamic memory allocation(data with dynamic size ) and unlike stack, the program needs to look up the data in heap using pointers.  堆其实是虚拟内存空间中一个段，由堆的开始地址和结束地址控制其大小，有一个堆指针指向未分配的第一个字节。所以，堆在本质上是指应用程序在运行过程中进行动态分配的内存区域，堆的管理通常在库函数中完成。
 
 光有栈，对于面向过程的程序设计还远远不够，因为栈上的数据在函数返回的时候就会被释放掉，所以**无法将数据传递至函数外部**，只能通过不断拷贝的方式保持其“存活”。而全局变量、静态变量生存期虽然与整个程序保持一致，但没有办法在程序的运行过程中动态生成，只能在编译的时候定义，有很多情况下缺乏表现力，且完全暴露给所有程序代码使用，在这种情况下，堆（Heap）是一种唯一的选择。The heap is an area of dynamically-allocated memory that is **managed automatically by the operating system or the memory manager library**. Memory on the heap is allocated, deallocated, and resized regularly during program execution, and this can lead to a problem called fragmentation. 
 
@@ -157,7 +158,5 @@ int main(void) {
 如果堆上有足够的空间的满足我们代码的内存申请，内存分配器可以完成内存申请无需内核参与，否则将通过操作系统调用（brk）进行扩展堆，通常是申请一大块内存。（对于 malloc 大默认指的是大于 MMAP_THRESHOLD 个字节 - 128KB）。
 
 任何线程都可以在堆上申请空间（全局的），因此每次申请堆内存都必须进行同步处理，竞争十分激烈，必然会出现线程阻塞。在java 中，为每个线程在eden 区分配一块TLAB 空间，线程在各自的TLAB内存区域申请空间，无需加锁，这是一种典型的空间换时间的策略。
-
-
 
 

@@ -41,6 +41,8 @@ controller-runtime 的核心是Manager 驱动 Controller 进而驱动 Reconciler
 
 ## 用法
 
+### 使用client-go
+
 单纯使用 client-go informer 机制 监听 某个object的写法。
 
 ```go
@@ -67,6 +69,22 @@ cache.WaitForCacheSync(stopCh, podSynced)
 	2. 多个workload，每一个workload 都持有 podInformer 会有重复的问题，为解决这个问题，需要一个独立的对象（比如叫cache）持有所有用到的informer（一个object 一个informer），**向informer 注册eventhandler 也应改为向 cache 注册eventhandler**。
 2. reconcile 时失败、延迟重试等功能
 
+### 使用controller-runtime
+
+极简版如下
+```go
+func main(){
+ 	mgr, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+        Scheme:             scheme,
+        Namespace:          namespace,
+    })
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+        setupLog.Error(err, "problem running manager")
+        os.Exit(1)
+    }
+}
+
+```
 
 [Controller Runtime 的四种使用姿势](https://mp.weixin.qq.com/s/zWvxbO1C2QrZY7iqvGtMGA)
 ```go

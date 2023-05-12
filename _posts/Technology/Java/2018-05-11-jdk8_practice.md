@@ -8,7 +8,7 @@ keywords: java forkjoin
 
 ---
 
-## 简介(持续更新)
+## 简介
 
 ## optional
 

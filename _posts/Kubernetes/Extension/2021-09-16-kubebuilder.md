@@ -25,7 +25,14 @@ Kubernetes 这样的分布式操作系统对外提供服务是通过 API 的形�
 
 [面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA)
 
-## 从 code-generator开始
+## 和code-generator的关系
+
+Kubebuilder和k8s.io/code-generator类似，是一个码生成工具，用于为你的CRD生成kubernetes-style API实现。区别在于：
+
+1. Kubebuilder不会生成informers、listers、clientsets，而code-generator会。
+2. Kubebuilder会生成Controller、Admission Webhooks，而code-generator不会。
+3. Kubebuilder会生成manifests yaml，而code-generator不会。
+4. Kubebuilder还带有一些其他便利性设施。
 
 client-go 只提供了rest api和 dynamic client来操作第三方资源，需要自己实现反序列化等功能（client-go内置informer 只针对k8s 内置object）。**建立好自己的crd struct后**（在types.go中），code-generator提供了以下工具为kubernetes中的资源生成代码（还有一些未列出）:
 1. deepcopy-gen: 生成深度拷贝方法,避免性能开销
@@ -104,14 +111,8 @@ kubebuilder 依赖于 controller-runtime 实现 controller 整个处理流程，
             /webhook
         main.go                 // 创建并启动 Manager，容器的entrypoint
         Dockerfile              // 制作Controller 镜像
-        go.mod                   
-            module app
-            go 1.13
-            require (
-                k8s.io/apimachinery v0.17.2
-                k8s.io/client-go v0.17.2
-                sigs.k8s.io/controller-runtime v0.5.0
-            )
+        PROJECT                 // 用于生成组件的 Kubebuilder 元数据
+        go.mod            
     ```
 2.  创建 API `kubebuilder create api --group apps --version v1alpha1 --kind Application` 后文件变化
     ```

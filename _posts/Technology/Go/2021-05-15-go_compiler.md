@@ -377,3 +377,26 @@ func init() {
 ```
 
 使用`go build  -tags "dev"`，执行二进制文件，会输出 `mysql dev`。
+
+## 闭包
+
+1. 闭包是匿名函数与匿名函数所引用环境的组合，匿名函数有动态创建的特性，这使得匿名函数不用通过参数传递的方式，就可以直接引用外部的变量。
+2. 循环的index、key、value 实质一个变量，如果循环启动了协程 使用了  index、key、value，则实质是for 循环主协程 与子协程共享这些变量，for 循环本身会不断改变这些变量的值，导致子协程读取的值 与预期不一致
+
+```go
+func i := range nodes{
+	// 你会发现处理的都是 最后一个node
+	go func(){
+		node := nodes[i]
+		处理 node
+	}
+}
+func i := range nodes{
+	index := i
+	// goroutine闭包不能直接使用循环的index、key、value，因为主协程for 会持续更改这些变量的值，等到子协程启动开始读取index、key、value 值时，已经与预期不一致了
+	go func(){
+		node := nodes[index]
+		处理 node
+	}
+}
+```

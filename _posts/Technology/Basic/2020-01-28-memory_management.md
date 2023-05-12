@@ -15,6 +15,9 @@ keywords: memory management
 
 [Demystifying memory management in modern programming languages](https://deepu.tech/memory-management-in-programming/)是一个系列，建议细读。推荐极客时间教程《编程高手必学的内存知识》
 
+过去25年中硬件发生了很大变化：内存延迟与处理器执行性能之间的冯诺依曼瓶颈增加了100-2000倍（也就是说，如果以CPU算术计算的速度为基准看，读内存的速度没有变快反而更慢了）；
+1. 指针的间接获取对性能的影响变得更大，因为对指针的解引用是昂贵的操作，尤其是当指针或它指向的对象不在处理器的缓存中时（没办法，只能读内存了）；
+2. java Valhalla引入的值类型，纯数据的聚合一类的对象，只有数据，没有标识。没有标识意味着不再有多态性、可变性，不能在对象上加锁，不能为Null，只能基于状态做对象比较，但优势是：不需要object header了，可以省去内存占用和分配的开销；可以在栈上直接分配值类型，而不必在堆上分配它们；
 
 ## 内存分配
 

@@ -451,4 +451,13 @@ $$
     ![](/public/upload/machine/vit.jpg)
 6. 所以如果你用Transformer来当backbone的时候，**你需要做的就只是把图片，文本，甚至表格信息等其他的所有模态信息全部flatten再concat或者相加成一维数组送进Transformer**，然后期待强大的Self-Attention开始work就可以了。
 
+[面向统一的AI神经网络架构和预训练方法](https://mp.weixin.qq.com/s/3KWbxBf1hEcgSnt2XBCgkg)近几年，自然语言处理（NLP）和图形图像领域（CV）在神经网络架构和预训练上正在经历一个趋向统一的融合趋势。Transformer 的神经网络架构率先在自然语言处理（NLP）领域取得了很好的效果，并成为该领域的主流神经架构。从 2020 年下半年开始，计算机视觉领域也开始将 Transformer 应用到各种视觉问题中，并取代此前的卷积神经网络，成为新的主流神经架构。关于统一的好处，这里列举三点：
+1. 技术和知识共享：技术和知识共享能让不同领域都有更快的进步，对于 NLP 和 CV 领域来说，深度学习革命的早期主要是 CV 技术在影响 NLP 领域，而最近两年 NLP 领域进展迅速，很多很好的技术被 CV 领域所借鉴。
+2. 促进多模态应用：技术的统一也在催生全新的多模态研究和应用，例如实现零样本物体识别能力的 CLIP 模型、能给定任意文本生成图片的 DALL-E 模型等等。
+3. 实现降本增效：我们举芯片的例子，以前设计芯片时需要优化不同的算子，例如卷积、Transformer 等，而现在芯片设计只需要优化 Transformer 就可以解决 90% 以上问题。Nvidia 最新的 H100 GPU 的一个主要宣传点，就是可以将 Transformer 的训练性能提升 6 倍。
+
+谷歌的 ViT 模型就是把图像切块切成不重叠的块，将每个块当作一个 token，于是就可以将 NLP 里的 Transformer 直接应用于图像分类。这种建模相比 CNN 有两个明显的好处：
+1. 相比 CNN 这种基于静态模板的网络，Transformer 的滤波模板是随位置动态的，可以更高效地建模关系。
+2. 可以建模长程关系（Long-term relationship），可以建模远距离的 token 之间的关联。
+
 [五年时间被引用3.8万次，Transformer宇宙发展成了这样](https://mp.weixin.qq.com/s/cVuBfrrtGBpNlZUekxgnmg) 未读。 

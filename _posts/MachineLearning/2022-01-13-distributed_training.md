@@ -89,10 +89,23 @@ RDMA本身指的是一种技术，具体协议层面，包含Infiniband（IB）�
 
 ### GPU 卡间通信
 
+[AI大模型时代的RDMA网络杂谈](https://zhuanlan.zhihu.com/p/618357812)GPU机内通讯技术：PCIe是机内通讯最重要的组件之一，它采用的是树状拓扑结构，在这个体系结构中，CPU和内存是核心，GPU、NIC、NVMe等都是外设 ，作为辅助，如下图所示。
+
+![](/public/upload/machine/pcie.jpg)
+
+然而，在深度学习时代，这一范式改变了，**GPU成为了计算的核心**，CPU反而只扮演的控制的角色，如下图所示。
+
+![](/public/upload/machine/nvlink.jpg)
+
+在机器内部的GPU-GPU之间，如果通讯仍然走PCIe/QPI/UPI等时，那往往会成为瓶颈；因此，NVIDIA专门提出了NVLink、NVSwitch等新的机内通讯元件，可以为同一机器的GPU之间提供几百Gbps甚至上Tbps的互联带宽。在机器之间，GPU间的通讯需要经过NIC，在没有PCIe Switch的情况下，GPU-NIC之间的通讯需要经过RC，并且会使用CPU做一次拷贝和中转，往往会成为瓶颈；为此，NVIDIA又搞出了GPU Direct RDMA（GDR）技术，让GPU的数据可以直接DMA到网卡上，而不需要经过CPU的拷贝和中转。
+
+那么，一个自然的问题就是，如何判断GPU之间是的连接方式呢？NVIDIA当然想得非常周到了，提供了`nvidia-smi topo -m`的命令，可以查看机内的连接方式。然而，值得注意的是，并非所有机器都会组装NVLink、NVSwitch、PCIe Switch等，毕竟这都是成本。所以，在给定机型下的GPU通讯性能最优、到底开不开GDR、PCIe参数到底怎么设置都需要根据具体机型和具体通信模式而具体分析了。最好的方式还是在购买GPU服务器和搭建物理网络时，就结合模型特点和实现方式，设计好GPU服务器的GPU-GPU、GPU-NIC等机内互联和NIC-交换机-NIC的网络互联，这样才能不至于在任何一个地方过早出现瓶颈，导致昂贵GPU算力资源的浪费。
+
+大模型要利用分布式的GPU算力，通讯库是关键环节之一。通讯库向上提供API供训练框架调用，向下连接机内机间的GPU以完成模型参数的高效传输。目前业界应用最为广泛的是NVIDIA提供的NCCL开源通讯库，各个大厂基本都基于NCCL或NCCL的改造版本作为GPU通讯的底座。NCCL是一个专门为多GPU之间提供集合通讯的通讯库，或者说是一个多GPU卡通讯的框架 ，它具有一定程度拓扑感知的能力，提供了包括AllReduce、Broadcast、Reduce、AllGather、ReduceScatter等集合通讯API，也支持用户去使用ncclSend()、ncclRecv()来实现各种复杂的点对点通讯，如One-to-all、All-to-one、All-to-all等，在绝大多数情况下都可以通过服务器内的PCIe、NVLink、NVSwitch等和服务器间的RoCEv2、IB、TCP网络实现高带宽和低延迟。
+
+
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
 Collective communication包含多个sender和多个receiver（相对于P2P 模式只有一个sender和一个receiver），一般的通信原语包括 broadcast，All-to-one (gather),all-gather，One-to-all (scatter)，reduce，all-reduce，reduce-scatter，all-to-all等。集合通信库的主要特征是：大体上会遵照 MPI 提供的接口规定，实现了包括点对点通信（SEND,RECV等），集合通信（ REDUCE，BROADCAST，ALLREDUCE等）等相关接口，然后根据自己硬件或者是系统的需要，在底层实现上进行了相应的改动，保证接口的稳定和性能。
-
-![](/public/upload/machine/gxpu_communication.png)
 
 [谈分布式机器学习系统中的网络相关问题](https://zhuanlan.zhihu.com/p/61731822)
 

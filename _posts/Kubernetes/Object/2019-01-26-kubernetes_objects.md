@@ -39,8 +39,10 @@ Kubernetes API是一个HTTP形式的API，主要有三种形式
 1. Domain
 2. API group, 在逻辑上相关的一组 Kind 集合。如 Job 和 ScheduledJob 都在 batch API group 里。同一资源的不同版本的 API，会放到一个 group 里面。一开始 所有资源都在一条 `/apis/$VERSION/` 路径下，用户很难使用不同版本的资源并保持控制器之间的兼容性。
 3. Version, 标示 API group 的版本更新， API group 会有多个版本 (version)。v1alpha1: 初次引入 ==> v1beta1: 升级改进 ==> v1: 开发完成毕业。 group  + domain + version 在url 上经常体现为`$group_$domain/version` 比如 `batch.tutorial.kubebuilder.io/v1`
-4. Kind, 表示实体的类型。直接对应一个Golang的类型，**定义在type.go**，会持久化存储在etcd 中
-5. Resource, 通常是小写的复数词，Kind 的小写形式（例如，pods），用于**标识一组 HTTP 端点**（路径），来对外暴露 CURD 操作。每个 Kind 和 Resource 都存在于一个APIGroupVersion 下，分别通过 GroupVersionKind 和 GroupVersionResource 标识。关联GVK 到GVR （资源存储与http path）的映射过程称作 REST mapping。
+4. Kind, 每个 API 组-版本包含一个或多个 API 类型Kind，表示实体的类型。直接对应一个Golang的类型，**定义在type.go**，会持久化存储在etcd 中
+5. Resource, 只是 API 中Kind的一个使用方式，通常是小写的复数词，Kind 的小写形式（例如，pods），用于**标识一组 HTTP 端点**（路径），来对外暴露 CURD 操作。
+
+每个 Kind 和 Resource 都存在于一个APIGroupVersion 下，分别通过 GroupVersionKind 和 GroupVersionResource 标识。关联GVK 到GVR （资源存储与http path）的映射过程称作 REST mapping。
 
 ![](/public/upload/kubernetes/k8s_rest_api.png)
 
@@ -65,7 +67,7 @@ type GroupVersionKind struct {
 	Kind    string
 }
 ```
-schema struct 将golang object 映射为可能的GVK。一个GVK 到一个GVR 的映射被称为 REST mapping,  RESTMapper interface/ RESTMapping struct 来完成转换。
+一个GVK 到一个GVR 的映射被称为 REST mapping,  RESTMapper interface/ RESTMapping struct 来完成转换。
 
 ```go
 // k8s.io/apimachinery/pkg/api/meta/interface.go
@@ -77,45 +79,8 @@ type RESTMapper interface {
 }
 ```
 
-### Protobuf Unmarshal
+每个 GVK 对应 Golang 代码中的到对应生成代码中的 Go type。Scheme提供了 Kinds 和相应的 Go 类型之间的映射。schema struct 将golang object 映射为可能的GVK。
 
-根据 生成的 golang 结构体的 Field tag来做 Unmarshal
-```go
-// 生成的 golang 结构体
-type EchoRequest struct {
-    A  string   `protobuf:"bytes,1,opt,name=A,proto3" json:"A,omitempty"`
-}
-// 收到请求，在 Unmarshal 过程中会调用这个函数
-func (m *EchoRequest) XXX_Unmarshal(b []byte) error {
-    return xxx_messageInfo_EchoRequest.Unmarshal(m, b)
-}
-var xxx_messageInfo_EchoRequest proto.InternalMessageInfo
-// InternalMessageInfo 是 Unmarshal 相关信息的存储位置
-// b 是 protocol buffer raw 数据，而a 是要 unmarshal 到的结构
-// 基础库不关心具体 unmarshal 类型，始终 unmarshal 到一个 interface Message
-// 实际上面到结构调用到时候 会是 EchoRequest 类型
-func (a *InternalMessageInfo) Unmarshal(msg Message, b []byte) error {
-    // ... 略
-    err := u.unmarshal(toPointer(&msg), b)
-    return err
-}
-func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error{
-    if atomic.LoadInt32(&u.initialized) == 0 {
-        // 保存 unmarshal 这个类型的函数、信息到一个结构里面，加速重复的 unmarshal
-		u.computeUnmarshalInfo()
-	}
-	// .... 略
-	if fn := f.unmarshal; fn != nil {
-		var err error
-		// unmarshal 这个 field 这里的关键是 unmarshal 到原始 bytes 设置到对应字段的
-		// offset上面去，里面比较关键的是用了 golang reflect的 StructField 
-		// StructField 的 Offset 是固定的，根据 一个结构的指针的 pointer 以及 Field的
-		// offset 就可以直接用指针设置 结构的某个字段内容了
-		b, err = fn(b, m.offset(f.field), wire)
-		// ....
-	}
-}
-```
 ### Kubernetes Scheme
 
 GVK 是一个 Object 概念，而 GVR 代表一个 Http Path。PS： rest path ==> gvr ==> gvk ==> empty go struct ==>  decoder.decode(empty go struct) ==> go struct.
@@ -240,6 +205,45 @@ func (s *Scheme) New(kind schema.GroupVersionKind) (Object, error) {
 }
 ```
 
+### Protobuf Unmarshal
+
+根据 生成的 golang 结构体的 Field tag来做 Unmarshal
+```go
+// 生成的 golang 结构体
+type EchoRequest struct {
+    A  string   `protobuf:"bytes,1,opt,name=A,proto3" json:"A,omitempty"`
+}
+// 收到请求，在 Unmarshal 过程中会调用这个函数
+func (m *EchoRequest) XXX_Unmarshal(b []byte) error {
+    return xxx_messageInfo_EchoRequest.Unmarshal(m, b)
+}
+var xxx_messageInfo_EchoRequest proto.InternalMessageInfo
+// InternalMessageInfo 是 Unmarshal 相关信息的存储位置
+// b 是 protocol buffer raw 数据，而a 是要 unmarshal 到的结构
+// 基础库不关心具体 unmarshal 类型，始终 unmarshal 到一个 interface Message
+// 实际上面到结构调用到时候 会是 EchoRequest 类型
+func (a *InternalMessageInfo) Unmarshal(msg Message, b []byte) error {
+    // ... 略
+    err := u.unmarshal(toPointer(&msg), b)
+    return err
+}
+func (u *unmarshalInfo) unmarshal(m pointer, b []byte) error{
+    if atomic.LoadInt32(&u.initialized) == 0 {
+        // 保存 unmarshal 这个类型的函数、信息到一个结构里面，加速重复的 unmarshal
+		u.computeUnmarshalInfo()
+	}
+	// .... 略
+	if fn := f.unmarshal; fn != nil {
+		var err error
+		// unmarshal 这个 field 这里的关键是 unmarshal 到原始 bytes 设置到对应字段的
+		// offset上面去，里面比较关键的是用了 golang reflect的 StructField 
+		// StructField 的 Offset 是固定的，根据 一个结构的指针的 pointer 以及 Field的
+		// offset 就可以直接用指针设置 结构的某个字段内容了
+		b, err = fn(b, m.offset(f.field), wire)
+		// ....
+	}
+}
+```
 
 ## kubernetes 对象
 

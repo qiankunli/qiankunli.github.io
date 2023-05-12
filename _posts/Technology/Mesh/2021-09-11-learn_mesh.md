@@ -23,6 +23,8 @@ keywords: mosn detail
 
 ![](/public/upload/mesh/tcp_vs_mesh.jpg)
 
+[Service Mesh 的未来在于网络](https://mp.weixin.qq.com/s/pnZdJOHKpJPtq58VcrUSeg) mesh 正在和ebpf 结合起来，尽量在内核实现所有功能。
+
 ## 问题
 
 [蚂蚁集团 Service Mesh 进展回顾与展望](https://mp.weixin.qq.com/s/eh0Jz7YeF27bXqdBMd4MPw) 提供了演进脉络。
