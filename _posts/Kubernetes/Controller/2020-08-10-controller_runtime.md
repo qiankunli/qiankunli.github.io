@@ -71,10 +71,12 @@ cache.WaitForCacheSync(stopCh, podSynced)
 
 ### 使用controller-runtime
 
-极简版如下
+每段旅程需要一个起点，每个程序需要一个入口函数，一个operator 程序本质是如下的样子
+
 ```go
 func main(){
- 	mgr, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	// 初始化 Manager，同时生成一个默认配置的 Cache
+ 	mgr, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{ 
         Scheme:             scheme,
         Namespace:          namespace,
     })
@@ -83,86 +85,67 @@ func main(){
         os.Exit(1)
     }
 }
+```
+接下来就是 用 Reconciler 实现业务逻辑，并将其挂在 manager 上。Reconciler 接受一个对象的名称，并返回我们是否需要再次尝试。
+```go
+type ApplicationReconciler struct {
+	client.Client
+	Scheme *runtime.Scheme
+    Log    logr.Logger
+}
+func (r *ApplicationReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	// get application
+	application := &xx.Application{}
+	if err := r.client.Get(ctx, req.NamespacedName, application); err != nil {...}
 
+    // your logic here
+
+    return ctrl.Result{}, nil
+}
+// 将 Reconcile 添加到 manager 中，这样当 manager 启动时它就会被启动。
+func (r *ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+    return ctrl.NewControllerManagedBy(mgr).
+        For(&xx.Application{}).
+        Complete(r)
+}
 ```
 
-[Controller Runtime 的四种使用姿势](https://mp.weixin.qq.com/s/zWvxbO1C2QrZY7iqvGtMGA)
+ApplicationReconciler 持有Client，便有能力对 相关资源进行 crud
+1. 从request 中资源name ，进而通过client 获取资源obj
+2. 处理完毕后，通过Result 告知是Requeue 下次重新处理，还是处理成功开始下一个
+
+如果我们要给 Reconciler 传一些参数的话 可以改造下 SetupWithManager
+
 ```go
-func start() {
+func SetupWithManager(mgr ctrl.Manager, cfg *Config, 其它参数) error {
+	r := &applicationReconciler{
+		client:        mgr.GetClient(),
+		cfg:           cfg,
+		log:           ctrl.LoggerFrom(context.Background()).WithName(name),
+		recorder:      mgr.GetEventRecorderFor(name),
+	}
+	return ctrl.NewControllerManagedBy(mgr).
+        For(&xx.Application{}).
+        Complete(r)
+}
+```
+将 crd 的scheme 注入到 manager 的scheme，将 Reconcile 添加到 manager 中
+```go
+func main() {
   	scheme := runtime.NewScheme()
   	_ = corev1.AddToScheme(scheme)
-  	// 1. init Manager	初始化 Manager，同时生成一个默认配置的 Cache
+	// 1. init Manager
   	mgr, _ := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
     	Scheme: scheme,
     	Port:   9443,
   	})
-  	// 2. init Reconciler（Controller）
-  	_ = ctrl.NewControllerManagedBy(mgr).	// 使用了builder 模式
-    	For(&corev1.Pod{}).				// 指定 watch 的资源类型
-		// .Owns()						// 表示某资源是我关心资源的从属，其 event 也会进去 Controller 的队列中；
-    	Complete(&ApplicationReconciler{})	// 将用户的 Reconciler 注册进 Controller，并生成 watch 资源的默认 eventHandler，同时执行 Controller 的 watch 函数；
+  	// 2. init Reconciler
+  	application.SetupWithManager(mgr)
   	// 3. start Manager
   	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
   	}
 }
-type ApplicationReconciler struct {
-}
-func (a ApplicationReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-  	return reconcile.Result{}, nil
-}
 ```
-上述代码经过了builder 模式的封装，相对底层的 样子如下
-```go
-func start() {
-  scheme := runtime.NewScheme()
-  _ = corev1.AddToScheme(scheme)
-  // 1. init Manager
-  mgr, _ := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-    Scheme: scheme,
-    Port:   9443,
-  })
-  // 2. init Reconciler（Controller）
-  c, _ := controller.New("app", mgr, controller.Options{
-	Reconciler: &ApplicationReconciler{},
-  })
-  // 监控Pod变动并将key写入workqueue
-  _ = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
-    CreateFunc: func(event event.CreateEvent) bool {...},
-    UpdateFunc: func(updateEvent event.UpdateEvent) bool {...},
-    DeleteFunc: func(deleteEvent event.DeleteEvent) bool {...},
-  })
-  // 3. start Manager
-  if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-  }
-}
-type ApplicationReconciler struct {
-	...
-}
-func (a ApplicationReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-  	// 初始化log
-	log := log.FromContext(ctx)
-	// 从缓存中获取Pod
-	pod := &corev1.Pod{}
-	err := r.client.Get(ctx, request.NamespacedName, rs)	// 使用controller-runtime的Client时，我们只需要提供资源名（Namespace/Name）、资源类型（结构体指针），即可开始CRUD操作。
-	if errors.IsNotFound(err) {
-		log.Error(nil, "Could not find Pod")
-		return reconcile.Result{}, nil
-	}
-	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("could not fetch Pod: %+v", err)
-	}
-	// 打印Pod
-	log.Info("Reconciling Pod", "pod name", pod.Name)
-	return reconcile.Result{}, nil
-}
-```
-
-我们可以看到，原先复杂的准备工作现在已经简化为几个步骤：
-
-1. 创建manager
-2. 创建controller，添加需要监控的资源
-1. 实现Reconcile方法，处理资源变动
-
 ## 整体设计
 
 ![](/public/upload/kubernetes/controller_runtime_overview.jpg)
@@ -313,7 +296,6 @@ func (cm *controllerManager) startLeaderElectionRunnables() {
 
 ## Controller
 
-
 Controller 管理一个工作队列，并从 source.Sources 中获取 reconcile.Requests 加入队列， 通过执行 reconcile.Reconciler 来处理队列中的每项 reconcile.Requests。Controller 逻辑主要有两个，对应两个函数是 Watch 与 Start
 1. 监听 object 事件并加入到 queue 中。
 	1. Controller 会先向 Informer 注册特定资源的 eventHandler；然后 Cache 会启动 Informer，Informer 向 ApiServer 发出请求，建立连接；当 Informer 检测到有资源变动后，使用 Controller 注册进来的 eventHandler 判断是否推入队列中；
@@ -458,34 +440,6 @@ func (c *Controller) reconcileHandler(obj interface{}) bool {
 	return true
 }
 ```
-
-## Reconciler 开发模式
-
-```go
-type ApplicationReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
-    Log    logr.Logger
-}
-type Reconciler interface {
-	Reconcile(Request) (Result, error)
-}
-type Request struct {
-	types.NamespacedName
-}
-type NamespacedName struct {
-	Namespace string
-	Name      string
-}
-type Result struct {
-	Requeue bool
-	RequeueAfter time.Duration
-}
-```
-
-ApplicationReconciler 持有Client，便有能力对 相关资源进行 crud
-1. 从request 中资源name ，进而通过client 获取资源obj
-2. 处理完毕后，通过Result 告知是Requeue 下次重新处理，还是处理成功开始下一个
 
 
 ## 其它

@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: controller 组件介绍
+title: 深入controller
 category: 架构
 tags: Kubernetes
 keywords: controller
@@ -12,6 +12,43 @@ keywords: controller
 * TOC
 {:toc}
 
+## condition
+
+1. conditions和status到底有什么区别？
+2. conditions的设计原则是什么？在设计API扩展时，该如何定义conditions？
+
+[What the heck are Conditions in Kubernetes controllers?](https://maelvls.dev/kubernetes-conditions/)
+the difference between the ‘phase’ and ‘conditions:
+1. The top-level phase is an aggregated state that answers some user-facing questions such as is my pod in a terminal state? but has gaps since the actual state is contained in the conditions.
+2. The conditions array is a set of types (Ready, PodScheduled…) with a status (True, False or Unknown) that make up the ‘computed state’ of a Pod at any time. As we will see later, the state is almost always ‘partial’ (open-ended conditions).
+
+### 从sync loop 说起
+
+Kubernetes itself is made of multiple binaries (kubelet on each node, one apiserver, one kube-controller-manager and one kube-scheduler). And each of these binaries have multiple components (i.e., sync loops):
+
+|binary|	sync loop = component|	reads	|creates|	updates|
+|---|---|---|---|---|
+|kube-controller-manager|	syncDeployment|	Pod	|ReplicaSet|	Deployment|
+|kube-controller-manager|	syncReplicaSet|	|	Pod	||
+|kubelet|	syncPod|||			Pod|
+|kube-scheduler|	scheduleOne|||			Pod|
+|kubelet|	syncNodeStatus|||			Node|
+
+We can see that one single object (Pod) can be read, edited and updated by different components. When I say ‘edited’, I mean the sync loop edits the status (which contains the conditions), not the rest. The status is a way of communicating between components/sync loops.
+
+The status of a Pod is not updated by a single Sync loop: it is updated by multiple components: the kubelet, and the kube-scheduler. Here is a list of the condition types per component:
+
+|Possible condition types for a Pod|	Component that updates this condition type|
+|---|---|
+|PodScheduled|	scheduleOne (kube-scheduler)|
+|Unschedulable|	scheduleOne (kube-scheduler)|
+|Initialized|	syncPod (kubelet)|
+|ContainersReady|	syncPod (kubelet)|
+|Ready|	syncPod (kubelet)|
+
+the status of a Pod is partly constructed by the kube-scheduler, partly by the kubelet.
+
+Although conditions are a good way to **convey information to the user, they also serve as a way of communicating between components** (e.g., between kube-scheduler and apiserver) but also to external components (e.g. a custom controller that wants to trigger something as soon as a pod becomes ‘Unschedulable’, and maybe order more VMs to the cloud provider and add it as a node.
 
 ## Finalizer
 

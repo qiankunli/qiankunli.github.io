@@ -157,6 +157,18 @@ Combining features, better known as feature crosses, enables the model to learn 
 
 [Introducing TensorFlow Feature Columns——Feature crosses](https://developers.googleblog.com/2017/11/introducing-tensorflow-feature-columns.html)
 
+[推荐系统（六）—— 特征融合](https://zhuanlan.zhihu.com/p/459012483)跟特征交叉类似的有 特征融合
+1. 特征交叉也称为特征组合，旨在提高模型对非线性的建模能力，从而提高模型的性能。
+2. 特征融合和特征交叉有相同的目的，都是为了提高模型的性能。不过，特征融合是想更好地利用不同特性的特征，对这些不同特征进行联合建模。
+    1. 例如，在目标检测中的多尺度特征融合。所谓多尺度，指的是不同分辨率的图片，或者是不同层次的图片特征（低层特征、高层特征），因为低分辨图片比较模糊，能够获取物体的大致位置，但会忽略很多细节；而高分辨率图片，能够描述物体的更多细节，具有更多语义信息。
+    2. 在推荐系统中，多模态信息的融合也变得越来越重要。以淘宝购物为例，用户在决策是否购买物品时，会考虑物品的属性、物品图片的展示、其他用户的评论信息、甚至是观看物品的介绍视频等等。换句话说，这些多模态信息（文本、图片、视频）会影响用户的行为。所以如何利用这些多模态信息来建模，是提高推荐系统准确度的一个途径。
+
+从处理时间的角度来看，特征融合可以分为早融合、中间融合和晚融合。从模型结构的角度来看，特征融合可以分为串行策略、并行策略。串行策略：整个模型只有一个支路；并行策略：模型会有多个支路，每个支路处理不同的特征。常见特征融合技术
+1. 比较简单的：特征拼接、特征求和、对应元素相乘
+2. 跳跃连接、反卷积、多尺度模型等
+3. 特征求外积+展开之后过MLP：
+3. 加权求和（注意力机制、self-attention、门控机制等）
+
 ## tf 特征处理 feature column
 
 [Introducing TensorFlow Feature Columns](https://developers.googleblog.com/2017/11/introducing-tensorflow-feature-columns.html) 必读文章

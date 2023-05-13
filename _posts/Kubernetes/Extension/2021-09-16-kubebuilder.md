@@ -25,9 +25,58 @@ Kubernetes 这样的分布式操作系统对外提供服务是通过 API 的形�
 
 [面向 K8s 设计误区](https://mp.weixin.qq.com/s/W_UjqI0Rd4AAVcafMiaYGA)
 
+## 示例demo
+
+[Kubebuilder中文文档](https://cloudnative.to/kubebuilder/introduction.html) 对理解k8s 上下游知识以及使用kubebuiler 编写控制器很有帮助。
+
+```
+# 创建项目
+kubebuilder init --domain example.io
+# 创建api
+kubebuilder create api --group apps --version v1alpha1 --kind Application
+# 编写 Reconciler 并注入到 manager 中
+# 根据 types.go 生成crd yaml（包含CustomResourceDefinition 等），一般会被封装在 Makefile中
+controller-gen crd:crdVersions=v1alpha1 paths=./pkg/apis/... output:crd:artifacts:config=./manifests/xx-controller/crds
+# 如果你需要 访问自己的crd，可以使用code-generator
+# 根据 types.go 生成clientset/informer/lister/deepcopy 等，，一般会被封装在 hack/update-codegen.sh/Makefile中
+$GOPATH/pkg/mod/k8s.io/code-generator@v0.26.1/generate-groups.sh <generators> <output-package> <apis-package> <groups-versions>
+```
+
+1. 在`GOPATH/src/app`创建脚手架工程 `kubebuilder init --domain example.io`
+    ```
+    GOPATH/src/app
+        /config                 // 跟k8s 集群交互所需的一些yaml配置
+            /certmanager
+            /default
+            /manager
+            /prometheus
+            /rbac
+            /webhook
+        main.go                 // 创建并启动 Manager，容器的entrypoint
+        Dockerfile              // 制作Controller 镜像
+        PROJECT                 // 用于生成组件的 Kubebuilder 元数据
+        go.mod            
+    ```
+2.  创建 API `kubebuilder create api --group apps --version v1alpha1 --kind Application` 后文件变化
+    ```
+    GOPATH/src/app
+        /api/v1alpha1
+            /application_types.go      // 新增 Application/ApplicationSpec/ApplicationStatus struct; 将类型注册到 scheme 辅助接口 
+            /zz_generated.deepcopy.go
+        /config
+            /crd                        // Application CustomResourceDefinition。提交后apiserver 可crudw该crd
+            /...
+        /controllers
+            /application_controller.go  // 定义 ApplicationReconciler ，核心逻辑就在这里实现
+        main.go                         // ApplicationReconciler 添加到 Manager，Manager.Start(stopCh)
+        go.mod     
+        Makefile                     
+    ```
+执行 `make install` 实质是执行 `kustomize build config/crd | kubectl apply -f -` 将cr yaml 提交到apiserver上。之后就可以 提交Application yaml 到 k8s 了。将crd struct 注册到 schema，则client-go 可以支持对crd的 crudw 等操作。
+
 ## 和code-generator的关系
 
-Kubebuilder和k8s.io/code-generator类似，是一个码生成工具，用于为你的CRD生成kubernetes-style API实现。区别在于：
+[混合kubebuilder与code generator编写CRD](https://cloud.tencent.com/developer/article/1656317) Kubebuilder和k8s.io/code-generator类似，是一个码生成工具，用于为你的CRD生成kubernetes-style API实现。区别在于：
 
 1. Kubebuilder不会生成informers、listers、clientsets，而code-generator会。
 2. Kubebuilder会生成Controller、Admission Webhooks，而code-generator不会。
@@ -43,7 +92,7 @@ client-go 只提供了rest api和 dynamic client来操作第三方资源，需�
 6. defaulter-gen 用于生产Defaulter函数
 7. openapi-gen  生成openAPI定义
 
-code-generator还专门整合了这些gen，形成了generate-groups.sh和generate-internal-groups.sh这两个脚本。 PS：原来client/informer/lister 这些代码都是自动生成的。
+code-generator还专门整合了这些gen，形成了generate-groups.sh和generate-internal-groups.sh这两个脚本。可能因为 kubebuilder 和    code-generator 不是一家出的，加上 kubebuilder v1/v2/v3 的迭代，不同版本kubebuilder 生成的 api 目录结构会不一致，所以在运行generate-groups.sh 时建议带上 `-v=10` 看看报的啥错。
 
 在使用Code-generator之前，首先需要初始化doc.go,register.go,types.go三个文件。[Code-generator](https://mp.weixin.qq.com/s/itNbhuYYF873Ff-RbBnZTw)
 1. doc.go主要是用来声明要使用deepcopy-gen以及groupName。
@@ -94,42 +143,6 @@ kubebuilder 依赖于 controller-runtime 实现 controller 整个处理流程，
 ![](/public/upload/kubernetes/kubebuilder_reconcile.png)
 
 其中 Informer 已经由kubebuilder和contorller-runtime 实现，监听到的资源的事件（创建、删除、更新）都会放在 Informer 中。然后这个事件会经过 `predict()`方法进行过滤，经过interface enqueue进行处理，最终放入 workqueue中。我们创建的 controller 则会依次从workqueue中拿取事件，并调用我们自己实现的 Recontile() 方法进行业务处理。
-
-## 示例demo
-
-[Kubebuilder中文文档](https://cloudnative.to/kubebuilder/introduction.html) 对理解k8s 上下游知识以及使用kubebuiler 编写控制器很有帮助。
-
-1. 在`GOPATH/src/app`创建脚手架工程 `kubebuilder init --domain example.io`
-    ```
-    GOPATH/src/app
-        /config                 // 跟k8s 集群交互所需的一些yaml配置
-            /certmanager
-            /default
-            /manager
-            /prometheus
-            /rbac
-            /webhook
-        main.go                 // 创建并启动 Manager，容器的entrypoint
-        Dockerfile              // 制作Controller 镜像
-        PROJECT                 // 用于生成组件的 Kubebuilder 元数据
-        go.mod            
-    ```
-2.  创建 API `kubebuilder create api --group apps --version v1alpha1 --kind Application` 后文件变化
-    ```
-    GOPATH/src/app
-        /api/v1alpha1
-            /application_types.go      // 新增 Application/ApplicationSpec/ApplicationStatus struct; 将类型注册到 scheme 辅助接口 
-            /zz_generated.deepcopy.go
-        /config
-            /crd                        // Application CustomResourceDefinition。提交后apiserver 可crudw该crd
-            /...
-        /controllers
-            /application_controller.go  // 定义 ApplicationReconciler ，核心逻辑就在这里实现
-        main.go                         // ApplicationReconciler 添加到 Manager，Manager.Start(stopCh)
-        go.mod     
-        Makefile                     
-    ```
-执行 `make install` 实质是执行 `kustomize build config/crd | kubectl apply -f -` 将cr yaml 提交到apiserver上。之后就可以 提交Application yaml 到 k8s 了。将crd struct 注册到 schema，则client-go 可以支持对crd的 crudw 等操作。
 
 ## 其它
 
