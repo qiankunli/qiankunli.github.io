@@ -49,6 +49,10 @@ keywords: observability
 
 [OPLG：新一代云原生可观测最佳实践](https://mp.weixin.qq.com/s/Bf6nmOymcG9bk91VxLL_Kw) 未细读
 
+[使用 OpenTelemetry Tracing 最大化 Kubernetes 效率](https://mp.weixin.qq.com/s/ieBQx0z1ZofKkgHvYOq_aQ) 未读
+
+[如何利用 OpenTelemetry 监控和优化 Kubernetes 的性能](https://mp.weixin.qq.com/s/zA5NZhDOPFDzzuAAnsI_pA) 未读
+
 ## 监控报警内在原因
 
 [蚂蚁智能监控](https://mp.weixin.qq.com/s/ZitNUki9QgMTnahy77n8XQ)在设计稳定性架构之初，我们首先应该意识到系统的运行时环境和输入都不会是稳定的。

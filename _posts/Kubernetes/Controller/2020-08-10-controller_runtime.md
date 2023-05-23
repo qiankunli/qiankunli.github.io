@@ -515,6 +515,29 @@ Watch函数支持三种资源监听类型，通过定义 eventhandler 实现：
 
 此外还可以自定义 predicates，用于过滤资源，例如只监听指定命名空间、包含指定注解或标签的资源。
 
+```go
+// 从B 中获取A得名字
+aFn := handler.MapFunc(
+	func(object client.Object) []reconcile.Request {
+		b := object.(*v1alpha1.B)
+		requests := append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Namespace: object.GetNamespace(),
+					Name:      b.Annotations["aName"],
+				},
+			})
+		return requests
+	})
+_, err := ctrl.NewControllerManagedBy(mgr).
+	WithOptions(controller.Options{
+		CacheSyncTimeout:        controllerCtx.Config.ControllerConfig.SyncTimeout.Duration,
+		MaxConcurrentReconciles: controllerCtx.Config.ControllerConfig.Concurrency,
+	}).
+	For(&v1alpha1.A{}).
+	// 当B 变更时，也触发A
+	Watches(&source.Kind{Type: &v1alpha1.B{}}, handler.EnqueueRequestsFromMapFunc(aFn)).
+	Build(r)
+```
 
 
 

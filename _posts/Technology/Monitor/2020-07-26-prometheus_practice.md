@@ -175,6 +175,8 @@ remote_read
 
 同样地，Promthues的Remote Read（远程读）也通过了一个适配器实现。在远程读的流程当中，当用户发起查询请求后，Promthues将向remote_read中配置的URL发起查询请求（matchers，time ranges），Adapter根据请求条件从第三方存储服务中获取响应的数据。同时将数据转换为Promthues的原始样本数据返回给Prometheus Server。当获取到样本数据后，Promthues在本地使用PromQL对样本数据进行二次处理。
 
+[Prometheus 如何优化远程读写的性能](https://mp.weixin.qq.com/s/0YIdATnnLhEGqAnaR5Yl9Q) 未细读。
+
 ## 其它
 
 一些比较有意思的exporter
