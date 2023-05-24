@@ -303,3 +303,5 @@ KubeDL-Morphling 组件实现了推理服务的自动规格调优，通过主动
 ## 其它
 
 推理服务不仅可以运行在服务端，还可以运行在客户端、浏览器端（比如Tensorflow 提供tensorflow.js）
+
+[机器学习平台 PAI 支持抢占型实例，模型服务最高降本 90%](https://mp.weixin.qq.com/s/IgqmCtAgbncJAMCjUsYSrw)

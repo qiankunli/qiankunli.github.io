@@ -157,6 +157,10 @@ root     32901 32794  0 00:01 pts/0    00:00:00 ps -ef
 
 ## perf
 
+CPU的硬件开发者们也想到了软件同学们会有统计观察硬件指标的需求。所以在硬件设计的时候，加了一类专用的寄存器，专门用于系统性能监视。这类寄存器的名字叫硬件性能计数器（PMC: Performance Monitoring Counter）。每个PMC寄存器都包含一个计数器和一个事件选择器，计数器用于存储事件发生的次数，事件选择器用于确定所要计数的事件类型。例如，可以使用PMC寄存器来统计 L1 缓存命中率或指令执行周期数等。当CPU执行到 PMC 寄存器所指定的事件时，硬件会自动对计数器加1，而不会对程序的正常执行造成任何干扰。
+
+![](/public/upload/linux/pmu.jpg)
+
 [perf](https://perf.wiki.kernel.org/index.php/Main_Page) began as a tool for using the performance counters subsystem in Linux, and has had various enhancements to add tracing capabilities. linux 有一个performance counters，perf 是这个子系统的外化。perf是性能分析的必备工具, 它最核心的能力是能访问硬件上的Performance Monitor Unit (PMU)。
 
 perf的原理是这样的：每隔一个固定的时间，就在CPU上（每个核上都有）产生一个中断，在中断上看看，当前是哪个pid，哪个函数，然后给对应的pid和函数加一个统计值，这样，我们就知道CPU有百分几的时间在某个pid，或者某个函数上了。这是一种采样的模式，我们预期，运行时间越多的函数，被时钟中断击中的机会越大，从而推测，那个函数（或者pid等）的CPU占用率就越高。perf最大的好处是它可以直接跟踪到整个系统的所有程序（而不仅仅是内核），所以perf通常是我们分析的第一步，我们先看到整个系统的outline，然后才会进去看具体的调度，时延等问题。

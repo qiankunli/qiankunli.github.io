@@ -109,3 +109,8 @@ kubectl delete replicaset my-repset --cascade=false
     3. maximum-dead-containers, 主机上最多允许的dead 容器数量，超过的容器会被删掉
 
 [kubelet 垃圾回收机制](https://mp.weixin.qq.com/s/GInMyCUdAjaa2hFX3swbNg)
+
+
+## 如何优化一个k8s应用的性能
+
+[KubeVela 稳定性及可扩展性评估](https://mp.weixin.qq.com/s/fkhiUZHDcPoyCmddd0D1fQ)
