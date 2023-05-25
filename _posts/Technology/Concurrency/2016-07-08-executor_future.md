@@ -238,6 +238,8 @@ jdk1.8 也提供了相关的方案：CompletableFuture，A Future that may be ex
 [[concurrency-interest] CompletableFuture](http://cs.oswego.edu/pipermail/concurrency-interest/2012-December/010423.html) CompletableFuture 曾经被讨论过以下命名：SettableFuture, FutureValue, Promise, and
 probably others.
 
+[全局视角看技术-Java多线程演进史](https://mp.weixin.qq.com/s/XwI_09N0BdrRqjS45REx0w)网上关于CompletableFuture相关介绍很多，大多是讲它原理及怎么用。但是笔者始终不明白一个问题：为什么在有那么多线程池工具的情况下，还会有CompletableFuture的出现，它解决了什么痛点？它的核心竞争力到底是什么？**CompletableFuture的核心竞争力是任务编排**。CompletableFuture继承Future接口特性，可以进行并发执行任务等特性这些能力都是有可替代性的。但它的任务编排能力无可替代，它的核心API中包括了构造任务链，合并任务结果等都是为了任务编排而设计的。所以JDK之所以在此版本引入此框架，主要是解决业务开发中越来越痛的任务编排需求。
+
 
 ### 基于异步接口组织业务逻辑——编排/Futures 
 

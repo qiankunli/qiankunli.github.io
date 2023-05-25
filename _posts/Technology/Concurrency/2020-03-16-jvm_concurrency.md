@@ -13,6 +13,16 @@ keywords: jvm concurrency
 
 ## 使用
 
+[全局视角看技术-Java多线程演进史](https://mp.weixin.qq.com/s/XwI_09N0BdrRqjS45REx0w)
+1. JDK 1.0 Thread和Runnable，JDK 1.0中创建线程的方式主要是继承Thread类或实现Runnable接口，通过对象实例的start方法启动线程，需要并行处理的代码放在run方法中，线程间的协作通信采用简单粗暴的stop/resume/suspend这样的方法。
+2. JDK 1.2 粗暴的stop/resume/suspend机制在这个版本被禁止使用了，转而采用wait/notify/sleep这样的多条线程配合行动的方式。ThreadLocal和Collections（SynchronizedList、Vector等）的加入增加了多线程使用的姿势
+3. JDK 5.0 
+    1. 引入并发包，之前，我们控制程序并发访问同步代码只能使用synchronized，那个时候synchronized的性能还没优化好，性能并不好，控制线程也只能使用Object的wait和notify方法。J.U.C提供了原子化对象、锁及工具套装、线程池、线程安全容器等几大类工具。
+    2. 明确Java内存模型。 Happens-before。不能保证任意时刻的数据一致性，但是通过对synchronized、volatile和final这几个语义被增强的关键字的使用，可以做到数据一致性。
+4. JDK 6.0 synchronized优化。自此再也不允许别人说它的性能比ReentrantLock差了。synchronized吃亏在了它只是个关键字，JVM负责它底层的动作，到底应用程序加锁的时候什么样的姿势舒服，得靠JVM“猜”。ReentrantLock就不同了，它将这件事直接交给程序员去处理了，你希望公平那就用公平锁，你希望你的不公平，那你就用非公平锁。设计层面算是一种偷懒，但同时也是一种灵活。
+5. JDK 15 禁用和废弃偏向锁
+6. JDK 19 虚拟线程
+
 ### C语言下的线程使用
 
 看看C语言下写多线程程序什么感觉

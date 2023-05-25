@@ -14,6 +14,8 @@ keywords: JAVA Generic Type 泛型
 
 C++的泛型是在编绎期实现的，为每一个类型都生成一份代码，所以C++的泛型容易让编绎后的代码出现膨胀。
 
+[Java中如何获得A<T>泛型中T的运行时类型及原理探究](https://mp.weixin.qq.com/s/Yn9CIfgLozZNs_xfSo1ZmA) 未读
+
 ## 实例对比
 
 
