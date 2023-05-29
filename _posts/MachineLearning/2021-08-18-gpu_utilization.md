@@ -23,6 +23,12 @@ keywords:  gpu
 
 [TKE qGPU 通过两层调度解决 GPU 资源碎片问题](https://mp.weixin.qq.com/s/ycGLxFxO2OQ7HC18bXJHUA) [TKE qGPU 通过 CRD 管理集群 GPU 卡资源](https://mp.weixin.qq.com/s/mIgh689r7-1veyAQ2DeU0Q)
 
+[大模型时代，企业如何榨干每一块 GPU？](https://mp.weixin.qq.com/s/e7H8z3qYvqA0QtCWkMQEAg)
+1.  mGPU Driver 是火山引擎内核与虚拟化团队推出的容器共享 GPU 驱动软件，负责提供算力、显存的虚拟化能力和故障隔离能力。在 GPU 设备之上，切分后的 GPU 资源由 mgpu-device-plugin 发现和上报，mGPU Scheduler 根据上报资源和 Pod 中请求的 GPU 资源，通过调度算法计算实现 Pod 的灵活调度。VKE 支持单个容器申领 1% 精度的百分比算力和 1 MiB 级显存调度，兼容整卡调度场景，满足同时使用 GPU 容器共享和整卡 GPU 的业务场景。
+1. 算力分配策略：固定配额；固定争抢；争抢模式。类似 Pod的QoS 机制。
+2. 双重调度策略：mGPU Binpack 调度，可将多个 Pod 优先调度到同一个节点或者使用同一张 GPU； mGPU Spread 调度，可将 Pod 尽量分散到不同的节点或者 GPU 卡上。
+3. 多卡共享策略: 单个容器可使用同一节点上的多张 GPU 卡共同提供算力和显存资源。 假设 A 应用申请了 18GiB 显存和 240% 的算力，并指定了 GPU 卡数为 3，那么该节点需为该应用提供 3 张 GPU 卡，且每张 GPU 卡提供 6GiB 显存和 80% 算力。
+
 [GPU共享资源隔离方案](https://mp.weixin.qq.com/s/luuc4Vj3je0g0Nmjhmp5Zw)
 1. 截获CUDA库转发，如vCUDA。
 2. 截获驱动转发，如阿里云cGPU、腾讯云qGPU。

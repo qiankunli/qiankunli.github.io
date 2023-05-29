@@ -298,6 +298,7 @@ cAdvisor中提供的内存指标是从node_exporter公开的43个内存指标的
 [KubeNode：阿里巴巴云原生容器基础设施运维实践](https://mp.weixin.qq.com/s/Fm_Pbz0ltu2mpFlDP74_fw) 仅仅是一个kubelet 是不够用的。
 
 [KubeEye：Kubernetes 集群自动巡检工具](https://segmentfault.com/a/1190000039173086)
+[一键自动巡检！青云 Kubernetes 集群巡检 SaaS 服务正式发布](https://mp.weixin.qq.com/s/rCW76FvjnVjFegokeQFb2w)
 
 [通过Kubernetes监控探索应用架构，发现预期外的流量](https://mp.weixin.qq.com/s/RasRiNYo8OyTTselaSwHKA) 是一个系列文章，阿里已经将应用 ==> k8s ==> 内核监控打通。构建拓扑图 ==>  发现异常流量、阈值报警（拓扑图的边黄色或红色）==> 异常流量上下游各种信息。
 

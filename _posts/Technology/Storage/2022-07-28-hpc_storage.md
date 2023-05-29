@@ -142,6 +142,11 @@ keywords: hpc 对象存储 AI
 
 [Alluxio在蚂蚁集团大规模训练中的应用](https://mp.weixin.qq.com/s/VF3vmVlcpDLH4ML0BvVWDw) 主要讲了 蚂蚁对Alluxio 本身的一些优化。 
 
+[面向大规模深度学习训练的缓存优化实践](https://mp.weixin.qq.com/s/maLIhnlaLQOgjW-LE8PM6A)
+1. 在 AI 的训练场景中，uniform 缓存淘汰算法要比传统的 LRU、LFU 更好。
+2. 缓存和远端的 networking 也是一个需要被分配和调度的资源。
+3. 在进行缓存优化时，不要只局限在一个作业或者一个 worker 上，应该统揽整个端到端全局的参数，才能使得整个集群的效率和性能有更好的提升。
+
 ## 其它
 
 [面向大数据存算分离场景的数据湖加速方案](https://mp.weixin.qq.com/s/kog8ADN6-1o9tLoPEUZ8rg) 未读
