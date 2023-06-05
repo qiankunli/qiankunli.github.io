@@ -163,25 +163,6 @@ CPU的硬件开发者们也想到了软件同学们会有统计观察硬件指�
 
 [perf](https://perf.wiki.kernel.org/index.php/Main_Page) began as a tool for using the performance counters subsystem in Linux, and has had various enhancements to add tracing capabilities. linux 有一个performance counters，perf 是这个子系统的外化。perf是性能分析的必备工具, 它最核心的能力是能访问硬件上的Performance Monitor Unit (PMU)。
 
-perf的原理是这样的：每隔一个固定的时间，就在CPU上（每个核上都有）产生一个中断，在中断上看看，当前是哪个pid，哪个函数，然后给对应的pid和函数加一个统计值，这样，我们就知道CPU有百分几的时间在某个pid，或者某个函数上了。这是一种采样的模式，我们预期，运行时间越多的函数，被时钟中断击中的机会越大，从而推测，那个函数（或者pid等）的CPU占用率就越高。perf最大的好处是它可以直接跟踪到整个系统的所有程序（而不仅仅是内核），所以perf通常是我们分析的第一步，我们先看到整个系统的outline，然后才会进去看具体的调度，时延等问题。
-
-### event 和 采样
-
-三类event，event 是 perf 工作的基础，主要有两种：有使用硬件的 PMU 里的 event，也有在内核代码中注册的 event。
-1. Hardware event，Hardware event 来自处理器中的一个 PMU（Performance Monitoring Unit），这些 event 数目不多，都是底层处理器相关的行为，perf 中会命名几个通用的事件，比如 cpu-cycles，执行完成的 instructions，Cache 相关的 cache-misses。不同的处理器有自己不同的 PMU 事件
-    1. Performance counters are CPU hardware registers that count hardware events such as instructions executed, cache-misses suffered, or branches mispredicted. They form a basis for **profiling applications** to trace dynamic control flow and identify hotspots. perf provides rich generalized abstractions over hardware specific capabilities. Among others, it provides per task, per CPU and per-workload counters, sampling on top of these and source code event annotation. 
-2. Software event，Software event 是定义在 Linux 内核代码中的几个特定的事件，比较典型的有进程上下文切换（内核态到用户态的转换）事件 context-switches、发生缺页中断的事件 page-faults 等。
-3. Tracepoints event，实现方式和 Software event 类似，都是在内核函数中注册了 event。不仅是用在 perf 中，它已经是 Linux 内核 tracing 的标准接口了，ftrace，ebpf 等工具都会用到它。
-    1. Tracepoints are instrumentation points placed at logical locations in code, such as for system calls, TCP/IP events, file system operations, etc. These have negligible(微不足道的) overhead when not in use, and can be enabled by the perf command to collect information including timestamps and stack traces. perf can also dynamically create tracepoints using the kprobes and uprobes frameworks, for kernel and userspace dynamic tracing. The possibilities with these are endless.
-
-在这些 event 都准备好了之后，perf 又是怎么去使用这些 event 呢？有计数和采样两种方式
-1. 计数，就是统计某个 event 在一段时间里发生了多少次。一般用perf stat 查看
-2. 采样，Perf 对 event 的采样有两种模式：
-    1. 按照 event 的数目（period），比如每发生 10000 次 cycles event 就记录一次 IP、进程等信息， perf record 中的 -c 参数可以指定每发生多少次，就做一次记录
-    2. 定义一个频率（frequency）， perf record 中的 -F 参数就是指定频率的，比如 perf record -e cycles -F 99 -- sleep 1 ，就是指采样每秒钟做 99 次。
-    1. 通过-e指定感兴趣的一个或多个event（perf list可以列出支持的event）
-    2. 指定采样的范围, 比如进程级别 (-p), 线程级别 (-t), cpu级别 (-C), 系统级别 (-a)
-
 使用 perf 的常规步骤：在 perf record 运行结束后，会在磁盘的当前目录留下 perf.data 这个文件，里面记录了所有采样得到的信息。然后我们再运行 perf report 命令，查看函数或者指令在这些采样里的分布比例，后面我们会用一个例子说明。或者
 
 ```sh
@@ -198,6 +179,36 @@ perf的原理是这样的：每隔一个固定的时间，就在CPU上（每个�
 perf record 在不加 -e 指定 event 的时候，它缺省的 event 就是 Hardware event cycles。
 
 ![](/public/upload/linux/perf_event.png)
+
+### event 和 采样
+
+perf的原理是这样的：每隔一个固定的时间，就在CPU上（每个核上都有）产生一个中断，在中断上看看，当前是哪个pid，哪个函数，然后给对应的pid和函数加一个统计值，这样，我们就知道CPU有百分几的时间在某个pid，或者某个函数上了。这是一种采样的模式，我们预期，运行时间越多的函数，被时钟中断击中的机会越大，从而推测，那个函数（或者pid等）的CPU占用率就越高。perf最大的好处是它可以直接跟踪到整个系统的所有程序（而不仅仅是内核），所以perf通常是我们分析的第一步，我们先看到整个系统的outline，然后才会进去看具体的调度，时延等问题。
+
+三类event，event 是 perf 工作的基础，主要有两种：有使用硬件的 PMU 里的 event，也有在内核代码中注册的 event。
+1. Hardware event，Hardware event 来自处理器中的一个 PMU（Performance Monitoring Unit），这些 event 数目不多，都是底层处理器相关的行为，perf 中会命名几个通用的事件，比如 cpu-cycles，执行完成的 instructions，Cache 相关的 cache-misses。不同的处理器有自己不同的 PMU 事件
+    1. Performance counters are CPU hardware registers that count hardware events such as instructions executed, cache-misses suffered, or branches mispredicted. They form a basis for **profiling applications** to trace dynamic control flow and identify hotspots. perf provides rich generalized abstractions over hardware specific capabilities. Among others, it provides per task, per CPU and per-workload counters, sampling on top of these and source code event annotation. 
+2. Software event，Software event 是定义在 Linux 内核代码中的几个特定的事件，比较典型的有进程上下文切换（内核态到用户态的转换）事件 context-switches、发生缺页中断的事件 page-faults 等。
+3. Tracepoints event，实现方式和 Software event 类似，都是在内核函数中注册了 event。不仅是用在 perf 中，它已经是 Linux 内核 tracing 的标准接口了，ftrace，ebpf 等工具都会用到它。
+    1. Tracepoints are instrumentation points placed at logical locations in code, such as for system calls, TCP/IP events, file system operations, etc. These have negligible(微不足道的) overhead when not in use, and can be enabled by the perf command to collect information including timestamps and stack traces. perf can also dynamically create tracepoints using the kprobes and uprobes frameworks, for kernel and userspace dynamic tracing. The possibilities with these are endless.
+
+在这些 event 都准备好了之后，perf 又是怎么去使用这些 event 呢？有计数和采样两种方式
+1. 计数，就是统计某个 event 在一段时间里发生了多少次。一般用perf stat 查看
+2. 采样，Perf 对 event 的采样有两种模式：
+    1. 按照 event 的数目（period），比如每发生 10000 次 cycles event 就记录一次 IP、进程等信息， perf record 中的 -c 参数可以指定每发生多少次，就做一次记录
+    2. 定义一个频率（frequency）， perf record 中的 -F 参数就是指定频率的，比如 perf record -e cycles -F 99 -- sleep 1 ，就是指采样每秒钟做 99 次。
+    1. 通过-e指定感兴趣的一个或多个event（perf list可以列出支持的event）
+    2. 指定采样的范围, 比如进程级别 (-p), 线程级别 (-t), cpu级别 (-C), 系统级别 (-a)
+
+### 流程
+
+[剖析CPU性能火焰图生成的内部原理](https://mp.weixin.qq.com/s/A19RlLhSgbzw8UU4p1TZNA)perf在采样的过程大概分为两步，一是调用 perf_event_open 来打开一个 event 文件，二是调用 read、mmap等系统调用读取内核采样回来的数据。其中 perf_event_open 完成了非常重要的几项工作。
+1. 创建各种event内核对象
+2. 创建各种event文件句柄
+3. 指定采样处理回调
+
+当 perf_event_open 创建事件对象，并打开后，硬件上发生的事件就可以出发执行了。内核注册相应的硬件中断处理函数是 perf_event_nmi_handler。这样 CPU 硬件会根据 perf_event_open 调用时指定的周期发起中断，调用 perf_event_nmi_handler 通知内核进行采样处理。内核和硬件一起协同合作，定时将当前正在执行的函数，以及函数完整的调用链路都给记录下来。
+
+![](/public/upload/linux/perf_work.jpg)
 
 ### perf stat
 
