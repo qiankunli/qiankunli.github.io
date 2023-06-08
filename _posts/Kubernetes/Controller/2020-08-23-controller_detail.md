@@ -71,7 +71,33 @@ metadata:
 
 `kubectl delete configmap/mymap` 只是给 mymap.deletionTimestamp 赋了一个值，当手动移除 finalizers （比如kubectl patch） 之后，才会真正删除mymap。
 
+## 日志
 
+golang中，一般以 logr.Logger 定义了日志接口，各个日志库比如klog提供底层实现（LogSink）
+
+```go
+func main(){
+    // controller-runtime 维护了一个全局的 Log，可以通过  SetLogger/LoggerFrom 等方法去设置和获取它。
+    // ctrl.SetLogger(klogr.New()) 表示底层使用的是klog
+	  ctrl.SetLogger(klogr.New())
+		mgr, err := ctrl.NewManager(restConf, ctrl.Options{
+      Scheme: Scheme,
+      ...
+    })
+
+	r := &xxReconciler{
+		client:        mgr.GetClient(),
+		log:           ctrl.LoggerFrom(context.Background()).WithName(name),
+		recorder:      mgr.GetEventRecorderFor(name),
+	}
+
+  ctrl.NewControllerManagedBy(mgr).
+    WithOptions(...).
+    For(&v1alpha1.xx{}).
+    Build(r)
+}
+
+```
 
 ## Garbage Collection
 

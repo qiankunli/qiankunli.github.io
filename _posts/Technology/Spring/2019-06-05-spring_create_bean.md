@@ -17,6 +17,8 @@ keywords: springboot
 
 本文主要讲下图中左侧的内容
 
+[Spring并行初始化加速的思路和实践](https://mp.weixin.qq.com/s/1xIWCoCdQtAPlcZe3zHusQ) 未读
+
 ## 根据xml, annotations or java code创建Bean
 
 [History of Spring Framework and Spring Boot](https://www.quickprogrammingtips.com/spring-boot/history-of-spring-framework-and-spring-boot.html)It currently consists of a large number of modules providing a range of services. These include a component container, aspect oriented programming support for building cross cutting concerns, security framework, data access framework, web application framework and support classes for testing components. **All the components of the spring framework are glued together by the dependency injection architecture pattern**. Dependency injection(also known as inversion of control) makes it easy to design and test loosely coupled software components. 依赖注入的关键就是有一个component container/IOC container，它持有所有对象的实例，负责所有对象的创建和销毁问题，在创建对象时可以夹一点自己的私货，比如

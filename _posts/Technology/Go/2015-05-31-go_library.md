@@ -20,16 +20,47 @@ keywords: Go library
 [用 GODEBUG 看调度跟踪](https://eddycjy.gitbook.io/golang/di-9-ke-gong-ju/godebug-sched) 未读
 [用 GODEBUG 看GC](https://eddycjy.gitbook.io/golang/di-9-ke-gong-ju/godebug-gc) 未读
 
-## klog
+## golang 日志
 
-[logr](https://github.com/go-logr/logr) logr offers an(other) opinion on how Go programs and libraries can do logging without becoming coupled to a particular logging implementation. This is not an implementation of logging - it is an API. 用户使用Logger type，Log提供方实现 LogSink interface. This decoupling allows application and library developers to write code in terms of logr.Logger (which has very low dependency fan-out) while the implementation of logging is managed "up stack" (e.g. in or near main().) Application developers can then switch out implementations as necessary. 
+### 日志接口
+
+[logr](https://github.com/go-logr/logr) logr offers an(other) opinion on how Go programs and libraries can do logging without becoming coupled to a particular logging implementation. This is not an implementation of logging - it is an API. 
+1. The Logger type is intended for application and library authors. It provides a relatively small API which can be used everywhere you want to emit logs. It defers the actual act of writing logs (to files, to stdout, or whatever) to the LogSink interface.
+  ```go
+  type appObject struct {
+      // 使用时 直接使用 logr.Logger
+      logger logr.Logger
+      // ... other fields ...
+  }
+  func (app *appObject) Run() {
+      app.logger.Info("starting up", "timestamp", time.Now())
+      ...
+  }
+  ```
+2. The LogSink interface is intended for logging library implementers. It is a pure interface which can be implemented by logging frameworks to provide the actual logging functionality.
+
+This decoupling allows application and library developers to write code in terms of logr.Logger (which has very low dependency fan-out) while the implementation of logging is managed "up stack" (e.g. in or near main().) Application developers can then switch out implementations as necessary. 
+
+```go
+// 启动时初始化一个 logr.Logger 实现（比如klog）赋给 全局logger 变量，然后就可以在项目中到处传递使用了。 
+func main() {
+    // ... other setup code ...
+    // Create the "root" logger.  We have chosen the "logimpl" implementation, which takes some initial parameters and returns a logr.Logger.
+    logger := logimpl.New(param1, param2)
+    // ... other setup code ...
+    app := createTheAppObject(logger)
+    app.Run()
+}
+```
+
+### 日志实现——以klog为例
 
 klog是著名google开源C++日志库glog的golang版本
 1. 支持四种日志等级INFO < WARING < ERROR < FATAL，不支持DEBUG等级。
 2. 每个日志等级对应一个日志文件，低等级的日志文件中除了包含该等级的日志，还会包含高等级的日志。
 3. 日志文件可以根据大小切割，但是不能根据日期切割。
 4. **程序开始时必须调用`flag.Parse()`解析命令行参数**，退出时必须调用`glog.Flush()`确保将缓存区日志输出。
-5. Info()与Infoln()没有区别，因为glog为了保证每行只有一条log记录，会主动check末尾是否有换行符，如果没有的话，会自动加上。
+5. `Info()`与`Infoln()`没有区别，因为glog为了保证每行只有一条log记录，会主动check末尾是否有换行符，如果没有的话，会自动加上。
 
 ```go
 func main() {
@@ -41,7 +72,7 @@ func main() {
     defer klog.Flush()
 }
 ```
-通常而言，日志打印会按错误级别进行打印，如:【Fatal,Error,Warning,Info】等级别。但在实际项目开发过程中，还会涉及到一些内部状态切换、基础库以及框架的使用。这些信息显然不能按照错误级别进行打印。所以对 Info 级别日志进行二次分级是必要的。info 又可细化为多个级别：0~10，信息的重要性依次降低。
+通常而言，日志打印会按错误级别进行打印，如:【Fatal,Error,Warning,Info】等级别。但在实际项目开发过程中，还会涉及到一些内部状态切换、基础库以及框架的使用。这些信息显然不能按照错误级别进行打印。所以**对 Info 级别日志进行二次分级是必要的**。info 又可细化为多个级别：0~10，信息的重要性依次降低。
 
 ![](/public/upload/go/klog_vlog.png)
 
