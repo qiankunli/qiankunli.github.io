@@ -9,12 +9,12 @@ keywords:  线性回归 pytorch
 ---
 
 
-## 简介（价值不大，审视后可以废弃）
+## 简介
 
 * TOC
 {:toc}
 
-书籍附带的代码 是由MXNet 写的，github 有一个项目将所有代码 转成了 Pytorch，https://tangshusen.me/Dive-into-DL-PyTorch/#/。
+书籍附带的代码 是由MXNet 写的，后来又出了一个pytorch版本。
 
 ## 异步计算
 

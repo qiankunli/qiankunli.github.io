@@ -52,7 +52,7 @@ keywords: large model
 
 [为什么说大模型训练很难？ - ZOMI酱的回答 - 知乎](https://www.zhihu.com/question/498271491/answer/2218933677)
 
-1. 内存墙。在计算过程中，神经网络模型每一层的卷积或者全连接计算，都会把权重W_m长期保存下来，用作网络的权重参数更新（静态内存）。另外针对诸如ADAM的优化器，会存储优化器的动量等信息，用于优化器计算（动态内存）。一块有16G显存的AI芯片，最大能塞满20+亿参数的模型，但是这时候已经没有额外空间，留给动态内存进行分配啦。静态内存和动态内存都可能造成内存墙的问题。
+1. 内存墙（GPU Memory Wall）。在计算过程中，神经网络模型每一层的卷积或者全连接计算，都会把权重W_m长期保存下来，用作网络的权重参数更新（静态内存）。另外针对诸如ADAM的优化器，会存储优化器的动量等信息，用于优化器计算（动态内存）。一块有16G显存的AI芯片，最大能塞满20+亿参数的模型，但是这时候已经没有额外空间，留给动态内存进行分配啦。静态内存和动态内存都可能造成内存墙的问题。
 2. 通讯墙。大模型通过模型并行、流水线并行切分到AI集群后，通讯便成了主要的性能瓶颈。随着机器规模的扩大，基于同步的All Reduce通讯聚合方式，会因为大量的AI芯片和服务器之间频繁进行同步，出现水桶效应，也就是最慢的一路通讯，将会决定整个AI集群的通讯的高度。如果采用目前比较流行的Ring-AllReduce的通信聚合方式，**当通讯的环越大，通讯的延长将会不断地被扩大**。另外网络协议的多次握手的方式，诸如此类的开销会导致训练无法有效利用带宽。
 3. 性能墙。性能墙呢主要是指计算资源利用率的问题。随着大模型的提出，对算力需求更加迫切，理论上在4K的集群上每块卡快1分钟，总体就快了68个小时。大模型会增加对算力的需求，但是随着大模型引入各项分布式并行技术的同时，会降低计算资源的利用率。
     1. 算子层(Operator Level)：小算子过多，可以通过算子融合进行优化；子实现不够高效，类似于卷积CONV算子针对2x2和3x3 Kernel大小的使用Winograd算法代替；内存局部性差，对算子和内存的开销进行分析，可以对计算时算子输出有相同的shape进行复用。
@@ -68,6 +68,8 @@ keywords: large model
 2. 模型大（DenseNet部分），比如NLP领域，GPT-3这样的模型高达1750亿参数，显存占用高达2.8 TB，单机内存无法容纳。而Bert-Large虽然只有3.4亿参数规模，但由于各种内存占用，在16G V100上，训练也仅能使用batch Size=8。 ==> 当面对GPT-3这种DenseNet部分大的模型，Allreduce 单卡内存无法容纳，我们需要采用模型并行(model parallelism)的方式将计算图划分到不同的设备上构建有向无环图(DAG)进行分布式训练，其中Gpipe, Megatron, Oneflow和Whale都提出模型并行的相关解决方案。相比于数据并行每个worker只有一部分数据，模型并行下每个node使用所有数据.
     1. Intra-layer parallelism(Tensor Parallelism) 。主要是将一层Layer中的矩阵计算分别拆分到不同的机器上进行运算，比如简单的Y_1=W_1 X_1这一次矩阵乘法中，我们将模型参数W_1或者输入数据X_1，按某个维度分别拆分到不同设备上计算，比如1D Megatron。
     2. Inter-layer parallelism（Pipeline Parallelism）。而Inter-Layer Parallism会将模型的layers拆分到不同的机器上，则一次forward就需要跨过不同的机器串行地进行运算，而流行并行通过将batch size切分为更小的mirco batch，减少数据依赖，从而将整个计算过程异步起来，最大化资源利用率。举例来说，在一个简单的三层MLP中（的Y_i = W_i X_i, i=1,2,3）会存在三次矩阵乘法 W_i X_i，流水线并行会把W_i X_i分别分配到三台机器上进行运算。
+
+    ![](/public/upload/machine/model_parallelism.jpg)
 
 AI for Science的出现，让高性能计算与AI融合成为刚需：
 1. 数据并行。假如整个模型设两个节点，一个模型节点0、另一个模型做的节点1，整个模型都做了数据并行，数据各一半要拿去训练学习，但是要注意训练完了以后不是最终的结果，因为只输入了一半的数据。因此这中间要AII-Reduce
@@ -152,7 +154,28 @@ GPU服务器特点
 3. 我们训练模型一般都是用单精度(FP32)的参数，但是其实我们还使用半精度(FP16)。半精度可以降低内存消耗，从而训练更大的模型或者使用更大的batch size；同时运算时间受内存和算术带宽的限制，在有些gpu(Tensor cores)上可以为半精度提供更大的算术带宽，从而提高训练效率，减少inference用时。
 
 
+## 离线推理Ray
 
+[基于 Ray 的大规模离线推理](https://mp.weixin.qq.com/s/pS5RJCA5O_s6pPcib0JsuQ) Ray 项目是 UC Berkeley 的 RISElab 实验室在 2017 年前后发起的，定位是通用的分布式编程框架——Python-first。理论上通过 Ray 引擎用户可以轻松地把任何 Python 应用做成分布式，尤其是机器学习的相关应用，目前 Ray 主攻的一个方向就是机器学习。Ray 的架构分为三层
+1. 最下面一层是各种云基础设施，也就是说 Ray 帮用户屏蔽了底层的基础设施，用户拉起一个 Ray Cluster之后就可以立即开始分布式的编程，不用考虑底层的云原生或各种各样的环境；
+2. 中间层是 Ray Core 层。这一层是 Ray 提供的核心基础能力，主要是提供了 Low-level 的非常简洁的分布式编程 API。基于这套 API，用户可以非常容易地把现有的 Python 的程序分布式化。值得注意的是，这一层的 API 是 Low-level，没有绑定任何的计算范式，非常通用；
+3. 最上层是 Ray 社区基于 Ray Core 层做的丰富的机器学习库，这一层的定位是做机器学习 Pipeline。比如，数据加工读取、模型训练、超参优化、推理，强化学习等，都可以直接使用这些库来完成整个的 Pipeline，这也是 Ray 社区目前主攻的一个方向。
 
+![](/public/upload/machine/ray_arch.jpg)
 
+上图展示的是 Ray Cluster 的基本架构，每一个大框就是一个节点。（这里的节点是一个虚拟的概念，可以是一个物理机，一个 VM 或一个 Linux 的 Docker。比如在 K8s 上，一个节点就是一个 Pod。）
 
+1. Head 节点：是 Ray Cluster 的调度中心，比较核心的组件是 GCS，负责全局存储、调度、作业、状态等，Head节点也有可观测性 Dashboard。
+2. Worker 节点：除了 Head 节点之外，其他都是 Worker 节点，承载具体的工作负载。
+    1. Raylet：每个节点上面都有一个守护进程 Raylet，它是一个 Local Scheduler，负责 Task 的调度以及 Worker 的管理。
+    2. Object Store  组件：每个节点上都有 Object Store 组件，负责节点之间 Object 传输。在整个 Cluster 中每个节点的 Object Store 组件组成一个全局的分布式内存。同时，在单个节点上，Object Store 在多进程之间通过共享内存的方式减少 copy。
+3. Driver：当用户向 Ray Cluster 上提交一个 Job，或者用 Notebook 连接的时候，Ray挑选节点来运行 Driver 进行，执行用户代码。作业结束后 Driver 销毁。
+4. Worker：是 Ray 中 Task 和 Actor 的载体。
+
+Ray 的Low-level和  High-level API
+
+![](/public/upload/machine/ray_api.jpg)
+
+在部署 Ray 时，开源社区有完整的解决方案 Kuberay 项目。每个 Ray Cluster 由 Head 节点和 Worker 节点组成，每个节点是一份计算资源，可以是物理机、Docker 等等，在 K8s 上即为一个 Pod。启动 Ray Cluster 时，使用 Kuberay 的 Operator 来管理整个生命周期，包括创建和销毁 Cluster 等等。Kuberay 同时也支持自动扩展和水平扩展。Ray Cluster 在内部用于收集负载的 Metrics，并根据 Metrics 决定是否扩充更多的资源，如果需要则触发 Kuberay 拉起新的 Pod 或删除闲置的 Pod。
+
+用户可以通过内部的平台使用 Ray，通过提交 Job 或使用 Notebook 进行交互式编程。平台通过 Kuberay 提供的 YAML 和 Restful API 这两种方式进行操作。

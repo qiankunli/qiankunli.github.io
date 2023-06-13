@@ -77,7 +77,7 @@ keywords:  Kubernetes 混部
   2. 及时识别干扰源，避免影响LS应用
 4. 资源抽象：Kubernetes 原生 QoS 分级无法满足大规模生产环境的要求
 
-[Kubernetes解决Noisy Neighbors场景的探索](https://mp.weixin.qq.com/s/g28ett0Z5LR0sHTyOljCRg) RDT机制 按照应用程序和线程的服务分类来限制和分配其使用的L1/L2/L3缓存。
+[Kubernetes解决Noisy Neighbors场景的探索](https://mp.weixin.qq.com/s/g28ett0Z5LR0sHTyOljCRg) RDT机制 按照应用程序和线程的服务分类来限制和分配其使用的L1/L2/L3缓存。 [Koordinator 最佳实践系列：精细化 CPU 编排](https://mp.weixin.qq.com/s/ps9eLWdvmCBLkcIP96bKMA)
 
 ## 技术要求
 
