@@ -45,7 +45,7 @@ keywords:  集群
   3. 假如deployment有10个pod，两个cluster 分别运行2/8 个pod，用户创建的deployment 的status 等字段如何感知真实情况？如何方便的查看 deployment 当前在各个cluster的分布与状态。
   4. 分发时要考虑集群当前的可用资源情况， [Karmada v1.3 新特性解读: 自定义资源模型](https://mp.weixin.qq.com/s/AsHB4elcCBD3kcI8wFO9Rw)
 2. 在不同的集群下发的模型怎样做到差异化？
-3. 怎样设计和解决在多集群的背景下，有状态服务的调度机制和访问机制？
+3. 怎样设计和解决在多集群的背景下，有状态服务的调度机制和访问机制？karmada FederatedHPA, MulitClusterIngress API。
 4. 多集群监控 [阿里云注册集群+Prometheus 解决多云容器集群运维痛点](https://mp.weixin.qq.com/s/Sud0TtLWk6lQUKmCPMN12A) [分布式云场景下的多集群监控方案最佳实践](https://mp.weixin.qq.com/s/M3S0kkJj7vn-QG7mw1hdUA)
 5. 多集群故障迁移 [Karmada跨集群优雅故障迁移特性解析](https://mp.weixin.qq.com/s/Bnrc3OCO-mBUD1vj6OsuLw) 主要包括发现故障、故障迁移、如何优雅故障迁移。
 
@@ -261,7 +261,7 @@ karmada 对象部署相关的 crd 可分为
 3. Binding Controller: watches ResourceBinding objects and create a Work object corresponding to each cluster with a single resource manifest. 
 4. Execution Controller: watches Work objects. When Work objects are created, the controller will distribute the resources to member clusters.
 
-karmada 会为每一个分发的资源每个目标成员集群的执行命名空间（karmada-es-*)中创建一个 work。具体的说，BindingController 根据 Resource Binging 资源内容创建 work 资源到各个成员集群的执行命名空间, work 中描述了要分到目标集群的资源列表。被分发的资源不区分是自定义资源还是 kubernetes 内置资源先被转化为 Unstructured 类型的数据，然后在 woker 中以 JSON 字节流的形式保存，然后在 execution_controller 中再反序列化，解析出 GVR，通过 dynamicClusterClient 在目标成员集群中创建指定分发资源。
+karmada 会为每一个分发的资源每个目标成员集群的执行命名空间（`karmada-es-*`)中创建一个 work。具体的说，BindingController 根据 Resource Binging 资源内容创建 work 资源到各个成员集群的执行命名空间, work 中描述了要分到目标集群的资源列表。被分发的资源不区分是自定义资源还是 kubernetes 内置资源先被转化为 Unstructured 类型的数据，然后在 woker 中以 JSON 字节流的形式保存，然后在 execution_controller 中再反序列化，解析出 GVR，通过 dynamicClusterClient 在目标成员集群中创建指定分发资源。
 
 [Karmada资源对象部署的设计与实现](https://mp.weixin.qq.com/s/8lWuaNVZJTF1LpqXUd6H5A)
 

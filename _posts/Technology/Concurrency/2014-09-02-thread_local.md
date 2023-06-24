@@ -76,7 +76,7 @@ __thread int g = 0;  // 1，这里增加了__thread关键字，把g定义成私�
 ```
 
 
-[全局视角看技术-Java多线程演进史](https://mp.weixin.qq.com/s/XwI_09N0BdrRqjS45REx0w)想像一下如果让你设计，一般的简单思路是：在ThreadLocal里维护一个全局线程安全的Map，key为线程，value为共享对象。这样设计有个弊端就是内存泄露问题，因为该Map会随着越来越多的线程加入而无限膨胀，如果要解决内容泄露，必须在线程结束时清理该Map，这又得强化GC能力了，显然投入产出比不合适。于是，ThreadLocal就被设计成Map不由ThreadLocal持有，而是由Thread本身持有。key为ThreadLocal变量，value为值。每个Thread将所用到的ThreadLoacl都放于其中。
+[全局视角看技术-Java多线程演进史](https://mp.weixin.qq.com/s/XwI_09N0BdrRqjS45REx0w)想像一下如果让你设计，一般的简单思路是：在ThreadLocal里维护一个全局线程安全的Map，key为线程，value为共享对象。这样设计有个弊端就是内存泄露问题，因为该Map会随着越来越多的线程加入而无限膨胀，如果要解决内容泄露，必须在线程结束时清理该Map，这又得强化GC能力了，显然投入产出比不合适。于是，**ThreadLocal就被设计成Map不由ThreadLocal持有，而是由Thread本身持有**。key为ThreadLocal变量，value为值。每个Thread将所用到的ThreadLoacl都放于其中。
 
 
 ## 使用模式 ##
@@ -154,6 +154,4 @@ __thread int g = 0;  // 1，这里增加了__thread关键字，把g定义成私�
 
 ## 引用
 
-严重推荐这篇文章： [Java中ThreadLocal模拟和解释][]
-
-[Java中ThreadLocal模拟和解释]: http://woshixy.blog.51cto.com/5637578/1275284
+严重推荐这篇文章：[Java中ThreadLocal模拟和解释](http://woshixy.blog.51cto.com/5637578/1275284)

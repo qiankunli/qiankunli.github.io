@@ -121,6 +121,8 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 ```
 ### 存储层
 
+[第4回：KubeAPIServer 的存储接口实现](https://mp.weixin.qq.com/s/L0DI_w-dVWxiHoSBnPUUtg) 未读。
+
 位于 `k8s.io/apiserver/pkg/storage` 下
 
 ```go

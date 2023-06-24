@@ -157,6 +157,8 @@ root     32901 32794  0 00:01 pts/0    00:00:00 ps -ef
 
 ## perf
 
+[盘点内核中常见的CPU性能卡点](https://mp.weixin.qq.com/s/moZjYijy2WcnGSTfv-nr9Q)CPU硬件影响程序运行性能的关键指标，分别是平均每条指令的时钟周期个数 CPI 和缓存命中率。其实，内核开发者们也都知道内核运行的过程中，哪些开销会比较高。所以老早就给我们提供了一种名为软件性能事件的支持（`perf list sw`可以看到alignment-faults,context-switches OR cs,cpu-migrations OR migrations,emulation-faults,major-faults,minor-faults,page-faults OR faults,task-clock）。以方便我们应用的开发者来观测这些事件发生的次数，以及发生时所触发的函数调用链。
+
 CPU的硬件开发者们也想到了软件同学们会有统计观察硬件指标的需求。所以在硬件设计的时候，加了一类专用的寄存器，专门用于系统性能监视。这类寄存器的名字叫硬件性能计数器（PMC: Performance Monitoring Counter）。每个PMC寄存器都包含一个计数器和一个事件选择器，计数器用于存储事件发生的次数，事件选择器用于确定所要计数的事件类型。例如，可以使用PMC寄存器来统计 L1 缓存命中率或指令执行周期数等。当CPU执行到 PMC 寄存器所指定的事件时，硬件会自动对计数器加1，而不会对程序的正常执行造成任何干扰。
 
 ![](/public/upload/linux/pmu.jpg)
