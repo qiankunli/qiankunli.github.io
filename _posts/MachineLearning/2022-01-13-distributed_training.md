@@ -61,13 +61,13 @@ keywords:  distributed training
 
 [巨型AI模型背后的分布式训练技术（二）](https://zhuanlan.zhihu.com/p/629443563)DP，TP，PP，Sharding, Offload，这么多的分布式优化技术，需要怎么用？
 
-[Galvatron项目原作解读：大模型分布式训练神器，一键实现高效自动并行](https://mp.weixin.qq.com/s/nqmfZSKdYD8JPtZwvQtWZw)稠密大模型拥有着动辄数十亿、百亿甚至万亿规模的参数量，面临高昂的计算、存储、以及通信成本，为 AI 基础设施带来了巨大的挑战。人们研发了很多工具（如 Megatron、DeepSpeed、FairSeq 等）来实现如数据并行、张量模型并行、流水并行、分片数据并行等各种并行范式。但这种粗粒度的封装逐渐难以满足用户对系统效率和可用性的需要。如何通过系统化、自动化的方式实现大模型分布式训练，已经成为了当前 MLSys 领域最为重要的问题之一。最近已经有一些系统开始提及“自动并行”的概念，但它们大部分都还停留在对 API 和算子进行工程上的封装，仍然依赖用户人工反复尝试或系统专家经验才能完成部署，并没有从根本上解决自动并行难题。近日，北大河图团队提出了一套面向大模型的自动并行分布式训练系统 Galvatron，相比于现有工作在多样性、复杂性、实用性方面均具有显著优势，性能显著优于现有解决方案。
+[Galvatron项目原作解读：大模型分布式训练神器，一键实现高效自动并行](https://mp.weixin.qq.com/s/nqmfZSKdYD8JPtZwvQtWZw)稠密大模型拥有着动辄数十亿、百亿甚至万亿规模的参数量，面临高昂的计算、存储、以及通信成本，为 AI 基础设施带来了巨大的挑战。人们研发了很多工具（如 Megatron、DeepSpeed、FairSeq 等）来实现如数据并行、张量模型并行、流水并行、分片数据并行等各种并行范式。但这种粗粒度的封装逐渐难以满足用户对系统效率和可用性的需要。**如何通过系统化、自动化的方式实现大模型分布式训练**，已经成为了当前 MLSys 领域最为重要的问题之一。最近已经有一些系统开始提及“自动并行”的概念，但它们大部分都还停留在对 API 和算子进行工程上的封装，仍然依赖用户人工反复尝试或系统专家经验才能完成部署，并没有从根本上解决自动并行难题。近日，北大河图团队提出了一套面向大模型的自动并行分布式训练系统 Galvatron，相比于现有工作在多样性、复杂性、实用性方面均具有显著优势，性能显著优于现有解决方案。
 
 ## 通信技术
 
 训练框架面临的是 单机CPU与GPU 之间、单机多GPU之间、多机CPU 之间、多机GPU 之间的通信问题，有各种优化方案，但要对上层提供统一通信接口，并进一步结合机器学习的特点提供 collective Communication 接口。
 
-### 协议层
+### 硬件和协议层
 
 [海思专家如何看待RDMA技术？](https://mp.weixin.qq.com/s/UqSydz8hJCFcX5CF30gXSw) 比较好的一篇文章
 
@@ -108,21 +108,34 @@ RDMA本身指的是一种技术，具体协议层面，包含Infiniband（IB）�
 
 ![](/public/upload/machine/nvlink.jpg)
 
-在机器内部的GPU-GPU之间，如果通讯仍然走PCIe/QPI/UPI等时，那往往会成为瓶颈；因此，NVIDIA专门提出了NVLink、NVSwitch等新的机内通讯元件，可以为同一机器的GPU之间提供几百Gbps甚至上Tbps的互联带宽。在机器之间，GPU间的通讯需要经过NIC，在没有PCIe Switch的情况下，GPU-NIC之间的通讯需要经过RC，并且会使用CPU做一次拷贝和中转，往往会成为瓶颈；为此，NVIDIA又搞出了GPU Direct RDMA（GDR）技术，让GPU的数据可以直接DMA到网卡上，而不需要经过CPU的拷贝和中转。
+在机器内部的GPU-GPU之间，如果通讯仍然走PCIe/QPI/UPI等时，那往往会成为瓶颈；因此，NVIDIA专门提出了NVLink、NVSwitch等**新的机内通讯元件**，可以为同一机器的GPU之间提供几百Gbps甚至上Tbps的互联带宽。在机器之间，GPU间的通讯需要经过NIC，在没有PCIe Switch的情况下，GPU-NIC之间的通讯需要经过RC，并且会使用CPU做一次拷贝和中转，往往会成为瓶颈；为此，NVIDIA又搞出了GPU Direct RDMA（GDR）技术，让GPU的数据可以直接DMA到网卡上，而不需要经过CPU的拷贝和中转。
 
 那么，一个自然的问题就是，如何判断GPU之间是的连接方式呢？NVIDIA当然想得非常周到了，提供了`nvidia-smi topo -m`的命令，可以查看机内的连接方式。然而，值得注意的是，并非所有机器都会组装NVLink、NVSwitch、PCIe Switch等，毕竟这都是成本。所以，在给定机型下的GPU通讯性能最优、到底开不开GDR、PCIe参数到底怎么设置都需要根据具体机型和具体通信模式而具体分析了。最好的方式还是在购买GPU服务器和搭建物理网络时，就结合模型特点和实现方式，设计好GPU服务器的GPU-GPU、GPU-NIC等机内互联和NIC-交换机-NIC的网络互联，这样才能不至于在任何一个地方过早出现瓶颈，导致昂贵GPU算力资源的浪费。
 
 大模型要利用分布式的GPU算力，通讯库是关键环节之一。通讯库向上提供API供训练框架调用，向下连接机内机间的GPU以完成模型参数的高效传输。目前业界应用最为广泛的是NVIDIA提供的NCCL开源通讯库，各个大厂基本都基于NCCL或NCCL的改造版本作为GPU通讯的底座。NCCL是一个专门为多GPU之间提供集合通讯的通讯库，或者说是一个多GPU卡通讯的框架 ，它具有一定程度拓扑感知的能力，提供了包括AllReduce、Broadcast、Reduce、AllGather、ReduceScatter等集合通讯API，也支持用户去使用ncclSend()、ncclRecv()来实现各种复杂的点对点通讯，如One-to-all、All-to-one、All-to-all等，在绝大多数情况下都可以通过服务器内的PCIe、NVLink、NVSwitch等和服务器间的RoCEv2、IB、TCP网络实现高带宽和低延迟。
 
-
 [深度学习分布式训练框架 horovod (3) --- Horovodrun背后做了什么](https://mp.weixin.qq.com/s/SkByud8mz4rjulJNec6jig)
 Collective communication包含多个sender和多个receiver（相对于P2P 模式只有一个sender和一个receiver），一般的通信原语包括 broadcast，All-to-one (gather),all-gather，One-to-all (scatter)，reduce，all-reduce，reduce-scatter，all-to-all等。集合通信库的主要特征是：大体上会遵照 MPI 提供的接口规定，实现了包括点对点通信（SEND,RECV等），集合通信（ REDUCE，BROADCAST，ALLREDUCE等）等相关接口，然后根据自己硬件或者是系统的需要，在底层实现上进行了相应的改动，保证接口的稳定和性能。
 
+
 [谈分布式机器学习系统中的网络相关问题](https://zhuanlan.zhihu.com/p/61731822)
 
-#### NCCL 
+### 通信库NCCL 
 
 The NVIDIA Collective Communication Library (NCCL) implements multi-GPU and multi-node communication primitives optimized for NVIDIA GPUs and Networking. NCCL provides routines such as all-gather, all-reduce, broadcast, reduce, reduce-scatter as well as point-to-point send and receive that are optimized to achieve high bandwidth and low latency over PCIe and NVLink high-speed interconnects within a node and over NVIDIA Mellanox Network across nodes. [Point-to-point communication](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/p2p.html)One-to-all (scatter) ,All-to-one (gather) , All-to-all 都可以基于 ncclSend 和 ncclRecv 来实现。
+
+为什么需要NCCL？或者说NCCL 都看了那些活儿？
+1. communication primitive
+   1. Point-to-point communication，只有一个sender和一个receiver
+   2. Collective communication，包含多个sender多个receiver，一般的通信原语包括broadcast，gather,all-gather,scatter,reduce,all-reduce,reduce-scatter,all-to-all等。
+2. ring-base collectives，传统Collective communication假设通信节点组成的topology是一颗fat tree，但实际的通信topology可能比较复杂，并不是一个fat tree。因此一般用ring-based Collective communication。**将所有的通信节点通过首尾连接形成一个单向环**，数据在环上依次传输。以broadcast为例， 假设有4个GPU，GPU0为sender将信息发送给剩下的GPU
+   1. 按照环的方式依次传输，GPU0-->GPU1-->GPU2-->GPU3，若数据量为N，带宽为B，整个传输时间为`（K-1）N/B`。时间随着节点数线性增长，不是很高效。
+   2. 把要传输的数据分成S份，每次只传N/S的数据量，GPU1接收到GPU0的一份数据后，也接着传到环的下个节点，这样以此类推，最后花的时间为`S*(N/S/B) + (k-2)*(N/S/B) = N(S+K-2)/(SB) --> N/B`，条件是S远大于K，即数据的份数大于节点数，这个很容易满足。所以通信时间不随节点数的增加而增加，只和数据总量以及带宽有关。
+   ![](/public/upload/machine/ring_base_collectives.png)
+   3. 那么在以GPU为通信节点的场景下，怎么构建通信环呢？
+   ![](/public/upload/machine/ring-based_collective_communication.png)
+3. NCCL在单机多卡上以及多机多卡实现：单机内多卡通过PCIe以及CPU socket通信，多机通过InfiniBand通信。
+
 
 ```c
 // nccl/src/nccl.h.in
@@ -163,19 +176,10 @@ struct ncclComm {
 };
 ```
 
-
-NCCL 最初只支持单机多 GPU 通信，从 NCCL2 开始支持多机多 GPU 通信。
-
-#### Gloo
-
-Gloo是facebook开源的用于机器学习任务中的集合通信库. It comes with a number of collective algorithms useful for machine learning applications. These include a barrier, broadcast, and allreduce. 
-
-Gloo 为CPU和GPU提供了集合通信程序的优化实现。但如果是在使用NVIDIA-硬件的情况下，主流的选择是NVIDIA自家的NCCL。
-
-#### MPI 与 NCCL/GLOO
-
-[利用多 GPU 加速深度学习模型训练](https://mp.weixin.qq.com/s/wiqOHIVfL2gKnRUhY62EBA)多机软件设计一般采用 MPI（Message Passing Interface）实现数据交互。MPI 是一种消息传递库接口描述标准，规定了点对点消息传递、协作通信、组和通讯员概念、进程拓扑、环境管理等各项内容，支持 C 和 Fortran 语言。**NCCL 出现得更晚一些，参考并兼容了 MPI 已有 API**。**NCCL 更多考虑了 GPU 的特性**，例如任意两块 GPU 之间的通信开销是有区别的，跨 QPI 情况与同一 PCIe Switch 情况，以及有 NVLink/ 无 NVLink 情况就有明显差异，但 MPI 认为两种情况下 GPU 与 GPU 都是等同的，甚至 **MPI 认为跨机器的 GPU 也是等同的**，这对于多 GPU 通信效率会有影响。MPI 可以和 NCCL 结合，实现**层次化的**并行通信机制，即同一台机器上的不同 GPU 之间采用 NCCL 通信，而不同机器上的 GPU 之间采用 MPI 辅助通信。[NCCL and MPI](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/mpi.html)
-
+其它
+1. NCCL 最初只支持单机多 GPU 通信，从 NCCL2 开始支持多机多 GPU 通信。
+1. Gloo是facebook开源的用于机器学习任务中的集合通信库. It comes with a number of collective algorithms useful for machine learning applications. These include a barrier, broadcast, and allreduce. Gloo 为CPU和GPU提供了集合通信程序的优化实现。但如果是在使用NVIDIA-硬件的情况下，主流的选择是NVIDIA自家的NCCL。
+2. [利用多 GPU 加速深度学习模型训练](https://mp.weixin.qq.com/s/wiqOHIVfL2gKnRUhY62EBA)多机软件设计一般采用 MPI（Message Passing Interface）实现数据交互。MPI 是一种消息传递库接口描述标准，规定了点对点消息传递、协作通信、组和通讯员概念、进程拓扑、环境管理等各项内容，支持 C 和 Fortran 语言。**NCCL 出现得更晚一些，参考并兼容了 MPI 已有 API**。**NCCL 更多考虑了 GPU 的特性**，例如任意两块 GPU 之间的通信开销是有区别的，跨 QPI 情况与同一 PCIe Switch 情况，以及有 NVLink/ 无 NVLink 情况就有明显差异，但 MPI 认为两种情况下 GPU 与 GPU 都是等同的，甚至 **MPI 认为跨机器的 GPU 也是等同的**，这对于多 GPU 通信效率会有影响。MPI 可以和 NCCL 结合，实现**层次化的**并行通信机制，即同一台机器上的不同 GPU 之间采用 NCCL 通信，而不同机器上的 GPU 之间采用 MPI 辅助通信。[NCCL and MPI](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/mpi.html)
 
 ## 优化手段
 
