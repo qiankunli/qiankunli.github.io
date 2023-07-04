@@ -14,8 +14,8 @@ keywords: JAVA spi xsd
 
 ```
 xxx
-    xxx-core/xxx-common
-    xxx-spring
+    xxx-core/xxx-common  // 核心抽象与实现
+    xxx-spring		     // 负责与spring整合，隐藏掉初始化，加一些注解等操作
 ```
 我们说面向过程，画流程图，流程图中从start到end的代码我们都看的到。但到java中，大部分时候，我们在写回调函数/生命周期函数。即便是我们用代码描述了开始与结束，但其中注解啊什么的，又为我们夹带了不少私货。经常有人说，大部分程序猿拿着面向对象的语言写面向过程的代码（常写controller-service-dao的程序猿对这点感受尤其明显）。那么理解问题、理解框架、理解框架与业务的边界，有利于我们从面向对象的角度去思考问题。
 

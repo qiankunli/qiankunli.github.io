@@ -147,6 +147,8 @@ keywords: hpc 对象存储 AI
 2. 缓存和远端的 networking 也是一个需要被分配和调度的资源。
 3. 在进行缓存优化时，不要只局限在一个作业或者一个 worker 上，应该统揽整个端到端全局的参数，才能使得整个集群的效率和性能有更好的提升。
 
+[多云缓存在知乎的演进](https://mp.weixin.qq.com/s/Pcvoa9ZSAO_XSLoiyhAeRA)
+
 ## 其它
 
 [面向大数据存算分离场景的数据湖加速方案](https://mp.weixin.qq.com/s/kog8ADN6-1o9tLoPEUZ8rg) 未读

@@ -31,11 +31,16 @@ kubelet 源码虽然庞大，但并不复杂，基本适用于上述规律（**�
 
 ![](/public/upload/kubernetes/kubelet_overview.png)
 
-### 节点状况的监视器
+### 生命周期事件生成器PLEG
 
-Kubelet 会使用上图中的 NodeStatus 机制，定期检查集群节点状况，并把节点 状况同步到 API Server。而 **NodeStatus 判断节点就绪状况的一个主要依据，就是 PLEG**。
+对于 Pod来说，Kubelet 会从多个数据来源（api、file以及http） watch Pod spec 中的变化。对于容器来说，Kubelet 会定期轮询容器运行时，以获取所有容器的最新状态。随着 Pod 和容器数量的增加，**轮询会产生较大开销**，带来的周期性大量并发请求会导致较高的 CPU 使用率峰值，降低节点性能，从而降低节点的可靠性。为了降低 Pod 的管理开销，提升 Kubelet 的性能和可扩展性，引入了 PLEG（Pod Lifecycle Event Generator）。改进了之前的工作方式：
 
-PLEG 是 Pod Lifecycle Events Generator 的缩写，基本上它的执行逻辑，是 定期检查节点上 Pod 运行情况，如果发现感兴趣的变化，PLEG 就会把这种变化包 装成 Event 发送给 Kubelet 的主同步机制 syncLoop 去处理。
+1. 减少空闲期间的不必要工作(例如 Pod 的定义和容器的状态没有发生更改)。
+2. 减少获取容器状态的并发请求数量。
+
+为了进一步降低损耗，社区推出了基于event实现的PLEG，当然也需要CRI运行时支持。
+
+它定期检查节点上 Pod 运行情况，如果发现感兴趣的变化，PLEG 就会把这种变化包 装成 Event 发送给 Kubelet 的主同步机制 syncLoop 去处理。
 
 ![](/public/upload/kubernetes/kubelet_pleg.png)
 

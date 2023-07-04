@@ -29,6 +29,7 @@ keywords: 实时训练
 ## 实践挑战
 
 1. 在线训练目前还没有标准的基础设施。
+2. 如何与已有的训练、推理流程整合起来。
 
 在线/实时训练其实输出的是一个模型的更新数据流，这里其实是最近上一批次产生的对模型造成变化被实时的发布到在线。离线其实会做批量天级别的训练，会发布一个全量的迁移参数模型，同时更回到线上。
 
@@ -36,3 +37,11 @@ keywords: 实时训练
 [如何增强推荐系统模型更新的「实时性」？](https://mp.weixin.qq.com/s/DzsS7Q1hqH2YwRTvKFVh6w) 未读。
 
 [天下武功，唯快不破，论推荐系统的「 实时性」](https://mp.weixin.qq.com/s/ZZoQynG8XYzhtgwqorBUyg) 未读。
+
+[基于实时流的广告特征平台的建设与实践](https://mp.weixin.qq.com/s/SGBy9LqsUQnw0MDBPOnWFQ)
+1. 离线和实时训练
+    ![](/public/upload/machine/bilibili_feature_platform_train.jpg)
+2. 推理
+    ![](/public/upload/machine/bilibili_feature_platform_serving.jpg)
+3. 离线实时+推理一起
+    ![](/public/upload/machine/bilibili_feature_platform.jpg)
