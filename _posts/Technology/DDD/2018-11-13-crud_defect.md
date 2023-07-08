@@ -24,9 +24,9 @@ keywords: ddd cqrs
 
 ## CRUD/controller-service-dao的败笔
 
-[Spring Web 应用的最大败笔](https://www.jdon.com/45857)
+在日常开发中，开发主要涉及到与前端交互、业务逻辑处理和数据存储，这样就可以分成三层：「视图层」、「业务逻辑层」和「数据访问层」。
 
-大部分Spring的Web应用程序，常见的错误的设计如下：
+[Spring Web 应用的最大败笔](https://www.jdon.com/45857)大部分Spring的Web应用程序，常见的错误的设计如下：
 
 1. 领域模型对象用来存储应用的数据(当作DTO使用)，领域模型是贫血模型这样的反模式。
 2. 服务层每个实体有一个服务。

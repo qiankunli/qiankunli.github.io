@@ -301,26 +301,6 @@ void up(struct semaphore *sem)
 
 反过来说，无锁的代码仅仅是不需要显式的Mutex来完成，但是存在数据竞争（Data Races）的情况下也会涉及到同步（Synchronization）的问题。从某种意义上来讲，所谓的无锁，仅仅只是颗粒度特别小的“锁”罢了，从代码层面上逐渐降低级别到CPU的指令级别而已，总会在某个层级上付出等待的代价，除非逻辑上彼此完全无关
 
-## 分布式锁
-
-[如何使用Redis实现分布式锁？](https://time.geekbang.org/column/article/301092)为了避免 Redis 实例故障而导致的锁无法工作的问题，Redis 的开发者 Antirez 提出了分布式锁算法 Redlock。基本思路是让客户端和多个独立的 Redis 实例依次请求加锁，如果客户端能够和半数以上的实例成功地完成加锁操作，就认为客户端成功地获得分布式锁了，否则加锁失败。
-
-[并发场景下的幂等问题——分布式锁详解](https://mp.weixin.qq.com/s/uupgv50JN7AGWp2VjsCRuQ)
-
-[聊聊分布式锁](https://mp.weixin.qq.com/s/-N4x6EkxwAYDGdJhwvmZLw)未读。
-
-[聊一聊分布式锁的设计模型](https://mp.weixin.qq.com/s/uA26VVmYMTfs-dWcLOY04w)
-
-[分布式锁实现原理与最佳实践](https://mp.weixin.qq.com/s/hvTx6_WSZ82ok3na7L1IiA)
-1. 单体应用：使用本地锁 + 数据库中的行锁解决
-2. 分布式应用：
-    1. 使用数据库中的乐观锁，加一个 version 字段，利用CAS来实现，会导致大量的 update 失败
-    2. 使用数据库维护一张锁的表 + 悲观锁 select，使用 select for update 实现。 
-    3. 使用Redis 的 setNX实现分布式锁
-    4. 使用zookeeper的watcher + 有序临时节点来实现可阻塞的分布式锁
-    5. 使用Redisson框架内的分布式锁来实现
-    6. 使用curator 框架内的分布式锁来实现
-		
 ## 一个博客系列的整理
 
 [[并发系列-0] 引子](http://kexianda.info/page/2/)
@@ -365,7 +345,3 @@ void up(struct semaphore *sem)
     2. 如果你能确定被锁住的代码执行时间很短，自旋
     3. 如果能区分出读写操作
 2. 乐观锁，假定冲突的概率很低，先修改完共享资源，再验证这段时间内有没有发生冲突。如果没有其他线程在修改资源，那么操作完成。如果发现其他线程已经修改了这个资源，就放弃本次操作。至于放弃后如何重试，则与业务场景相关。无锁编程中，验证是否发生了冲突是关键。
-
-[聊聊原子变量、锁、内存屏障那点事](http://0xffffff.org/2017/02/21/40-atomic-variable-mutex-and-memory-barrier/)
-
-![](/public/upload/java/cpu_cache_memory.png)
