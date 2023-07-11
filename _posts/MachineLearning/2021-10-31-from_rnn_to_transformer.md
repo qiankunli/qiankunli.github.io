@@ -231,9 +231,7 @@ Transformer模型采用的也是编码器-解码器架构，但是在该模型�
 1. Encoder具有两层结构，self-attention和前馈神经网络。self-attention计算句子中的每个词都和其他词的关联，从而帮助模型更好地理解上下文语义，引入Muti-Head attention后，每个头关注句子的不同位置，增强了Attention机制关注句子内部单词之间作用的表达能力。前馈神经网络为encoder引入非线性变换，增强了模型的拟合能力。本质上，自注意力机制使得模型能理解语句中不同单词间的关系。而且**跟以往按固定顺序处理单词**的传统模型不同，transformers 其实是同时检查所有单词，并根据每个词跟句中其他词之间的相关性，为各词分配所谓“注意力得分”指标。
 2. Decoder接受encoder输入的同时也接受output输入，帮助当前节点获取到需要重点关注的内容。解码器则从编码器处获取编码，之后产生输出序列。在机器翻译和文本生成等任务中，解码器会根据从编码器处接收到的输入生成经过翻译的序列。跟编码器类似，解码器同样由多层自注意力加前馈神经网络组成。**但解码器还包含额外的注意力机制，用于专注处理编码器的输出，保证解码器在生成输出时考虑到来自输入序列的相关信息**。
 
-
-
-每一个部分都有公式对应。
+Transformer 模型本来是为了翻译任务而设计的。在训练过程中，Encoder 接受源语言的句子作为输入，而 Decoder 则接受目标语言的翻译作为输入。在 Encoder 中，由于翻译一个词语需要依赖于上下文，因此注意力层可以访问句子中的所有词语；而 Decoder 是顺序地进行解码，在生成每个词语时，注意力层只能访问前面已经生成的单词。例如，假设翻译模型当前已经预测出了三个词语，我们会把这三个词语作为输入送入 Decoder，然后 Decoder 结合 Encoder 所有的源语言输入来预测第四个词语。每一个部分都有公式对应。
 
 ### self-attention 机制
 
@@ -310,11 +308,13 @@ $$
 
 ### 位置编码/Positional Encoding
 
+Positional Embeddings 基于一个简单但有效的想法：使用与位置相关的值模式来增强词向量。
+
 对self-attention来说，它跟每一个input vector都做attention，所以没有考虑到input sequence的顺序。更通俗来讲，大家可以发现我们前文的计算每一个词向量都与其他词向量计算内积，得到的结果丢失了我们原来文本的顺序信息。打乱词向量的顺序，得到的结果仍然是相同的。但实际上位置信息很有用，比如动词出现在句首的概率就比名词低，所以要把位置信息塞到学习过程中去。 
 
 位置信息编码位于encoder和decoder的embedding之后，每个block之前。
 
-关于positional embedding ，有两种方法：
+如果预训练数据集足够大，那么最简单的方法就是让模型自动学习位置嵌入。 除此以外，Positional Embeddings 还有一些替代方案：
 1. Learned Positional Embedding ，这个是绝对位置编码，即直接对不同的位置随机初始化一个postion embedding，这个postion embedding作为参数进行训练。缺点：
   1. 不同位置对应的positional embedding固然不同，但是位置1和位置2的距离比位置3和位置10的距离更近，这些关于位置的相对含义，模型能够通过绝对位置编码参数学习到吗？
   2. 位置之间没有约束关系，我们只能期待它隐式地学到，是否有更合理的方法能够显示的让模型理解位置的相对关系呢？
@@ -425,6 +425,8 @@ Sequence Mask， 上述训练过程是挨个单词串行进行的，那么能不
 
 鲁提辖：要理解Transformer就是搞懂Attention，再就是Positional Encoding。Attention主要负责对长程依赖内容依赖建模，Positional Encoding负责对短程依赖和位置依赖建模，两者合力就有了Transformer强大的拟合能力。
 
+## 其它视角
+
 ### 李宏毅
 
 [台大李宏毅自注意力机制和Transformer详解！](https://www.bilibili.com/video/BV1v3411r78R) 视频总结了 Self-Attention 与RNN 和 CNN和 GNN的关系，Self-Attention 可以用来学习原来由  RNN 和 CNN  和 GNN学习的任务。
@@ -445,7 +447,15 @@ $$
 
 一个知乎回答：transformer中的Q,K,V到底是什么？就是查字典。假想你有一个map/dict或者其他名字，一个key对应一个value，在检索的时候，给定query，如果query in map，就是query等于其中一个key，就返回对应的value。这个方法太hard了，有就是有，没有就是没有。对于qkv都是向量的情况，这种方法不可行，只能让它变soft，那就是算一算query和key的关系，按照比例对value加和，这和max变成softmax有异曲同工之妙。
 
-## 其它
+## 编码视角
+
+NLP 神经网络模型的本质就是对输入文本进行编码，常规的做法是首先对句子进行分词，然后将每个词语 (token) 都转化为对应的词向量 (token embeddings)，这样文本就转换为一个由词语向量组成的矩阵 $X=(x_1,x_2,...,x_n)$，其中$x_i$就表示第i个词语的词向量。
+1. RNN（例如 LSTM）的方案很简单，每一个词语$x_t$对应的编码结果$y_t$通过递归地计算得到：$y_t=f(y_{t-1},xt)$，RNN 本质是一个马尔科夫决策过程，难以学习到全局的结构信息；
+2. CNN 则通过滑动窗口基于局部上下文来编码文本，例如核尺寸为 3 的卷积操作就是使用每一个词自身以及前一个和后一个词来生成嵌入式表示：$y_t=f(x_{t-1},x_{t},x_{t+1})$，由于是通过窗口来进行编码，所以更侧重于捕获局部信息，难以建模长距离的语义依赖。
+3. 直接使用 Attention 机制编码整个文本。相比 RNN 要逐步递归才能获得全局信息（因此一般使用双向 RNN），而 CNN 实际只能获取局部信息，需要通过层叠来增大感受野，Attention 机制一步到位获取了全局信息：$y_t=f(x_t,A,B)$，其中 A,B是另外的词语序列（矩阵），如果取A=B=X就称为 Self-Attention，即直接将$x_t$与自身序列中的每个词语进行比较，最后算出$y_t$。
+
+
+## Transformer与多模态
 
 [为什么Transformer适合做多模态任务？](https://mp.weixin.qq.com/s/zGUwdaS5qlET_PZ6O2amxg)
 1. 其实不是“Transformer适合做多模态任务”，而是Transformer中的Attention适合做多模态任务，准确的说，应该是“Transformer中的Dot-product Attention适合做多模态任务”．
@@ -465,6 +475,65 @@ $$
 1. 相比 CNN 这种基于静态模板的网络，Transformer 的滤波模板是随位置动态的，可以更高效地建模关系。
 2. 可以建模长程关系（Long-term relationship），可以建模远距离的 token 之间的关联。
 
+## 工程
+
+Hugging Face 专门为使用 Transformer 模型编写了一个 Transformers 库，建立在 Pytorch 框架之上（Tensorflow 的版本功能并不完善），所有 Transformer 模型都可以在 Hugging Face Hub 中找到并且加载使用。
+
+```python
+from transformers import pipeline
+classifier = pipeline("sentiment-analysis") # 情感分析
+result = classifier("I've been waiting for a HuggingFace course my whole life.")
+print(result)
+
+from transformers import pipeline
+generator = pipeline("text-generation")     # 文本生成
+results = generator("In this course, we will teach you how to")
+print(results)
+```
+
+开箱即用的 pipelines，Transformers 库最基础的对象就是 `pipeline()` 函数，它封装了预训练模型和对应的前处理和后处理环节。
+1. 预处理 (preprocessing)，将原始文本转换为模型可以接受的输入格式；具体地，我们会使用每个模型对应的分词器 (tokenizer) 来进行：
+  1. 将输入切分为词语、子词或者符号（例如标点符号），统称为 tokens；
+  2. 根据模型的词表将每个 token 映射到对应的 token 编号（就是一个数字）；
+  3. 根据模型的需要，添加一些额外的输入。
+2. 将处理好的输入送入模型；
+3. 对模型的输出进行后处理 (postprocessing)，将其转换为人类方便阅读的格式。
+
+
+```python
+from transformers import AutoTokenizer, AutoModel
+checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+
+model = AutoModel.from_pretrained(checkpoint) 
+raw_inputs = [
+    "I've been waiting for a HuggingFace course my whole life.",
+    "I hate this so much!",
+]
+inputs = tokenizer(raw_inputs, padding=True, truncation=True, return_tensors="pt") # 使用分词器进行预处理
+outputs = model(**inputs) # 送入模型
+predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)  # 后处理
+print(predictions)
+```
+
+
+```python
+# 加载与保存分词器
+from transformers import BertTokenizer
+
+tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
+tokenizer.save_pretrained("./models/bert-base-cased/")
+# 加载与保存模型
+from transformers import AutoModel
+# 所有存储在 HuggingFace Model Hub 上的模型都可以通过 Model.from_pretrained() 来加载权重，参数可以是 checkpoint 的名称，也可以是本地路径（预先下载的模型目录）
+model = AutoModel.from_pretrained("bert-base-cased")
+model.save_pretrained("./models/bert-base-cased/") # 保存模型
+```
+
+
+## 其它
+
 [五年时间被引用3.8万次，Transformer宇宙发展成了这样](https://mp.weixin.qq.com/s/cVuBfrrtGBpNlZUekxgnmg) 未读。 
 
 汪涛：这次的人工智能爆发一方面是算力的不断提升，另一个是Trasformer这个新算法的进步。**它是CNN（神经网络）带来的深度学习算法之后又一次小的算法革命（本质上还是神经网络）**。只要利用了这种新的算法，只有量的区别，不会有什么“涌现”“不涌现”的本质区别。有些是已经涌现了，而有些还没有涌现。如果只是一些量的差异，只要在量上不断改进就可趋同或超越，而如果是质的差别，就可能很长时间超越不了。PS：Trasformer 的上限决定了这一波“智能”的上限。
+

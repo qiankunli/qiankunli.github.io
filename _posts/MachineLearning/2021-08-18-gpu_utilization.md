@@ -12,6 +12,33 @@ keywords:  gpu
 * TOC
 {:toc}
 
+## 等数据
+
+![](/public/upload/machine/gpu_run.jpg)
+
+GPU 任务会交替的使用 CPU 和 GPU 进行计算，当 CPU 计算成为瓶颈时，就会出现 GPU 等待的问题，GPU 空跑那利用率就低了。那么优化的方向就是缩短一切使用 CPU 计算环节的耗时，减少 CPU 计算对 GPU 的阻塞情况。常见的 CPU 计算操作如下：
+
+1. 数据加载
+    1. 存储和计算跨城了，跨城加载数据太慢导致 GPU 利用率低
+    2. 存储介质性能太差
+    3. 小文件太多，导致文件 io 耗时太长，读取会浪费很多时间在寻道上
+    4. 未启用多进程并行读取数据
+    5. 未启用提前加载机制来实现 CPU 和 GPU 的并行
+    5. 未设置共享内存 pin_memory
+2. 数据预处理
+    1. 数据预处理逻辑太复杂
+    2. 利用 GPU 进行数据预处理 -- Nvidia DALI
+3. 模型保存
+    1. 模型保存太频繁
+4. loss 计算
+    1. loss 计算太复杂
+5. 评估指标计算
+    1. 指标上报太频繁，CPU 和 GPU 频繁切换导致 GPU 利用率低
+6. 日志打印
+    1. 日志打印太频繁，CPU 和 GPU 频繁切换导致 GPU 利用率低
+7. 指标上报
+8. 进度上报
+
 ## gpu 共享
 
 2. 支持共享gpu，按卡和按显存调度共存（主要针对推理和开发集群）。通过共享gpu 的方式提高资源利用率，将多应用容器部署在一张 GPU 卡上。 Kubernetes对于GPU这类扩展资源的定义仅仅支持整数粒度的加加减减， it's impossible for a user to ask for 0.5 GPU in a Kubernetes cluster。需要支持 以显存为调度标尺，按显存和按卡调度的方式可以在集群内并存，但是同一个节点内是互斥的，不支持二者并存；要么是按卡数目，要么是按显存分配。可以使用 [Volcano GPU共享特性设计和使用](https://mp.weixin.qq.com/s/byVNvnm_NiMuwiRwxZ_gpA) 和 [AliyunContainerService/gpushare-scheduler-extender](https://github.com/AliyunContainerService/gpushare-scheduler-extender) 等开源实现
