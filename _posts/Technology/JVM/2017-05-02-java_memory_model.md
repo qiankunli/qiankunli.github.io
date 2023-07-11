@@ -17,8 +17,6 @@ keywords: JAVA memory model
 
 [Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)
 
-
-
 ## 为什么会有内存模型一说
 
 [Java内存模型：Java中的volatile有什么用？](https://time.geekbang.org/column/article/464954)在不同的架构上，缓存一致性问题是不同的，例如 x86 采用了 TSO 模型，它的写后写（StoreStore）和读后读（LoadLoad）完全不需要软件程序员操心，但是 Arm 的弱内存模型就要求我们自己在合适的位置添加 StoreStore barrier 和 LoadLoad barrier。一些代码在 x86 机器上运行是没有问题的，但是在 Arm 机器就有概率打印出 Error。为了解决这个问题，Java 语言在规范中做出了明确的规定，也就是在 JSR 133 文档中规定了 Java 内存模型。内存模型是用来描述编程语言在支持多线程编程中，对共享内存访问的顺序。在 JSR133 文档中，这个内存模型有一个专门的名字，叫 Happens-before，它规定了一些同步动作的先后顺序。JMM 是一种标准规定，它并不管实现者是如何实现它的。纯粹的 JMM 本身的实用性并不强。PS：线程间共享变量 就是 cpu多核共享缓存
@@ -112,13 +110,20 @@ happens-before规则由两部分组成，一部分是program order，即单线�
 
 1. happens-before 关系是用来描述两个操作的内存可见性的。如果操作 X happens-before 操作 Y，那么 X 的结果对于 Y 可见。
 2. **规定的happens-before 关系**：Java 内存模型定义了六七种线程间的 happens-before 关系。比如 线程的启动操作（即 Thread.starts()） happens-before 该线程的第一个操作。
-3. **可以手动控制的happens-before 关系**：Java 内存模型通过定义了一系列的 happens-before 操作（包括锁、volatile 字段、final 字段与安全发布），让应用程序开发者能够轻易地表达不同线程的操作之间的内存可见性。
-2. Java 内存模型是通过内存屏障来禁止重排序的。语义上，内存屏障之前的所有写操作都要写入内存；内存屏障之后的读操作都可以获得同步屏障之前的写操作的结果。
+2. **如果需要在没有happen before关系的时候可见，就要用到内存屏障了**。Java 内存模型是通过内存屏障来禁止重排序的。语义上，内存屏障之前的所有写操作都要写入内存；内存屏障之后的读操作都可以获得同步屏障之前的写操作的结果。
+3. 应用程序开发者能够轻易地干预/表达不同线程的操作之间的内存可见性，包括锁、volatile 字段、final 字段与安全发布，**所有的解决可见性的手段，最终都基于CPU指令lock**。
 
-**法无禁止即允许，在遵守happens-before规则的前提下，即时编译器以及底层体系架构能够调整内存访问操作（也就是重排序），以达到性能优化的效果。**
+[了解Java可见性的本质](https://mp.weixin.qq.com/s/yS6fjvXxhMOO73XTT8SnXQ) 非常经典。volatile关键字的本质
+1. 禁止编译重排序；
+2. 插入运行时内存屏障（x86 lock）。
+    1. 在每个volatile写操作的前面插入一个StoreStore屏障；
+    2. 在每个volatile写操作的后面插入一个StoreLoad屏障；
+    3. 在每个volatile读操作的前面插入一个LoadLoad屏障；
+    4. 在每个volatile读操作的后面插入一个LoadStore屏障。
 
-[《mysql技术内幕》笔记2](http://qiankunli.github.io/2017/11/12/inside_mysql2.html) 提到 数据库一共会发生11种异常现象，脏读、不可重复读、幻读只是其中三种，数据库提出隔离性的概念，用这三种异常现象的出现情况来描述并发读写的安全程度。java 有可见性的概念，提供关键字（而不是配置，比如隔离级别是mysql的一种配置）给用户来描述期望的可见性。
+L1\2\3 cache解决CPU读写内存效率的问题，但引出了缓存一致性问题；MESI协议解决缓存一致性问题，但加剧了总线占用和资源竞争；store buffer进一步解决CPU效率的问题，但引出了可见性问题；最终可见性问题抛给了开发者，硬件只提供了lock指令。
 
+![](/public/upload/jvm/jvm_volatile_lock.jpg)
 
 ## 进程内存布局
 
@@ -171,7 +176,6 @@ Metaspace is a new memory space – starting from the Java 8 version; it has rep
 Java includes several language constructs, including volatile, final, and synchronized, **which are intended to help the programmer describe a program’s concurrency requirements to the compiler.** The Java Memory Model defines the behavior of volatile and synchronized, and, more importantly, ensures that a correctly synchronized Java program runs correctly on all processor architectures.
 
 
-volatile的写操作是发生在后续的读操作之前：volatile保证的有序性其实是在跨线程之间建立了一条happens-before规则，即volatile的写操作发生在后续的volatile读操作之前，它只建立了这一条有序关系。所以说volatile保证的有序是帮助串联起跨线程之间操作的有序。在x86平台上，volatile的读操作没有任何消耗，volatile的写操作使用的是 lock 汇编指令。
 
 
 

@@ -434,4 +434,7 @@ Spring 元信息
 5. Spring 外部化配置元信息 PropertySource
 6. Spring Profile 元信息 @Profile
 
+当大家第一次去看Spring Bean扫描的逻辑时，它的逻辑是很复杂的，如果让我们自己去实现一个，你可能会很简单的设计出来，根据指定的路径扫描所有的类，如果有@Component的注解时就存放到BeanDefinnitionMap中，那为什么Spring要设计得这么复杂呢，原因是现实场景中Bean定义有多种方法，比如嵌套定义Bean，再比如先扫描出一部分Bean，此时这些Bean中有定义@CompentScan，又可以加载其它的Bean，所以你看这么多你不曾考虑的场景叠加在一起，实现起来的复杂度自然就高了。
+
 ![](/public/upload/spring/spring_ioc.png)
+

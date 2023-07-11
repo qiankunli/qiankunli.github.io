@@ -15,27 +15,31 @@ keywords: ddd cqrs
 
 DDD绝非是什么标新立异之物，我更倾向于将其看成是软件发展的自然结果。就像20世纪六七十年代出现了软件危机之后，面向对象成为了人们的救赎；瀑布式开发过程遇到瓶颈时，敏捷被搬上了舞台；而DDD则是对传统的以数据为中心的建模方式的反思结果。
 
-如果你的项目完全以数据为中心，所有的操作都通过对数据库的crud完成，那么你并不需要DDD。此时你的团队只需要一个漂亮的数据库表编辑器。如果你的系统只有25到30个业务操作， 这应该是相当简单的，你没有感受到由复杂性和业务变化所带来的痛苦。 当你的系统有三四十个use case的时候，软件的复杂性便暴露出来了，如果软件功能在未来几年不断变化，ddd将有助于你管理复杂性和应对变化。
+如果你的项目完全以数据为中心，所有的操作都通过对数据库的crud完成，那么你并不需要DDD。此时你的团队只需要一个漂亮的数据库表编辑器。如果你的系统只有25到30个业务操作， 这应该是相当简单的，你没有感受到由复杂性和业务变化所带来的痛苦。 **当你的系统有三四十个use case的时候**，软件的复杂性便暴露出来了，如果软件功能在未来几年不断变化，ddd将有助于你管理复杂性和应对变化。
 
 
 守住三个基本原则
 
-1. 必须通过领域建模来驱动设计
+1. 必须通过领域建模来驱动设计。 
 1. One principle behind DDD is to bridge the gap between domain experts and developers by using the same language to create the same understanding. 
 2. Another principle is to reduce complexity by applying object oriented design and design patters to avoid reinventing the wheel.
+
+Domain-Driven Design is a way of structuring and modeling the software after the Domain it belongs to. What this means is that a domain first has to be considered for the software that is written. The domain is the topic or problem that the software intends to work on. **The software should be written to reflect the domain**. The architecture in the code should also reflect on the domain. 
 
 书的基本思路：传统编码的问题 ==> DDD的基本概念 ==> DDD与架构的关系 DDD在某个架构下找到自己“位置”：领域模型只负责业务逻辑，此外还有应用层和基础设施层与领域层协作 ==> 领域模型内，领域对象的组成与彼此之间的关系
 
 ### DDD入门
 
-    public void saveConsumer(String id,name,age,address,...){
-        Consumer consumer = new Consumer();
-        if(id != null){
-            ...
-        }
+```java
+public void saveConsumer(String id,name,age,address,...){
+    Consumer consumer = new Consumer();
+    if(id != null){
         ...
-        consumerDao.save(consumer);
     }
+    ...
+    consumerDao.save(consumer);
+}
+```
 
 saveConsumer 至少存在三大问题
 
@@ -45,10 +49,12 @@ saveConsumer 至少存在三大问题
 
 一种优化：每一个应用层方法对应一个单一的用例流
 
-    interface Consumer{
-        public changePersonalName(String firstName,String lastName);
-        ...
-    }
+```java
+interface Consumer{
+    public changePersonalName(String firstName,String lastName);
+    ...
+}
+```
 
 我们希望对对象行为的命名能够传达准确的业务含义，也即反映通用语言。要达到这样的目的，肯定不是先在类上定义属性，然后向客户端暴露getter和setter那么简单。那只是在创建纯数据模型。如果只提供setter 和getter 会怎么样？
 
@@ -127,6 +133,10 @@ DDD 与分层架构整合有多种方式，这是比较传统的一种
 ![](/public/upload/ddd/layered_architecture.png)
 
 1. 领域层实现业务逻辑，领域层映射到领域模型，是问题域的领域模型在软件中的反映。包含实体、值对象和领域服务等领域对象，在实体、值对象和领域服务等领域对象的方法中封装实现业务规则和保证完整性约束。领域对象在实现业务逻辑上具备坚不可摧的完整性，意味着不管外界代码如何操作，都不可能创建不合法的领域对象（例如没有账户号码或余额为负数的借记卡对象），亦不可能打破任何业务规则（例如在多次转账之后，钱凭空丢失或凭空产生）。**领域对象的功能是高度内聚的，具有单一的职责，任何不涉及业务逻辑的复杂的组合操作都不在领域层而在应用层中实现**。领域层中的全部领域对象的总和在功能上是完备的，意味着系统的所有行为都可以由领域层中的领域对象组合实现。
+    1. 领域层不依赖基础层的实现：在领域层定义好repo接口，由基础层依赖领域层实现这个接口。
+    2. 模型与数据分离：
+        1. 改变模型：domain.bizFunc。
+        2. 改变数据：repo.save(domain)
 2. 应用层映射到系统用例模型，是系统用例模型在软件中的反映。它的职责可表示为“编排和转发”，即将它要实现的功能委托给一个或多个领域对象来实现，它本身只负责安排工作顺序和拼装操作结果。
 3. 基础设施层为其余各层提供技术支持。**注意基础设施层不只负责数据库访问**，它实现了系统的全部技术性需求，比如持久化、消息通知等
 4. 用户接口层为外部用户访问底层系统提供交互界面和数据表示。用户接口层有两个任务：（1）从用户处接收命令操作，改变底层系统状态；（2）从用户处接收查询操作，将底层系统状态以合适的形式呈现给用户。PS：相当于输入输出设备
@@ -197,11 +207,7 @@ DDD 与分层架构整合有多种方式，这是比较传统的一种
 1. 设计小聚合。聚合只包含最小数量的属性或值类型属性，且为相互之间必须保持一致的属性
 2. 优先考虑通过全局唯一标识来引用外部聚合，而不是直接的对象引用
 
-## 其它
 
-无论你选择做什么，总有人说你是错的，又总有这样那样的困难诱使你相信批评你的人是对的。要找到一条正确之路并坚持到最后，你需要的是勇气。 
-
-一旦你没有被击倒，那么你所做的选择将双倍的补偿你
 
 
 
