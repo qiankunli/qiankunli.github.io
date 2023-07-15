@@ -169,7 +169,7 @@ keywords: test environment
 
 ![](/public/upload/practice/service_mesh_isolation.png)
 
-
+[基于Go语言的滴滴DevOps重塑之路](https://mp.weixin.qq.com/s/SV8Mu0TaOYHlDFInuzZfmQ)
 
 
 
