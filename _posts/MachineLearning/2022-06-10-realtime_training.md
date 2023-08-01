@@ -45,3 +45,6 @@ keywords: 实时训练
     ![](/public/upload/machine/bilibili_feature_platform_serving.jpg)
 3. 离线实时+推理一起
     ![](/public/upload/machine/bilibili_feature_platform.jpg)
+
+
+[实时深度学习训练PAI-ODL](https://mp.weixin.qq.com/s/dR5Hdj4WUGE3_CcAr8peag)

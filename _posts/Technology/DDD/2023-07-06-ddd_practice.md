@@ -79,7 +79,7 @@ https://github.com/KendoCross/kendoDDD 概念太多了，换一个角度，从MV
 
 ## ddd框架
 
-ddd这么多年一直曲高和寡的一部分原因是，在代码层面缺少框架支持，用户从0到1使用ddd从概念理解上和代码实现上都成本非常大，这点相对“声明式API + 控制器模型”之于kubebuilder/controller-runtime 都差距很大。既提供了大量辅助代码（比如client、workqueue等）、自动生成代码（比如clientset）以减少代码量，又显式定义了实现规范（比如crd包含spec和status）和约束（实现reconcile等）。
+ddd这么多年一直曲高和寡的一部分原因是，在代码层面缺少框架支持，用户从0到1使用ddd从概念理解上和代码实现上都成本非常大，给人带来的困惑、给团队带来的争论相比便利来说一点都不少，这点相对“声明式API + 控制器模型”之于kubebuilder/controller-runtime 都差距很大。既提供了大量辅助代码（比如client、workqueue等）、自动生成代码（比如clientset）以减少代码量，又显式定义了实现规范（比如crd包含spec和status）和约束（实现reconcile等）。
 
 ddd 可以封装的部分。比如抽象一个入口对象engine/bootstrap
 1. 用户接口层
@@ -115,3 +115,5 @@ ddd 可以封装的部分。比如抽象一个入口对象engine/bootstrap
 用户接口层、应用层模式化（不同项目基本一样，只是改改名），domain层+repo层规范化，非业务/技术特性隐藏化。
 
 ![](/public/upload/ddd/ddd_engine.png)
+
+![](/public/upload/ddd/ddd_engine_run_command.png)
