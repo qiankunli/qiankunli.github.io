@@ -82,13 +82,21 @@ scrape_configs:
 3. 周期性得往抓取对象发起抓取请求，得到数据
 4. 将数据写入本地盘或者写往远端存储
 
-具体的说：服务发现 ==> targets ==> relabel ==> 抓取 ==> metrics_relabel ==> 缓存 ==> 2小时落盘。[Prometheus Relabeling 重新标记的使用](https://mp.weixin.qq.com/s/6BtqApQKI4OzUWXM-8u_nw)
+Prometheus指标抓取的生命周期：服务发现 ==> targets ==> relabel ==> 抓取 ==> metrics_relabel ==> 缓存 ==> 2小时落盘。[Prometheus Relabeling 重新标记的使用](https://mp.weixin.qq.com/s/6BtqApQKI4OzUWXM-8u_nw)
 
 ![](/public/upload/go/prometheus_relabel.png)
 
+1. 在每个scrape_interval期间，Prometheus都会检查执行的作业（Job）；
+2. 这些作业首先会根据Job上指定的发现配置生成target列表，此即服务发现过程；
+3. 服务发现会返回一个Target列表，其中包含一组称为元数据的标签，这些标签都以“__meta_”为前缀；
+4. 服务发现还会根据目标配置来设置其它标签，这些标签带有“__”前缀和后缀，包括“__scheme__”、 “__address__”和“__metrics_path__”，分别保存有target支持使用协议(http或https，默认为http）、target的地址及指标的URI路径（默认为/metrics）；
+5. 若URI路径中存在任何参数，则它们的前缀会设置为“__param_；
+6. 配置标签会在抓取的生命周期中被重复利用以生成其他标签，例如，指标上的instance标签的默认值就来自于__address__标签的值；
+7. 抓取而来的指标在保存之前，还允许用户对指标重新打标并过滤，在job段metric_relabel_configs配置，通常用来删除不需要的指标、删除敏感或不必要的标签和添加修改标签格式等。
+
 ## prometheus 服务发现
 
-在基于云(IaaS或者CaaS)的基础设施环境中用户可以像使用水、电一样按需使用各种资源（计算、网络、存储）。按需使用就意味着资源的动态性，这些资源可以随着需求规模的变化而变化。这种按需的资源使用方式对于监控系统而言就意味着没有了一个固定的监控目标，所有的监控对象(基础设施、应用、服务)都在动态的变化。对于Prometheus这一类基于Pull模式的监控系统，显然也无法继续使用的static_configs的方式静态的定义监控目标。解决方案就是引入一个中间的代理人（服务注册中心），这个代理人掌握着当前所有监控目标的访问信息，Prometheus只需要向这个代理人询问有哪些监控目标即可， 这种模式被称为服务发现。
+在基于云(IaaS或者CaaS)的基础设施环境中用户可以像使用水、电一样按需使用各种资源（计算、网络、存储）。按需使用就意味着资源的动态性，这些资源可以随着需求规模的变化而变化。这种按需的资源使用方式对于监控系统而言就意味着没有了一个固定的监控target，所有的监控对象(基础设施、应用、服务)都在动态的变化。对于Prometheus这一类基于Pull模式的监控系统，显然也无法继续使用的static_configs的方式静态的定义监控目标。解决方案就是引入一个中间的代理人（服务注册中心），这个代理人掌握着当前所有监控目标的访问信息，Prometheus只需要向这个代理人询问有哪些监控目标即可， 这种模式被称为服务发现。
 
 服务发现方式
 
