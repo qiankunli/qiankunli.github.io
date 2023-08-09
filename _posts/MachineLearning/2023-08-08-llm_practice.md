@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: LLM的工具库
+title: LLM工具栈
 category: 架构
 tags: MachineLearning
 keywords: llm chatgpt gpt bert
@@ -41,7 +41,6 @@ Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供�
 4. Datasets：这是一个数据集的库，让你可以获取、加载和处理超过1400个公开可用的数据集。Datasets支持多种数据类型（如文本、图像、音频等）和格式（如JSON、CSV等），并提供了高效且统一的API，让你可以快速地加载、缓存和转换数据。
 
 LangChain使用 Hugging Face 模型
-
 1. 使用在线模型
     ```python
     import os
@@ -66,7 +65,7 @@ LangChain使用 Hugging Face 模型
     pipe = pipeline("text2text-generation",model=model,tokenizer=tokenizer, max_length=100)
     local_llm = HuggingFacePipeline(pipeline=pipe)
     print(local_llm('What is the capital of France? '))
-
+    
     template = """Question: {question} Answer: Let's think step by step."""
     prompt = PromptTemplate(template=template, input_variables=["question"])
     llm_chain = LLMChain(prompt=prompt, llm=local_llm)
@@ -75,6 +74,8 @@ LangChain使用 Hugging Face 模型
     ```
 
 ## 模型服务
+
+### 简单封装
 
 [ChatGLM-6B](https://github.com/THUDM/ChatGLM-6B) 在github 有一个仓库，一般包含
 1. 模型介绍 README.md
@@ -106,12 +107,7 @@ async def create_item(request: Request):
                                    temperature=temperature if temperature else 0.95)
     now = datetime.datetime.now()
     time = now.strftime("%Y-%m-%d %H:%M:%S")
-    answer = {
-        "response": response,
-        "history": history,
-        "status": 200,
-        "time": time
-    }
+    answer = {"response": response,"history": history,"status": 200,"time": time}
     log = "[" + time + "] " + '", prompt:"' + prompt + '", response:"' + repr(response) + '"'
     print(log)
     torch_gc()
@@ -124,6 +120,11 @@ if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=8000, workers=1)
 ```
 
+### FastChat
+
+[FastChat](https://github.com/lm-sys/FastChat)是一个用于训练、服务和评估基于聊天机器人的大型语言模型的开放平台。核心功能包括:
+1. 最先进模型(如Vicuna、FastChat-T5)的权重、训练代码和评估代码。
+2. 一个具有web界面和openai兼容的RESTful api的分布式多模型服务系统。
 
 ## LangChain
 
@@ -174,10 +175,7 @@ template = """
 I want you to act as a naming consultant for new companies.
 What is a good name for a company that makes {product}?
 """
-prompt = PromptTemplate(
-    input_variables=["product"],
-    template=template,
-)
+prompt = PromptTemplate(input_variables=["product"], template=template,)
 prompt.format(product="colorful socks")
 # -> I want you to act as a naming consultant for new companies.
 # -> What is a good name for a company that makes colorful socks?
@@ -196,7 +194,6 @@ chain = LLMChain(llm = llm, prompt = prompt)
 4. VectorDBQA 能够完成和 llama-index 相似的事情，只要预先做好内部数据资料的 Embedding 和索引，通过对 LLMChain 进行一次调用，我们就可以直接获取回答的结果。
 5. Langchain 里有 SQLDatabaseChain 可以直接让我们写需求访问数据库。
 这些能力大大增强了 AI 的实用性，解决了几个之前大语言模型处理得不好的问题，包括数学计算能力、实时数据能力、和现有程序结合的能力，以及搜索属于自己的资料库的能力。你完全可以定义自己需要的 LLMChain，通过程序来完成各种任务，然后合理地组合不同类型的 LLMChain 对象，来实现连 ChatGPT 都做不到的事情。
-
 
 
 ### 高级功能
@@ -261,3 +258,44 @@ agent.run("What's the date today? What great events have taken place today in hi
     result = qa({"query": "科大讯飞今年第一季度收入是多少？"}) # 进行问答
     print(result)
     ```
+
+## 向量数据库
+
+chroma 是个本地的向量数据库，他提供的一个 persist_directory 来设置持久化目录进行持久化。读取时，只需要调取 from_document 方法加载即可。
+
+```python
+from langchain.vectorstores import Chroma
+# 持久化数据
+docsearch = Chroma.from_documents(documents, embeddings, persist_directory="D:/vector_store") 
+docsearch.persist()
+# 从本地目录加载数据
+docsearch = Chroma(persist_directory="D:/vector_store", embedding_function=embeddings) 
+# 录入documents 到chroma
+loader = DirectoryLoader('/content/sample_data/data/', glob='**/*.txt') # 加载文件夹中的所有txt类型的文件
+documents = loader.load() # 将数据转成 document 对象，每个文件会作为一个 document
+text_splitter = CharacterTextSplitter(chunk_size=100, chunk_overlap=0) # 初始化加载器
+split_docs = text_splitter.split_documents(documents) # 切割加载的 document
+embeddings = OpenAIEmbeddings() # 初始化 openai 的 embeddings 对象
+docsearch = Chroma.from_documents(split_docs, embeddings) # 将 document 通过 openai 的 embeddings 对象计算 embedding 向量信息并临时存入 Chroma 向量数据库，用于后续匹配查询
+# 创建问答对象
+qa = RetrievalQA.from_chain_type(llm=OpenAI(), chain_type="stuff", retriever=docsearch.as_retriever(), return_source_documents=True)
+# 进行问答
+result = qa({"query": "科大讯飞今年第一季度收入是多少？"})
+print(result)
+```
+
+Pinecone 是一个在线的向量数据库。所以，我可以第一步依旧是注册，然后拿到对应的 api key。
+
+```python
+# 从远程服务加载数据
+docsearch = Pinecone.from_existing_index(index_name, embeddings)
+
+# 录入documents 持久化数据到pinecone
+# 初始化 pinecone
+pinecone.init(api_key="你的api key",environment="你的Environment")
+loader = DirectoryLoader('/content/sample_data/data/', glob='**/*.txt')
+documents = loader.load() # 将数据转成 document 对象，每个文件会作为一个 document
+text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=0)
+split_docs = text_splitter.split_documents(documents) # 切割加载的 document
+docsearch = Pinecone.from_texts([t.page_content for t in split_docs], embeddings, index_name=index_name) # 持久化数据到pinecone
+```
