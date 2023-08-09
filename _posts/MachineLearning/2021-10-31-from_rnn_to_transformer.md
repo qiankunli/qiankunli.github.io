@@ -476,6 +476,7 @@ NLP 神经网络模型的本质就是对输入文本进行编码，常规的做�
 2. 可以建模长程关系（Long-term relationship），可以建模远距离的 token 之间的关联。
 
 ## 工程
+
 [Transformers快速入门](https://transformers.run/)Hugging Face 专门为使用 Transformer 模型编写了一个 Transformers 库，建立在 Pytorch 框架之上（Tensorflow 的版本功能并不完善），所有 Transformer 模型都可以在 Hugging Face Hub 中找到并且加载使用。
 
 ```python
