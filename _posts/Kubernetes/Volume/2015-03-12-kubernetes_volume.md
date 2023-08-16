@@ -51,6 +51,8 @@ merged/upper/lower 也是linux UnionFS 官方的说法，可以在`/proc/mounts`
 - 容器间共享数据
 
 
+
+
 ## docker volume——物理机的一个目录
 
 Volume 挂载方式语法：`-v: src:dst:opts`

@@ -111,15 +111,16 @@ Helm的打包格式叫做chart，helm命令从Chart Repository中下载 Helm Cha
 ```
 WordPress
  |—— charts                           // 存放依赖的chart
- ├── templates                        // 存放应用一系列 k8s 资源的 yaml 模板
- │     ├── NOTES.txt
+ ├── templates                        // 存放应用一系列 k8s 资源的 yaml 模板，通过渲染变量得到部署文件
+ │     ├── NOTES.txt                  // 为用户提供一个关于 chart 部署后使用说明的文件
+ |     |—— _helpers.tpl               // 存放能够复用的模板
  │     ├── deployment.yaml
  │     ├── externaldb-secrets.yaml
  │     └── 版面原因省略其他资源文件
  │     └── ingress.yaml
- └── Chart.yaml                       // 应用自身的详细信息（名称、版本、许可证、自述、说明、图标，等等）
+ └── Chart.yaml                       // chart 的基本信息（名称、版本、许可证、自述、说明、图标，等等）
  └── requirements.yaml                // 应用的依赖关系，依赖项指向的是另一个应用的坐标（名称、版本、Repository 地址）
- └── values.yaml                      // 存储 templates 目录中模板文件中用到变量的值
+ └── values.yaml                      // 存放全局变量， templates 目录中模板文件中用到变量的值
  ```
 
 ![](/public/upload/kubernetes/helm_template.png)
@@ -187,3 +188,24 @@ There are five different ways you can express the chart you want to install:
 3. By path to an unpacked chart directory: `helm install mynginx ./nginx`
 4. By absolute URL: `helm install mynginx https://example.com/charts/nginx-1.2.3.tgz`
 5. By chart reference and repo url: `helm install --repo https://example.com/charts/ mynginx nginx`
+
+```
+# 仓库操作
+# 添加阿里云的 chart 远程仓库
+helm repo add aliyun https://kubernetes.oss-cn-hangzhou.aliyuncs.com/charts
+"aliyun" has been added to your repositories
+# 查看配置的 chart 仓库有哪些
+helm repo list
+# 删除 chart 仓库地址
+helm repo remove aliyun
+# 从指定 chart 仓库地址搜索 chart
+helm search repo aliyun
+
+# 搜索和下载Chart
+#  查看阿里云 chart 仓库中的 memcached
+# helm search repo aliyun |grep memcached
+# 查看 chart 信息
+helm show chart aliyun/memcached
+# 下载 chart 包到本地
+helm pull aliyun/memcached
+```

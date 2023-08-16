@@ -15,7 +15,7 @@ keywords: llm chatgpt gpt bert
 
 ![](/public/upload/machine/llm_tool.png)
 
-## Hugging Face
+## HuggingFace
 
 Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供了以下几个产品和服务：
 1. Hub：这是一个机器学习的中心，让你可以创建、发现和协作ML项目。可以从排行榜开始，了解社区中表现较好的模型。如果你没有 GPU，你必须使用小的模型。转到文件目录并查看 .bin 文件的大小。有的项目在型号卡中也会提到所需的最低规格。PS：就像github 包含代码文件一样，这里包含代码的模型文件，git clone 时要安装Git LFS（Git Large File Storage）
@@ -40,7 +40,39 @@ Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供�
 3. Inference API：这是一个服务，让你可以直接从Hugging Face的基础设施上运行大规模的NLP模型，并在毫秒级别得到响应。
 4. Datasets：这是一个数据集的库，让你可以获取、加载和处理超过1400个公开可用的数据集。Datasets支持多种数据类型（如文本、图像、音频等）和格式（如JSON、CSV等），并提供了高效且统一的API，让你可以快速地加载、缓存和转换数据。
 
-LangChain使用 Hugging Face 模型
+下载模型文件（一般有几个G）有多种方式
+1. 到huggingface 官网下载
+2. Git LFS 下载。
+3. Hugging Face Hub 下载。
+    ```python
+    from huggingface_hub import snapshot_download
+    snapshot_download(repo_id="bert-base-chinese")
+    ```
+4. 使用transformers 库
+    ```
+    from transformers import AutoTokenizer, AutoModel
+    tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True,mirror="tuna")
+    model = AutoModel.from_pretrained("THUDM/chatglm2-6b",trust_remote_code=True, mirror="tuna")
+    ```
+    下载后文件会出现在 `~/.cache`目录下
+    ```
+    ~/.cache
+        /torch/sentence_transformers
+            /moka-ai_m3e-base
+                /config.json
+                /pytorch_model.bin
+        /huggingface/hub
+            /models--THUDM--chatglm2-6b
+                /blobs
+                /snapshots
+                    /b1502f4f75c71499a3d566b14463edd62620ce9f   # 某个版本的文件内容
+                        /config.json
+                        /pytorch_model.xx.bin
+    ```
+
+### LangChain使用 HuggingFace 模型
+
+如果只是调用模型服务，那直接使用HuggingFace库即可，但若是想和LangChain结合，还是要适配成LangChain.LLM 才能与LangChain 其它模块协同，HuggingFace 提供了LangChain.LLM 的实现。
 1. 使用在线模型
     ```python
     import os
@@ -143,14 +175,14 @@ LangChain is a framework for developing applications powered by language models.
 ### 基础功能
 
 [LangChain 中文入门教程](https://github.com/liaokongVFX/LangChain-Chinese-Getting-Started-Guide)：
-1. Model，主要涵盖大语言模型（LLM）。支持流模式（就是一个字一个字的返回，类似打字效果）。
+1. Model，主要涵盖大语言模型（LLM），为各种不同基础模型**提供统一接口**。支持流模式（就是一个字一个字的返回，类似打字效果）。
 2. Prompt，支持各种自定义模板
 3. 拥有大量的文档加载器，从指定源进行加载数据的，比如 Email、Markdown、PDF、Youtube ...当使用loader加载器读取到数据源后，数据源需要转换成 Document 对象后，后续才能进行使用。
-4. 对索引的支持
+4. 对索引的支持。对用户私域文本、图片、PDF等各类文档进行存储和检索。为了索引，便不得不牵涉以下这些能力
     1. 文档分割器，为什么需要分割文本？因为我们每次不管是做把文本当作 prompt 发给 openai api ，还是还是使用 openai api embedding 功能都是有字符限制的。比如我们将一份300页的 pdf 发给 openai api，让它进行总结，它肯定会报超过最大 Token 错。所以这里就需要使用文本分割器去分割我们 loader 进来的 Document。
     2. 向量化，数据相关性搜索其实是向量运算。以，不管我们是使用 openai api embedding 功能还是直接通过向量数据库直接查询，都需要将我们的加载进来的数据 Document 进行向量化，才能进行向量运算搜索。
     3. 对接向量存储与搜索，比如 Chroma、Pinecone、Qdrand
-5. Chains
+5. Chains，包括一系列对各种组件的调用，Chain可以相互嵌套并串行执行，通过这一层，让LLM的能力链接到各行各业
     1. LLMChain
     2. 各种工具Chain
     3. LangChainHub
@@ -261,32 +293,91 @@ agent.run("What's the date today? What great events have taken place today in hi
 
 ## 向量数据库
 
-chroma 是个本地的向量数据库，他提供的一个 persist_directory 来设置持久化目录进行持久化。读取时，只需要调取 from_document 方法加载即可。
+当我们把通过模型或者 AI 应用处理好的数据喂给它之后（“一堆特征向量”），它会根据一些固定的套路，例如像传统数据库进行查询优化加速那样，为这些数据建立索引。避免我们进行数据查询的时候，需要笨拙的在海量数据中进行。
+
+### 本地
+
+faiss 原生使用
+```python
+# 准备数据
+model = SentenceTransformer('uer/sbert-base-chinese-nli')
+sentences = ["住在四号普里怀特街的杜斯利先生及夫人非常骄傲地宣称自己是十分正常的人",
+             "杜斯利先生是一家叫作格朗宁斯的钻机工厂的老板", "哈利看着她茫然地低下头摸了摸额头上闪电形的伤疤",
+             "十九年来哈利的伤疤再也没有疼过"]
+sentence_embeddings = model.encode(sentences)
+# 建立索引
+dimension = sentence_embeddings.shape[1]
+index = faiss.IndexFlatL2(dimension)
+index.add(sentence_embeddings)
+
+# 检索
+topK = 2
+search = model.encode(["哈利波特猛然睡醒"])  # 将要搜索的内容“哈利波特猛然睡醒”编码为向量
+D, I = index.search(search, topK)         # D指的是“数据置信度/可信度” I 指的是我们之前数据准备时灌入的文本数据的具体行数。
+print(I)
+print([x for x in sentences if sentences.index(x) in I[0]])
+```
+faiss 与LangChain 集合，主要是与  LangChain 的 document和 Embeddings 结合。 faiss 本身只存储 文本向量化后的向量（index.faiss文件），但是vector db对外使用，一定是文本查文本，所以要记录 文本块与向量关系（index.pkl文件）。此外，需支持新增和删除文件（包含多个文本块），所以也要支持按文件删除 文本块对应的向量。 
 
 ```python
-from langchain.vectorstores import Chroma
-# 持久化数据
-docsearch = Chroma.from_documents(documents, embeddings, persist_directory="D:/vector_store") 
-docsearch.persist()
-# 从本地目录加载数据
-docsearch = Chroma(persist_directory="D:/vector_store", embedding_function=embeddings) 
-# 录入documents 到chroma
-loader = DirectoryLoader('/content/sample_data/data/', glob='**/*.txt') # 加载文件夹中的所有txt类型的文件
+from langchain.document_loaders import TextLoader
+# 录入documents 到faiss
+loader = TextLoader("xx.txt")  # 加载文件夹中的所有txt类型的文件
 documents = loader.load() # 将数据转成 document 对象，每个文件会作为一个 document
-text_splitter = CharacterTextSplitter(chunk_size=100, chunk_overlap=0) # 初始化加载器
-split_docs = text_splitter.split_documents(documents) # 切割加载的 document
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0) 
+docs = text_splitter.split_documents(documents)  # 切割加载的 document
+
 embeddings = OpenAIEmbeddings() # 初始化 openai 的 embeddings 对象
-docsearch = Chroma.from_documents(split_docs, embeddings) # 将 document 通过 openai 的 embeddings 对象计算 embedding 向量信息并临时存入 Chroma 向量数据库，用于后续匹配查询
-# 创建问答对象
-qa = RetrievalQA.from_chain_type(llm=OpenAI(), chain_type="stuff", retriever=docsearch.as_retriever(), return_source_documents=True)
-# 进行问答
-result = qa({"query": "科大讯飞今年第一季度收入是多少？"})
-print(result)
+db = FAISS.from_documents(docs, embeddings) # 将 document 通过 openai 的 embeddings 对象计算 embedding 向量信息并临时存入 faiss 向量数据库，用于后续匹配查询
+
+query = "What did the president say about Ketanji Brown Jackson"
+docs = db.similarity_search(query)
+print(docs[0].page_content)
 ```
+
+简单的源码分析
+
+```python
+# 根据文档内容构建 langchain.vectorstores.Faiss
+vectorstore.base.from_documents(cls: Type[VST],documents: List[Document], embedding: Embeddings,    **kwargs: Any,) -> VST:
+    """Return VectorStore initialized from documents and embeddings."""
+    texts = [d.page_content for d in documents]
+    metadatas = [d.metadata for d in documents]
+    return cls.from_texts(texts, embedding, metadatas=metadatas, **kwargs)
+        # Embeds documents.
+        embeddings = embedding.embed_documents(texts)
+        cls.__from(texts,embeddings,embedding, metadatas=metadatas,ids=ids,**kwargs,)
+            # Initializes the FAISS database
+            faiss = dependable_faiss_import()
+            index = faiss.IndexFlatL2(len(embeddings[0]))
+            vector = np.array(embeddings, dtype=np.float32)
+            index.add(vector)
+            # 建立id 与text 的关联
+            documents = []
+            if ids is None:
+                ids = [str(uuid.uuid4()) for _ in texts]
+            for i, text in enumerate(texts):
+                metadata = metadatas[i] if metadatas else {}
+                documents.append(Document(page_content=text, metadata=metadata))
+            index_to_id = dict(enumerate(ids))
+            # Creates an in memory docstore
+            docstore = InMemoryDocstore(dict(zip(index_to_id.values(), documents)))
+            return cls(embedding.embed_query,index,docstore,index_to_id,normalize_L2=normalize_L2,**kwargs,) 
+save_local:
+    faiss = dependable_faiss_import()
+    faiss.write_index(self.index, str(path / "{index_name}.faiss".format(index_name=index_name)))
+    with open(path / "{index_name}.pkl".format(index_name=index_name), "wb") as f:
+        pickle.dump((self.docstore, self.index_to_docstore_id), f)   
+```
+
+
+
+### 在线
 
 Pinecone 是一个在线的向量数据库。所以，我可以第一步依旧是注册，然后拿到对应的 api key。
 
 ```python
+from langchain.vectorstores import Pinecone
 # 从远程服务加载数据
 docsearch = Pinecone.from_existing_index(index_name, embeddings)
 
@@ -299,3 +390,5 @@ text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=0)
 split_docs = text_splitter.split_documents(documents) # 切割加载的 document
 docsearch = Pinecone.from_texts([t.page_content for t in split_docs], embeddings, index_name=index_name) # 持久化数据到pinecone
 ```
+
+[ LangChain + GPTCache =兼具低成本与高性能的 LLM](https://mp.weixin.qq.com/s/kC6GB9JaT-WApxU2o3QfdA) 未读。
