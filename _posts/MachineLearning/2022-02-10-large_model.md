@@ -188,29 +188,3 @@ GPU服务器特点
 [揭秘大语言模型实践：分布式推理的工程化落地才是关键！](https://mp.weixin.qq.com/s/QeDmD-XlvkkJ7LMNJEynHg)与以往的模型不同，单张 GPU 卡的显存可能不足以支撑大语言模型。因此，需要使用模型并行技术，将大语言模型进行切分后，在多张 GPU 卡上进行推理。我们使用 DeepSpeed Inference 来部署大语言模型分布式推理服务。DeepSpeed Inference 是 Microsoft 提供的分布式推理解决方案，能够很好的支持 transformer 类型的大语言模型。。DeepSpeed Inference 提供了模型并行能力，在多 GPU 上对大模型并行推理。通过张量并行技术同时利用多个 GPU，提高推理性能。DeepSpeed 还提供了优化过的推理定制内核来提高 GPU 资源利用率，降低推理延迟。
 
 有了大模型分布式推理方案，然而想要在 Kubernetes 集群中高效部署大模型推理服务，还存在很多工程化挑战，比如大规模的 GPU 等异构资源如何高效地管理运维和自动调度？如何快速部署推理服务，服务上线后如何保证资源能够应对波动的访问量？以及没有适合的工具进行推理服务时延、吞吐、GPU 利用率、显存占用等关键指标监控，没有合理的模型切分方案，模型版本管理等。
-
-### 离线推理Ray
-
-[基于 Ray 的大规模离线推理](https://mp.weixin.qq.com/s/pS5RJCA5O_s6pPcib0JsuQ) Ray 项目是 UC Berkeley 的 RISElab 实验室在 2017 年前后发起的，定位是通用的分布式编程框架——Python-first。**理论上通过 Ray 引擎用户可以轻松地把任何 Python 应用做成分布式**，尤其是机器学习的相关应用，目前 Ray 主攻的一个方向就是机器学习。Ray 的架构分为三层
-1. 最下面一层是各种云基础设施，也就是说 Ray 帮用户屏蔽了底层的基础设施，用户拉起一个 Ray Cluster之后就可以立即开始分布式的编程，不用考虑底层的云原生或各种各样的环境；
-2. 中间层是 Ray Core 层。这一层是 Ray 提供的核心基础能力，主要是提供了 Low-level 的非常简洁的分布式编程 API。基于这套 API，用户可以非常容易地把现有的 Python 的程序分布式化。值得注意的是，这一层的 API 是 Low-level，没有绑定任何的计算范式，非常通用；
-3. 最上层是 Ray 社区基于 Ray Core 层做的丰富的机器学习库，这一层的定位是做机器学习 Pipeline。比如，数据加工读取、模型训练、超参优化、推理，强化学习等，都可以直接使用这些库来完成整个的 Pipeline，这也是 Ray 社区目前主攻的一个方向。
-
-![](/public/upload/machine/ray_arch.jpg)
-
-上图展示的是 Ray Cluster 的基本架构，每一个大框就是一个节点。（这里的节点是一个虚拟的概念，可以是一个物理机，一个 VM 或一个 Linux 的 Docker。比如在 K8s 上，一个节点就是一个 Pod。）
-
-1. Head 节点：是 Ray Cluster 的调度中心，比较核心的组件是 GCS，负责全局存储、调度、作业、状态等，Head节点也有可观测性 Dashboard。
-2. Worker 节点：除了 Head 节点之外，其他都是 Worker 节点，承载具体的工作负载。
-    1. Raylet：每个节点上面都有一个守护进程 Raylet，它是一个 Local Scheduler，负责 Task 的调度以及 Worker 的管理。
-    2. Object Store  组件：每个节点上都有 Object Store 组件，负责节点之间 Object 传输。在整个 Cluster 中每个节点的 Object Store 组件组成一个全局的分布式内存。同时，在单个节点上，Object Store 在多进程之间通过共享内存的方式减少 copy。
-3. Driver：当用户向 Ray Cluster 上提交一个 Job，或者用 Notebook 连接的时候，Ray挑选节点来运行 Driver 进行，执行用户代码。作业结束后 Driver 销毁。
-4. Worker：是 Ray 中 Task 和 Actor 的载体。
-
-Ray 的Low-level和  High-level API
-
-![](/public/upload/machine/ray_api.jpg)
-
-在部署 Ray 时，开源社区有完整的解决方案 Kuberay 项目。每个 Ray Cluster 由 Head 节点和 Worker 节点组成，每个节点是一份计算资源，可以是物理机、Docker 等等，在 K8s 上即为一个 Pod。启动 Ray Cluster 时，使用 Kuberay 的 Operator 来管理整个生命周期，包括创建和销毁 Cluster 等等。Kuberay 同时也支持自动扩展和水平扩展。Ray Cluster 在内部用于收集负载的 Metrics，并根据 Metrics 决定是否扩充更多的资源，如果需要则触发 Kuberay 拉起新的 Pod 或删除闲置的 Pod。
-
-用户可以通过内部的平台使用 Ray，通过提交 Job 或使用 Notebook 进行交互式编程。平台通过 Kuberay 提供的 YAML 和 Restful API 这两种方式进行操作。

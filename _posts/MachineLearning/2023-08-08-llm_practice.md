@@ -41,8 +41,8 @@ Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供�
 4. Datasets：这是一个数据集的库，让你可以获取、加载和处理超过1400个公开可用的数据集。Datasets支持多种数据类型（如文本、图像、音频等）和格式（如JSON、CSV等），并提供了高效且统一的API，让你可以快速地加载、缓存和转换数据。
 
 下载模型文件（一般有几个G）有多种方式
-1. 到huggingface 官网下载
-2. Git LFS 下载。
+1. 到huggingface 官网手动下载
+2. Git LFS 下载。`git clone https://huggingface.co/THUDM/chatglm-6b` PS：注意不是github 地址
 3. Hugging Face Hub 下载。
     ```python
     from huggingface_hub import snapshot_download
@@ -154,6 +154,8 @@ if __name__ == '__main__':
 
 ### FastChat
 
+[一文入门最热的LLM应用开发框架LangChain](https://mp.weixin.qq.com/s/bYzNNL3F0998Do2Jl0PQtw)
+
 [FastChat](https://github.com/lm-sys/FastChat)是一个用于训练、服务和评估基于聊天机器人的大型语言模型的开放平台。核心功能包括:
 1. 最先进模型(如Vicuna、FastChat-T5)的权重、训练代码和评估代码。
 2. 一个具有web界面和openai兼容的RESTful api的分布式多模型服务系统。
@@ -175,14 +177,16 @@ LangChain is a framework for developing applications powered by language models.
 ### 基础功能
 
 [LangChain 中文入门教程](https://github.com/liaokongVFX/LangChain-Chinese-Getting-Started-Guide)：
-1. Model，主要涵盖大语言模型（LLM），为各种不同基础模型**提供统一接口**。支持流模式（就是一个字一个字的返回，类似打字效果）。
+1. Model，主要涵盖大语言模型（LLM），为各种不同基础模型**提供统一接口**，然后我们可以自由的切换不同的模型。
+    1. 普通LLM：接收文本字符串作为输入，并返回文本字符串作为输出
+    2. 聊天模型：将聊天消息列表作为输入，并返回一个聊天消息。支持流模式（就是一个字一个字的返回，类似打字效果）。
 2. Prompt，支持各种自定义模板
 3. 拥有大量的文档加载器，从指定源进行加载数据的，比如 Email、Markdown、PDF、Youtube ...当使用loader加载器读取到数据源后，数据源需要转换成 Document 对象后，后续才能进行使用。
 4. 对索引的支持。对用户私域文本、图片、PDF等各类文档进行存储和检索。为了索引，便不得不牵涉以下这些能力
-    1. 文档分割器，为什么需要分割文本？因为我们每次不管是做把文本当作 prompt 发给 openai api ，还是还是使用 openai api embedding 功能都是有字符限制的。比如我们将一份300页的 pdf 发给 openai api，让它进行总结，它肯定会报超过最大 Token 错。所以这里就需要使用文本分割器去分割我们 loader 进来的 Document。
+    1. 文档分割器/Text Splitters，为什么需要分割文本？因为我们每次不管是做把文本当作 prompt 发给 openai api ，还是还是使用 openai api embedding 功能都是有字符限制的。比如我们将一份300页的 pdf 发给 openai api，让它进行总结，它肯定会报超过最大 Token 错。所以这里就需要使用文本分割器去分割我们 loader 进来的 Document。
     2. 向量化，数据相关性搜索其实是向量运算。以，不管我们是使用 openai api embedding 功能还是直接通过向量数据库直接查询，都需要将我们的加载进来的数据 Document 进行向量化，才能进行向量运算搜索。
     3. 对接向量存储与搜索，比如 Chroma、Pinecone、Qdrand
-5. Chains，包括一系列对各种组件的调用，Chain可以相互嵌套并串行执行，通过这一层，让LLM的能力链接到各行各业
+5. Chains，包括一系列对各种组件的调用，Chain可以相互嵌套并串行执行，通过这一层，让LLM的能力链接到各行各业。 
     1. LLMChain
     2. 各种工具Chain
     3. LangChainHub
@@ -213,10 +217,11 @@ prompt.format(product="colorful socks")
 # -> What is a good name for a company that makes colorful socks?
 ```
 
-LLMChain ，通过链式调用的方式，把一个需要询问 AI 多轮才能解决的问题封装起来，在这个链式序列中，每个链式都有一个输入和一个输出，**一个步骤的输出作为下一个步骤的输入**。把一个通过自然语言多轮调用才能解决的问题，变成了一个函数调用。
+LLMChain ，通过链式调用的方式，把一个需要询问 AI 多轮才能解决的问题封装起来，在这个链式序列中，每个链式都有一个输入和一个输出，**一个步骤的输出作为下一个步骤的输入**。把一个通过自然语言多轮调用才能解决的问题，变成了一个函数调用。所有 Chain 对象共享的call和 run 方法外
 
 ```python
 chain = LLMChain(llm = llm, prompt = prompt)
+chain("what is rice?")
 ```
 
 想要通过大语言模型，完成一个复杂的任务，往往需要我们多次向 AI 提问，并且前面提问的答案，可能是后面问题输入的一部分。LangChain 通过将多个 LLMChain 组合成一个 SequantialChain 并顺序执行，大大简化了这类任务的开发工作。Langchain 的链式调用并不局限于使用大语言模型的接口。
@@ -230,7 +235,7 @@ chain = LLMChain(llm = llm, prompt = prompt)
 
 ### 高级功能
 
-Memory，在 LangChain 中，链式和代理**默认以无状态模式运行，即它们独立处理每个传入的查询**。然而，在某些应用程序（如聊天机器人）中，保留先前的交互记录对于短期和长期都非常重要。这时就需要引入 “内存” 的概念，对整个对话的过程里我们希望记住的东西做了封装。
+Memory，在 LangChain 中，链式和代理**默认以无状态模式运行，即它们独立处理每个传入的查询**。然而，在某些应用程序（如聊天机器人）中，保留先前的交互记录对于短期和长期都非常重要。这时就需要引入 “内存” 的概念，则需要我们自行维护聊天记录，即每次把聊天记录发给 gpt。
 1. 我们可以通过 BufferWindowMemory 记住过去几轮的对话，通过 SummaryMemory 概括对话的历史并记下来。也可以将两者结合，使用 BufferSummaryMemory 来维护一个对整体对话做了小结，同时又记住最近几轮对话的“记忆”。
 2. 可以使用 EntityMemory，它会帮助我们记住整个对话里面的“命名实体”（Entity），保留实际在对话中我们最关心的信息。
 
@@ -246,7 +251,7 @@ ai_response = chat(history.messages) # 执行对话
 print(ai_response)
 ```
 
-Agent，某些应用可能需要不仅预定的 LLM（大型语言模型）/其他工具调用顺序，还可能需要根据用户的输入确定不确定的调用顺序。这种情况下涉及到的序列包括一个 “代理（Agent）”，该代理可以访问多种工具。根据用户的输入，代理可能决定是否调用这些工具，并确定调用时的输入。如果我们真的想要做一个能跑在生产环境上的 AI 聊天机器人，我们需要的不只一个单项技能，对于有很多个不同的“单项技能”，AI 要能够自己判断什么时候该用什么样的技能（意图识别问题）。通过“先让 AI 做个选择题”的方式，Langchain 让 AI 自动为我们选择合适的 Tool 去调用。我们可以把回答不同类型问题的 LLMChain 封装成不同的 Tool，也可以直接让 Tool 去调用特定能力的LLMChain 等工具。比如
+Agent，某些应用可能需要不仅预定的 LLM（大型语言模型）/其他工具调用顺序，还可能需要根据用户的输入确定不确定的调用顺序。这种情况下涉及到的序列包括一个 “代理（Agent）”，该代理可以访问多种工具。**根据用户的输入，代理可能决定是否调用这些工具**，并确定调用时的输入。如果我们真的想要做一个能跑在生产环境上的 AI 聊天机器人，我们需要的不只一个单项技能，对于有很多个不同的“单项技能”，AI 要能够自己判断什么时候该用什么样的技能（意图识别问题）。通过“先让 AI 做个选择题”的方式，Langchain 让 AI 自动为我们选择合适的 Tool 去调用。我们可以把回答不同类型问题的 LLMChain 封装成不同的 Tool，也可以直接让 Tool 去调用特定能力的LLMChain 等工具。比如
 
 ```python
 from langchain.agents import load_tools

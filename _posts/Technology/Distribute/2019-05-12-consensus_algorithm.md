@@ -13,6 +13,11 @@ keywords: 一致性协议
 * TOC
 {:toc}
 
+[共识协议的技术变迁 -- 既要“高”容错，又要“易”定序，还要“好”理解](https://mp.weixin.qq.com/s/UY9TPMcuf0O7xS0kuXTcVw)
+1. 共识协议面向有状态分布式系统的数据一致性与服务容错性这两大难题提供了近乎完美的解决方案.
+2. 分布式系统最朴实的目标是把一堆普通机器的计算/存储等能力整合到一起，然后整体上能够像一台超级机器一样对外提供可扩展的读写服务，设计原则上要实现即使其中的部分机器发生故障，系统整体服务不受影响。对于**有状态的分布式系统**而言，实现上述容错性目标的有效手段绕不开大名鼎鼎的复制状态机。。该模型的原理是为一个服务器集合里的每台服务器都维护着相同机制的确定有限状态机（DFSM，Determinate Finite State Machine），如果能够保障每个状态机输入的是完全一致的命令序列，那么这个集合中的每个状态机最终都可以以相同状态对外提供服务，同时也具备了容忍部分状态机故障的能力。显然，在复制状态机模型中，如何保证状态机之间数据一致的问题转换成了如何保证各台机器上日志序列一致的问题，这个成为了复制状态机模型最核心的挑战，而这，也正是共识协议神圣的职责。PS： 分布式系统一致性 ==> 日志序列一致性
+    ![](/public/upload/distribute/dfsm.jpg)
+
 ## 一致性和共识算法
 
 ### 分布式共识问题和复制状态机
@@ -56,6 +61,8 @@ Paxos 算法的出发点，是为了达成分布式共识。状态机复制，�
 
 ![](/public/upload/distribute/paxos_role.jpg)
 
+![](/public/upload/distribute/basic_paxos.jpg)
+
 ||proposer|acceptor|作用|
 |---|---|---|---|
 |prepare阶段|proposer 生成全局唯一且自增的proposal id，**广播**propose<br>只广播proposal id即可，无需value|Acceptor 收到 propose 后，做出“两个承诺，一个应答”<br>1. 不再应答 proposal id **小于等于**当前请求的propose<br>2. 不再应答 proposal id **小于** 当前请求的 accept<br>3. 若是符合应答条件，返回已经accept 过的提案中proposal id最大的那个 propose 的value 和 proposal id， 没有则返回空值|争取提议权，争取到了提议权才能在Accept阶段发起提议，否则需要重新争取<br>学习之前已经提议的值|
@@ -76,6 +83,12 @@ Paxos 算法的出发点，是为了达成分布式共识。状态机复制，�
 应用程序连接到任意一台服务器后提起状态修改请求（也可以是获得某个状态锁的请求），从图上看也就是服务器 1，会将这个请求发送给集群中其他服务器进行表决。如果某个服务器同时收到了另一个应用程序同样的修改请求，它可能会拒绝服务器 1 的表决，并且自己也发起一个同样的表决请求，那么其他服务器就会根据时间戳和服务器排序规则进行表决。表决结果会发送给其他所有服务器，最终发起表决的服务器也就是服务器 1，会根据收到的表决结果决定该修改请求是否可以执行，事实上，只有在收到多数表决同意的情况下才会决定执行。当有多个请求同时修改某个数据的情况下，服务器的表决机制保证只有一个请求会通过执行，从而保证了数据的一致性。
 
 ## multi-paxos
+
+[共识协议的技术变迁 -- 既要“高”容错，又要“易”定序，还要“好”理解](https://mp.weixin.qq.com/s/UY9TPMcuf0O7xS0kuXTcVw)Basic Paxos协议完美地解决了分布式系统中针对某一个值达成共识的问题，但是，实际的分布式系统显然不可能仅仅基于一个值的共识来运转。按照复制状态机模型的要求，我们是要解决日志序列一系列值的共识问题，直观地，我们可以反复地一轮一轮执行Basic Paxos，为日志序列中每一条日志达成共识，这个就是通常所谓的Multi Paxos。这里的所谓一轮一轮的轮号就是我们常说的Log ID，而前者提到的Proposal ID，则是我们常说的Epoch ID。对于采用Multi Paxos的有状态分布式系统而言，日志序列的Log ID必须是严格连续递增并且无空洞地应用到状态机，这个是Multi Paxos支持乱序提交所带来的约束限制，否则我们无法保证各状态机最终应用的命令序列是完全一致的。Proposal ID（Epoch ID）的全局唯一且单调递增的约束主要还是出于效率的考虑，Log ID的全局唯一且单调递增的约束则是出于正确性的考虑。
+
+从Basic Paxos到Multi Paxos，这之间存在着巨大的鸿沟，实践中有着太多的挑战需要一一应对：LiveLock问题；CatchUp问题。
+
+如果Basic Paxos中绝对公平意味着低效，那么不妨在Multi Paxos中引入选举并产生唯一Leader，只有当选为Leader才能够提议请求。这样的好处很明显，首先由唯一的Leader做Log ID分配，比较容易实现全局唯一且连续递增，解决了CatchUp问题； 其次，唯一的Leader提议不存在并发提议冲突问题，解决了LiveLock难题；。进一步地，本来PREPARE就是为了争夺提议权，现在既然只有Leader能够提议，就至少在Leader任职时间内就不必每个提议都要再走一遍PREPARE，这样大幅提升了形成决议的效率。
 
 《分布式协议与算法实战》Multi-Paxos 是一种思想，不是算法，缺失实现算法的必须编程细节。而 Multi-Paxos 算法是一个统称，它是指基于 Multi-Paxos 思想，通过多个 Basic Paxos 实例实现一系列值的共识的算法（比如 Chubby 的 Multi-Paxos 实现、Raft 算法等）。Multi Paxos 对 Basic Paxos 的核心改进是，增加了“选主”的过程。
 1. 提案节点会通过定时轮询（心跳），确定当前网络中的所有节点里是否存在一个主提案节点；
@@ -100,8 +113,9 @@ Paxos 算法的出发点，是为了达成分布式共识。状态机复制，�
 
 另一种表述：Basic Paxos达成一次决议至少需要两次网络来回，并发情况下可能需要更多，极端情况下甚至可能形成活锁，效率低下。Multi-Paxos选举一个Leader，提议由Leader发起，没有竞争，解决了活锁问题。提议都由Leader发起的情况下，Prepare阶段可以跳过，将两阶段变为一阶段，提高效率。Multi-Paxos并不假设唯一Leader，它允许多Leader并发提议，不影响安全性，极端情况下退化为Basic Paxos。Multi-Paxos与Basic Paxos的区别并不在于Multi（Basic Paxos也可以Multi），只是在同一Proposer**连续提议时**可以优化跳过Prepare直接进入Accept阶段。
 
-
 ## Paxos 优化
+
+当然啦，引入了Leader之后，Multi Paxos也是要处理好Leader切换前后的数据一致性问题，并且新的Leader如何填补日志空洞等难题也需要好好设计。问题还是不少。一直等到2007年，来自Google的工程师们通过《Paxos Made Live - An Engineering Perspective》一文，详细地介绍了他们在Chubby中落地Multi Paxos的最佳实践。这篇文章提到的Multi Paxos生产落地过程遇到的种种挑战：磁盘故障（disk corruption）；Master租约（master lease）；Master纪元（master epoch）/幽灵复现；共识组成员（group membership）；镜像快照（snapshots。
 
 以 Chubby 的 Multi-Paxos 实现为例
 
@@ -109,7 +123,6 @@ Paxos 算法的出发点，是为了达成分布式共识。状态机复制，�
 2. 在 Chubby 中，主节点是通过执行 Basic Paxos 算法，进行投票选举产生的，并且在运行过程中，主节点会通过不断续租的方式来延长租期（Lease）。
 3. 在 Chubby 中实现了兰伯特提到的，“当领导者处于稳定状态时，省掉准备阶段，直接进入接受阶段”这个优化机制，减少非必须的协商步骤来提升性能。
 4. 在 Chubby 中，为了实现了强一致性，所有的读请求和写请求都由主节点来处理。也就是说，只要数据写入成功，之后所有的客户端读到的数据都是一致的。
-
 
 减少 Paxos 算法的网络开销：对于原本是两阶段的 Prepare-Accept 的请求，我们可以在 Accept 请求里，带上下一次 Paxos 算法里的 Prepare 请求。因为所有的外部请求都会先到达 Master，然后由 Master 发起提案，所以这样的策略在实现上非常容易。而且因为请求都是从 Master 发起的，所以达成共识的过程中很少会有冲突，往往一个 Prepare-Accept 的过程，共识就已经达成了。这样，原先是两阶段的 Prepare-Accept，常常只要一个网络请求就已经完成了，我们的 Paxos 算法在大部分情况下，就变成一个一阶段就能完成的了。
 
@@ -151,7 +164,7 @@ Raft与Multi-Paxos中相似的概念：
 |term|proposal id|
 |log entry|proposal|
 |log index|instance id|
-|Leader选举|prepare 阶段|
+|Leader选举，“随机超时+多数派”机制，仅允许拥有最新日志的节点当选为Leader|prepare 阶段|
 |日志复制|Accept阶段|
 
 Raft与Multi-Paxos的不同：
@@ -163,7 +176,12 @@ Raft与Multi-Paxos的不同：
 |日志复制|保证复制|允许空洞|
 |日志提交|推进commit index|异步的commit 消息|
 
-Raft 和 Paxos 最大的不同之处就在于 Raft 的**强领导特性**：Raft 使用leader选举作为一致性协议里必不可少的部分，**并且将尽可能多的功能集中到了leader身上**。这样就可以使得算法更加容易理解。例如，在 Paxos 中，leader选举和基本的一致性协议是正交的：leader选举仅仅是性能优化的手段，而且不是一致性所必须要求的。但是，这样就增加了多余的机制：Paxos 同时包含了针对基本一致性要求的两阶段提交协议和针对leader选举的独立的机制。相比较而言，Raft 就直接将leader选举纳入到一致性算法中，并作为两阶段一致性的第一步。这样就减少了很多机制。
+Raft 和 Paxos 最大的不同之处就在于 Raft 的强主/**强领导特性**：
+1. 在 Paxos 中，leader选举和基本的一致性协议是正交的：leader选举仅仅是性能优化的手段（省得七嘴八舌效率低），而且不是一致性所必须要求的，是可以随时被更换的。但是，这样就增加了多余的机制：Paxos 同时包含了针对基本一致性要求的两阶段提交协议和针对leader选举的独立的机制。
+2. 相比较而言，Raft 就直接将leader选举纳入到一致性算法中，并作为两阶段一致性的第一步，**并且将尽可能多的功能集中到了leader身上**。Leader是拥有最多信息的那个Proposer，Leader的标准就是整个分组的标准，不一致的地方统统以Leader为准。事实上，其余角色都指着Leader存活，成为了Leader的依附，更换Leader也就成为了一件非常慎重的事情，中间甚至会产生共识停服的窗口。强主」模式体现了Raft的「简单有效好实现」的设计理念，也直接支撑了其它如日志复制、一致性保障等模块的简化。
+    1. 所有的日志流均是严格按顺序从Leader发送给Follower，这个共识组里面并不存在其它通信通道。
+    2. Leader给Follower发送的每条日志X都包含有Leader记录的该Follower上一条消费的日志Y，在Follower这边收到Leader发送过来的日志X并准备接受之前，会检查本地记录的上一条日志是否是Y，如果不一致，那么一切以Leader为标准，Follower继续往前追溯，找到与Leader分叉点，消除掉本地分叉并坚决学习Leader的日志。
+    3. 通过这个强主逻辑的设计，日志复制管理得到了质的简化，事实上消除了日志空洞的情形，也将更加方便拉平两个节点的最新日志。Multi Paxos支持提议的乱序提交，允许日志空洞存在，这个虽然是提供了协议的灵活性，并发性也更优，但是的确让协议变得更加的复杂，阻碍了协议的工业落地。
 
 强Leader在工程中一般使用Leader Lease和Leader Stickiness来保证：
  
