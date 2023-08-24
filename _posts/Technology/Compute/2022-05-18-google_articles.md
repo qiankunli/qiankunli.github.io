@@ -4,7 +4,7 @@ layout: post
 title: 《大数据经典论文解读》 三驾马车学习
 category: 技术
 tags: Compute
-keywords: ceph
+keywords: bigdata google articles
 
 ---
 
