@@ -172,3 +172,7 @@ type Rule interface {
 type AlertingRule struct {...}
 type RecordingRule struct {...}
 ```
+
+## 其它
+
+[时序数据高基数问题分析与解决方法](https://mp.weixin.qq.com/s/PCOftV4zxgVppyPC2Mz6xQ)

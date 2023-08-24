@@ -117,6 +117,8 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 
 ## Java对象在内存中的表示
 
+[jvm中类和对象定义存储基础知识](https://mp.weixin.qq.com/s/1ffuusC21mJvAKl-v-OAOg) 未细读。
+
 磁盘表示 ：java 源码文件 ==> 磁盘表示： 字节码文件 ==> 内存的c++表示： oop-kclass struct ==> 内存的二进制表示：数据结构和方法对应的机器指令。
 
 面向对象语言将对象(数据)和方法(对象上的操作)绑定到了一起，来提供更强的封装性和多态。这些特性都依赖对象头中的类型信息来实现，Java、Python语言都是如此。Java对象在内存中的`layout=mark + kclass* + fields`。 

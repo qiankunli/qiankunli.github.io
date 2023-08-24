@@ -138,6 +138,8 @@ Prometheus指标抓取的生命周期：服务发现 ==> targets ==> relabel ==>
           ca_file: xx
         bearer_token_file: xx
     ```
+4. 如果系统内部署了Prometheus Operator 则可以通过创建 ServiceMonitor CRD 指定监听target，Opertor会根据ServiceMonitor crd的定义生成prometheus server的配置文件。[Prometheus-operator 介绍和配置解析](https://zhuanlan.zhihu.com/p/76835425)
+    ![](/public/upload/monitor/prometheus_operator.jpg)
 
 [服务发现与Relabel](https://yunlzheng.gitbook.io/prometheus-book/part-ii-prometheus-jin-jie/sd/service-discovery-with-relabel)
 
