@@ -11,6 +11,8 @@ keywords: Python
 * TOC
 {:toc}
 
+## 前言 
+
 Python有两大类并行方式：多线程与多进程。由于GIL的存在，这两种方式有着截然不同的特点：
 
 1. 多线程可以直接共享数据，但至多只能用一个CPU核。Python有一个GIL来保证同一时间只能有一个线程来执行，当然，GIL 在较新的python版本已经退出历史舞台了。
@@ -128,3 +130,5 @@ if __name__ == "__main__":
 Python还提供了异步IO的模块 asyncio，在单线程内实现并发，asyncio的核心原理，就是一个event-loop（可以理解成 while True 循环）。在event-loop的每一次循环中，线程会遍历各个任务，在前面任务IO等待的过程中，进行后面任务的CPU计算。循环往复，直到所有任务执行完毕。
 
 ## ray 并发库
+
+请参考另一篇专门写ray的博客。

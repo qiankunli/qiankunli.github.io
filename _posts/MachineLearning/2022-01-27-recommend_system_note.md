@@ -282,3 +282,5 @@ print('\n\nTest Loss {}, Test Accuracy {}'.format(test_loss, test_accuracy)
 [如何提升推荐系统的可解释性？京东智能推荐卖点技术全解析](https://mp.weixin.qq.com/s/z6nTgptRrvC29PnyTAf8RQ)
 
 ![](/public/upload/machine/deep_recsys_practise.png)
+
+[推荐系统范式之争，LLM vs. ID？](https://mp.weixin.qq.com/s/7pQ891pnp_BM7qH7ROiWwg)
