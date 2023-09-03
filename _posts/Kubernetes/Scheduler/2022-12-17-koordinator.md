@@ -120,7 +120,7 @@ spec:
 QoS主要表现为使用的隔离参数不同，**以Pod Label 的形式声明**。
 
 Koordinator 针对智能化调度的设计思路如下：
-1. 优先级：智能资源超卖，**超卖的基本思想是去利用那些已分配但未使用的资源来运行低优先级的任务**。Koordinator 首先解决的是节点资源充分利用的问题，通过分析节点容器的运行状态计算可超卖的资源量，并结合 QoS 的差异化诉求将超卖的资源分配给不同类型的任务，大幅提高集群的资源利用率。 PS：已分配但未使用的资源，对应下图灰色和深蓝色之间的部分。
+1. 优先级：智能资源超卖，**超卖的基本思想是去利用那些已分配但未使用的资源来运行低优先级的任务**（一种新资源的上报和调度）。Koordinator 首先解决的是节点资源充分利用的问题，通过分析节点容器的运行状态计算可超卖的资源量，并结合 QoS 的差异化诉求将超卖的资源分配给不同类型的任务，大幅提高集群的资源利用率。 PS：已分配但未使用的资源，对应下图灰色和深蓝色之间的部分。
   ![](/public/upload/kubernetes/koordinator_resource_model.jpg)
 2. Priority 和 QoS 是两个正交的维度，可以排列组合使用，部分排列组合不合法。
 2. QoS 感知的重调度，当节点中 Pod 的运行时 QoS 不符合预期时（干扰检测），Koordinator 将智能决策抑制更低优先级的任务亦或是迁移当前受到干扰的容器，从而解决应用 QoS 不满足导致的问题。问题：重调度的细节问题很多，Pod驱逐后 集群是否有资源保证可以运行，涉及到资源预留。 
@@ -129,7 +129,7 @@ Koordinator 针对智能化调度的设计思路如下：
 
 [Koordinator v0.7: 为任务调度领域注入新活力](https://mp.weixin.qq.com/s/oOjg8j9tDBs5jOm30XjCMA)
 
-QoS 表示应用在节点上运行时得到的物理资源质量，包含了System、LS、BE三类，LS又细分为LSE（Latency-Sensitive Excluded）、LSR（Latency-Sensitive Reserved）、LS（Latency-Sensitive）和 LS（Best Effort），保障策略
+QoS 表示应用在节点上运行时得到的物理资源质量，**以 CPU 为主维度**，包含了System、LS、BE三类，LS又细分为LSE（Latency-Sensitive Excluded）、LSR（Latency-Sensitive Reserved）、LS（Latency-Sensitive）和 LS（Best Effort），保障策略
 1. CPU 方面，通过内核自研的 Group Identity 机制，针对不同 QoS 等级设置内核调度的优先级，优先保障 LSR/LS 的 cpu 调度，允许抢占 BE 的 CPU 使用，以达到最小化在线应用调度延迟的效果；对于 LS 应用的突发流量，提供了 CPU Burst 策略以规避非预期的 CPU 限流。
 2. 内存方面，由于容器 cgroup 级别的直接内存回收会带来一定延时，LS 应用普遍开启了容器内存异步回收能力，规避同步回收带来的响应延迟抖动。除此之外，针对末级缓存（Last-Level Cache，LLC）这种共享资源，为了避免大数据等 BE 应用大量刷 Cache 导致 LS/LSR 应用的 Cache Miss Rate 异常增大，降低流水线执行效率，引入了 RDT 技术来限制 BE 应用可分配的 Cache 比例，缩小其争抢范围。
 

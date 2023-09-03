@@ -283,4 +283,8 @@ print('\n\nTest Loss {}, Test Accuracy {}'.format(test_loss, test_accuracy)
 
 ![](/public/upload/machine/deep_recsys_practise.png)
 
+[谈一谈LLM在推荐域的一些理解](https://mp.weixin.qq.com/s/9f87dKcFNfGm6Q-jJNdJEw)
+
 [推荐系统范式之争，LLM vs. ID？](https://mp.weixin.qq.com/s/7pQ891pnp_BM7qH7ROiWwg)
+
+[大模型实现生成式推荐系统](https://mp.weixin.qq.com/s/eijfbK744c4TqvsGlBJuDA)

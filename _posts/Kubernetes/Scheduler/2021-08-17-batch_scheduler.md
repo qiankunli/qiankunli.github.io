@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: k8s批处理调度
+title: k8s批处理调度/Job调度
 category: 架构
 tags: Kubernetes
 keywords: kube-batch,volcano
@@ -22,9 +22,8 @@ keywords: kube-batch,volcano
 
 ## 必要性
 
-
-在大数据作业中，特别是批式计算的作业通常只会占用资源一段时间，在运行结束后即归还资源。而用户通常会提交多个作业，这就导致部分作业不能立即获得资源，而需要排队等待直到有作业结束退出后才能获得资源开始运行。**原生 Kubernetes 调度器最初是针对在线服务设计的，没有“队列”和“作业”这两个概念**。为了更好地支持大数据场景资源分配，新增了以下两个重要概念：
-1. Queue CRD：描述了一个“队列”，即 Quota（资源配额）的抽象；
+Job 是一种更高层次的抽象，通常具有特定的计算任务或操作。它可以分割成多个子任务并行完成，也可以拆分成多个子任务协作完成。在大数据作业中，特别是批式计算的作业通常只会占用资源一段时间，在运行结束后即归还资源。而用户通常会提交多个作业，这就导致部分作业不能立即获得资源，而需要排队等待直到有作业结束退出后才能获得资源开始运行。**原生 Kubernetes 调度器最初是针对在线服务设计的，没有“队列”和“作业”这两个概念**。为了更好地支持大数据场景资源分配，新增了以下两个重要概念：
+1. Queue CRD：描述了一个“队列”，即 Quota（资源配额）的抽象；Job 排队，因为系统中的资源有限的，而 Job 的数量和计算需求往往是无限的。
 2. PodGroup CRD：描述了一个“作业”，用于标识多个 Pod 属于同一个集合，从而可以把多个 Pod 看作整体进行调度。
 
 [kube-batch在AI计算平台的应用](https://mp.weixin.qq.com/s/zXiSC0RWmow8RJ7XLog8JQ)k8s原生的调度器，会将需要启动的容器，放到一个优先队列（Priority Queue）里面，每次从队列里面取出一个容器，将其调度到一个节点上。 分布式训练需要所有worker都启动后，训练才能够开始进行。使用原生调度器，可能会出现以下问题：        
@@ -119,9 +118,7 @@ Action 实现了调度机制（mechanism），Plugin 实现了调度的不同策
 
 action负责管理核心逻辑和流程，xxFns 是流程里暴露出来的hook，一个plugin（扩展需求）通过一个或多个Fns 组合来实现，这就很像default-scheduler 中的 Scheduling Framework 了。[Volcano火山：容器与批量计算的碰撞](https://bbs.huaweicloud.com/blogs/205045)action 和plugin 的关系
 1. action是第一级插件，定义了调度周期内需要的各个动作；默认提供 enqueue、allocate、 preempt和backfill四个action。比如allocate 为pod 分配node ，preempt 实现抢占。
-2. plugin是第二级插件，根据不同场景提供了action 中算法的具体实现细节；比如如何为job排序，为node排序，优先抢占谁。
-
-
+2. plugin是第二级插件，根据不同场景提供了action 中算法的具体实现细节；比如如何为job排序，为node排序，优先抢占谁。PS：按照 Job 粒度进行调度，自然会有Job粒度的扩展插件，如 Filter 插件，Score 插件等
 
 ## 调度流程
 

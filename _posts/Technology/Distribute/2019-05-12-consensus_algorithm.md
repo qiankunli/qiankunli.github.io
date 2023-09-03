@@ -76,6 +76,8 @@ Paxos 算法的出发点，是为了达成分布式共识。状态机复制，�
 
 目前比较好的通俗解释，以贿选来描述 [如何浅显易懂地解说 Paxos 的算法？ - GRAYLAMB的回答 - 知乎](https://www.zhihu.com/question/19787937/answer/107750652)。想想tcp 握个手都很麻烦。
 
+[图解分布式共识算法 Paxos 议会协议](https://mp.weixin.qq.com/s/NkrwcETWMC0ttAyRupBaIw) 未读
+
 ### 另一种表述
 
 ![](/public/upload/distribute/paxos_sequence.png)
@@ -262,6 +264,7 @@ ZAB 算法的目的，同样是在多台服务器之间达成一致，保证这�
 
 生活中面临的任何选择，最后都可以转换为一个问题：你想要什么（以及为此愿意牺牲什么）。任何不一致问题， 本质上都可以转换为一个一致问题。 一个队伍谁当老大 可以各不服气，但大家可以对“多票当选”取得一致，这就是所谓“民主”。**你可以不尊重老大，但必须尊重价值观**。而在basic-poxos 中，底层的“价值观”就是：**谁的ProposerId 大谁的优先级更高**。有了“优先级”/“价值观” 就可以让“无序”的世界变“有序”。 
 
+[聊一聊分布式系统中的时空观构建](https://mp.weixin.qq.com/s/3dGpV4hSgNOlwkSJ9pjPrw)
 
 
 

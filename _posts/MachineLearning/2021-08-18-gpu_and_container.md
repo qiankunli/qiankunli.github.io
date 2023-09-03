@@ -124,3 +124,13 @@ Allocatable:
 1. ElasticGPU：ElasticGPU 是集群中一个实际可使用的 GPU 资源，可以是一块本地 GPU 物理卡、一个 GPU 切片资源（ GPU 算力 / 显存 的组合）、一个远端 GPU 设备。
 2. ElasticGPUClaim：ElasticGPUClaim 是用户对 ElasticGPU 资源的申领，可以申请整卡数量，申请 GPU 核数 / 显存，或者申请 TFLOPS 算力。
 3. EGPUClass：EGPUClass 提供了生产和挂载 ElasticGPU 的方式，可以使用 qGPU 虚拟化、vCUDA、或是 GPU 远端池化的技术。
+
+[mGPU 技术揭秘 ：新一代 Kubernetes GPU 共享调度方案](https://mp.weixin.qq.com/s/HgL1rmlqXm_15BFUcBr2TA)
+1. 两层调度：mGPU 虚拟化方案则为 GPU 增加了算力和显存两个维度的属性，不再是一个简单的设备个数。对于单机上的 kubelet 来说，算力和显存会被视为两种独立的扩展资源。在 mGPU 场景下，如果由 kubelet 进行 GPU 级别的调度，可能会导致一个容器被分配到的算力和显存是在两个 GPU 上，实际上无法使用。因此，算力和显存两种资源的“撮合”需要由调度器来完成。也就是说，调度器不仅需要决策将 Pod 调度到哪个节点，还需要进一步决策将该 Pod 中的各个容器分别调度到该节点的哪些 GPU 上。
+2. 卡级别的 Binpack/Spread 策略：在引入了两层调度后，GPU 也将作为一种调度的拓扑域。调度器不仅需要考虑节点级别的 Binpack/Spread 策略，也需要支持卡级别的 Binpack/Spread 策略，从而减少卡级别的资源碎片，或者提升卡级别的故障隔离性。
+3. 基于 Scheduling Framework 扩展 GPUShare Plugin，实现 GPU 共享调度。
+  1. 将 Pod 调度到合适的节点。
+  2. 将 Pod 中的各个 Container 调度到合适的 GPU 组合上（并将结果记录到 Pod Annotation 中）。
+4. mGPU Device Plugin: 单机上的 mGPU 资源管理插件。在本功能中负责：
+  1. 发布 mGPU 资源 （最终将由 kubelet 上报到 Node 对象中）。
+  2. 根据调度器的分配结果，将相应的环境变量注入到容器中。

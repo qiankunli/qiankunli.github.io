@@ -271,6 +271,8 @@ karmada 会为每一个分发的资源每个目标成员集群的执行命名空
 
 [如何使用 Karmada 更高效地实现故障转移](https://mp.weixin.qq.com/s/JooV-4YYUsjTWUBNbzfsMg)
 
+[突破集群边界，Karmada 引领跨集群弹性伸缩](https://mp.weixin.qq.com/s/nf6maF5qEZp7B2g2wlzbRA)
+
 ### 源码分析
 
 ResourceDetector 组件监听 用户创建的object，查找 object 匹配的 PropagationPolicy 并创建ResourceBinding
@@ -465,3 +467,5 @@ func (g *genericScheduler) Schedule(..., placement *policyv1alpha1.Placement, sp
 [跨集群运行 StatefulSet](https://mp.weixin.qq.com/s/Py0LB7W19ASB8crBkrhBiA)
 
 [B站多云管理平台建设](https://code.byted.org/epscp/apphub/merge_requests/698) 多云管理不只是 多k8s 集群管理。
+
+[字节跳动开源KubeAdmiral：基于 K8s 的新一代多集群编排调度引擎](https://mp.weixin.qq.com/s/RvQiJ9HZe4Xqo1nKSoMWLg) v1的KubeFed FederatedDeployment ==> v2 KubeAdmiral 迎合 Kubernetes 单集群用户的使用习惯，提供了原生 Kubernetes API 的支持。用户创建原生资源（如 Deployment）后，由 Federate Controller 将其自动转化为联邦内部对象供其他 controller 使用。KubeAdmiral 提供了 **status 汇聚**的能力，Status Aggregator 将多个成员集群中资源的 status 进行合并与融合，并写回原生资源，让用户无需感知多集群拓扑，就可以一目了然地观测到资源在整个联邦中的状态。

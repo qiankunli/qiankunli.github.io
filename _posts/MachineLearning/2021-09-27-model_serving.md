@@ -223,8 +223,7 @@ spec:
 ## 模型服务——提高吞吐，使服务能并行执行多个请求
 
 [模型推理服务化框架Triton保姆式教程（一）：快速入门](https://mp.weixin.qq.com/s/YES9OO9NX6-HnzR-pvfFyQ)Triton 是 Nvidia 发布的一个高性能推理服务框架，可以帮助开发人员高效轻松地在云端、数据中心或者边缘设备部署高性能推理服务。其中主要特征包括：
-1. 支持多种深度学习框架
-2. 支持多种机器学习框架
+1. 支持多种深度学习框架（Triton 称之为backend，tf、pytorch、FasterTransformer都有对应backend）
 3. 模型并发执行
 4. 动态批处理(Dynamic batching)
 5. 有状态模型的序列批处理(Sequence batching)和隐式状态管理(implicit state management)

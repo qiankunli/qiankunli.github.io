@@ -110,6 +110,8 @@ AI平台的定位：面向算法工程师，围绕AI 模型的全生命周期去
 
 用户体验：对于数据科学家和算法工程师开发训练 AI 模型来说，Kubernetes 的语法和操作却是一种“负担”。他们更习惯在 Jupyter Notebook 等 IDE 中调试代码，使用命令行或者 Web 界面提交、管理训练任务。任务运行时的日志、监控、存储接入、GPU 资源分配和集群维护，最好都是内置的能力，使用工具就可以简单操作。因此要提供命令行工具/SDK/运维大盘/开发控制台来满足用户的各种需要。 [AI 作业生命周期管理（Arena）](https://mp.weixin.qq.com/s/yGc44Q0qseDG7zy0-PC8gg)
 
+[云原生深度学习平台 PAI-DLC 架构设计](https://mp.weixin.qq.com/s/73JWA2cmY2JPszE5CX1unQ)
+
 ### vivo
 
 训练平台 + 推理平台 + 容器平台（日常维护cli ==> 白屏化）

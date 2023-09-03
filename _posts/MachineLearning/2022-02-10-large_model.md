@@ -170,6 +170,8 @@ GPU服务器特点
 
 [OpenAI 是怎么使用 Kubernetes 的？](https://mp.weixin.qq.com/s/ZVUlTQ9H19LQQ_vP0yxDwA)
 
+[面向大模型的存储加速方案设计和实践](面向大模型的存储加速方案设计和实践) 未细读。
+
 ### 网络架构
 
 [大规模 AI 高性能网络的设计与实践](https://mp.weixin.qq.com/s/o0vAQvAo6GnYxzzAkGtQWQ) 并行训练策略 ==> 我们在训练大模型时，通常混合采用了三种并行策略。
@@ -201,3 +203,4 @@ GPU服务器特点
 有了大模型分布式推理方案，然而想要在 Kubernetes 集群中高效部署大模型推理服务，还存在很多工程化挑战，比如大规模的 GPU 等异构资源如何高效地管理运维和自动调度？如何快速部署推理服务，服务上线后如何保证资源能够应对波动的访问量？以及没有适合的工具进行推理服务时延、吞吐、GPU 利用率、显存占用等关键指标监控，没有合理的模型切分方案，模型版本管理等。
 
 [大模型的好伙伴，浅析推理加速引擎FasterTransformer](https://mp.weixin.qq.com/s/Gkf_zIYWs4u7AJrJLDVq_Q) 未细读
+FasterTransformer 是真对于 Transofrmer 类型模型（也包括 encoder-only、decoder-only）的推理加速方案，其提供了 Kernel Fuse、Memory reuse、kv cache、量化等多种优化方案，同时也提供了 Tensor Parallel 和 Pipeline Parallel 两种分布式推理方案。

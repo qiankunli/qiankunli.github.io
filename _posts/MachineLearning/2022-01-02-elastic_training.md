@@ -88,7 +88,7 @@ volcano掌握了要调度的所有pod、queue的资源使用情况， 便有足�
 
 训练代码层面，支持弹性之后，worker数量经常变化，每次变化都会重启worker
 1. 需使用checkpoint 来暂存训练成果。rank=0 启动时load checkpoint， 每次epoch 训练结束后 save checkpoint，checkpoint内容包括但不限于：model 数据、optimizer 数据、本次训练进行到了哪个epoch等。
-2. batch size、学习率等也应根据 worker数量（可以从env中获取WORLD_SIZE）进行一定调整。 
+2. batch size、学习率等也应根据 worker数量（可以从env中获取WORLD_SIZE）进行一定调整。 [EasyScale 精度无损弹性训练](https://mp.weixin.qq.com/s/73JWA2cmY2JPszE5CX1unQ)
 
 pytorch 层面，必须使用`python -m torch.distributed.run train_script.py`来启动训练脚本，原理参见 [云原生的弹性 AI 训练系列之二：PyTorch 1.9.0 弹性分布式训练的设计与实现](https://mp.weixin.qq.com/s/hlOYLKSHFDZWN21AsUn6bg)，测试过程中发现pytorch v1.10 缩容的bug，由腾讯的同学提交issue推进修复。
 
