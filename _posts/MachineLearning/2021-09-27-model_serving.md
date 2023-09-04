@@ -313,6 +313,7 @@ KubeDL-Morphling 组件实现了推理服务的自动规格调优，通过主动
 
 [携程AI推理性能的自动化优化实践](https://mp.weixin.qq.com/s/jVnNMQNo_MsX3uSFRDmevA)
 
+[⻜桨⼤模型推理部署⾼性能优化](https://mp.weixin.qq.com/s/PIh2gPhqF8r-9k8QZQ8GEw) 未读
 
 ## 其它
 

@@ -455,8 +455,7 @@ func (g *genericScheduler) Schedule(..., placement *policyv1alpha1.Placement, sp
       name: exp-scratch
 
 ## 其它
-
-阿里：
+阿里
 
 [还在为多集群管理烦恼吗？OCM来啦！](https://mp.weixin.qq.com/s/t1AGv3E7Q00N7LmHLbdZyA)
 [CNCF 沙箱项目 OCM Placement 多集群调度指南](https://mp.weixin.qq.com/s/_k2MV4b3hfTrLUCCOKOG8g)
@@ -466,6 +465,6 @@ func (g *genericScheduler) Schedule(..., placement *policyv1alpha1.Placement, sp
 
 [跨集群运行 StatefulSet](https://mp.weixin.qq.com/s/Py0LB7W19ASB8crBkrhBiA)
 
-[B站多云管理平台建设](https://code.byted.org/epscp/apphub/merge_requests/698) 多云管理不只是 多k8s 集群管理。
+[B站多云管理平台建设](xx) 多云管理不只是 多k8s 集群管理。
 
 [字节跳动开源KubeAdmiral：基于 K8s 的新一代多集群编排调度引擎](https://mp.weixin.qq.com/s/RvQiJ9HZe4Xqo1nKSoMWLg) v1的KubeFed FederatedDeployment ==> v2 KubeAdmiral 迎合 Kubernetes 单集群用户的使用习惯，提供了原生 Kubernetes API 的支持。用户创建原生资源（如 Deployment）后，由 Federate Controller 将其自动转化为联邦内部对象供其他 controller 使用。KubeAdmiral 提供了 **status 汇聚**的能力，Status Aggregator 将多个成员集群中资源的 status 进行合并与融合，并写回原生资源，让用户无需感知多集群拓扑，就可以一目了然地观测到资源在整个联邦中的状态。
