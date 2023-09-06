@@ -183,9 +183,10 @@ LangChain is a framework for developing applications powered by language models.
 2. Prompt，支持各种自定义模板
 3. 拥有大量的文档加载器，从指定源进行加载数据的，比如 Email、Markdown、PDF、Youtube ...当使用loader加载器读取到数据源后，数据源需要转换成 Document 对象后，后续才能进行使用。
 4. 对索引的支持。对用户私域文本、图片、PDF等各类文档进行存储和检索。为了索引，便不得不牵涉以下这些能力
+    1. 在LangChain中，所有的数据源都可以认为是Document，任何的数据库、网络、内存等等都可以看成是一个Docstore。
     1. 文档分割器/Text Splitters，为什么需要分割文本？因为我们每次不管是做把文本当作 prompt 发给 openai api ，还是还是使用 openai api embedding 功能都是有字符限制的。比如我们将一份300页的 pdf 发给 openai api，让它进行总结，它肯定会报超过最大 Token 错。所以这里就需要使用文本分割器去分割我们 loader 进来的 Document。
     2. 向量化，数据相关性搜索其实是向量运算。以，不管我们是使用 openai api embedding 功能还是直接通过向量数据库直接查询，都需要将我们的加载进来的数据 Document 进行向量化，才能进行向量运算搜索。
-    3. 对接向量存储与搜索，比如 Chroma、Pinecone、Qdrand
+    3. 对接向量存储与搜索，向量化存储接口VectorStore， 比如 Chroma、Pinecone、Qdrand
 5. Chains，相当于 pipeline，包括一系列对各种组件的调用，**每一个从Prompt到Answer的过程，都被标准化为不同类型的LLMChain**。Chain可以相互嵌套并串行执行，通过这一层，让LLM的能力链接到各行各业。 内嵌了memory、cache、callback等组件。
     1. LLMChain
     2. 各种工具Chain
@@ -244,7 +245,7 @@ chain("what is rice?")
 
 ### Memory
 
-在 LangChain 中，链式和代理**默认以无状态模式运行，即它们独立处理每个传入的查询**。然而，在某些应用程序（如聊天机器人）中，保留先前的交互记录对于短期和长期都非常重要。这时就需要引入 “内存” 的概念，则需要我们自行维护聊天记录，即每次把聊天记录发给 gpt。
+在 LangChain 中，链式和代理**默认以无状态模式运行，即它们独立处理每个传入的查询**。然而，在某些应用程序（如聊天机器人）中，保留先前的交互记录对于短期和长期都非常重要。这时就需要引入 “内存” 的概念，则需要我们自行维护聊天记录，即每次把聊天记录发给 gpt。PS：一般情况下，记忆模型更多的是应用于会话/chat场景，BaseMemory下一层只有一个子类 BaseChatMemory。
 1. 我们可以通过 BufferWindowMemory 记住过去几轮的对话，通过 SummaryMemory 概括对话的历史并记下来。也可以将两者结合，使用 BufferSummaryMemory 来维护一个对整体对话做了小结，同时又记住最近几轮对话的“记忆”。
 2. 可以使用 EntityMemory，它会帮助我们记住整个对话里面的“命名实体”（Entity），保留实际在对话中我们最关心的信息。
 

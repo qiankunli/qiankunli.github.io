@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: llm部分技术源码学习
+title: LLM部分技术源码学习
 category: 技术
 tags: MachineLearning
 keywords: langchain
