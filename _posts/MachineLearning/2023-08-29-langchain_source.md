@@ -17,6 +17,8 @@ LangChain底层就是Prompt，大模型API，以及三方应用API调用三个�
 
 ## LLM模型层
 
+一次最基本的LLM调用需要的prompt模板、调用的LLM API设置、输出文本的结构化解析等。
+
 ```python
 # BaseLanguageModel 是一个抽象基类，是所有语言模型的基类
 class BaseLanguageModel(...):
@@ -33,8 +35,37 @@ class BaseLLM(BaseLanguageModel[str], ABC):
     2. predict ==> __call__
 # LLM类期望它的子类可以更加简单，将大模型的调用方法完全封装，不需要用户实现完整的_generate方法，只需要对外提供一个非常简单的call方法就可以操作LLMs
 class LLM(BaseLLM):
-    1. _generate ==> _call 留给子类实现。 输入文本格式提示提，返回文本格式的答案
+    1. _generate ==> _call 留给子类实现。 输入文本格式提示，返回文本格式的答案
+```
 
+## Prompt
+
+[Langchain 中的提示工程](https://cookbook.langchain.com.cn/docs/langchain-prompt-templates/)我们只要让机器将下一个单词预测的足够准确就能完成许多复杂的任务！下面是一个典型的提示结构。并非所有的提示都使用这些组件，但是一个好的提示通常会使用两个或更多组件。让我们更加准确地定义它们。
+1. 指令 ：告诉模型该怎么做，如何使用外部信息（如果提供），如何处理查询并构建 Out。
+2. 外部信息 或 上下文 ：充当模型的附加知识来源。这些可以手动插入到提示中，通过矢量数据库 （Vector Database） 检索（检索增强）获得，或通过其他方式（API、计算等）引入。
+3. 用户 In 或 查询 ：通常（但不总是）是由人类用户（即提示者）In 到系统中的查询。
+4. Out 指示器 ：标记要生成的文本的 开头。如果生成 Python 代码，我们可以使用 import 来指示模型必须开始编写 Python 代码（因为大多数 Python 脚本以 import 开头）。
+
+![](/public/upload/machine/prompt_structure.jpg)
+
+我们不太可能硬编码上下文和用户问题。我们会通过一个 模板 PromptTemplate 简化使用动态 In 构建提示的过程。我们本可以轻松地用 f-strings（如 f"insert some custom text '{custom_text}' etc"）替换。然而，使用Langchain 的 PromptTemplate 对象，我们可以规范化这个过程，添加多个参数，并**以面向对象的方式构建提示**。
+
+few-shot learning 适用于将这些示例在提示中提供给模型，通过示例来强化我们在提示中传递的指令，我们可以使用 Langchain 的 FewShotPromptTemplate 规范化这个过程，**比如根据查询长度来可变地包含不同数量的示例**，因为我们的提示和补全 (completion) Out 的最大长度是有限的，这个限制通过 最大上下文窗口 maximum context window 进行衡量，上下文窗口 (ontext window) = In 标记 (input_tokens) + Out 标记 (output tokens)。如果我们传递一个较短或较长的查询，我们应该会看到所包含的示例数量会有所变化。
+
+```
+prompt = "" " The following are exerpts from conversations with an AI
+assistant. The assistant is typically sarcastic and witty, producing
+creative  and funny responses to the users questions. Here are some
+examples: 
+
+User: How are you?
+AI: I can't complain but sometimes I still do.
+
+User: What time is it?
+AI: It's time to get a watch.
+
+User: What is the meaning of life?
+AI: "" "
 ```
 
 ## Chain模块
@@ -145,9 +176,11 @@ def _load_stuff_chain(...)-> StuffDocumentsChain:
     return StuffDocumentsChain(llm_chain=llm_chain,...) 
 ```
 
-## agent
+## Agent
 
 agent在LangChain框架中负责决策制定以及工具组的串联，可以根据用户的输入决定调用哪个工具。具体的说，Agent就是将大模型进行封装来简化用户使用，根据用户的输入，理解用户的相应意图，通过action字段选用对应的Tool，并将action_input作为Tool的入参，来处理用户的请求。当我们不清楚用户意图的时候，由Agent来决定使用哪些工具实现用户的需求。
+
+大佬：这一波Agent热潮爆发，其实是LLM热情的余波，大家太希望挖掘LLM潜力，为此希望LLM担任各方面的判断。但实际上有一些简单模块是不需要LLM的，不经济也不高效。例如我们要抽取每轮对话的情绪，可以用LLM，其实也可以用情绪识别模型。例如我们希望将长对话压缩后作为事件记忆存储，可以用LLM，也可以用传统摘要模型，一切只看是否取得ROI的最佳平衡，而不全然指望LLM。
 
 ### 使用
 
@@ -218,7 +251,7 @@ Question: {input}
 Thought:{agent_scratchpad}"""
 ```
 
-通过这个模板，加上我们的问题以及自定义的工具，会变成下面这个样子（# 后面是增加的注释）：
+通过这个模板，加上我们的问题以及自定义的工具，会变成下面这个样子（# 后面是增加的注释）
 
 ```
 Answer the following questions as best you can.  You have access to the following tools: #  尽可能的去回答以下问题，你可以使用以下的工具：
@@ -244,7 +277,8 @@ Begin! # 开始
 Question: Query the weather of this week,And How old will I be in ten years?  This year I am 28 #  问输入的问题
 Thought:
 ```
-通过这个模板向openai告知了一系列的规范，包括目前现有哪些工具集，你需要思考回答什么问题，你需要用到哪些工具，你对工具需要输入什么内容等。如果仅仅是这样，openai会完全补完你的回答，中间无法插入任何内容。因此LangChain使用OpenAI的stop参数，截断了AI当前对话。`"stop": ["\nObservation: ", "\n\tObservation: "]`。做了以上设定以后，OpenAI仅仅会给到Action和 Action Input两个内容就被stop停止。以下是OpenAI的响应内容：
+
+我们首先告诉 LLM 它可以使用的工具，在此之后，定义了一个**示例格式**，它遵循 Question（来自用户）、Thought（思考）、Action（动作）、Action Input（动作输入）、Observation（观察结果）的流程 - 并重复这个流程直到达到 Final Answer（最终答案）。如果仅仅是这样，openai会完全补完你的回答，中间无法插入任何内容。因此LangChain使用OpenAI的stop参数，截断了AI当前对话。`"stop": ["\nObservation: ", "\n\tObservation: "]`。做了以上设定以后，OpenAI仅仅会给到Action和 Action Input两个内容就被stop停止。以下是OpenAI的响应内容：
 ```
 I need to use the weather tool to answer the first part of the question, and the calculator to answer the second part.
 Action: Weather
@@ -389,3 +423,45 @@ Agent.plan() 可以看做两步：
 因此，agent 能否正常运行，与 prompt 格式，以及 LLM 的 ICL 以及 alignment 能力有着很大的关系。
    1. LangChain主要是基于GPT系列框架进行设计，其适用的Prompt不代表其他大模型也能有相同表现，所以如果要自己更换不同的大模型(如：文心一言，通义千问...等)。则很有可能底层prompt都需要跟著微调。
    2. 在实际应用中，我们很常定期使用用户反馈的bad cases持续迭代模型，但是Prompt Engeering的工程是非常难进行的微调的，往往多跟少一句话对于效果影响巨大，因此这类型产品达到80分是很容易的，但是要持续迭代到90分甚至更高基本上是很难的。
+
+## Memory
+
+记忆 ( memory )允许大型语言模型（LLM）记住与用户的先前交互。默认情况下，LLM 是 无状态 stateless 的，这意味着每个传入的查询都独立处理，不考虑其他交互。对于无状态代理 (Agents) 来说，唯一存在的是当前输入，没有其他内容。有许多应用场景，记住先前的交互非常重要，比如聊天机器人。在 LangChain 中，有几种方法可以实现对话记忆，它们都是构建在 ConversationChain 之上的。
+
+
+ConversationChain 的提示模板 `print(conversation.prompt.template)`：
+```
+The following is a friendly conversation between a human and an AI. The AI is talkative and provides lots of specific details from its context. If the AI does not know the answer to a question, it truthfully says it does not know.
+Current conversation:
+{history}
+Human: {input}
+AI:
+```
+
+ConversationSummaryMemory 的提示模版
+
+```
+Progressively summarize the lines of conversation provided, adding onto the previous summary returning a new summary.
+
+EXAMPLE
+Current summary:
+The human asks what the AI thinks of artificial intelligence. The AI thinks artificial intelligence is a force for good.
+
+New lines of conversation:
+Human: Why do you think artificial intelligence is a force for good?
+AI: Because artificial intelligence will help humans reach their full potential.
+
+New summary:
+The human asks what the AI thinks of artificial intelligence. The AI thinks artificial intelligence is a force for good because it will help humans reach their full potential.
+END OF EXAMPLE
+
+Current summary:
+{summary}
+
+New lines of conversation:
+{new_lines}
+
+New summary:
+```
+
+使用这种方法，我们可以总结每个新的交互，并将其附加到所有过去交互的 summary 中。
