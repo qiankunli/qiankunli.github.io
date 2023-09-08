@@ -81,7 +81,7 @@ Chain模块有一个基类Chain，是所有chain对象的基本入口，与用�
         1. 用户会输入一些key，对应用户在prompt template 中的variables，若是只插入了一个str，则视为key=input 或 key=query 或 key=question
         2. memory 会提供key=history 或 chat_history
         3. vector 会提供key=input_documents 或 key= context     
-    2. 从大模型获取的输出 也会包含一些key
+    2. 除了大模型获取的text输出，其它组件也会附着一些key
         1. llm 输出对应key=result/key=response
         2. memory会获取特定的key 保存下来作为hitory
         3. vector会带上附属的 key=source_documents
@@ -110,8 +110,6 @@ print(result['text'])
 ```
 
 ![](/public/upload/machine/chain_call.jpg)
-
-LLMChain(xx) ==> Chain.__call__ ==> LLMChain._call ==> LLMChain.prompt.format_prompt + LLMChain.llm.generate_prompt
 
 ```python
 class Chain(Serializable, Runnable[Dict[str, Any], Dict[str, Any]], ABC):
@@ -147,6 +145,8 @@ class LLMChain(Chain):
 |||docs = _get_docs(question)<br> answer = combine_documents_chain.run(question,docs)|
 |AgentExecutor||while._should_continue <br> agent.plan + tool.run|
 |ConversationalRetrievalChain||chat_history_str = get_chat_history <br>new_question = question_generator.run(new_question,chat_history_str) <br> docs = _get_docs(new_question,inputs) <br> answer = combine_docs_chain.run(new_question,docs)<br>||
+
+PS：用一个最复杂的场景比如 ConversationalRetrievalChain 打上断点，观察各个变量值的变化，有助于了解Chain的运行逻辑。 
 
 ### RetrievalQA
 
@@ -372,6 +372,12 @@ Final Answer: I will be 38 in ten years and the weather this week is sunny.
 
 根据输出再回头看agent的官方解释：An Agent is a wrapper around a model, which takes in user input and returns a response corresponding to an “action” to take and a corresponding “action input”.
 
+### stop token
+
+[How to Get Better Outputs from Your Large Language Model](https://developer.nvidia.com/blog/how-to-get-better-outputs-from-your-large-language-model/)It is especially useful to design a stopping template in a **few-shot** setting so the model can learn to stop appropriately upon completing an intended task. Figure shows separating examples with the string “===” and passing that as the stop word.
+
+![](/public/upload/machine/llm_stop.jpg)
+
 ### 原理
 
 AgentExecutor由一个Agent和Tool的集合组成。AgentExecutor负责调用Agent，获取返回（callback）、action和action_input，并根据意图将action_input给到具体调用的Tool，获取Tool的输出，并将所有的信息传递回Agent，以便猜测出下一步需要执行的操作。`AgentExecutor.run 实质是chain.run ==> AgentExecutor.__call__ 实质是chain.__call__() ==> AgentExecutor._call()`
@@ -435,6 +441,8 @@ Agent.plan() 可以看做两步：
 因此，agent 能否正常运行，与 prompt 格式，以及 LLM 的 ICL 以及 alignment 能力有着很大的关系。
    1. LangChain主要是基于GPT系列框架进行设计，其适用的Prompt不代表其他大模型也能有相同表现，所以如果要自己更换不同的大模型(如：文心一言，通义千问...等)。则很有可能底层prompt都需要跟著微调。
    2. 在实际应用中，我们很常定期使用用户反馈的bad cases持续迭代模型，但是Prompt Engeering的工程是非常难进行的微调的，往往多跟少一句话对于效果影响巨大，因此这类型产品达到80分是很容易的，但是要持续迭代到90分甚至更高基本上是很难的。
+
+
 
 ## Memory
 
