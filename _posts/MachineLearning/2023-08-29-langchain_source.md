@@ -15,9 +15,11 @@ keywords: langchain
 
 LangChain底层就是Prompt，大模型API，以及三方应用API调用三个个核心模块。对于LangChain底层不同的功能，都是需要依赖不同的prompt进行控制。**基于自然语言对任务的描述进行模型控制，对于任务类型没有任何限制，只有说不出来，没有做不到的事情**。
 
+PS：看LangChain的感受就是：遇事不决问LLM。这跟常规的工程项目 严丝合缝的逻辑 + ifelse控制流非常不一样。 比如外挂知识库，LLM 不只用于最后一步 对topk 匹配的chunk 做一下润色给出anwser，前期的文档切分、存储、history的存储、选用，用户query的意图识别、转换都可能用到LLM。
+
 ## LLM模型层
 
-一次最基本的LLM调用需要的prompt模板、调用的LLM API设置、输出文本的结构化解析等。
+一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。
 
 ```python
 # BaseLanguageModel 是一个抽象基类，是所有语言模型的基类
@@ -72,10 +74,17 @@ AI: "" "
 
 LangChain是语言链的涵义，那么Chain就是其中的链结构，属于组合各个层的中间结构，可以称之为胶水层，将各个模块（models, document retrievers, other chains）粘连在一起，实现相应的功能，也是用于程序的调用入口。
 
-Chain模块也有一个基类Chain，是所有chain对象的基本入口，与用户程序的交互、用户的输入、其他模块的输入、内存的接入、回调能力。chain通过传入String值，控制接受的输入和给到的输出格式。Chain的子类基本都是担任某项专业任务的具体实现类，比如LLMChain，这就是专门为大语言模型准备的Chain实现类（一般是配合其他的chain一起使用）。PS： 注意，这些是Chain 的事情，模型层不做这些
+Chain模块有一个基类Chain，是所有chain对象的基本入口，与用户程序的交互、用户的输入、其他模块的输入、内存的接入、回调能力。chain通过传入String值，控制接受的输入和给到的输出格式。Chain的子类基本都是担任某项专业任务的具体实现类，比如LLMChain，这就是专门为大语言模型准备的Chain实现类（一般是配合其他的chain一起使用）。PS： 注意，这些是Chain 的事情，模型层不做这些
 1. 针对每一种chain都有对应的load方法，load方法的命名很有规律，就是在chain的名称前面加上`_load`前缀
-
-
+2. **从 Chain可以看到核心方法run/_call输入输出是dict**，有dict 自然有key，所以每个 Chain 里都包含了两个很重要的属性：input_keys 和 output_keys。 
+    1. input 这些keys 都会被用于format chain 对应的prompt template。最终prompt template 要求有哪些variables，用户输入、memory 就需要提供哪些
+        1. 用户会输入一些key，对应用户在prompt template 中的variables，若是只插入了一个str，则视为key=input 或 key=query 或 key=question
+        2. memory 会提供key=history 或 chat_history
+        3. vector 会提供key=input_documents 或 key= context     
+    2. 从大模型获取的输出 也会包含一些key
+        1. llm 输出对应key=result/key=response
+        2. memory会获取特定的key 保存下来作为hitory
+        3. vector会带上附属的 key=source_documents
 ```python
 class Chain(...,ABC):
     memory: Optional[BaseMemory] = None
@@ -84,6 +93,8 @@ class Chain(...,ABC):
     def _call(self,inputs: Dict[str, Any],run_manager: Optional[CallbackManagerForChainRun] = None,) -> Dict[str, Any]:
     1. 覆盖了 __call__ 实现 ==> 输入处理 + _call + 输出处理  
 ```
+
+![](/public/upload/machine/langchain_chain_run.png)
 
 ```python
 from langchain import PromptTemplate, OpenAI, LLMChain
@@ -98,13 +109,22 @@ result = llm_chain("今天的天气真不错")
 print(result['text'])
 ```
 
-我们在 Prompt 中定义了一个占位符 `{sentence}`，但是在调用 Chain 的时候并没有明确指定该占位符的值，LangChain 是怎么知道要将我们的输入替换掉这个占位符的呢？实际上，每个 Chain 里都包含了两个很重要的属性：input_keys 和 output_keys，用于表示这个 Chain 的输入和输出。所以 LLMChain 的入参就是 Prompt 的 input_variables。
-
 ![](/public/upload/machine/chain_call.jpg)
 
 LLMChain(xx) ==> Chain.__call__ ==> LLMChain._call ==> LLMChain.prompt.format_prompt + LLMChain.llm.generate_prompt
 
 ```python
+class Chain(Serializable, Runnable[Dict[str, Any], Dict[str, Any]], ABC):
+    @property
+    @abstractmethod
+    def input_keys(self) -> List[str]:
+    @property
+    @abstractmethod
+    def output_keys(self) -> List[str]:
+    # # Chain 的本质其实就是根据一个 Dict 输入，得到一个 Dict 输出
+    def __call__(self,inputs: Union[Dict[str, Any], Any],...) -> Dict[str, Any]:
+        inputs = self.prep_inputs(inputs)
+        outputs = (self._call(inputs, run_manager=run_manager) if new_arg_supported else self._call(inputs))
 class LLMChain(Chain):
     @property
     def input_keys(self) -> List[str]:
@@ -118,23 +138,15 @@ class LLMChain(Chain):
                     prompts.append(prompt)
             return self.llm.generate_prompt(prompts,stop)  # 
         return self.create_outputs(response)[0]
-
-
-class Chain(Serializable, Runnable[Dict[str, Any], Dict[str, Any]], ABC):
-    @property
-    @abstractmethod
-    def input_keys(self) -> List[str]:
-    @property
-    @abstractmethod
-    def output_keys(self) -> List[str]:
-    # # Chain 的本质其实就是根据一个 Dict 输入，得到一个 Dict 输出
-    def __call__(self,inputs: Union[Dict[str, Any], Any],...) -> Dict[str, Any]:
-        inputs = self.prep_inputs(inputs)
-        outputs = (self._call(inputs, run_manager=run_manager) if new_arg_supported else self._call(inputs))
 ```
 
-![](/public/upload/machine/langchain_chat.jpg)
-
+|`__call__逻辑`||||
+|---|---|---|---|
+|Chain|prep_inputs<br>inputs = inputs + memory external_context|_call|prep_outputs <br> memory.save_context|
+|LLMChain||generate=prep_prompts+generate_prompt|
+|||docs = _get_docs(question)<br> answer = combine_documents_chain.run(question,docs)|
+|AgentExecutor||while._should_continue <br> agent.plan + tool.run|
+|ConversationalRetrievalChain||chat_history_str = get_chat_history <br>new_question = question_generator.run(new_question,chat_history_str) <br> docs = _get_docs(new_question,inputs) <br> answer = combine_docs_chain.run(new_question,docs)<br>||
 
 ### RetrievalQA
 
@@ -465,3 +477,40 @@ New summary:
 ```
 
 使用这种方法，我们可以总结每个新的交互，并将其附加到所有过去交互的 summary 中。
+
+### 使用了memory的chain的流程
+
+使用了memory的chain的流程如下，整个执行的流程其实除来入口调用predict及标红部分，其他执行的步骤和流程一样。标红部分就是memory的使用部分。主要包括load_memory_variables和save_context。PS：跟BaseMemory的接口方法也都对上了。
+
+![](/public/upload/machine/chain_memory.jpg)
+
+### 底层实现
+
+```python
+class BaseMemory(Serializable, ABC):
+    @property
+    @abstractmethod
+    def memory_variables(self) -> List[str]:
+        """The string keys this memory class will add to chain inputs."""
+    @abstractmethod
+    def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Return key-value pairs given the text input to the chain."""
+    @abstractmethod
+    def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, str]) -> None:
+        """Save the context of this chain run to memory."""
+class BaseChatMemory(BaseMemory, ABC):
+    """Abstract base class for chat memory."""
+    chat_memory: BaseChatMessageHistory = Field(default_factory=ChatMessageHistory) # 这就是所谓的存在内存里了
+    output_key: Optional[str] = None
+    input_key: Optional[str] = None
+    return_messages: bool = False
+# 消息在内存中的形态
+class BaseChatMessageHistory(ABC):
+    messages: List[BaseMessage] 
+    def add_user_message(self, message: str) -> None:   # 带有Chat字样的类是为聊天设计的，主要保存聊天的历史信息，实现了add_xx_message方法
+    def add_ai_message(self, message: str) -> None:
+# 消息格式
+class BaseMessage(Serializable):
+    content: str
+    additional_kwargs: dict = Field(default_factory=dict)
+```

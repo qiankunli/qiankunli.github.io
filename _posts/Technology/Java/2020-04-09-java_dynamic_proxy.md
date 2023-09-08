@@ -247,3 +247,5 @@ public final class $Proxy0 extends Proxy implements Hello {
 
 1. 根据用户配置穷举所有可能性， 然后根据配置调用 不同的实现类来处理。
 2. 等运行时加载了用户的配置之后，再实现该接口。也就是 将实现接口的行为 放在 运行时。
+
+[一种基于动态代理的通用研发提效解决方案](https://mp.weixin.qq.com/s/ejjsBHJnl-4SVqlrONyBiA) 未细读。
