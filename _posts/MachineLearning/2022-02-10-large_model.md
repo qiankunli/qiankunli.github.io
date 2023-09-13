@@ -176,6 +176,8 @@ GPU服务器特点
 
 [DeepSpeed结合Megatron-LM训练GPT2模型笔记（上）](https://mp.weixin.qq.com/s/r0Ta4dk8o9Aaj1AJ5x6O-Q) 未读
 
+Megatron-LM是一种优雅的高性能训练解决方案。Megatron-LM中提供了张量并行（Tensor Parallel，TP，把大乘法分配到多张卡并行计算）、流水线并行（Pipeline Parallel，PP，把模型不同层分配到不同卡处理）、序列并行（Sequence Parallel， SP，序列的不同部分由不同卡处理，节约显存）、DistributedOptimizer优化（类似DeepSpeed Zero Stage-2，切分梯度和优化器参数至所有计算节点）等技术，能够显著减少显存占用并提升GPU利用率。Megatron-LM运营着一个活跃的开源社区，持续有新的优化技术、功能设计合并进框架中。
+
 ### 网络架构
 
 [大规模 AI 高性能网络的设计与实践](https://mp.weixin.qq.com/s/o0vAQvAo6GnYxzzAkGtQWQ) 并行训练策略 ==> 我们在训练大模型时，通常混合采用了三种并行策略。
@@ -193,6 +195,8 @@ GPU服务器特点
 3. 最后是稳定的问题，由于训练时长至少是几个星期，长时间下的稳定性显得非常重要。假定单 GPU 的月可用性是 99.9%，那么在千卡规模下模型训练一月内遇到故障发生中断的概率是 60%，而如果采用 8 千卡中断概率就有 99%。即使 GPU 的可用性提升到 99.99%，8 千卡下的中断概率仍然在 50% 左右。
 
 基于这样的目标，我们有针对性地设计了 AI 大底座里面的 AI 高性能网络—— AIPod。有约 400 台交换机、3000 张网卡、10000 根线缆和 20000 个光模块。其中仅线缆的总长度就相当于北京到青岛的距离。PS： 后面再具体的技术介绍就看不懂了。
+
+[AI 大模型狂飙的背后：高性能计算网络是如何“织”成的？](https://mp.weixin.qq.com/s/uaBL9qu6whlNEnrOBWRFKw) 未读。
 
 ## 其它
 

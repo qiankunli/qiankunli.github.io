@@ -50,6 +50,8 @@ Go 语言的编译器完全用 Go 语言本身来实现，它完全实现了从�
 
 ## Go 程序启动引导
 
+[深入剖析 Golang 程序启动原理 - 从 ELF 入口点到GMP初始化到执行 main！](https://mp.weixin.qq.com/s/0EZCmABsMEV3TFVmDZmzZA)一般编程语言的入口点都不会是我们在代码中写的那个 main。c 语言中如此，golang 中更是这样。这是因为各个语言都需要在进程启动过程中做一些启动逻辑的。在 golang 中，其底层运行的 GMP、垃圾回收等机制都需要在进入用户的 main 函数之前启动起来。
+
 [Go 程序启动引导](https://golang.design/under-the-hood/zh-cn/part1basic/ch02life/boot/)Go 程序既不是从 main.main 直接启动，也不是从 runtime.main 直接启动。 相反，其实际的入口位于 runtime._rt0_amd64_*。随后会转到 runtime.rt0_go 调用。在这个调用中，除了进行运行时类型检查外，还确定了两个很重要的运行时常量，即处理器核心数以及内存物理页大小。
 
 ![](/public/upload/go/go_start.png)

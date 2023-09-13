@@ -312,6 +312,8 @@ $$
 
 当我们编码“it”一词时，一个注意力头集中在“animal”上，而另一个则集中在“tired”上，从某种意义上说，模型对“it”一词的表达在某种程度上是“animal”和“tired”的代表。
 
+多头注意力机制类似于赛马机制，它有助于减少模型初始化的随机性对模型效果的影响。所以即使只留下一个注意力头也能使用，但这会导致模型的稳定性和多样性无法得到保障，进而造成模型的性能下降。
+
 ### 位置编码/Positional Encoding
 
 Positional Embeddings 基于一个简单但有效的想法：使用与位置相关的值模式来增强词向量。
@@ -329,6 +331,8 @@ Positional Embeddings 基于一个简单但有效的想法：使用与位置相�
 transformer中，模型输入encoder的每个token向量由两部分加和而成：Position Encoding, Input Embedding。Positional Embedding的成分直接叠加于Embedding之上，使得每个token的位置信息和它的语义信息(embedding)充分融合，并被传递到后续所有经过复杂变换的序列表达中去。
 
 ![](/public/upload/machine/positional_encoding.jpg)
+
+为什么 RNN 不需要位置编码呢？RNN 是串行处理输入数据的，所以每个 RNN 单元其实都包含了所在位置之前的全部输入信息，所以对当前位置输入的处理是有状态的。但是，Transformer 会并行地处理所有输入的内容，所以各个并行单元会无状态地处理每个输入。因此，我们需要在最开始就给每个输入的嵌入向量一个位置编号，这样模型才能通过输入判断它在整体中的位置。
 
 ### Position-wise Feed Forward
 
@@ -352,7 +356,6 @@ Normalization有两种方法，Batch Normalization和Layer Normalization。关�
 一般情况下，输入是一个矩阵，然后矩阵的 每一行是一个样本，多个行（多个样本）是 一个 batch，每一列是一个特征，多个列是 feature。batchnorm 是说每一次，去把每一个列，就是每一个特征，把它在一个小 mini-batch 里面，每列 的均值变成 0 方差变成 1。 [Batch Norm详解之原理及为什么神经网络需要它](https://zhuanlan.zhihu.com/p/441573901)
 
 **在 Transformer 里面，或者说正常的 RNN 里面，它的输入是一个三维的矩阵**。因为 输入的是一个序列的样本，即每一个样本里面有很多个元素。一个序列，如：一个句子里面有 n 个词，所以每个词表示为一个向量的话，还有一个 batch 维度，那么就是个 3D 的输入。列不再是特征，而是序列的长度，对每一个 sequence 就是 每个词，每个词有自己对应的向量。如果是 layernorm 的话，那么就是对每个样本切一下（横着切一下）。为什么 layer norm 用的多一点？一个原因是：在 时序的序列模型 里面，每个样本的长度可能会发生变化。那些不够 sequence 的长度 n 的样本 ，一般是补 0。 layernorm 是对 每个样本来做，所以不管样本是长还是短，反正算均值是在样本自己算的，这样的话相对来说它稳定一些。
-
 
 
 ### Residual Network 残差网络

@@ -120,7 +120,8 @@ SMP 系统的出现，对应用软件没有任何影响，因为应用软件始�
 linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
 
 1. 结构体 tss， 所有寄存器切换 ==> 内存拷贝/拷贝到特定tss_struct
-2. struct rq，为每一个CPU都创建一个队列来保存可以在这个CPU上运行的任务，这里面包括一个实时进程队列rt_rq和一个CFS运行队列cfs_rq ，task_struct就是用sched_entity这个成员变量将自己挂载到某个CPU的队列上的。
+2. struct rq，为每一个CPU都创建一个队列来保存可以在这个CPU上运行的任务，这样调度的时候，只需要看当前的 CPU 上的资源就行，把（竞争全局线程队列）锁的开销就砍掉了。这里面包括一个实时进程队列rt_rq和一个CFS运行队列cfs_rq ，task_struct就是用sched_entity这个成员变量将自己挂载到某个CPU的队列上的。PS： Go中GMP 模型中的P抄的也是这个。
+
     ![](/public/upload/linux/cpu_runqueue.jpg)
 
 进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，**将这个进程放进某个CPU的队列上来**。选择CPU，CPU 调度是在缓存性能和空闲核心两个点之间做权衡，同等条件下会尽量优先考虑缓存命中率，选择同 L1/L2 的核，其次会选择同一个物理 CPU 上的（共享 L3），最坏情况下去选择另外一个物理 CPU 上的核心。

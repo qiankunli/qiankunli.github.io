@@ -19,7 +19,7 @@ PS：看LangChain的感受就是：遇事不决问LLM。这跟常规的工程项
 
 ## LLM模型层
 
-一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。
+一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析（output_parsers 在 prompt 中插入了需要返回的格式说明）等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。
 
 ```python
 # BaseLanguageModel 是一个抽象基类，是所有语言模型的基类
@@ -40,9 +40,38 @@ class LLM(BaseLLM):
     1. _generate ==> _call 留给子类实现。 输入文本格式提示，返回文本格式的答案
 ```
 
+LangChain 本质上就是对各种大模型提供的 API 的套壳，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**。
+1. Chat Model，聊天模型，用于产生人类和 AI 之间的对话，有两个专属于 Chat 模型的概念，一个是消息，一个是角色。每个消息都有一个 role（可以是 system、user 或 assistant）和 content（消息的内容）。系统消息设定了对话的背景（比如你是一个很棒的智能助手），然后用户消息提出了具体请求。
+    1. system：系统消息主要用于设定对话的背景或上下文。这可以帮助模型理解它在对话中的角色和任务。例如，你可以通过系统消息来设定一个场景，让模型知道它是在扮演一个医生、律师或者一个知识丰富的 AI 助手。系统消息通常在对话开始时给出。
+    2. user：用户消息是从用户或人类角色发出的。它们通常包含了用户想要模型回答或完成的请求。用户消息可以是一个问题、一段话，或者任何其他用户希望模型响应的内容。
+    3. assistant：助手消息是模型的回复。例如，在你使用 API 发送多轮对话中新的对话请求时，可以通过助手消息提供先前对话的上下文。然而，请注意在对话的最后一条消息应始终为用户消息，因为模型总是要回应最后这条用户消息。
+2. Text Model，文本模型
+
+Chat Model响应
+
+```json
+{
+ 'id': 'chatcmpl-2nZI6v1cW9E3Jg4w2Xtoql0M3XHfH',
+ 'object': 'chat.completion',
+ 'created': 1677649420,
+ 'model': 'gpt-4',
+ 'usage': {'prompt_tokens': 56, 'completion_tokens': 31, 'total_tokens': 87},
+ 'choices': [
+   {
+    'message': {
+      'role': 'assistant',
+      'content': '你的花店可以叫做"花香四溢"。'
+     },
+    'finish_reason': 'stop',
+    'index': 0
+   }
+  ]
+}
+```
+
 ## Prompt
 
-[Langchain 中的提示工程](https://cookbook.langchain.com.cn/docs/langchain-prompt-templates/)我们只要让机器将下一个单词预测的足够准确就能完成许多复杂的任务！下面是一个典型的提示结构。并非所有的提示都使用这些组件，但是一个好的提示通常会使用两个或更多组件。让我们更加准确地定义它们。
+[Langchain 中的提示工程](https://cookbook.langchain.com.cn/docs/langchain-prompt-templates/)我们只要让机器将下一个单词预测的足够准确就能完成许多复杂的任务！并且是**自己写大部分让大模型补小部分**。下面是一个典型的提示结构。并非所有的提示都使用这些组件，但是一个好的提示通常会使用两个或更多组件。让我们更加准确地定义它们。
 1. 指令 ：告诉模型该怎么做，如何使用外部信息（如果提供），如何处理查询并构建 Out。
 2. 外部信息 或 上下文 ：充当模型的附加知识来源。这些可以手动插入到提示中，通过矢量数据库 （Vector Database） 检索（检索增强）获得，或通过其他方式（API、计算等）引入。
 3. 用户 In 或 查询 ：通常（但不总是）是由人类用户（即提示者）In 到系统中的查询。
@@ -51,6 +80,8 @@ class LLM(BaseLLM):
 ![](/public/upload/machine/prompt_structure.jpg)
 
 我们不太可能硬编码上下文和用户问题。我们会通过一个 模板 PromptTemplate 简化使用动态 In 构建提示的过程。我们本可以轻松地用 f-strings（如 f"insert some custom text '{custom_text}' etc"）替换。然而，使用Langchain 的 PromptTemplate 对象，我们可以规范化这个过程，添加多个参数，并**以面向对象的方式构建提示**。
+
+![](/public/upload/machine/llm_chain.jpg)
 
 few-shot learning 适用于将这些示例在提示中提供给模型，通过示例来强化我们在提示中传递的指令，我们可以使用 Langchain 的 FewShotPromptTemplate 规范化这个过程，**比如根据查询长度来可变地包含不同数量的示例**，因为我们的提示和补全 (completion) Out 的最大长度是有限的，这个限制通过 最大上下文窗口 maximum context window 进行衡量，上下文窗口 (ontext window) = In 标记 (input_tokens) + Out 标记 (output tokens)。如果我们传递一个较短或较长的查询，我们应该会看到所包含的示例数量会有所变化。
 
@@ -137,7 +168,9 @@ class LLMChain(Chain):
             return self.llm.generate_prompt(prompts,stop)  # 
         return self.create_outputs(response)[0]
 ```
-
+继承 Chain 的子类主要有两种类型：
+1. 通用工具 Chain: 控制 Chain 的调用顺序， 是否调用，他们可以用来合并构造其他的 Chain 。比如MultiPromptChain、EmbeddingRouterChain、LLMRouterChain(使用 LLM 来确定动态选择下一个链)。
+2. 专门用途 Chain: 和通用 Chain 比较来说，他们承担了具体的某项任务，可以和通用的 Chain 组合起来使用，也可以直接使用。有些 Chain 类可能用于处理文本数据，有些可能用于处理图像数据，有些可能用于处理音频数据等。
 |`__call__逻辑`||||
 |---|---|---|---|
 |Chain|prep_inputs<br>inputs = inputs + memory external_context|_call|prep_outputs <br> memory.save_context|
