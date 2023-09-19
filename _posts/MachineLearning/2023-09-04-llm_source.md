@@ -11,7 +11,187 @@ keywords: langchain
 * TOC
 {:toc}
 
-## 前言（未完成）
+## 前言
+
+## Transformers
+
+[Transformers快速入门](https://transformers.run/)Hugging Face 专门为使用 Transformer 模型编写了一个 Transformers 库，建立在 Pytorch 框架之上（Tensorflow 的版本功能并不完善），所有 Transformer 模型都可以在 Hugging Face Hub 中找到并且加载使用，包括训练、推理、量化等。
+
+transformers开源库的核心组件包括3个：Conﬁguration、Tokenizer、Model，针对上述三大类，transformer还额外封装了AutoConfig, AutoTokenizer,AutoModel，可通过模型的命名来定位其所属的具体类，比如’bert-base-cased’，就可以知道要加载BERT模型相关的配置、切词器和模型。
+
+```python
+from transformers import pipeline
+classifier = pipeline("sentiment-analysis") # 情感分析
+result = classifier("I've been waiting for a HuggingFace course my whole life.")
+print(result)
+
+from transformers import pipeline
+generator = pipeline("text-generation")     # 文本生成
+results = generator("In this course, we will teach you how to")
+print(results)
+```
+
+开箱即用的 pipelines，Transformers 库最基础的对象就是 `pipeline()` 函数，它封装了预训练模型和对应的前处理和后处理环节。
+1. 预处理 (preprocessing)，将原始文本转换为模型可以接受的输入格式；具体地，我们会使用每个模型对应的分词器 (tokenizer) 来进行：
+  1. 将输入切分为词语、子词或者符号（例如标点符号），统称为 tokens；
+  2. 根据模型的词表将每个 token 映射到对应的 token 编号（就是一个数字）；
+  3. 根据模型的需要，添加一些额外的输入。
+2. 将处理好的输入送入模型；
+3. 对模型的输出进行后处理 (postprocessing)，将其转换为人类方便阅读的格式。
+
+```python
+# 加载与保存分词器
+from transformers import BertTokenizer
+
+tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
+tokenizer.save_pretrained("./models/bert-base-cased/")
+# 加载与保存模型
+from transformers import AutoModel
+# 所有存储在 HuggingFace Model Hub 上的模型都可以通过 Model.from_pretrained() 来加载权重，参数可以是 checkpoint 的名称，也可以是本地路径（预先下载的模型目录）
+model = AutoModel.from_pretrained("bert-base-cased")
+model.save_pretrained("./models/bert-base-cased/") # 保存模型
+```
+
+## GPT-2养成记 
+
+[Training and Fine-Tuning GPT-2 and GPT-3 Models Using Hugging Face Transformers and OpenAI API](https://www.it-jim.com/blog/training-and-fine-tuning-gpt-2-and-gpt-3-models-using-hugging-face-transformers-and-openai-api/) 
+1.  it does not implement neural networks from scratch but relies on lower-level frameworks PyTorch, TensorFlow, and FLAX. 
+2. it heavily uses Hugging Face Hub, another Hugging Face project, a hub for downloadable neural networks for various frameworks. 
+3. Model is a valid PyTorch model with some additional restrictions and naming conventions introduced by the transformers framework. 
+4. Neural networks are not able to work with raw text; they only understand numbers. We need a tokenizer to convert a text string into a list of numbers. But first, it breaks the string up into individual tokens, which most often means “words”, although some models can use word parts or even individual characters. Tokenization is a classical natural language processing task. Once the text is broken into tokens, each token is replaced by an integer number called encoding from a fixed dictionary. Note that a tokenizer, and especially its dictionary, is model-dependent: you cannot use Bert tokenizer with GPT-2, at least not unless you train the model from scratch. Some models, especially of the Bert family, like to use special tokens, such as `[PAD]`,`[CLS]`, `[SEP]`, etc. GPT-2, in contrast, uses them very sparingly.
+
+以GPT-2 为例 
+1. The transformer itself works with a D-dimensional vector at every position, for GPT-2 D=768. 
+2. V=50257 is the GPT-2 dictionary size. 
+
+![](/public/upload/machine/gpt_2_tensor_dimensions.jpg)
+
+### GPT-2 model使用
+
+```python
+config = transformers.GPT2Config.from_pretrained(MODEL_NAME)
+config.do_sample = config.task_specific_params['text-generation']['do_sample']
+config.max_length = config.task_specific_params['text-generation']['max_length']
+# print(config)
+model = transformers.GPT2LMHeadModel.from_pretrained(MODEL_NAME, config=config)
+# Tokenizer
+tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL_NAME)
+# Tokenize the input
+enc = tokenizer(['The elf queen'], return_tensors='pt')
+print('enc =', enc)
+print(tokenizer.batch_decode(enc['input_ids']))
+
+input_ids = enc['input_ids']
+attention_mask = torch.ones(input_ids.shape, dtype=torch.int64)
+# predicts the next token at each position. 也就是 input_ids = [v1,v2,v3] 输出为 [v20,v30,v4]]。 v20 是根据v1 生成的下一个token，大概率跟v2 不一样，v4 是根据v1,v2,v3 生成的。
+out = model(input_ids=input_ids, attention_mask=attention_mask)
+logits = out['logits']
+# -1 在python list 里表示最后一个元素
+new_id = logits[:, -1, :].argmax(dim=1)
+print(new_id)
+print(tokenizer.batch_decode(new_id))
+```
+
+一次想预测一个字符太慢了 可以直接生成一段话，这也是model.generate 的原理。 
+
+```python
+input_ids = enc['input_ids']
+for i in range(20):
+    attention_mask = torch.ones(input_ids.shape, dtype=torch.int64)
+    logits = model(input_ids=input_ids,attention_mask=attention_mask)['logits']                    
+    new_id = logits[:, -1, :].argmax(dim=1)    # Generate new ID
+    input_ids = torch.cat([input_ids, new_id.unsqueeze(0)], dim=1)
+```
+
+|i|input_ids|decoded text|next token|
+|---|---|---|---|
+|0|[464,23878,16599]|the elf queen|11|
+|1|[464,23878,16599,11]|the elf queen,|508|
+|2|[464,23878,16599,11,508]|the elf queen,who|550|
+
+### 微调GPT-2 model
+
+GPT models are trained in an unsupervised way on a large amount of text (or text corpus). The corpus is broken into sequences, usually of uniform size (e.g., 1024 tokens each). The model is trained to predict the next token (word) at each step of the sequence. For example (here, we write words instead of integer encodings for clarity) :
+
+|position|1|2|3|4|5|6|7|8|9|
+|---|---|---|---|---|---|---|---|---|---|
+|input_ids|The|elf|queen|was|wearing|a|cloak|.|[END]|
+|labels|elf|queen|was|wearing|a|cloak|.|[END]|[-1]
+
+**The labels are identical to input_ids, but shifted to one position to the left**. Note that for GPT-2 in Hugging Face transformers this shift happens automatically when the loss is calculated, so from the user perspective, the tensor labels should be identical to input_ids.  PS：常规深度模型的训练输入是 `feature1,feature2,...,label`，LLM也是，不过关系更隐式一些。
+
+There are two ways to train Hugging Face transformers models: with the Trainer class or with a standard PyTorch training loop. We start with Trainer. PS: 下面代码基于GPT-2 已有的参数微调GPT-2，侧重点在于讲Transformers库原理。
+
+```python
+class MyDset(torch.utils.data.Dataset):
+    """A custom dataset that serves 1024-token blocks as input_ids == labels"""
+    def __init__(self, data: list[list[int]]):
+        self.data = []
+        for d in data:
+            input_ids = torch.tensor(d, dtype=torch.int64)
+            attention_mask = torch.ones(len(d), dtype=torch.int64)
+            self.data.append({'input_ids': input_ids, 'attention_mask': attention_mask, 'labels': input_ids})
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx: int):
+        return self.data[idx]
+def break_text_to_pieces(text_path: str, tokenizer: transformers.PreTrainedTokenizer, block_len: int = 512) -> list[str]:
+    """Read a file and convert it to tokenized blocks, edding <|endoftext|> to each block"""
+    with open(text_path) as f:
+        text = f.read()
+    chunk_len0 = block_len - 1  # Leave space for a TOKEN_ENDOFTEXT
+    tokens = tokenizer.encode(text) # 原文本直接弄，够粗暴
+    blocks = []
+    pos = 0
+    while pos < len(tokens):
+        chunk = tokens[pos: pos + chunk_len0]
+        chunk.append(TOKEN_ENDOFTEXT)
+        blocks.append(chunk)
+        pos += chunk_len0
+
+    if len(blocks[-1]) < block_len:
+        del blocks[-1]
+
+    return blocks
+def train_val_split(data: list[str], ratio: float):
+    n = len(data)
+    assert n >= 2
+    n_val = max(1, int(n * ratio))
+    return data[n_val:], data[:n_val]
+def prepare_dsets(text_path: str, tokenizer: transformers.PreTrainedTokenizer, block_len: int):
+    """Read the text, prepare the datasets """
+    data = break_text_to_pieces(text_path, tokenizer, block_len)
+    data_train, data_val = train_val_split(data, 0.2)
+    return MyDset(data_train), MyDset(data_val)
+
+# Load model and tokenizer
+model = transformers.GPT2LMHeadModel.from_pretrained(MODEL_NAME)
+tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL_NAME)
+training_args = transformers.TrainingArguments(output_dir="idiot_save/", learning_rate=1e-3,...)
+trainer = transformers.Trainer(model=model,args=training_args,train_dataset=dset_train,eval_dataset=dset_val)
+trainer.train()
+# Save the model if needed
+model.save_pretrained('./trained_model/')
+tokenizer.save_pretrained('./trained_model/')
+# Now our model is trained, try the generation
+text = 'Natural language understanding comprises a wide range of diverse tasks'
+batch = tokenizer([text], return_tensors='pt')
+for k, v in batch.items():
+    batch[k] = v.to(DEVICE)
+out = model.generate(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], max_length=20)
+print('GENERATION=', tokenizer.batch_decode(out.cpu()))
+```
+
+一把情况下 you are not allowed to train a model from scratch.  Neither are you allowed to fine-tune on a text corpus or fine-tune with additional heads. The only type of fine-tuning allowed is fine-tuning on prompt+completion pairs, represented in JSONL format, for example:
+
+```
+{"prompt":"banana is ","completion":"yellow"}
+{"prompt":"orange is ","completion":"orange"}
+{"prompt":"sky is ","completion":"blue"}
+```
+How exactly is GPT-3 trained on such examples? We are not exactly sure (OpenAI is very secretive), but perhaps the two sequences of tokens are concatenated together, then GPT-3 is trained on such examples, **but the loss is only calculated in the “completion” part**. PS: 终于知道为何要分成两段，而不是喂一个文本就算了。
 
 ## LoRA
 

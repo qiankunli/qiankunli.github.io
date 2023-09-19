@@ -463,63 +463,6 @@ NLP 神经网络模型的本质就是对输入文本进行编码，常规的做�
 2. CNN 则通过滑动窗口基于局部上下文来编码文本，例如核尺寸为 3 的卷积操作就是使用每一个词自身以及前一个和后一个词来生成嵌入式表示：$y_t=f(x_{t-1},x_{t},x_{t+1})$，由于是通过窗口来进行编码，所以更侧重于捕获局部信息，难以建模长距离的语义依赖。
 3. 直接使用 Attention 机制编码整个文本。相比 RNN 要逐步递归才能获得全局信息（因此一般使用双向 RNN），而 CNN 实际只能获取局部信息，需要通过层叠来增大感受野，Attention 机制一步到位获取了全局信息：$y_t=f(x_t,A,B)$，其中 A,B是另外的词语序列（矩阵），如果取A=B=X就称为 Self-Attention，即直接将$x_t$与自身序列中的每个词语进行比较，最后算出$y_t$。
 
-
-## 工程
-
-[Transformers快速入门](https://transformers.run/)Hugging Face 专门为使用 Transformer 模型编写了一个 Transformers 库，建立在 Pytorch 框架之上（Tensorflow 的版本功能并不完善），所有 Transformer 模型都可以在 Hugging Face Hub 中找到并且加载使用，包括训练、推理、量化等。
-
-```python
-from transformers import pipeline
-classifier = pipeline("sentiment-analysis") # 情感分析
-result = classifier("I've been waiting for a HuggingFace course my whole life.")
-print(result)
-
-from transformers import pipeline
-generator = pipeline("text-generation")     # 文本生成
-results = generator("In this course, we will teach you how to")
-print(results)
-```
-
-开箱即用的 pipelines，Transformers 库最基础的对象就是 `pipeline()` 函数，它封装了预训练模型和对应的前处理和后处理环节。
-1. 预处理 (preprocessing)，将原始文本转换为模型可以接受的输入格式；具体地，我们会使用每个模型对应的分词器 (tokenizer) 来进行：
-  1. 将输入切分为词语、子词或者符号（例如标点符号），统称为 tokens；
-  2. 根据模型的词表将每个 token 映射到对应的 token 编号（就是一个数字）；
-  3. 根据模型的需要，添加一些额外的输入。
-2. 将处理好的输入送入模型；
-3. 对模型的输出进行后处理 (postprocessing)，将其转换为人类方便阅读的格式。
-
-
-```python
-from transformers import AutoTokenizer, AutoModel
-checkpoint = "distilbert-base-uncased-finetuned-sst-2-english"
-tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-
-model = AutoModel.from_pretrained(checkpoint) 
-raw_inputs = [
-    "I've been waiting for a HuggingFace course my whole life.",
-    "I hate this so much!",
-]
-inputs = tokenizer(raw_inputs, padding=True, truncation=True, return_tensors="pt") # 使用分词器进行预处理
-outputs = model(**inputs) # 送入模型
-predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)  # 后处理
-print(predictions)
-```
-
-
-```python
-# 加载与保存分词器
-from transformers import BertTokenizer
-
-tokenizer = BertTokenizer.from_pretrained("bert-base-cased")
-tokenizer.save_pretrained("./models/bert-base-cased/")
-# 加载与保存模型
-from transformers import AutoModel
-# 所有存储在 HuggingFace Model Hub 上的模型都可以通过 Model.from_pretrained() 来加载权重，参数可以是 checkpoint 的名称，也可以是本地路径（预先下载的模型目录）
-model = AutoModel.from_pretrained("bert-base-cased")
-model.save_pretrained("./models/bert-base-cased/") # 保存模型
-```
-
-
 ## 其它
 
 [五年时间被引用3.8万次，Transformer宇宙发展成了这样](https://mp.weixin.qq.com/s/cVuBfrrtGBpNlZUekxgnmg) 未读。 

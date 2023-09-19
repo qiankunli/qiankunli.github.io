@@ -344,6 +344,16 @@ def net(X):         # 模型可以表示为矩阵运算
 
 用所有数据训练一遍就是一个 Epoch。但受到硬件设备的限制，训练时不会一次性的读入所有数据，而是一次读入一部分进行训练，这里的“每次”就是对应的 Step 这个概念。那每次读入的数据量就是 batch_size。训练集有1000个样本，batchsize=10，那么：训练完整个样本集需要100次iteration，1次epoch。
 
+The typical PyTorch training loop looks like this
+```python
+for i_epoch in range(n_epochs):
+     for x, y in loader_train:
+         optimizer.zero_grad()
+         out = model(x)
+         loss = my_loss_function(out, y)
+         loss.backward()
+         optimizer.step()
+```
 
 
 ## 其它
