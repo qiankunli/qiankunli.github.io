@@ -13,7 +13,7 @@ keywords:  distributed training
 * TOC
 {:toc}
 
-分布式训练的本质是分布式计算，分布式计算跟着任务切分、存算分离、数据加速、分布式通信等一系列事儿。
+单个GPU的显存上限，限制了训练时的参数规模及batch size，导致训练效率无法达到预期。分布式训练的本质是分布式计算，分布式计算跟着任务切分、存算分离、数据加速、分布式通信等一系列事儿。
 
 [关于深度学习框架的一些自己见解](https://zhuanlan.zhihu.com/p/375634204)我觉得做深度学习框架其实有两个派别的人，一派是从分布式系统的人来做的，另外一派是从做算法的人来做的。不同的人的背景不同，所以做这个事情的角度也会不同，从而产生不同门派。tensorflow属于系统派，而pytorch属于算法派。
 1. TensorFlow从设计之初就在考虑超大的模型分布式训练的场景，设想这个框架需要能够从规模上很好支持分布式，能够很好的扩展到任意大的深度模型的框架。**很自然会把模型的开发过程分成构图和执行两个阶段**。构图的时候只是生成一个逻辑执行计划，然后通过显式方式的提交（或者execute），系统再根据用户指定的或者系统智能的决定的placement进行分图，并在这些分图中添加合适的Send-Recv的Op从而构成一个分布式的执行计划。但是这样的设计理念也会带来一些困恼，我们在模型训练时候有时候有些类似控制图的部分，在这种设计理念下，我们必须要把这些控制流图的代码也op化，然后把这些op也整体串联在Tensor的Flow执行图中。但是这种方式会使得一些习惯单机开发的研究人员觉得比较晦涩。
@@ -46,14 +46,76 @@ keywords:  distributed training
   2. 计算图拆分为子图： 就是把计算图分成多个最小依赖子图，然后放置到不同的机器上，同时在上游子图和下游子图之间自动插入数据发送和数据接收节点，并做好网络拓扑结构的配置，各个机器上的子图通过进程间通信实现互联。
   3. 单纯的把模型的参数切分到多个GPU上，在使用时通过数据驱动的方式，每个GPU从其他GPU上拉取需要的那部分。比如大embedding参数如果有100GB，可以切分成8份放在8个GPU上。每个minibatch计算时embedding层仅需要gather 100GB中很少的一部分。
   4. TensorFlow可以说是支持MP的典型框架，通过将device placement暴露给用户，开放了几乎所有的玩法。但是弊端就是大部分用户其实并不能合理的使用，反而是经常因为配置错误导致性能急剧下降。
-  5. 一个比较大的问题是GPU利用率低。当没有计算到某个GPU上的模型分片时，这个GPU常常是闲着的。PP一定程度上解决了这个问题。由于模型分割开的各个部分之间有相互依赖关系，因此计算效率不高，所以在模型大小不算太大的情况下（只要一个GPU卡放的下）一般不使用模型并行。
-2. 数据并行（主要方案）：因为训练费时的一个重要原因是训练数据量很大。数据并行就是在很多设备上放置相同的模型，并且各个设备采用不同的训练样本对模型训练。训练深度学习模型常采用的是batch SGD方法，采用数据并行，可以每个设备都训练不同的batch，然后收集这些梯度用于模型参数更新。所有worker共享ps 上的模型参数，并按照相同拓扑结构的数据流图进行计算。
+  5. 一个比较大的问题是GPU利用率低。一条链上只有一个 GPU 在干活，剩下的都在干等，当没有计算到某个GPU上的模型分片时，这个GPU常常是闲着的。pipeline parallelism一定程度上解决了这个问题，可以把一个 batch 分为若干个 mini-batch，每个节点每次只处理一个 mini-batch 的数据，并且只有当整个批次都训练完成后才会进行参数更新。
+2. 数据并行：因为训练费时的一个重要原因是训练数据量很大。数据并行就是在很多设备上放置相同的模型，并且各个设备采用不同的训练样本对模型训练。训练深度学习模型常采用的是batch SGD方法，采用数据并行，可以每个设备都训练不同的batch，在反向传播时，为了能将结果共享——**确保整个模型参数能够在不同的GPU之间进行同步，所有的梯度都将进行全局归纳**。所有worker共享ps 上的模型参数，并按照相同拓扑结构的数据流图进行计算。
   1. 几乎所有的训练框架都支持这种方法，早期比较流行的开源实现是horovod。现在pytorch ddp和tensorflow mirror strategy都原生的支持了。
   2. 当batch size=1时，传统方法无法继续切分。
   3. 对于parameter, optimizer state等batch size无关的空间开销是无能为力的。每个GPU上依然需要一份完整的parameter等副本。
 3. 流水并行，本质是解决模型并行（模型较后部分的计算必须等前面计算完成）后 效率低的问题 [所有人都能用的超大规模模型训练工具](https://mp.weixin.qq.com/s/3VU_9lednIkuD4dj_4NTZA)
 
 ![](/public/upload/machine/parallelism_strategy.jpg)
+
+### 代码示例
+
+数据并行可以直接使用pytroch DataParallel或DistributedDataParallel，模型并行示例代码
+
+```python
+import torch
+import torch.nn as nn
+class SimpleModel(nn.Module):
+  def __init__(self):
+    super(SimpleModel,self).__init__()
+    self.layer1 == nn.Linear(10,20).to('cuda:0')
+    self.layer2 == nn.Linear(20,1).to('cuda:1')
+  def forward(self,x):
+    # 第一层在0号卡上的运行
+    x1 = x.to('cuda:0')
+    x1 = self.layer1(x1)
+    # 将第一层输出移动到1号卡，并在1号卡上执行第二层计算
+    x2 = x1.to('cuda:1')
+    x2 = self.layer2(x2)
+    return x2
+  
+  model = SimpleModel() # 创建模型示例
+  input_data = torch.randn(64,10)
+  output_data = model(input_data)
+  print(output_data,shape)
+```
+
+张量并行
+
+![](/public/upload/machine/tensor_parallel.png)
+
+```python
+import torch
+import torch.nn as nn
+class TensorParallelModel(nn.Module):
+  def __init__(self,input_size,output_size):
+    super(TensorParallelModel,self).__init__()
+    self.input_size = input_size
+    self.output_size = output_size
+    self.linear == nn.Linear(input_size,output_size).to('cuda:0')
+  def forward(self,x):
+    # 将输入数据切分为两个子张量，分别将x1、x2置于不同的设备上
+    split_size = x.shape[0] // 2
+    x1,x2 = x[:split_size].to('cuda:0'), x[split_size:].to('cuda:1')
+    # 将模型权重和偏差复制到第二个设备
+    linear2 = self.linear.to('cuda:1')
+    # 在两个设备上并行计算线性层
+    y1 = self.linear(x1)
+    y2 = linear2(x2)
+    # 合并计算结果并返回
+    y = torch.cat([y1.to('cuda:1'),y2],dim=0)
+    return y 
+  
+  model = TensorParallelModel(10,20) # 创建模型示例
+  input_data = torch.randn(64,10)
+  output_data = model(input_data)
+  print(output_data,shape)
+```
+
+
+### 框架
 
 [阿里云机器学习平台大模型训练框架 EPL](https://mp.weixin.qq.com/s/09u1W-6yL_MVPsgoM0jQKA)EPL（EasyParallelLibrary） 是一个统一多种并行策略、易用的分布式深度学习训练框架，它将不同的并行策略进行了统一抽象。在一套分布式训练框架中，支持多种并行策略，包括数据并行、流水并行和算子拆分并行，并支持不同策略的组合和嵌套使用。同时 EPL 提供了灵活应用的接口，用户只需要添加几行代码就可以实现丰富的并行化策略。**模型侧不需要去做任何的代码改动**。除了用户手动标记并行策略之外，EPL 也支持自动的并行策略探索，包括自动的算子拆分策略以及流水并行中的自动 layer 切分策略等等。EPL 在框架层面也提供了全方位的优化，包括多维度的显存优化、计算优化、通信优化等，从而实现高效的分布式训练性能。
 
