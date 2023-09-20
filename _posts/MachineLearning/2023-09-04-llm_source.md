@@ -54,7 +54,7 @@ model.save_pretrained("./models/bert-base-cased/") # 保存模型
 
 ## GPT-2养成记 
 
-[Training and Fine-Tuning GPT-2 and GPT-3 Models Using Hugging Face Transformers and OpenAI API](https://www.it-jim.com/blog/training-and-fine-tuning-gpt-2-and-gpt-3-models-using-hugging-face-transformers-and-openai-api/) 
+[Training and Fine-Tuning GPT-2 and GPT-3 Models Using Hugging Face Transformers and OpenAI API](https://www.it-jim.com/blog/training-and-fine-tuning-gpt-2-and-gpt-3-models-using-hugging-face-transformers-and-openai-api/)  非常经典，入门必读。
 1.  it does not implement neural networks from scratch but relies on lower-level frameworks PyTorch, TensorFlow, and FLAX. 
 2. it heavily uses Hugging Face Hub, another Hugging Face project, a hub for downloadable neural networks for various frameworks. 
 3. Model is a valid PyTorch model with some additional restrictions and naming conventions introduced by the transformers framework. 
@@ -213,6 +213,44 @@ LoRA，LoRA背后有一个假设：我们现在看到的这些大语言模型，
 
 ### 实现
 
+[LoRA](https://huggingface.co/docs/peft/conceptual_guides/lora)As with other methods supported by PEFT, to fine-tune a model using LoRA, you need to:
+1. Instantiate a base model.
+2. Create a configuration (LoraConfig) where you define LoRA-specific parameters.
+3. Wrap the base model with get_peft_model() to get a trainable PeftModel.
+4. Train the PeftModel as you normally would train the base model.
+
+用 `get_peft_model` 将原来的model 封装一下就行了。
+
+```python
+from peft import LoraConfig, get_peft_model
+# # 创建基础transformer模型，并初始化Lora模型
+model = xx.from_pretrained(args.model_dir)
+config = LoraConfig(r=args.lora_r,lora_alpha=32,...)
+model = get_peft_model(model, config)    
+model = model.half().cuda()   
+
+# 设置DeepSpeed配置参数，并进行DeepSpeed初始化
+conf = {"train_micro_batch_size_per_gpu": args.train_batch_size,...)
+model_engine, optimizer, _, _ = deepspeed.initialize(config=conf,model=model,model_parameters=model.parameters())
+model_engine.train()                                                     
+train_dataset = Seq2SeqDataSet(args.train_path, tokenizer,...)
+train_dataloader = DataLoader(train_dataset,batch_size=...)
+# 开始模型训练   
+for i_epoch in range(args.num_train_epochs):         
+    train_iter = iter(train_dataloader)    
+    for step, batch in enumerate(train_iter):
+        # 获取训练结果
+        input_ids = batch["input_ids"].cuda()
+        labels = batch["labels"].cuda()     
+        outputs = model_engine.forward(input_ids=input_ids, labels=labels)     
+        loss = outputs[0]    
+        # 损失进行回传 
+        model_engine.backward(loss)  
+        model_engine.step() # 进行参数优化
+    # 每一轮模型训练结束，进行模型保存  
+    save_dir = os.path.join(args.output_dir, f"global_step-{global_step}")  
+    model_engine.save_pretrained(save_dir)                           
+```
 
 LoraModel是LoRA模块的核心类，冻结base model的参数，旁路低秩矩阵的创建，替换，合并等逻辑都在这个类中。
 
