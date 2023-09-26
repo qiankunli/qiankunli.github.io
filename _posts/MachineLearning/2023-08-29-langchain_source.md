@@ -116,6 +116,24 @@ Chain模块有一个基类Chain，是所有chain对象的基本入口，与用�
         1. llm 输出对应key=result/key=response
         2. memory会获取特定的key 保存下来作为hitory
         3. vector会带上附属的 key=source_documents
+
+链有很多种调用方式。
+1. 直接调用，当我们像函数一样调用一个对象时，它实际上会调用该对象内部实现的 __call__ 方法。
+2. 通过 run 方法，也等价于直接调用 _call_ 函数。
+3. predict 方法类似于 run，只是输入键被指定为关键字参数而不是 Python 字典。
+4. apply 方法允许我们针对输入列表运行链，一次处理多个输入。
+
+    ```python
+    input_list = [
+        {"flower": "玫瑰",'season': "夏季"},
+        {"flower": "百合",'season': "春季"},
+        {"flower": "郁金香",'season': "秋季"}
+    ]
+    result = llm_chain.apply(input_list)
+    print(result)
+    ```
+5. generate 方法类似于 apply，只不过它返回一个 LLMResult 对象，而不是字符串。LLMResult 通常包含模型生成文本过程中的一些相关信息，例如令牌数量、模型名称等。
+
 ```python
 class Chain(...,ABC):
     memory: Optional[BaseMemory] = None

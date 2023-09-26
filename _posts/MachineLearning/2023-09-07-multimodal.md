@@ -4,7 +4,7 @@ layout: post
 title: 多模态LLM
 category: 技术
 tags: MachineLearning
-keywords: langchain
+keywords: llm multimodal
 
 ---
 

@@ -477,7 +477,7 @@ $$
 Attention(Q,K,V) = softmax(\frac{QK^T}{\sqrt{d_k}})V
 $$
 
-其中V就等价于$X^t$，而$softmax(\frac{QK^T}{\sqrt{d_k}})$就是我们想要学到的$W^t$（所以说self-attention 的权重是根据输入的改变和改变的，而CNN中一旦训练完成，各个通道的卷积核参数就固定了）， attention 多做了一些什么呢？对于要学习的参数矩阵$W^t$增加了低秩的约束。参考 self-attention 的情况，即输出和输入的 size 保持一致，那么理论上没有任何约束的情况下$W^t$可以是一个满秩的n*n方阵。但是，在 self-attention 中，假设$Q,K\in\R^{n*d}$那么$softmax(\frac{QK^T}{\sqrt{d_k}})$就是一个秩至多为d的方阵。秩上的降低也意味着表征能力的下降，但好处在于$\mathcal{O}(n^2) $变成了$\mathcal{O}(nd) $， $d\ll n$ 的时候这样做的价值就体现出来了。（比如原来比如GPT2 一个token向量 是768维，context若是4000，那mlp就非常deep，所以一定是预处理一下再接入mlp）。可以说attention 是一种为了压缩参数量而牺牲一些表征能力，是用类似于 matrix fatorization 的方式来近似转置线性层的做法。PS：所以有人提出什么 **MLP is all you need** 之类的说法，用 MLP 替代 CNN 或者 attention 也能取得不俗的图像分类效果……那可不是必须的嘛？人家那可是加了各种约束，为了压缩参数量牺牲了表征能力来近似你这个线性层的结果啊。
+其中V就等价于$X^t$，而$softmax(\frac{QK^T}{\sqrt{d_k}})$就是我们想要学到的$W^t$（所以说self-attention 的权重是根据输入的改变和改变的，而CNN中一旦训练完成，各个通道的卷积核参数就固定了）， attention 多做了一些什么呢？对于要学习的参数矩阵$W^t$增加了低秩的约束。参考 self-attention 的情况，即输出和输入的 size 保持一致，那么理论上没有任何约束的情况下$W^t$可以是一个满秩的n*n方阵。但是，在 self-attention 中，假设$Q,K\in\R^{n*d}$那么$softmax(\frac{QK^T}{\sqrt{d_k}})$就是一个秩至多为d的方阵。秩上的降低也意味着表征能力的下降，但好处在于$\mathcal{O}(n^2) $变成了$\mathcal{O}(nd) $， $d\ll n$ 的时候这样做的价值就体现出来了。比如原来比如GPT2 一个token向量 是768维，context若是4k，input item数量是768*4096，所以一定是预处理一下再接入mlp；cnn类似，一张1024*768的图片 每个pixel 作为一个item，weight就不小了。可以说attention 是一种为了压缩参数量而牺牲一些表征能力，是用类似于 matrix fatorization 的方式来近似转置线性层的做法。所以有人提出什么 **MLP is all you need** 之类的说法，用 MLP 替代 CNN 或者 attention 也能取得不俗的图像分类效果……那可不是必须的嘛？人家那可是加了各种约束，为了压缩参数量牺牲了表征能力来近似你这个线性层的结果啊。PS：大部分模型最后的部分都是mlp，所以可以视为前半部分的处理是在缩小input 规模以便接入mlp。
 
 ## 其它
 

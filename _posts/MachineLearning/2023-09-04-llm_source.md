@@ -4,7 +4,7 @@ layout: post
 title: LLM部分技术源码学习
 category: 技术
 tags: MachineLearning
-keywords: langchain
+keywords: llm source
 
 ---
 
@@ -17,7 +17,11 @@ keywords: langchain
 
 [Transformers快速入门](https://transformers.run/)Hugging Face 专门为使用 Transformer 模型编写了一个 Transformers 库，建立在 Pytorch 框架之上（Tensorflow 的版本功能并不完善），所有 Transformer 模型都可以在 Hugging Face Hub 中找到并且加载使用，包括训练、推理、量化等。
 
-transformers开源库的核心组件包括3个：Conﬁguration、Tokenizer、Model，针对上述三大类，transformer还额外封装了AutoConfig, AutoTokenizer,AutoModel，可通过模型的命名来定位其所属的具体类，比如’bert-base-cased’，就可以知道要加载BERT模型相关的配置、切词器和模型。
+transformers开源库的核心组件包括3个：Conﬁguration、Tokenizer、Model
+1. 「Conﬁguration」：配置类，通常继承自「PretrainedConﬁg」，保存model或tokenizer的超参数，例如词典大小，隐层维度数，dropout rate等。配置类主要可用于复现模型。
+2. 「Tokenizer」：切词类，通常继承自「PreTrainedTokenizer」，主要存储词典，token到index映射关系等。此外，还会有一些model-specific的特性，如特殊token，[SEP], [CLS]等的处理，token的type类型处理，语句最大长度等，因此tokenizer通常和模型是一对一适配的。
+3. 「Model」: 模型类。封装了预训练模型的计算图过程，遵循着相同的范式，如根据token ids进行embedding matrix映射，紧接着多个self-attention层做编码，最后一层task-specific做预测。
+针对上述三大类，transformer还额外封装了AutoConfig, AutoTokenizer,AutoModel，可通过模型的命名来定位其所属的具体类，比如’bert-base-cased’，就可以知道要加载BERT模型相关的配置、切词器和模型。
 
 ```python
 from transformers import pipeline
@@ -52,10 +56,16 @@ model = AutoModel.from_pretrained("bert-base-cased")
 model.save_pretrained("./models/bert-base-cased/") # 保存模型
 ```
 
+PS: 深度学习都得指定features/labels。在llm 场景下，features 和labels 有几个特点
+1. llm 有base model、sft model 等，不同的model 数据集格式不同，一般分为几个部分，比如`{"question:":"xx","answer":"xx"}`，但不管如何，这几部分都会拼为一个sentence（中间可能有一些特殊字符起到连接作用），然后把sentence通过tokenizer转换成input_ids，之后再走embedding 模块等等就是Transformer系列模型内的事儿了，最后得到output_ids.
+2. labels 一般由input_ids copy而来，然后做一些处理，比如labels 全部左移一位（预训练），也或者将sentence部分中question 的位置都置为-100，-100表示在计算loss的时候会被忽略（sft），这个由任务性质决定。
+3. 之后就是对output_ids 和 labels 计算loss。
+3. 上述过程也是Transformers 库抽象的基础，指定input_ids,labels，则计算output_ids 和 loss 可以自动进行。对于一个base llm，可以基于finetune做很多task specific llm模型，主要体现在 input 数据集格式 和labels 的不同。
+
 ## GPT-2养成记 
 
 [Training and Fine-Tuning GPT-2 and GPT-3 Models Using Hugging Face Transformers and OpenAI API](https://www.it-jim.com/blog/training-and-fine-tuning-gpt-2-and-gpt-3-models-using-hugging-face-transformers-and-openai-api/)  非常经典，入门必读。
-1.  it does not implement neural networks from scratch but relies on lower-level frameworks PyTorch, TensorFlow, and FLAX. 
+1.  it does not implement neural networks from scratch(从头开始) but relies on lower-level frameworks PyTorch, TensorFlow, and FLAX. 
 2. it heavily uses Hugging Face Hub, another Hugging Face project, a hub for downloadable neural networks for various frameworks. 
 3. Model is a valid PyTorch model with some additional restrictions and naming conventions introduced by the transformers framework. 
 4. Neural networks are not able to work with raw text; they only understand numbers. We need a tokenizer to convert a text string into a list of numbers. But first, it breaks the string up into individual tokens, which most often means “words”, although some models can use word parts or even individual characters. Tokenization is a classical natural language processing task. Once the text is broken into tokens, each token is replaced by an integer number called encoding from a fixed dictionary. Note that a tokenizer, and especially its dictionary, is model-dependent: you cannot use Bert tokenizer with GPT-2, at least not unless you train the model from scratch. Some models, especially of the Bert family, like to use special tokens, such as `[PAD]`,`[CLS]`, `[SEP]`, etc. GPT-2, in contrast, uses them very sparingly.
@@ -213,20 +223,21 @@ LoRA，LoRA背后有一个假设：我们现在看到的这些大语言模型，
 
 ### 实现
 
+许多朋友在使用LoRA的过程中，都会用到HuggingFace Peft库封装好的LoRA接口，这个接口是对微软版LoRA代码的改写和封装，目的是减少大家在使用LoRA过程中的手工活（例如徒手更改模型架构，为模型添加LoRA adapter结构等），除此外核心处理逻辑不变。
+
 [LoRA](https://huggingface.co/docs/peft/conceptual_guides/lora)As with other methods supported by PEFT, to fine-tune a model using LoRA, you need to:
 1. Instantiate a base model.
 2. Create a configuration (LoraConfig) where you define LoRA-specific parameters.
 3. Wrap the base model with get_peft_model() to get a trainable PeftModel.
 4. Train the PeftModel as you normally would train the base model.
 
-用 `get_peft_model` 将原来的model 封装一下就行了。
 
 ```python
 from peft import LoraConfig, get_peft_model
-# # 创建基础transformer模型，并初始化Lora模型
+# # 创建基础transformer模型
 model = xx.from_pretrained(args.model_dir)
 config = LoraConfig(r=args.lora_r,lora_alpha=32,...)
-model = get_peft_model(model, config)    
+model = get_peft_model(model, config)     # 初始化Lora模型
 model = model.half().cuda()   
 
 # 设置DeepSpeed配置参数，并进行DeepSpeed初始化
@@ -252,7 +263,18 @@ for i_epoch in range(args.num_train_epochs):
     model_engine.save_pretrained(save_dir)                           
 ```
 
-LoraModel是LoRA模块的核心类，冻结base model的参数，旁路低秩矩阵的创建，替换，合并等逻辑都在这个类中。
+```python
+def get_peft_model(model: PreTrainedModel, peft_config: PeftConfig, adapter_name: str = "default") -> PeftModel:
+    model_config = getattr(model, "config", {"model_type": "custom"})
+    peft_config.base_model_name_or_path = model.__dict__.get("name_or_path", None)
+    if peft_config.task_type not in MODEL_TYPE_TO_PEFT_MODEL_MAPPING.keys() and not peft_config.is_prompt_learning:
+        return PeftModel(model, peft_config, adapter_name=adapter_name)
+    if peft_config.is_prompt_learning:
+        peft_config = _prepare_prompt_learning_config(peft_config, model_config)
+    return MODEL_TYPE_TO_PEFT_MODEL_MAPPING[peft_config.task_type](model, peft_config, adapter_name=adapter_name)
+```
+
+（微软的）LoraModel是LoRA模块的核心类，冻结base model的参数，旁路低秩矩阵的创建，替换，合并等逻辑都在这个类中。
 
 ```python
 # LoraModel也是继承torch.nn.Module，相当于pytorch的一个网络模块
