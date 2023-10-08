@@ -13,7 +13,9 @@ keywords: langchain
 
 ## 前言
 
-LangChain底层就是Prompt，大模型API，以及三方应用API调用三个个核心模块。对于LangChain底层不同的功能，都是需要依赖不同的prompt进行控制。**基于自然语言对任务的描述进行模型控制，对于任务类型没有任何限制，只有说不出来，没有做不到的事情**。
+LLM 不管是 GPT 还是 BERT，有且只有一个核心功能，就是预测你给定的语句的下一个词最有可能是什么（靠Prompt激发），除此之外的工作，比如解析 PDF、比如对话式搜索、甚至拿过来一个大任务分解、创建子任务，最终完成，都需要有一整套的工具来把核心功能包装，便于开发人员搭积木，这个工具就是 LangChain。
+
+LangChain底层就是Prompt、大模型API、以及三方应用API调用三个个核心模块。对于LangChain底层不同的功能，都是需要依赖不同的prompt进行控制。**基于自然语言对任务的描述进行模型控制，对于任务类型没有任何限制，只有说不出来，没有做不到的事情**。
 
 PS：看LangChain的感受就是：遇事不决问LLM。这跟常规的工程项目 严丝合缝的逻辑 + ifelse控制流非常不一样。 比如外挂知识库，LLM 不只用于最后一步 对topk 匹配的chunk 做一下润色给出anwser，前期的文档切分、存储、history的存储、选用，用户query的意图识别、转换都可能用到LLM。
 
@@ -116,6 +118,7 @@ Chain模块有一个基类Chain，是所有chain对象的基本入口，与用�
         1. llm 输出对应key=result/key=response
         2. memory会获取特定的key 保存下来作为hitory
         3. vector会带上附属的 key=source_documents
+PS： 不准确的说，**各种chain的核心是预定了很多prompt template的构建方法**。
 
 链有很多种调用方式。
 1. 直接调用，当我们像函数一样调用一个对象时，它实际上会调用该对象内部实现的 __call__ 方法。
@@ -277,7 +280,7 @@ class CustomCalculatorTool(BaseTool):
 # 这里使用OpenAI temperature=0，temperature越大表示灵活度越高，输出的格式可能越不满足我们规定的输出格式，因此此处设置为0
 llm = OpenAI(temperature=0)
 tools = [WeatherTool(), CalculatorTool()]
-agent = initialize_agent(tools, llm, agent="zero-shot-react-description", verbose=True)
+agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 agent.run("Query the weather of this week,And How old will I be in ten years? This year I am 28")
 
 
@@ -314,6 +317,8 @@ Question: {input}
 Thought:{agent_scratchpad}"""
 ```
 
+**这个提示词就是 Agent 之所以能够趋动大模型，进行思考 - 行动 - 观察行动结果 - 再思考 - 再行动 - 再观察这个循环的核心秘密**。有了这样的提示词，模型就会不停地思考、行动，直到模型判断出问题已经解决，给出最终答案，跳出循环。
+
 通过这个模板，加上我们的问题以及自定义的工具，会变成下面这个样子（# 后面是增加的注释）
 
 ```
@@ -348,7 +353,7 @@ Action: Weather
 Action Input: This week
 ```
 这里从Tools中找到name=Weather的工具，然后再将This Week传入方法。具体业务处理看详细情况。这里仅返回Sunny。
-由于当前找到了Action和Action Input。 代表OpenAI认定当前任务链并没有结束。因此像请求体后拼接结果：Observation: Sunny 并且让他再次思考Thought。开启第二轮思考：下面是再次请求的完整请求体:
+由于当前找到了Action和Action Input。 代表OpenAI认定当前任务链并没有结束。因此向tool请求后拼接结果：Observation: Sunny 并且让他再次思考Thought。开启第二轮思考：下面是再次请求的完整请求体:
 ```
 Answer the following questions as best you can. You have access to the following tools:
 
@@ -429,7 +434,25 @@ Final Answer: I will be 38 in ten years and the weather this week is sunny.
 
 ![](/public/upload/machine/llm_stop.jpg)
 
-### 原理
+
+### 认知框架Cognitive Architecture
+
+**AgentType 对应一个Agent class，对应一个prompt**（又是prompt 起了关键作用），AgentType 有以下几种选择
+1. zero-shot ReAct，完全依靠对所用到的tools 的说明书来理解和使用tools，理论上支持无限多个。
+2. Structured tool chat，跟第一个不同的地方在于接收一个结构化的dict 作为参数且能记住上下文。
+3. OpenAI functions，OpenAI 在大模型层面针对 API的调用做了训练，相当于帮大家做了SFT，可以想象效果必然好。
+4. conversational，类似于第一、二类型，针对对话场景做了优化，比如聊天记录、聊天轮次等meta-data
+5. self-ask，通过自问自答的方式把大问题拆解成小问题之后再组成最终的单子。
+
+ReAct是 Shunyu Yao 等人在 ICLR 2023 会议论文《ReAct: Synergizing Reasoning and Acting in Language Models》中提出的，一个关键启发在于：大语言模型可以通过生成推理痕迹和任务特定行动来实现更大的协同作用。具体来说，就是引导模型生成一个任务解决轨迹：观察环境 - 进行思考 - 采取行动，也就是观察 - 思考 - 行动。那么，再进一步进行简化，就变成了推理 - 行动。ReAct 框架会提示 LLMs 为任务生成推理轨迹和操作，这使得代理能系统地执行动态推理来创建、维护和调整操作计划，同时还支持与外部环境（例如 Google 搜索、Wikipedia）的交互，以将额外信息合并到推理中。PS：使用LLM来做ifelse
+
+
+### 源码
+
+LangChain关键组件
+1. 代理（Agent）：这个类决定下一步执行什么操作。它由一个语言模型和一个提示（prompt）驱动。提示可能包含代理的性格（也就是给它分配角色，让它以特定方式进行响应）、任务的背景（用于给它提供更多任务类型的上下文）以及用于激发更好推理能力的提示策略（例如 ReAct）。LangChain 中包含很多种不同类型的代理。
+2. 工具（Tools）：工具是代理调用的函数。这里有两个重要的考虑因素：一是让代理能访问到正确的工具，二是以最有帮助的方式描述这些工具。如果你没有给代理提供正确的工具，它将无法完成任务。如果你没有正确地描述工具，代理将不知道如何使用它们。LangChain 提供了一系列的工具，同时你也可以定义自己的工具。
+3. 代理执行器（AgentExecutor）：代理执行器是代理的运行环境，它调用代理并执行代理选择的操作。执行器也负责处理多种复杂情况，包括处理代理选择了不存在的工具的情况、处理工具出错的情况、处理代理产生的无法解析成工具调用的输出的情况，以及在代理决策和工具调用进行观察和日志记录。
 
 AgentExecutor由一个Agent和Tool的集合组成。AgentExecutor负责调用Agent，获取返回（callback）、action和action_input，并根据意图将action_input给到具体调用的Tool，获取Tool的输出，并将所有的信息传递回Agent，以便猜测出下一步需要执行的操作。`AgentExecutor.run 实质是chain.run ==> AgentExecutor.__call__ 实质是chain.__call__() ==> AgentExecutor._call()`
 
@@ -470,6 +493,13 @@ class AgentExecutor(Chain):
         return result
 ```
 
+Agent.plan() 可以看做两步：
+1. 将各种异构的历史信息转换成 inputs，传入到 LLM 当中；
+2. 根据 LLM 生成的反馈，采取决策。LLM 生成的回复是 string 格式，langchain 中ZeroShotAgent 通过字符串匹配的方式来识别 action。
+因此，agent 能否正常运行，与 prompt 格式，以及 LLM 的 ICL 以及 alignment 能力有着很大的关系。
+   1. LangChain主要是基于GPT系列框架进行设计，其适用的Prompt不代表其他大模型也能有相同表现，所以如果要自己更换不同的大模型(如：文心一言，通义千问...等)。则很有可能底层prompt都需要跟著微调。
+   2. 在实际应用中，我们很常定期使用用户反馈的bad cases持续迭代模型，但是Prompt Engeering的工程是非常难进行的微调的，往往多跟少一句话对于效果影响巨大，因此这类型产品达到80分是很容易的，但是要持续迭代到90分甚至更高基本上是很难的。
+
 ```python
 # 一个 Agent 单元负责执行一次任务
 class Agent(...):
@@ -486,13 +516,7 @@ class Agent(...):
         return self.output_parser.parse(full_output)
 ```
 
-Agent.plan() 可以看做两步：
-1. 将各种异构的历史信息转换成 inputs，传入到 LLM 当中；
-2. 根据 LLM 生成的反馈，采取决策。LLM 生成的回复是 string 格式，langchain 中ZeroShotAgent 通过字符串匹配的方式来识别 action。
-因此，agent 能否正常运行，与 prompt 格式，以及 LLM 的 ICL 以及 alignment 能力有着很大的关系。
-   1. LangChain主要是基于GPT系列框架进行设计，其适用的Prompt不代表其他大模型也能有相同表现，所以如果要自己更换不同的大模型(如：文心一言，通义千问...等)。则很有可能底层prompt都需要跟著微调。
-   2. 在实际应用中，我们很常定期使用用户反馈的bad cases持续迭代模型，但是Prompt Engeering的工程是非常难进行的微调的，往往多跟少一句话对于效果影响巨大，因此这类型产品达到80分是很容易的，但是要持续迭代到90分甚至更高基本上是很难的。
-
+有人希望通过一些开源的  LLM 来实现 ReAct Agent，但实际开发过程中会发现开源低参数（比如一些 6B、7B 的 LLM）的 LLM  对于提示词的理解会非常差，根本不会按照提示词模板的格式来输出，这样就会导致我们的 Agent 无法正常工作，所以如果想要实现一个好的  Agent，还是需要使用好的 LLM，目前看来使用gpt-3.5模型是最低要求。
 
 
 ## Memory

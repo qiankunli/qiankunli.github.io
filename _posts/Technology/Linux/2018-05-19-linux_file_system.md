@@ -106,6 +106,8 @@ fdtable.fd数组的下标就是文件描述符，其中 0、1、2 三个描述�
 
 ![](/public/upload/linux/linux_vfsmount.png)
 
+Linux为什么不能像Windows那样自动mount？Unix-like的操作系统不支持自动mount原因是为了权限控制。POSIX权限的概念出现的很早，Unix、Linux都是支持POSIX权限的。那么对于一个新设备来说，操作系统不是很确定是不是所有用户都对这个设备有访问权限，这种情况下，如果自动mount，那么这个设备的内容就可能会被所有用户看到，这样会有安全的隐患。所以Unix和Linux才要求必须先mount，并且mount命令必须要用root权限，也就是说对于一个未知的设备，必须由root来决定是不是可用的。Linux可以配置自动mount，但这个配置的过程本身也需要root权限；Linux也允许用户通过编辑fstab来设置挂载点，但fstab编辑也需要root权限。
+
 ### 打开文件
 
 例如要打开 `/mnt/win/dir1/abc` 这个文件，就是根据这个路径，找到‘abc’ 对应的 dentry ，进而得到 inode 的过程。

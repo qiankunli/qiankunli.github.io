@@ -15,6 +15,8 @@ keywords: llm chatgpt gpt bert
 
 ![](/public/upload/machine/llm_tool.png)
 
+模型会预测下一个token。在生成token时，模型通常会将decorder 输出的每个token的概率归一化，如果只选择概率最高的token，生成的响应会比较保守和重复。因此chatgpt通常使用temperature 来表示引入一定程度的随机性，以使生成的响应更加丰富多样。较大的temperature 会有更多机会选择非最高概率token，也可能导致生成的响应过于随机和不合理。 
+
 ## HuggingFace
 
 Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供了以下几个产品和服务：
@@ -48,6 +50,7 @@ Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供�
     from huggingface_hub import snapshot_download
     snapshot_download(repo_id="bert-base-chinese")
     ```
+4. `huggingface-cli  download  --resume-download --cache-dir ./cache/ --local-dir ./starcoder  bigcode/starcoder`
 4. 使用transformers 库，但这种方式速度慢，且经常中断。
     ```
     from transformers import AutoTokenizer, AutoModel
@@ -107,11 +110,15 @@ Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供�
 
 ## 模型服务
 
+一般有几个需求
+1. 统一api，这样切换模型时上游应用无感，最好是 OpenAI-compatible，其api 被主要上游框架（比如langchain）兼容
+2. 支持多实例，进而支持灰度发布等
+
 ### 简单封装
 
 [ChatGLM-6B](https://github.com/THUDM/ChatGLM-6B) 在github 有一个仓库，一般包含
 1. 模型介绍 README.md
-2. 模型的对外接口 api.py/cli_demo.py/web_demo.py
+2. 模型的对外接口 api.py/cli_demo.py/web_demo.py。 自己使用 fastapi 基于python库直接对外提供RESTful APIs.
 
 以api.py 为例
 ```python
@@ -156,9 +163,23 @@ if __name__ == '__main__':
 
 [一文入门最热的LLM应用开发框架LangChain](https://mp.weixin.qq.com/s/bYzNNL3F0998Do2Jl0PQtw)
 
-[FastChat](https://github.com/lm-sys/FastChat)是一个用于训练、服务和评估基于聊天机器人的大型语言模型的开放平台。核心功能包括:
-1. 最先进模型(如Vicuna、FastChat-T5)的权重、训练代码和评估代码。
-2. 一个具有web界面和openai兼容的RESTful api的分布式多模型服务系统。
+[FastChat](https://github.com/lm-sys/FastChat)是一个用于训练、服务和评估基于聊天机器人的大型语言模型的开放平台。The core features include:
+1. The training and evaluation code for state-of-the-art models (e.g., Vicuna).
+2. A distributed multi-model serving system with web UI and OpenAI-compatible RESTful APIs.
+
+
+```sh
+# 命令行方式与llm 交互
+python3 -m fastchat.serve.cli --model-path lmsys/vicuna-7b-v1.3
+# webui方式与llm交互，此时需启动3个组件 web servers ==> controller ==> model workers
+python3 -m fastchat.serve.controller
+python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3
+python3 -m fastchat.serve.gradio_web_server
+# 提供OpenAI-compatible RESTful APIs  openai_api_server ==> controller ==> model workers
+python3 -m fastchat.serve.controller
+python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3
+python3 -m fastchat.serve.openai_api_server --host localhost --port 8000
+```
 
 ## LangChain
 
@@ -263,7 +284,9 @@ print(ai_response)
 
 ### Agent
 
-人类之所以在地球上显得独特，一个重要原因是我们更擅长使用工具。
+Turn your LLMs into reasoning engines. the core idea of agents is to use an LLM to choose a sequence of actions to take. in chains, a sequence of actions is hardcoded(in code). In agents a language model is used as a reasoning engine to determine which actions to take and in which order. 
+
+人类之所以在地球上显得独特，一个重要原因是我们更擅长使用工具。无论是网络上的还是现实世界里面的实体机器人，**只要给大模型足够的「说明书」**，大模型就可以把它纳入到解决方案工具箱，用来回答或者执行你用自然语言提出的问题 or 任务。
 
 某些应用可能需要不仅预定的 LLM（大型语言模型）/其他工具调用顺序，还可能需要根据用户的输入确定不确定的调用顺序。这种情况下涉及到的序列包括一个 “代理（Agent）”，该代理可以访问多种工具。**根据用户的输入，代理可能决定是否调用这些工具**，并确定调用时的输入。如果我们真的想要做一个能跑在生产环境上的 AI 聊天机器人，我们需要的不只一个单项技能，对于有很多个不同的“单项技能”，AI 要能够自己判断什么时候该用什么样的技能（意图识别问题）。通过“先让 AI 做个选择题”的方式，Langchain 让 AI 自动为我们选择合适的 Tool 去调用。我们可以把回答不同类型问题的 LLMChain 封装成不同的 Tool，也可以直接让 Tool 去调用特定能力的LLMChain 等工具。比如
 

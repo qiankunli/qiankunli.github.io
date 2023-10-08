@@ -131,4 +131,4 @@ Python还提供了异步IO的模块 asyncio，在单线程内实现并发，asyn
 
 ## ray 并发库
 
-请参考另一篇专门写ray的博客。
+ray core 可以作为 multiprocess 模块的平替，ChatGPT 本身在各种 dirty-work 里面也大量应用了 Ray，请参考另一篇专门写ray的博客。
