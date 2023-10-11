@@ -42,7 +42,7 @@ class LLM(BaseLLM):
     1. _generate ==> _call 留给子类实现。 输入文本格式提示，返回文本格式的答案
 ```
 
-LangChain 本质上就是对各种大模型提供的 API 的套壳，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**。
+LangChain 本质上就是对各种大模型提供的 API 的套壳，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**。PS：底层Transformers/fastchat库只提供 `output_ids = model.generate(input_ids)` 对话信息一般需要通过 prompt template 转为prompt/input_ids，每个model 的 chat prompt template 也都会有所不同。
 1. Chat Model，聊天模型，用于产生人类和 AI 之间的对话，有两个专属于 Chat 模型的概念，一个是消息，一个是角色。每个消息都有一个 role（可以是 system、user 或 assistant）和 content（消息的内容）。系统消息设定了对话的背景（比如你是一个很棒的智能助手），然后用户消息提出了具体请求。
     1. system：系统消息主要用于设定对话的背景或上下文。这可以帮助模型理解它在对话中的角色和任务。例如，你可以通过系统消息来设定一个场景，让模型知道它是在扮演一个医生、律师或者一个知识丰富的 AI 助手。系统消息通常在对话开始时给出。
     2. user：用户消息是从用户或人类角色发出的。它们通常包含了用户想要模型回答或完成的请求。用户消息可以是一个问题、一段话，或者任何其他用户希望模型响应的内容。
@@ -336,8 +336,7 @@ Action: the action to take, should be one of [Calculator, Weather] #  你应该�
 Action Input: the input to the action #  动作的输入
 Observation: the result of the action # 动作的结果
 ...  (this Thought/Action/Action Input/Observation can repeat N times) # 思考-行动-输入-输出 的循环可以重复N次
-T
-hought: I now know the final answer # 最后，你应该知道最终结果了
+Thought: I now know the final answer # 最后，你应该知道最终结果了
 Final Answer: the final answer to the original input question # 针对于原始问题，输出最终结果
 
 
@@ -426,11 +425,11 @@ Final Answer: I will be 38 in ten years and the weather this week is sunny.
 ```
 可以看到。ai严格的按照设定返回想要的内容，并且还以外的把28+10=3这个数学错误给改正了。通过 `verbose=True` 可以动态查看上述过程。 PS: 通过prompt 引导llm 进行文字接龙，通过解析文字接龙来进行tool 的调用。
 
-根据输出再回头看agent的官方解释：An Agent is a wrapper around a model, which takes in user input and returns a response corresponding to an “action” to take and a corresponding “action input”.
+根据输出再回头看agent的官方解释：An Agent is a wrapper around a model, which takes in user input and returns a response corresponding to an “action” to take and a corresponding “action input”. **本质上是通过和大模型的多轮对话交互来实现的**（对比常规聊天时的一问一答/单轮对话）， 不断重复“Action+ Input -> 结果 -> 下一个想法”，一直到找到最终答案。通过特定的提示词引导LLM模型以固定格式来回复，LLM模型回复完毕后，解析回复，这样就获得了要执行哪个tool，以及tool的参数。然后就可以去调tool了，调完把结果拼到prompt中，然后再让LLM模型根据调用结果去总结并回答用户的问题。
 
 ### stop token
 
-[How to Get Better Outputs from Your Large Language Model](https://developer.nvidia.com/blog/how-to-get-better-outputs-from-your-large-language-model/)It is especially useful to design a stopping template in a **few-shot** setting so the model can learn to stop appropriately upon completing an intended task. Figure shows separating examples with the string “===” and passing that as the stop word.
+[How to Get Better Outputs from Your Large Language Model](https://developer.nvidia.com/blog/how-to-get-better-outputs-from-your-large-language-model/)It is especially useful to design a stopping template in a **few-shot** setting so the model can learn to stop appropriately upon completing an intended task. Figure shows separating examples with the string “===” and passing that as the stop word.我们知道一般 LLM 都会长篇大论，说一大堆废话，我们希望 LLM 在返回了我们需要的信息后就停止输出，这里就需要用到stop参数，这个参数是一个列表，列表中的每个元素都是一个字符串，代表了 LLM 输出中的某一句话，当 LLM 输出中包含了这句话时，LLM 就会停止输出，这样我们就可以只获取到我们需要的信息了
 
 ![](/public/upload/machine/llm_stop.jpg)
 
@@ -516,7 +515,7 @@ class Agent(...):
         return self.output_parser.parse(full_output)
 ```
 
-有人希望通过一些开源的  LLM 来实现 ReAct Agent，但实际开发过程中会发现开源低参数（比如一些 6B、7B 的 LLM）的 LLM  对于提示词的理解会非常差，根本不会按照提示词模板的格式来输出，这样就会导致我们的 Agent 无法正常工作，所以如果想要实现一个好的  Agent，还是需要使用好的 LLM，目前看来使用gpt-3.5模型是最低要求。
+有人希望通过一些开源的  LLM 来实现 ReAct Agent，但实际开发过程中会发现开源低参数（比如一些 6B、7B 的 LLM）的 LLM  对于提示词的理解会非常差，根本不会按照提示词模板的格式来输出（例如不按`Action: xx Action Input: xx`返回），这样就会导致我们的 Agent 无法正常工作，所以如果想要实现一个好的  Agent，还是需要使用好的 LLM，目前看来使用gpt-3.5模型是最低要求。
 
 
 ## Memory

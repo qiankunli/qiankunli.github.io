@@ -19,7 +19,7 @@ keywords: llm source
 
 transformers开源库的核心组件包括3个：Conﬁguration、Tokenizer、Model
 1. 「Conﬁguration」：配置类，通常继承自「PretrainedConﬁg」，保存model或tokenizer的超参数，例如词典大小，隐层维度数，dropout rate等。配置类主要可用于复现模型。
-2. 「Tokenizer」：切词类，通常继承自「PreTrainedTokenizer」，主要存储词典，token到index映射关系等。此外，还会有一些model-specific的特性，如特殊token，[SEP], [CLS]等的处理，token的type类型处理，语句最大长度等，因此tokenizer通常和模型是一对一适配的。
+2. 「Tokenizer」：切词类，通常继承自「PreTrainedTokenizer」，主要存储词典，token到index映射关系等。此外，还会有一些model-specific的特性，如特殊token，`[SEP]`, `[CLS]`等的处理，token的type类型处理，语句最大长度等，**因此tokenizer通常和模型是一对一适配的**。
 3. 「Model」: 模型类。封装了预训练模型的计算图过程，遵循着相同的范式，如根据token ids进行embedding matrix映射，紧接着多个self-attention层做编码，最后一层task-specific做预测。
 针对上述三大类，transformer还额外封装了AutoConfig, AutoTokenizer,AutoModel，可通过模型的命名来定位其所属的具体类，比如’bert-base-cased’，就可以知道要加载BERT模型相关的配置、切词器和模型。
 

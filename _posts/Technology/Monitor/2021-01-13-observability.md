@@ -137,7 +137,7 @@ devops基本理念：
 1. 质量观测的几个痛点：
     1. 海量的异构数据
     2. 依赖规则，缺乏智能
-    3. 告警风暴与告警误报 [无效告警优化实践总结](https://mp.weixin.qq.com/s/cBCaHwEvQFGM7RNDMMavzA) [跟误告警说再见，Smart Metrics 帮你用算法配告警](https://mp.weixin.qq.com/s/jfT1pqKXGh3JjT5ajR8qTA)
+    3. 告警风暴与告警误报 [无效告警优化实践总结](https://mp.weixin.qq.com/s/cBCaHwEvQFGM7RNDMMavzA) [跟误告警说再见，Smart Metrics 帮你用算法配告警](https://mp.weixin.qq.com/s/jfT1pqKXGh3JjT5ajR8qTA) [被报警大量骚扰？来看看治理方法论](https://mp.weixin.qq.com/s/rEn25SejnU0rOWFb39QuUw) 未读。
 2. 针对第一点，数据统一接入和管理，将这些异构的数据进行统一的存储和管理。将日志、指标、Trace等数据全部接入到一个统一的可观测性存储中。然后基于这个统一的存储，进行后续的查询分析、可视化、监控告警、AI 等上层能力，甚至还可以进行数据的加工和规整，一站式地完成异构数据到同构数据的转换过程。基于统一的存储，我们可以构建统一的查询和分析语法，从而一套语法适配不同的数据，并且让不同的数据之间进行联合查询也变成了可能。我们以标准 SQL 为基础，进行了部分 DSL 扩展和 SQL 函数扩展，并融合了 PromQL，从而让不同类型的数据查询和分析变得统一。
 3. 针对第一点，[ AntMonitor 总结 - 云原生 Prometheus 监控实践](https://mp.weixin.qq.com/s/4M6_GRe3Vjv4-96TlH8uwQ) AntMonitor是一款主要以日志方式采集监控数据的监控产品，Prometheus 是 metrics 监控的事实标准，需要将 Prometheus 的主要功能融合进了 AntMonitor 的现有架构
     1. AntMonitor 现有的数据链路大致为由 agent 采集日志数据缓存于内存，由 spark 计算集群从 agent 内存中拉取数据，进行聚合，存储于 CeresDB。 metrics 数据不同于日志数据，，可以跳过计算步骤，直接进行存储。因此，我们根据用户的业务需求，提供了两条数据链路：直接存储metric 源 == 拉取==> 采集agent ==> PushGateway ==> CeresDB存储；需要数据聚合的情况下，走基于 spark 的聚合数据采集。

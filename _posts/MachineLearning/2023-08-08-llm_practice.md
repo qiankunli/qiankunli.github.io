@@ -181,6 +181,56 @@ python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3
 python3 -m fastchat.serve.openai_api_server --host localhost --port 8000
 ```
 
+源码分析
+
+使用ModelWorker 加载model 提供http 接口 
+
+```python
+app = FastAPI()
+@app.post("/worker_generate")
+async def api_generate(request: Request):
+    params = await request.json()
+    await acquire_worker_semaphore()
+    output = worker.generate_gate(params)
+    release_worker_semaphore()
+    return JSONResponse(output)
+if __name__ == "__main__":
+    ...
+    worker = ModelWorker(...,args.model_path,)
+    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+```
+ModelWorker实现
+```python
+BaseModelWorker
+     init_heart_beat
+         # 将modelWorker id注册到controller，并保持心跳。均通过http接口
+
+# 加载模型，调用模型（底层都是调用流式接口）
+ModelWorker
+     def __init__():
+          self.model, self.tokenizer = load_model(model_path, device=device,...)
+          # load_model 对应一个专门的 ModelAdapter 抽象，用来适配模型的加载
+            adapter = get_model_adapter(model_path)
+            model, tokenizer = adapter.load_model(model_path, kwargs)
+     generate_stream_gate(self, params) 
+     generate_gate(self, params)    # 根据参数返回输出，调用generate_stream_gate
+        for x in self.generate_stream_gate(params):
+            pass
+        return json.loads(x[:-1].decode())
+```
+api => ModelWorker.generate_gate ==> ModelWorker.generate_stream_gate ==> ModelWorker.model.stream_generate
+```python
+generate_stream_gate
+    get_generate_stream_function(model: torch.nn.Module, model_path: str)
+       # 根据模型不同选择对应的函数 
+       generate_stream_chatglm
+            prompt = params["prompt"]
+            inputs = tokenizer([prompt], return_tensors="pt").to(model.device)
+            for total_ids in model.stream_generate(**inputs, **gen_kwargs):
+                  response = tokenizer.decode(output_ids)
+                  response = process_response(response)
+```
+
 ## LangChain
 
 LangChain is a framework for developing applications powered by language models. We believe that the most powerful and differentiated applications will not only call out to a language model, but will also be:
@@ -434,6 +484,12 @@ docsearch = Pinecone.from_texts([t.page_content for t in split_docs], embeddings
 ```
 
 [ LangChain + GPTCache =兼具低成本与高性能的 LLM](https://mp.weixin.qq.com/s/kC6GB9JaT-WApxU2o3QfdA) 未读。
+
+## 推理
+
+1. vLLM是一个开源的大模型推理加速框架，通过PagedAttention高效地管理attention中缓存的张量，实现了比HuggingFace Transformers高14-24倍的吞吐量。
+2. NVIDIA FasterTransformer (FT) 是一个用于实现基于Transformer的神经网络推理的加速引擎。它包含Transformer块的高度优化版本的实现，其中包含编码器和解码器部分。使用此模块，您可以运行编码器-解码器架构模型（如：T5）、仅编码器架构模型（如：BERT）和仅解码器架构模型（如：GPT）的推理。FT框架是用C++/CUDA编写的，依赖于高度优化的 cuBLAS、cuBLASLt 和 cuSPARSELt 库，这使您可以在 GPU 上进行快速的 Transformer 推理。与 NVIDIA TensorRT 等其他编译器相比，FT 的最大特点是它支持以分布式方式进行 Transformer 大模型推理。在底层，节点间或节点内通信依赖于 MPI 、 NVIDIA NCCL、Gloo等。因此，使用FasterTransformer，您可以在多个 GPU 上以张量并行运行大型Transformer，以减少计算延迟。同时，TP 和 PP 可以结合在一起，在多 GPU 节点环境中运行具有数十亿、数万亿个参数的大型 Transformer 模型。
+3. DeepSpeed-MII 是 DeepSpeed 的一个新的开源 Python 库，旨在使模型不仅低延迟和低成本推理，而且还易于访问。
 
 ## 其它
 

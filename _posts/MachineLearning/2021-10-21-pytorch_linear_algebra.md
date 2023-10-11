@@ -70,6 +70,9 @@ NumPy是Python中用于数据分析、机器学习、科学计算的重要软件
 4. type , 数组所属的数据类型
 5. axis, 数组的轴, 即数组的维度，它是从 0 开始的。对于我们这个二维数组来说，有两个轴，分别是代表行的 0 轴与代表列的 1 轴。比如沿着 0轴求和 `np.sum(interest_score, axis=0)`
 
+numpy的ndarray与 pytorch 和tf的tensor 相比没太大区别，接口高度接近，一些差异
+1. 由于numpy的ndarray 诞生较早，只兼容CPU，tensor设计之初主要面向深度学习加速，对各类硬件支持较好。
+2. ndarray没有考虑微分，而像比如pytorch 的自动微分设计与tensor绑定比较紧密。
 
 ### 数组访问
 

@@ -12,6 +12,60 @@ keywords: controller
 * TOC
 {:toc}
 
+## 基于crd写一个controller的套路
+
+```
+crd:
+  spec:
+  status:
+```
+
+```go
+// 抽象版
+func reconcile(){
+  // 1. 获取当前状态
+  // 2. 获取期望状态
+  // 3. 对比期望状态和当前状态
+  // 4. 更新状态
+  // 5. 返回
+}
+// 细节版
+func reconcile(name){
+  crd := client.get(xx)
+  defer(){
+    // 保存对crd的变更
+    patch crd.status
+  }
+  if !crd.DeletionTimestamp.IsZero() {
+    // 检查是否可以删掉crd
+    // 如果不可以，状态1，doXX
+    // 如果不可以，状态2，doXX
+    // 如果可以
+    controllerutil.RemoveFinalizer(crd, xx)
+    return ctrl.Result{RequeueAfter: xx}, nil
+  }
+  if !controllerutil.ContainsFinalizer(crd, xx) {
+		controllerutil.AddFinalizer(crd, xx)
+	}
+  // 查到crd 可能依赖的其它crd
+  // 获取当前状态： status值、依赖的crd等
+  // 根据当前状态采取行动
+  // 如果状态1，doXX（增删改其它crd，调用外部数据等，最后看是否状态流转，更改crd状态）
+  // 如果状态2，doXX
+  return ctrl.Result{}, err
+}
+func register(){
+  // 监听哪些crd
+  // 监听哪些事件
+}
+```
+
+conroller 很适合处理“状态机”相关的逻辑。
+1. controller 核心是梳理状态、 状态处理函数（包含状态流转等）两部分
+2. 因为reconcile 本质都是异步的，所以日志、event 要写仔细，每一条日志带上crd名字等，方便排查问题。event 上最好体现状态流转过程。
+3. 有的状态是“进行态”，处理完成后一般 `return ctrl.Result{RequeueAfter: 10s}, nil` 以主动触发下次reconcile，有的状态是“终止态”，处理完 `return ctrl.Result{}, err`，只有主要靠用户事件来触发reconcile。
+4. 正常状态流转 和 `crd.DeletionTimestamp.IsZero()` 后的状态流转会有细微差别，比如后者执行时一些资源可能已经被销毁了。
+
 ## condition
 
 1. conditions和status到底有什么区别？
