@@ -40,7 +40,7 @@ Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供�
         model = AutoModelForCausalLM.from_pretrained("databricks/dolly-v2-3b")
         ```
 3. Inference API：这是一个服务，让你可以直接从Hugging Face的基础设施上运行大规模的NLP模型，并在毫秒级别得到响应。
-4. Datasets：这是一个数据集的库，让你可以获取、加载和处理超过1400个公开可用的数据集。Datasets支持多种数据类型（如文本、图像、音频等）和格式（如JSON、CSV等），并提供了高效且统一的API，让你可以快速地加载、缓存和转换数据。
+4. Datasets：这是一个数据集的库，让你可以获取、加载和处理超过1400个公开可用的数据集。Datasets支持多种数据类型（如文本、图像、音频等）和格式（如JSON、CSV等），并提供了高效且统一的API，让你可以快速地加载、缓存和转换数据。PS： 一开始看代码的时候，总以为是pytorch dataset
 
 下载模型文件（一般有几个G）有多种方式
 1. 到huggingface 官网手动通过文件链接下载
@@ -336,7 +336,7 @@ print(ai_response)
 
 Turn your LLMs into reasoning engines. the core idea of agents is to use an LLM to choose a sequence of actions to take. in chains, a sequence of actions is hardcoded(in code). In agents a language model is used as a reasoning engine to determine which actions to take and in which order. 
 
-人类之所以在地球上显得独特，一个重要原因是我们更擅长使用工具。无论是网络上的还是现实世界里面的实体机器人，**只要给大模型足够的「说明书」**，大模型就可以把它纳入到解决方案工具箱，用来回答或者执行你用自然语言提出的问题 or 任务。
+从“告诉计算机要做什么”的编程范式向“告诉计算机我们想要什么”的范式的转变。人类之所以在地球上显得独特，一个重要原因是我们更擅长使用工具。无论是网络上的还是现实世界里面的实体机器人，**只要给大模型足够的「说明书」**，大模型就可以把它纳入到解决方案工具箱，用来回答或者执行你用自然语言提出的问题 or 任务。
 
 某些应用可能需要不仅预定的 LLM（大型语言模型）/其他工具调用顺序，还可能需要根据用户的输入确定不确定的调用顺序。这种情况下涉及到的序列包括一个 “代理（Agent）”，该代理可以访问多种工具。**根据用户的输入，代理可能决定是否调用这些工具**，并确定调用时的输入。如果我们真的想要做一个能跑在生产环境上的 AI 聊天机器人，我们需要的不只一个单项技能，对于有很多个不同的“单项技能”，AI 要能够自己判断什么时候该用什么样的技能（意图识别问题）。通过“先让 AI 做个选择题”的方式，Langchain 让 AI 自动为我们选择合适的 Tool 去调用。我们可以把回答不同类型问题的 LLMChain 封装成不同的 Tool，也可以直接让 Tool 去调用特定能力的LLMChain 等工具。比如
 

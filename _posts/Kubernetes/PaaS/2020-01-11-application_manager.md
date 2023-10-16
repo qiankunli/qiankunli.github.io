@@ -39,7 +39,7 @@ Kubernetes 实际上是面向平台开发者，而不是面向研发和应用运
 
 ![](/public/upload/kubernetes/multi_pass.png)
 
-我们能不能抛弃传统 PaaS 的一个做法，基于 K8s 打造高可扩展的应用管理平台。我们想办法能把 K8s 能力无缝的透给用户，同时又能提供传统 PaaS 比较友好的面向研发运维的使用体验呢？我们不是说要在 Kubernetes 上盖一个 PaaS，因为 K8s 本身可以扩展，可以写一组 CRD，把我们要的 API 给装上去。
+我们能不能抛弃传统 PaaS 的一个做法，基于 K8s 打造高可扩展的应用管理平台。我们想办法能把 K8s 能力无缝的透给用户，同时又能提供传统 PaaS 比较友好的面向研发运维的使用体验呢？我们不是说要在 Kubernetes 上盖一个 PaaS，因为 K8s 本身可以扩展，可以写一组 CRD，把我们要的 API 给装上去。PS：从使用者来看，对平台的使用可以看做写 core.oam.dev/v1beta1 的Application ，仅需指定type+properties 即可使用平台。平台能力提供者提供type 即可将能力发布出去。
 
 ## Open Application Model （OAM）
 
@@ -70,6 +70,10 @@ In Open Application Model, we propose an app-centric approach instead:
 1. Application first - define the app deployment with a self-contained model, where **operational behaviors as part of app definition**, free of infrastructure, simply deploy.
 2. Clarity and extensibility - an open standard to modularize app delivery into reusable pieces, assemble them into a **deployment plan** per your own needs, fully self-service.
 3. Vendor agnostic - a consistent yet higher level abstraction to model app delivery across on-prem clusters, cloud providers or even edge devices. Zero lock-in.
+
+应用定义实际上是应用交付/分发不可或缺的部分，所以我们可以思考下是否可以定义足够开放的、可复用的应用模型呢？
+1. 一个应用定义需要容易上手，但又不失灵活性，更不能是一个黑盒。应用定义同样需要跟开源生态紧密结合，没有生态的应用定义注定是没有未来的，自然也很难持续的迭代和演进。
+2. 一个合理的应用模型应该具有区分使用者角色的分层结构，同时将运维能力模块化的封装。让不同的角色使用不同的 API
 
 ### oam 应用模型
 

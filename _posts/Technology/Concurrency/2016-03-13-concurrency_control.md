@@ -78,7 +78,7 @@ LOCK_PREFIX 是一个宏，根据需要展开成“lock;”或者空串。单核
 
 [剖析Disruptor:为什么会这么快？(三)揭秘内存屏障](http://ifeve.com/disruptor-memory-barrier/)
 
-什么是内存屏障？它是一个CPU指令，在不同计算机架构下有不同的实现细节。
+什么是内存屏障？它是一个CPU指令，用于控制处理器和内存系统中对内存操作的重新排序和优化（干预CPU内部执行的一种CPU API接口），在不同计算机架构下有不同的实现细节。
 
 1. 插入一个内存屏障，相当于告诉CPU和编译器先于这个命令的必须先执行，后于这个命令的必须后执行。PS：CPU流水线 有异步的LoadBuffer,Store Buffer, Invalidate Queue，写屏障：阻塞直到把Store Buffer中的数据刷到Cache中；读屏障：阻塞直到Invalid Queue中的消息执行完毕。也就是有了禁止CPU 指令重排的效果。
 2. 强制更新一次不同CPU的缓存。例如，一个写屏障会把这个屏障前写入的数据刷新到缓存，这样任何试图读取该数据的线程将得到最新值。

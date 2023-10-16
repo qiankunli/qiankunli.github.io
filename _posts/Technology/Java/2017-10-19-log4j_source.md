@@ -32,6 +32,8 @@ keywords: log4j
 
 [技术攻关：从零到精通](http://zhangtielei.com/posts/blog-zero-to-professional.html)每个人都知道怎么打日志，但打一份好的日志，实际没有几个人能够做到的。一般来说，如果没有足够的重视，工程师打出来的日志，或者过于随意，或者逻辑缺失。一份好的日志其实要花很多精力来调整细节，把程序运行看成一个状态机，每一个关键的状态变化，都要在日志中记录。一份好的日志其实反映了一套好的程序逻辑。总之，打日志的目标是：如果线上发生奇怪的情况，拿过这份日志来就能分析出问题所在。这在客户端上分析线上问题的时候尤其有用。
 
+[系统日志规范及最佳实践](https://mp.weixin.qq.com/s/V-TIT1Cw5fH8xSYAEMyukQ) 未读。
+
 ## 问题
 
 The org.slf4j.Logger interface is the main user entry point of SLF4J API. slf4j 定好了Logger和LoggerFactory实现，最直观的感觉，为什么不是`Logger.debug(),Logger.info()`直接写到文件就好了呢？

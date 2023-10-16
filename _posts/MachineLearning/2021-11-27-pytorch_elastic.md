@@ -21,6 +21,22 @@ keywords:  pytorch distributed elastic 弹性
 3. 如何捕获单个进程训练失败，如何在单个节点上管理所有训练进程。
 4. 如何与现有训练代码集成。
 
+## 20231012弹性训练集大成
+
+[DLRover 在 K8s 上千卡级大模型训练稳定性保障的技术实践](https://mp.weixin.qq.com/s/gHoP3mESWJ8BUFT-m0-eBA) OpenAI 在 1024 个 NVIDIA A100 GPU 上训练 GPT-3 大约需要 34 天。训练节点越多，耗时越长，训练期间节点故障概率就越大。据我们在蚂蚁 GPU 训练集群上观察，一个月内，单卡的故障率约 8%，那么一天单卡的故障率约为 0.27%。常见的故障原因有 Xid、ECC、NVLINK error 和 NCCL error 故障等。对于一个千卡训练作业来说，卡故障导致一天内训练失败的概率高达到 93%。所以训练作业几乎每天都会失败。作业失败后，用户需要手动重启作业，运维成本很高。如果用户重启不及时，中间间隔的时间就会导致 GPU 卡空闲，浪费昂贵的算力资源。
+
+弹性训练是指在训练过程中可以伸缩节点数量。当前支持 PyTroch 弹性训练的框架有 Torch Elastic 和 Elastic Horovod。二者显著的区别在于节点数量变化后是否需要重启训练子进程来恢复训练。Torch Elastic 感知到新节点加入后会立刻重启所有节点的子进程，集合通信组网，然后从 checkpoint 文件里恢复训练状态来继续训练。而 Elastic Horovod 则是每个训练子进程在每个 step 后检查新节点加入，子进程不退出的情况下重新集合通信组网，然后有 rank-0 将模型广播给所有 rank。
+1. **集合通信动态组网**。动态组网是指训练进程可以自动根据动态变化的节点数量来组网集合通信，无需固定给各个节点指定集合通信的 rank 和 world size。**动态组网是弹性容错训练必须的**，因为弹性容错作业中，节点的失败、扩容或者缩容都会导致节点的 rank 和 world size 变化。所以我们无法在作业启动前给节点指定 rank 和 world size。PS： Rendezvous 机制：Rendezvous Manager/Rendezvous Agent/共享存储。 DLRover （ ElasticJob ）会启动一个Master 存CPU pod，负责运行Rendezvous Manager，且会踢掉用不到的pod（让worker pod 进程退出？）。
+2. 分布式训练容错，训练容错是指训练出现故障后能在无人工介入的情况下快速恢复训练。训练恢复需要如下步骤：定位错误原因，判断错误是否可以恢复；启动训练进程加载训练代码，训练进程能重新集合通信组网；训练进程能加载模型导出的 checkpoint 来恢复训练状态；如果存在故障机，要及时将故障机排除，以便新节点继续调度在故障机。
+    1. 对于无故障机的错误，DLRover 重启进程来恢复训练。
+    2. 对于故障机的错误，DLRover 会通知 SRE 隔离故障机并重新拉起 Pod 来替换出错的 Pod
+    3. 对于正常运行的 Pod 重启其训练进程，减少 Pod 调度时间开销。
+3. 故障机检测
+4. 错误日志收集，在 PyTorch 分布式训练中，一个节点的进程出错后，Torch Elastic 会停止所有节点的进程。各个进程的日志都是单独存在各自日志文件中。为了找到训练失败是哪个进程出错导致的，我们需要搜索所有进程的日志。这个工作对于千卡作业是十分耗时且繁琐的。为此，我们在 ElasticAgent 中开发了错误日志收集供功能。当 ElasticAgent 发现子进程失败后，后将其错误日志的 message 发送给 Job Master。Job Master 会在其日志中展示具体哪个节点的那个进程失败了，以及错误日志。这样用户只需看下 Job Master 的节点日志就可以定位训练失败原因了。
+PS：
+1. 故障检测，踢掉故障worker，踢掉多余worker（有时用户要求worker数必须是N的整数倍），worker 被踢掉之后，由controller来创建新的pod？ 若worker 被踢掉之后，新的pod 因为资源不够一直pending，当前集群不满足客户要求的最小worker数，如何处理呢？
+2. 除了controller、crd等，代码上，DLRover 提供了 ElasticTrainer 来封装训练过程，dlrover-run 来启动训练代码（只要是能用 torchrun 启动的任务，都是支持用 dlrover-run 来跑的。dlrover-run 是扩展了torchrun，所以原生的torchrun的配置都支持。）。
+
 ## train_script 的守护者elastic agent
 
 `python -m torch.distributed.run train_script.py ` 对于每一个node 有两个角色
@@ -397,8 +413,6 @@ PContext 就是一个抽象类，有两个派生类：MultiprocessContext 和 Su
 节点级容错： elastic agent 注册了 `signal.signal(signal.SIGTERM, _terminate_process_handler)`  之后 引起 `rdzv_handler.shutdown()`
 
 ## 与horovod 对比
-
-
 
 ## 其它
 

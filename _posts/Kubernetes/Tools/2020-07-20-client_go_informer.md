@@ -13,6 +13,8 @@ keywords:  kubernetes client-go
 * TOC
 {:toc}
 
+Kubernetes 的内部组件，如 kube-scheduler 、kube-controller-manager 等都需要通过 client-go 和 kube-apiserver 交互，但过程中为了保证 HTTP 消息的实时性、可靠性、顺序性，还得借助 client-go 的 Informer 机制。
+
 ```
 k8s.io/client-go
     /rest
@@ -46,20 +48,24 @@ Kubernetes Controller能够知道资源对象的当前状态，通常需要访�
 
 [Kubernetes: Controllers, Informers, Reflectors and Stores](http://borismattijssen.github.io/articles/kubernetes-informers-controllers-reflectors-stores)Kubernetes offers these powerful structures to get a local representation of the API server's resources.The **Informer just a convenient wrapper** to  automagically syncs the upstream data to a downstream store and even offers you some handy event hooks.
 
-针对同一类资源只建立一个连接，同一类资源对象（比如Pod、Deployment）都共享一个Informer（底层都用到了SharedIndexInformer），减少kube-apiserver的负载。
-
 [Kubernetes Informer 详解](https://developer.aliyun.com/article/679508) Informer 只会调用 Kubernetes List 和 Watch 两种类型的 API，Informer 在初始化的时，先调用 Kubernetes List API 获得某种 resource 的全部 Object（真的只调了一次），缓存在内存中; 然后，调用 Watch API 去 watch 这种 resource，去维护这份缓存; 之后，Informer 就不再调用 Kubernetes 的任何 API。Kubernetes 中的组件如果要访问Kubernetes 中的Object，绝大部分会使用Informer中的Lister() 方法，而非自接调用kube-apiserver。
 
-![](/public/upload/kubernetes/k8s_controller_model.png)
+![](/public/upload/kubernetes/informer_overview.png)
 
 [client-go的informer的工作流程](https://cloudsre.me/2020/03/client-go-0-informer/)
 
-informer 机制主要两个流程
+Informer 的架构设计里面，有以下三个重要组件：
 
-1. Reflector 通过ListWatcher 同步apiserver 数据（只启动时搞一次），并watch apiserver ，将event 加入到 delta Queue 中。PS：reflector 大部分时间都是在watch event/delta
-2. controller 从 delta Queue中取出event，调用Indexer进行缓存并建立索引，并触发Processor 业务层注册的 ResourceEventHandler。即processLoop。
+1. Reflector：用于监控 kube-apiserver 中指定的资源，当资源变化时，更新到 DeltaFIFO 中（充当生产者）
+1. DeltaFIFO：是一个用来存储 K8s 资源对象及其类型的先进先出的队列
+3. Indexer：存储资源对象并自带索引功能的本地存储，Informer 会从 DeltaFIFO 中将消费出来的资源存储到 Indexer 中，后续 client-go 获取资源就可以直接从 Indexer 中获取，减少服务器压力
 
-![](/public/upload/kubernetes/informer_overview.png)
+informer 机制/Informer.Run 主要两个流程（主要看Run 方法即可）
+
+1. Reflector.Run 通过ListWatcher 同步apiserver 数据（只启动时搞一次），并watch apiserver ，将event 加入到 delta Queue 中。PS：reflector 大部分时间都是在watch event/delta
+2. Controller.Run: 从 delta Queue中取出event，调用Indexer进行缓存并建立索引，并触发Processor 业务层注册的 ResourceEventHandler。即processLoop。
+
+![](/public/upload/kubernetes/k8s_controller_model.png)
 
 ## Reflector
 
@@ -200,7 +206,7 @@ func (f *DeltaFIFO) Get(obj interface{}) (item interface{}, exists bool, err err
 
 [client-go 之 Indexer 的理解](https://cloud.tencent.com/developer/article/1692517) 未细读
 
-## Watch event 消费
+## controller.Run/ Watch event 消费
 
 sharedIndexInformer.Run ==> controller.Run ==> controller.processLoop ==> for Queue.Pop 也就是 sharedIndexInformer.HandleDeltas ==> 更新LocalStore + processor.distribute
 

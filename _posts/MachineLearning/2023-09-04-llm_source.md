@@ -36,12 +36,14 @@ print(results)
 ```
 
 开箱即用的 pipelines，Transformers 库最基础的对象就是 `pipeline()` 函数，它封装了预训练模型和对应的前处理和后处理环节。
-1. 预处理 (preprocessing)，将原始文本转换为模型可以接受的输入格式；具体地，我们会使用每个模型对应的分词器 (tokenizer) 来进行：
+1. 预处理 (preprocessing)，**Transformer模型无法直接处理原始文本字符串**；具体地，我们会使用每个模型对应的分词器 (tokenizer) 来进行。 PS： 有点类似于tf的各种FeatureColumn
   1. 将输入切分为词语、子词或者符号（例如标点符号），统称为 tokens；
-  2. 根据模型的词表将每个 token 映射到对应的 token 编号（就是一个数字）；
-  3. 根据模型的需要，添加一些额外的输入。
+  2. 根据模型的词表将每个 token 映射到对应的 token 编号/id；
+  3. 根据模型的需要，添加一些额外的输入。比如tokens补齐和截断操作
 2. 将处理好的输入送入模型；
 3. 对模型的输出进行后处理 (postprocessing)，将其转换为人类方便阅读的格式。
+
+![](/public/upload/machine/transformers_pipeline.jpg)
 
 ```python
 # 加载与保存分词器
@@ -54,11 +56,41 @@ from transformers import AutoModel
 # 所有存储在 HuggingFace Model Hub 上的模型都可以通过 Model.from_pretrained() 来加载权重，参数可以是 checkpoint 的名称，也可以是本地路径（预先下载的模型目录）
 model = AutoModel.from_pretrained("bert-base-cased")
 model.save_pretrained("./models/bert-base-cased/") # 保存模型
+
+inputs = tokenizer(["来到美丽的大自然，我们发现"], return_tensors="pt")
+# {'input_ids': tensor([[    1, 68846, 68881, 67701, 67668, 98899, 91935]]), 'attention_mask': tensor([[1, 1, 1, 1, 1, 1, 1]])}
+
+gen_kwargs = {"max_length": 128, "top_p": 0.8, "temperature": 0.8, "do_sample": True, "repetition_penalty": 1.1}
+output = model.generate(**inputs, **gen_kwargs)
+output = tokenizer.decode(output[0].tolist(), skip_special_tokens=True)
+print(output)
 ```
 
+针对每个模型输入，模型会分别得到对应的高维向量特征（动态词向量，而word2vec是静态词向量）。Transformer的基础架构（无论是编码器、解码器还是seq2seq），将输入张量转换为隐状态向量。这些基础架构是整个模型的一部分。对于不同任务，还有不同的head架构，他们将隐状态输出为任务需要的输出变量。不同任务有相同的Transformer基础架构，但是它们的head架构往往是不同的，具体架构与任务相关。
+
+在Transformers（Transformers库多了一个s，而transformer模型没有s）库中，有许多模型架构，他们一般有基础Transformer架构加上不同的head模块组成，部分例子如下：
+1. *Model (retrieve the hidden states)：只输出隐状态
+2. *ForCausalLM：常规语言模型，典型的有GPT系列
+3. *ForMaskedLM：掩码语言模型，典型的有BERT、RoBERTa、DeBERTa
+4. *ForMultipleChoice：多项选择模型
+5. *ForQuestionAnswering：问答模型，一般是抽取式问答
+6. *ForSequenceClassification：序列分类模型
+7. *ForTokenClassification：token分类模型，如命名实体识别和关系抽取
+
+
 PS: 深度学习都得指定features/labels。在llm 场景下，features 和labels 有几个特点
-1. llm 有base model、sft model 等，不同的model 数据集格式不同，一般分为几个部分，比如`{"question:":"xx","answer":"xx"}`，但不管如何，这几部分都会拼为一个sentence（中间可能有一些特殊字符起到连接作用），然后把sentence通过tokenizer转换成input_ids，之后再走embedding 模块等等就是Transformer系列模型内的事儿了，最后得到output_ids.
-2. labels 一般由input_ids copy而来，然后做一些处理，比如labels 全部左移一位（预训练），也或者将sentence部分中question 的位置都置为-100，-100表示在计算loss的时候会被忽略（sft），这个由任务性质决定。
+1. llm 有base model、sft model 等，不同的model 数据集格式不同，一般分为几个部分，比如sft 的`{"question:":"xx","answer":"xx"}`，各家模型都不太一样，很多数据集是不公开的。但不管如何，这几部分都会拼为一个sentence（中间可能有一些特殊字符起到连接作用），然后把sentence通过tokenizer转换成input_ids，之后再走embedding 模块等等就是Transformer系列模型内的事儿了，最后得到output_ids.
+2. 模型输入格式，模型输入dict 一般包含3个key： input_ids,attention_mask,labels
+    1. 有些模型内置从input ids 提取attention mask的操作
+    2. 预训练场景 labels 一般由input_ids copy而来，然后做一些处理，比如labels 全部左移一位（预训练）
+    3. 明确指定labels 的话，一般是要微调，比如sft时，sentence部分中question 的位置都置为-100，-100表示在计算loss的时候会被忽略，这个由任务性质决定。
+2. 预处理（将dataset 转为模型输入）过程由​ Dataset.map() + tokennizer 来办。
+    ```python
+        def tokenize_function(example):
+            # example 表示数据集中的一行数据
+            return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
+        tokenized_dataset = dataset.map(tokenize_function, batched=True)
+    ```
 3. 之后就是对output_ids 和 labels 计算loss。
 3. 上述过程也是Transformers 库抽象的基础，指定input_ids,labels，则计算output_ids 和 loss 可以自动进行。对于一个base llm，可以基于finetune做很多task specific llm模型，主要体现在 input 数据集格式 和labels 的不同。
 
@@ -128,9 +160,9 @@ GPT models are trained in an unsupervised way on a large amount of text (or text
 |input_ids|The|elf|queen|was|wearing|a|cloak|.|[END]|
 |labels|elf|queen|was|wearing|a|cloak|.|[END]|[-1]
 
-**The labels are identical to input_ids, but shifted to one position to the left**. Note that for GPT-2 in Hugging Face transformers this shift happens automatically when the loss is calculated, so from the user perspective, the tensor labels should be identical to input_ids.  PS：常规深度模型的训练输入是 `feature1,feature2,...,label`，LLM也是，不过关系更隐式一些。
+**The labels are identical to input_ids, but shifted to one position to the left**. Note that for GPT-2 in Hugging Face transformers this shift happens automatically when the loss is calculated, so from the user perspective, the tensor labels should be identical to input_ids.  PS：常规深度模型的训练输入是 `feature1,feature2,...,label`，LLM也是，不过label 有时是由input_id得到的。
 
-There are two ways to train Hugging Face transformers models: with the Trainer class or with a standard PyTorch training loop. We start with Trainer. PS: 下面代码基于GPT-2 已有的参数微调GPT-2，侧重点在于讲Transformers库原理。
+There are two ways to train Hugging Face transformers models: with the Trainer class or with a standard PyTorch training loop. We start with Trainer. PS: 下面代码基于GPT-2 已有的参数微调GPT-2，**感觉模型微调 跟model = load_checkpoint(xx) 断点重训没啥区别**，侧重点在于讲Transformers库原理。
 
 ```python
 class MyDset(torch.utils.data.Dataset):
@@ -180,6 +212,7 @@ def prepare_dsets(text_path: str, tokenizer: transformers.PreTrainedTokenizer, b
 model = transformers.GPT2LMHeadModel.from_pretrained(MODEL_NAME)
 tokenizer = transformers.AutoTokenizer.from_pretrained(MODEL_NAME)
 training_args = transformers.TrainingArguments(output_dir="idiot_save/", learning_rate=1e-3,...)
+# 传给trainer 的必须是预处理好的dataset（包含input_ids 等column）
 trainer = transformers.Trainer(model=model,args=training_args,train_dataset=dset_train,eval_dataset=dset_val)
 trainer.train()
 # Save the model if needed
@@ -205,9 +238,12 @@ How exactly is GPT-3 trained on such examples? We are not exactly sure (OpenAI i
 
 ## LoRA
 
+假如LLM的原始权重视为矩阵“X”。对于任何给定的任务，经过优化微调的 LLM 的权重由矩阵“Y”表示。微调的目标是发现一个 delta 矩阵“Z”，使得 X+Z=Y。然而，在 LoRA 的情况下，这个增量矩阵“Z”是通过低秩分解来近似的。因此，对于某些类型的任务来说， 一些数据集可能更容易对齐，而另一些数据集可能会有效果损失。相比之下，全参数微调则没有这个约束， 学习到的权重保留了原始模型的表达能力，可能简化了拟合不同数据的任务。
+
 [从0到1！得物如何打造通用大模型训练和推理平台](https://mp.weixin.qq.com/s/5EE1VXxq7k_VoC9gRPvyMg)
 
 对于大语音模型来说，其参数量非常多。GPT3有1750亿参数，而且LLAMA系列模型包括 7B,13B,33B,65B，而其中最小的7B都有70亿参数。要让这些模型去适应特定的业务场景，需要对他们进行微调。如果直接对这些模型进行微调，由于参数量巨大，需要的GPU成本就会非常高。LoRA的做法是对这些预训练好的大模型参数进行冻结，也就是在微调训练的时候，这些模型的参数设置为不可训练。然后往模型中加入额外的网络层，并只训练这些新增的网络层参数。这样可训练的参数就会变的非常少，可以以低成本的GPU微调大语言模型。LoRA在Transformer架构的每一层注入可训练的秩分解矩阵，与使用Adam微调的GPT-3 175B相比，LoRA可以将可训练参数数量减少10000倍，GPU内存需求减少3倍，并且在效果上相比于传统微调技术表现的相当或更好。当前已经得到HuggingFace 的 PEFT库 https://github.com/huggingface/peft 的支持。
+
 
 
 ### 原理

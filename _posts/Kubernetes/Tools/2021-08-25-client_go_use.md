@@ -199,8 +199,10 @@ client-go 包含了 k8s 一些核心对象的访问，此外一些非核心对�
 Informer是一个带有本地缓存和索引机制的、可以注册 EventHandler 的 client，本地缓存被称为 Store，索引被称为 Index。使用 informer 的目的是为了减轻 apiserver 数据交互的压力而抽象出来的一个 cache 层, 客户端对 apiserver 数据的 “读取” 和 “监听” 操作都通过本地 informer 进行（相对于直接监听apiserver`resp, err := http.Get("http://apiserver:8080/api/v1/watch/pods?watch=yes")`）。Informer 实例的Lister()方法可以直接查找缓存在本地内存中的数据。
 
 ```go
-// 通过informer 获取node 列表
+// Informer 工厂 
 factory := informers.NewSharedInformerFactory(clientset, 30*time.Second)
+// Informer 工厂  Core().V1().Nodes() 方法时，返回的是 PodeInformer 接口。 
+// PS： 用了这么久，才知道工厂返回实例还有这么玩的
 nodeInformer := factory.Core().V1().Nodes()
 go nodeInformer.Informer().Run(stopCh)
 if !cache.WaitForCacheSync(stopCh, nodeInformer.Informer().HasSynced) {
