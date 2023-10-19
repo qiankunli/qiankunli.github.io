@@ -596,3 +596,11 @@ class BaseMessage(Serializable):
     content: str
     additional_kwargs: dict = Field(default_factory=dict)
 ```
+
+## Callback
+
+LangChain 的 Callback 机制允许你在应用程序的不同阶段进行自定义操作，如日志记录、监控和数据流处理，这个机制通过 CallbackHandler（回调处理器）来实现。回调处理器是 LangChain 中实现 CallbackHandler 接口的对象，为每类可监控的事件提供一个方法。当该事件被触发时，CallbackManager 会在这些处理器上调用适当的方法。
+1. BaseCallbackHandler 是最基本的回调处理器，你可以继承它来创建自己的回调处理器。它包含了多种方法，如 on_llm_start/on_chat（当 LLM 开始运行时调用）和 on_llm_error（当 LLM 出现错误时调用）等。
+2. LangChain 也提供了一些内置的处理器，例如 StdOutCallbackHandler，它会将所有事件记录到标准输出。还有 FileCallbackHandler，会将所有的日志记录到一个指定的文件中。
+3. 在 LangChain 的各个组件，如 Chains、Models、Tools、Agents 等，都提供了两种类型的回调设置方法：构造函数回调和请求回调。你可以在初始化 LangChain 时将回调处理器传入，或者在单独的请求中使用回调。例如，当你想要在整个链的所有请求中进行日志记录时，可以在初始化时传入处理器；而当你只想在某个特定请求中使用回调时，可以在请求时传入。
+    1. verbose = True等同于将一个输出到控制台的回调处理器添加到你的对象中。
