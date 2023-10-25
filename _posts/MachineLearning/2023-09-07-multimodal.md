@@ -21,7 +21,7 @@ keywords: llm multimodal
 ## Transformer与多模态
 
 [为什么Transformer适合做多模态任务？](https://mp.weixin.qq.com/s/zGUwdaS5qlET_PZ6O2amxg)
-1. 其实不是“Transformer适合做多模态任务”，而是Transformer中的Attention适合做多模态任务，准确的说，应该是“Transformer中的Dot-product Attention适合做多模态任务”．
+1. 其实不是“Transformer适合做多模态任务”，而是Transformer中的Attention适合做多模态任务，准确的说，应该是“Transformer中的Dot-product Attention适合做多模态任务”。PS： Transformer提出了深度学习领域既MLP、CNN、RNN后的第4大特征提取器。
 2. 之前的多模态任务是怎么做的? 在Transformer，特别是Vision Transformer出来打破CV和NLP的模型壁垒之前，CV的主要模型是CNN，NLP的主要模型是RNN，那个时代的多模态任务，主要就是通过CNN拿到图像的特征，RNN拿到文本的特征，然后做各种各样的Attention与concat过分类器。
 3. 为什么Transformer可以做图像也可以做文本，为什么它适合做一个跨模态的任务？说的直白一点，因为Transformer中的Self-Attetion机制很强大，使得Transformer是一个天然强力的一维长序列特征提取器，而所有模态的信息都可以合在一起变成一维长序列被Transformer处理。当你输入纯句子时，模型能学到这个it主要指animal，那么比如当你输入图片猫+这个句子的时候，模型可能就能学到你前面那张猫指的就是这个animal。
 4. attention本身就是很强大的，已经热了很多年了，而self-attention更是使得Transformer的大规模pretrain成为可能的重要原因self-attention的序列特征提取功能其实是非常强大的，如果你用CNN，那么一次提取的特征只有一个限定大小的矩阵，如果在句子里做TextCNN，那就是提取一小段文字的特征，最后汇聚到一起；如果做RNN，那么会产生长程依赖问题，当句子 太长最后RNN会把前面的东西都忘掉。**self-attention的本质就是对每个token，计算这个token相对于这个句子其他所有token的特征再concat到一起**，无视长度，输入有多长，特征就提多远。**Transformer也可以认为是一个全连接图**， 缓解了序列数据普遍存在的长距离依赖和梯度消失等缺陷 。

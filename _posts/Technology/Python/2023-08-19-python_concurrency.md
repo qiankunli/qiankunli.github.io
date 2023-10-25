@@ -145,16 +145,23 @@ async def async_function():
     # 当 time.sleep() 被调用，整个程序都会暂停，什么都做不了。asyncio.sleep()是异步的，或者说是非阻塞的。
     await asyncio.sleep(3)
     return 1
-# 异步生成器
+# 异步生成器，调用方一般await for 生成器
 async def async_generator():
     yield 1
 print(async_function())
 # <coroutine object async_function at 0x102ff67d8>
 ```
+### Task
+
 异步代码是以 Task 的形式去运行，被 Event Loop 管理和调度的，协程跟普通函数区别是不会直接运行，此外coroutine 对象中的异步代码是可以被暂停和恢复的。`result = async_function()` 协程对象 result 虽然生成了，但是还没有运行，要使代码块实际运行，需要使用 asyncio 提供的其他工具。
 1. 最常见的是 await 关键字。在另一个async 函数里  `result = await async_function()`，有点像主动去调用一个传统意义上的同步函数
-2. `result = asyncio.run(async_function())`
-3. `asyncio.create_task()`，创建一个 Task 对象实例，Task 对象实例立即被运行。
+    1. 如果一个对象可以在 await 语句中使用，那么它就是 可等待 对象。许多 asyncio API 都被设计为接受可等待对象。可等待 对象有三种主要类型: 协程, Task  和 Future.
+2. `result = asyncio.run(async_function())`。 这是程序入口处专用的。run里边就不能再run了。
+3. `asyncio.create_task(async_function())`，创建一个 Task 对象实例，异步函数被包在了Task，Task 对象实例立即被运行。这一点与await不同，**如果我们有一个Coroutine，我们必须await它，才能把相应的异步函数提交给asyncio（然后才开始运行）**。当然了，虽然Task不await也能执行，但我们通常还是需要await各个Task。因为这可以确保它们执行完成并收集运行结果，不然我们就得用Future。
+    1. 任务可以便捷和安全地取消。 当任务被取消时，asyncio.CancelledError 将在遇到机会时在任务中被引发。
+    2. 任务组合并了一套用于等待分组中所有任务完成的方便可靠方式的任务创建 API。class asyncio.TaskGroup，持有一个任务分组的 异步上下文管理器。 可以使用 create_task() 将任务添加到分组中。 async with 语句将等待分组中的所有任务结束。 
+。当该上下文管理器退出时所有任务都将被等待。当首次有任何属于分组的任务因 asyncio.CancelledError 以外的异常而失败时，分组中的剩余任务将被取消。一旦所有任务被完成，如果有任何任务因 asyncio.CancelledError 以外的异常而失败，这些异常会被组合在 ExceptionGroup 或 BaseExceptionGroup 中并将随后引发。PS： 有点像go中的waitgroup，启动多个任务，发生异常、等一个任务执行完、等待所有任务都完成、限制某个任务执行过程都提供了接口。
+
 
 `result = await async_function()` 和普通的同步函数没有任何区别，主要原因是：这里其实没有将协程放到 Event Loop 中，这用到了asyncio.create_task()。
 
@@ -167,6 +174,24 @@ async def main():
     print(await task2)
 asyncio.run(main())
 ```
+Task 对象有以下api，非常直观。
+```
+done() # 如果 Task 对象 已完成 则返回 True。
+result() # 返回 Task 的结果。
+exception() # 返回 Task 对象的异常。
+add_done_callback(callback, *, context=None) # 添加一个回调，将在 Task 对象 完成 时被运行。
+get_stack(*, limit=None) # 返回此 Task 对象的栈框架列表。
+print_stack(*, limit=None, file=None) # 打印此 Task 对象的栈或回溯。
+cancel(msg=None) # 请求取消 Task 对象。
+cancelled() # 如果 Task 对象 被取消 则返回 True。
+uncancel() # 递减对此任务的取消请求计数。返回剩余的取消请求数量。
+```
+
+### 事件
+
+`class asyncio.Event`可用于通知多个 asyncio 任务某个事件已发生。asyncio.Event管理一个内部标志，该标志可以使用set() 方法设置为true，并使用clear() 方法重置为false。 wait() 方法阻塞，直到标志设置为 true 。该标志最初设置为false。
+
+### 实现原理
 
 生成器与协程的实现。模组、函数、类都是代码块，编译器会为每个代码块创建代码对象，代码对象描述了代码块的具体内容，包括代码对应的字节码、常数、变量名和其它相关信息。而函数则通过函数对象保存其代码对象、函数名、默认参数以及 `__doc__`属性等信息。生成器函数也是函数，只是其代码对象带有 CO_GENERATOR 标记。用户调用生成器函数时，Python 会检查此标记，如果存在，则不执行函数，而是返回生成器对象。类似地，原生协程函数也是函数，只是代码对象带有 CO_COROUTINE 标记，看到此标记时，Python 会直接返回原生协程对象。执行函数时，Python 会创建函数帧对象，用于保存代码对象的执行状态，包括代码对象本身以及局部变量的值、全局变量与内置变量字典的引用、值栈、指令指针等等。
 1. 生成器对象保存着生成器函数的函数帧，以及一些辅助数据，如生成器名称、运行标记等。关键的区别在于，运行普通函数时，每次创建一个新的函数帧，而运行生成器时，使用的是同一个函数帧，因而能保存其运行状态。

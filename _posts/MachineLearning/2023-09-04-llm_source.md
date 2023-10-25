@@ -236,15 +236,13 @@ print('GENERATION=', tokenizer.batch_decode(out.cpu()))
 ```
 How exactly is GPT-3 trained on such examples? We are not exactly sure (OpenAI is very secretive), but perhaps the two sequences of tokens are concatenated together, then GPT-3 is trained on such examples, **but the loss is only calculated in the “completion” part**. PS: 终于知道为何要分成两段，而不是喂一个文本就算了。
 
-## LoRA
+## PEFT/LoRA
 
 假如LLM的原始权重视为矩阵“X”。对于任何给定的任务，经过优化微调的 LLM 的权重由矩阵“Y”表示。微调的目标是发现一个 delta 矩阵“Z”，使得 X+Z=Y。然而，在 LoRA 的情况下，这个增量矩阵“Z”是通过低秩分解来近似的。因此，对于某些类型的任务来说， 一些数据集可能更容易对齐，而另一些数据集可能会有效果损失。相比之下，全参数微调则没有这个约束， 学习到的权重保留了原始模型的表达能力，可能简化了拟合不同数据的任务。
 
 [从0到1！得物如何打造通用大模型训练和推理平台](https://mp.weixin.qq.com/s/5EE1VXxq7k_VoC9gRPvyMg)
 
 对于大语音模型来说，其参数量非常多。GPT3有1750亿参数，而且LLAMA系列模型包括 7B,13B,33B,65B，而其中最小的7B都有70亿参数。要让这些模型去适应特定的业务场景，需要对他们进行微调。如果直接对这些模型进行微调，由于参数量巨大，需要的GPU成本就会非常高。LoRA的做法是对这些预训练好的大模型参数进行冻结，也就是在微调训练的时候，这些模型的参数设置为不可训练。然后往模型中加入额外的网络层，并只训练这些新增的网络层参数。这样可训练的参数就会变的非常少，可以以低成本的GPU微调大语言模型。LoRA在Transformer架构的每一层注入可训练的秩分解矩阵，与使用Adam微调的GPT-3 175B相比，LoRA可以将可训练参数数量减少10000倍，GPU内存需求减少3倍，并且在效果上相比于传统微调技术表现的相当或更好。当前已经得到HuggingFace 的 PEFT库 https://github.com/huggingface/peft 的支持。
-
-
 
 ### 原理
 
@@ -318,7 +316,7 @@ class LoraModel(torch.nn.Module):
     def __init__(self, model, config, adapter_name) -> None:
         super().__init__()
         self.model = model  # # model 被用来微调的基础大模型
-        self.forward = self.model.forward   # oraModel把自己的前向传播函数forword设置为大模型的forward方法
+        self.forward = self.model.forward   # LoraModel把自己的前向传播函数forword设置为大模型的forward方法
         self.peft_config = config
         self.add_adapter(adapter_name,self.peft_config[adapter_name])
     def _find_and_replace(self,adapter_name):
@@ -340,8 +338,30 @@ class LoraModel(torch.nn.Module):
         )
 ```
 可以看到
-1. Freeze参数的本质：requires_grad = False 
+1. Freeze 预训练模型权重/参数的本质：requires_grad = False ，不接受梯度更新，只微调参数A和B。，此时该步骤模型微调的参数量由$d×k$变成$d×r+r×k$，而$r≪min(d,k)$，因此微调参数量大量减少了。
 
 [图解大模型微调系列之：大模型低秩适配器LoRA（源码解读与实操篇）](https://mp.weixin.qq.com/s/RuV_4lCQentq4kBr3fv08A) 未读。
 
 [深入浅出剖析 LoRA 源码及实践](https://mp.weixin.qq.com/s/QdX1R0GPe6dvEDXjdJj5lA) 未读。
+
+## P-Tuning 系列/可学习的提示
+
+P-Tuning，简称PT，是一种针对于大模型的soft-prompt方法，包括两个版本；P-Tuning，仅对大模型的Embedding加入新的参数； P-Tuning-V2，将大模型的Embedding和每一层前都加上新的参数，这个也叫深度prompt。
+
+很多任务我们只需要在输入端输入合适的prompt，大语言模型就能给出一个比较合理的结果。但对于人工设计的prompt，prompt的变化对模型最终的性能特别敏感，加一个词、少一个词或者变动位置都会造成比较大的变化。那干脆让大模型学习一个合理的prompt，然后直接输入到模型中，这样是不是就可以直接得到一个比较合理的结果了？放弃之前人工或半自动离散空间的hard prompt设计，采用连续可微空间soft prompt设计，通过端到端优化学习不同任务对应的prompt参数。
+
+Prefix Tuning（面向文本生成领域（NLG）） 方法在输入 token 之前构造一段**任务相关的 virtual tokens** 作为 Prefix，然后训练的时候只更新 Prefix 部分的参数，而 PLM 中的其他部分参数固定。
+
+![](/public/upload/machine/prefix_tuning.jpg)
+
+Prompt Tuning 可以看作是 Prefix Tuning 的简化版本，它给每个任务定义了自己的Prompt，然后拼接到数据上作为输入，但只在输入层加入prompt tokens（在输入embedding层加入一段定长的可训练的向量，在微调的时候只更新这一段prompt的参数），另外，virtual token的位置也不一定是前缀，插入的位置是可选的。 但也有一些缺点 PS： Prompt Tuning 和 P Tuning 分不清了。
+1. 针对模型参数量缺少通用性，之前的试验证明了p-tuning针对参数量大于10B的模型有很好的效果，甚至可以达到全量微调的效果。但是针对中等规模的模型，效果就不是很明显了。
+2. 针对不同任务的通用性也比较差，之前的实验结果证明了在一些NLU任务上效果比较好，对序列标注类比较难的任务效果较差。
+2. prompt只加在了embedding层，这样做就让prompt比较难训练，同时也导致了可训练参数比较少。
+
+基于此，作者提出了P-tuning v2
+1. 在每一层都加入了Prompts tokens作为输入，而不是仅仅加在输入层，可学习的参数更多（从P-tuning和Prompt Tuning的0.01%增加到0.1%-3%），prompts与更深层相连，对模型输出产生更多的直接影响。
+
+除Prefix Tuning用于NLG任务外，Prompt Tuning、P-Tuning、P-Tuning V2 均用于NLU，P-Tuning和Prompt Tuning技术本质等同，Prefix Tuning和P-Tuning V2技术本质等同。
+
+**对于领域化的数据定制处理，P-Tune（Parameter Tuning）更加合适**。领域化的数据通常包含一些特定的领域术语、词汇、句法结构等，与通用领域数据不同。对于这种情况，微调模型的参数能够更好地适应新的数据分布，从而提高模型的性能。相比之下，LORA（Layer-wise Relevance Propagation）更注重对模型内部的特征权重进行解释和理解，通过分析模型对输入特征的响应来解释模型预测的结果。虽然LORA也可以应用于领域化的数据定制处理，但它更适合于解释模型和特征选择等任务，而不是针对特定领域的模型微调。

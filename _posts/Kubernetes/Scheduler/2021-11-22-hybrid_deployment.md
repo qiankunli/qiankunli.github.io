@@ -97,6 +97,8 @@ Koordinator，名字取自 coordinator，K for Kubernetes，发音相同。语�
 
 [字节跳动开源 Katalyst：在离线混部调度，成本优化升级](https://mp.weixin.qq.com/s/A5_1h3RLmDNazmAddbhYaA)提供资源超卖的能力，充分利用集群中 “**已经售卖但未充分使用的资源**” 部署更多低优业务，同时在系统侧完善 CPU、内存、磁盘、网络等多维度的资源隔离机制，并且智能预测、感知各类服务的负载变化，结合服务的分级机制，通过分钟级的指标感知和调控策略，保证服务的稳定性。
 
+[Koordinator 支持 K8s 与 YARN 混部](https://mp.weixin.qq.com/s/F-03uNnBNRqWP68lgpiizA)基于 Hadoop YARN 开源版本，原则上不对 YARN 做侵入式改造。单机侧 同时运行kubelet（pod） 和  NodeManger（YARN Task within cgroup），koordlet 做一些协同。
+
 ### 可观测性体系
 
 ### 单机层面：操作系统级/资源隔离
