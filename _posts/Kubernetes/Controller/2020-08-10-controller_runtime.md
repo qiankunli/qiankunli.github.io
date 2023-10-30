@@ -335,8 +335,11 @@ func New(name string, mgr manager.Manager, options Options) (Controller, error) 
 }
 ```
 
+一个controller主要包含Watch和Start两个方法，以及一个调协方法Reconcile。在controller的定义中，看上去没有资源对象的Informer或者Indexer数据，而在K8s中所有与kube-apiserver资源的交互是通过Informer实现的，实际上这里是通过下面的 startWatches 属性做了一层封装。
 
-### watch
+### watch event 并将其放入队列中
+
+Watch方法首先会判断当前的controller是否已启动，如果未启动，会将watch的内容暂存到startWatches中等待controller启动。如果已启动，则会直接调用src.Start(c.ctx, evthdler, c.Queue, prct...), 其中Source可以为informer、kind、channel等。src.Start方法作用是获取对应的informer，为informer注册了一个internal.EventHandler。internal.EventHandler实现了OnAdd、OnUpdate、OnDelete等方法，以OnAdd方法为例，该方法最后会调用EventHandler.Create 方法。EventHandler为一个接口，有EnqueueRequestForObject、Funcs、EnqueueRequestForOwner、enqueueRequestsFromMapFunc四个实现类。Reconcile协调执行的数据对象，实际是通过Informer中的EventHandler入队的。
 
 ![](/public/upload/kubernetes/controller_watch.png)
 
@@ -391,9 +394,9 @@ func (ks *Kind) Start(handler handler.EventHandler, queue workqueue.RateLimiting
 
 watch 在 controller 初始化时调用，明确了 Controller 监听哪些Type，订阅这些Type的变化（入队逻辑挂到informer 上）。Controller.Watch ==> Source.Start 也就是 Kind.Start 就是从cache 中获取资源对象的 Informer 并注册事件监听函数。 对 事件监听函数进行了封装，放入到工作队列中的元素不是以前默认的元素唯一的 KEY，而是经过封装的 reconcile.Request 对象，当然通过这个对象也可以很方便获取对象的唯一标识 KEY。
 
-### start
+### start 触发队列消费
 
-start 由manager.Start 触发，消费workqueue，和 一般控制器中启动控制循环比较类似
+start 由manager.Start 触发，消费workqueue，和 一般控制器中启动控制循环比较类似。Start方法有两个主要功能，一是调用所有startWatches中Source的start方法，注册EventHandler。二是启动Work来处理资源对象，processNextWorkItem从Queue中获取资源对象，reconcileHandler 函数就是我们真正执行元素业务处理的地方，函数中包含了事件处理以及错误处理，真正的事件处理是通过c.Do.Reconcile(req) 暴露给开发者的，所以对于开发者来说，只需要在 Reconcile 函数中去处理业务逻辑就可以了。
 
 ```go
 // sigs.k8s.io/controller-runtime/pkg/internal/controller/controller.go

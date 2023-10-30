@@ -348,7 +348,7 @@ Normalization有两种方法，Batch Normalization和Layer Normalization。关�
 ### Position-wise Feed Forward
 
 1. 每一层经过attention之后，还会有一个FFN，这个FFN的作用就是空间变换。FFN包含了2层linear transformation层，中间的激活函数是ReLu。
-2. attention层的output最后会和相乘，为什么这里又要增加一个2层的FFN网络？FFN的加入引入了非线性(ReLu激活函数)，变换了attention output的空间, 从而增加了模型的表现能力。把FFN去掉模型也是可以用的，但是效果差了很多。
+2. attention层的output最后会和相乘，为什么这里又要增加一个2层的FFN网络？Attention内部就是对特征向量V加权平均的过程。只用self-Attention搭建的网络结构就只有线性表达能力。FFN的加入引入了非线性(ReLu激活函数)，变换了attention output的空间, 从而增加了模型的表现能力。把FFN去掉模型也是可以用的，但是效果差了很多。
 $$
 FFN(x) = max(0,xW_1+b1)W_2+b_2
 $$

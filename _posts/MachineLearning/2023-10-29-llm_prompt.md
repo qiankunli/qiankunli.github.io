@@ -1,0 +1,160 @@
+---
+
+layout: post
+title: 提示工程
+category: 技术
+tags: MachineLearning
+keywords: llm prompt
+
+---
+
+* TOC
+{:toc}
+
+## Prompt 材料1
+
+预训练+微调范式主要是让预训练语言模型去适配下游任务，通过**引入下游任务的loss**，让模型在具体任务上继续训练，以便在下游任务上取得较好的成绩。在这个过程中，语言模型会遗忘预训练过程中学到的知识，造成模型泛化性和鲁棒性的丢失，仅能保留某个任务或者某个数据的信息。而且随着语言模型的逐渐变大，模型本身已经存储了大量的知识，因为具体的下游任务微调导致原本模型能力丧失，是大家不愿意看到的。因此预训练+提示+预测的范式成为LLM主流使用方法，该模式**让下游任务去适配预训练语言模型**，通过对下游任务的重构，让下游任务符合模型预训练过程，消除预训练任务与下游任务之间的差异，使得下游任务在少样本甚至零样本上可以获得较好的成绩，提高模型的泛化性和鲁棒性。具体而言，提示学习是在原始输入文本上附加额外的提示信息作为新的输入，将下游的预测任务转化为语言模型任务，并将语言模型的预测结果转化为原本下游任务的预测结果。以情感分析任务为例
+1. 原始任务 input=“我爱中国”，output=正向/负向
+2. 提示学习 input=“我爱中国，这句话的情感为{mask}”，output=mask值，再将mask值映射到情感标签上。
+
+GPT-3论文定义：如果需要（基于梯度下降为主的算法）对模型参数进行更新，就是fine-tune。如果不需要修改模型和参数，只要给模型一些提示和样例，就让模型复合我们的一些要求完成一些任务就叫in-context learning，后面大家开始叫prompt。GPT 模型可以使用prompt 和 fine tune两种方式进行训练和使用，取决于具体的应用场景和任务需求。prompt 是第一种针对GPT 模型的特殊训练方式，**不需要大量数据，不需要对模型参数进行改动，也就意味着可以不部署模型，而是接入公开的大预言模型服务（MaaS）**。缺点是，模型生成的内容受限于提示信息，不能够完全发挥模型的潜力。PS：即便是AGI，你也得在具体提问上需要告诉模型任务是什么。
+
+[我对Prompt Engineering的理解](https://mp.weixin.qq.com/s/fLtYMwqefoDSeypOuY8bUA)“提示工程（Prompt Engineering）” 这一概念源于语言模型的发展，它描述了如何有效地**利用提示从语言模型中提取信息**的过程，包括选择合适的词汇、语法、上下文和主题等元素。 PS：准备样本 ==> 准备提示。**提示词的本质就是收窄范围**。p(input)=output，为了让模型输出期待的output，找到合适的input。 
+1. 在语言模型中，“提示” 是用户提供给模型的输入。在 ChatGPT 中，它可以理解为你输入文本框的文字。然后，语言模型根据你的提示 “推断” 出一个 “补全”。
+2. “提示工程” 是利用提示作为一种从模型中提取所需信息的方法。这种方法很有吸引力，因为你不需要大量的离线训练数据集，不需要离线访问模型，而且对于非工程师来说也很直观。提示只是调整模型的一种方式。
+3. “提示工程” 是一种更严谨的领域，**旨在利用提示作为一种为实际应用构建可靠功能的方法**。它与 ChatGPT 式的提示有所不同，因为通过提示工程生成的提示通常用于在高频、多样化的场景中反复使用，**以便为应用程序可靠地解决特定问题**。
+
+
+[一文详解Prompt学习和微调（Prompt Learning & Prompt Tuning）](https://zhuanlan.zhihu.com/p/620222350)
+
+1. 过去许多机器学习方法是基于全监督学习（fully supervised learning）的。由于监督学习需要大量的数据学习性能优异的模型，而在 NLP 中大规模训练数据（指为特定任务而标注好的数据）是不足的，因此在深度学习出现之前研究者通常聚焦于**特征工程**（feature engineering），即利用领域知识从数据中提取好的特征；
+2. 在深度学习出现之后, 由于特征可以从数据中习得，因此研究者转向了**结构工程**（architecture engineering），即通过通过设计一个合适的网络结构来把归纳偏置（inductive bias）引入模型中，从而有利于学习好的特征。
+3. 在 2017-2019 年，NLP 模型开始转向一个新的模式（BERT），即预训练 + 微调（pre-train and fine-tune）。在这个模式中, 先用一个固定的结构预训练一个语言模型（language model, LM），预训练的方式就是让模型补全上下文（比如完形填空）。由于预训练不需要专家知识，因此可以在网络上搜集的大规模文本上直接进行训练。然后这个 LM 通过引入额外的参数或微调来适应到下游任务上。此时研究者转向了**目标工程**（objective engineering），即为预训练任务和微调任务设计更好的目标函数。
+4. 在做 objective engineering 的过程中，研究者发现**让下游任务的目标与预训练的目标对齐是有好处的**（预训练是文字接龙，就把目标任务也改为文字接龙的形式，预训练是文字填空，就把目标任务也改为文字填空）。因此下游任务通过引入文本提示符（textual prompt），把原来的任务目标重构为与预训练模型一致的填空题。比如一个输入 “I missed the bus today.” 的重构：
+    1. 情感预测任务。输入：“I missed the bus today.I felt so___.” 其中 “I felt so” 就是提示词（prompt），然后使用 LM 用一个表示情感的词填空。
+    2. 翻译任务。输入：“English:I missed the bus today. French: ___.” 其中 “English:” 和 “French:” 就是提示词，然后使用 LM 应该再空位填入相应的法语句子。
+5. 我们发现用不同的 prompt 加到相同的输入上，就能实现不同的任务，从而使得下游任务可以很好的对齐到预训练任务上，实现更好的预测效果。后来研究者发现，在同一个任务上使用不同的 prompt，预测效果也会有显著差异，因此现在有许多研究开始聚焦于 **prompt engineering**。
+
+[五万字综述！Prompt Tuning：深度解读一种新的微调范式](https://mp.weixin.qq.com/s/-lfq63NrsqUgmvYNzogCew)
+1. Prompt-Tuning自从GPT-3被提出以来，从传统的离散、连续的Prompt的构建、走向面向超大规模模型的In-Context Learning、Instruction-tuning和Chain-of-Thought。
+2. 自从GPT、EMLO、BERT的相继提出，以Pre-training + Fine-tuning 的模式在诸多自然语言处理（NLP）任务中被广泛使用，其先在Pre-training阶段通过一个模型在大规模无监督语料上预先训练一个 预训练语言模型（Pre-trained Language Model，PLM） ，然后在Fine-tuning阶段基于训练好的语言模型在具体的下游任务上再次进行 微调（Fine-tuning） ，以获得适应下游任务的模型。这种模式在诸多任务的表现上超越了传统的监督学习方法，不论在工业生产、科研创新还是竞赛中均作为新的主流方式。然而，这套模式也存在着一些问题。例如，在大多数的下游任务微调时，**下游任务的目标与预训练的目标差距过大 导致提升效果不明显，微调过程中依赖大量的监督语料** 等。
+3. 至此，以GPT-3、PET为首提出一种基于预训练语言模型的新的微调范式——Prompt-Tuning ，其旨在**通过添加模板的方法来避免引入额外的参数**，从而让语言模型可以在小样本（Few-shot）或零样本（Zero-shot）场景下达到理想的效果。
+4. 以二分类的情感分析作为例子，给定一个句子`[CLS] I like the Disney films very much. [SEP]`
+    1. 传统的Fine-tuning方法是将其通过BERT的Transformer获得 `[CLS]`表征之后再喂入新增加的MLP分类器进行二分类，预测该句子是积极的（positive）还是消极的（negative），因此需要一定量的训练数据来训练。
+    2. Prompt-Tuning则执行如下步骤：
+        1. 构建模板（Template Construction） ：通过人工定义、自动搜索、文本生成等方法，生成与给定句子相关的一个含有`[MASK]`标记的模板。例如`It was [MASK]`，并拼接到原始的文本中，获得Prompt-Tuning的输入：`[CLS] I like the Disney films very much. [SEP] It was [MASK]. [SEP]`。将其喂入BERT模型中，并复用预训练好的MLM分类器，即可直接得到`[MASK]`预测的各个token的概率分布；
+        2. 标签词映射（Label Word Verbalizer） ：因为`[MASK]`部分我们只对部分词感兴趣，因此需要建立一个映射关系。例如如果`[MASK]`预测的词是“great”，则认为是positive类，如果是“terrible”，则认为是negative类。
+    3. 不同的句子应该有不同的template和label word，没错，因为每个句子可能期望预测出来的label word都不同，因此如何最大化的寻找当前任务更加合适的template和label word是Prompt-tuning非常重要的挑战。
+    4. 其实我们可以理解，引入的模板和标签词本质上也属于一种数据增强，通过添加提示的方式引入先验知识。
+5. GPT-3开创性提出 in-context learning 概念，即无须修改模型即可实现few-shot/zero-shot learning。同时引入了demonstrate learning，即让模型知道与标签相似的语义描述，提升推理能力。
+    1. In-context Learning ：是Prompt的前身。其通过从训练集中挑选一些样本作为任务的提示提示（Natural Language Prompt），来实现免参数更新的模型预测；
+    2. Demonstration Learning ：添加一些新的文本作为提示。例如在对“I like the Disney film. It was [MASK]”进行情感分析时，可以拼接一些相似场景的ground-truth文本“I like the book, it was great.”、“The music is boring. It is terrible for me.”等。此时模型在根据新添加的两个样例句子就可以“照葫芦画瓢”式地预测结果了。
+
+[ChatGPT Prompt工程：设计、实践与思考](https://mp.weixin.qq.com/s/AizUBFssilX2S9aRfuz3_g) 未细读。
+
+[关于AI未来，我有十二条自用的思考Prompt分享](https://mp.weixin.qq.com/s/7eah_qMhol4EBwrz1bzxeA)
+
+[AI大模型如何在行业实际落地：企业对话场景拥抱大模型之路](AI大模型如何在行业实际落地：企业对话场景拥抱大模型之路)
+1. 提示工程主要是为了解决预训练语言模型训练过程的任务和实际业务的任务之间不一致的问题。通过提示语，可以让预训练语言模型理解当前任务的类型，从而可以更好地完成任务。随着 NLP 技术的飞速发展，现在的提示工程已变得更为复杂，**提示语通常包含任务指令、任务目标、行为约束、输出规范、资源清单、样例展示和思维能力提示等要素**。给每个任务找到合适的提示语还是一个很大的挑战。不同的任务需要差异化的 Prompt 模版（PromptTemplate），从指令设计、样例选择、样例的顺序以及推理过程等细节进行 prompt 的优化微调，每一个环节都可能影响到 Prompt 在实际应用的场景效果。测试结果显示，在意图识别上，不同的 Prompt 的准确率能达到 2%~80% 的巨大差距。
+2. Prompt 工程可能是暂时的一个中间过程。只是说，**现在大模型的能力还没有达到基于人工设定的复杂任务目标去自主性进行任务分解，然后根据这些任务转化成一种它可以直接解决的细粒度的自然语言任务**。现在大模型需要中间的提示工程师帮助它理解任务，然后转化成它可以直接执行的自然语言任务，这中间是一个适配的过程”。未来随着大模型的能力向更高层级提升，会覆盖掉现有的 Prompt 工程。
+
+
+## Prompt 材料2
+
+为模型增加外部记忆，在提示词中引入一些领域知识，帮助模型提升回答质量。只需给予大模型详细的指令，清晰表达任务约束或规范，超大模型就能够按指令要求地完成任务。
+
+[人人都需要掌握的Prompt Engineering技巧](https://mp.weixin.qq.com/s/JvoBOzdHmagLXiT2k1nYPQ)对于一些复杂的问题，Prompt写得好不好，直接影响着大模型给出答案的正确与否。本质上，**LLM是一个概率模型，它只是在给定的信息的前提下，给出概率最大的结果，它并不保证结果的合理性和正确性**。要让LLM给出的结果尽可能地合理、正确，这是我们使用LLM的人的职责。
+
+AI界的大佬 --- Andrew NG推出过一个Prompt Engineering的短课程《ChatGPT Prompt Engineering for Developers》，提到写好Prompt的一些基本理念。PS： **ICL给示范/示例，CoT给思路**，老师教学也是这么搞的。
+1. 明确、具体是关键。我们发给LLM的批令，越明确、越具体，对于LLM越友好。
+    ![](/public/upload/machine/prompt_tips.jpg)
+2. 给LLM更多的时间去思考。通过Prompt Engineering 的方式，把LLM的“慢思考”调动起来。
+    1. 一个简单的技巧是在你的Prompt后面，加上这样一句话“Let’s think step by step”。这句话会引导LLM，会去分步骤思考，效果会比不加这句话要好。
+    2. CoT(Chain-of-Thought) 在Prompt中加入一些例子，让LLM照着例子进行推理、思考。注意，CoT是LLM足够大（参数足够多，通常是在1000亿参数）时才涌现出来的能力。因此，在一些不够大的LLM上，CoT的效果并不明显。此外，在Prompt中加入的示例不是1条，而是多条。具体要考虑解决的问题类型，以及Prompt的长度（因为LLM的Prompt长度通常都是有长度限制的）。
+3. Self-Consistency技术：利用CoT Prompting技巧，写好Prompt；不要让LLM只生成最合适的唯一一个结果，而是利用LLM结果的多样性，生成多种不同推理路径所得的结果的集合；从结果集合中投票选择，选出投票最多的结果，做为最终的答案。
+4. 从易至难技术：Least-to-Most，CoT的特点是同类型问题的迁移思考，因此，如果给的例子是比较简单的问题，而给的问题却是难度大很多的问题，这时候CoT的效果就不尽如人意。LtM(Least-to-Most)主是为了解决CoT这种从易到难的迁移能力不足而诞生的。LtM的核心思想是：教LLM把复杂问题，拆解成一系列的简单问题，通过解决这一系列的简单问题，来最终得到复杂问题的结果。LtM的过程包含两个阶段：
+    1. 分解阶段：把复杂问题分解成一系列的简单子问题。这个阶段的Prompt中要包含分解问题的示例，要和分解的问题；
+    2. 解决子问题阶段：这个阶段的Prompt中包含三部分内容：一是完整的LtM的例子；二是已解决的子问题及其答案列表；三是接下来要解答的子问题。
+
+[构建高性能 Prompt 之路——结构化 Prompt](https://zhuanlan.zhihu.com/p/647134737) 
+
+[GPT Prompt编写的艺术：如何提高AI模型的表现力](https://mp.weixin.qq.com/s/N8XnSSdXlIITSig5z1oZCw) 目标、问题、上下文、要求，针对各个场景罗列了写prompt 的具体技巧和案例。 
+
+目前网上已经有不少 prompt 优化工具，比如 chatgpt 的插件中就有一个不错的工具 prompt perfect，能够基于用户给的 prompt 进行优化，再喂给 chatgpt 进行提问
+
+![](/public/upload/machine/prompt_perfect.jpg)
+
+## 工程示例
+
+通过增强大语言模型输入的质量，来提升生成内容质量。
+
+[硬核Prompt赏析：HuggingGPT告诉你Prompt可以有多“工程”](https://mp.weixin.qq.com/s/Cu2BpzWOuphrVsZ69JR9Hw) 值得细读。
+
+## 代码示例
+
+零样本
+```python
+from langchain import PromptTemplate
+template = "What is a good name for a company that makes {product}?"
+prompt = PromptTemplate(
+    input_variables=["product"],
+    template=template,
+)
+prompt.format(product="colorful socks")
+```
+小样本
+```python
+from langchain import PromptTemplate, FewShotPromptTemplate
+examples = [
+    {"word": "happy", "antonym": "sad"},
+    {"word": "tall", "antonym": "short"},
+]
+example_template = """
+Word: {word}
+Antonym: {antonym}\n
+"""
+example_prompt = PromptTemplate(
+    input_variables=["word", "antonym"],
+    template=example_template,
+)
+few_shot_prompt = FewShotPromptTemplate(
+    examples=examples,
+    example_prompt=example_prompt,
+    prefix="Give the antonym of every input",
+    suffix="Word: {input}\nAntonym:",
+    input_variables=["input"],
+    example_separator="\n",
+)
+few_shot_prompt.format(input="big")
+```
+
+以上代码将生成一个提示模板，并根据提供的示例和输入组合成以下提示：
+
+```
+Give the antonym of every input
+
+Word: happy
+Antonym: sad
+
+Word: tall
+Antonym: short
+
+Word: big
+Antonym:
+```
+
+## Prompt 能力有上限嘛？
+
+[Prompt工程如此强大，我们还需要模型训练吗？ - 算法小陈的回答 - 知乎](https://www.zhihu.com/question/586331504/answer/3125792161)
+
+1. 在GPT没有爆火之前，一直以来的共识都是：模型的规模越大，模型在下游任务上的能力越多、越强。LLM原始训练目标是为了生成自然、连贯的文本，因为其本身接受了大量的文本进行预训练，因此根据提示补全和创造文本就是模型的原生能力。不过，仅仅能进行文本创造，并不足以让大语言模型掀起新的一轮技术革命，引爆这一轮技术革命的真正原因是：大语言模型的**涌现能力**。针对这些在小模型上没有出现，但是在大模型上出现的不可预测的能力，就被称为涌现能力，换句话说：所谓涌现能力（EmergentCapabilities），指的是**模型在没有针对特定任务进行训练的情况下，仍然能够在合理提示下处理这些任务的能力**，有时也可以将涌现能力理解为模型潜力，巨大的技术潜力，是LLM爆火的根本原因。
+2. 激发大型语言模型的涌现能力有两种方法：提示工程（prompt engineering）和微调（fine-tuning）。对于这两种方法各自有各自使用的应用场景，**提示工程解决的问题，往往不会用微调（如小语义空间内的推理问题），微调通常用于解决那些无法通过特征工程解决的问题**。它们更多的时候是作为上下游技术关系，例如要进行本地知识库的定制化问答，最好的方法就是借助提示工程进行数据标注，然后再利用标注好的数据进行微调。
+3. 相比模型的原生能力，模型的涌现能力是非常不稳定的，要利用提示工程和微调技术来引导和激发模型的涌现能力，难度很大。在不修改模型本身参数（微调）的情况下，模型涌现能力极度依赖对模型的提示过程，即对同样一个模型，不同的提示方法将获得质量完全不同的结果。
+4. 对于提示工程来说，其侧重点是要解决复杂语义理解问题，而要验证模型是否具备这种能力，可以观察模型是否能解决复杂逻辑推理问题。
+    1. 'text-davinci-003'在Zero-shot的情况下，逻辑推理能力较弱，只能围绕相对简单的、只有线性运算过程的推理问题进行很好的解答。**四个经典推理问题只能答对一个**。如何加强模型的逻辑处理能力？
+    2. One-shot & Few-shot提示学习法。通过输入一些类似问题和问题答案，让模型参考学习，并在同一个prompt的末尾提出新的问题，依次提升模型的推理能力。虽然无法确定模型预测过程发生了何种变化，Few-shot提示方法能够一定程度提高模型推理能力，但提升的幅度有限，对于稍微复杂些的推理问题，模型仍然无法做出准确的回答。**四个经典推理问题答对二个**。
+    3. Few-shot有非常多的变种方法，其中一类非常重要的变种方法就是围绕提示的示例进行修改，即在示例中不仅提供问题+答案，同时还会增加一些辅助思考和判断的“提示”。Zero-shot-CoT是在Few-shot思想下，一种更好的提示方法。它借助思维链（也被称为思考链，Chain of Thought，CoT）提示法来解决这个问题。一种非常简单而有效的方式是：在提示词尾部追加一句“Let’s think step by step”，即可大幅提高模型推理能力。**四个经典推理问题答对三个**。
+    4. Zero-shot-CoT是零样本提示的情况下通过修改提示词后缀激发模型的思维链，而Few-shot-CoT则是通过编写思维链样本作为提示词，让模型学会思维链的推导方式，从而更好的完成推导任务。相比于Few-shot，Few-shot-CoT的不同之处只是在于需要在提示样本中不仅给出问题的答案、还同时需要给出问题推导的过程（即思维链），从而让模型学到思维链的推导过程，并将其应用到新的问题中。
+    5. 在谷歌大脑提出的CoT被实际验证能够大幅提升大语言模型的推理能力不久，来自谷歌大脑的另一个团队在此基础上提出了一种名为Least-to-Most（LtM）的提示方法，初衷是为了解决CoT提示方法泛化能力不足的问题——即通过人工编写的思维链提示样本可能并不能够很好的迁移到别的问题当中去，导致“新的问题”无法使用“老的模板”进行解决。即然要找到更加普适的解决问题的流程会非常复杂，那能否“千人千面”让大模型自己找到解决当前问题的思维链呢？基于这个思路开发了一种全新的提示流程，即先通过提示过程让模型找到解决该问题必须要分步解决哪几个问题，然后再通过依次解决这些问题来解决最原始的问题。而整个依次回答问题的过程，其实就可以看成是CoT的过程，只不过LtM会要求模型根据每个不同的问题，单独生成解决问题的链路，以此做到解决问题流程的“千人千面”，从而能够更加精准的解决复杂推理问题。而整个过程问题的由少变多，则是LEAST-TO-MOST一词的来源。通过提示模板“To solve __, we need ti first solve:”来引导模型创建子问题，然后先解决这个子问题，之后将原问题、子问题和问题和答案三部分都作为prompt输入给大语言模型，让其对原始问题进行回答。所以，LtM的核心并不仅仅在于引导模型拆分问题，还在于及时将子问题的问题和答案回传给模型，以便更好的围绕原始问题进行回答。**四个经典推理问题答对四个**。
+
+
