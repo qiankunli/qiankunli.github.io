@@ -21,28 +21,7 @@ PS：看LangChain的感受就是：遇事不决问LLM。这跟常规的工程项
 
 ## LLM模型层
 
-一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析（output_parsers 在 prompt 中插入了需要返回的格式说明）等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。
-
-```python
-# BaseLanguageModel 是一个抽象基类，是所有语言模型的基类
-class BaseLanguageModel(...):
-    # 基于用户输入生成prompt
-    @abstractmethod
-    def generate_prompt(self,prompts: List[PromptValue],stop: Optional[List[str]] = None,...) -> LLMResult:
-    @abstractmethod
-    def predict(self, text: str, *, stop: Optional[Sequence[str]] = None, **kwargs: Any ) -> str:
-    @abstractmethod
-    def predict_messages(self, messages: List[BaseMessage],) -> BaseMessage:
-# BaseLLM 增加了缓存选项, 回调选项, 持有各种参数
-class BaseLLM(BaseLanguageModel[str], ABC):
-    1. 覆盖了 __call__ 实现  ==> generate ==> _generate_helper ==> prompt 处理 +  _generate 留给子类实现。 
-    2. predict ==> __call__
-# LLM类期望它的子类可以更加简单，将大模型的调用方法完全封装，不需要用户实现完整的_generate方法，只需要对外提供一个非常简单的call方法就可以操作LLMs
-class LLM(BaseLLM):
-    1. _generate ==> _call 留给子类实现。 输入文本格式提示，返回文本格式的答案
-```
-
-LangChain 本质上就是对各种大模型提供的 API 的套壳，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**。PS：底层Transformers/fastchat库只提供 `output_ids = model.generate(input_ids)` 对话信息一般需要通过 prompt template 转为prompt/input_ids，每个model 的 chat prompt template 也都会有所不同。
+LangChain 本身不提供LLM，本质上就是对各种大模型提供的 API 的套壳，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**。PS：底层Transformers/fastchat库只提供 `output_ids = model.generate(input_ids)` 对话信息一般需要通过 prompt template 转为prompt/input_ids，每个model 的 chat prompt template 也都会有所不同。
 1. Chat Model，聊天模型，用于产生人类和 AI 之间的对话，有两个专属于 Chat 模型的概念，一个是消息，一个是角色。每个消息都有一个 role（可以是 system、user 或 assistant）和 content（消息的内容）。系统消息设定了对话的背景（比如你是一个很棒的智能助手），然后用户消息提出了具体请求。
     1. system：系统消息主要用于设定对话的背景或上下文。这可以帮助模型理解它在对话中的角色和任务。例如，你可以通过系统消息来设定一个场景，让模型知道它是在扮演一个医生、律师或者一个知识丰富的 AI 助手。系统消息通常在对话开始时给出。
     2. user：用户消息是从用户或人类角色发出的。它们通常包含了用户想要模型回答或完成的请求。用户消息可以是一个问题、一段话，或者任何其他用户希望模型响应的内容。
@@ -69,6 +48,27 @@ Chat Model响应
    }
   ]
 }
+```
+
+一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析（output_parsers 在 prompt 中插入了需要返回的格式说明）等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。
+
+```python
+# BaseLanguageModel 是一个抽象基类，是所有语言模型的基类
+class BaseLanguageModel(...):
+    # 基于用户输入生成prompt
+    @abstractmethod
+    def generate_prompt(self,prompts: List[PromptValue],stop: Optional[List[str]] = None,...) -> LLMResult:
+    @abstractmethod
+    def predict(self, text: str, *, stop: Optional[Sequence[str]] = None, **kwargs: Any ) -> str:
+    @abstractmethod
+    def predict_messages(self, messages: List[BaseMessage],) -> BaseMessage:
+# BaseLLM 增加了缓存选项, 回调选项, 持有各种参数
+class BaseLLM(BaseLanguageModel[str], ABC):
+    1. 覆盖了 __call__ 实现  ==> generate ==> _generate_helper ==> prompt 处理 +  _generate 留给子类实现。 
+    2. predict ==> __call__
+# LLM类期望它的子类可以更加简单，将大模型的调用方法完全封装，不需要用户实现完整的_generate方法，只需要对外提供一个非常简单的call方法就可以操作LLMs
+class LLM(BaseLLM):
+    1. _generate ==> _call 留给子类实现。 输入文本格式提示，返回文本格式的答案
 ```
 
 ## Prompt
@@ -103,7 +103,7 @@ User: What is the meaning of life?
 AI: "" "
 ```
 
-## Chain模块
+## Chain
 
 LangChain是语言链的涵义，那么Chain就是其中的链结构，属于组合各个层的中间结构，可以称之为胶水层，将各个模块（models, document retrievers, other chains）粘连在一起，实现相应的功能，也是用于程序的调用入口。
 
@@ -244,8 +244,21 @@ def _load_stuff_chain(...)-> StuffDocumentsChain:
 
 ## Memory
 
-记忆 ( memory )允许大型语言模型（LLM）记住与用户的先前交互。默认情况下，LLM 是 无状态 stateless 的，这意味着每个传入的查询都独立处理，不考虑其他交互。对于无状态代理 (Agents) 来说，唯一存在的是当前输入，没有其他内容。有许多应用场景，记住先前的交互非常重要，比如聊天机器人。在 LangChain 中，有几种方法可以实现对话记忆，它们都是构建在 ConversationChain 之上的。
+记忆 ( memory )允许大型语言模型（LLM）记住与用户的先前交互。默认情况下，LLM/Chain 是 无状态 stateless 的，每次交互都是独立的，无法知道之前历史交互的信息。对于无状态代理 (Agents) 来说，唯一存在的是当前输入，没有其他内容。有许多应用场景，记住先前的交互非常重要，比如聊天机器人。
 
+LangChain使用Memory组件保存和管理历史消息，这样可以跨多轮进行对话，在当前会话中保留历史会话的上下文。Memory组件支持多种存储介质，可以与Monogo、Redis、SQLite等进行集成，以及简单直接形式就是Buffer Memory。常用的Buffer Memory有
+1. ConversationSummaryMemory ：以摘要的信息保存记录
+2. ConversationBufferWindowMemory：以原始形式保存最新的n条记录
+3. ConversationBufferMemory：以原始形式保存所有记录
+
+通过查看chain的prompt，可以发现{history}变量传递了从memory获取的会话上下文。
+
+```python
+memory = ConversationBufferMemory()
+conversation = ConversationChain(llm=llm, memory=memory, verbose=True)
+print(conversation.prompt)
+print(conversation.predict(input="1+1=?"))
+```
 
 ConversationChain 的提示模板 `print(conversation.prompt.template)`：
 ```

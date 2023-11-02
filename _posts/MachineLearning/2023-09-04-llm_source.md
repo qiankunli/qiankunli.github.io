@@ -11,7 +11,7 @@ keywords: llm source
 * TOC
 {:toc}
 
-## 前言（持续中）
+## 前言
 
 ## OPENAI API
 
@@ -46,13 +46,23 @@ ChatCompletion.create函数的详细参数和Completion.create函数相比发生
 
 ## Transformers
 
+[NLP Course](https://huggingface.co/learn/nlp-course) 官方教程，建议从头到尾细看一下。
+
 [Transformers快速入门](https://transformers.run/)Hugging Face 专门为使用 Transformer 模型编写了一个 Transformers 库，建立在 Pytorch 框架之上（Tensorflow 的版本功能并不完善），所有 Transformer 模型都可以在 Hugging Face Hub 中找到并且加载使用，包括训练、推理、量化等。
 
-transformers开源库的核心组件包括3个：Conﬁguration、Tokenizer、Model
-1. 「Conﬁguration」：配置类，通常继承自「PretrainedConﬁg」，保存model或tokenizer的超参数，例如词典大小，隐层维度数，dropout rate等。配置类主要可用于复现模型。
-2. 「Tokenizer」：切词类，通常继承自「PreTrainedTokenizer」，主要存储词典，token到index映射关系等。此外，还会有一些model-specific的特性，如特殊token，`[SEP]`, `[CLS]`等的处理，token的type类型处理，语句最大长度等，**因此tokenizer通常和模型是一对一适配的**。
-3. 「Model」: 模型类。封装了预训练模型的计算图过程，遵循着相同的范式，如根据token ids进行embedding matrix映射，紧接着多个self-attention层做编码，最后一层task-specific做预测。
-针对上述三大类，transformer还额外封装了AutoConfig, AutoTokenizer,AutoModel，可通过模型的命名来定位其所属的具体类，比如’bert-base-cased’，就可以知道要加载BERT模型相关的配置、切词器和模型。
+![](/public/upload/machine/transformers_overview.png)
+
+### pipelines
+
+开箱即用的 pipelines，它封装了预训练模型和对应的前处理和后处理环节。
+1. 预处理 (preprocessing)，**Transformer模型无法直接处理原始文本字符串**；具体地，我们会使用每个模型对应的分词器 (tokenizer) 来进行。 PS： 有点类似于tf的各种FeatureColumn
+  1. 将输入切分为词语、子词或者符号（例如标点符号），统称为 tokens；
+  2. 根据模型的词表将每个 token 映射到对应的 token 编号/id；
+  3. 根据模型的需要，添加一些额外的输入。比如tokens补齐和截断操作
+2. 将处理好的输入送入模型；
+3. 对模型的输出进行后处理 (postprocessing)，将其转换为人类方便阅读的格式。
+
+![](/public/upload/machine/transformers_pipeline.jpg)
 
 ```python
 from transformers import pipeline
@@ -66,15 +76,34 @@ results = generator("In this course, we will teach you how to")
 print(results)
 ```
 
-开箱即用的 pipelines，Transformers 库最基础的对象就是 `pipeline()` 函数，它封装了预训练模型和对应的前处理和后处理环节。
-1. 预处理 (preprocessing)，**Transformer模型无法直接处理原始文本字符串**；具体地，我们会使用每个模型对应的分词器 (tokenizer) 来进行。 PS： 有点类似于tf的各种FeatureColumn
-  1. 将输入切分为词语、子词或者符号（例如标点符号），统称为 tokens；
-  2. 根据模型的词表将每个 token 映射到对应的 token 编号/id；
-  3. 根据模型的需要，添加一些额外的输入。比如tokens补齐和截断操作
-2. 将处理好的输入送入模型；
-3. 对模型的输出进行后处理 (postprocessing)，将其转换为人类方便阅读的格式。
+### 基础
 
-![](/public/upload/machine/transformers_pipeline.jpg)
+transformers开源库的核心组件包括3个：Conﬁguration、Tokenizer、Model
+1. 「Conﬁguration」：配置类，通常继承自「PretrainedConﬁg」，保存model或tokenizer的超参数，例如词典大小，隐层维度数，dropout rate等。配置类主要可用于复现模型。
+2. 「Tokenizer」：Model只能处理数字，因此Tokenizer需要将我们的文本输入转换为数字。
+    1. 通常继承自「PreTrainedTokenizer」，主要存储词典（也就是`from_pretrained()` 的部分），token到index映射关系等。
+    2. 此外，还会有一些model-specific的特性，如特殊token，`[SEP]`, `[CLS]`等的处理，token的type类型处理，语句最大长度等，**因此tokenizer通常和模型是一对一适配的**。
+3. 「Model」: 模型类。封装了预训练模型的计算图过程，遵循着相同的范式，如根据token ids进行embedding matrix映射，紧接着多个self-attention层做编码，最后一层task-specific做预测。
+针对上述三大类，transformer还额外封装了AutoConfig, AutoTokenizer,AutoModel，可通过模型的命名来定位其所属的具体类，比如’bert-base-cased’，就可以知道要加载BERT模型相关的配置、切词器和模型。
+
+```python
+# Building the config
+config = BertConfig()
+# Building the model from the config,使用随机值对其进行初始化
+model = BertModel(config)
+print(config)
+BertConfig {
+  [...]
+  "hidden_size": 768,               # 定义了hidden状态向量的大小
+  "intermediate_size": 3072,
+  "max_position_embeddings": 512,
+  "num_attention_heads": 12,
+  "num_hidden_layers": 12,          # 定义了Transformer模型的层数
+  [...]
+}
+# 加载已经训练过的Transformers模型
+model = BertModel.from_pretrained("bert-base-cased")
+```
 
 ```python
 # 加载与保存分词器
@@ -107,6 +136,257 @@ print(output)
 5. *ForQuestionAnswering：问答模型，一般是抽取式问答
 6. *ForSequenceClassification：序列分类模型
 7. *ForTokenClassification：token分类模型，如命名实体识别和关系抽取
+
+![](/public/upload/machine/transformers_pipelines.png)
+
+### 源码分析
+
+```python
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
+sequences = ["I've been waiting for a HuggingFace course my whole life.", "So have I!"]
+tokens = tokenizer(sequences, padding=True, truncation=True, return_tensors="pt")
+print(tokens)
+#{
+#    'input_ids': tensor([
+#        [  101,  1045,  1005,  2310,  2042,  3403,  2005,  1037, 17662, 12172,2607,  2026,  2878,  2166,  1012,   102],
+#        [  101,  2061,  2031,  1045,   999,   102,     0,     0,     0,     0, 0,     0,     0,     0,     0,     0]
+#    ]),     
+#    'attention_mask': tensor([
+#        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+#        [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+#    ])
+#}
+output = model(**tokens)
+print(output)
+# SequenceClassifierOutput(
+#    loss=None, 
+#    logits=tensor([[-1.5607,  1.6123],[-3.6183,  3.9137]], grad_fn=<AddmmBackward0>), 
+#    hidden_states=None, 
+#    attentions=None
+#)
+```
+
+model(xx) ==> `Module.__call__` ==> Module.forward/model.forward
+
+```python
+class Module:
+	__call__ : Callable[..., Any] = _call_impl
+	def _call_impl(self, *args, **kwargs):
+        forward_call = (self._slow_forward if torch._C._get_tracing_state() else self.forward)
+       	...
+     	result = forward_call(*args, **kwargs)  # dict 可以作为kwargs参数传入
+     	... # 涉及到动态图的构建
+     	return result
+
+class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMixin, PeftAdapterMixin):
+	def save_pretrained(...)
+	@classmethod
+    def from_pretrained(...)
+
+class ChatGLMPreTrainedModel(TorchModel, PreTrainedModel):
+    ...
+class ChatGLMModel(ChatGLMPreTrainedModel):
+	def forward(self,input_ids,attention_mask,...)
+```
+
+一些细节
+
+1. Models expect a batch of inputs。当你试图将两个（或更多）句子组合在一起时，它们的长度可能不同。为了解决这个问题，我们将使用填充使张量具有矩形。Padding通过在值较少的句子中添加一个名为Padding token的特殊单词来确保我们所有的句子长度相同。当要求处理更长的序列时
+    ```python
+    model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
+    batched_ids = [
+        [200, 200, 200],
+        [200, 200, tokenizer.pad_token_id],
+    ]
+    attention_mask = [
+        [1, 1, 1],
+        [1, 1, 0],
+    ]
+    outputs = model(torch.tensor(batched_ids), attention_mask=torch.tensor(attention_mask))
+    print(outputs.logits)
+    ```
+
+### Dataset
+
+```python
+from datasets import load_dataset
+raw_datasets = load_dataset("glue", "mrpc")
+print(raw_datasets)
+# 包含训练集、验证集和测试集。每一个集合都包含几个列(sentence1, sentence2, label, and idx)以及一个代表行数的变量
+#DatasetDict({
+#    train: Dataset({
+#        features: ['sentence1', 'sentence2', 'label', 'idx'],
+#        num_rows: 3668
+#    })
+#    validation: Dataset({
+#        features: ['sentence1', 'sentence2', 'label', 'idx'],
+#        num_rows: 408
+#    })
+#    test: Dataset({
+#        features: ['sentence1', 'sentence2', 'label', 'idx'],
+#        num_rows: 1725
+#    })
+#})
+```
+
+为了预处理数据集，我们需要将文本转换为模型能够理解的数字，使用Dataset.map()方法
+```python
+# example 是一个dict，对应数据集的每个元素，并返回一个包含input_ids、attention_mask 和token_type_ids为key的新dict
+def tokenize_function(example):
+    return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
+tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+print(raw_datasets)
+#DatasetDict({
+#    train: Dataset({
+#        features: ['attention_mask', 'idx', 'input_ids', 'label', 'sentence1', 'sentence2', 'token_type_ids'],
+#        num_rows: 3668
+#    })
+#    validation: Dataset({
+#        features: ['attention_mask', 'idx', 'input_ids', 'label', 'sentence1', 'sentence2', 'token_type_ids'],
+#        num_rows: 408
+#    })
+#    test: Dataset({
+#        features: ['attention_mask', 'idx', 'input_ids', 'label', 'sentence1', 'sentence2', 'token_type_ids'],
+#        num_rows: 1725
+#    })
+#})
+```
+为了解决句子长度统一的问题，我们必须定义一个collate函数，该函数会将每个batch句子填充到正确的长度。
+
+```python
+from datasets import load_dataset
+from transformers import AutoTokenizer, DataCollatorWithPadding
+
+raw_datasets = load_dataset("glue", "mrpc")
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+def tokenize_function(example):
+    return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
+tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+```
+加载本地数据集
+```python
+from datasets import load_dataset
+#{
+#    "data": [
+#        {
+#            "title": "Terremoto del Sichuan del 2008",
+#            "paragraphs": [{...}]
+#        }
+#    ],
+#     "version": "1.1"
+#}
+squad_it_dataset = load_dataset("json", data_files="SQuAD_it-train.json", field="data")
+print(squad_it_dataset) # 加载本地文件会创建一个带有train的DatasetDict 对象
+# DatasetDict({
+#    train: Dataset({
+#        features: ['title', 'paragraphs'],
+#        num_rows: 442
+#    })
+#})
+data_files = {"train": "SQuAD_it-train.json", "test": "SQuAD_it-test.json"}
+squad_it_dataset = load_dataset("json", data_files=data_files, field="data")
+print(squad_it_dataset) # 包括 train 和 test 的 DatasetDict 对象
+#DatasetDict({
+#    train: Dataset({
+#        features: ['title', 'paragraphs'],
+#        num_rows: 442
+#    })
+#    test: Dataset({
+#        features: ['title', 'paragraphs'],
+#        num_rows: 48
+#    })
+#})
+```
+
+与 Pandas 类似，transformers Datasets 提供了几个函数来操作 Dataset 和 DatasetDict 对象
+1. rename_column 重命名DatasetDict中的列
+2. filter 过滤一些行
+3. 为数据集中的所有行创建新的数据列
+    ```python
+    def compute_review_length(example):
+        return {"review_length": len(example["review"].split())}
+    drug_dataset = drug_dataset.map(compute_review_length)
+    ```
+4. 用于预训练 GPT-2 的 WebText 语料库包含超过 800 万个文档和 40 GB 的文本，全加载到计算机内存吃不消，`pubmed_dataset_streamed = load_dataset("json", data_files=data_files, split="train", streaming=True)`，streaming=True 返回的对象是一个 IterableDataset
+
+## Trainer
+
+在我们定义 Trainer 之前首先要定义一个 TrainingArguments 类，它将包含 Trainer用于训练和评估的所有超参数。唯一必须提供的参数是保存训练模型的目录，以及训练过程中的检查点。对于其余的参数，可以保留默认值。
+
+```python
+from transformers import TrainingArguments
+raw_datasets = load_dataset("glue", "mrpc")
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+def tokenize_function(example):
+    return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
+tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+training_args = TrainingArguments("test-trainer")
+model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
+trainer = Trainer(
+    model,
+    training_args,
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["validation"],
+    data_collator=data_collator,
+    tokenizer=tokenizer,
+)
+trainer.train()
+```
+不用trainer，纯手工实现训练过程，也是trainer帮我们自动化的部分
+```python
+raw_datasets = load_dataset("glue", "mrpc")
+
+# data preprocessing
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+def tokenize_function(example):
+    return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
+tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+tokenized_datasets = tokenized_datasets.remove_columns(["sentence1", "sentence2", "idx"])
+tokenized_datasets = tokenized_datasets.rename_column("label", "labels")
+tokenized_datasets.set_format("torch")
+## tokenized_datasets column_names: ["attention_mask", "input_ids", "labels", "token_type_ids"]
+train_dataloader = DataLoader(
+    tokenized_datasets["train"], shuffle=True, batch_size=8, collate_fn=data_collator
+)
+eval_dataloader = DataLoader(
+    tokenized_datasets["validation"], batch_size=8, collate_fn=data_collator
+)
+
+model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
+optimizer = AdamW(model.parameters(), lr=3e-5)
+## put our model and our batches on GPU
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+model.to(device)
+num_epochs = 3
+num_training_steps = num_epochs * len(train_dataloader)
+lr_scheduler = get_scheduler(   #  the learning rate scheduler 
+    "linear",
+    optimizer=optimizer,
+    num_warmup_steps=0,
+    num_training_steps=num_training_steps,
+)
+progress_bar = tqdm(range(num_training_steps))
+
+model.train()
+for epoch in range(num_epochs):
+    for batch in train_dataloader:
+        batch = {k: v.to(device) for k, v in batch.items()}
+        outputs = model(**batch)
+        loss = outputs.loss
+        loss.backward()
+
+        optimizer.step()
+        lr_scheduler.step()
+        optimizer.zero_grad()
+        progress_bar.update(1)
+```
+
 
 
 ## GPT-2养成记 

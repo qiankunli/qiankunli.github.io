@@ -149,6 +149,8 @@ keywords: hpc 对象存储 AI
 
 [多云缓存在知乎的演进](https://mp.weixin.qq.com/s/Pcvoa9ZSAO_XSLoiyhAeRA)
 
+[火山引擎云原生存储加速实战](https://mp.weixin.qq.com/s/lo6kEPmqJSSLUS6ZJs6EDw)
+
 ## 其它
 
 [面向大数据存算分离场景的数据湖加速方案](https://mp.weixin.qq.com/s/kog8ADN6-1o9tLoPEUZ8rg) 未读

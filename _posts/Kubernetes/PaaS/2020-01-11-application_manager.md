@@ -130,3 +130,7 @@ OAM 支持  Kubernetes 内置的工作负载，那什么时候该使用 Deployme
     2. 编写适用于所有 object 的通用工具也更简单；
     3. 用户体验更加一致。
 6. Reconcile 机制：还通过让不同 k8s 组件使用同一套设计模式来实现一致性。由于所有操作都是基于观察（observation）而非状态机， 因此 reconcile 机制非常健壮：每次一个 controller 挂掉之后再起来时， 能够接着之前的状态继续工作。
+
+## 其它
+
+[八年磨一剑，四大技术视角总结云上应用管理实践](https://mp.weixin.qq.com/s/oTjDzGsXL3RhYbee01MOJw)
