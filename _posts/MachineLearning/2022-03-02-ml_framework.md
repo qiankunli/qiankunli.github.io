@@ -8,6 +8,8 @@ keywords: ml framework
 
 ---
 
+<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
+
 ## 简介
 
 * TOC
@@ -28,6 +30,8 @@ keywords: ml framework
 4. 大模型有两个比较大的特点：
     1. 模型结构收敛到Transformer，而且大部分是decoder only的架构；
     2. 模型的规模大，达到百亿/千亿级别，训练推理成本高，训练时间长。
+
+所谓的“模型”本质上是两个部分的合体：计算图和模型参数——神经网络的本质是一个数学定义下的函数，它自身不是一个可执行的程序。举个简单的例子，假设某个模型的函数实际上就是一个二次函数$f(x)=x^2+2x+1$，那它的“计算图”就是$ax^2+bx+c$（简写，实际要变成图结构），参数就是一个字典：`{a:1,b:2,c:1}`。所以**pytorch保存的模型文件实际上是一个python字典（key是模型层的名称，value是对应参数）**，你用pytorch载入一个保存好的模型，需要先在代码里import 模型定义，然后再load_state_dict。换句话说，实际发布的“模型”本身需要依附于框架而存在，不是一个可执行文件。
 
 ## 抽象层
 

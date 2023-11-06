@@ -233,6 +233,7 @@ print(raw_datasets)
 为了预处理数据集，我们需要将文本转换为模型能够理解的数字，使用Dataset.map()方法
 ```python
 # example 是一个dict，对应数据集的每个元素，并返回一个包含input_ids、attention_mask 和token_type_ids为key的新dict
+# 在机器学习任务中，一个example通常定义为模型的输入（也成为特征集合）
 def tokenize_function(example):
     return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
 tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)

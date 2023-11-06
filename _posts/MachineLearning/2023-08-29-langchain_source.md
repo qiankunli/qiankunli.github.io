@@ -21,7 +21,7 @@ PS：看LangChain的感受就是：遇事不决问LLM。这跟常规的工程项
 
 ## LLM模型层
 
-LangChain 本身不提供LLM，本质上就是对各种大模型提供的 API 的套壳，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**。PS：底层Transformers/fastchat库只提供 `output_ids = model.generate(input_ids)` 对话信息一般需要通过 prompt template 转为prompt/input_ids，每个model 的 chat prompt template 也都会有所不同。
+**LangChain 本身不提供LLM，本质上就是对各种大模型提供的 API 的套壳**，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**。PS：底层Transformers/fastchat库只提供 `output_ids = model.generate(input_ids)` 对话信息一般需要通过 prompt template 转为prompt/input_ids，每个model 的 chat prompt template 也都会有所不同。
 1. Chat Model，聊天模型，用于产生人类和 AI 之间的对话，有两个专属于 Chat 模型的概念，一个是消息，一个是角色。每个消息都有一个 role（可以是 system、user 或 assistant）和 content（消息的内容）。系统消息设定了对话的背景（比如你是一个很棒的智能助手），然后用户消息提出了具体请求。
     1. system：系统消息主要用于设定对话的背景或上下文。这可以帮助模型理解它在对话中的角色和任务。例如，你可以通过系统消息来设定一个场景，让模型知道它是在扮演一个医生、律师或者一个知识丰富的 AI 助手。系统消息通常在对话开始时给出。
     2. user：用户消息是从用户或人类角色发出的。它们通常包含了用户想要模型回答或完成的请求。用户消息可以是一个问题、一段话，或者任何其他用户希望模型响应的内容。
@@ -204,13 +204,102 @@ PS：用一个最复杂的场景比如 ConversationalRetrievalChain 打上断点
 
 ### RetrievalQA
 
+检索器(retriever)是一个接口，它需要实现的功能是：对于给定的一个非结构化的查询，返回Document对象；它本身不需要存储数据，只是简单地返回数据。
+
+Document 对象的艺术之旅（从加载、转换、存储、到查询结果都用Document 表示）
+
+![](/public/upload/machine/langchain_retriever.jpg)
+
+```python
+loader = TextLoader('./test.txt', encoding='utf8')
+docs = loader.load()
+print(docs)
+# [Document(page_content='ChatGPT是OpenAI开发的一个大型语言模型，...', metadata={'source': './test.txt'})]
+text_splitter = CharacterTextSplitter(separator = "\n\n",chunk_size = 1000,chunk_overlap  = 200,length_function = len,is_separator_regex = False,)
+texts = text_splitter.create_documents([d.page_content for d in docs])
+print(texts)
+# [
+#	Document(page_content='ChatGPT是OpenAI开发的一个大型语言模型，...', metadata={}), 
+#	Document(page_content='我们将探讨如何使用不同的提示工程技术来实现不同的目标。...', metadata={}), 
+#	Document(page_content='无论您是普通人、研究人员、开发人员，...', metadata={}), 
+#	Document(page_content='在整本书中，...', metadata={})
+#]
+embeddings = HuggingFaceEmbeddings(model_name='BAAI/bge-large-en',multi_process=True)
+db = Chroma.from_documents(texts, embeddings)
+query = "ChatGPT是什么？"
+docs = db.similarity_search(query)
+print(docs[0].page_content)
+# ChatGPT是OpenAI开发的一个大型语言模型，可以提供各种主题的信息
+retriever = db.as_retriever()
+retrieved_docs = retriever.invoke(query)
+print(retrieved_docs[0].page_content)
+```
+
+retriever.invoke(query) ==> retriever.get_relevant_documents ==> VectorStoreRetriever.similarity_search
+
+```python
+class BaseRetriever(ABC):
+    def invoke(self, input: str, config: Optional[RunnableConfig] = None) -> List[Document]:
+        config = config or {}
+        return self.get_relevant_documents(input,...)     
+    def get_relevant_documents(self, query: str, *, callbacks: Callbacks = None, **kwargs: Any) -> List[Document]:
+    @abstractmethod
+    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+    async def aget_relevant_documents(self, query: str, *, callbacks: Callbacks = None, **kwargs: Any) -> List[Document]:
+class VectorStoreRetriever(BaseRetriever):
+    def _get_relevant_documents( self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+        docs = self.vectorstore.similarity_search(query, **self.search_kwargs)
+        return docs
+```
+BaseRetriever 的基本工作就是 get_relevant_documents（留给子类 _get_relevant_documents实现），核心是vectorstore.similarity_search，对于 BaseRetriever 的扩展，则是在vectorstore.similarity_search 之前或之后做一些事情，这也是  retriever 和 VectorStore 要分为两个接口的原因。
+1. 处理query，比如生成多个新的query
+2. 对找回的documents 进一步的查询、转换等
+2. 提供add_documents 接口，在存入 vectorstore 时即将 get_relevant_documents 用到的一些关联数据存入到docstore
+
+```python
+class MultiQueryRetriever(BaseRetriever):
+    retriever: BaseRetriever
+    llm_chain: LLMChain
+    def _get_relevant_documents(self,query: str,*,run_manager: CallbackManagerForRetrieverRun,) -> List[Document]:
+        queries = self.generate_queries(query, run_manager)
+        documents = self.retrieve_documents(queries, run_manager)
+        return self.unique_union(documents) 
+class MultiVectorRetriever(BaseRetriever):
+    id_key: str = "doc_id"
+    vectorstore: VectorStore
+    docstore: BaseStore[str, Document]
+    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+        sub_docs = self.vectorstore.similarity_search(query, **self.search_kwargs)
+        ids = [] # We do this to maintain the order of the ids that are returned
+        for d in sub_docs:
+            if d.metadata[self.id_key] not in ids:
+                ids.append(d.metadata[self.id_key])
+        docs = self.docstore.mget(ids)
+        return [d for d in docs if d is not None]
+class ParentDocumentRetriever(MultiVectorRetriever):
+    child_splitter: TextSplitter
+    parent_splitter: Optional[TextSplitter] = None
+    def add_documents(self,documents: List[Document],ids: Optional[List[str]] = None,add_to_docstore: bool = True,) -> None:
+        documents = self.parent_splitter.split_documents(documents)
+        docs = []
+        full_docs = []
+        for i, doc in enumerate(documents):
+            sub_docs = self.child_splitter.split_documents([doc])
+            for _doc in sub_docs:
+                _doc.metadata[self.id_key] = _id
+            docs.extend(sub_docs)
+            full_docs.append((_id, doc))
+        self.vectorstore.add_documents(docs)
+        self.docstore.mset(full_docs)
+```
+
+RetrievalQA 则是retriever 的包装类，有点retriever  工厂的意思，根据不同的参数 选择不同的llm、retriever 来实现QA。 
+
 ```python
 qa = RetrievalQA.from_chain_type(llm=OpenAI(), chain_type="stuff",retriever=self.vector_db.as_retriever())
 answer = qa(query)                                          
 ```
-
 其实质是 通过retriever 获取相关文档，并通过BaseCombineDocumentsChain 来获取答案。
-
 ```
 RetrievalQA.from_chain_type 
     ==> load_qa_chain ==> _load_stuff_chain ==> StuffDocumentsChain(xx)
@@ -240,6 +329,8 @@ def _load_stuff_chain(...)-> StuffDocumentsChain:
     _prompt = prompt or stuff_prompt.PROMPT_SELECTOR.get_prompt(llm)
     llm_chain = LLMChain(llm=llm,prompt=_prompt,verbose=verbose,callback_manager=callback_manager,callbacks=callbacks,)
     return StuffDocumentsChain(llm_chain=llm_chain,...) 
+class RetrievalQA(BaseRetrievalQA):
+    retriever: BaseRetriever = Field(exclude=True)
 ```
 
 ## Memory

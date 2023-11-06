@@ -23,6 +23,11 @@ keywords: llm finetune
 外挂知识库也不是全能的
 1. 向量化的匹配能力是有上限的，搜索引擎实现语义搜索已经是好几年的事情了，为什么一直无法上线，自然有他的匹配精确度瓶颈问题，只是很多以前没有接触过AI 的朋友对之不熟悉罢了。
 2. 在引入外部知识这个事情上，如果是特别专业领域，纯粹依赖向量、NLP、策略/规则在某些场景仍然不奏效。对于某个具体业务而言，不要管是不是90%会被解决，只有需要被解决或不需要被解决。
+3. 微调的优势在于能够使LLM的行为适应特定的细微差别、语气或术语。如果我们希望模型听起来更像医学专业人士、或者使用特定行业的术语，那么对特定领域的数据进行微调可以让我们实现这些定制。
+4. 有多少标记的训练数据可用？微调LLM以适应特定任务或领域在很大程度上取决于可用标记数据的质量和数量。丰富的数据集可以帮助模型深入理解特定领域的细微差别、复杂性和独特模式，从而使其能够生成更准确且与上下文相关的响应。然而，如果我们使用有限的数据集，微调带来的改进可能微乎其微。从本质上讲，如果我们拥有大量的标记数据来捕获该领域的复杂性，那么微调可以提供更加定制和完善的模型行为。但在此类数据有限的情况下，RAG 系统提供了一个强大的替代方案，确保应用程序通过其检索功能保持数据知情和上下文感知。
+5. 抑制幻觉有多重要？
+6. 数据的静态/动态程度如何？在特定数据集上微调 LLM 意味着模型的知识成为训练时该数据的静态快照。如果数据频繁更新、更改或扩展，模型很快就会过时。相比之下，RAG 系统在动态数据环境中具有固有的优势。他们的检索机制不断查询外部来源，确保他们提取用于生成响应的信息是最新的。
+
 
 ## 如何对大模型进行微调
 
@@ -176,7 +181,7 @@ Prompt Tuning 可以看作是 Prefix Tuning 的简化版本，它给每个任务
 
 **对于领域化的数据定制处理，P-Tune（Parameter Tuning）更加合适**。领域化的数据通常包含一些特定的领域术语、词汇、句法结构等，与通用领域数据不同。对于这种情况，微调模型的参数能够更好地适应新的数据分布，从而提高模型的性能。相比之下，LORA（Layer-wise Relevance Propagation）更注重对模型内部的特征权重进行解释和理解，通过分析模型对输入特征的响应来解释模型预测的结果。虽然LORA也可以应用于领域化的数据定制处理，但它更适合于解释模型和特征选择等任务，而不是针对特定领域的模型微调。
 
-## 实践（未完成）
+## 实践
 
 PS: 深度学习都得指定features/labels。在llm 场景下，features 和labels 有几个特点
 1. llm 有base model、sft model 等，不同的model 数据集格式不同，一般分为几个部分，比如sft 的`{"question:":"xx","answer":"xx"}`，各家模型都不太一样，很多数据集是不公开的。但不管如何，这几部分都会拼为一个sentence（中间可能有一些特殊字符起到连接作用），然后把sentence通过tokenizer转换成input_ids，之后再走embedding 模块等等就是Transformer系列模型内的事儿了，最后得到output_ids.
@@ -245,3 +250,60 @@ PS: 深度学习都得指定features/labels。在llm 场景下，features 和lab
 
 ### 使用huggingface的Trainer API进行模型微调
 
+[使用医患对话数据训练新冠诊疗模型的例子](https://github.com/hiyouga/ChatGLM-Efficient-Tuning/blob/main/examples/covid_doctor.md)
+
+```
+LLaMA-Factory
+    /src
+        /llmtuner
+            /tuner
+                /core  一些通用逻辑
+                /dpo
+                    /workflow.py
+                /ppo
+                    /workflow.py
+                /pt
+                    /workflow.py
+                /rm
+                    /workflow.py
+                /sft
+                    /workflow.py
+```
+
+workflow.py 的逻辑言简意赅，就是拼凑运行 Trainer的dataset、model、tokenizer、data_collator等参数。其中 dataset 有一个load_dataset 和preprocess_dataset 的过程，preprocess_dataset 会根据任务目标不同，处理逻辑不同，也就是将数据转为input_ids 的方式不同。 
+
+以pt对应的workflow.py 为例
+```python
+def run_pt(model_args: "ModelArguments",data_args: "DataArguments",training_args: "Seq2SeqTrainingArguments",finetuning_args: "FinetuningArguments",callbacks: Optional[List["TrainerCallback"]] = None):
+    dataset = get_dataset(model_args, data_args)
+    model, tokenizer = load_model_and_tokenizer(model_args, finetuning_args, training_args.do_train, stage="pt")
+    dataset = preprocess_dataset(dataset, tokenizer, data_args, training_args, stage="pt")
+    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    trainer = Trainer(
+        model=model,
+        args=training_args,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        callbacks=callbacks,
+        **split_dataset(dataset, data_args, training_args)
+    )
+    # Training
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
+        trainer.log_metrics("train", train_result.metrics)
+        trainer.save_metrics("train", train_result.metrics)
+        trainer.save_state()
+        trainer.save_model()
+        if trainer.is_world_process_zero() and model_args.plot_loss:
+            plot_loss(training_args.output_dir, keys=["loss", "eval_loss"])
+     # Evaluation
+    if training_args.do_eval:
+        metrics = trainer.evaluate(metric_key_prefix="eval")
+        try:
+            perplexity = math.exp(metrics["eval_loss"])
+        except OverflowError:
+            perplexity = float("inf")
+        metrics["perplexity"] = perplexity
+        trainer.log_metrics("eval", metrics)
+        trainer.save_metrics("eval", metrics)
+```

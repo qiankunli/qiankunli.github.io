@@ -37,3 +37,5 @@ keywords: llm multimodal
 谷歌的 ViT 模型就是把图像切块切成不重叠的块，将每个块当作一个 token，于是就可以将 NLP 里的 Transformer 直接应用于图像分类。这种建模相比 CNN 有两个明显的好处：
 1. 相比 CNN 这种基于静态模板的网络，Transformer 的滤波模板是随位置动态的，可以更高效地建模关系。
 2. 可以建模长程关系（Long-term relationship），可以建模远距离的 token 之间的关联。
+
+![](/public/upload/machine/multimodal_network.jpg)
