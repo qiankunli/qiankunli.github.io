@@ -31,7 +31,7 @@ keywords:  distributed training
   1. 一是模型太大，我们需要把模型“拆”成多个小模型分布到不同的Worker机器上；
   2. 二是数据太大，我们需要把数据“拆”成多个更小的数据分布到不同Worker上。
 2. 架构模式，通过模型并行或数据并行解决了“大问题”的可行性，接下来考虑“正确性”。以数据并行为例，当集群中的每台机器只看到1/N的数据的时候，我们需要一种机制在多个机器之间同步信息（梯度），来保证分布式训练的效果与非分布式是一致的（N * 1/N == N）。相对成熟的做法主要有基于参数服务器（ParameterServer）和基于规约（Reduce）两种模式。Tensorflow 既有 PS 模式又有对等模式，PyTorch 以支持对等模式为主，而 MXNET 以支持 KVStore 和 PS-Lite 的 PS 模式为主。 [ 快手八卦 --- 机器学习分布式训练新思路(1)](https://mp.weixin.qq.com/s/CYJzTP-wU3pmyR1lPCSsvg) 
-3. 同步范式（参数更新方式）， 在梯度同步时还要考虑“木桶”效应，即集群中的某些Worker比其他的更慢的时候，导致计算快的Worker需要等待慢的Worker，整个集群的速度上限受限于最慢机器的速度。因此梯度的更新一般有**同步(Sync)、异步(Async)和混合**三种范式。
+3. 在worker与parameter server之间模型参数的更新有同步(Synchronous)、异步(Asynchronous)和混合三种模式。 在梯度同步时还要考虑“木桶”效应，即集群中的某些Worker比其他的更慢的时候，导致计算快的Worker需要等待慢的Worker，整个集群的速度上限受限于最慢机器的速度。因此梯度的更新一般有**同步(Sync)、异步(Async)和混合**三种范式。
   1. 同步模式中，在每一次迭代过程中，所有工作节点都需要进行通信，并且下一步迭代必须等待当前迭代的通信完成才能开始。**确保所有的设备都是采用相同的模型参数来训练**，需要各个设备的计算能力要均衡，而且要求集群的通信也要均衡。
   2. 反之，异步式分布算法 则不需要等待时间：当某个节点完成计算后就可直接传递本地梯度，进行模型更新。
 4. 物理架构，这里主要指基于GPU的部署架构，基本上分为两种：单机多卡和多机多卡
@@ -125,9 +125,18 @@ class TensorParallelModel(nn.Module):
 
 [Galvatron项目原作解读：大模型分布式训练神器，一键实现高效自动并行](https://mp.weixin.qq.com/s/nqmfZSKdYD8JPtZwvQtWZw)稠密大模型拥有着动辄数十亿、百亿甚至万亿规模的参数量，面临高昂的计算、存储、以及通信成本，为 AI 基础设施带来了巨大的挑战。人们研发了很多工具（如 Megatron、DeepSpeed、FairSeq 等）来实现如数据并行、张量模型并行、流水并行、分片数据并行等各种并行范式。但这种粗粒度的封装逐渐难以满足用户对系统效率和可用性的需要。**如何通过系统化、自动化的方式实现大模型分布式训练**，已经成为了当前 MLSys 领域最为重要的问题之一。最近已经有一些系统开始提及“自动并行”的概念，但它们大部分都还停留在对 API 和算子进行工程上的封装，仍然依赖用户人工反复尝试或系统专家经验才能完成部署，并没有从根本上解决自动并行难题。近日，北大河图团队提出了一套面向大模型的自动并行分布式训练系统 Galvatron，相比于现有工作在多样性、复杂性、实用性方面均具有显著优势，性能显著优于现有解决方案。
 
+## 存储
+
+分布式训练所需的数据集通常占用的存储空间都很大，如果为每个计算节点都配备一个足够大的存储单元来存放完整数据集的副本，其成本将及其高昂，也使得数据集的管理、更新和同步十分复杂和耗时。所以在构建集群时通常会构建一个独立的大规模存储系统，存储系统上的数据对每个计算节点都可见，减少不必要的数据拷贝和同步的开销，同时存储系统的搭建还需要考虑AI分布式计算在I/O负载方面一些不同的特性，比如数据以大量的小文件读为主，数据请求频率高，并发量大等问题。
+
+
 ## 通信技术
 
 训练框架面临的是 单机CPU与GPU 之间、单机多GPU之间、多机CPU 之间、多机GPU 之间的通信问题，有各种优化方案，但要对上层提供统一通信接口，并进一步结合机器学习的特点提供 collective Communication 接口。
+
+AI分布式集群中**计算节点之间**通常使用InfiniBand或Myrinet等高性能网络互连和通信，每个**计算节点内**的多个加速卡(比如GPU、TPU、NPU等)通过PCI-E进行通信。在一个完整AI分布式训练过程中包两个链路的数据传输：训练数据从磁盘到主机内存、加速卡存储的I/O网络链路，训练参数在节点内不同加速卡和不同节点上的传输的参数传输链路，所以分布式训练通常包含多种不同的通信协议和技术的混合应用。
+1. 高效的数据通信需要选择合适的通信协议和网络拓扑，并且需要根据任务特性进行优化，以减少通信开销引入的系统延迟。以CPU+GPU的异构集群为例，节点与节点之间是高性能网络通信，节点内CPU和CPU之间是通过总线共享内存、CPU和GPU之间则通过PCI-E总线通信、GPU与GPU之间通过NVLink直连模式通信等。
+2. 在多节点网络通信中，传统的以太网通常采用TCP/IP协议进行网络通信，数据发送方把原始的数据分割成以Packet为单位的数据包，每个数据包在发送前要先经过TCP协议、IP协议、UDP协议等多层网络协议处理和封装后再交由物理层进行数据发送，接收方从网络中接收到数据包后需要经过对应的多层网络协议解析后才能获取到原始的数据包。远程直接内存访问(Remote Direct Memory Access, RDMA)是一种高性能低延迟的网络通信方案，它可以通过网络把数据直接传入计算机的存储单元中，数据的封装、搬运和解析都是由硬件直接完成不需要CPU和操作系统的参与。相比于传统TCP/IP网络通信，RDMA在执行数据读写请求时数据直接从应用程序发送到本地网卡缓冲区，数据发送过程不需要CPU进行额外的处理，本地网卡获取到数据后通过网络传送到目标网卡，目标网卡在确认接收到数据后直接将其写入到应用程序的缓存中。RDMA实现了一个虚拟的I/O通道，应用程序可通过RDMA方式直接对远程虚拟内存进行zero copy的读写，大幅降低了网络通信的延迟和CPU的负载。
 
 ### 硬件和协议层
 
@@ -152,6 +161,8 @@ RDMA本身指的是一种技术，具体协议层面，包含Infiniband（IB）�
 |硬件|以太网卡|RDMA 网卡|
 |驱动||rdma-core|
 |接口|socket|libibverbs|
+
+在多节点网络通信中，传统的以太网通常采用TCP/IP协议进行网络通信，数据发送方把原始的数据分割成以Packet为单位的数据包，每个数据包在发送前要先经过TCP协议、IP协议、UDP协议等多层网络协议处理和封装后再交由物理层进行数据发送，接收方从网络中接收到数据包后需要经过对应的多层网络协议解析后才能获取到原始的数据包。在这个过程数据需要消耗CPU资源进行多次数据拷贝和网络协议处理，因而会引入一定的延迟。由于AI分布式训练对网络的吞吐量和延迟都有比较高的要求，所以需要有更高效的通信协议和通信方式来降低网络的通信延迟。远程直接内存访问(Remote Direct Memory Access, RDMA)是一种高性能低延迟的网络通信方案，它可以通过网络把数据直接传入计算机的存储单元中，数据的封装、搬运和解析都是由硬件直接完成不需要CPU和操作系统的参与。相比于传统TCP/IP网络通信，RDMA在执行数据读写请求时数据直接从应用程序发送到本地网卡缓冲区，数据发送过程不需要CPU进行额外的处理，本地网卡获取到数据后通过网络传送到目标网卡，目标网卡在确认接收到数据后直接将其写入到应用程序的缓存中。RDMA实现了一个虚拟的I/O通道，应用程序可通过RDMA方式直接对远程虚拟内存进行zero copy的读写，大幅降低了网络通信的延迟和CPU的负载。
 
 [系列解读SMC-R：透明无感提升云上TCP应用网络性能](https://mp.weixin.qq.com/s/Zz0qTbG9ZbRT53LHPJ_koQ)Shared Memory Communication over RDMA (SMC-R) 是一种基于 RDMA 技术、兼容 socket 接口的内核网络协议，由 IBM 提出并在 2017 年贡献至 Linux 内核。SMC-R 能够帮助 TCP 网络应用程序透明使用 RDMA，获得高带宽、低时延的网络通信服务。
 
@@ -183,6 +194,13 @@ Collective communication包含多个sender和多个receiver（相对于P2P 模�
 [谈分布式机器学习系统中的网络相关问题](https://zhuanlan.zhihu.com/p/61731822)
 
 ### 通信库NCCL 
+
+
+在AI分布式训练过程中因为需要在节点内不同AI加速器以及不同节点之间传输网络模型权重参数和临时变量等，在这个过程中涉及多种通信协议和不同网络连接方式的数据传输，它要求用户根据各个厂家的硬件通信接口和通信协议来实现不同的设备之间的数据传输。分布式的通信一般有两大类：点对点通信(Point to point communication, P2P)和集合通信(Collective communication, CC)。P2P通信模式包含一个sender和一个receive，是一对一的数据通信，实现起来也比较简单，集合通信是一对多或者多对多的数据通信，通过定义一些比较底层的通信原语操作来实现不同硬件和协议的抽象，常见的通信原语有broadcast、scatter、gather、reduce、reduce-scatter、all-gather、all-reduce、all-to-all等。
+
+分布式集群的网络硬件多种多样，深度学习框架通常不直接操作硬件，而是使用通信库的方式来屏蔽底层硬件的细节。MPI (Massage Passing Interface)是一个消息传递的标准函数库，它提供了丰富的消息传递接口，可用于不同任务之间的通信。NCCL (Nvidia Collective Communication Library)是Nvidia提供的一个集合通信库，可实现跨节点GPU之间的直接数据通信，它在接口形式上与MPI相似，因为是针对自身硬件定制和优化的，所以在Nvidia自家GPU上会有更好的通信表现。
+
+![](/public/upload/machine/communication_primitive.jpg)
 
 The NVIDIA Collective Communication Library (NCCL) implements multi-GPU and multi-node communication primitives optimized for NVIDIA GPUs and Networking. NCCL provides routines such as all-gather, all-reduce, broadcast, reduce, reduce-scatter as well as point-to-point send and receive that are optimized to achieve high bandwidth and low latency over PCIe and NVLink high-speed interconnects within a node and over NVIDIA Mellanox Network across nodes. [Point-to-point communication](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/p2p.html)One-to-all (scatter) ,All-to-one (gather) , All-to-all 都可以基于 ncclSend 和 ncclRecv 来实现。
 

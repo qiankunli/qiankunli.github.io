@@ -19,16 +19,35 @@ LangChain底层就是Prompt、大模型API、以及三方应用API调用三个�
 
 PS：看LangChain的感受就是：遇事不决问LLM。这跟常规的工程项目 严丝合缝的逻辑 + ifelse控制流非常不一样。 比如外挂知识库，LLM 不只用于最后一步 对topk 匹配的chunk 做一下润色给出anwser，前期的文档切分、存储、history的存储、选用，用户query的意图识别、转换都可能用到LLM。
 
-## LLM模型层
+## OPENAI接口
 
-**LangChain 本身不提供LLM，本质上就是对各种大模型提供的 API 的套壳**，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**。PS：底层Transformers/fastchat库只提供 `output_ids = model.generate(input_ids)` 对话信息一般需要通过 prompt template 转为prompt/input_ids，每个model 的 chat prompt template 也都会有所不同。
-1. Chat Model，聊天模型，用于产生人类和 AI 之间的对话，有两个专属于 Chat 模型的概念，一个是消息，一个是角色。每个消息都有一个 role（可以是 system、user 或 assistant）和 content（消息的内容）。系统消息设定了对话的背景（比如你是一个很棒的智能助手），然后用户消息提出了具体请求。
-    1. system：系统消息主要用于设定对话的背景或上下文。这可以帮助模型理解它在对话中的角色和任务。例如，你可以通过系统消息来设定一个场景，让模型知道它是在扮演一个医生、律师或者一个知识丰富的 AI 助手。系统消息通常在对话开始时给出。
+**LangChain 本身不提供LLM，本质上就是对各种大模型提供的 API 的套壳**，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**
+
+2. Text Model，文本模型
+1. Chat Model，聊天模型，用于产生人类和 AI 之间的对话，有两个专属于 Chat 模型的概念，一个是Message，一个是role。每个Message都有一个 role（可以是 system、user 或 assistant）和 content（消息的内容）。系统消息设定了对话的背景（比如你是一个很棒的智能助手），然后用户消息提出了具体请求。
+    1. system：系统消息主要用于设定对话的背景或上下文。这可以帮助模型理解它在对话中的角色和任务。例如，你可以通过系统消息来设定一个场景，让模型知道它是在扮演一个医生、律师或者一个知识丰富的 AI 助手。系统消息通常在对话开始时给出。PS: prompt技巧之一就是设定角色
     2. user：用户消息是从用户或人类角色发出的。它们通常包含了用户想要模型回答或完成的请求。用户消息可以是一个问题、一段话，或者任何其他用户希望模型响应的内容。
     3. assistant：助手消息是模型的回复。例如，在你使用 API 发送多轮对话中新的对话请求时，可以通过助手消息提供先前对话的上下文。然而，请注意在对话的最后一条消息应始终为用户消息，因为模型总是要回应最后这条用户消息。
-2. Text Model，文本模型
 
-Chat Model响应
+Completion `response = openai.Completion.create(model="text-davinci-003",prompt="Say this is a test")` （TEXT IN TEXT OUT）
+
+```json
+{
+    "id":xx,
+    "object":"text_completion",
+    "created": xx,
+    "model": "text-davinci-003",
+    "choices": [
+        {
+            "text": "Yes, this is a test.",
+            "index": 0,
+            "logprobs": null,
+            "finish_reason": "stop",
+        }
+}
+```
+
+Chat Model响应（MESSAGE IN MEESAGE OUT）
 
 ```json
 {
@@ -50,7 +69,9 @@ Chat Model响应
 }
 ```
 
-一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析（output_parsers 在 prompt 中插入了需要返回的格式说明）等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。
+## LLM模型层
+
+一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析（output_parsers 在 prompt 中插入了需要返回的格式说明）等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。PS：底层Transformer比如 chatglm原输出不是直接str，langchain中要求模型返回必须是str的结果，因此 Transformers.Model 与 langchain.llm 要有一个适配。
 
 ```python
 # BaseLanguageModel 是一个抽象基类，是所有语言模型的基类
@@ -109,7 +130,7 @@ LangChain是语言链的涵义，那么Chain就是其中的链结构，属于组
 
 Chain模块有一个基类Chain，是所有chain对象的基本入口，与用户程序的交互、用户的输入、其他模块的输入、内存的接入、回调能力。chain通过传入String值，控制接受的输入和给到的输出格式。Chain的子类基本都是担任某项专业任务的具体实现类，比如LLMChain，这就是专门为大语言模型准备的Chain实现类（一般是配合其他的chain一起使用）。PS： 注意，这些是Chain 的事情，模型层不做这些
 1. 针对每一种chain都有对应的load方法，load方法的命名很有规律，就是在chain的名称前面加上`_load`前缀
-2. **从 Chain可以看到核心方法run/_call输入输出是dict**，有dict 自然有key，所以每个 Chain 里都包含了两个很重要的属性：input_keys 和 output_keys。 
+2. **从 Chain可以看到核心方法run/_call输入输出是dict**(DICT IN DICT OUT)，有dict 自然有key，所以每个 Chain 里都包含了两个很重要的属性：input_keys 和 output_keys。 
     1. input 这些keys 都会被用于format chain 对应的prompt template。最终prompt template 要求有哪些variables，用户输入、memory 就需要提供哪些
         1. 用户会输入一些key，对应用户在prompt template 中的variables，若是只插入了一个str，则视为key=input 或 key=query 或 key=question
         2. memory 会提供key=history 或 chat_history
@@ -192,6 +213,7 @@ class LLMChain(Chain):
 继承 Chain 的子类主要有两种类型：
 1. 通用工具 Chain: 控制 Chain 的调用顺序， 是否调用，他们可以用来合并构造其他的 Chain 。比如MultiPromptChain、EmbeddingRouterChain、LLMRouterChain(使用 LLM 来确定动态选择下一个链)。
 2. 专门用途 Chain: 和通用 Chain 比较来说，他们承担了具体的某项任务，可以和通用的 Chain 组合起来使用，也可以直接使用。有些 Chain 类可能用于处理文本数据，有些可能用于处理图像数据，有些可能用于处理音频数据等。
+
 |`__call__逻辑`||||
 |---|---|---|---|
 |Chain|prep_inputs<br>inputs = inputs + memory external_context|_call|prep_outputs <br> memory.save_context|
@@ -202,7 +224,7 @@ class LLMChain(Chain):
 
 PS：用一个最复杂的场景比如 ConversationalRetrievalChain 打上断点，观察各个变量值的变化，有助于了解Chain的运行逻辑。 
 
-### RetrievalQA
+### Retriever
 
 检索器(retriever)是一个接口，它需要实现的功能是：对于给定的一个非结构化的查询，返回Document对象；它本身不需要存储数据，只是简单地返回数据。
 
@@ -251,7 +273,8 @@ class VectorStoreRetriever(BaseRetriever):
         docs = self.vectorstore.similarity_search(query, **self.search_kwargs)
         return docs
 ```
-BaseRetriever 的基本工作就是 get_relevant_documents（留给子类 _get_relevant_documents实现），核心是vectorstore.similarity_search，对于 BaseRetriever 的扩展，则是在vectorstore.similarity_search 之前或之后做一些事情，这也是  retriever 和 VectorStore 要分为两个接口的原因。
+
+BaseRetriever 的基本工作就是 get_relevant_documents（留给子类 _get_relevant_documents实现），核心是vectorstore.similarity_search，对于 BaseRetriever 的扩展，则是在vectorstore.similarity_search 之前或之后做一些事情，这也是  retriever 和 VectorStore 要分为两个接口的原因，比如做以下的事儿
 1. 处理query，比如生成多个新的query
 2. 对找回的documents 进一步的查询、转换等
 2. 提供add_documents 接口，在存入 vectorstore 时即将 get_relevant_documents 用到的一些关联数据存入到docstore
@@ -394,7 +417,54 @@ New summary:
 
 ![](/public/upload/machine/chain_memory.jpg)
 
+
+
 ### 底层实现
+
+Chain 与 Memory 相关有两处 prep_inputs 和 prep_outputs，Chain 是 DICT IN DICT OUT的，prep_inputs 会将 memory 数据`{"history": messages }`加入到dict=inputs，prep_outputs 会将 inputs、outputs 保存到 memory中: HumanMessage(content=inputs), AIMessage(content=outputs) 。 
+
+```python
+class Chain(Serializable, Runnable[Dict[str, Any], Dict[str, Any]], ABC):
+    memory: Optional[BaseMemory] = None
+    callbacks: Callbacks = Field(default=None, exclude=True)
+    def invoke( self,input: Dict[str, Any],...) -> Dict[str, Any]:
+        return self(input,callbacks=config.get("callbacks"),...)
+
+    @property
+    @abstractmethod
+    def input_keys(self) -> List[str]:
+        """Keys expected to be in the chain input."""
+    @property
+    @abstractmethod
+    def output_keys(self) -> List[str]:
+        """Keys expected to be in the chain output."""
+
+    def __call__(self,inputs: Union[Dict[str, Any], Any],callbacks,...)-> Dict[str, Any]:
+        inputs = self.prep_inputs(inputs)
+        callback_manager = CallbackManager.configure(callbacks,...)
+        run_manager = callback_manager.on_chain_start(inputs,...)
+        outputs = self._call(inputs, run_manager=run_manager)
+        run_manager.on_chain_end(outputs)
+        final_outputs = self.prep_outputs(inputs, outputs, return_only_outputs)
+        return final_outputs  
+        
+    @abstractmethod
+    def _call(self,inputs: Dict[str, Any],...) -> Dict[str, Any]:   
+        """Execute the chain.This is a private method that is not user-facing. It is only called within
+            `Chain.__call__`, which is the user-facing wrapper method that handles
+            callbacks configuration and some input/output processing.""" 
+
+    def prep_inputs(self, inputs: Union[Dict[str, Any], Any]) -> Dict[str, str]:
+        ...
+        if self.memory is not None:
+            external_context = self.memory.load_memory_variables(inputs)
+            inputs = dict(inputs, **external_context)
+        return inputs
+     def prep_outputs(self,inputs: Dict[str, str],outputs: Dict[str, str],...)-> Dict[str, str]:
+        ...
+        if self.memory is not None:
+            self.memory.save_context(inputs, outputs)     
+```
 
 ```python
 class BaseMemory(Serializable, ABC):
@@ -414,6 +484,19 @@ class BaseChatMemory(BaseMemory, ABC):
     output_key: Optional[str] = None
     input_key: Optional[str] = None
     return_messages: bool = False
+    def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, str]) -> None:
+        """Save context from this conversation to buffer."""
+        input_str, output_str = self._get_input_output(inputs, outputs)
+        self.chat_memory.add_user_message(input_str)
+        self.chat_memory.add_ai_message(output_str)
+class ConversationBufferMemory(BaseChatMemory):
+    memory_key: str = "history"
+    def load_memory_variables(self, inputs: Dict[str, Any]) -> Dict[str, Any]: 
+        """Return history buffer."""
+        return {self.memory_key: self.buffer} # self.buffer = self.chat_memory.messages
+```
+
+```python
 # 消息在内存中的形态
 class BaseChatMessageHistory(ABC):
     messages: List[BaseMessage] 
@@ -432,3 +515,46 @@ LangChain 的 Callback 机制允许你在应用程序的不同阶段进行自定
 2. LangChain 也提供了一些内置的处理器，例如 StdOutCallbackHandler，它会将所有事件记录到标准输出。还有 FileCallbackHandler，会将所有的日志记录到一个指定的文件中。
 3. 在 LangChain 的各个组件，如 Chains、Models、Tools、Agents 等，都提供了两种类型的回调设置方法：构造函数回调和请求回调。你可以在初始化 LangChain 时将回调处理器传入，或者在单独的请求中使用回调。例如，当你想要在整个链的所有请求中进行日志记录时，可以在初始化时传入处理器；而当你只想在某个特定请求中使用回调时，可以在请求时传入。
     1. verbose = True等同于将一个输出到控制台的回调处理器添加到你的对象中。
+
+
+看 AsyncCallbackHandler 各个回调方法的参数，再结合langhcain 各个抽象的作用，很对口。
+```python
+class AsyncCallbackHandler(BaseCallbackHandler):
+    async def on_llm_start(self,prompts: List[str],...)
+        """Run when LLM starts running."""
+    async def on_llm_end(self,response: LLMResult,...):
+        """Run when LLM ends running.""" 
+
+    async def on_chat_model_start(self,serialized: Dict[str, Any],messages: List[List[BaseMessage]],...):
+        """Run when a chat model starts running."""
+        
+    async def on_llm_new_token(self,token: str,...):
+        """Run on new LLM token. Only available when streaming is enabled."""
+    
+    async def on_chain_start(self,inputs: Dict[str, Any],...):
+        """Run when chain starts running."""
+    async def on_chain_end(self,outputs: Dict[str, Any],...):
+        """Run when chain ends running."""
+    async def on_chain_error(self,error: BaseException,...):
+        """Run when chain errors."""
+
+    async def on_tool_start(self,serialized: Dict[str, Any],input_str: str,...):
+        """Run when tool starts running."""
+    async def on_tool_end(self,output: str,...):
+        """Run when tool ends running."""
+    async def on_tool_error(self,error: BaseException, ...):
+        """Run when tool errors."""
+        
+
+    async def on_agent_action(self,action: AgentAction,...):
+        """Run on agent action."""
+    async def on_agent_finish(self,finish: AgentFinish,...):
+        """Run on agent end."""
+        
+    async def on_retriever_start(self,serialized: Dict[str, Any],query: str,...):
+        """Run on retriever start."""
+    async def on_retriever_end(self,documents: Sequence[Document],...):
+        """Run on retriever end."""
+    async def on_retriever_error(self,error: BaseException,...):
+        """Run on retriever error."""
+```

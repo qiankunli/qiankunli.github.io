@@ -42,24 +42,26 @@ es 不适合/不善于频繁更新、复杂关联查询、事务等操作
 
 tar.gz 文件解压完
 
-    bin
-        elasticsearch
-    config
-        elasticsearch.yml  
-        jvm.options  
-        log4j2.properties  
-        role_mapping.yml  
-        roles.yml  
-        users  
-        users_roles
-    jdk
-    lib
-    LICENSE.txt
-    logs
-    modules
-    NOTICE.txt
-    plugins
-    README.textile
+```
+bin
+    elasticsearch
+config
+    elasticsearch.yml  
+    jvm.options  
+    log4j2.properties  
+    role_mapping.yml  
+    roles.yml  
+    users  
+    users_roles
+jdk
+lib
+LICENSE.txt
+logs
+modules
+NOTICE.txt
+plugins
+README.textile
+```
 
 `bin/elasticsearch` 前台启动，`bin/elasticsearch -d`后台启动。
 
