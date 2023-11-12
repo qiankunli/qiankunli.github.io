@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 微调理论及实践
+title: LLM微调理论及实践
 category: 技术
 tags: MachineLearning
 keywords: llm finetune

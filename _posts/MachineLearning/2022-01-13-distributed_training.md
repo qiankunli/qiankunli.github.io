@@ -264,9 +264,16 @@ struct ncclComm {
 ## 优化手段
 
 ![](/public/upload/machine/distributed_trainning_optimize.png)
+
 关于深度的分布式训练，主要工作主从技术栈上呈现从浅层到深层的一个过程。
 1. 前三类的优化基本上是处于框架层，需要平台为用户提供基础的框架支持。比如说在计算图的并行化策略方面，我们通过GSPMD和GPipe提供了包括数据并行、模型并行和流水线并行的通用化的并行化策略的抽象层。此外，我们通过DeepSpeed来做支持，用ZeRO (Zero Redundancy Optimizer)来优化Optimizer的显存使用，以及我们可以用低精度的压缩来加速参数的同步
 2. 集合通信层的一些优化，这类优化对于用户跟上层的框架完全透明，不需要改动上层的代码就能够真正落地。拿网络的协议站做一个类比的话，NCCL基本上跟IP协议一样，是整个协议栈的narrow waist的位置。[Fast Socket：NCCL的高性能网络栈](https://mp.weixin.qq.com/s/P50A3bGJfoekGcIxImv16A) 提到了对NCCL 本身的优化，比较底层。
+
+1. GPipe
+2. ZeRO
+3. ZeRO-Offload
+4. ZeRO-Infinity
+5. 3D Parallelism
 
 ## 数据并行ps/allreduce
 

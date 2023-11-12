@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 提示工程
+title: 激发LLM涌现——提示工程
 category: 技术
 tags: MachineLearning
 keywords: llm prompt
