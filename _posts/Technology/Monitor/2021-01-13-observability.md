@@ -230,3 +230,5 @@ devops基本理念：
 2. 日志分析：查看、分析指定日志数量的趋势；根据日志内容生成指标（比如每次交易成功打印一条日志，可以生成关于交易额的一个指标）；自动识别日志模式（比如查看不同模式的日志数量的变化，占比）。
 
 [Continuous Profiling 实践解析](https://mp.weixin.qq.com/s/yiwq81ZHB0nSTcYSjOeyZg) 对cpu 利用率高、频繁gc 等进行更细致的分析。
+
+[基于 eBPF 构建下一代智能可观测系统](https://mp.weixin.qq.com/s/YTfiBrAVkIsO1kFbNbn7iQ) 未读

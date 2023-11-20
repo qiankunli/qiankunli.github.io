@@ -27,6 +27,8 @@ keywords: serverless
 
 毕玄：Serverless 面临的核心难题是什么？主要是弹性的速度。比如 Serverless 我要拉起一个系统，这不是几秒就能拉得起来的，但对在线业务来讲，你不可能点一下几秒都出不来，大家能接受的都是几毫秒。所以 Serverless 都只是拿来做一些像计算这种后期的事情，以前可能是一些离线的事情，都是对响应时间可以忍受的。
 
+2018 年 AWS ReInvent 大会上 AWS CTO Werner Volgels 提出的 21 世纪架构中 20 个有趣的事情中最后一个观点：All The Code You Ever Write Will Be Business Logic。开发者只应该关心业务逻辑，不用关心基础设施，不用关心开发工具链。我们讨论 Serverless 的时候，最开始是在云基础设施上的计算和存储 serverless，比如基于安全容器构建的容器实例、函数计算和对象存储等基础设施，但是这些不能满足应用开发者对开发基础设施 Serverless 的需求。于是最近几年云产品开始有全面 Serverless 化的趋势，涉及应用部署，比如 API 网关和日志监控服务等。也有一些 Serverless 化的数据服务，比如数据库和数据仓库。最近新的趋势是人工智能服务也开始全面 Serverless 化，尤其是大模型之后越发明显。
+
 ## 为什么Serverless 会火
 
 Kubernetes 虽然提供了容器应用的全生命周期管理，但是太丰富、太复杂、太灵活，这既是一种优势，有时候也是一种劣势。容器和 Kubernetes 并非一定要捆绑使用。

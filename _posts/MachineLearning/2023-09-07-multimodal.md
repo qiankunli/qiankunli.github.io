@@ -39,3 +39,7 @@ keywords: llm multimodal
 2. 可以建模长程关系（Long-term relationship），可以建模远距离的 token 之间的关联。
 
 ![](/public/upload/machine/multimodal_network.jpg)
+
+## 文生图
+
+[文生图模型发展简史与原理：DALL·E, Imagen, Stable Diffusion](https://mp.weixin.qq.com/s/u4t23yzx0Qli_NIlnvNNEA) 未读。 

@@ -38,8 +38,8 @@ func reconcile(name){
   }
   if !crd.DeletionTimestamp.IsZero() {
     // 检查是否可以删掉crd
-    // 如果不可以，状态1，doXX
-    // 如果不可以，状态2，doXX
+    // 如果不可以，状态1，doXX/reconcileXX
+    // 如果不可以，状态2，doXX/reconcileXX
     // 如果可以
     controllerutil.RemoveFinalizer(crd, xx)
     return ctrl.Result{RequeueAfter: xx}, nil
@@ -47,11 +47,11 @@ func reconcile(name){
   if !controllerutil.ContainsFinalizer(crd, xx) {
 		controllerutil.AddFinalizer(crd, xx)
 	}
-  // 查到crd 可能依赖的其它crd
+  // 查找crd 可能依赖的其它crd
   // 获取当前状态： status值、依赖的crd等
   // 根据当前状态采取行动
-  // 如果状态1，doXX（增删改其它crd，调用外部数据等，最后看是否状态流转，更改crd状态）
-  // 如果状态2，doXX
+  // 如果状态1，doXX/reconcileXX（增删改其它crd，调用外部数据等，最后看是否状态流转，更改crd状态）
+  // 如果状态2，doXX/reconcileXX
   return ctrl.Result{}, err
 }
 func register(){
@@ -61,10 +61,17 @@ func register(){
 ```
 
 conroller 很适合处理“状态机”相关的逻辑。
-1. controller 核心是梳理状态、 状态处理函数（包含状态流转等）两部分
+1. controller 核心是梳理状态、 状态处理函数（包含状态流转等）两部分。
+  1. 最外围的controller.reconcile 只做一件事，判断状态并reconcile对应的状态函数reconcilexxx（除了状态定义外，没有具体业务逻辑的痕迹），具体的业务逻辑都收敛到 reconcilexxx里。 写代码有设计感的一个体现是：后来者如果要加一个逻辑，基本就只能在某个地方加。如果一段代码新增功能，既能在controller.reconcile写，又能在reconcilexxx加，代码慢慢就失控了。
+  2. reconcilexxx 有3个结果：成功（流转到下一个状态）、失败、下次重试。
+从这个视角讲，所有的controller.reconcile 都是一个套路。
 2. 因为reconcile 本质都是异步的，所以日志、event 要写仔细，每一条日志带上crd名字等，方便排查问题。event 上最好体现状态流转过程。
 3. 有的状态是“进行态”，处理完成后一般 `return ctrl.Result{RequeueAfter: 10s}, nil` 以主动触发下次reconcile，有的状态是“终止态”，处理完 `return ctrl.Result{}, err`，只有主要靠用户事件来触发reconcile。
 4. 正常状态流转 和 `crd.DeletionTimestamp.IsZero()` 后的状态流转会有细微差别，比如后者执行时一些资源可能已经被销毁了。
+5. 一个crd spec 的定义很关键，它潜在的表示了你可以对这个crd 有哪些operation。 一种不太好的设计是 把所有信息都塞到annotation里，把逻辑都塞到reconcile 里，肯定也能干活儿，但这就好比一个类只有setter/getter方法一样，说明你对这个类的功能范围、调用者如何使用它没有充分的思考。
+6. 好的设计一定是清晰简单的，只有一个角色改动一个地方（一个地方只会被一个角色改动），否则就是设计不清晰、模块分工不明确的征兆。干啥都得讲点“师出有名”，一块代码叫啥名、放在啥地方会影响后续的思考方式。
+
+![](/public/upload/kubernetes/kubernetes_reconcile.png)
 
 ## condition
 

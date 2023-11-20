@@ -69,6 +69,35 @@ Chat Model响应（MESSAGE IN MEESAGE OUT）
 }
 ```
 
+Completions API 主要用于补全问题，用户输入一段提示文字，模型按照文字的提示给出对应的输出。
+
+||||
+|---|---|---|
+|model|必选参数|调用的Completions模型名称，如text-davinci-003、text-curie-001等，不同模型参数规模不 同；在大模型领域，（就OpenAI提供的A、B、C、D四大模型来看）参数规模越大、越新版本的模型效果更好（费用也更高）|
+|prompt|必选参数|提示词|
+|suffix|可选参数|默认为空，具体指模型返回结果的后缀|
+|max_tokens|可选参数|默认为16，代表返回结果的token数量|
+|temperature|可选参数|取值范围为0—2，默认值为1。参数代表采样温度，数值越小，则模型会倾向于选择概率较高的词汇，生成的文本会更加保守；而当temperature值较高时，模型会更多地选择概率较低的词汇，生成的文本会更加多样|
+|top_p|可选参数|取值范围为0—1，默认值为1，和temperature作用类似，用于控制输出文本的随机性，数值越趋近与1，输出文本随机性越强，越趋近于0文本随机性越弱；通常来说若要调节文本随机性，top＿p和temperature两个参数选择一个进行调整即可；更推荐使用temperature参数进行文本随机性调整|
+|n|可选参数|默认值为1，表示一个提示返回几个Completion|
+|stream|可选参数|默认值为False，表示回复响应的方式，当为False时，模型会等待返回结果全部生成后一次性返回全部结果，而为True时，则会逐个字进行返回|
+|logprobs|可选参数|默认为null，该参数用于指定模型返回前N个概率最高的token及其对数概率。例如，如果logprobs设为10，那么对于生成的每个token，API会返回模型预测的前10个token及其对数概率；|
+|echo|可选参数|默认为False，该参数用于控制模型是否应该简单地复述用户的输入。如果设为True，模型的响应会尽可能地复述用户的输入|
+|stop|可选参数|该参数接受一个或多个字符串，用于指定生成文本的停止信号。当模型生成的文本遇到这些字符串中的任何一个时，会立即停止生成。这可以用来控制模型的输出长度或格式；|
+|presence_penalty|可选参数|默认为0，取值范围为［—2，2］，该参数用于调整模型生成新内容（例如新的概念或主题）的倾向性。较高的值会使模型更倾向于生成新内容，而较低的值则会使模型更倾向于坚持已有的内容，当返回结果篇幅较大并且存在前后主题重复时，可以提高该参数的取值；|
+|frequency_penalty|可选参数|默认为0，取值范围为［—2，2］，该参数用于调整模型重复自身的倾向性。较高的值会使模型更倾向于避免重复，而较低的值则会使模型更可能重复自身；当返回结果篇幅较大并且存在前后语言重复时，可以提高该参数的取值；|
+|best_of||该参数用于控制模型的生成过程。它会让模型进行多次尝试（例如，生成5个不同的响应），然后选择这些响应中得分最高的一个；|
+|logit_bias||该参数接受一个字典，用于调整特定token的概率。字典的键是token的ID，值是应用于该token的对数概率的偏置；在GPT中可以使用tokenizer tool查看文本Token的标记。一般不建议修改；|
+|user|可选参数|使用用户的身份标记，可以通过人为设置标记，来注明当前使用者身份。|
+
+Chat模型升级的核心功能是对话， 它基于大量高质量对话文本进行微调，能够更好的理解用户对话意图，所以它能更顺利的完成与用户的对话（大语言模型本质上都是概率模型，根据前文提示进行补全是⼤语⾔模型的原始功能，而对话类的功能则是加⼊额外数据集之后训练的结果）。
+
+ChatCompletion.create函数的详细参数和Completion.create函数相比发生了以下变化：
+1. **用messages参数代替了prompt参数**，使之更适合能够执行对话类任务
+2. 新增functions和function_call参数，使之能够在函数内部调用其他工具的API
+3. 其他核心参数完全一致，例如temperature、top_p、max_tokens、n、presence_penalty等参数的解释和使用方法都完全一致，且这些参数具体的调整策略也完全一致
+4. 剔除了best_of参数，即Chat模型不再支持从多个答案中选择一个最好的答案这一功能
+
 ## LLM模型层
 
 一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析（output_parsers 在 prompt 中插入了需要返回的格式说明）等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。PS：底层Transformer比如 chatglm原输出不是直接str，langchain中要求模型返回必须是str的结果，因此 Transformers.Model 与 langchain.llm 要有一个适配。
@@ -131,14 +160,15 @@ LangChain是语言链的涵义，那么Chain就是其中的链结构，属于组
 Chain模块有一个基类Chain，是所有chain对象的基本入口，与用户程序的交互、用户的输入、其他模块的输入、内存的接入、回调能力。chain通过传入String值，控制接受的输入和给到的输出格式。Chain的子类基本都是担任某项专业任务的具体实现类，比如LLMChain，这就是专门为大语言模型准备的Chain实现类（一般是配合其他的chain一起使用）。PS： 注意，这些是Chain 的事情，模型层不做这些
 1. 针对每一种chain都有对应的load方法，load方法的命名很有规律，就是在chain的名称前面加上`_load`前缀
 2. **从 Chain可以看到核心方法run/_call输入输出是dict**(DICT IN DICT OUT)，有dict 自然有key，所以每个 Chain 里都包含了两个很重要的属性：input_keys 和 output_keys。 
-    1. input 这些keys 都会被用于format chain 对应的prompt template。最终prompt template 要求有哪些variables，用户输入、memory 就需要提供哪些
-        1. 用户会输入一些key，对应用户在prompt template 中的variables，若是只插入了一个str，则视为key=input 或 key=query 或 key=question
-        2. memory 会提供key=history 或 chat_history
-        3. vector 会提供key=input_documents 或 key= context     
-    2. 除了大模型获取的text输出，其它组件也会附着一些key
-        1. llm 输出对应key=result/key=response
-        2. memory会获取特定的key 保存下来作为hitory
-        3. vector会带上附属的 key=source_documents
+    ||输入dict|输出dict|
+    |---|---|---|
+    |chain(question)|{chain.input_keys:question}||
+    |chain({"question":question})|{"question":question}||
+    |memory|{memory.memory_key:memory.buffer}||
+    |BaseConversationalRetrievalChain|{"input_documents":xx}||
+    |llm||{"full_generation":generation,chain.output_key:chain.output_parser.parse_result(generation)}|
+    |memory||读取memory.output_key 保存|
+    |BaseConversationalRetrievalChain||带上source_documents,generated_question|
 PS： 不准确的说，**各种chain的核心是预定了很多prompt template的构建方法**。
 
 链有很多种调用方式。
@@ -226,9 +256,9 @@ PS：用一个最复杂的场景比如 ConversationalRetrievalChain 打上断点
 
 ### Retriever
 
-检索器(retriever)是一个接口，它需要实现的功能是：对于给定的一个非结构化的查询，返回Document对象；它本身不需要存储数据，只是简单地返回数据。
+检索器(retriever)是一个接口，它需要实现的功能是：对于给定的一个非结构化的查询，返回Document对象；它本身不需要存储数据，只是简单地返回数据。A retriever is an interface that returns documents given an unstructured query. It is more general than a vector store. A retriever does not need to be able to store documents, only to return (or retrieve) them. Vector stores can be used as the backbone of a retriever, but there are other types of retrievers as well. 比如 EnsembleRetriever 本身不存储数据，只是基于rrf 算法对 持有的Retriever 的返回结果进行汇总排序。
 
-Document 对象的艺术之旅（从加载、转换、存储、到查询结果都用Document 表示）
+**Document 对象的艺术之旅**（从加载、转换、存储、到查询结果都用Document 表示）
 
 ![](/public/upload/machine/langchain_retriever.jpg)
 
@@ -299,6 +329,7 @@ class MultiVectorRetriever(BaseRetriever):
                 ids.append(d.metadata[self.id_key])
         docs = self.docstore.mget(ids)
         return [d for d in docs if d is not None]
+# 将文档拆分为较小的块，同时每块关联其父文档的id，小块用于提高检索准确度，大块父文档用于返回上下文
 class ParentDocumentRetriever(MultiVectorRetriever):
     child_splitter: TextSplitter
     parent_splitter: Optional[TextSplitter] = None

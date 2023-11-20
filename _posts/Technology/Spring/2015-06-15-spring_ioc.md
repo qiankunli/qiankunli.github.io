@@ -30,6 +30,8 @@ keywords: JAVA Spring
 3. 依赖对象的获取，通过依赖对象绑定的协议，获取到对应的对象
 4. 依赖对象的注入，即被依赖的对象如何注入到使用者内
 
+java的servlet就是一种组件，而负责运行servlet的比如tomcat这些，就是一种容器，tomcat和servlet就是一种控制反转，传统你要写一个http的服务器，你需要从main函数写起，你需要编写监听端口的代码，需要写处理逻辑的代码……，那经过ioc之后，你只需要写servlet，剩下的控制，交给tomcat等http服务器就好了，几乎所有的服务器端web服务器，都是这种理念的产物。di是ioc的一种，但是di并不是ioc的全部，spring是di的一种实现方式。在早些年，java没有static import，而且static方法，还放在一个不清不楚的方法区，而不是heap里面的时候用di可以让java代码更加易于维护的同时，也可以避开性能上的一些坑比如你把所有方法都放在方法区里，那方法区有多大啊？会不会爆掉啊？现在方法区已经被取消了，归入heap了，加上static import的引入，以及zgc等功能。其实你完全不需要spring和di，你的代码运行效率都不会低多少。
+
 Spring 容器具象化一点就是 从xml、配置类、依赖jar 等处 通过 `BeanDefinitionRegistry.registerBeanDefinition` 向容器注入Bean信息，然后通过`BeanFactory.getBean` 应用在各个位置。 
 
 ![](/public/upload/spring/ioc_overview.png)

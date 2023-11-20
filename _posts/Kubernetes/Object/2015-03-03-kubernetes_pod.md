@@ -246,6 +246,10 @@ Control group /:
 
 [Kubernetes 上运行有状态应用的最佳实践](https://mp.weixin.qq.com/s/l3GPCNO4P828Fl_CjaK7WA) 未读。
 
+## 其它
+
+[解密 Kubernetes Pod 中容器的有序部署：Kubexit 工具的妙用](https://mp.weixin.qq.com/s/bMbhcuIo-IcjGkej2LYPMw)
+未细读。
 
 
 
