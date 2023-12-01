@@ -199,7 +199,13 @@ cpu limits 会被带宽控制组设置为 cpu.cfs_period_us 和 cpu.cfs_quota_us
 
 [cgroups 在 K8s 中的应用](https://mp.weixin.qq.com/s/bgoFj-aZo-RMh2hR5h0zrA)kubelet 作为 kubernetes 中的 node agent，所有 cgroup 的操作都由其内部的 containerManager 模块实现，containerManager 会通过 cgroup 将资源使用层层限制：node -> qos -> pod -> container。每一层都抽象出一种资源管理模型，通过这种方式提供了一种稳定的运行环境。如下图所示：
 
-![](/public/upload/container/kubelet_cgroup.png)
+![](/public/upload/container/kubelet_cgroup.jpg)
+
+kubelet 会在 node 上创建了 4 个 cgroup 层级，从 node 的root cgroup（一般都是/sys/fs/cgroup）往下：
+1. Node 级别：针对 SystemReserved、KubeReserved 和 k8s pods 分别创建的三个 cgroup；
+2. QoS 级别：在kubepodscgroup 里面，又针对三种 pod QoS 分别创建一个 sub-cgroup：
+3. Pod 级别：每个 pod 创建一个 cgroup，用来限制这个 pod 使用的总资源量；
+4. Container 级别：在 pod cgroup 内部，限制单个 container 的资源使用量。
 
 [Kubelet 对 Pod 的服务质量管理](https://mp.weixin.qq.com/s/Hp9clsqFe6hFghbnrAEyWA)kubelet 为不同类型的 pod 创建了不同的 cgroups，从而保证不同类型的 pod 获得的资源不同，尽量保证高优先级的服务质量，提升系统稳定性。
 
@@ -226,6 +232,17 @@ cgroup
       /pod6  
 ``` 
 
+资源使用量超出 limits 的后果
+1. CPU：
+  1. Container CPU 使用量可能允许超过 limit，也可能不允许；
+  2. ContainerCPU 使用量超过 limit 之后，并不会被干掉。
+2. Memory：
+  1. 如果 container 的内存使用量超过 request，那这个 node 内存不足时， 这个Pod 可能会被驱逐；
+  2. Container 的内存使用量超过 limit时，可能会被干掉（OOMKilled）。如果可重启，kubelet 会重启它。
+
+Kubelet 寻求最大资源效率，因此默认没有设置资源限制， Burstable and BestEffort pods 可以使用足够的的空闲资源。但只要 Guaranteed pods 需要资源，这些低优先级的 pods 就必须及时释放资源。如何释放呢？
+1. 对于 CPU 等 compressible resources，可以通过 CPU CFS shares，针对每个 QoS 分配一定比例的资源，确保在 CPU 资源受限时，每个 pod 能获得它所申请的 CPU 资源。
+2. 这几个 cgroup初始化之后，kubelet 会调用UpdateCgroups()，方法来定期更新这三个 cgroup 的 resource limit。
 
 ### 降低高优任务的调度延迟
 

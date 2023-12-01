@@ -183,6 +183,8 @@ Decoder最后是一个线性变换和softmax层。解码组件最后会输出一
 
 ## 其它视角
 
+[逐步理解Transformers的数学原理](https://mp.weixin.qq.com/s/b9YHoCOp5Pu5kfyeTdoBxw) 可以看看从字符串到输出向量 到各层的变换过程。
+
 ### 李宏毅
 
 [台大李宏毅自注意力机制和Transformer详解！](https://www.bilibili.com/video/BV1v3411r78R) 视频总结了 Self-Attention 与RNN 和 CNN和 GNN的关系，Self-Attention 可以用来学习原来由  RNN 和 CNN  和 GNN学习的任务。

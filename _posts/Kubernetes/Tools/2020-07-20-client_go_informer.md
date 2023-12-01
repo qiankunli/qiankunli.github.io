@@ -342,6 +342,8 @@ func (p *processorListener) run() {
 
 [Kubernetes之controller-runtime事件再处理](https://mp.weixin.qq.com/s/NTRog9zrSv3en9MV5_nJuQ) 值得细读一下。
 
+待确认：一个workqueue内只有一个类型的crd。
+
 ## 细节
 
 ### watch 是如何实现的？

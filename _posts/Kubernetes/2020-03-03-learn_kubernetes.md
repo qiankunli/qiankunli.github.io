@@ -82,6 +82,19 @@ Kubernetes 本身就是微服务的架构，虽然看起来复杂，但是容易
 
 ## 从技术实现角度的整体设计
 
+对于一个编排系统来说，资源管理至少需要考虑以下几个方面：
+1. 资源模型的抽象；包括，
+    2. 有哪些种类的资源，例如，CPU、内存等；
+    1. 如何用数据结构表示这些资源；
+2. 资源的调度
+    1. 如何描述一个 workload 的资源申请（spec），例如，“该容器需要 4 核和 12GB~16GB 内存”；
+    2. 如何描述一台 node 当前的资源分配状态，例如已分配/未分配资源量，是否支持超分等；
+    3. 调度算法：如何根据 workload spec 为它挑选最合适的 node；
+3. 资源的限额（capacity enforcement）
+    1. 如何确保 workload 使用的资源量不超出预设范围（从而不会影响其他 workload）；
+    2. 如何确保 workload 和系统/基础服务的限额，使二者互不影响。
+k8s 是目前最流行的容器编排系统，那它是如何解决这些问题的呢？
+
 [A few things I've learned about Kubernetes](https://jvns.ca/blog/2017/06/04/learning-about-kubernetes/) 值得读三遍
 
 [47 advanced tutorials for mastering Kubernetes](https://techbeacon.com/top-tutorials-mastering-kubernetes) 设计k8s 的方方面面，未详细读
@@ -101,6 +114,7 @@ Kubernetes 本身就是微服务的架构，虽然看起来复杂，但是容易
 go get -d k8s.io/kubernetes
 cd $GOPATH/src/k8s.io/kubernetes
 ```
+
 
 ## k8s各个组件的实现思路
 
