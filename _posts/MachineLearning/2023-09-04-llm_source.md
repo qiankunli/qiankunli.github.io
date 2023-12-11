@@ -175,6 +175,101 @@ class ChatGLMModel(ChatGLMPreTrainedModel):
     outputs = model(torch.tensor(batched_ids), attention_mask=torch.tensor(attention_mask))
     print(outputs.logits)
     ```
+### generate实现
+
+[浅谈LLAMA2核心函数generate源码](https://mp.weixin.qq.com/s/vnke00f7kzlA16Pw_FJFjQ)
+
+```python
+def generate(self,
+        prompt_tokens: List[List[int]],  # 输入的提示
+        max_gen_len: int,  # 最大生成长度
+        temperature: float = 0.6,  # 影响生成文本的随机性
+        top_p: float = 0.9,  # 用于决定采样过程中保留的 token 集合的概率阈值
+        logprobs: bool = False,  # 是否返回每个 token 的对数概率
+        echo: bool = False,  # 是否返回输入的提示
+) -> Tuple[List[List[int]], Optional[List[List[float]]]]:
+    # ---------------------------初始化长度为 total_len tokens张量，并填充 pad_id----------------------------------
+    params = self.model.params
+    bsz = len(prompt_tokens)
+    assert bsz <= params.max_batch_size, (bsz, params.max_batch_size)
+
+    min_prompt_len = min(len(t) for t in prompt_tokens)
+    max_prompt_len = max(len(t) for t in prompt_tokens)
+    assert max_prompt_len <= params.max_seq_len
+    total_len = min(params.max_seq_len, max_gen_len + max_prompt_len)
+
+    pad_id = self.tokenizer.pad_id
+    tokens = torch.full((bsz, total_len), pad_id, dtype=torch.long, device="cuda")
+    # 将prompt_tokens中的token复制到tokens张量中。
+    for k, t in enumerate(prompt_tokens):
+        tokens[k, : len(t)] = torch.tensor(t, dtype=torch.long, device="cuda")
+    if logprobs: # 是否返回每个 token 的对数概率
+        # 创建一个与tokens相同形状的token_logprobs张量，并用0填充
+        token_logprobs = torch.zeros_like(tokens, dtype=torch.float)
+
+    prev_pos = 0
+    eos_reached = torch.tensor([False] * bsz, device="cuda")
+    input_text_mask = tokens != pad_id
+    # -------------------------------------------------------------
+
+    for cur_pos in range(min_prompt_len, total_len):
+        # 调用模型的forward方法获取logits
+        logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
+        if logprobs: # 是否返回每个 token 的对数概率
+            # 计算token level的logprobs
+            token_logprobs[:, prev_pos + 1: cur_pos + 1] = -F.cross_entropy(
+                input=logits.transpose(1, 2),
+                target=tokens[:, prev_pos + 1: cur_pos + 1],
+                reduction="none",
+                ignore_index=pad_id,
+            )
+        # 根据温度参数和top_p参数对logits进行softmax和采样，得到下一个token
+        if temperature > 0:
+            # sample_top_p函数对probs进行采样
+            probs = torch.softmax(logits[:, -1] / temperature, dim=-1)
+            next_token = sample_top_p(probs, top_p)
+        else:
+            # 将logits中概率最大的token作为下一个token。
+            next_token = torch.argmax(logits[:, -1], dim=-1)
+
+        next_token = next_token.reshape(-1)
+        # only replace token if prompt has already been generated
+        next_token = torch.where(
+            input_text_mask[:, cur_pos], tokens[:, cur_pos], next_token
+        )
+        # tokens张量更新
+        tokens[:, cur_pos] = next_token
+        eos_reached |= (~input_text_mask[:, cur_pos]) & (
+                next_token == self.tokenizer.eos_id
+        )
+        prev_pos = cur_pos
+        # 检查是否已经生成了所有的eos token，如果是则停止生成
+        if all(eos_reached):
+            break
+
+    if logprobs:
+        # token_logprobs列表化
+        token_logprobs = token_logprobs.tolist()
+    out_tokens, out_logprobs = [], []
+    for i, toks in enumerate(tokens.tolist()):
+        # cut to max gen len
+        # 对于 tokens 张量中的每一行（即每一个生成的序列），如果 echo 参数为假，则去掉提示部分
+        start = 0 if echo else len(prompt_tokens[i])
+        toks = toks[start: len(prompt_tokens[i]) + max_gen_len]
+        probs = None
+        if logprobs:
+            probs = token_logprobs[i][start: len(prompt_tokens[i]) + max_gen_len]
+        # cut to eos tok if any
+        # 存在结束标记，则去掉结束标记之后的部分
+        if self.tokenizer.eos_id in toks:
+            eos_idx = toks.index(self.tokenizer.eos_id)
+            toks = toks[:eos_idx]
+            probs = probs[:eos_idx] if logprobs else None
+        out_tokens.append(toks)
+        out_logprobs.append(probs)
+    # 返回生成的tokens和对数概率（如果logprobs参数为真）
+    return (out_tokens, out_logprobs if logprobs else None)
+```
 
 ### Dataset
 
@@ -500,5 +595,4 @@ print('GENERATION=', tokenizer.batch_decode(out.cpu()))
 {"prompt":"sky is ","completion":"blue"}
 ```
 How exactly is GPT-3 trained on such examples? We are not exactly sure (OpenAI is very secretive), but perhaps the two sequences of tokens are concatenated together, then GPT-3 is trained on such examples, **but the loss is only calculated in the “completion” part**. PS: 终于知道为何要分成两段，而不是喂一个文本就算了。
-
 

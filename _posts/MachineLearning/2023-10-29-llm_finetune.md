@@ -28,6 +28,54 @@ keywords: llm finetune
 5. 抑制幻觉有多重要？
 6. 数据的静态/动态程度如何？在特定数据集上微调 LLM 意味着模型的知识成为训练时该数据的静态快照。如果数据频繁更新、更改或扩展，模型很快就会过时。相比之下，RAG 系统在动态数据环境中具有固有的优势。他们的检索机制不断查询外部来源，确保他们提取用于生成响应的信息是最新的。
 
+## 整体思路
+
+在大模型相关原理的指导下，AI 模型的构建也逐渐演化出了不同的阶段和流程：预训练、继续预训练、对齐(SFT、RLHF)。预训练模型（Base 模型）始终是智能的基础，而Alignment的主要目标是实现有效的人机接口。此外，由于RLHF的高成本和相对复杂性，SFT作为其廉价替代品已经获得了广泛的应用。
+
+[垂直领域大模型落地思考](https://mp.weixin.qq.com/s/HXdbuuLU7tjOhUecgtGl5w)
+
+![](/public/upload/machine/finetune_arch.jpg)
+
+垂直大模型基本套路
+1. Continue PreTraining: 一般垂直大模型是基于通用大模型进行二次的开发。为了给模型注入领域知识，就需要用领域内的语料进行继续的预训练。
+2. SFT: 通过SFT可以激发大模型理解领域内各种问题并进行回答的能力(在有召回知识的基础上)
+3. RLHF: 通过RLHF可以让大模型的回答对齐人们的偏好，比如行文的风格。
+需要注意的是一般垂直领域大模型不会直接让模型生成答案，而是跟先检索相关的知识，然后基于召回的知识进行回答，这种方式能减少模型的幻觉，保证答案的时效性，还能快速干预模型对特定问题的答案。
+
+SFT和RLHF阶段（微调也会有RLHF）主要要培养模型的三个能力:
+1. 领域内问题的判别能力，对领域外的问题需要能拒识 
+2. 基于召回的知识回答问题的能力 
+3. 领域内风格对齐的能力，例如什么问题要简短回答什么问题要翔实回答，以及措辞风格要与领域内的专业人士对齐。
+
+
+
+### 继续预训练
+
+1. 混合数据，如果想要领域的模型还具备一定的通用能力，即通用的能力不会退化（或者灾难性遗忘）这就需要在语言模型训练的时候混杂通用的数据。
+2. 要不要从零训。回顾人对知识的理解：小学中学都在学习通用领域的知识，然后大学阶段继续进一步学习特定领域的知识。所以在通用模型的基础上继续二次预训练注入领域知识是合理的。但是如果想通过二次预训练进行语言层面的迁移就会比较难，没有从零开始训练好。回顾人对语言的学习，如果刚“出生”时候就在学习一门语言，进行听说读写的训练，这就是母语了。会比长大以后再去学习一门外语要容易的多，效果也要好很多。所以基于llama做的中文适配 不如 纯中文训练的baichuan 在中文任务上效果好。
+
+### 领域微调
+
+领域微调的核心是构建高质量大规模的领域微调数据。让人去收集一个领域内的语料是容易的，但是让人去编写领域内的微调指令和回答是很难的。下面介绍的方法都是来尝试解决这个问题。这些方法的核心都是基于一些已有的数据+GPT4，然后生成领域内的微调数据。
+
+|数据生成方法|已有数据|生成数据|
+|---|---|---|
+|Self-Instruct|一些单轮/多轮种子数据|单轮/多轮指令微调数据|
+|Self-QA|文档数据|单轮指令微调数据|
+|Self-KG|知识图谱|单轮指令微调数据|
+
+Self-Instruct是一种微调数据扩充的方法。如果已经一些种子微调数据(大约100条)，可以通过Self-Instruct+GPT4进行扩充，生成更多相对符合要求的微调数据。一条微调数据包括三个部分：指令，输入 和 输出。下面具体介绍如何生成这三个部分。
+1. 首先从种子指令（人工编写的指令/业务侧积累的问题）中随机选择一些指令，然后让GPT4参考这些指令，生成一系列类似的指令。
+2. 有了指令后，再让GPT4判断这个指令是一个“分类”问题还是一个“生成”问题。后面会采用不同的答案生成策略。
+    1. 如果一个问题是“分类”问题，则采用“output-first”的生成方式，即首先生成输出（具体哪个类别），然后再根据指令和输出，生成输入。例如指令是:"判断下面句子的情感是消极还是积极"，首先生成输出的类别：“积极”，然后再根据指令和类别生成输入的句子：“我今天很开心”。
+    2. 如果一个问题是“生成”问题，则采用“input-first”的生成方式，即首先生成输入，然后再根据指令和输入，生成输出。例如指令是：“将下面的句子翻译成英文”，首先生成输入的句子：“我今天很开心”，然后再根据指令和输入生成输出的答案：“I am happy today”。如果一个指令不需要输入的句子，则输入为空。例如指令：“有哪些减肥的运动？”
+3. 经过上面的步骤就能初步获得一批微调数据，还需要进行进一步的过滤。例如过滤与已有数据相似度很高的结果，过滤明显低质的结果（指令过长或者过短）。过滤后的微调数据就可以继续加入“种子指令”中，以此循环，源源不断地进行生成。
+
+如果连基础的种子指令数据都没有，那就不适于Self-Instruct的方法了。这时候可以尝试Self—QA的方法，直接从文档中生成指令数据。整体的流程如下：
+1. 基本的思想是：首先根据无结构的文档通过GPT4生成可能的指令，然后输入指令和对应的文档再让GPT4生成问题的答案。这里的文档可以直接就是文档语料，也可以从结构的表格数据或者图谱数据中生成无结构的文档数据。
+2. 基于设计的Prompt就可以让GPT4分别进行指令和答案的生成，由此构成指令微调数据。这些数据还需要进一步通过启发式和规则的方法进行过滤，来提高数据的质量。
+
+如果一个领域已经有了高质量的知识图谱，也可以直接基于知识图谱生成指令数据。这种基于知识的指令数据生成方法是HuaTuo提出的，称为Self—KG。
 
 ## 如何对大模型进行微调
 
@@ -216,7 +264,6 @@ PS: 深度学习都得指定features/labels。在llm 场景下，features 和lab
 对于prompt部分的labels被-100所填充，这样在计算loss的时候模型只计算response部分的loss，-100的部分被忽略了。这个机制得益于torch的CrossEntropyLossignore_index参数，ignore_index参数定义为如果labels中包含了指定了需要忽略的类别号（默认是-100），那么在计算loss的时候就不会计算该部分的loss也就对梯度的更新不起作用。
 
 
-
 ## 代码
 
 ### 手写
@@ -255,6 +302,40 @@ PS: 深度学习都得指定features/labels。在llm 场景下，features 和lab
     ```
 
 ### 使用huggingface的Trainer API进行模型微调
+
+[Fine-tuning a model with the Trainer API](https://huggingface.co/learn/nlp-course/chapter3/3)Transformers provides a Trainer class to help you fine-tune any of the pretrained models it provides on your dataset. Once you’ve done all the data preprocessing work in the last section, you have just a few steps left to define the Trainer. The hardest part is likely to be preparing the environment to run `Trainer.train()`
+
+```python
+from datasets import load_dataset
+from transformers import AutoTokenizer, DataCollatorWithPadding
+
+raw_datasets = load_dataset("glue", "mrpc")
+checkpoint = "bert-base-uncased"
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+def tokenize_function(example):
+    return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
+tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
+data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+from transformers import TrainingArguments
+training_args = TrainingArguments("test-trainer")
+
+from transformers import AutoModelForSequenceClassification
+model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
+from transformers import Trainer
+trainer = Trainer(
+    model,
+    training_args,
+    train_dataset=tokenized_datasets["train"],
+    eval_dataset=tokenized_datasets["validation"],
+    data_collator=data_collator,
+    tokenizer=tokenizer,
+)
+# To fine-tune the model on our dataset, we just have to call the train() method of our Trainer
+trainer.train()
+```
+
+[A full training](https://huggingface.co/learn/nlp-course/chapter3/4)  手写train loop。
 
 [使用医患对话数据训练新冠诊疗模型的例子](https://github.com/hiyouga/ChatGLM-Efficient-Tuning/blob/main/examples/covid_doctor.md)
 

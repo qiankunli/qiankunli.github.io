@@ -337,9 +337,16 @@ func New(name string, mgr manager.Manager, options Options) (Controller, error) 
 
 一个controller主要包含Watch和Start两个方法，以及一个调协方法Reconcile。在controller的定义中，看上去没有资源对象的Informer或者Indexer数据，而在K8s中所有与kube-apiserver资源的交互是通过Informer实现的，实际上这里是通过下面的 startWatches 属性做了一层封装。
 
+```go
+type Controller struct {
+	// startWatches maintains a list of sources, handlers, and predicates to start when the controller is started.
+   	startWatches []watchDescription
+}
+```
+
 ### watch event 并将其放入队列中
 
-Watch方法首先会判断当前的controller是否已启动，如果未启动，会将watch的内容暂存到startWatches中等待controller启动。如果已启动，则会直接调用src.Start(c.ctx, evthdler, c.Queue, prct...), 其中Source可以为informer、kind、channel等。src.Start方法作用是获取对应的informer，为informer注册了一个internal.EventHandler。internal.EventHandler实现了OnAdd、OnUpdate、OnDelete等方法，以OnAdd方法为例，该方法最后会调用EventHandler.Create 方法。EventHandler为一个接口，有EnqueueRequestForObject、Funcs、EnqueueRequestForOwner、enqueueRequestsFromMapFunc四个实现类。Reconcile协调执行的数据对象，实际是通过Informer中的EventHandler入队的。
+Watch方法首先会判断当前的controller是否已启动，如果未启动，会将watch的内容暂存到startWatches中等待controller启动。如果已启动，则会直接调用`src.Start(c.ctx, evthdler, c.Queue, prct...)`, 其中Source可以为informer、kind、channel等。src.Start方法作用是获取对应的informer，为informer注册了一个internal.EventHandler。internal.EventHandler实现了OnAdd、OnUpdate、OnDelete等方法，以OnAdd方法为例，该方法最后会调用EventHandler.Create 方法。EventHandler为一个接口，有EnqueueRequestForObject、Funcs、EnqueueRequestForOwner、enqueueRequestsFromMapFunc四个实现类。Reconcile协调执行的数据对象，实际是通过Informer中的EventHandler入队的。
 
 ![](/public/upload/kubernetes/controller_watch.png)
 

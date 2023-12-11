@@ -28,6 +28,7 @@ PS：看LangChain的感受就是：遇事不决问LLM。这跟常规的工程项
     1. system：系统消息主要用于设定对话的背景或上下文。这可以帮助模型理解它在对话中的角色和任务。例如，你可以通过系统消息来设定一个场景，让模型知道它是在扮演一个医生、律师或者一个知识丰富的 AI 助手。系统消息通常在对话开始时给出。PS: prompt技巧之一就是设定角色
     2. user：用户消息是从用户或人类角色发出的。它们通常包含了用户想要模型回答或完成的请求。用户消息可以是一个问题、一段话，或者任何其他用户希望模型响应的内容。
     3. assistant：助手消息是模型的回复。例如，在你使用 API 发送多轮对话中新的对话请求时，可以通过助手消息提供先前对话的上下文。然而，请注意在对话的最后一条消息应始终为用户消息，因为模型总是要回应最后这条用户消息。
+    4. observation： 比如chatglm3 为了强化Agent能力，新增了observation role 表示其内容是由tool返回的。
 
 Completion `response = openai.Completion.create(model="text-davinci-003",prompt="Say this is a test")` （TEXT IN TEXT OUT）
 
@@ -458,8 +459,11 @@ New summary:
 ![](/public/upload/machine/chain_memory.jpg)
 
 
-
 ### 底层实现
+
+一个Memory系统要支持两个基本操作：读和写。一个Chain对输入有特定的要求，一部分输入直接来自用户，另外一些可能来自Memory系统。在一个完整的对话轮次中，Chain会和Memory系统交互两次。具体为：
+1. 接收用户初始输入后，执行具体逻辑前，Chain会读取Memory来增强用户输入。
+2. 执行具体逻辑后，返回应答之前，Chain会把当前轮次的输入与输出写进Memory，供以后使用。
 
 Chain 与 Memory 相关有两处 prep_inputs 和 prep_outputs，Chain 是 DICT IN DICT OUT的，prep_inputs 会将 memory 数据`{"history": messages }`加入到dict=inputs，prep_outputs 会将 inputs、outputs 保存到 memory中: HumanMessage(content=inputs), AIMessage(content=outputs) 。 
 
@@ -535,7 +539,7 @@ class ConversationBufferMemory(BaseChatMemory):
         """Return history buffer."""
         return {self.memory_key: self.buffer} # self.buffer = self.chat_memory.messages
 ```
-
+把Memory集成到系统中涉及两个核心问题：存储的历史信息是什么、如何检索历史信息。
 ```python
 # 消息在内存中的形态
 class BaseChatMessageHistory(ABC):

@@ -162,6 +162,8 @@ updatePolicy
 [Airbnb 如何实现 Kubernetes 集群动态扩展](https://mp.weixin.qq.com/s/aSPnXtmaudGjjbBuI9a77Q) 提到了对CA的扩展。
 [kubernetes 资源管理概述](https://cizixs.com/2018/06/25/kubernetes-resource-management/)
 
+应用层的自动伸缩负责对 Pods 的自动伸缩控制。设想一个场景，某个服务在突增的业务高峰需要 100 个 Pods 扛住流量，集群常备的资源够跑 50 个Pods，那会剩余 50 个 Pods 没有资源可以调度。这个就是资源层弹性要解决的问题了，资源层弹性负责集群有足够的资源调度 Pods，且在不需要那么多资源的时候，自动释放，不造成太大的浪费。
+
 随着业务的发展，应用会逐渐增多，每个应用使用的资源也会增加，总会出现集群资源不足的情况。为了动态地应对这一状况，我们还需要 CLuster Auto Scaler，能够根据整个集群的资源使用情况来增减节点。CA 是面向事件工作的，并每 10 秒检查一次是否存在不可调度（Pending）的 Pod(当调度器无法找到可以容纳 Pod 的节点时，这个 Pod 是不可调度的）。此时，CA 开始创建新节点。
 
 CA（ cluster-autoscaler）是用来弹性伸缩kubernetes集群的，自动的根据部署的应用所请求的资源量来动态的伸缩集群

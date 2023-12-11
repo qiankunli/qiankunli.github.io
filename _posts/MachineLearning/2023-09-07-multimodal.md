@@ -13,6 +13,8 @@ keywords: llm multimodal
 
 ## 前言（未完成）
 
+大语言模型仅仅赋予了模型接受语言输入的能力，多模态则想给大模型安装上眼睛和耳朵。
+
 语言模型的发展历程与视觉模型有许多相似之处。
 1. 它们都考虑了生物行为的特点，找到了适合自身的神经网络结构——循环神经网络（RNN）和卷积神经网络（CNN）。
 2. 它们在模型规模不断扩大的过程中，也都遇到了梯度爆炸和梯度消失的问题，并基于各自模型结构的特点找到了应对方法，分别是 LSTM 和 ResNet。
@@ -43,3 +45,7 @@ keywords: llm multimodal
 ## 文生图
 
 [文生图模型发展简史与原理：DALL·E, Imagen, Stable Diffusion](https://mp.weixin.qq.com/s/u4t23yzx0Qli_NIlnvNNEA) 未读。 
+
+[​浅析多模态大模型的前世今生](https://mp.weixin.qq.com/s/DXoeQqjVoDLxGV2oZeL95Q) 未读
+
+[文生图模型发展简史与原理：DALL·E, Imagen, Stable Diffusion](https://mp.weixin.qq.com/s/3-p16x4e5XVRYuPj6QTnxg) 未读

@@ -76,6 +76,8 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
 3. 根据top-k块的文本生成响应
 我们会看到所有的过程都是有信息损失的，这意味着不能保证所有的信息都能保存在结果中。如果我们把所有的限制放在一起，重新考虑一些公司即将推出的基于RAG的企业搜索，我真的很好奇它们能比传统的全文搜索引擎好多少。
 
+[RAG探索之路的血泪史及曙光](https://mp.weixin.qq.com/s/PMvmBmTh1jrDSvXqNaV3KQ) 值得细读。
+
 ### 分级
 
 如何让LLM简要、准确回答细粒度知识？如何让LLM回答出全面的粗粒度（跨段落）知识？QA 的难度主要在于回答这个问题所依赖的信息在长文档中的分布情况，具体可以大致分为下面三种情况：
@@ -99,9 +101,9 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
     2. 文档切片的大小如何控制？ 太小则 容易造成信息丢失，太大则不利于向量检索命中。此外还要考虑LLM context 长度的限制，GPT-3.5-turbo 支持的上下文窗口为 4096 个令牌，这意味着输入令牌和生成的输出令牌的总和不能超过 4096，否则会出错。为了保证不超过这个限制，我们可以预留约 2000 个令牌作为输入提示，留下约 2000 个令牌作为返回的消息。这样，如果你提取出了五个相关信息块，那么每个片的大小不应超过 400 个令牌。[最详细的文本分块(Chunking)方法——可以直接影响基于LLM应用效果](https://mp.weixin.qq.com/s/WjiOrJHt8nSW5OGe2x4BAg)
     3. 基于算法模型，主要是使用类似 BERT 结构的语义段落分割模型，能够较好的对段落进行切割，并获取尽量完整的上下文语义。需要微调，上手难度高，而且切分出的段落有可能大于向量模型所支持的长度，这样就还需要进行切分。
 3. 文档召回过程中如何保证召回内容跟问题是相关的？ 或者说，如何尽可能减少无关信息？  召回数据相关性的影响方面很多，既包括文档的切分，也包括文档query输入的清晰度，因此现在也出现了从多query、多召回策略以及排序修正等多个方案。
-    1. Finetune 向量模型。embedding 模型 可能从未见过你文档的内容，也许你的文档的相似词也没有经过训练。在一些专业领域，通用的向量模型可能无法很好的理解一些专有词汇，所以不能保证召回的内容就非常准确，不准确则导致LLM回答容易产生幻觉（简而言之就是胡说八道）。可以通过 Prompt 暗示 LLM 可能没有相关信息，则会大大减少 LLM 幻觉的问题，实现更好的拒答。[大模型应用中大部分人真正需要去关心的核心——Embedding](https://mp.weixin.qq.com/s/Uqt3H2CfD0sr4P5u169yng)
-    2. 利用 LLM 对知识语料进行增强和扩充。将用户问题采用多个不同的视角去提问，然后 LLM 会得出最终结果。大多数人在问问题的过程中，如果不懂 prompt 工程，往往不专业，要么问题过于简单化，要么有歧义，意图不明显。那么向量搜索也是不准确的，导致LLM回答的效果不好。所以需要 LLM 进行问题的修正和多方位解读。MultiQueryRetriever 。PS： 对一篇文档/chunk生成知识点、问题、短摘要，当根据query 进行匹配时，可能先匹配到知识点、问题、短摘要，再找到原始chunk。MultiVectorRetriever/ParentDocumentRetriever  [使用RAG-Fusion和RRF让RAG在意图搜索方面更进一步](https://mp.weixin.qq.com/s/N7HgjsqgCVf2i-xy05qZtA)
-    3. 同时使用了es 和向量召回。 EnsembleRetriever
+    1. Finetune 向量模型。embedding 模型 可能从未见过你文档的内容，也许你的文档的相似词也没有经过训练。在一些专业领域，通用的向量模型可能无法很好的理解一些专有词汇，所以不能保证召回的内容就非常准确，不准确则导致LLM回答容易产生幻觉（简而言之就是胡说八道）。可以通过 Prompt 暗示 LLM 可能没有相关信息，则会大大减少 LLM 幻觉的问题，实现更好的拒答。[大模型应用中大部分人真正需要去关心的核心——Embedding](https://mp.weixin.qq.com/s/Uqt3H2CfD0sr4P5u169yng) [分享Embedding 模型微调的实现](https://mp.weixin.qq.com/s/1AzDW9Ubk9sWup2XJWbvlA)
+    2. 利用 LLM 对知识语料进行增强和扩充。将用户问题采用多个不同的视角去提问，然后 LLM 会得出最终结果。大多数人在问问题的过程中，如果不懂 prompt 工程，往往不专业，要么问题过于简单化，要么有歧义，意图不明显。那么向量搜索也是不准确的，导致LLM回答的效果不好。所以需要 LLM 进行问题的修正和多方位解读。MultiQueryRetriever 。PS： 对一篇文档/chunk生成知识点、问题、短摘要，当根据query 进行匹配时，可能先匹配到知识点、问题、短摘要，再找到原始chunk。MultiVectorRetriever/ParentDocumentRetriever  。[使用RAG-Fusion和RRF让RAG在意图搜索方面更进一步](https://mp.weixin.qq.com/s/N7HgjsqgCVf2i-xy05qZtA)
+    3. 同时使用了es 和向量召回。 EnsembleRetriever。 
         |倒排召回|向量召回|
         |---|---|
         |检索速度更快||
@@ -124,6 +126,7 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
         ![](/public/upload/machine/icl_keyword_extraction.jpg)
     2. 有监督方案
         ![](/public/upload/machine/supervised_learning_keyword_extraction.jpg)
+在专业的垂直领域，待检索的文档往往都是非常专业的表述，而用户的问题往往是非常不专业的白话表达。所以直接拿用户的query去检索，召回的效果就会比较差。Keyword LLM就是解决这其中GAP的。例如在ChatDoctor中会先让大模型基于用户的query生成一系列的关键词，然后再用关键词去知识库中做检索。ChatDoctor是直接用In-Context Learning的方式进行关键词的生成。我们也可以对大模型在这个任务上进行微调，训练一个专门根据用户问题生成关键词的大模型。这就是ChatLaw中的方案。
 
 ![](/public/upload/machine/keyword_recall.jpg)
 
@@ -149,8 +152,23 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
     1. RRF只是对召回的topk数据的顺序进行近似排序计算，并有真正的对数据顺序计算。
     2. RRF只关注topk数据的位置，忽略了真实分数以及分布信息。
 
+### Self-RAG
+
 [Self-RAG 框架：更精准的信息检索与生成](https://mp.weixin.qq.com/s/-AozhJr8zM8lovSX0m7JVQ) 未读
 [也看引入自我反思的大模型RAG检索增强生成框架：SELF-RAG的数据构造及基本实现思路](https://mp.weixin.qq.com/s/VyrkSnYb4Uss8cfZp1yrvA) 未读
+
+[Self-RAG 及其实现](https://mp.weixin.qq.com/s/tpAJww8gs8uurEidRWSmwA)
+Self-RAG 主要步骤概括如下：
+1. 判断是否需要额外检索事实性信息（retrieve on demand），仅当有需要时才召回
+2. 平行处理每个片段：生产prompt+一个片段的生成结果。PS： query + chunk ==> 带有反思标记（relevant/supported/partital/inrelevant）的chunk
+3. 使用反思字段，检查输出是否相关，选择最符合需要的片段；
+4. 再重复检索
+5. 生成结果会引用相关片段，以及输出结果是否符合该片段，便于查证事实。  
+
+![](/public/upload/machine/self_rag.jpg)
+
+Self-RAG 的一个重要创新是 Reflection tokens (反思字符)：通过生成反思字符这一特殊标记来检查输出。这些字符会分为 Retrieve 和 Critique 两种类型，会标示：检查是否有检索的必要，完成检索后检查输出的相关性、完整性、检索片段是否支持输出的观点。模型会基于原有词库和反思字段来生成下一个 token。
+
 
 ## 要不要微调
 
