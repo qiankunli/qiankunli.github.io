@@ -55,10 +55,12 @@ Kubernetes 里 Pod 的 CPU 和内存资源，实际上还要分为 limits 和 re
 
 QoS 划分的主要应用场景，是当宿主机资源（主要是不可压缩资源）紧张的时候，kubelet 对 Pod 进行 Eviction（即资源回收）时需要用到的。“紧张”程度可以作为kubelet 启动参数配置，默认为
 
-	memory.available<100Mi
-	nodefs.available<10%
-	nodefs.inodesFree<5%
-	imagefs.available<15%
+```
+memory.available<100Mi
+nodefs.available<10%
+nodefs.inodesFree<5%
+imagefs.available<15%
+```
 
 Kubernetes 计算 Eviction 阈值的数据来源，主要依赖于从 Cgroups 读取到的值，以及使用 cAdvisor 监控到的数据。当宿主机的 Eviction 阈值达到后，就会进入 MemoryPressure 或者 DiskPressure 状态，从而避免新的 Pod 被调度到这台宿主机上。
 

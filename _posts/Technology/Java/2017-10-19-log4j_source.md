@@ -97,6 +97,8 @@ LogManager
 
 ## 日志框架的性能问题
 
+[浅析JAVA日志中的几则性能实践与原理解释](https://mp.weixin.qq.com/s/qYAYObrLjWkppmYik4v0Vw)
+
 2017.12.23补充：有反馈称log4j2 性能更好，log4j在一定程度的负载下性能会急剧下降，成为瓶颈点。
 
 2019.1.30补充：日志记录期间分配临时对象，如日志事件对象，字符串，字符数组，字节数组等，这会对垃圾收集器造成压力并增加GC暂停发生的频率。具体事例参见 [java gc](http://qiankunli.github.io/2016/06/17/gc.html) 中 `log.debug(JSON.toJSONString(object))` 导致频繁fullgc 的例子

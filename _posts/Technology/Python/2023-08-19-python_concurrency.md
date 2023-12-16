@@ -233,3 +233,31 @@ async for result in async_generator():
 ## ray 并发库
 
 ray core 可以作为 multiprocess 模块的平替，ChatGPT 本身在各种 dirty-work 里面也大量应用了 Ray，请参考另一篇专门写ray的博客。
+
+xoscar: Python actor framework for heterogeneous computing. PS：在python 里一个 对象跟并行体是一体的，Java里对象是对象，Thread 是Thread，所以要么XXThread 里塞业务逻辑，要么是对象里塞Thread/ExecutorPool，将这个对象的部分方法实现为异步的。但在python 里，只要 继承特定的class（会带上装饰器），则其所有方法均可以异步、远程调用。 
+
+```python
+# Define an actor
+import xoscar as xo
+# stateful actor, for stateless actor, inherit from xo.StatelessActor
+class MyActor(xo.Actor):
+    def __init__(self, *args, **kwargs):
+        pass
+    async def __post_create__(self):
+        # called after created
+        pass
+    async def __pre_destroy__(self):
+        # called before destroy
+        pass
+    def method_a(self, arg_1, arg_2, **kw_1):  # user-defined function
+        pass
+    async def method_b(self, arg_1, arg_2, **kw_1):  # user-defined async function
+        pass
+# Create an actor
+import xoscar as xo
+actor_ref = await xo.create_actor(
+    MyActor, 1, 2, a=1, b=2,
+    address='<ip>:<port>', uid='UniqueActorName')
+# Invoke a method
+await actor_ref.method_a.send(1, 2, a=1, b=2)
+```

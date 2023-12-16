@@ -133,6 +133,8 @@ shares值即CFS中每个进程的(准确的说是调度实体)权重(weight/load
 
 ## Kubernetes 与 CFS
 
+QoS(Guaranteed，Burstable，BestEffort) 是对 SLO 宏观层面的定义，而操作系统为不同 QoS 的 Pod 提供微观层面的 SLO 保障和隔离能力。Kubelet 对外暴露了绑核、NUMA 亲和等能力，针对 Guaranteed 类型的 Pod，其每个 Container 会独占 CPU，而所有非 Guaranteed Pod 的 Container 将会共享（也做了绑核，绑的是余下所有的核，包括预留的核）剩余的所有核，同时 Kubelet 也会根据 CPU Request 和 Limit 的值设置 CPU shares 和 quota 的值（cgroup v1 v2 对应不同的文件）。也可以通过扩展 Kubelet 或者完全自研的方式，配合 kernel，实现更丰富的隔离、压制能力等，例如基于 RDT 的超线程隔离，基于 cgroup identity 的绝对压制能力等。
+
 假设`cat /proc/cpuinfo| grep "processor"| wc -l` 查看某个node 的逻辑core 数为48，使用`kubectl describe node xx`查看node cpu情况
 ```
 Capacity:     # 节点的总资源
