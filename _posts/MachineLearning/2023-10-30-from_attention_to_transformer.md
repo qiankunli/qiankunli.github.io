@@ -78,7 +78,7 @@ $$
   ![](/public/upload/machine/self_attention_vector.jpg)
 2. 计算得分。假设我们在为这个例子中的第一个词“Thinking”计算自注意力向量，我们需要拿输入句子中的每个单词对“Thinking”打分。这些分数决定了在编码单词“Thinking”的过程中有多重视句子的其它部分。这些分数是通过打分单词（所有输入句子的单词）的K向量与“Thinking”的Q向量相点积来计算的。PS： 点积是一种常用的相似度度量
   ![](/public/upload/machine/self_attention_vector_dot_product.jpg)
-3. 将分数除以8(8是论文中使用的键向量的维数64的平方根，这会让梯度更稳定。这里也可以使用其它值，8只是默认值)，然后通过softmax传递结果。**softmax的作用是使所有单词的分数归一化**，得到的分数都是正值且和为1。这个softmax分数决定了每个单词对编码当下位置（“Thinking”）的贡献。显然，已经在这个位置上的单词将获得最高的softmax分数，但有时关注另一个与当前单词相关的单词也会有帮助。
+3. 将分数除以8(8是论文中使用的键向量的维数64的平方根，这会让梯度更稳定。这里也可以使用其它值，8只是默认值)，然后通过softmax传递结果。**softmax的作用是使所有单词的分数归一化，得到的分数都是正值且和为1**。这个softmax分数决定了每个单词对编码当下位置（“Thinking”）的贡献。显然，已经在这个位置上的单词将获得最高的softmax分数，但有时关注另一个与当前单词相关的单词也会有帮助。
   /![](/public/upload/machine/self_attention_score.jpg)
 4. 将每个V 乘以softmax分数(这是为了准备之后将它们求和)。这里的直觉是希望关注语义上相关的单词，并弱化不相关的单词(例如，让它们乘以0.001这样的小数)。对加权值向量求和，然后即得到自注意力层在该位置的输出(在我们的例子中是对于第一个单词)。
   ![](/public/upload/machine/self_attention_convert.jpg)

@@ -236,6 +236,7 @@ PS：**基本上对一个推理服务框架的需求都在这里了**。
 
 [模型推理服务化框架Triton保姆式教程（二）：架构解析](https://mp.weixin.qq.com/s/ioAx1tAwmCwnVfsATm2qXQ)
 
+[深度学习部署神器——triton-inference-server入门教程指北](https://mp.weixin.qq.com/s/BuVEuZUIvSCuxHQdmR6QUg) 未细读。
 
 [字节跳动模型大规模部署实战](https://mp.weixin.qq.com/s/Aya7V8yomSDqLHA2n1zwbQ)
 

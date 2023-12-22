@@ -235,35 +235,6 @@ Prompt Tuning 可以看作是 Prefix Tuning 的简化版本，它给每个任务
 
 [NEFT：新的指令微调技术大幅提升大模型性能（LLaMA系增加NEFT性能提升约10%）](https://mp.weixin.qq.com/s/47Gg5FRihnX3w7UqW7lCqQ)
 
-## 实践
-
-PS: 深度学习都得指定features/labels。在llm 场景下，features 和labels 有几个特点
-1. llm 有base model、sft model 等，不同的model 数据集格式不同，一般分为几个部分，比如sft 的`{"question:":"xx","answer":"xx"}`，各家模型都不太一样，很多数据集是不公开的。但不管如何，这几部分都会拼为一个sentence（中间可能有一些特殊字符起到连接作用），然后把sentence通过tokenizer转换成input_ids，之后再走embedding 模块等等就是Transformer系列模型内的事儿了，最后得到output_ids.
-2. 模型输入格式，模型输入dict 一般包含3个key： input_ids,attention_mask,labels
-    1. 有些模型内置从input ids 提取attention mask的操作
-    2. 预训练场景 labels 一般由input_ids copy而来，然后做一些处理，比如labels 全部左移一位（预训练）
-    3. 明确指定labels 的话，一般是要微调，比如sft时，sentence部分中question 的位置都置为-100，-100表示在计算loss的时候会被忽略，这个由任务性质决定。
-2. 预处理（将dataset 转为模型输入）过程由​ Dataset.map() + tokennizer 来办。
-    ```python
-        def tokenize_function(example):
-            # example 表示数据集中的一行数据
-            return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
-        tokenized_dataset = dataset.map(tokenize_function, batched=True)
-    ```
-3. 之后就是对output_ids 和 labels 计算loss。
-3. 上述过程也是Transformers 库抽象的基础，指定input_ids,labels，则计算output_ids 和 loss 可以自动进行。对于一个base llm，可以基于finetune做很多task specific llm模型，主要体现在 input 数据集格式 和labels 的不同。
-
-不管是PreTraining阶段还是SFT阶段，loss函数都是一样的
-1. preprocess_pretrain_dataset处理PreTraining阶段的数据，数据组成形式：
-    1. 输入input： `<bos> X1 X2 X3`
-    2. 标签labels：`X1 X2 X3 </s>`
-    典型的Decoder架构的数据训练方式；
-2. preprocess_supervised_dataset处理SFT阶段的数据，数据组成形式：
-    1. 输入input：`<bos> prompt response`
-    2. 标签labels： `-100 ... -100 response </s>`
-对于prompt部分的labels被-100所填充，这样在计算loss的时候模型只计算response部分的loss，-100的部分被忽略了。这个机制得益于torch的CrossEntropyLossignore_index参数，ignore_index参数定义为如果labels中包含了指定了需要忽略的类别号（默认是-100），那么在计算loss的时候就不会计算该部分的loss也就对梯度的更新不起作用。
-
-
 ## 代码
 
 ### 手写
@@ -343,37 +314,42 @@ trainer.train()
 LLaMA-Factory
     /src
         /llmtuner
-            /tuner
-                /core  一些通用逻辑
+            /train
+                /data 
+                    /loader.py     # get_dataset
+                    /preprocess.py # preprocess_dataset
+                /model
+                    /loader.py     # load_model_and_tokenizer
                 /dpo
-                    /workflow.py
+                    /trainer.py     # 一些trainer 用到的函数
+                    /workflow.py    # run_dpo
                 /ppo
-                    /workflow.py
+                    /trainer.py     # 一些trainer 用到的函数
+                    /workflow.py    # run_ppo
                 /pt
-                    /workflow.py
+                    /trainer.py     # 一些trainer 用到的函数
+                    /workflow.py    # run_pt
                 /rm
-                    /workflow.py
+                    /trainer.py     # 一些trainer 用到的函数
+                    /workflow.py    # run_rm
                 /sft
-                    /workflow.py
+                    /trainer.py     # 一些trainer 用到的函数
+                    /workflow.py    # run_sft
 ```
 
-workflow.py 的逻辑言简意赅，就是拼凑运行 Trainer的dataset、model、tokenizer、data_collator等参数。其中 dataset 有一个load_dataset 和preprocess_dataset 的过程，preprocess_dataset 会根据任务目标不同，处理逻辑不同，也就是将数据转为input_ids 的方式不同。 
+workflow.py 的逻辑言简意赅，就是拼凑运行 Trainer的dataset、model、tokenizer、data_collator等参数
+1. 对于dataset 有一个load_dataset 和preprocess_dataset 的过程，preprocess_dataset 会根据任务目标不同，处理逻辑不同，也就是将数据转为input_ids 的方式不同。 最终转为trainer 也就是transformer model 可以接受的dataset，包含列 input_ids/attention_task/labels（或其它model.forward 可以支持的参数）。 
+2. Trainer 对训练逻辑已经封的很好了，内部也支持了accelerate 和 deepspeed，只要合适的配置 training_args 即可。
 
 以pt对应的workflow.py 为例
+
 ```python
 def run_pt(model_args: "ModelArguments",data_args: "DataArguments",training_args: "Seq2SeqTrainingArguments",finetuning_args: "FinetuningArguments",callbacks: Optional[List["TrainerCallback"]] = None):
     dataset = get_dataset(model_args, data_args)
     model, tokenizer = load_model_and_tokenizer(model_args, finetuning_args, training_args.do_train, stage="pt")
     dataset = preprocess_dataset(dataset, tokenizer, data_args, training_args, stage="pt")
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        tokenizer=tokenizer,
-        data_collator=data_collator,
-        callbacks=callbacks,
-        **split_dataset(dataset, data_args, training_args)
-    )
+    trainer = Trainer(model,training_args,tokenizer,data_collator,callbacks,**split_dataset(dataset, data_args, training_args)
     # Training
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
@@ -386,11 +362,18 @@ def run_pt(model_args: "ModelArguments",data_args: "DataArguments",training_args
      # Evaluation
     if training_args.do_eval:
         metrics = trainer.evaluate(metric_key_prefix="eval")
-        try:
-            perplexity = math.exp(metrics["eval_loss"])
-        except OverflowError:
-            perplexity = float("inf")
+        perplexity = math.exp(metrics["eval_loss"])
         metrics["perplexity"] = perplexity
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
 ```
+
+不管是PreTraining阶段还是SFT阶段，loss函数都是一样的，只是计算的方式存在差异，PreTraining阶段计算的是整段输入文本的loss，而SFT阶段计算的是response部分的loss。
+1. preprocess_pretrain_dataset处理PreTraining阶段的数据，数据组成形式：
+    1. 输入input： `<bos> X1 X2 X3`
+    2. 标签labels：`X1 X2 X3 </s>`
+    典型的Decoder架构的数据训练方式；
+2. preprocess_supervised_dataset处理SFT阶段的数据，数据组成形式：
+    1. 输入input：`<bos> prompt response`
+    2. 标签labels： `-100 ... -100 response </s>`
+对于prompt部分的labels被-100所填充，这样在计算loss的时候模型只计算response部分的loss，-100的部分被忽略了。这个机制得益于torch的CrossEntropyLossignore_index参数，ignore_index参数定义为如果labels中包含了指定了需要忽略的类别号（默认是-100），那么在计算loss的时候就不会计算该部分的loss也就对梯度的更新不起作用。

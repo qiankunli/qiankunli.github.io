@@ -134,9 +134,10 @@ print(output)
 #    hidden_states=None, 
 #    attentions=None
 #)
+# output = model(**tokens) 对于文本分类来说，整段文本输入返回一个标签，也就是SequenceClassifierOutput.logits，那么对于文本生成来说，整段文本输入返回CausalLMOutputWithPast，它的logits 是自动补全的是 input_ids 的下一个token呢，还是直到eos的多个token呢？
 ```
 
-model(xx) ==> `Module.__call__` ==> Module.forward/model.forward
+model(xx) ==> `Module.__call__` ==> Module.forward/model.forward，几乎每一个llm 都会自定义forward 方法，如果向forward 方法传入 labels，还会自动计算loss。
 
 ```python
 class Module:
@@ -152,11 +153,36 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMix
 	def save_pretrained(...)
 	@classmethod
     def from_pretrained(...)
-
+class GenerationMixin:
+   def generate(inputs,...):> Union[GenerateOutput, torch.LongTensor]:
+        ...
+        outputs = self(model_input_ids,attention_mask=model_attn,...)
+        ...             
 class ChatGLMPreTrainedModel(TorchModel, PreTrainedModel):
     ...
 class ChatGLMModel(ChatGLMPreTrainedModel):
-	def forward(self,input_ids,attention_mask,...)
+	def forward(self,input_ids,attention_mask,...):
+        ...
+class GPT2PreTrainedModel(PreTrainedModel):
+    ...
+class GPT2LMHeadModel(GPT2PreTrainedModel):
+    def __init__(self, config):
+        ...
+        self.transformer = GPT2Model(config)
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        ...
+    def forward(self,input_ids,attention_mask,labels,...):
+       transformer_outputs = self.transformer(input_ids,attention_mask,...)
+       hidden_states = transformer_outputs[0]
+       lm_logits = self.lm_head(hidden_states)
+       loss = None
+       if labels is not None:
+           labels = labels.to(lm_logits.device) # move labels to correct device to enable model parallelism
+           shift_logits = lm_logits[..., :-1, :].contiguous() # Shift so that tokens < n predict n
+           shift_labels = labels[..., 1:].contiguous()
+           loss_fct = CrossEntropyLoss()
+           loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        return ((loss,) + output) if loss is not None else output     
 ```
 
 一些细节
@@ -175,6 +201,28 @@ class ChatGLMModel(ChatGLMPreTrainedModel):
     outputs = model(torch.tensor(batched_ids), attention_mask=torch.tensor(attention_mask))
     print(outputs.logits)
     ```
+2. attention_mask ，self-attention使用，shape和input_ids一致。模型训练和预测基本都是批量化处理的，处理多个序列时，在attention的时候，不去attend被mask掉的部分。 作用是告诉模型一个batch的数据里哪些是padding的，从而可以忽略掉那些padding的部分，比如下图的例子：
+    ![](/public/upload/machine/attention_mask.jpg)
+
+PS: 深度学习都得指定features/labels。在llm 场景下，features 和labels 有几个特点
+1. llm 有base model、sft model 等，不同的model 数据集格式不同，一般分为几个部分，比如sft 的`{"question:":"xx","answer":"xx"}`，各家模型都不太一样，很多数据集是不公开的。但不管如何，这几部分都会拼为一个sentence（中间可能有一些特殊字符起到连接作用），然后把sentence通过tokenizer转换成input_ids，之后再走embedding 模块等等就是Transformer系列模型内的事儿了，最后得到output_ids.
+2. 模型输入格式，模型输入dict 一般包含3个key： input_ids,attention_mask,labels
+    1. 有些模型内置从input ids 提取attention mask的操作
+    2. 预训练场景 labels 一般由input_ids copy而来，然后做一些处理，比如labels 全部左移一位（预训练）
+    3. 明确指定labels 的话，一般是要微调，比如sft时，sentence部分中question 的位置都置为-100，-100表示在计算loss的时候会被忽略，这个由任务性质决定。
+2. 预处理（将dataset 转为模型输入）过程由​ Dataset.map() + tokennizer 来办。
+    ```python
+        def tokenize_function(example):
+            # example 表示数据集中的一行数据
+            return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
+        tokenized_dataset = dataset.map(tokenize_function, batched=True)
+    ```
+3. 之后就是对output_ids 和 labels 计算loss。
+3. 上述过程也是Transformers 库抽象的基础，指定input_ids,labels，则计算output_ids 和 loss 可以自动进行。对于一个base llm，可以基于finetune做很多task specific llm模型，主要体现在 input 数据集格式 和labels 的不同。
+
+
+
+
 ### generate实现
 
 [浅谈LLAMA2核心函数generate源码](https://mp.weixin.qq.com/s/vnke00f7kzlA16Pw_FJFjQ)
@@ -293,6 +341,7 @@ print(raw_datasets)
 #    })
 #})
 ```
+load_dataset函数返回的是DatasetDict对象，它类似Python的Dict。DatasetDict里的不同key代表了数据集的不同split（默认的split是train），比如glue数据集包含”train”、”validation”和”test”三个split。DatasetDict的value是Dataset对象，它包含了一个split的全部数据。
 
 为了预处理数据集，我们需要将文本转换为模型能够理解的数字，使用Dataset.map()方法
 ```python
@@ -502,7 +551,7 @@ for i in range(20):
     attention_mask = torch.ones(input_ids.shape, dtype=torch.int64)
     logits = model(input_ids=input_ids,attention_mask=attention_mask)['logits']                    
     new_id = logits[:, -1, :].argmax(dim=1)    # Generate new ID
-    input_ids = torch.cat([input_ids, new_id.unsqueeze(0)], dim=1)
+    input_ids = torch.cat([input_ids, new_id.unsqueeze(0)], dim=1)  # input_ids 加入新生成的字符
 ```
 
 |i|input_ids|decoded text|next token|

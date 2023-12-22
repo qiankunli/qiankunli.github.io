@@ -38,14 +38,14 @@ keywords: large model
 
 ![](/public/upload/machine/vllm_arch.jpg)
 
-1. vLLM是一个开源的大模型推理加速框架，通过PagedAttention高效地管理attention中缓存的张量，实现了比HuggingFace Transformers高14-24倍的吞吐量。
+1. vLLM是一个开源的大模型推理加速框架，通过PagedAttention高效地管理attention中缓存的张量，实现了比HuggingFace Transformers高14-24倍的吞吐量，就像在操作系统中管理CPU虚拟内存一样
 2. NVIDIA FasterTransformer (FT) 是一个用于实现基于Transformer的神经网络推理的加速引擎。它包含Transformer块的高度优化版本的实现，其中包含编码器和解码器部分。使用此模块，您可以运行编码器-解码器架构模型（如：T5）、仅编码器架构模型（如：BERT）和仅解码器架构模型（如：GPT）的推理。FT框架是用C++/CUDA编写的，依赖于高度优化的 cuBLAS、cuBLASLt 和 cuSPARSELt 库，这使您可以在 GPU 上进行快速的 Transformer 推理。与 NVIDIA TensorRT 等其他编译器相比，FT 的最大特点是它支持以分布式方式进行 Transformer 大模型推理。在底层，节点间或节点内通信依赖于 MPI 、 NVIDIA NCCL、Gloo等。因此，使用FasterTransformer，您可以在多个 GPU 上以张量并行运行大型Transformer，以减少计算延迟。同时，TP 和 PP 可以结合在一起，在多 GPU 节点环境中运行具有数十亿、数万亿个参数的大型 Transformer 模型。
 3. DeepSpeed-MII 是 DeepSpeed 的一个新的开源 Python 库，旨在使模型不仅低延迟和低成本推理，而且还易于访问。
 
 当前的生成式大模型的推理可以分为两个阶段：Context 阶段和 Generation 阶段。Context 阶段是批量计算输入的 Prompt，属于计算密集型。Generation 阶段是逐字生成下一个 Token，属于访存密集型，虽然每一轮 Generation 的计算量小于 Context 阶段，但是访存量相当。大模型推理主要面临三个挑战：输入输出变长、计算规模大、显存占用大，针对这些挑战当前有多种优化手段进行优化：
 1. 服务层面，打破之前的 Batch 只能同时返回结果的限制，允许部分请求结束后插入新的请求。
 2. 计算方面，也有一些算子融合，KV Cache 这样的无损加速方案，也有模型量化加速方案，比如 Smooth Quant 量化方案将激活和权重的分布进行平衡来降低模型精度损失。
-3. 显存方面，Generation 计算的访存密集型可以通过 Flash Attention 优化访存，也可以通过 Paged Attention 方法优化推理过程显存占用从而支持更大的吞吐。
+3. 显存方面，Generation 计算的访存密集型可以通过 Flash Attention 优化访存，也可以通过 Paged Attention 方法优化推理过程显存占用从而支持更大的吞吐。Paged Attention基本构建了一个类似于CPU内存管理的内存管理系统，以减少内存碎片并充分利用内存吞吐量
     1. 对于较短的文本输入 (词元数小于 1024)，推理的内存需求很大程度上取决于模型权重的大小。
 
 
@@ -59,6 +59,10 @@ keywords: large model
 3. 压缩：稀疏性或蒸馏。
 4. 并行化：在多个设备间进行张量并行，或者针对较大的模型进行流水线并行。
 除上述方法以外，还有许多针对Transformer的重要优化技术，如KV（键-值）缓存。[Transformer推理性能优化技术很重要的一个就是K V cache，能否通俗分析，可以结合代码? - 看图学的回答 - 知乎](https://www.zhihu.com/question/596900067/answer/3257946543)
+
+![](/public/upload/machine/kv_cache.jpg)
+
+提问【天王盖地虎，】的QKV实际上重复计算了很多遍。由于GPT是单向注意力，每层的提问的KV只根据上一层的提问的KV（或提问的嵌入向量）计算，不跟据回答中任何字符的KV计算，完全可以把它们缓存起来避免重复计算。至于为什么不缓存Q，因为推理场景下我们只取最后一个词，那么每层输出HS[-1]就可以了。HS[-1]根据全部的V和注意力矩阵的最后一行A[-1]计算，而A[-1]根据Q[-1]和全部的K计算，Q[-1]只根据输入最后一个字符X[-1]计算。所以我们通过传入KVCache保证K和V是完整的，输入字符只传入最后一个，也就是上一次GPT生成出来的字符，就可以了。
 
 在LLM中，计算主要由矩阵乘法计算主导；这些维度较小的计算在大多数硬件上通常受内存带宽的限制。在以自回归方式生成词元时，激活矩阵的维度之一（由批大小和序列中的词元数定义）在小型批大小上较小。因此，速度由我们将模型参数从GPU内存加载到本地缓存/寄存器中的速度决定，而不是由计算加载数据的速度决定。相比峰值计算性能，推理硬件中可用和可实现的内存带宽能够更好地预测词元的生成速度。
 
@@ -170,11 +174,14 @@ python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3
 python3 -m fastchat.serve.openai_api_server --host localhost --port 8000
 ```
 
+![](/public/upload/machine/langchain_chatchat_call.jpg)
+
 设计思路
-1. 因为要支持不同的llm 库或加速库，比如Transformer、vllm等，因此推理侧必须有一个统一的LLM 抽象，在Fastchat里是XXModelWorker，在xinference 里是XXLLM
+1. 因为要支持不同的llm 库或加速库，比如Transformer、vllm等，且不同的llm在一些细节上有差异，因此推理侧必须有一个统一的LLM 抽象，在Fastchat里是XXModelWorker，在xinference 里是XXLLM
 2. 将python llm 库 api化，一个api 要有一个api handler 函数，一般抽象为一个对象 作为api handler的载体，这个对象持有上面的XxLLM 执行chat/generate 方法，有时候还要支持/封装分布式、异步等细节。在Fastchat里是ModelWorker，在xinference 里是WorkerActor
-3. 不同的llm 还有很多差别的（比如加载 load_model、运行chat/generate、模型配置转换），也有很多共性，所以模型设计的分层抽象很重要，Fastchat 的思路是 提供了一个ModelAdapter（主要差异化了加载） 和一个 generate_stream_gate 函数成员（差异化生成），inference的思路是一个模型一个XXLLM
+3. 不同的llm 还有很多差别的（比如加载 load_model、运行chat/generate、模型配置转换），也有很多共性，所以模型设计的分层抽象很重要，Fastchat 的思路是 提供了一个ModelAdapter（主要差异化了加载） 和一个 generate_stream_gate 函数成员（差异化text生成），inference的思路是一个模型（比如chatglm、llama等）一个XXLLM
   1. 这里的模型配置转换说的是，比如一个chat message 包含role 和content 两个部分，role=system/user/assistant 各家各有差异，但因为对外提供的接口一般是openai 风格，所以有一个转换的过程。
+4. 除了文本生成模型，还经常需要部署embedding模型、rerank模型、图生图、文生图等（入参出参与LLM 肯定不一样了），Fastchat 的方式是 让ModelWorker支持除了generate_stream_xx 外的get_embeddings、get_rerank方法，inference的思路除了LLM之外还定义了 EmbeddingModel、RerankModel等。
 
 ### FastChat源码分析
 
@@ -249,3 +256,51 @@ response, history = model.chat(tokenizer, "晚上睡不着应该怎么办", hist
 print(response)
 晚上睡不着可能会让你感到焦虑或不舒服,但以下是一些可以帮助你入睡的方法:...
 ```
+
+## 一些材料
+
+推理加速
+1. 模型优化技术
+2. 模型压缩技术
+3. 硬件加速
+4. GPU加速
+5. 模型并行化和分布式计算技术
+
+
+[迈向100倍加速：全栈Transformer推理优化](https://mp.weixin.qq.com/s/1QlZ_d4BrAcD9YE9BEdyYg)本文回顾了从GPU架构到MLsys方法，从模型架构到解码算法的全栈Transformer推理优化方法。可以看出，大部分性能提升都来自于一个原则的利用：Transformer推理受内存限制，因此我们可以释放额外的计算能力/flops。其次，优化要么来自于优化内存访问，比如Flash Attention和Paged Attention，要么来自于释放计算能力，比如Medusa和前向解码。我们相信MLSys和建模仍有许多改进空间。在即将到来的2024年，随着模型变得更大、上下文变得更长以及随着更多开源MoE（混合专家模型）、更高内存带宽和更大内存容量的硬件，以及具有更大DRAM和专用计算引擎的移动设备的亮相，将出现更强大且人人可操作、可访问的AI。一个新时代即将到来。
+
+GPU编程基础：在执行model.generate(prompt)时，我们进行以下操作： 
+
+1. 内存访问:
+    1. 从高带宽内存（HBM）加载模型权重到L2缓存，然后传输到SM（流处理器单元）
+2. 计算:
+    1. 在SM中执行矩阵乘法，SM请求张量核心执行计算
+3. A100:
+    1. 108个SM，DRAM容量为80G，40M L2缓存
+    2. bf16张量核心：每秒312万亿浮点运算（TFLOPS）
+    3. DRAM内存带宽为2039GB/秒 = 2.039T/秒
+4. 如果模型很大，我们将其分割到多个GPU上，比如两个由NVLink连接的GPU
+    1. NVLink 300GB/秒 = 0.3T/秒
+    2. 我们大致观察了速度层次结构。尽管不能直接比较，但它们的数量级差异是我们需要优化的主要方面：
+    3. 312T（SM计算） > 2.03T（DRAM内存访问） > 0.3T=300G（NVLink跨设备通信） > 60G（PCIe跨设备通信）
+
+这意味着，如果我们希望速度更快，我们应该尽力：
+
+1. 充分利用SM
+2. 减少单个GPU的内存访问（因为它比计算慢得多），
+3. 减少GPU之间的通信（因为它甚至比内存访问还要慢）。
+
+调用model.generate(prompt)时有两个步骤：
+1. 预填充：
+    1. 为提示计算键值（kv）缓存。
+    2. 这一步骤受计算限制，因为我们并行计算了一系列词元。
+2. 解码：
+    1. 自回归采样下一个词元。
+    2. 这一步骤受内存限制，因为我们仅计算一个词元，未充分利用SM。
+
+
+
+
+
+
+
