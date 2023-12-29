@@ -144,7 +144,10 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
 
 **优化召回的输入**。
 1. 将用户问题采用多个不同的视角去提问，然后 LLM 会得出最终结果。大多数人在问问题的过程中，如果不懂 prompt 工程，往往不专业，要么问题过于简单化，要么有歧义，意图不明显。那么向量搜索也是不准确的，导致LLM回答的效果不好。所以需要 LLM 进行问题的修正和多方位解读。MultiQueryRetriever 。[使用RAG-Fusion和RRF让RAG在意图搜索方面更进一步](https://mp.weixin.qq.com/s/N7HgjsqgCVf2i-xy05qZtA)
-2. Finetune 向量模型。embedding 模型 可能从未见过你文档的内容，也许你的文档的相似词也没有经过训练。在一些专业领域，通用的向量模型可能无法很好的理解一些专有词汇，所以不能保证召回的内容就非常准确，不准确则导致LLM回答容易产生幻觉（简而言之就是胡说八道）。可以通过 Prompt 暗示 LLM 可能没有相关信息，则会大大减少 LLM 幻觉的问题，实现更好的拒答。[大模型应用中大部分人真正需要去关心的核心——Embedding](https://mp.weixin.qq.com/s/Uqt3H2CfD0sr4P5u169yng) [分享Embedding 模型微调的实现](https://mp.weixin.qq.com/s/1AzDW9Ubk9sWup2XJWbvlA) ，此外，原则上：embedding 所得向量长度越长越好，过长的向量也会造成 embedding 模型在训练中越难收敛。
+2. Finetune 向量模型。embedding 模型 可能从未见过你文档的内容，也许你的文档的相似词也没有经过训练。在一些专业领域，通用的向量模型可能无法很好的理解一些专有词汇，所以不能保证召回的内容就非常准确，不准确则导致LLM回答容易产生幻觉（简而言之就是胡说八道）。可以通过 Prompt 暗示 LLM 可能没有相关信息，则会大大减少 LLM 幻觉的问题，实现更好的拒答。
+    1. [大模型应用中大部分人真正需要去关心的核心——Embedding](https://mp.weixin.qq.com/s/Uqt3H2CfD0sr4P5u169yng) 
+    2. [分享Embedding 模型微调的实现](https://mp.weixin.qq.com/s/1AzDW9Ubk9sWup2XJWbvlA) ，此外，原则上：embedding 所得向量长度越长越好，过长的向量也会造成 embedding 模型在训练中越难收敛。
+    3. [手工微调embedding模型，让RAG应用检索能力更强](https://mp.weixin.qq.com/s/DuxqXcpW5EyLI3lj4ZJXdQ) 未细读
 3. 许多向量存储支持了对元数据的操作。LangChain 的 Document 对象中有个 2 个属性，分别是page_content和metadata，metadata就是元数据，我们可以使用metadata属性来过滤掉不符合条件的Document。元数据过滤的方法虽然有用，但需要我们手动来指定过滤条件，我们更希望让 LLM 帮我们自动过滤掉不符合条件的文档。SelfQueryRetriever
 4. **增加追问机制**。这里是通过Prompt就可以实现的功能，只要在Prompt中加入“如果无法从背景知识回答用户的问题，则根据背景知识内容，对用户进行追问，问题限制在3个以内”。这个机制并没有什么技术含量，主要依靠大模型的能力。不过大大改善了用户体验，用户在多轮引导中逐步明确了自己的问题，从而能够得到合适的答案。
 
@@ -166,6 +169,7 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
         1. RRF只是对召回的topk数据的顺序进行近似排序计算，并有真正的对数据顺序计算。
         2. RRF只关注topk数据的位置，忽略了真实分数以及分布信息。
 
+[基于ElasticSearch的混合检索实战&原理分析](https://mp.weixin.qq.com/s/EBaGXFOnNHmF_rj_NLf_Ww)
 
 **优化召回输出**
 

@@ -118,9 +118,33 @@ LoRA，LoRA背后有一个假设：我们现在看到的这些大语言模型，
 
 [深入浅出剖析 LoRA 技术原理](https://mp.weixin.qq.com/s/jk1qBRjiq80nK0e04LQqiw) 未细读。
 
-### 实现
+### HuggingFace Peft 实现
 
-许多朋友在使用LoRA的过程中，都会用到HuggingFace Peft库封装好的LoRA接口，这个接口是对微软版LoRA代码的改写和封装，目的是减少大家在使用LoRA过程中的手工活（例如徒手更改模型架构，为模型添加LoRA adapter结构等），除此外核心处理逻辑不变。
+许多朋友在使用LoRA的过程中，都会用到HuggingFace Peft，使得预训练语言模型能够高效地适应各种下游应用，无需微调模型的所有参数。与 Accelerate 无缝集成，支持利用 DeepSpeed 和 Big Model Inference 来处理大规模模型。支持的方法：LoRA、Prefix Tuning、P-Tuning、Prompt Tuning、AdaLoRA等。
+
+```python
+# 导入必要的库和函数
+from transformers import AutoModelForSeq2SeqLM  # 用于加载和处理序列到序列的语言模型
+from peft import get_peft_config, get_peft_model, LoraConfig, TaskType  # 导入PEFT相关的配置和功能
+# 指定模型和分词器的路径或名称
+model_name_or_path = "bigscience/mt0-large"      # 指定预训练模型的名称或路径
+tokenizer_name_or_path = "bigscience/mt0-large"  # 指定分词器的名称或路径
+# 配置PEFT的参数
+peft_config = LoraConfig(
+    task_type=TaskType.SEQ_2_SEQ_LM,  # 指定任务类型为序列到序列的语言模型
+    inference_mode=False,  # 设置是否为推理模式
+    r=8,  # 设置LoRA的rank
+    lora_alpha=32,  # LoRA的alpha值，决定参数增加的数量
+    lora_dropout=0.1  # LoRA层的dropout比例
+)
+# 加载预训练的序列到序列语言模型
+model = AutoModelForSeq2SeqLM.from_pretrained(model_name_or_path)
+# 应用PEFT方法调整模型
+model = get_peft_model(model, peft_config)
+```
+
+
+HuggingFace Peft库封装好的LoRA接口，这个接口是对微软版LoRA代码的改写和封装，目的是减少大家在使用LoRA过程中的手工活（例如徒手更改模型架构，为模型添加LoRA adapter结构等），除此外核心处理逻辑不变。
 
 [LoRA](https://huggingface.co/docs/peft/conceptual_guides/lora)As with other methods supported by PEFT, to fine-tune a model using LoRA, you need to:
 1. Instantiate a base model.
@@ -377,3 +401,18 @@ def run_pt(model_args: "ModelArguments",data_args: "DataArguments",training_args
     1. 输入input：`<bos> prompt response`
     2. 标签labels： `-100 ... -100 response </s>`
 对于prompt部分的labels被-100所填充，这样在计算loss的时候模型只计算response部分的loss，-100的部分被忽略了。这个机制得益于torch的CrossEntropyLossignore_index参数，ignore_index参数定义为如果labels中包含了指定了需要忽略的类别号（默认是-100），那么在计算loss的时候就不会计算该部分的loss也就对梯度的更新不起作用。
+
+PS: 深度学习都得指定features/labels。在llm 场景下，features 和labels 有几个特点
+1. llm 有base model、sft model 等，不同的model 数据集格式不同，一般分为几个部分，比如sft 的`{"question:":"xx","answer":"xx"}`，各家模型都不太一样，很多数据集是不公开的。但不管如何，这几部分都会拼为一个sentence（中间可能有一些特殊字符起到连接作用），然后把sentence通过tokenizer转换成input_ids，之后再走embedding 模块等等就是Transformer系列模型内的事儿了，最后得到output_ids.
+2. 模型输入格式，模型输入dict 一般包含3个key： input_ids,attention_mask,labels
+    1. 有些模型内置从input ids 提取attention mask的操作
+    2. 预训练场景 labels 一般由input_ids copy而来，然后做一些处理，比如labels 全部左移一位（预训练）
+    3. 明确指定labels 的话，一般是要微调，比如sft时，sentence部分中question 的位置都置为-100，-100表示在计算loss的时候会被忽略，这个由任务性质决定。
+2. 预处理（将dataset 转为模型输入）过程由​ Dataset.map() + tokennizer 来办。
+    ```python
+        def tokenize_function(example):
+            # example 表示数据集中的一行数据
+            return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
+        tokenized_dataset = dataset.map(tokenize_function, batched=True)
+    ```
+3. 之后就是对output_ids 和 labels 计算loss。

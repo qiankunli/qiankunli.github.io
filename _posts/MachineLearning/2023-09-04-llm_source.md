@@ -134,8 +134,8 @@ print(output)
 #    hidden_states=None, 
 #    attentions=None
 #)
-# output = model(**tokens) 对于文本分类来说，整段文本输入返回一个标签，也就是SequenceClassifierOutput.logits，那么对于文本生成来说，整段文本输入返回CausalLMOutputWithPast，它的logits 是自动补全的是 input_ids 的下一个token呢，还是直到eos的多个token呢？
 ```
+`output = model(**tokens)` 对于文本分类来说，整段文本输入返回一个标签，也就是SequenceClassifierOutput.logits，那么对于文本生成来说，整段文本输入返回CausalLMOutputWithPast，它的logits自动补全的是 input_ids 的下一个token呢，还是直到eos的多个token呢？生成式模型的训练是并行的，靠的attention mask操作。推理的时候，只能一个字一个字的推理，所以会调用多次。训练的时候只需要调用一次即可，因为attention mask的机制可以保证当前token的loss不包含后面的token。所以推理的时候，  output = model(inputs)  或者 output = model.forward(inputs)的时候，inputs 其实也不需要包含 attention_mask，inputs 仅仅是token 就可以，而训练时，inputs 则是一个dict，包含input_ids  和  attention_mask。
 
 model(xx) ==> `Module.__call__` ==> Module.forward/model.forward，几乎每一个llm 都会自定义forward 方法，如果向forward 方法传入 labels，还会自动计算loss。
 
@@ -201,27 +201,12 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
     outputs = model(torch.tensor(batched_ids), attention_mask=torch.tensor(attention_mask))
     print(outputs.logits)
     ```
-2. attention_mask ，self-attention使用，shape和input_ids一致。模型训练和预测基本都是批量化处理的，处理多个序列时，在attention的时候，不去attend被mask掉的部分。 作用是告诉模型一个batch的数据里哪些是padding的，从而可以忽略掉那些padding的部分，比如下图的例子：
-    ![](/public/upload/machine/attention_mask.jpg)
-
-PS: 深度学习都得指定features/labels。在llm 场景下，features 和labels 有几个特点
-1. llm 有base model、sft model 等，不同的model 数据集格式不同，一般分为几个部分，比如sft 的`{"question:":"xx","answer":"xx"}`，各家模型都不太一样，很多数据集是不公开的。但不管如何，这几部分都会拼为一个sentence（中间可能有一些特殊字符起到连接作用），然后把sentence通过tokenizer转换成input_ids，之后再走embedding 模块等等就是Transformer系列模型内的事儿了，最后得到output_ids.
-2. 模型输入格式，模型输入dict 一般包含3个key： input_ids,attention_mask,labels
-    1. 有些模型内置从input ids 提取attention mask的操作
-    2. 预训练场景 labels 一般由input_ids copy而来，然后做一些处理，比如labels 全部左移一位（预训练）
-    3. 明确指定labels 的话，一般是要微调，比如sft时，sentence部分中question 的位置都置为-100，-100表示在计算loss的时候会被忽略，这个由任务性质决定。
-2. 预处理（将dataset 转为模型输入）过程由​ Dataset.map() + tokennizer 来办。
-    ```python
-        def tokenize_function(example):
-            # example 表示数据集中的一行数据
-            return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
-        tokenized_dataset = dataset.map(tokenize_function, batched=True)
-    ```
-3. 之后就是对output_ids 和 labels 计算loss。
-3. 上述过程也是Transformers 库抽象的基础，指定input_ids,labels，则计算output_ids 和 loss 可以自动进行。对于一个base llm，可以基于finetune做很多task specific llm模型，主要体现在 input 数据集格式 和labels 的不同。
-
-
-
+2. attention_mask ，self-attention使用，shape和input_ids一致。
+    1. Encoder中的Mask。模型训练和预测基本都是批量化处理的，处理多个序列时，在attention的时候，不去attend被mask掉的部分。 作用是告诉模型一个batch的数据里哪些是padding的，从而可以忽略掉那些padding的部分，也叫padding mask ，比如下图的例子：
+        ![](/public/upload/machine/attention_mask.jpg)
+    2. decoder中的mask。用于在训练过程中解码的时候掩盖掉当前时刻之后的信息；也叫sequence mask
+        ![](/public/upload/machine/sequence_mask.jpg)
+    3. 为什么Attention Mask不是0和1构成的矩阵，而是0和负无穷构成的？在 Transformer 模型中通常用于指示模型哪些位置是有效的输入，哪些位置是填充的。它的主要目的是确保模型在计算注意力分数时不会考虑到填充的位置。在大多数实现中，当我们说“mask”时，我们通常是指一个由0和1组成的矩阵，其中1表示“考虑这个位置”而0表示“不考虑这个位置”。但在实际的注意力机制计算中，这种简单的0和1的表示方法并不直接适用。Transformer中的注意力机制涉及到softmax函数，该函数会将输入的原始分数转换为概率分布。为了确保某些位置在softmax之后的概率为0，我们需要在softmax之前为这些位置赋予一个非常小的分数，通常是负无穷。这样，经过softmax转换后，这些位置的概率会接近于0。
 
 ### generate实现
 
@@ -318,6 +303,7 @@ def generate(self,
     # 返回生成的tokens和对数概率（如果logprobs参数为真）
     return (out_tokens, out_logprobs if logprobs else None)
 ```
+推理的时候不使用mask，要串行执行，只有得到前一个单词，重新进入decoder模块，通过模型推理才能得到下一个输出。
 
 ### Dataset
 
@@ -427,7 +413,9 @@ print(squad_it_dataset) # 包括 train 和 test 的 DatasetDict 对象
 
 ## Trainer
 
-在我们定义 Trainer 之前首先要定义一个 TrainingArguments 类，它将包含 Trainer用于训练和评估的所有超参数。唯一必须提供的参数是保存训练模型的目录，以及训练过程中的检查点。对于其余的参数，可以保留默认值。
+transformer 支持自定义dataset，自定义model实现forward（forward 支持的参数均可以作为dataset的column），forward 过程中还计算loss，模型的差异性基本已经兜住了，这也是为何 只要提供包含特定column的dataset，剩下的训练代码都可以交给trainer封装掉。
+
+在我们定义 Trainer 之前首先要定义一个 TrainingArguments 类，它将包含 Trainer用于训练和评估的所有超参数，也内置了Accelerate和deepspeed等支持。唯一必须提供的参数是保存训练模型的目录，以及训练过程中的检查点。对于其余的参数，可以保留默认值。
 
 ```python
 from transformers import TrainingArguments

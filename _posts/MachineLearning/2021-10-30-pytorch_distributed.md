@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
 ![](/public/upload/machine/data_parallel.png)
 
-[ PyTorch 分布式(2) ----- DataParallel(上)](https://mp.weixin.qq.com/s/cGfKl6yydc5Xmd_Ok3mnkA) 缺点很多。
+[PyTorch 分布式(2) ----- DataParallel(上)](https://mp.weixin.qq.com/s/cGfKl6yydc5Xmd_Ok3mnkA) 缺点很多。
 
 ## 分布式训练
 

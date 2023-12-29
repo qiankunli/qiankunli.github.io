@@ -211,6 +211,8 @@ devops基本理念：
 
 [可观测 AIOps 的智能监控和诊断实践](https://mp.weixin.qq.com/s/IP64xlunmZ7D8yERJIHs0A) 非常经典。
 
+[AIOps在美团的探索与实践——事件管理篇](https://mp.weixin.qq.com/s/9U7PKSt60AbRx7Ngud0Qxg) 未细看
+
 ## 其它
 
 [做出让人爱不释手的基础软件：可观测性和可交互性](https://mp.weixin.qq.com/s/WEO1y8vg21CXlix8wO28hw) 个人理解: 尽可能多的监控，之后就是尽量串起来

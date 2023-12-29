@@ -65,14 +65,26 @@ panic("No working init found.  Try passing init= option to kernel. "
         "See Linux Documentation/admin-guide/init.rst for guidance.");
 ```
 
+|进程号|	进程来源|	作用|
+|---|---|---|
+|0|	Docker daemon 进程|	负责容器中进程的管理|
+|1|	可以被 Dockerfile 中的 ENTRYPOINT 或 CMD 指令所指明；也可以被 docker run 命令的启动参数所覆盖|	负责启动业务进程|
+
+1. 以 Docker Container 为例，容器创建后，默认情况下是不会共享宿主机的 PID Namespace，它会自己创建一个 PID Namespace，**这个 PID Namespace 的1号/init进程就是我们创建容器时指定的entrypoint**。
+2. 由于 1 号进程的特殊性，Linux 内核为他做了特殊处理（无法在容器中使用 kill -9 杀死 1 号进程，主机上是可以的）。如果它没有提供某个信号的处理逻辑，那么与其在同一个 PID 名空间下的进程发送给它的该信号都会被屏蔽。这个功能的主要作用是防止 init 进程被误杀。
+2. docker 提供了两个命令 docker stop 和 docker kill 来向容器中的PID1进程发送信号
+   1. docker stop：docker 会首先向容器的 PID 1 进程发送一个 SIGTERM 信号，用于容器内程序的退出。如果容器在收到 SIGTERM 后没有结束， 那么 Docker Daemon 会在等待一段时间（默认是10s）后，再向容器发送 SIGKILL 信号，将容器杀死变为退出状态。也就是说如果我在 1 号进程实现了 SIGTERM(15) 信号处理，就实现了优雅停止。
+   2. docker kill： 可以向容器内 PID 1 进程发送任何信号，缺省是发送 SIGKILL 信号来强制退出应用（这里在宿主机上对 1 号进程下发的 kill）。
+
 ## 管理孤儿/僵尸（zombie）进程
 
 1. 一个正常的进程退出流程是这样的：子进程退出后，给父进程发送一个SIGCHLD的信号，父进程收到这个信号后，会通过wait系统调用来回收子进程。
 2. 如果父进程已经结束了，那些依然在运行中的子进程会成为“孤儿（orphaned）”进程。在Linux中Init进程(PID1)作为所有进程的父进程，会维护进程树的状态，一旦有某个子进程成为了“孤儿”进程后，init就会负责接管这个子进程。当一个子进程成为“僵尸”进程之后，如果其父进程已经结束，init会收割这些“僵尸”，释放PID资源。
 3. 僵尸进程（内存文件等都已释放，只留了一个stask_struct instance）如果不清理，就会消耗系统中的进程号资源，最坏会导致创建新进程。
 
+
 如果僵尸进程是在容器内产生的，就更好不处理了。
-1. 以 Docker Container 为例，容器创建后，默认情况下是不会共享宿主机的 PID Namespace，它会自己创建一个 PID Namespace，**这个 PID Namespace 的1号/init进程就是我们创建容器时指定的entrypoint**。
+
 2. 根据linux进程回收的原理，孤儿进程都会被init进程接管，并由init进程来回收。那在docker容器自己创建出来的 PID Namespace 中，孤儿进程的父进程都会变成 entrypoint 进程。很多entrypoint都不具备主动回收僵尸进程的能力，那一个会产生僵尸进程的容器，里面的僵尸进程就一直得不到回收。
 3. 知道了原理，预防方式就比较简单：让具备僵尸进程回收能力的进程充当容器的init进程。
 

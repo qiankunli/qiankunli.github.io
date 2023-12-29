@@ -4,7 +4,7 @@ layout: post
 title: 大模型推理
 category: 架构
 tags: MachineLearning
-keywords: large model
+keywords: llm inference
 
 ---
 
@@ -49,7 +49,7 @@ keywords: large model
     1. 对于较短的文本输入 (词元数小于 1024)，推理的内存需求很大程度上取决于模型权重的大小。
 
 
-### 影响因素
+## 影响因素
 
 [语言大模型推理性能工程：最佳实践](https://mp.weixin.qq.com/s/mniKrBWkDE1tWWb2wQBDCA)
 我们应该如何准确衡量模型的推理速度呢？首个词元生成时间（Time To First Token，简称TTFT）；单个输出词元的生成时间；时延：模型为用户生成完整响应所需的总时间；吞吐量：推理服务器在所有用户和请求中每秒可生成的输出词元数。
@@ -58,30 +58,42 @@ keywords: large model
 2. 量化：对激活值和权重进行压缩，以使用更少的比特数。一般来说，所有量化技术的工作原理如下: $Y=X*W$ 变成 $Y=X* dequantize(W); quantize(W)$，当输入向量走过模型计算图时，所有权重矩阵都会依次执行反量化和重量化操作。因此，使用权重量化时，推理时间通常 不会 减少，反而会增加。
 3. 压缩：稀疏性或蒸馏。
 4. 并行化：在多个设备间进行张量并行，或者针对较大的模型进行流水线并行。
-除上述方法以外，还有许多针对Transformer的重要优化技术，如KV（键-值）缓存。[Transformer推理性能优化技术很重要的一个就是K V cache，能否通俗分析，可以结合代码? - 看图学的回答 - 知乎](https://www.zhihu.com/question/596900067/answer/3257946543)
-
-![](/public/upload/machine/kv_cache.jpg)
-
-提问【天王盖地虎，】的QKV实际上重复计算了很多遍。由于GPT是单向注意力，每层的提问的KV只根据上一层的提问的KV（或提问的嵌入向量）计算，不跟据回答中任何字符的KV计算，完全可以把它们缓存起来避免重复计算。至于为什么不缓存Q，因为推理场景下我们只取最后一个词，那么每层输出HS[-1]就可以了。HS[-1]根据全部的V和注意力矩阵的最后一行A[-1]计算，而A[-1]根据Q[-1]和全部的K计算，Q[-1]只根据输入最后一个字符X[-1]计算。所以我们通过传入KVCache保证K和V是完整的，输入字符只传入最后一个，也就是上一次GPT生成出来的字符，就可以了。
 
 在LLM中，计算主要由矩阵乘法计算主导；这些维度较小的计算在大多数硬件上通常受内存带宽的限制。在以自回归方式生成词元时，激活矩阵的维度之一（由批大小和序列中的词元数定义）在小型批大小上较小。因此，速度由我们将模型参数从GPU内存加载到本地缓存/寄存器中的速度决定，而不是由计算加载数据的速度决定。相比峰值计算性能，推理硬件中可用和可实现的内存带宽能够更好地预测词元的生成速度。
 
 对于服务成本来说，推理硬件的利用率非常重要。由于GPU的价格十分高昂，因此我们需要尽可能地让它们完成更多工作。共享推理服务通过将多个用户的工作负载组合在一起，填补各自的差距，并将重叠的请求进行批处理，以降低成本。对于LLaMA2-70B等大型模型，只有在较大的批大小下才能实现更好的性价比。拥有能够以较大批大小运行的推理服务系统对于成本效率至关重要。然而，较大的批大小意味着较大的KV缓存，这反过来又增加了部署模型所需的GPU数量。我们需要在这两者之间博弈，进行取舍，共享服务运营商需要权衡成本，优化系统。
 
-### 在线推理
+### KV Cache
 
-[揭秘大语言模型实践：分布式推理的工程化落地才是关键！](https://mp.weixin.qq.com/s/QeDmD-XlvkkJ7LMNJEynHg)与以往的模型不同，单张 GPU 卡的显存可能不足以支撑大语言模型。因此，需要使用模型并行技术，将大语言模型进行切分后，在多张 GPU 卡上进行推理。我们使用 DeepSpeed Inference 来部署大语言模型分布式推理服务。DeepSpeed Inference 是 Microsoft 提供的分布式推理解决方案，能够很好的支持 transformer 类型的大语言模型。。DeepSpeed Inference 提供了模型并行能力，在多 GPU 上对大模型并行推理。通过张量并行技术同时利用多个 GPU，提高推理性能。DeepSpeed 还提供了优化过的推理定制内核来提高 GPU 资源利用率，降低推理延迟。
+有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存。但是有一个问题就是KV Cache非常的大，比如说拿LLaMA-13B举例子，假设每个token在一层的大小有20KB，LLaMA-13B有40层，这样这个token大小就会达到800KB，而一个sequence一般来说会有几千的token，也就是说一个sequence就会达到几个G。[Transformers KV Caching Explained](https://medium.com/@joaolages/kv-caching-explained-276520203249) 动图实在太贴切了。
 
-有了大模型分布式推理方案，然而想要在 Kubernetes 集群中高效部署大模型推理服务，还存在很多工程化挑战，比如大规模的 GPU 等异构资源如何高效地管理运维和自动调度？如何快速部署推理服务，服务上线后如何保证资源能够应对波动的访问量？以及没有适合的工具进行推理服务时延、吞吐、GPU 利用率、显存占用等关键指标监控，没有合理的模型切分方案，模型版本管理等。
+```
+K = X * W_k
+V = X * W_v
+Q = X * W_q
+Attention(Q, K, V) = softmax(Q * K^T / sqrt(d)) * V
 
-[大模型的好伙伴，浅析推理加速引擎FasterTransformer](https://mp.weixin.qq.com/s/Gkf_zIYWs4u7AJrJLDVq_Q) 未细读
-FasterTransformer 是真对于 Transofrmer 类型模型（也包括 encoder-only、decoder-only）的推理加速方案，其提供了 Kernel Fuse、Memory reuse、kv cache、量化等多种优化方案，同时也提供了 Tensor Parallel 和 Pipeline Parallel 两种分布式推理方案。
+# 初始化缓存
+K_cache = []
+V_cache = []
+for x in X:  # 对每一个新的输入x
+    # 计算新的K和V
+    K_new = x * W_k
+    V_new = x * W_v
+    # 将新的K和V添加到缓存中
+    K_cache.append(K_new)
+    V_cache.append(V_new)
+    # 使用缓存中的K和V计算Attention
+    output = Attention(Q, K_cache, V_cache)
+```
 
-### 分布式推理
+Memory waste in KV Cache
+1. 内部碎片：推理过程具有非常大的动态性，输出的长度不能预先知道，传统的serving system为了保险起见，就会预留非常大的空间，比如模型支持的最大输出2048个token，它就会预留这么大的空间，那么如果我产生的输出仅有10个token，剩下的2038的slots就会作为内部碎片被浪费。
+2. 外部碎片：因为每个request长度不等，就像os中的malloc，长度不等，不停的malloc就会产生外部碎片。
 
-1. 在提升模型显存使用效率方面，Flash Attention 和 Paged Attention 是两种常用的方法。在输入序列中，模型会根据每个词的重要性来分配显存。对于重要性较高的词，模型会分配更多的显存空间来存储其信息；而对于重要性较低的词，模型则会分配较少的显存空间。
-2. 量化。量化过程主要涉及两个方面：参数环节的小型化和降低数据类型。通过这一步骤，我们能够使得模型加载的参数更小，从原本的 FP32 降低到 FP16，从而提高推理性能。在量化过程中，我们还会采用混合精度量化技术。这种技术能够在保证模型准确性的前提下，将异常值保留精度，并在混合精度分块矩阵最后再加回去。
-3. 模型稀疏化。模型稀疏化是一种重要的优化方法。它的主要目的是减少模型参数的数量，从而降低模型的复杂度，提高模型的泛化能力和计算效率。模型稀疏化的主要方法有剪枝、量化、低秩近似等。剪枝是一种直接删除模型中部分参数的方法，它可以有效地减少模型的规模，但需要注意不能过度剪枝，以免影响模型的性能。低秩近似则是通过将模型转换为低秩矩阵，来减少模型的参数数量。
+[如何解决LLM大语言模型的并发问题？](https://www.zhihu.com/question/613263140/answer/3271554389)vLLM：Efficient memory management for LLM inference 受到操作系统中的分页和虚拟内存的启发，将KV Block当做页，将Request当做进程，以此来实现vLLM。PagedAttention机制：传统要求将keys和values存到连续的内存空间，因为我们知道传统大家都是用TensorFlow、pytorch之类的，它是一个个tensor，所以很自然的就假设给它们一段连续的内存空间，但是对于LLM来说，这个假设就不是一个好的假设，因此PagedAttention允许在非连续内存空间中存储连续的keys和values，vLLM维护一个Block table，存放逻辑空间到物理空间的映射。现在有一个Prompt：Alan Turing is a computer scientist，当产生一个新的token时，会查看Block table中的Physical block no.,然后找到对应物理内存的地方存储进去，并更新Block table中的Filled slots内容。当产生“renowned”的时候，是新开了一个Block，所以也要更新Block table，新开一个物理内存（每个kv block中有固定的token数目）。
+
+
 
 ## 模型服务框架
 
@@ -259,6 +271,8 @@ print(response)
 
 ## 一些材料
 
+[大模型推理加速技术的学习路线是什么? ](https://www.zhihu.com/question/591646269/answer/3333428921)
+
 推理加速
 1. 模型优化技术
 2. 模型压缩技术
@@ -300,7 +314,20 @@ GPU编程基础：在执行model.generate(prompt)时，我们进行以下操作�
 
 
 
+### 在线推理
 
+[揭秘大语言模型实践：分布式推理的工程化落地才是关键！](https://mp.weixin.qq.com/s/QeDmD-XlvkkJ7LMNJEynHg)与以往的模型不同，单张 GPU 卡的显存可能不足以支撑大语言模型。因此，需要使用模型并行技术，将大语言模型进行切分后，在多张 GPU 卡上进行推理。我们使用 DeepSpeed Inference 来部署大语言模型分布式推理服务。DeepSpeed Inference 是 Microsoft 提供的分布式推理解决方案，能够很好的支持 transformer 类型的大语言模型。。DeepSpeed Inference 提供了模型并行能力，在多 GPU 上对大模型并行推理。通过张量并行技术同时利用多个 GPU，提高推理性能。DeepSpeed 还提供了优化过的推理定制内核来提高 GPU 资源利用率，降低推理延迟。
+
+有了大模型分布式推理方案，然而想要在 Kubernetes 集群中高效部署大模型推理服务，还存在很多工程化挑战，比如大规模的 GPU 等异构资源如何高效地管理运维和自动调度？如何快速部署推理服务，服务上线后如何保证资源能够应对波动的访问量？以及没有适合的工具进行推理服务时延、吞吐、GPU 利用率、显存占用等关键指标监控，没有合理的模型切分方案，模型版本管理等。
+
+[大模型的好伙伴，浅析推理加速引擎FasterTransformer](https://mp.weixin.qq.com/s/Gkf_zIYWs4u7AJrJLDVq_Q) 未细读
+FasterTransformer 是真对于 Transofrmer 类型模型（也包括 encoder-only、decoder-only）的推理加速方案，其提供了 Kernel Fuse、Memory reuse、kv cache、量化等多种优化方案，同时也提供了 Tensor Parallel 和 Pipeline Parallel 两种分布式推理方案。
+
+### 分布式推理
+
+1. 在提升模型显存使用效率方面，Flash Attention 和 Paged Attention 是两种常用的方法。在输入序列中，模型会根据每个词的重要性来分配显存。对于重要性较高的词，模型会分配更多的显存空间来存储其信息；而对于重要性较低的词，模型则会分配较少的显存空间。
+2. 量化。量化过程主要涉及两个方面：参数环节的小型化和降低数据类型。通过这一步骤，我们能够使得模型加载的参数更小，从原本的 FP32 降低到 FP16，从而提高推理性能。在量化过程中，我们还会采用混合精度量化技术。这种技术能够在保证模型准确性的前提下，将异常值保留精度，并在混合精度分块矩阵最后再加回去。
+3. 模型稀疏化。模型稀疏化是一种重要的优化方法。它的主要目的是减少模型参数的数量，从而降低模型的复杂度，提高模型的泛化能力和计算效率。模型稀疏化的主要方法有剪枝、量化、低秩近似等。剪枝是一种直接删除模型中部分参数的方法，它可以有效地减少模型的规模，但需要注意不能过度剪枝，以免影响模型的性能。低秩近似则是通过将模型转换为低秩矩阵，来减少模型的参数数量。
 
 
 
