@@ -213,6 +213,8 @@ devops基本理念：
 
 [AIOps在美团的探索与实践——事件管理篇](https://mp.weixin.qq.com/s/9U7PKSt60AbRx7Ngud0Qxg) 未细看
 
+[如何利用 AI 算法解决告警配置三大难题？](https://mp.weixin.qq.com/s/6WLb8cVK3Z7qoGsD_7ht5A) 有没有合适工具，告诉小 A 应该对哪些指标配告警？有没有合适工具，给小 A 自动推荐合适的告警阈值？有没有合适工具，帮小 A 给起伏不定的指标配告警？
+
 ## 其它
 
 [做出让人爱不释手的基础软件：可观测性和可交互性](https://mp.weixin.qq.com/s/WEO1y8vg21CXlix8wO28hw) 个人理解: 尽可能多的监控，之后就是尽量串起来

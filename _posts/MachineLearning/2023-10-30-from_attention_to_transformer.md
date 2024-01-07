@@ -38,7 +38,7 @@ Transformer 模型本来是为了翻译任务而设计的。在训练过程中�
 
 ## self-attention 机制
 
-self-attention 机制用于计算句子中当前词与其他词的联系，举个例子：
+在处理每个单词的表示时，要对你传递给它的句子中某些单词特别关注（并且忽略其他单词）。一个单词本身具有意义，但是该意义深受上下文影响，这可以是正在研究的单词之前或之后的任何其他单词（或多个）。self-attention 机制用于计算句子中当前词与其他词的联系，每个单词的新表示形式是由它自己和其他单词的交互得到的。举个例子：
 
 ```
 The animal didn’t cross the street because it was too tired
@@ -153,6 +153,8 @@ transformer中，模型输入encoder的每个token向量由两部分加和而成
 
 ##  Layer Normalization
 
+这些都是用于Normalization激活的技术，可以加速学习，提高模型的性能。
+
 在每个block中，最后出现的是Layer Normalization，其作用是规范优化空间，加速收敛。当我们使用梯度下降算法做优化时，我们可能会对输入数据进行归一化，但是经过网络层作用后，我们的数据已经不是归一化的了。随着网络层数的增加，数据分布不断发生变化，偏差越来越大，导致我们不得不使用更小的学习率来稳定梯度。Layer Normalization 的作用就是保证数据特征分布的稳定性，将数据标准化到ReLU激活函数的作用区域，可以使得激活函数更好的发挥作用
 
 Normalization有两种方法，Batch Normalization和Layer Normalization。关于两者区别不再详述。
@@ -255,6 +257,45 @@ $$
 
 其中V就等价于$X^t$，而$softmax(\frac{QK^T}{\sqrt{d_k}})$就是我们想要学到的$W^t$（所以说self-attention 的权重是根据输入的改变和改变的，而CNN中一旦训练完成，各个通道的卷积核参数就固定了）， attention 多做了一些什么呢？对于要学习的参数矩阵$W^t$增加了低秩的约束。参考 self-attention 的情况，即输出和输入的 size 保持一致，那么理论上没有任何约束的情况下$W^t$可以是一个满秩的n*n方阵。但是，在 self-attention 中，假设$Q,K\in\R^{n*d}$那么$softmax(\frac{QK^T}{\sqrt{d_k}})$就是一个秩至多为d的方阵。秩上的降低也意味着表征能力的下降，但好处在于$\mathcal{O}(n^2) $变成了$\mathcal{O}(nd) $， $d\ll n$ 的时候这样做的价值就体现出来了。比如原来比如GPT2 一个token向量 是768维，context若是4k，input item数量是768*4096，所以一定是预处理一下再接入mlp；cnn类似，一张1024*768的图片 每个pixel 作为一个item，weight就不小了。可以说attention 是一种为了压缩参数量而牺牲一些表征能力，是用类似于 matrix fatorization 的方式来近似转置线性层的做法。所以有人提出什么 **MLP is all you need** 之类的说法，用 MLP 替代 CNN 或者 attention 也能取得不俗的图像分类效果……那可不是必须的嘛？人家那可是加了各种约束，为了压缩参数量牺牲了表征能力来近似你这个线性层的结果啊。PS：大部分模型最后的部分都是mlp，所以可以视为前半部分的处理是在缩小input 规模以便接入mlp。
 
+### 代码
+
+[以LLAMA为例，快速入门LLM的推理过程](https://mp.weixin.qq.com/s/5lbrqbqiHPZIARsVW6l6tA)
+
+```
+model = LlamaForCausalLM.from_pretrained(model, torch_dtype='auto')
+print(model)
+```
+可以通过print看模型结构：
+```
+LlamaForCausalLM(
+  (model): LlamaModel(
+    (embed_tokens): Embedding(32000, 4096, padding_idx=31999)
+    (layers): ModuleList(
+      (0-31): 32 x LlamaDecoderLayer(
+        (self_attn): LlamaAttention(
+          (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+          (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+          (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+          (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+          (rotary_emb): LlamaRotaryEmbedding()
+        )
+        (mlp): LlamaMLP(
+          (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+          (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+          (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+          (act_fn): SiLUActivation()
+        )
+        (input_layernorm): LlamaRMSNorm()
+        (post_attention_layernorm): LlamaRMSNorm()
+      )
+    )
+    (norm): LlamaRMSNorm()
+  )
+  (lm_head): Linear(in_features=4096, out_features=32000, bias=False)
+)
+```
+
+LLAMA属于Decoder-only models，有32个LlamaDecoderLayer，每个Decoder包含一个LlamaAttention和LlamaMLP，然后是LlamaRMSNorm和head部分，核心的结构是LlamaDecoderLayer。30B的话有60个LlamaDecoderLayer，30B和7B的差别也就是decoder的个数和decoder的不同配置。
 
 ## 其它
 

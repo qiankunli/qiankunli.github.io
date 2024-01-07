@@ -108,203 +108,6 @@ print(output)
 
 ![](/public/upload/machine/transformers_pipelines.png)
 
-### 源码分析
-
-```python
-tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
-sequences = ["I've been waiting for a HuggingFace course my whole life.", "So have I!"]
-tokens = tokenizer(sequences, padding=True, truncation=True, return_tensors="pt")
-print(tokens)
-#{
-#    'input_ids': tensor([
-#        [  101,  1045,  1005,  2310,  2042,  3403,  2005,  1037, 17662, 12172,2607,  2026,  2878,  2166,  1012,   102],
-#        [  101,  2061,  2031,  1045,   999,   102,     0,     0,     0,     0, 0,     0,     0,     0,     0,     0]
-#    ]),     
-#    'attention_mask': tensor([
-#        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-#        [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-#    ])
-#}
-output = model(**tokens)
-print(output)
-# SequenceClassifierOutput(
-#    loss=None, 
-#    logits=tensor([[-1.5607,  1.6123],[-3.6183,  3.9137]], grad_fn=<AddmmBackward0>), 
-#    hidden_states=None, 
-#    attentions=None
-#)
-```
-`output = model(**tokens)` 对于文本分类来说，整段文本输入返回一个标签，也就是SequenceClassifierOutput.logits，那么对于文本生成来说，整段文本输入返回CausalLMOutputWithPast，它的logits自动补全的是 input_ids 的下一个token呢，还是直到eos的多个token呢？生成式模型的训练是并行的，靠的attention mask操作。推理的时候，只能一个字一个字的推理，所以会调用多次。训练的时候只需要调用一次即可，因为attention mask的机制可以保证当前token的loss不包含后面的token。所以推理的时候，  output = model(inputs)  或者 output = model.forward(inputs)的时候，inputs 其实也不需要包含 attention_mask，inputs 仅仅是token 就可以，而训练时，inputs 则是一个dict，包含input_ids  和  attention_mask。
-
-model(xx) ==> `Module.__call__` ==> Module.forward/model.forward，几乎每一个llm 都会自定义forward 方法，如果向forward 方法传入 labels，还会自动计算loss。
-
-```python
-class Module:
-	__call__ : Callable[..., Any] = _call_impl
-	def _call_impl(self, *args, **kwargs):
-        forward_call = (self._slow_forward if torch._C._get_tracing_state() else self.forward)
-       	...
-     	result = forward_call(*args, **kwargs)  # dict 可以作为kwargs参数传入
-     	... # 涉及到动态图的构建
-     	return result
-
-class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMixin, PeftAdapterMixin):
-	def save_pretrained(...)
-	@classmethod
-    def from_pretrained(...)
-class GenerationMixin:
-   def generate(inputs,...):> Union[GenerateOutput, torch.LongTensor]:
-        ...
-        outputs = self(model_input_ids,attention_mask=model_attn,...)
-        ...             
-class ChatGLMPreTrainedModel(TorchModel, PreTrainedModel):
-    ...
-class ChatGLMModel(ChatGLMPreTrainedModel):
-	def forward(self,input_ids,attention_mask,...):
-        ...
-class GPT2PreTrainedModel(PreTrainedModel):
-    ...
-class GPT2LMHeadModel(GPT2PreTrainedModel):
-    def __init__(self, config):
-        ...
-        self.transformer = GPT2Model(config)
-        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
-        ...
-    def forward(self,input_ids,attention_mask,labels,...):
-       transformer_outputs = self.transformer(input_ids,attention_mask,...)
-       hidden_states = transformer_outputs[0]
-       lm_logits = self.lm_head(hidden_states)
-       loss = None
-       if labels is not None:
-           labels = labels.to(lm_logits.device) # move labels to correct device to enable model parallelism
-           shift_logits = lm_logits[..., :-1, :].contiguous() # Shift so that tokens < n predict n
-           shift_labels = labels[..., 1:].contiguous()
-           loss_fct = CrossEntropyLoss()
-           loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
-        return ((loss,) + output) if loss is not None else output     
-```
-
-一些细节
-
-1. Models expect a batch of inputs。当你试图将两个（或更多）句子组合在一起时，它们的长度可能不同。为了解决这个问题，我们将使用填充使张量具有矩形。Padding通过在值较少的句子中添加一个名为Padding token的特殊单词来确保我们所有的句子长度相同。当要求处理更长的序列时
-    ```python
-    model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
-    batched_ids = [
-        [200, 200, 200],
-        [200, 200, tokenizer.pad_token_id],
-    ]
-    attention_mask = [
-        [1, 1, 1],
-        [1, 1, 0],
-    ]
-    outputs = model(torch.tensor(batched_ids), attention_mask=torch.tensor(attention_mask))
-    print(outputs.logits)
-    ```
-2. attention_mask ，self-attention使用，shape和input_ids一致。
-    1. Encoder中的Mask。模型训练和预测基本都是批量化处理的，处理多个序列时，在attention的时候，不去attend被mask掉的部分。 作用是告诉模型一个batch的数据里哪些是padding的，从而可以忽略掉那些padding的部分，也叫padding mask ，比如下图的例子：
-        ![](/public/upload/machine/attention_mask.jpg)
-    2. decoder中的mask。用于在训练过程中解码的时候掩盖掉当前时刻之后的信息；也叫sequence mask
-        ![](/public/upload/machine/sequence_mask.jpg)
-    3. 为什么Attention Mask不是0和1构成的矩阵，而是0和负无穷构成的？在 Transformer 模型中通常用于指示模型哪些位置是有效的输入，哪些位置是填充的。它的主要目的是确保模型在计算注意力分数时不会考虑到填充的位置。在大多数实现中，当我们说“mask”时，我们通常是指一个由0和1组成的矩阵，其中1表示“考虑这个位置”而0表示“不考虑这个位置”。但在实际的注意力机制计算中，这种简单的0和1的表示方法并不直接适用。Transformer中的注意力机制涉及到softmax函数，该函数会将输入的原始分数转换为概率分布。为了确保某些位置在softmax之后的概率为0，我们需要在softmax之前为这些位置赋予一个非常小的分数，通常是负无穷。这样，经过softmax转换后，这些位置的概率会接近于0。
-
-### generate实现
-
-[浅谈LLAMA2核心函数generate源码](https://mp.weixin.qq.com/s/vnke00f7kzlA16Pw_FJFjQ)
-
-```python
-def generate(self,
-        prompt_tokens: List[List[int]],  # 输入的提示
-        max_gen_len: int,  # 最大生成长度
-        temperature: float = 0.6,  # 影响生成文本的随机性
-        top_p: float = 0.9,  # 用于决定采样过程中保留的 token 集合的概率阈值
-        logprobs: bool = False,  # 是否返回每个 token 的对数概率
-        echo: bool = False,  # 是否返回输入的提示
-) -> Tuple[List[List[int]], Optional[List[List[float]]]]:
-    # ---------------------------初始化长度为 total_len tokens张量，并填充 pad_id----------------------------------
-    params = self.model.params
-    bsz = len(prompt_tokens)
-    assert bsz <= params.max_batch_size, (bsz, params.max_batch_size)
-
-    min_prompt_len = min(len(t) for t in prompt_tokens)
-    max_prompt_len = max(len(t) for t in prompt_tokens)
-    assert max_prompt_len <= params.max_seq_len
-    total_len = min(params.max_seq_len, max_gen_len + max_prompt_len)
-
-    pad_id = self.tokenizer.pad_id
-    tokens = torch.full((bsz, total_len), pad_id, dtype=torch.long, device="cuda")
-    # 将prompt_tokens中的token复制到tokens张量中。
-    for k, t in enumerate(prompt_tokens):
-        tokens[k, : len(t)] = torch.tensor(t, dtype=torch.long, device="cuda")
-    if logprobs: # 是否返回每个 token 的对数概率
-        # 创建一个与tokens相同形状的token_logprobs张量，并用0填充
-        token_logprobs = torch.zeros_like(tokens, dtype=torch.float)
-
-    prev_pos = 0
-    eos_reached = torch.tensor([False] * bsz, device="cuda")
-    input_text_mask = tokens != pad_id
-    # -------------------------------------------------------------
-
-    for cur_pos in range(min_prompt_len, total_len):
-        # 调用模型的forward方法获取logits
-        logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
-        if logprobs: # 是否返回每个 token 的对数概率
-            # 计算token level的logprobs
-            token_logprobs[:, prev_pos + 1: cur_pos + 1] = -F.cross_entropy(
-                input=logits.transpose(1, 2),
-                target=tokens[:, prev_pos + 1: cur_pos + 1],
-                reduction="none",
-                ignore_index=pad_id,
-            )
-        # 根据温度参数和top_p参数对logits进行softmax和采样，得到下一个token
-        if temperature > 0:
-            # sample_top_p函数对probs进行采样
-            probs = torch.softmax(logits[:, -1] / temperature, dim=-1)
-            next_token = sample_top_p(probs, top_p)
-        else:
-            # 将logits中概率最大的token作为下一个token。
-            next_token = torch.argmax(logits[:, -1], dim=-1)
-
-        next_token = next_token.reshape(-1)
-        # only replace token if prompt has already been generated
-        next_token = torch.where(
-            input_text_mask[:, cur_pos], tokens[:, cur_pos], next_token
-        )
-        # tokens张量更新
-        tokens[:, cur_pos] = next_token
-        eos_reached |= (~input_text_mask[:, cur_pos]) & (
-                next_token == self.tokenizer.eos_id
-        )
-        prev_pos = cur_pos
-        # 检查是否已经生成了所有的eos token，如果是则停止生成
-        if all(eos_reached):
-            break
-
-    if logprobs:
-        # token_logprobs列表化
-        token_logprobs = token_logprobs.tolist()
-    out_tokens, out_logprobs = [], []
-    for i, toks in enumerate(tokens.tolist()):
-        # cut to max gen len
-        # 对于 tokens 张量中的每一行（即每一个生成的序列），如果 echo 参数为假，则去掉提示部分
-        start = 0 if echo else len(prompt_tokens[i])
-        toks = toks[start: len(prompt_tokens[i]) + max_gen_len]
-        probs = None
-        if logprobs:
-            probs = token_logprobs[i][start: len(prompt_tokens[i]) + max_gen_len]
-        # cut to eos tok if any
-        # 存在结束标记，则去掉结束标记之后的部分
-        if self.tokenizer.eos_id in toks:
-            eos_idx = toks.index(self.tokenizer.eos_id)
-            toks = toks[:eos_idx]
-            probs = probs[:eos_idx] if logprobs else None
-        out_tokens.append(toks)
-        out_logprobs.append(probs)
-    # 返回生成的tokens和对数概率（如果logprobs参数为真）
-    return (out_tokens, out_logprobs if logprobs else None)
-```
-推理的时候不使用mask，要串行执行，只有得到前一个单词，重新进入decoder模块，通过模型推理才能得到下一个输出。
-
 ### Dataset
 
 ```python
@@ -411,7 +214,229 @@ print(squad_it_dataset) # 包括 train 和 test 的 DatasetDict 对象
     ```
 4. 用于预训练 GPT-2 的 WebText 语料库包含超过 800 万个文档和 40 GB 的文本，全加载到计算机内存吃不消，`pubmed_dataset_streamed = load_dataset("json", data_files=data_files, split="train", streaming=True)`，streaming=True 返回的对象是一个 IterableDataset
 
-## Trainer
+### 源码分析
+
+```python
+tokenizer = AutoTokenizer.from_pretrained(checkpoint)
+model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
+sequences = ["I've been waiting for a HuggingFace course my whole life.", "So have I!"]
+tokens = tokenizer(sequences, padding=True, truncation=True, return_tensors="pt")
+print(tokens)
+#{
+#    'input_ids': tensor([
+#        [  101,  1045,  1005,  2310,  2042,  3403,  2005,  1037, 17662, 12172,2607,  2026,  2878,  2166,  1012,   102],
+#        [  101,  2061,  2031,  1045,   999,   102,     0,     0,     0,     0, 0,     0,     0,     0,     0,     0]
+#    ]),     
+#    'attention_mask': tensor([
+#        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+#        [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+#    ])
+#}
+output = model(**tokens)
+print(output)
+# SequenceClassifierOutput(
+#    loss=None, 
+#    logits=tensor([[-1.5607,  1.6123],[-3.6183,  3.9137]], grad_fn=<AddmmBackward0>), 
+#    hidden_states=None, 
+#    attentions=None
+#)
+```
+
+`output = model(**tokens)` 对于文本分类来说，整段文本输入返回一个标签，也就是SequenceClassifierOutput.logits，那么对于文本生成来说，整段文本输入返回CausalLMOutputWithPast， 对于 input_ids = [v1,v2,v3] 输出为 [v20,v30,v4]。 v20 是根据v1 生成的下一个token（大概率跟真实的v2 不一样），v4 是根据v1,v2,v3 生成的。
+1. 生成式模型的训练是并行的，靠的attention mask操作。训练的时候只需要调用一次即可，因为attention mask的机制可以保证当前token的loss不包含后面的token。inputs 则是一个dict，包含input_ids  和  attention_mask。
+2. 推理的时候，只能一个字一个字的推理，所以会调用多次。 output = model(inputs)  或者 output = model.forward(inputs)的时候，inputs 其实也不需要包含 attention_mask，inputs 仅仅是token 就可以
+
+model(xx) ==> `Module.__call__` ==> Module.forward/model.forward，几乎每一个llm 都会自定义forward 方法，如果向forward 方法传入 labels，还会自动计算loss。
+
+```python
+class Module:
+	__call__ : Callable[..., Any] = _call_impl
+	def _call_impl(self, *args, **kwargs):
+        forward_call = (self._slow_forward if torch._C._get_tracing_state() else self.forward)
+       	...
+     	result = forward_call(*args, **kwargs)  # dict 可以作为kwargs参数传入
+     	... # 涉及到动态图的构建
+     	return result
+
+class PreTrainedModel(nn.Module, ModuleUtilsMixin, GenerationMixin, PushToHubMixin, PeftAdapterMixin):
+	def save_pretrained(...)
+	@classmethod
+    def from_pretrained(...)
+class GenerationMixin:
+   def generate(inputs,...):> Union[GenerateOutput, torch.LongTensor]:
+        ...
+        outputs = self(model_input_ids,attention_mask=model_attn,...)
+        ...             
+class ChatGLMPreTrainedModel(TorchModel, PreTrainedModel):
+    ...
+class ChatGLMModel(ChatGLMPreTrainedModel):
+	def forward(self,input_ids,attention_mask,...):
+        ...
+class GPT2PreTrainedModel(PreTrainedModel):
+    ...
+class GPT2LMHeadModel(GPT2PreTrainedModel):
+    def __init__(self, config):
+        ...
+        self.transformer = GPT2Model(config)
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        ...
+    def forward(self,input_ids,attention_mask,labels,...):
+       transformer_outputs = self.transformer(input_ids,attention_mask,...)
+       hidden_states = transformer_outputs[0]
+       lm_logits = self.lm_head(hidden_states)
+       loss = None
+       if labels is not None:
+           labels = labels.to(lm_logits.device) # move labels to correct device to enable model parallelism
+           shift_logits = lm_logits[..., :-1, :].contiguous() # Shift so that tokens < n predict n
+           shift_labels = labels[..., 1:].contiguous()
+           loss_fct = CrossEntropyLoss()
+           loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        return ((loss,) + output) if loss is not None else output     
+```
+
+一些细节
+
+1. Models expect a batch of inputs。当你试图将两个（或更多）句子组合在一起时，它们的长度可能不同。为了解决这个问题，我们将使用填充使张量具有矩形。Padding通过在值较少的句子中添加一个名为Padding token的特殊单词来确保我们所有的句子长度相同。当要求处理更长的序列时
+    ```python
+    model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
+    batched_ids = [
+        [200, 200, 200],
+        [200, 200, tokenizer.pad_token_id],
+    ]
+    attention_mask = [
+        [1, 1, 1],
+        [1, 1, 0],
+    ]
+    outputs = model(torch.tensor(batched_ids), attention_mask=torch.tensor(attention_mask))
+    print(outputs.logits)
+    ```
+2. attention_mask ，self-attention使用，shape和input_ids一致。
+    1. Encoder中的Mask。模型训练和预测基本都是批量化处理的，处理多个序列时，在attention的时候，不去attend被mask掉的部分。 作用是告诉模型一个batch的数据里哪些是padding的，从而可以忽略掉那些padding的部分，也叫padding mask ，比如下图的例子：
+        ![](/public/upload/machine/attention_mask.jpg)
+    2. decoder中的mask。用于在训练过程中解码的时候掩盖掉当前时刻之后的信息；也叫sequence mask
+        ![](/public/upload/machine/sequence_mask.jpg)
+    3. 为什么Attention Mask不是0和1构成的矩阵，而是0和负无穷构成的？在 Transformer 模型中通常用于指示模型哪些位置是有效的输入，哪些位置是填充的。它的主要目的是确保模型在计算注意力分数时不会考虑到填充的位置。在大多数实现中，当我们说“mask”时，我们通常是指一个由0和1组成的矩阵，其中1表示“考虑这个位置”而0表示“不考虑这个位置”。但在实际的注意力机制计算中，这种简单的0和1的表示方法并不直接适用。Transformer中的注意力机制涉及到softmax函数，该函数会将输入的原始分数转换为概率分布。为了确保某些位置在softmax之后的概率为0，我们需要在softmax之前为这些位置赋予一个非常小的分数，通常是负无穷。这样，经过softmax转换后，这些位置的概率会接近于0。
+
+### 推理/generate实现
+
+[浅谈LLAMA2核心函数generate源码](https://mp.weixin.qq.com/s/vnke00f7kzlA16Pw_FJFjQ)
+
+```python
+def generate(self,
+        prompt_tokens: List[List[int]],  # 输入的提示
+        max_gen_len: int,  # 最大生成长度
+        temperature: float = 0.6,  # 影响生成文本的随机性
+        top_p: float = 0.9,  # 用于决定采样过程中保留的 token 集合的概率阈值
+        logprobs: bool = False,  # 是否返回每个 token 的对数概率
+        echo: bool = False,  # 是否返回输入的提示
+) -> Tuple[List[List[int]], Optional[List[List[float]]]]:
+    # ---------------------------初始化长度为 total_len tokens张量，并填充 pad_id----------------------------------
+    params = self.model.params
+    bsz = len(prompt_tokens)
+    assert bsz <= params.max_batch_size, (bsz, params.max_batch_size)
+
+    min_prompt_len = min(len(t) for t in prompt_tokens)
+    max_prompt_len = max(len(t) for t in prompt_tokens)
+    assert max_prompt_len <= params.max_seq_len
+    total_len = min(params.max_seq_len, max_gen_len + max_prompt_len)
+
+    pad_id = self.tokenizer.pad_id
+    tokens = torch.full((bsz, total_len), pad_id, dtype=torch.long, device="cuda")
+    # 将prompt_tokens中的token复制到tokens张量中。
+    for k, t in enumerate(prompt_tokens):
+        tokens[k, : len(t)] = torch.tensor(t, dtype=torch.long, device="cuda")
+    if logprobs: # 是否返回每个 token 的对数概率
+        # 创建一个与tokens相同形状的token_logprobs张量，并用0填充
+        token_logprobs = torch.zeros_like(tokens, dtype=torch.float)
+
+    prev_pos = 0
+    eos_reached = torch.tensor([False] * bsz, device="cuda")
+    input_text_mask = tokens != pad_id
+    # -------------------------------------------------------------
+
+    for cur_pos in range(min_prompt_len, total_len):
+        # 调用模型的forward方法获取logits
+        logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
+        if logprobs: # 是否返回每个 token 的对数概率
+            # 计算token level的logprobs
+            token_logprobs[:, prev_pos + 1: cur_pos + 1] = -F.cross_entropy(
+                input=logits.transpose(1, 2),
+                target=tokens[:, prev_pos + 1: cur_pos + 1],
+                reduction="none",
+                ignore_index=pad_id,
+            )
+        # 根据温度参数和top_p参数对logits进行softmax和采样，得到下一个token
+        if temperature > 0:
+            # sample_top_p函数对probs进行采样
+            probs = torch.softmax(logits[:, -1] / temperature, dim=-1)
+            next_token = sample_top_p(probs, top_p)
+        else:
+            # 将logits中概率最大的token作为下一个token。
+            next_token = torch.argmax(logits[:, -1], dim=-1)
+
+        next_token = next_token.reshape(-1)
+        # only replace token if prompt has already been generated
+        next_token = torch.where(
+            input_text_mask[:, cur_pos], tokens[:, cur_pos], next_token
+        )
+        # tokens张量更新
+        tokens[:, cur_pos] = next_token
+        eos_reached |= (~input_text_mask[:, cur_pos]) & (
+                next_token == self.tokenizer.eos_id
+        )
+        prev_pos = cur_pos
+        # 检查是否已经生成了所有的eos token，如果是则停止生成
+        if all(eos_reached):
+            break
+
+    if logprobs:
+        # token_logprobs列表化
+        token_logprobs = token_logprobs.tolist()
+    out_tokens, out_logprobs = [], []
+    for i, toks in enumerate(tokens.tolist()):
+        # cut to max gen len
+        # 对于 tokens 张量中的每一行（即每一个生成的序列），如果 echo 参数为假，则去掉提示部分
+        start = 0 if echo else len(prompt_tokens[i])
+        toks = toks[start: len(prompt_tokens[i]) + max_gen_len]
+        probs = None
+        if logprobs:
+            probs = token_logprobs[i][start: len(prompt_tokens[i]) + max_gen_len]
+        # cut to eos tok if any
+        # 存在结束标记，则去掉结束标记之后的部分
+        if self.tokenizer.eos_id in toks:
+            eos_idx = toks.index(self.tokenizer.eos_id)
+            toks = toks[:eos_idx]
+            probs = probs[:eos_idx] if logprobs else None
+        out_tokens.append(toks)
+        out_logprobs.append(probs)
+    # 返回生成的tokens和对数概率（如果logprobs参数为真）
+    return (out_tokens, out_logprobs if logprobs else None)
+```
+推理的时候不使用mask，要串行执行，只有得到前一个单词，重新进入decoder模块，通过模型推理才能得到下一个输出。
+
+[以LLAMA为例，快速入门LLM的推理过程](https://mp.weixin.qq.com/s/5lbrqbqiHPZIARsVW6l6tA) 建议细读。
+
+[一网打尽文本生成策略（beam search/top-k/top-p/温度系数）](https://zhuanlan.zhihu.com/p/676398366)假设我们输入 “I am a”，GPT会对这个序列进行编码得到embedding，并预测下一个单词的概率。“I am a”作为输入，编码后也会得到三个token对应的embedding。GPT会使用输入序列最后一个token对应的embedding做预测，也就是说，”a”经过编码后的embedding会被映射到整个词表上，得到下一个单词的概率。因为GPT是使用masked attention的，每个token在编码时都只会和他前面的token交互。那么最后一个token自然就包括了当前序列的所有信息，因此用于预测下一个token是最合理的。当得到了整个词表中的单词作为下一个token的概率之后，GPT是选择概率最大（贪心）的那个作为输出吗？显然不是的。因为使用这样的策略，对于相同的输入GPT每次都会给出一样的回答（推理模式下所有参数都固定，不存在随机性）。而理解GPT回答的多样性就需要介绍一些生成策略了。
+1. Beam search，当输入为“I am a”, 设置num_beams=2，beam search的过程可表达为：假设A,B,C对应的概率分别为0.5,0.2,0.3。那么此时选择每个token并组成序列的概率分别为：
+    ```
+    “I am a A”: 0.5
+    “I am a B”: 0.3
+    “I am a C”: 0.2
+    ```
+    beam search会选择概率最大的num_beams=2个序列，参与后续的生成。因此“I am a A”和“I am a B”会参与下一个token的预测。假设得到六个可能序列对应的概率。此时再保留num_beams=2个最大概率的序列，比如是”I am a A C”=0.25, ”I am a B C”=0.27，再把这两个序列送到下一个token的预测中。上述步骤会一直重复，直到遇到结束符或指定的长度。最终，会有num_beams个序列被预测出来。此时可以对这几个概率最大的序列做进一步的处理，例如选一个概率最大的作为最终的输出，或者根据概率做个采样作为输出。beam search有什么好处呢？相比于每次都选最大的贪心，beam search显然增大了搜索空间。而且更重要的是，beam search会防止潜在概率很大的序列被过早的抛弃。例如”I am a B C”，在预测到B的时候序列的概率还是不大的，但是到C就变得更大了。当num_beams=1时，beam search等价于贪心。
+2. Top-k sampling，就是每一步只考虑概率最大的k个token，并且把这k个token的概率做重归一化，并随机采样得到预测的token。假设在一步中，ABC对应的概率ligits是[5,3,2]，k设置为2。那么会选出字母A,B，并把其对应的概率logits[5,3]进行重新归一化softmax([5,3]) = [0.88,0.12]。随后基于归一化后的概率随机选A或B，拼接到“I am a”后面，并进行下一个token的预测，如此反复。top-k和beam search有什么区别呢？top-k自始至终只有一个序列进行预测，k只用于规定采样的范围，每步只采样一个token作为结果。而beam search会保留num_beams个序列进行预测。
+3. top-p sampling，这种策略会把token的概率按照递减的次序累加，直到累加的概率值超过了阈值p，在这些token中做采样得到预测。假设p=0.7，ABC在第一步预测的概率分布为[0.5,0.3,0.2]。那么A和B的概率值加起来超过了0.7，第一步就会在A,B中采样得到预测。假设第二步概率分布为[0.3,0.3,0.4]，那么ABC三个加起来才会超过0.7，此时第二步就会在这三个里面采样，如此反复。可以看出top-p的每一步实际上会在一个动态长度的范围里做采样。。这样的优点是可以排除一些概率不高的单词，例如分布为[0.9,0.05,0.05]时，只考虑第一个就足够了，而top-k还是会考虑前k个。并且在分布相对均衡时，top-p会增加输出的多样性。
+4. 温度系数，在上面提到的归一化中，我们还可以引入温度系数调整概率分布
+
+    $$
+    Softmax(x_i) = \frac{e^{x_i}/T}{\sum_j e^{x_j}/T}
+    $$
+
+    T越大归一化后的概率分布越均匀，而T越小概率分布越陡峭。因此大的T会增加模型输出的随机性，而小的T则会让模型的输出更加固定。这也是“温度系数影响模型创造性”说法的原因。
+
+以上策略体现在代码上 就是：经过多个AttentionLayer  hidden_states，Normalization之后得到 outputs.logits，将 logits 传递给 logits_processor 和 logits_warper（包含TopKLogitsWarper/TopPLogitsWarper等），最后，使用 softmax 函数将经过预处理的 logits 转换为概率分布，并利用 multinomial 方法从中采样得到下一个 token。
+
+## 训练/Trainer
 
 transformer 支持自定义dataset，自定义model实现forward（forward 支持的参数均可以作为dataset的column），forward 过程中还计算loss，模型的差异性基本已经兜住了，这也是为何 只要提供包含特定column的dataset，剩下的训练代码都可以交给trainer封装掉。
 
@@ -525,13 +550,13 @@ attention_mask = torch.ones(input_ids.shape, dtype=torch.int64)
 # predicts the next token at each position. 也就是 input_ids = [v1,v2,v3] 输出为 [v20,v30,v4]]。 v20 是根据v1 生成的下一个token，大概率跟v2 不一样，v4 是根据v1,v2,v3 生成的。
 out = model(input_ids=input_ids, attention_mask=attention_mask)
 logits = out['logits']
-# -1 在python list 里表示最后一个元素
+# -1 在python list 里表示最后一个元素。
 new_id = logits[:, -1, :].argmax(dim=1)
 print(new_id)
 print(tokenizer.batch_decode(new_id))
 ```
 
-一次想预测一个字符太慢了 可以直接生成一段话，这也是model.generate 的原理。 
+[GPT2 源码解析](https://zhuanlan.zhihu.com/p/630970209) 建议细读
 
 ```python
 input_ids = enc['input_ids']
@@ -631,5 +656,5 @@ print('GENERATION=', tokenizer.batch_decode(out.cpu()))
 {"prompt":"orange is ","completion":"orange"}
 {"prompt":"sky is ","completion":"blue"}
 ```
-How exactly is GPT-3 trained on such examples? We are not exactly sure (OpenAI is very secretive), but perhaps the two sequences of tokens are concatenated together, then GPT-3 is trained on such examples, **but the loss is only calculated in the “completion” part**. PS: 终于知道为何要分成两段，而不是喂一个文本就算了。
+How exactly is GPT-3 trained on such examples? We are not exactly sure (OpenAI is very secretive), but perhaps the two sequences of tokens are concatenated together, then GPT-3 is trained on such examples, **but the loss is only calculated in the “completion” part**. PS: 终于知道为何要分成两段，而不是喂一个文本就算了。labels 中prompt部分的位置都置为-100，-100表示在计算loss的时候会被忽略，这个由任务性质决定。
 

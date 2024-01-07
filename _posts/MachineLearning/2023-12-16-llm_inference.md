@@ -15,7 +15,6 @@ keywords: llm inference
 * TOC
 {:toc}
 
-
 ## 思路
 
 [大模型推理加速技术概要](https://mp.weixin.qq.com/s/kr5-QFhPXrUb7omTvJ-rDw)目前大模型推理加速技术栈大体可以分成三层（从低到高）：
@@ -31,16 +30,14 @@ keywords: llm inference
     4. Batching 批量化：将多个请求合并处理，是提高性能的另外一个关键办法，这个能大幅提高性能的原因主要有两个：1. 合并请求可以增大代数运算的矩阵规模，而下层代数库处理越大的矩阵规模，相对性能越高。2. 合并请求可以减少对静态的模型参数矩阵的扫描次数，减少内存带宽消耗。
 3. 大模型调度引擎，vLLM、TensorRT-LLM（原FasterTransformer）、llama.cpp等。大模型调度引擎是2022年开始新出现的一层抽象。为什么有了执行引擎还需要大模型调度引擎？主要是因为大家希望进一步优化推理性能，而大模型架构相对固定（Transformer架构及变形），通过专门针对大模型而不是更通用的神经网络进行推理优化，就可以利用大模型架构的特点和算法特性，来进一步提高性能。
     1. KV Cache：这是fairseq等系统很早就开始有的基础方法，就是将transformer attention计算中的Key和Value张量集合缓存下来，避免每输出一个token都重复计算。
-    2. Iteration-level scheduling 迭代层调度：这是2022年Orca引入的方法（参考文献1），推理引擎默认都是按请求批量化，而LLM推理需要多次迭代进行自回归计算，所以按“迭代”为单位进行批量化，可以提高并行度和性能。
+    2. Iteration-level scheduling 迭代层调度：这是2022年Orca引入的方法，推理引擎默认都是按请求批量化，而LLM推理需要多次迭代进行自回归计算，所以按“迭代”为单位进行批量化，可以提高并行度和性能。
     3. PagedAttention 分页注意力: 这是今年vLLM引入的方法（参考文献2），背后洞察是上面提到的KV cache占用大量GPU内存，一个13B模型每个输出token对应的KV张量，需要800KB，而最长输出长度2048个token的话，一个请求就需要1.6GB显存。因此vLLM引入类似操作系统中的分页机制，大幅减少了KV cache的碎片化，提高性能。
     4. GPTQ量化。有一批研究专注于寻找更优的量化方法，llama.cpp支持近期发表的GPTQ（参考文献3），默认将模型量化到4比特，大幅提升性能且准确率下降很小。
     5. Fused kernels等各类手工优化：很多时候，手打优化都是少不了的办法，llama.cpp短时间积累大量用户，就是因为项目作者不怕麻烦，快速积累了大量手工小优化，集腋成裘，形成领先的综合性能。
 
 ![](/public/upload/machine/vllm_arch.jpg)
 
-1. vLLM是一个开源的大模型推理加速框架，通过PagedAttention高效地管理attention中缓存的张量，实现了比HuggingFace Transformers高14-24倍的吞吐量，就像在操作系统中管理CPU虚拟内存一样
-2. NVIDIA FasterTransformer (FT) 是一个用于实现基于Transformer的神经网络推理的加速引擎。它包含Transformer块的高度优化版本的实现，其中包含编码器和解码器部分。使用此模块，您可以运行编码器-解码器架构模型（如：T5）、仅编码器架构模型（如：BERT）和仅解码器架构模型（如：GPT）的推理。FT框架是用C++/CUDA编写的，依赖于高度优化的 cuBLAS、cuBLASLt 和 cuSPARSELt 库，这使您可以在 GPU 上进行快速的 Transformer 推理。与 NVIDIA TensorRT 等其他编译器相比，FT 的最大特点是它支持以分布式方式进行 Transformer 大模型推理。在底层，节点间或节点内通信依赖于 MPI 、 NVIDIA NCCL、Gloo等。因此，使用FasterTransformer，您可以在多个 GPU 上以张量并行运行大型Transformer，以减少计算延迟。同时，TP 和 PP 可以结合在一起，在多 GPU 节点环境中运行具有数十亿、数万亿个参数的大型 Transformer 模型。
-3. DeepSpeed-MII 是 DeepSpeed 的一个新的开源 Python 库，旨在使模型不仅低延迟和低成本推理，而且还易于访问。
+## 影响因素
 
 当前的生成式大模型的推理可以分为两个阶段：Context 阶段和 Generation 阶段。Context 阶段是批量计算输入的 Prompt，属于计算密集型。Generation 阶段是逐字生成下一个 Token，属于访存密集型，虽然每一轮 Generation 的计算量小于 Context 阶段，但是访存量相当。大模型推理主要面临三个挑战：输入输出变长、计算规模大、显存占用大，针对这些挑战当前有多种优化手段进行优化：
 1. 服务层面，打破之前的 Batch 只能同时返回结果的限制，允许部分请求结束后插入新的请求。
@@ -48,13 +45,10 @@ keywords: llm inference
 3. 显存方面，Generation 计算的访存密集型可以通过 Flash Attention 优化访存，也可以通过 Paged Attention 方法优化推理过程显存占用从而支持更大的吞吐。Paged Attention基本构建了一个类似于CPU内存管理的内存管理系统，以减少内存碎片并充分利用内存吞吐量
     1. 对于较短的文本输入 (词元数小于 1024)，推理的内存需求很大程度上取决于模型权重的大小。
 
-
-## 影响因素
-
 [语言大模型推理性能工程：最佳实践](https://mp.weixin.qq.com/s/mniKrBWkDE1tWWb2wQBDCA)
 我们应该如何准确衡量模型的推理速度呢？首个词元生成时间（Time To First Token，简称TTFT）；单个输出词元的生成时间；时延：模型为用户生成完整响应所需的总时间；吞吐量：推理服务器在所有用户和请求中每秒可生成的输出词元数。
 以下通用技术可用于优化语言大模型的推理：
-1. 算子融合：将相邻的不同算子合并在一起通常可以获得更短的时延。
+1. 算子融合：将相邻的不同算子合并在一起通常可以获得更短的时延（避免了反复从HBM中读写数据）。
 2. 量化：对激活值和权重进行压缩，以使用更少的比特数。一般来说，所有量化技术的工作原理如下: $Y=X*W$ 变成 $Y=X* dequantize(W); quantize(W)$，当输入向量走过模型计算图时，所有权重矩阵都会依次执行反量化和重量化操作。因此，使用权重量化时，推理时间通常 不会 减少，反而会增加。
 3. 压缩：稀疏性或蒸馏。
 4. 并行化：在多个设备间进行张量并行，或者针对较大的模型进行流水线并行。
@@ -62,6 +56,12 @@ keywords: llm inference
 在LLM中，计算主要由矩阵乘法计算主导；这些维度较小的计算在大多数硬件上通常受内存带宽的限制。在以自回归方式生成词元时，激活矩阵的维度之一（由批大小和序列中的词元数定义）在小型批大小上较小。因此，速度由我们将模型参数从GPU内存加载到本地缓存/寄存器中的速度决定，而不是由计算加载数据的速度决定。相比峰值计算性能，推理硬件中可用和可实现的内存带宽能够更好地预测词元的生成速度。
 
 对于服务成本来说，推理硬件的利用率非常重要。由于GPU的价格十分高昂，因此我们需要尽可能地让它们完成更多工作。共享推理服务通过将多个用户的工作负载组合在一起，填补各自的差距，并将重叠的请求进行批处理，以降低成本。对于LLaMA2-70B等大型模型，只有在较大的批大小下才能实现更好的性价比。拥有能够以较大批大小运行的推理服务系统对于成本效率至关重要。然而，较大的批大小意味着较大的KV缓存，这反过来又增加了部署模型所需的GPU数量。我们需要在这两者之间博弈，进行取舍，共享服务运营商需要权衡成本，优化系统。
+
+KV Cache/PagedAttention/FlashAttention 本质是基于GPU计算和内存架构，对注意力计算过程的优化
+
+$$
+Attention(Q,K,V) = softmax(\frac{QK^T}{\sqrt{d_k}})V
+$$
 
 ### KV Cache
 
@@ -93,9 +93,19 @@ Memory waste in KV Cache
 
 [如何解决LLM大语言模型的并发问题？](https://www.zhihu.com/question/613263140/answer/3271554389)vLLM：Efficient memory management for LLM inference 受到操作系统中的分页和虚拟内存的启发，将KV Block当做页，将Request当做进程，以此来实现vLLM。PagedAttention机制：传统要求将keys和values存到连续的内存空间，因为我们知道传统大家都是用TensorFlow、pytorch之类的，它是一个个tensor，所以很自然的就假设给它们一段连续的内存空间，但是对于LLM来说，这个假设就不是一个好的假设，因此PagedAttention允许在非连续内存空间中存储连续的keys和values，vLLM维护一个Block table，存放逻辑空间到物理空间的映射。现在有一个Prompt：Alan Turing is a computer scientist，当产生一个新的token时，会查看Block table中的Physical block no.,然后找到对应物理内存的地方存储进去，并更新Block table中的Filled slots内容。当产生“renowned”的时候，是新开了一个Block，所以也要更新Block table，新开一个物理内存（每个kv block中有固定的token数目）。
 
+PS：Transformer （和Attention） layer 已经支持了缓存机制 (use_cache=true)，kvcache 在代码上如何体现可以理解。pageattention 是不是可以理解为：pageattention 初始化了cache，只要把这个cache 引用传给 Transformer （和Attention） forward 函数参数，Transformer 就可以用这个cache 到计算过程中了？
 
+### 调度优化
+
+Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的，将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。
+
+### 推理时的模型并行（未完成）
 
 ## 模型服务框架
+
+1. vLLM是一个开源的大模型推理加速框架，通过PagedAttention高效地管理attention中缓存的张量，实现了比HuggingFace Transformers高14-24倍的吞吐量，就像在操作系统中管理CPU虚拟内存一样
+2. NVIDIA FasterTransformer (FT) 是一个用于实现基于Transformer的神经网络推理的加速引擎。它包含Transformer块的高度优化版本的实现，其中包含编码器和解码器部分。使用此模块，您可以运行编码器-解码器架构模型（如：T5）、仅编码器架构模型（如：BERT）和仅解码器架构模型（如：GPT）的推理。FT框架是用C++/CUDA编写的，依赖于高度优化的 cuBLAS、cuBLASLt 和 cuSPARSELt 库，这使您可以在 GPU 上进行快速的 Transformer 推理。与 NVIDIA TensorRT 等其他编译器相比，FT 的最大特点是它支持以分布式方式进行 Transformer 大模型推理。在底层，节点间或节点内通信依赖于 MPI 、 NVIDIA NCCL、Gloo等。因此，使用FasterTransformer，您可以在多个 GPU 上以张量并行运行大型Transformer，以减少计算延迟。同时，TP 和 PP 可以结合在一起，在多 GPU 节点环境中运行具有数十亿、数万亿个参数的大型 Transformer 模型。
+3. DeepSpeed-MII 是 DeepSpeed 的一个新的开源 Python 库，旨在使模型不仅低延迟和低成本推理，而且还易于访问。
 
 使用大模型时，我们在huggingface或modelscope 看到的代码类似下面，很明显不能直接向用户提供服务。 
 ```python
@@ -313,6 +323,7 @@ GPU编程基础：在执行model.generate(prompt)时，我们进行以下操作�
     2. 这一步骤受内存限制，因为我们仅计算一个词元，未充分利用SM。
 
 
+函数计算推出 GPU 闲置计费功能，在保障性能的前提下，可以帮助您大幅降低 GPU 的成本开销。以往部署大型语言模型（LLM）可能需要昂贵的 GPU 支持，尤其在需要大量计算资源时。但请求处理并不是每时每刻都处于活跃状态，势必存在流量的潮汐现象，后端的计算资源会出现空载导致成本的浪费。借助函数计算 GPU 闲置计费功能，用户的开销将会根据实际计算负载动态调整。
 
 ### 在线推理
 
