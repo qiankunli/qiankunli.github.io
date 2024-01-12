@@ -148,6 +148,7 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
     1. [大模型应用中大部分人真正需要去关心的核心——Embedding](https://mp.weixin.qq.com/s/Uqt3H2CfD0sr4P5u169yng) 
     2. [分享Embedding 模型微调的实现](https://mp.weixin.qq.com/s/1AzDW9Ubk9sWup2XJWbvlA) ，此外，原则上：embedding 所得向量长度越长越好，过长的向量也会造成 embedding 模型在训练中越难收敛。
     3. [手工微调embedding模型，让RAG应用检索能力更强](https://mp.weixin.qq.com/s/DuxqXcpW5EyLI3lj4ZJXdQ) 未细读
+    4. [如何提高LLMs的文本表征(Text Embedding)能力?](https://mp.weixin.qq.com/s/ZIXjMWKIkgWsFZJGJGgfFQ)
 3. 许多向量存储支持了对元数据的操作。LangChain 的 Document 对象中有个 2 个属性，分别是page_content和metadata，metadata就是元数据，我们可以使用metadata属性来过滤掉不符合条件的Document。元数据过滤的方法虽然有用，但需要我们手动来指定过滤条件，我们更希望让 LLM 帮我们自动过滤掉不符合条件的文档。SelfQueryRetriever
 4. **增加追问机制**。这里是通过Prompt就可以实现的功能，只要在Prompt中加入“如果无法从背景知识回答用户的问题，则根据背景知识内容，对用户进行追问，问题限制在3个以内”。这个机制并没有什么技术含量，主要依靠大模型的能力。不过大大改善了用户体验，用户在多轮引导中逐步明确了自己的问题，从而能够得到合适的答案。
 

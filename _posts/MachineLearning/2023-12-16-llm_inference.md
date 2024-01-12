@@ -99,7 +99,14 @@ PS：Transformer （和Attention） layer 已经支持了缓存机制 (use_cache
 
 Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的，将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。
 
-### 推理时的模型并行（未完成）
+### Flash Attention
+
+[图解大模型计算加速系列：Flash Attention V1，从硬件到计算逻辑](https://mp.weixin.qq.com/s/J2i2MDv4us_GMwCyku0tnw)
+1. Fast（with IO-Awareness），计算快。它发现：计算慢的卡点不在运算能力，而是在读写速度上。所以它通过**降低对显存（HBM）的访问次数**来加快整体运算速度（通过分块计算（tiling）和核函数融合（kernel fusion）来降低对显存的访问），这种方法又被称为IO-Awareness。
+2. Memory Efficicent，节省显存。在标准attention场景中，forward时我们会计算并保存N*N大小的注意力矩阵；在backward时我们又会读取它做梯度计算，这就给硬件造成了的存储压力。在Flash Attention中，则巧妙避开了这点，使得存储压力降至。在后文中我们会详细看这个trick。
+3. Exact Attention，精准注意力。
+
+我们知道显存的带宽相比SRAM要小的多，读一次数据是很费时的，但是SRAM存储又太小，装不下太多数据。所以我们就以SRAM的存储为上限，尽量保证每次加载数据都把SRAM给打满，能合并的计算我们尽量合并在一起，节省数据读取时间。举例来说，我现在要做计算A和计算B。在老方法里，我做完A后得到一个中间结果，写回显存，然后再从显存中把这个结果加载到SRAM，做计算B。但是现在我发现SRAM完全有能力存下我的中间结果，那我就可以把A和B放在一起做了，这样就能节省很多读取时间，我们管这样的操作叫kernel融合。kernel包含对线程结构（grid-block-thread）的定义，以及结构中具体计算逻辑的定义。flash attention将矩阵乘法、mask、softmax、dropout操作合并成一个kernel，做到了只读一次和只写回一次，节省了数据读取时间。
 
 ## 模型服务框架
 
