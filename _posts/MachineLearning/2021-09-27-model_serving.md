@@ -220,30 +220,6 @@ spec:
 
 [CPU 推理优化](https://mp.weixin.qq.com/s/LQ6xjHqv0YYDRXtQTB5qPw)  直接使用 TensorFlow 提供的 C++ 接口调用 Session::Run，无法实现多 Session 并发处理 Request，导致单 Session 无法实现 CPU 的有效利用。如果通过多 Instance 方式（多进程），无法共享底层的 Variable，导致大量使用内存，并且每个 Instance 各自加载一遍模型，严重影响资源的使用率和模型加载效率。为了提高 CPU 使用率，也尝试多组 Session Intra/Inter，均会导致 latency升高，服务可用性降低。
 
-## 模型服务——提高吞吐，使服务能并行执行多个请求
-
-[模型推理服务化框架Triton保姆式教程（一）：快速入门](https://mp.weixin.qq.com/s/YES9OO9NX6-HnzR-pvfFyQ)Triton 是 Nvidia 发布的一个高性能推理服务框架，可以帮助开发人员高效轻松地在云端、数据中心或者边缘设备部署高性能推理服务。其中主要特征包括：
-1. 支持多种深度学习框架（Triton 称之为backend，tf、pytorch、FasterTransformer都有对应backend），Triton Server 可以提供 HTTP/gRPC 等多种服务协议。同时支持多种推理引擎后端，如：TensorFlow, TensorRT, PyTorch, ONNXRuntime 等。Server 采用 C++ 实现，并采用 C++ API调用推理计算引擎，保障了请求处理的性能表现。
-3. 模型并发执行
-4. 动态批处理(Dynamic batching)
-5. 有状态模型的序列批处理(Sequence batching)和隐式状态管理(implicit state management)
-6. 提供允许添加自定义后端和前/后置处理操作的后端 API
-7. 支持使用 Ensembling 或业务逻辑脚本 (BLS)进行模型流水线
-8. HTTP/REST和GRPC推理协议是基于社区开发的KServe协议
-9. 支持使用 C API 和 Java API 允许 Triton 直接链接到您的应用程序，用于边缘端场景
-10. 支持查看 GPU 利用率、服务器吞吐量、服务器延迟等指标
-PS：**基本上对一个推理服务框架的需求都在这里了**。
-
-[模型推理服务化框架Triton保姆式教程（二）：架构解析](https://mp.weixin.qq.com/s/ioAx1tAwmCwnVfsATm2qXQ)
-
-[深度学习部署神器——triton-inference-server入门教程指北](https://mp.weixin.qq.com/s/BuVEuZUIvSCuxHQdmR6QUg) 未细读。
-
-[字节跳动模型大规模部署实战](https://mp.weixin.qq.com/s/Aya7V8yomSDqLHA2n1zwbQ)
-
-PyTorch/TensorFlow 等框架相对已经解决了模型的训练/推理统一的问题，因此模型计算本身不存在训推一体的问题了。完整的服务通常还存在大量的预处理/后处理等业务逻辑，这类逻辑通常是把各种输入经过加工处理转变为 Tensor，再输入到模型，之后模型的输出 Tensor 再加工成目标格式。核心要解决的问题就是：**预处理和后处理需要提供高性能训推一体的方案**。
-
-![](/public/upload/machine/pre_after_process.jpg)
-
 ## 调优
 
 算法工程师视角

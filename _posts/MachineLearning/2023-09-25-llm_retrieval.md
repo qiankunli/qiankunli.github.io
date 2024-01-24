@@ -143,7 +143,7 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
 召回的输入（不一定是用户原输入）？召回的输出（不一定是Vectordb原输出）？召回的方式（不一定直接查vectordb，微调embedding）？
 
 **优化召回的输入**。
-1. 将用户问题采用多个不同的视角去提问，然后 LLM 会得出最终结果。大多数人在问问题的过程中，如果不懂 prompt 工程，往往不专业，要么问题过于简单化，要么有歧义，意图不明显。那么向量搜索也是不准确的，导致LLM回答的效果不好。所以需要 LLM 进行问题的修正和多方位解读。MultiQueryRetriever 。[使用RAG-Fusion和RRF让RAG在意图搜索方面更进一步](https://mp.weixin.qq.com/s/N7HgjsqgCVf2i-xy05qZtA)
+1. 将用户问题采用多个不同的视角去提问，借助子问题检索，然后 LLM 会得出最终结果。大多数人在问问题的过程中，如果不懂 prompt 工程，往往不专业，要么问题过于简单化，要么有歧义，意图不明显。那么向量搜索也是不准确的，导致LLM回答的效果不好。所以需要 LLM 进行问题的修正和多方位解读。MultiQueryRetriever 。[使用RAG-Fusion和RRF让RAG在意图搜索方面更进一步](https://mp.weixin.qq.com/s/N7HgjsqgCVf2i-xy05qZtA)
 2. Finetune 向量模型。embedding 模型 可能从未见过你文档的内容，也许你的文档的相似词也没有经过训练。在一些专业领域，通用的向量模型可能无法很好的理解一些专有词汇，所以不能保证召回的内容就非常准确，不准确则导致LLM回答容易产生幻觉（简而言之就是胡说八道）。可以通过 Prompt 暗示 LLM 可能没有相关信息，则会大大减少 LLM 幻觉的问题，实现更好的拒答。
     1. [大模型应用中大部分人真正需要去关心的核心——Embedding](https://mp.weixin.qq.com/s/Uqt3H2CfD0sr4P5u169yng) 
     2. [分享Embedding 模型微调的实现](https://mp.weixin.qq.com/s/1AzDW9Ubk9sWup2XJWbvlA) ，此外，原则上：embedding 所得向量长度越长越好，过长的向量也会造成 embedding 模型在训练中越难收敛。

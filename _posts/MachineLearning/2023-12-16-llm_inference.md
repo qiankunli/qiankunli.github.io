@@ -91,7 +91,9 @@ Memory waste in KV Cache
 1. 内部碎片：推理过程具有非常大的动态性，输出的长度不能预先知道，传统的serving system为了保险起见，就会预留非常大的空间，比如模型支持的最大输出2048个token，它就会预留这么大的空间，那么如果我产生的输出仅有10个token，剩下的2038的slots就会作为内部碎片被浪费。
 2. 外部碎片：因为每个request长度不等，就像os中的malloc，长度不等，不停的malloc就会产生外部碎片。
 
-[如何解决LLM大语言模型的并发问题？](https://www.zhihu.com/question/613263140/answer/3271554389)vLLM：Efficient memory management for LLM inference 受到操作系统中的分页和虚拟内存的启发，将KV Block当做页，将Request当做进程，以此来实现vLLM。PagedAttention机制：传统要求将keys和values存到连续的内存空间，因为我们知道传统大家都是用TensorFlow、pytorch之类的，它是一个个tensor，所以很自然的就假设给它们一段连续的内存空间，但是对于LLM来说，这个假设就不是一个好的假设，因此PagedAttention允许在非连续内存空间中存储连续的keys和values，vLLM维护一个Block table，存放逻辑空间到物理空间的映射。现在有一个Prompt：Alan Turing is a computer scientist，当产生一个新的token时，会查看Block table中的Physical block no.,然后找到对应物理内存的地方存储进去，并更新Block table中的Filled slots内容。当产生“renowned”的时候，是新开了一个Block，所以也要更新Block table，新开一个物理内存（每个kv block中有固定的token数目）。
+[如何解决LLM大语言模型的并发问题？](https://www.zhihu.com/question/613263140/answer/3271554389)vLLM：Efficient memory management for LLM inference 受到操作系统中的分页和虚拟内存的启发，将KV Block当做页，将Request当做进程，允许在非连续的内存空间中存储连续的KV。PagedAttention机制：传统要求将keys和values存到连续的内存空间，因为我们知道传统大家都是用TensorFlow、pytorch之类的，它是一个个tensor，所以很自然的就假设给它们一段连续的内存空间，但是对于LLM来说，这个假设就不是一个好的假设，因此PagedAttention允许在非连续内存空间中存储连续的keys和values，vLLM维护一个Block table，存放逻辑空间到物理空间的映射。现在有一个Prompt：Alan Turing is a computer scientist，当产生一个新的token时，会查看Block table中的Physical block no.,然后找到对应物理内存的地方存储进去，并更新Block table中的Filled slots内容。当产生“renowned”的时候，是新开了一个Block，所以也要更新Block table，新开一个物理内存（每个kv block中有固定的token数目）。
+
+![](/public/upload/machine/paged_attention.gif)
 
 PS：Transformer （和Attention） layer 已经支持了缓存机制 (use_cache=true)，kvcache 在代码上如何体现可以理解。pageattention 是不是可以理解为：pageattention 初始化了cache，只要把这个cache 引用传给 Transformer （和Attention） forward 函数参数，Transformer 就可以用这个cache 到计算过程中了？
 
@@ -285,6 +287,10 @@ response, history = model.chat(tokenizer, "晚上睡不着应该怎么办", hist
 print(response)
 晚上睡不着可能会让你感到焦虑或不舒服,但以下是一些可以帮助你入睡的方法:...
 ```
+
+### vllm 源码分析
+
+[vLLM代码及逻辑介绍](https://zhuanlan.zhihu.com/p/675322419)
 
 ## 一些材料
 

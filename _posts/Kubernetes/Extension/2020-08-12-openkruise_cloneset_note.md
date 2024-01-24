@@ -323,7 +323,9 @@ func (c *realControl) updatePod(cs *appsv1alpha1.CloneSet, coreControl clonesetc
 ### 原地升级
 
 [如何为 Kubernetes 实现原地升级？](https://mp.weixin.qq.com/s/CNLf8MHYGs_xeD4PxChR4A)
-[如何在Kubernetes中实现容器原地升级](https://cloud.tencent.com/developer/article/1413743)一个Pod中可能包含了主业务容器，还有不可剥离的依赖业务容器，以及SideCar组件容器等，如果因为要更新其中一个SideCar Container而继续按照ReCreate Pod的方式进行整个Pod的重建，那负担还是很大的。更新一个轻量的SideCar却导致了分钟级的单个Pod的重建过程，因此，我们迫切希望能实现，只升级Pod中的某个Container，而不用重建整个Pod。
+[如何在Kubernetes中实现容器原地升级](https://cloud.tencent.com/developer/article/1413743)一个Pod中可能包含了主业务容器，还有不可剥离的依赖业务容器，以及SideCar组件容器等，如果因为要更新其中一个SideCar Container而继续按照ReCreate Pod的方式进行整个Pod的重建，那负担还是很大的。更新一个轻量的SideCar却导致了分钟级的单个Pod的重建过程，因此，我们迫切希望能实现，只升级Pod中的某个Container，而不用重建整个Pod，这样可以节省调度、网络分配（Pod还使用原有IP）、分配挂载远程盘（Pod使用原有PV）、拉取镜像（新镜像只需下载很少的几层layer）耗时。
+
+原地升级核心原理：每个Node上的kubelet 会针对本机上所有Pod.spec.containers中的每个container计算一个hash值，并记录到实际创建的容器中。如果我们修改了Pod中某个container的image字段，kubectl会发现container的hash发生了变化，与机器上过去创建的容器hash不一致，而后kubelet就会把旧容器停掉，然后根据最新Pod spec中的container 来创建新的容器。
 
 Kubernetes把容器原地升级的能力只做在Kubelet这一层，**并没有暴露在Deployment、StatefulSet等Controller中直接提供给用户**，原因很简单，还是建议大家把Pod作为完整的部署单元。为了实现容器原地升级，我们更改Pod.Spec中对应容器的Image，就会生成kubetypes.UPDATE类型的事件，kubelet 将容器优雅终止。旧的容器被杀死之后，kubelet启动新的容器，如此即完成Pod不重建的前提下实现容器的原地升级。
 
