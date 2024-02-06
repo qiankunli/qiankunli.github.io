@@ -32,12 +32,26 @@ keywords: llm inference
     1. KV Cache：这是fairseq等系统很早就开始有的基础方法，就是将transformer attention计算中的Key和Value张量集合缓存下来，避免每输出一个token都重复计算。
     2. Iteration-level scheduling 迭代层调度：这是2022年Orca引入的方法，推理引擎默认都是按请求批量化，而LLM推理需要多次迭代进行自回归计算，所以按“迭代”为单位进行批量化，可以提高并行度和性能。
     3. PagedAttention 分页注意力: 这是今年vLLM引入的方法（参考文献2），背后洞察是上面提到的KV cache占用大量GPU内存，一个13B模型每个输出token对应的KV张量，需要800KB，而最长输出长度2048个token的话，一个请求就需要1.6GB显存。因此vLLM引入类似操作系统中的分页机制，大幅减少了KV cache的碎片化，提高性能。
-    4. GPTQ量化。有一批研究专注于寻找更优的量化方法，llama.cpp支持近期发表的GPTQ（参考文献3），默认将模型量化到4比特，大幅提升性能且准确率下降很小。
+    4. 低比特量化。传统的量化方法分为Quantization-Aware Training (QAT) 和 Post-Training Quantization (PTQ)。PTQ主要是对模型权重值和激活值进行INT8/INT4量化，QAT一般效果是更好的，但是它需要重训模型所以成本会大一些，相关的研究成果相较PTQ也少一些，在fintune阶段会用的比较多一些，例如 QLoRA。GPTQ量化。有一批研究专注于寻找更优的量化方法，llama.cpp支持近期发表的GPTQ（参考文献3），默认将模型量化到4比特，大幅提升性能且准确率下降很小。
     5. Fused kernels等各类手工优化：很多时候，手打优化都是少不了的办法，llama.cpp短时间积累大量用户，就是因为项目作者不怕麻烦，快速积累了大量手工小优化，集腋成裘，形成领先的综合性能。
 
 ![](/public/upload/machine/vllm_arch.jpg)
 
 ## 影响因素
+
+[语言大模型推理加速指南](https://mp.weixin.qq.com/s/B3TD2p_5HKoYkzzupLoUxQ)
+
+### 算法优化
+
+每个周期的generate函数都必须处理逐渐增多的词元，因为每个周期我们都要在上下文中添加新词元。这意味着要从一个由10个词元组成的提示生成100个词元，你需要在模型上运行的不止109个词元，而是10 + 11 + 12 + 13 + ... + 109 = 5950个词元！（初始提示可以并行处理，这也是为什么在推理API中提示词元通常更便宜的原因之一。）同时也意味着，随着生成的进行，模型会越来越慢，因为每个连续的词元生成都有一个越来越长的前缀。
+
+### 系统工程优化
+
+1. 低比特量化，通过是否需要重新训练分为QAT和PTQ，围绕QAT和PTQ也衍生了很多经典算法
+2. 并行计算，大多数模型并行都是应用在分布式训练场景，不过像PaLM inference继承了TP的思想是应用在大规模Transformer推理场景的。
+3. 内存管理，随着KV Cache优化变成一个事实标准，对存储的使用需求越来越大。这里主要提三个系统优化，vLLM使用的pagedAttention优化、SpecInfer提出的tree attention优化和LightLLM采用的更精细的标记级内存管理机制。但这些优化在提高吞吐量的同时会牺牲一部分请求响应延时。
+4. 请求调度，早期的LLM 推理框架只支持request-level的调度，比如像fastertransformer这种，ORCA率先提出了iteration-level的调度系统，结合selective-batching输出了更高效的调度能力。后来continuous batching逐步应用到vLLM、TensorRT-LLM(flight batching)和RayLLM上，也成为了事实标准。
+5. 内核优化，即内核融合、定制attention、采样优化（采样算法的选择会极大地影响LLM的生成质量）、变长序列优化和自动编译优化。
 
 当前的生成式大模型的推理可以分为两个阶段：Context 阶段和 Generation 阶段。Context 阶段是批量计算输入的 Prompt，属于计算密集型。Generation 阶段是逐字生成下一个 Token，属于访存密集型，虽然每一轮 Generation 的计算量小于 Context 阶段，但是访存量相当。大模型推理主要面临三个挑战：输入输出变长、计算规模大、显存占用大，针对这些挑战当前有多种优化手段进行优化：
 1. 服务层面，打破之前的 Batch 只能同时返回结果的限制，允许部分请求结束后插入新的请求。
@@ -49,7 +63,8 @@ keywords: llm inference
 我们应该如何准确衡量模型的推理速度呢？首个词元生成时间（Time To First Token，简称TTFT）；单个输出词元的生成时间；时延：模型为用户生成完整响应所需的总时间；吞吐量：推理服务器在所有用户和请求中每秒可生成的输出词元数。
 以下通用技术可用于优化语言大模型的推理：
 1. 算子融合：将相邻的不同算子合并在一起通常可以获得更短的时延（避免了反复从HBM中读写数据）。
-2. 量化：对激活值和权重进行压缩，以使用更少的比特数。一般来说，所有量化技术的工作原理如下: $Y=X*W$ 变成 $Y=X* dequantize(W); quantize(W)$，当输入向量走过模型计算图时，所有权重矩阵都会依次执行反量化和重量化操作。因此，使用权重量化时，推理时间通常 不会 减少，反而会增加。
+2. 量化。浮点数有不同的大小，这对性能很重要。对于常规软件（例如 JavaScript 数字和 Python 浮点数），我们大多使用64位（双精度）IEEE 754 浮点数。然而，大多数机器学习一直以来都使用的是32位（单精度）IEEE 754。一个70 亿参数的模型在fp64下需要占用56GB，而在fp32下只需28GB。在训练和推理期间，大量的时间都用来将数据从内存搬运到缓存和寄存器，所以搬运的数据越少越好。截至2023年，GPU不支持小于fp16的数据格式，除了int8（8 位整数）。
+    1. 对激活值和权重进行压缩，以使用更少的比特数。一般来说，所有量化技术的工作原理如下: $Y=X*W$ 变成 $Y=X* dequantize(W); quantize(W)$，当输入向量走过模型计算图时，所有权重矩阵都会依次执行反量化和重量化操作。因此，使用权重量化时，推理时间通常 不会 减少，反而会增加。
 3. 压缩：稀疏性或蒸馏。
 4. 并行化：在多个设备间进行张量并行，或者针对较大的模型进行流水线并行。
 
@@ -97,9 +112,6 @@ Memory waste in KV Cache
 
 PS：Transformer （和Attention） layer 已经支持了缓存机制 (use_cache=true)，kvcache 在代码上如何体现可以理解。pageattention 是不是可以理解为：pageattention 初始化了cache，只要把这个cache 引用传给 Transformer （和Attention） forward 函数参数，Transformer 就可以用这个cache 到计算过程中了？
 
-### 调度优化
-
-Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的，将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。
 
 ### Flash Attention
 
@@ -110,187 +122,16 @@ Batching就是将一段时间内到达的用户请求合并到一起，提交到
 
 我们知道显存的带宽相比SRAM要小的多，读一次数据是很费时的，但是SRAM存储又太小，装不下太多数据。所以我们就以SRAM的存储为上限，尽量保证每次加载数据都把SRAM给打满，能合并的计算我们尽量合并在一起，节省数据读取时间。举例来说，我现在要做计算A和计算B。在老方法里，我做完A后得到一个中间结果，写回显存，然后再从显存中把这个结果加载到SRAM，做计算B。但是现在我发现SRAM完全有能力存下我的中间结果，那我就可以把A和B放在一起做了，这样就能节省很多读取时间，我们管这样的操作叫kernel融合。kernel包含对线程结构（grid-block-thread）的定义，以及结构中具体计算逻辑的定义。flash attention将矩阵乘法、mask、softmax、dropout操作合并成一个kernel，做到了只读一次和只写回一次，节省了数据读取时间。
 
-## 模型服务框架
+### 调度优化
 
-1. vLLM是一个开源的大模型推理加速框架，通过PagedAttention高效地管理attention中缓存的张量，实现了比HuggingFace Transformers高14-24倍的吞吐量，就像在操作系统中管理CPU虚拟内存一样
-2. NVIDIA FasterTransformer (FT) 是一个用于实现基于Transformer的神经网络推理的加速引擎。它包含Transformer块的高度优化版本的实现，其中包含编码器和解码器部分。使用此模块，您可以运行编码器-解码器架构模型（如：T5）、仅编码器架构模型（如：BERT）和仅解码器架构模型（如：GPT）的推理。FT框架是用C++/CUDA编写的，依赖于高度优化的 cuBLAS、cuBLASLt 和 cuSPARSELt 库，这使您可以在 GPU 上进行快速的 Transformer 推理。与 NVIDIA TensorRT 等其他编译器相比，FT 的最大特点是它支持以分布式方式进行 Transformer 大模型推理。在底层，节点间或节点内通信依赖于 MPI 、 NVIDIA NCCL、Gloo等。因此，使用FasterTransformer，您可以在多个 GPU 上以张量并行运行大型Transformer，以减少计算延迟。同时，TP 和 PP 可以结合在一起，在多 GPU 节点环境中运行具有数十亿、数万亿个参数的大型 Transformer 模型。
-3. DeepSpeed-MII 是 DeepSpeed 的一个新的开源 Python 库，旨在使模型不仅低延迟和低成本推理，而且还易于访问。
+Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的，将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。
 
-使用大模型时，我们在huggingface或modelscope 看到的代码类似下面，很明显不能直接向用户提供服务。 
-```python
-from transformers import AutoTokenizer, AutoModel
-tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True)
-model = AutoModel.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True).half().cuda()
-model = model.eval()
-response, history = model.chat(tokenizer, "你好", history=[])
-print(response)
-你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。
-response, history = model.chat(tokenizer, "晚上睡不着应该怎么办", history=history)
-print(response)
-晚上睡不着可能会让你感到焦虑或不舒服,但以下是一些可以帮助你入睡的方法:...
-```
+![](/public/upload/machine/iteration_level_batching.jpg)
 
-一般有几个需求
-1. 统一api，这样切换模型时上游应用无感，最好是 OpenAI-compatible，其api 被主要上游框架（比如langchain）兼容
-    1. 支持流式输出和普通输出
-2. 支持多实例，进而支持灰度发布等
-3. 支持通用的加速库比如vllm等
+为了进行批次生成，我们改为一次向模型传递多个序列，在同一前向传递中为每个序列生成一个补全（completion），这需要在左侧或右侧使用填充词元对序列进行填充，使它们达到相同的长度。填充词元（可以是任何词元，我这里使用 `[end]`）在注意力掩码中被屏蔽，以确保它们不会影响生成。
 
-### 简单封装
+但在上面的例子中，请注意 “Mark is quick. He moves quickly.” 在其他序列之前完成，但由于整个批次尚未完成，我们被迫继续为其生成词元（“Random”）。这并不影响准确度，我们只需简单地将生成的序列截断到 `[end]` 词元即可，但这样很浪费资源，因为GPU资源正在用于生成我们即将丢弃的词元。连续批处理通过将新序列插入批次来解决这一问题，插入位置是 `[end]` 词元之后。在 `[end]` 词元之后生成随机词元的代替方案是，在批次的相应行中插入新序列，并使用注意力掩码机制来防止该序列受到上一序列中词元的影响。（实际上，先前的序列充当了额外的填充内容。）
 
-[ChatGLM-6B](https://github.com/THUDM/ChatGLM-6B) 在github 有一个仓库，一般包含
-1. 模型介绍 README.md
-2. 模型的对外接口 api.py/cli_demo.py/web_demo.py。 自己使用 fastapi 基于python库直接对外提供RESTful APIs.
-
-以api.py 为例
-```python
-from fastapi import FastAPI, Request
-from transformers import AutoTokenizer, AutoModel
-import uvicorn, json, datetime
-import torch
-
-app = FastAPI()
-
-@app.post("/")
-async def create_item(request: Request):
-    global model, tokenizer
-    json_post_raw = await request.json()
-    json_post = json.dumps(json_post_raw)
-    json_post_list = json.loads(json_post)
-    prompt = json_post_list.get('prompt')
-    history = json_post_list.get('history')
-    max_length = json_post_list.get('max_length')
-    top_p = json_post_list.get('top_p')
-    temperature = json_post_list.get('temperature')
-    response, history = model.chat(tokenizer,prompt, history=history,
-                                   max_length=max_length if max_length else 2048,
-                                   top_p=top_p if top_p else 0.7,
-                                   temperature=temperature if temperature else 0.95)
-    now = datetime.datetime.now()
-    time = now.strftime("%Y-%m-%d %H:%M:%S")
-    answer = {"response": response,"history": history,"status": 200,"time": time}
-    log = "[" + time + "] " + '", prompt:"' + prompt + '", response:"' + repr(response) + '"'
-    print(log)
-    torch_gc()
-    return answer
-
-if __name__ == '__main__':
-    tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True)
-    model = AutoModel.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True).half().cuda()
-    model.eval()
-    uvicorn.run(app, host='0.0.0.0', port=8000, workers=1)
-```
-
-### FastChat
-
-[一文入门最热的LLM应用开发框架LangChain](https://mp.weixin.qq.com/s/bYzNNL3F0998Do2Jl0PQtw)
-
-FastChat功能覆盖训练，推理，评估的全过程。设计目标非常明确，就是在性能、功能及风格上全面对标OpenAI ChatGPT，以成为ChatGPT的开源平替。在生态集成上，由于它完全兼容OpenAI的风格，基于ChatGPT的langchain应用，可以无缝地使用FastChat替代。 推理侧类似工具Xinference/OpenLLM/RayLLM
-
-[FastChat](https://github.com/lm-sys/FastChat)是一个用于训练、服务和评估基于聊天机器人的大型语言模型的开放平台。The core features include:
-1. The training and evaluation code for state-of-the-art models (e.g., Vicuna).
-2. A distributed multi-model serving system with web UI and OpenAI-compatible RESTful APIs.
-
-
-```sh
-# 命令行方式与llm 交互
-python3 -m fastchat.serve.cli --model-path lmsys/vicuna-7b-v1.3
-# webui方式与llm交互，此时需启动3个组件 web servers ==> controller ==> model workers
-python3 -m fastchat.serve.controller
-python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3
-python3 -m fastchat.serve.gradio_web_server
-# 提供OpenAI-compatible RESTful APIs  openai_api_server ==> controller ==> model workers
-python3 -m fastchat.serve.controller
-python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3
-python3 -m fastchat.serve.openai_api_server --host localhost --port 8000
-```
-
-![](/public/upload/machine/langchain_chatchat_call.jpg)
-
-设计思路
-1. 因为要支持不同的llm 库或加速库，比如Transformer、vllm等，且不同的llm在一些细节上有差异，因此推理侧必须有一个统一的LLM 抽象，在Fastchat里是XXModelWorker，在xinference 里是XXLLM
-2. 将python llm 库 api化，一个api 要有一个api handler 函数，一般抽象为一个对象 作为api handler的载体，这个对象持有上面的XxLLM 执行chat/generate 方法，有时候还要支持/封装分布式、异步等细节。在Fastchat里是ModelWorker，在xinference 里是WorkerActor
-3. 不同的llm 还有很多差别的（比如加载 load_model、运行chat/generate、模型配置转换），也有很多共性，所以模型设计的分层抽象很重要，Fastchat 的思路是 提供了一个ModelAdapter（主要差异化了加载） 和一个 generate_stream_gate 函数成员（差异化text生成），inference的思路是一个模型（比如chatglm、llama等）一个XXLLM
-  1. 这里的模型配置转换说的是，比如一个chat message 包含role 和content 两个部分，role=system/user/assistant 各家各有差异，但因为对外提供的接口一般是openai 风格，所以有一个转换的过程。
-4. 除了文本生成模型，还经常需要部署embedding模型、rerank模型、图生图、文生图等（入参出参与LLM 肯定不一样了），Fastchat 的方式是 让ModelWorker支持除了generate_stream_xx 外的get_embeddings、get_rerank方法，inference的思路除了LLM之外还定义了 EmbeddingModel、RerankModel等。
-
-### FastChat源码分析
-
-使用ModelWorker 加载model 提供http 接口 
-
-```python
-app = FastAPI()
-@app.post("/worker_generate")
-async def api_generate(request: Request):
-    params = await request.json()
-    await acquire_worker_semaphore()
-    output = worker.generate_gate(params)
-    release_worker_semaphore()
-    return JSONResponse(output)
-if __name__ == "__main__":
-    ...
-    worker = ModelWorker(...,args.model_path,)
-    uvicorn.run(app, host=args.host, port=args.port, log_level="info")
-```
-ModelWorker实现
-```python
-BaseModelWorker
-     init_heart_beat
-         # 将modelWorker id注册到controller，并保持心跳。均通过http接口
-
-# 加载模型，调用模型（底层都是调用流式接口）
-ModelWorker
-     def __init__():
-          self.model, self.tokenizer = load_model(model_path, device=device,...)
-            # load_model 对应一个专门的 ModelAdapter 抽象，用来适配模型的加载
-            adapter = get_model_adapter(model_path)
-            model, tokenizer = adapter.load_model(model_path, kwargs)
-     generate_stream_gate(self, params) 
-     generate_gate(self, params)    # 根据参数返回输出，调用generate_stream_gate
-        for x in self.generate_stream_gate(params):
-            pass
-        return json.loads(x[:-1].decode())
-```
-api => ModelWorker.generate_gate ==> ModelWorker.generate_stream_gate ==> ModelWorker.model.stream_generate
-```python
-generate_stream_gate
-    get_generate_stream_function(model: torch.nn.Module, model_path: str)
-       # 根据模型不同选择对应的函数 
-       generate_stream_chatglm
-            prompt = params["prompt"]
-            inputs = tokenizer([prompt], return_tensors="pt").to(model.device)
-            for total_ids in model.stream_generate(**inputs, **gen_kwargs):
-                  response = tokenizer.decode(output_ids)
-                  response = process_response(response)
-```
-
-
-### FastChat, How to support a new model?
-
-1. FastChat uses the Conversation class to handle prompt templates and BaseModelAdapter class to handle model loading.
-2. Implement a conversation template for the new model at `fastchat/conversation.py`. You can follow existing examples and use register_conv_template to add a new one. Please also add a link to the official reference code if possible. PS： 毕竟fastcaht 服务chat 场景嘛，对话请求传入的时候 一般是 `prompt = "\n###user:天为什么这么蓝？\n###"`，要把这个还原为 `history = [{"role": "user", "content": "天为什么这么蓝？"}]`，不同的模型 对role的称呼不同。
-3. Implement a model adapter for the new model at `fastchat/model/model_adapter.py`. You can follow existing examples and use register_model_adapter to add a new one. PS：不同的模型加载时有一些特定的参数，比如 chatglm 的trust_remote_code 参数，`model = AutoModel.from_pretrained(model_path, trust_remote_code=True, **from_pretrained_kwargs)`
-4. ModelWorker 主要逻辑是执行 `generate_stream(model,tokenizer,params)` ，很常规的 `input_ids = tokenizer(prompt); output_ids = model(input_ids,xx)`。 如果模型的generate 逻辑有一些特别的处理，则需要自定义generate_stream_xx，并加入get_generate_stream_function 逻辑（根据模型名等 路由到不同的generate_stream_xx）
-5. (Optional) add the model name to the "Supported models" section above and add more information in `fastchat/model/model_registry.py.`
-
-如何理解FastChat 都干了什么？本质是对下面的 原始的大模型推理代码进行抽象（模型加载、模型推理=tokenizer+model）和封装，对外提供rest api。
-
-```python
-from transformers import AutoTokenizer, AutoModel
-tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True)
-model = AutoModel.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True).half().cuda()
-model = model.eval()
-response, history = model.chat(tokenizer, "你好", history=[])
-print(response)
-你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。
-response, history = model.chat(tokenizer, "晚上睡不着应该怎么办", history=history)
-print(response)
-晚上睡不着可能会让你感到焦虑或不舒服,但以下是一些可以帮助你入睡的方法:...
-```
-
-### vllm 源码分析
-
-[vLLM代码及逻辑介绍](https://zhuanlan.zhihu.com/p/675322419)
 
 ## 一些材料
 

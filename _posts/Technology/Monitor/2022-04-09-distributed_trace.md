@@ -53,6 +53,8 @@ Span 的数据结构应该足够简单，以便于能放在日志或者网络协
 
 [链路追踪（Tracing）其实很简单：请求轨迹回溯与多维链路筛选](https://mp.weixin.qq.com/s/n27ozW8pQi6OxXc4GaIftw) 未读
 
+[初探分布式链路追踪](https://mp.weixin.qq.com/s/0l-y-24UT3AB98H_1jhFHQ) 未读。
+
 ## 其它
 
 
