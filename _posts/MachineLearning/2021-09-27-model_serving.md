@@ -220,6 +220,8 @@ spec:
 
 [CPU 推理优化](https://mp.weixin.qq.com/s/LQ6xjHqv0YYDRXtQTB5qPw)  直接使用 TensorFlow 提供的 C++ 接口调用 Session::Run，无法实现多 Session 并发处理 Request，导致单 Session 无法实现 CPU 的有效利用。如果通过多 Instance 方式（多进程），无法共享底层的 Variable，导致大量使用内存，并且每个 Instance 各自加载一遍模型，严重影响资源的使用率和模型加载效率。为了提高 CPU 使用率，也尝试多组 Session Intra/Inter，均会导致 latency升高，服务可用性降低。
 
+[小红书推搜场景下如何优化机器学习异构硬件推理突破算力瓶颈！](https://mp.weixin.qq.com/s/tqHBSRV0fYB9BRBXqLyNEg) 罗列的比较详细。
+
 ## 调优
 
 算法工程师视角

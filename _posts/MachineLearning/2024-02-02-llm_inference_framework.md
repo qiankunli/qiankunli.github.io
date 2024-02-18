@@ -212,9 +212,20 @@ print(response)
 
 ## vllm 源码分析
 
-[vLLM代码及逻辑介绍](https://zhuanlan.zhihu.com/p/675322419)
+[vLLM代码及逻辑介绍](https://zhuanlan.zhihu.com/p/675322419) 值得细读。
 
 [如何让vLLM适配一个新模型](https://zhuanlan.zhihu.com/p/680636375)
+
+[vLLM（二）架构概览](https://zhuanlan.zhihu.com/p/681716326)
+
+## TensorRT-LLM
+
+[大语言模型推理提速：TensorRT-LLM 高性能推理实践](https://mp.weixin.qq.com/s/jnQs5XhWeAqoitahmDhziQ)TensorRT-LLM 主要利用以下四项优化技术提升 LLM 模型推理效率。
+1. 量化
+2. In-Flight Batching
+3. Attention，Attention 机制按照演进顺序可以分为 MHA（Multi-head Attention）、MQA（Multi-query Attention）以及 GQA（Group-query Attention）机制。MQA 和 GQA 都是 MHA 的变种。MHA 是标准的多头注意力机制，每个 query 存储一份 KV，因此需要使用较多的显存。MQA 所有 query 共享一份 KV，推理时容易丢失一些细节信息。GQA 将 query 进行分组，组内共享一份 KV，可以有效避免 MHA 和 MQA 的问题。
+    ![](/public/upload/machine/attention_iteration.jpg)
+4. Graph Rewriting，TensorRT-LLM提供了一组 Python API 用于定义 LLMs，并且使用最新的优化技术将 LLM 模型转换为 TensorRT Engines，在将 LLM 模型编译为 TensorRT Engines 时会对神经网络进行优化，推理时直接使用优化后的 TensorRT Engines。
 
 
 

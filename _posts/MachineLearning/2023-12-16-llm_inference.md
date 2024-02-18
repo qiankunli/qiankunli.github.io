@@ -47,11 +47,21 @@ keywords: llm inference
 
 ### 系统工程优化
 
+分类方式1
 1. 低比特量化，通过是否需要重新训练分为QAT和PTQ，围绕QAT和PTQ也衍生了很多经典算法
 2. 并行计算，大多数模型并行都是应用在分布式训练场景，不过像PaLM inference继承了TP的思想是应用在大规模Transformer推理场景的。
 3. 内存管理，随着KV Cache优化变成一个事实标准，对存储的使用需求越来越大。这里主要提三个系统优化，vLLM使用的pagedAttention优化、SpecInfer提出的tree attention优化和LightLLM采用的更精细的标记级内存管理机制。但这些优化在提高吞吐量的同时会牺牲一部分请求响应延时。
 4. 请求调度，早期的LLM 推理框架只支持request-level的调度，比如像fastertransformer这种，ORCA率先提出了iteration-level的调度系统，结合selective-batching输出了更高效的调度能力。后来continuous batching逐步应用到vLLM、TensorRT-LLM(flight batching)和RayLLM上，也成为了事实标准。
 5. 内核优化，即内核融合、定制attention、采样优化（采样算法的选择会极大地影响LLM的生成质量）、变长序列优化和自动编译优化。
+
+[整理一下最近学习进度](https://zhuanlan.zhihu.com/p/680314529)分类方式2 
+1. 单request单次推理中的算子级优化问题，如算子融合、算子加速、FlashAttention、FlashDecoder
+2. 多request多用户推理服务系统中的优化问题，目前来说比较有代表性的工作就是continuing batch等工作。
+3. 当模型大到一块卡甚至一台机器放不下的情况，包括模型放得下但是多请求服务系统中形成的规模放不下的情况，都会涉及到分布式系统和分布并行方法来帮忙解决其中的瓶颈。包括并行机制、分布调度、通信优化、容错优化等等方面。
+4. 改进推理算法类的工作：比如在推理时不再是一个词一个词蹦，可能一次多出来几个词作为候选的投机推理方法，比较有名如SpecInfer等工作；还有改变自回归机制的方法。不过这些方法大体上都需要训练配合。还有就是新的循环结构，如RWKV等。
+5. 模型小型化的工作：这里又会细分为小模型设计、模型稀疏化、模型剪枝、量化推理、蒸馏等方面。
+6. 专用硬件加速器：从我的感受看现在GPU上因为高速缓存的访存速度非常快，所以目前的优化瓶颈都在如何把计算算力利用好，同时相比Attention部分，MLP已经在生态中被优化了好多年了，Attention部分的优化，包括KVCache结合部分，才是真正的瓶颈。同时新的硬件研发也会结合这块的技术特点。
+7. 高效有效的解码算法和探索替代基础架构​​​​：现在主要的问题还是除了decoder这个结构之外其他的结构算法效果都不太好，但是其实不排除啥时候出现新的结构，怕就是突然的变化让现在基于decoder结构优化的方法存在一定的时效。
 
 当前的生成式大模型的推理可以分为两个阶段：Context 阶段和 Generation 阶段。Context 阶段是批量计算输入的 Prompt，属于计算密集型。Generation 阶段是逐字生成下一个 Token，属于访存密集型，虽然每一轮 Generation 的计算量小于 Context 阶段，但是访存量相当。大模型推理主要面临三个挑战：输入输出变长、计算规模大、显存占用大，针对这些挑战当前有多种优化手段进行优化：
 1. 服务层面，打破之前的 Batch 只能同时返回结果的限制，允许部分请求结束后插入新的请求。
@@ -112,15 +122,19 @@ Memory waste in KV Cache
 
 PS：Transformer （和Attention） layer 已经支持了缓存机制 (use_cache=true)，kvcache 在代码上如何体现可以理解。pageattention 是不是可以理解为：pageattention 初始化了cache，只要把这个cache 引用传给 Transformer （和Attention） forward 函数参数，Transformer 就可以用这个cache 到计算过程中了？
 
+[图解大模型推理优化：KV Cache](https://mp.weixin.qq.com/s/7Lx26Pv1Pdf8uI3pakQZxg)
+
 
 ### Flash Attention
 
-[图解大模型计算加速系列：Flash Attention V1，从硬件到计算逻辑](https://mp.weixin.qq.com/s/J2i2MDv4us_GMwCyku0tnw)
+[图解大模型计算加速系列：Flash Attention V1，从硬件到计算逻辑](https://mp.weixin.qq.com/s/J2i2MDv4us_GMwCyku0tnw)在矩阵分块的时候设计好一个能够充分利用高速访存HBM的分块方法，让一次搬运进HBM中的参数可以全部和该做乘加操作的算子都计算完再丢弃，达到数量单次访存利用率最大化。
 1. Fast（with IO-Awareness），计算快。它发现：计算慢的卡点不在运算能力，而是在读写速度上。所以它通过**降低对显存（HBM）的访问次数**来加快整体运算速度（通过分块计算（tiling）和核函数融合（kernel fusion）来降低对显存的访问），这种方法又被称为IO-Awareness。
 2. Memory Efficicent，节省显存。在标准attention场景中，forward时我们会计算并保存N*N大小的注意力矩阵；在backward时我们又会读取它做梯度计算，这就给硬件造成了的存储压力。在Flash Attention中，则巧妙避开了这点，使得存储压力降至。在后文中我们会详细看这个trick。
 3. Exact Attention，精准注意力。
 
 我们知道显存的带宽相比SRAM要小的多，读一次数据是很费时的，但是SRAM存储又太小，装不下太多数据。所以我们就以SRAM的存储为上限，尽量保证每次加载数据都把SRAM给打满，能合并的计算我们尽量合并在一起，节省数据读取时间。举例来说，我现在要做计算A和计算B。在老方法里，我做完A后得到一个中间结果，写回显存，然后再从显存中把这个结果加载到SRAM，做计算B。但是现在我发现SRAM完全有能力存下我的中间结果，那我就可以把A和B放在一起做了，这样就能节省很多读取时间，我们管这样的操作叫kernel融合。kernel包含对线程结构（grid-block-thread）的定义，以及结构中具体计算逻辑的定义。flash attention将矩阵乘法、mask、softmax、dropout操作合并成一个kernel，做到了只读一次和只写回一次，节省了数据读取时间。
+
+[图解大模型计算加速系列：Flash Attention V2，从原理到并行计算](https://mp.weixin.qq.com/s/gMRZV-ZCrFccKPKSkOpxsQ) 未读。
 
 ### 调度优化
 
@@ -132,6 +146,20 @@ Batching就是将一段时间内到达的用户请求合并到一起，提交到
 
 但在上面的例子中，请注意 “Mark is quick. He moves quickly.” 在其他序列之前完成，但由于整个批次尚未完成，我们被迫继续为其生成词元（“Random”）。这并不影响准确度，我们只需简单地将生成的序列截断到 `[end]` 词元即可，但这样很浪费资源，因为GPU资源正在用于生成我们即将丢弃的词元。连续批处理通过将新序列插入批次来解决这一问题，插入位置是 `[end]` 词元之后。在 `[end]` 词元之后生成随机词元的代替方案是，在批次的相应行中插入新序列，并使用注意力掩码机制来防止该序列受到上一序列中词元的影响。（实际上，先前的序列充当了额外的填充内容。）
 
+[vLLM（二）架构概览](https://zhuanlan.zhihu.com/p/681716326)vllm Scheduler 使用 iterative-level 策略对请求进行调度（选择要被处理的请求），被调度的请求在生成一个 token 后会被重新调度。得益于 itertive-level 策略，vLLM 能够在每一轮新的迭代时选择不固定数量的请求进行处理（即 batch size 每次都不一定相同），因此它能够尽可能多地处理请求。
+
+请求的处理通常分为两个阶段，第一个阶段对 prompt 进行处理（也被称为填充阶段，后文使用填充阶段表示这一个阶段），生成 prompt KV cache 的同时生成第一个 token，第二个阶段是生成阶段，不断预测下一个 token。目前对 iterative-level 的实现有两种方式，一种是区分填充阶段和生成阶段，另一种是不区分这两个阶段。vLLM 采用的 iterative-level 策略是区分两个阶段的（https://github.com/vllm-project/vllm/pull/658），即同一批被调度的请求要么都处于填充阶段，要么都处于生成阶段，Scheduler 中有 3 个队列，waiting（接受到的新请求会先放入 waiting 队列）、running（被调度的请求）和 swapped 队列（swapped 队列用于存放被抢占的请求，即当请求处于生成阶段时，但由于空间的不足，需暂时将 running 队列中优先级低的请求移到 swapped 队列）。在调度时，Scheduler 会按照先到先处理（first come first served）的原则从 waiting 队列中选择请求放入 running 队列，此外，Scheduler 的另一个核心组件是 BlockSpaceManager，它主要负责块表的维护。
+
+![](/public/upload/machine/vllm_overview.jpg)
+
+假设 vLLM 接收到 3 个请求（记为 s0, s1, s2）并放入 waiting 队列中，它们的 prompt 分别为 "Hello, my name is"、"The future of AI is" 和 "The life is"。接下来开始 vLLM 的调度和处理。
+1. vLLM 的第一轮处理，假设 vLLM 在这一轮只能调度两个请求进行处理，那么根据先到先处理的原则，会从 waiting 队列中选择 s0 ("Hello, my name is") 和 s1 ("The future of AI is") 放入到 running 队列。对于 s0，Worker 生成的 token 为 Dustin，对于 s1，Worker 生成的 token 为 bright。同时，Worker 会将计算过程产生的 KV 值存储在 KV cache 中
+    ![](/public/upload/machine/vllm_scheduler_1.jpg)
+2. vLLM 的第二轮处理，由于 waiting 队列中还有一个请求 s2（The life is)，因此，vLLM 在第二轮只会处理这一个请求，因为前面提到，vLLM 只会处理要么都是填充阶段的请求，要么都是生成阶段的请求。
+    ![](/public/upload/machine/vllm_scheduler_2.jpg)
+3. vLLM 的第三轮处理，waiting 队列中没有要处理的新请求，所以会从 running 队列中选择此轮要处理的请求（这些请求均处于生成阶段）。但由于没有多余的空间，vLLM 只会选择 s0 和 s1 进行处理。经过多轮调度和推理，最终完成 3 个请求的处理，以上就是 vLLM 的工作流。
+
+[让LLM推理加速的batching是什么技术（in-flight batching）](https://zhuanlan.zhihu.com/p/679723881)
 
 ## 一些材料
 
@@ -187,6 +215,8 @@ GPU编程基础：在执行model.generate(prompt)时，我们进行以下操作�
 
 [大模型的好伙伴，浅析推理加速引擎FasterTransformer](https://mp.weixin.qq.com/s/Gkf_zIYWs4u7AJrJLDVq_Q) 未细读
 FasterTransformer 是真对于 Transofrmer 类型模型（也包括 encoder-only、decoder-only）的推理加速方案，其提供了 Kernel Fuse、Memory reuse、kv cache、量化等多种优化方案，同时也提供了 Tensor Parallel 和 Pipeline Parallel 两种分布式推理方案。
+
+[​揭秘NVIDIA大模型推理框架：TensorRT-LLM](https://mp.weixin.qq.com/s/xv3gBjmejoxJEpvFoeUXOg)
 
 ### 分布式推理
 

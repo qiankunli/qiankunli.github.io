@@ -47,6 +47,9 @@ ML的迭代属性意味着， 如果没有完备的自动更新流程，想要�
 |CI/CD|将代码部署至生产环境|将数据处理管道部署至生产环境|部署代码及训练管道至生产环境|
 |监控|SLO|SLO|SLO<br>异常监控<br>统计监控|
 
+当我们在说云原生AI的时候，我们在说什么？
+![](/public/upload/machine/ai_cloud_native.jpg)
+
 ## 业界实践
 
 [2022年8个好用的MLOps工具和平台](https://mp.weixin.qq.com/s/IdJqiXSl4vcsN3etWdWrig) 未读
