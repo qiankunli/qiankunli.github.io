@@ -107,6 +107,98 @@ C语言的动态内存分配基本函数是 malloc()，在 Linux 上的实现是
 
 ## 语言/运行时
 
+[聊聊C语言中的malloc申请内存的内部原理](https://mp.weixin.qq.com/s/7ZyCXUABL0Urso4VeaEdBQ)操作系统为应为应用层提供了 mmap、brk 等系统调用来申请内存。但是这些系统调用在很多的时候，我们并不会直接使用。原因有以下两个
+1. 系统调用管理的内存粒度太大。系统调用申请内存都是整页 4KB 起，但是我们平时编程的时候经常需要申请几十字节的小对象。如果使用 mmap 未免碎片率也太大了。
+2. 频繁的系统调用的开销比较大。和函数调用比起来，系统的调用的开销非常的大。如果每次申请内存都发起系统调用，那么我们的应用程序将慢如牛。
+所以，现代编程语言的做法都是自己在应用层实现了一个内存分配器。其思想都和内核自己用的 SLAB 内存分配器类似。都是内存分配器预先向操作系统申请一些内存，然后自己构造一个内存池。当我们申请内存的时候，直接由分配器从预先申请好的内存池里申请。当我们释放内存的时候，分配器会将这些内存管理起来，并通过一些策略来判断是否将其回收给操作系统。通过这种方式既灵活地管理了各种不同大小的小对象，也避免了用户频率地调用 mmap 系统调用所造成的开销。常见的内存分配器有 glibc 中的 ptmalloc、Google 的 tcmalloc、Facebook 的 jemalloc 等等。我们在学校里学习 C 语言时候使用的 malloc 函数的底层就是 glibc 的 ptmalloc 内存分配器实现的。
+
+### ptmalloc
+
+在 ptmalloc 中，使用分配区 arena 管理从操作系统中批量申请来的内存。之所以要有多个分配区，原因是多线程在操作一个分配区的时候需要加锁。在线程比较多的时候，在锁上浪费的开销会比较多。为了降低锁开销，ptmalloc 支持多个分配区。这样在单个分配区上锁的竞争开销就会小很多（但但是有，毕竟不是一个线程一个分配区）。
+
+```c
+//file:malloc/malloc.c
+static struct malloc_state main_arena;
+//file:malloc/malloc.c
+struct malloc_state {
+ // 锁，用来解决在多线程分配时的竞争问题
+ mutex_t mutex;
+ // 分配区下管理内存的各种数据结构
+ ...
+ /* Linked list 通过这个指针，ptmalloc 把所有的分配区都以一个链表组织了起来，方便后面的遍历。*/ 
+ struct malloc_state *next;
+}
+```
+![](/public/upload/basic/ptmalloc_arena.jpg)
+内存块 chunk，在每个 arena 中，最基本的内存分配的单位是 malloc_chunk，我们简称 chunk。它包含 header 和 body 两部分。
+
+```c
+// file:malloc/malloc.c
+struct malloc_chunk {
+ INTERNAL_SIZE_T      prev_size;  /* Size of previous chunk (if free).  */
+ INTERNAL_SIZE_T      size;       /* Size in bytes, including overhead. */
+
+ struct malloc_chunk* fd;         /* double links -- used only if free. */
+ struct malloc_chunk* bk;
+
+ /* Only used for large blocks: pointer to next larger size.  */
+ struct malloc_chunk* fd_nextsize; /* double links -- used only if free. */
+ struct malloc_chunk* bk_nextsize;
+};
+```
+![](/public/upload/basic/ptmalloc_chunk.jpg)
+
+我们在开发中每次调用 malloc 申请内存的时候，分配器都会给我们分配一个大小合适的 chunk 出来，**把 body 部分的 user data 的地址返回给我们**。这样我们就可以向该地址写入和读取数据了。如果我们在开发中调用 free 释放内存的话，其对应的 chunk 对象其实并不会归还给内核。而是由 glibc 又组织管理了起来。其 body 部分的 fd、bk 字段分别是指向上一个和下一个空闲的 chunk（ chunk 在使用的时候是没有这两个字段的，这块内存在不同场景下的用途不同），用来当双向链表指针来使用。
+
+![](/public/upload/basic/ptmalloc_chunk_body.jpg)
+
+glibc 会将相似大小的空闲内存块 chunk 都串起来。这样等下次用户再来分配的时候，先找到链表，然后就可以从链表中取下一个元素快速分配。这样的一个链表被称为一个 bin。ptmalloc 中根据管理的内存块的大小，总共有 fastbins、smallbins、largebins 和 unsortedbins 四类。
+
+这四类 bins 分别定义在 struct malloc_state 的不同成员里。
+```c
+//file:malloc/malloc.c
+struct malloc_state {
+ /* Fastbins */
+ mfastbinptr      fastbins[NFASTBINS]; // 管理尺寸最小空闲内存块的链表。其管理的内存块的最大大小是 MAX_FAST_SIZE。
+ /* Base of the topmost chunk -- not otherwise kept in a bin */
+ mchunkptr        top;  // 当所有的空闲链表中都申请不到合适的大小的时候，会来这里申请。
+ /* The remainder from the most recent split of a small request */
+ mchunkptr        last_remainder;
+ /* Normal bins packed as described above */
+ mchunkptr        bins[NBINS * 2];  // 管理空闲内存块的主要链表数组。NBINS 的大小是 128，所以这里总共有 256 个空闲链表。smallbins、largebins 和 unsortedbins 都使用的是这个数组。
+ /* Bitmap of bins */
+ unsigned int     binmap[BINMAPSIZE];
+}
+```
+
+![](/public/upload/basic/ptmalloc_fastbins.jpg)
+
+![](/public/upload/basic/ptmalloc_smallbins.jpg)
+
+malloc 的工作过程：，当用户要分配内存的时候，malloc 函数就可以根据其大小，从合适的 bins 中查找合适的 chunk。当用户用完需要释放的时候，glibc 再根据其内存块大小，放到合适的 bin 下管理起来。下次再给用户申请时备用。另外还有就是为 ptmalloc 管理的 chunk 可能会发生拆分或者合并。当需要申请小内存块，但是没有大小合适的时候，会将大的 chunk 拆成多个小 chunk。如果申请大内存块的时候，而系统中又存在大量的小 chunk 的时候，又会发生合并，以降低碎片率。
+
+```c
+//file:malloc/malloc.c
+Void_t* public_mALLOc(size_t bytes){
+ // 选一个分配区 arena 出来，并为其加锁
+ arena_lookup(ar_ptr);
+ arena_lock(ar_ptr, bytes);
+
+ // 从分配区申请内存
+ victim = _int_malloc(ar_ptr, bytes);
+
+ // 如果选中的分配区没有申请成功，则换一个分配区申请
+ ......
+
+ // 释放锁并返回
+ mutex_unlock(&ar_ptr->mutex);
+ return victim;
+}
+```
+
+
+### 堆栈
+
 进程在推进运行的过程中会调用一些数据，可能中间会产生一些数据保留在堆栈段，栈空间 一般在编译时确定（**在编译器和操作系统的配合下，栈里的内存可以实现自动管理**）， 堆空间 运行时动态管理。对于堆具体的说，由runtime 在启动时 向操作 系统申请 一大块内存，然后根据 自定义策略进行分配与回收（手动、自动，分代不分代等），必要时向操作系统申请内存扩容。
 
 从堆还是栈上分配内存？如果你使用的是静态类型语言，那么，不使用 new 关键字分配的对象大都是在栈中的，通过 new 或者 malloc 关键字分配的对象则是在堆中的。对于动态类型语言，无论是否使用 new 关键字，内存都是从堆中分配的。

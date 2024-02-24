@@ -273,6 +273,16 @@ print('\n\nTest Loss {}, Test Accuracy {}'.format(test_loss, test_accuracy)
 
 [推荐模型离线评测效果好，线上效果却不佳的原因](https://mp.weixin.qq.com/s/zXvZdMFS-BnoNMgEXqLQTw)
 
+## 推荐 
+
+[大模型实现生成式推荐系统](https://mp.weixin.qq.com/s/eijfbK744c4TqvsGlBJuDA)
+
+[LLM在电商推荐系统的探索与实践](https://mp.weixin.qq.com/s/QFV1kJ6ElGyvHK4mXLJNxg) 值得细读
+
+[华为：大语言模型在推荐系统的实践应用](https://zhuanlan.zhihu.com/p/674032466)聚焦在两块，一是如何用语言模型来丰富用户特征的表征，二是如何用语言模型来丰富物品特征的表征。
+
+[谈一谈LLM在推荐域的一些理解](https://mp.weixin.qq.com/s/9f87dKcFNfGm6Q-jJNdJEw)
+
 ## 其它
 
 [推荐系统中比模型结构更重要的是什么？](https://mp.weixin.qq.com/s/I1ylBlPfqrToezs2Ml-Dtw) 未读。
@@ -283,10 +293,4 @@ print('\n\nTest Loss {}, Test Accuracy {}'.format(test_loss, test_accuracy)
 
 ![](/public/upload/machine/deep_recsys_practise.png)
 
-[谈一谈LLM在推荐域的一些理解](https://mp.weixin.qq.com/s/9f87dKcFNfGm6Q-jJNdJEw)
-
 [推荐系统范式之争，LLM vs. ID？](https://mp.weixin.qq.com/s/7pQ891pnp_BM7qH7ROiWwg)
-
-[大模型实现生成式推荐系统](https://mp.weixin.qq.com/s/eijfbK744c4TqvsGlBJuDA)
-
-[LLM在电商推荐系统的探索与实践](https://mp.weixin.qq.com/s/QFV1kJ6ElGyvHK4mXLJNxg) 值得细读

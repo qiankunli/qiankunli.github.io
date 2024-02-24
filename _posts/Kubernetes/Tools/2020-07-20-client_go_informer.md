@@ -338,9 +338,41 @@ func (p *processorListener) run() {
 
 如果想自定义控制器非常简单，我们直接注册handler就行。但是绝大部分k8s原生控制器中，handler并没有直接处理。而是统一遵守一套：add/update/del -> queue -> run -> runWorker -> syncHandler 处理的模式。有几个好处
 1. chan的功能过于单一，无法满足各类场景的需求，workqueue除了一个缓冲机制外，还有错误重试、限速等机制。
-2. 利用了Indexer本地缓存机制，queue里面只包括 key就行。数据indexer里有
+2. 利用了Indexer本地缓存机制，queue里面只包括 key就行，数据indexer里有
+
+![](/public/upload/kubernetes/workqueue.jpg)
 
 [Kubernetes之controller-runtime事件再处理](https://mp.weixin.qq.com/s/NTRog9zrSv3en9MV5_nJuQ) 值得细读一下。
+
+workqueue 中内置了三种队列模型
+1. Interface，实现了基本的先进先出队列, 跟常规队列相比多了去重功能。为什么队列需要去重功能?当一个资源对象被频繁变更, 然而同一个对象还未被消费, 没必要在在队列中存多份, 经过去重后只需要处理一次即可。
+2. DelayingInterface，在 Interface 的基础上, 实现了延迟队里功能。为什么需要 delay 延迟入队功能 ?有些 k8s controller 是需要延迟队列功能的, 比如像 cronjob 依赖延迟队列实现定时功能. 另外也可以实现延迟 backoff 时长后重入队.
+3. RateLimitingInterface，在 DelayingInterface 的基础上, 实现了 RateLimiter 限频器功能. 当插入元素的次数超过限频器规则时, 则把对象推到延迟队列中处理.
+
+```go
+type Interface interface {
+    Add(item interface{}) // 添加元素
+    Len() int // 获取队列的长度, queue 字段的长度
+    Get() (item interface{}, shutdown bool) // 从队列中获取元素
+    Done(item interface{}) // 标记元素执行完毕
+    ShutDown()  // 关闭
+    ShuttingDown() bool  // 是否关闭
+}
+type Type struct {
+    // 使用 slice 切片存放元素, 顺序为 fifo 模式, 写为 append 追加, 读则从头部获取.
+    queue []t
+    // 使用一个 set 集合做去重操作, 避免未消费的队列中相同的元素. 
+    dirty set
+    // 也是个 set 集合, 其目的是避免相同的元素被并发执行, 有了 processing 后, 当某个元素正在执行, 另一个生产者只能把元素放到 dirty 集合里做去重, 等待上一个元素干完了后, 这个元素才会重写入 dirty 里.  为什么不放到 queue slice 里, 因为放 queue slice 里, 并发消费场景下, 同一个元素会被多个协程并发处理. 
+    processing set
+    // 条件变量, 用来唤醒等待元素的协程
+    cond *sync.Cond
+    // 用来统计指标
+    metrics queueMetrics
+}
+```
+
+delayingQueue 的代码逻辑还是很清晰的. 首先使用数据结构小顶堆 minheap 来排列定时任务（使用readyAt作为大小依据）. 当添加定时任务时, 把该任务扔到一个 chan 里, 然后由一个独立的协程监听该 chan, 把任务扔到 heap 中, 该独立协程会从堆里找到最近到期的任务, 并对该任务的进行到期监听, 当定时后期后, 会把到期的定时任务添加到 queue 队列中.
 
 待确认：一个workqueue内只有一个类型的crd。
 

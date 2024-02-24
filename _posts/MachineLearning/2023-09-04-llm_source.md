@@ -21,6 +21,7 @@ keywords: llm source
 
 ![](/public/upload/machine/transformers_overview.png)
 
+
 ### pipelines
 
 开箱即用的 pipelines，它封装了预训练模型和对应的前处理和后处理环节。
@@ -91,6 +92,7 @@ inputs = tokenizer(["来到美丽的大自然，我们发现"], return_tensors="
 
 gen_kwargs = {"max_length": 128, "top_p": 0.8, "temperature": 0.8, "do_sample": True, "repetition_penalty": 1.1}
 output = model.generate(**inputs, **gen_kwargs)
+# decode the new tokens
 output = tokenizer.decode(output[0].tolist(), skip_special_tokens=True)
 print(output)
 ```
@@ -416,7 +418,11 @@ def generate(self,
 
 [以LLAMA为例，快速入门LLM的推理过程](https://mp.weixin.qq.com/s/5lbrqbqiHPZIARsVW6l6tA) 建议细读。
 
-[一网打尽文本生成策略（beam search/top-k/top-p/温度系数）](https://zhuanlan.zhihu.com/p/676398366)假设我们输入 “I am a”，GPT会对这个序列进行编码得到embedding，并预测下一个单词的概率。“I am a”作为输入，编码后也会得到三个token对应的embedding。GPT会使用输入序列最后一个token对应的embedding做预测，也就是说，”a”经过编码后的embedding会被映射到整个词表上，得到下一个单词的概率。因为GPT是使用masked attention的，每个token在编码时都只会和他前面的token交互。那么最后一个token自然就包括了当前序列的所有信息，因此用于预测下一个token是最合理的。当得到了整个词表中的单词作为下一个token的概率之后，GPT是选择概率最大（贪心）的那个作为输出吗？显然不是的。因为使用这样的策略，对于相同的输入GPT每次都会给出一样的回答（推理模式下所有参数都固定，不存在随机性）。而理解GPT回答的多样性就需要介绍一些生成策略了。
+[一网打尽文本生成策略（beam search/top-k/top-p/温度系数）](https://zhuanlan.zhihu.com/p/676398366)假设我们输入 “I am a”，GPT会对这个序列进行编码得到embedding，并预测下一个单词的概率。“I am a”作为输入，编码后也会得到三个token对应的embedding。GPT会使用输入序列最后一个token对应的embedding做预测，也就是说，”a”经过编码后的embedding会被映射到整个词表上，得到下一个单词的概率。因为GPT是使用masked attention的，每个token在编码时都只会和他前面的token交互。**那么最后一个token自然就包括了当前序列的所有信息，因此用于预测下一个token是最合理的**。
+
+![](/public/upload/machine/llm_last_token.jpg)
+
+当得到了整个词表中的单词作为下一个token的概率之后，GPT是选择概率最大（贪心）的那个作为输出吗？显然不是的。因为使用这样的策略，对于相同的输入GPT每次都会给出一样的回答（推理模式下所有参数都固定，不存在随机性）。而理解GPT回答的多样性就需要介绍一些生成策略了。
 1. Beam search，当输入为“I am a”, 设置num_beams=2，beam search的过程可表达为：假设A,B,C对应的概率分别为0.5,0.2,0.3。那么此时选择每个token并组成序列的概率分别为：
     ```
     “I am a A”: 0.5
@@ -524,6 +530,10 @@ for epoch in range(num_epochs):
 3. Model is a valid PyTorch model with some additional restrictions and naming conventions introduced by the transformers framework. 
 4. Neural networks are not able to work with raw text; they only understand numbers. We need a tokenizer to convert a text string into a list of numbers. But first, it breaks the string up into individual tokens, which most often means “words”, although some models can use word parts or even individual characters. Tokenization is a classical natural language processing task. Once the text is broken into tokens, each token is replaced by an integer number called encoding from a fixed dictionary. Note that a tokenizer, and especially its dictionary, is model-dependent: you cannot use Bert tokenizer with GPT-2, at least not unless you train the model from scratch. Some models, especially of the Bert family, like to use special tokens, such as `[PAD]`,`[CLS]`, `[SEP]`, etc. GPT-2, in contrast, uses them very sparingly.
 
+![](/public/upload/machine/gpt_architecture.jpg)
+
+different GPT versions differ pretty much only in size, minor details, and the dataset+training regime. If you understand how GPT-2 or even GPT-1 works, you can, to a large extent, understand GPT-4 also. PS： 不同的gpt从模型结构上差别不大。
+
 以GPT-2 为例 
 1. The transformer itself works with a D-dimensional vector at every position, for GPT-2 D=768. 
 2. V=50257 is the GPT-2 dictionary size. 
@@ -575,7 +585,7 @@ for i in range(20):
 
 ### 微调GPT-2 model
 
-GPT models are trained in an unsupervised way on a large amount of text (or text corpus). The corpus is broken into sequences, usually of uniform size (e.g., 1024 tokens each). The model is trained to predict the next token (word) at each step of the sequence. For example (here, we write words instead of integer encodings for clarity) :
+GPT models are trained in an unsupervised way on a large amount of text (or text corpus). The corpus is broken into sequences, usually of uniform size (e.g., 1024 tokens each). PS： 预训练素材通常被切成特定长度的句子。The model is trained to predict the next token (word) at each step of the sequence. For example (here, we write words instead of integer encodings for clarity) :
 
 |position|1|2|3|4|5|6|7|8|9|
 |---|---|---|---|---|---|---|---|---|---|

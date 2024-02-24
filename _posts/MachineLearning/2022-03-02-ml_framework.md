@@ -21,6 +21,8 @@ keywords: ml framework
 
 [手把手教你如何自己设计实现一个深度学习框架](https://mp.weixin.qq.com/s/0bDyrSjg_VmUgAenNuysqg) 未读
 
+[从零构建现代深度学习框架(TinyDL-0.01)](https://mp.weixin.qq.com/s/tFl0RQd3ex98_SAOIIfM_Q)
+
 ## 发展脉络
 
 [大模型时代，AI框架的机遇和挑战](https://mp.weixin.qq.com/s/h7UsG1FU8eqbeE04MtP67Q)AI框架经历了四个阶段的发展：

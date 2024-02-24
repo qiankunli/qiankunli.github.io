@@ -201,6 +201,9 @@ perf的原理是这样的：每隔一个固定的时间，就在CPU上（每个�
     1. 通过-e指定感兴趣的一个或多个event（perf list可以列出支持的event）
     2. 指定采样的范围, 比如进程级别 (-p), 线程级别 (-t), cpu级别 (-C), 系统级别 (-a)
 
+[perf 后端：硬件 PMU（上）](https://zhuanlan.zhihu.com/p/678581172)
+[perf 后端：硬件 PMU（下）](https://zhuanlan.zhihu.com/p/678581247)
+
 ### 流程
 
 [剖析CPU性能火焰图生成的内部原理](https://mp.weixin.qq.com/s/A19RlLhSgbzw8UU4p1TZNA)perf在采样的过程大概分为两步，一是调用 perf_event_open 来打开一个 event 文件，二是调用 read、mmap等系统调用读取内核采样回来的数据。其中 perf_event_open 完成了非常重要的几项工作。

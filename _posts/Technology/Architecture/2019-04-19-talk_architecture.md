@@ -13,6 +13,9 @@ keywords: 聊聊架构
 * TOC
 {:toc}
 
+Martin Fowler 认为软件架构是：重要并且难以改变的决策。
+
+软件架构的设计无非就是前后端的双向打通，前端是面向用户的 user friendly 接口，考验的是程序员对业务的理解与设计；后端是实现功能所依赖的基础能力，考验的是程序员对底层技术的掌握与应用；而前后端的打通，考验的是程序员的能力、经验与审美。
 
 [聊聊架构](http://www.infoq.com/cn/articles/talk-arch?utm_source=articles_about_talk-arch&utm_medium=link&utm_campaign=talk-arch)
 

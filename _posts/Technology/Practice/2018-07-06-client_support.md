@@ -25,6 +25,8 @@ keywords: abtest
 
 平台支持类系统 有很多的共同点，这也就意味着，很多共同点可以作为框架抽取出来。[无线运维的起源与项目建设思考](https://mp.weixin.qq.com/s/ViADw7vwNIydSmxseMrZow)
 
+[软件架构一致性 —— 被忽视的研发成本](https://mp.weixin.qq.com/s/dlf-SUmystsc5PZf6ayVdw)
+
 ## 几个基本的功能点
 
 ### 基本构成
@@ -173,6 +175,8 @@ app sdk设计
 
 1. 画像数据由客户端一次请求（加上必要的同步），持久存储，每次请求时携带用户画像数据
 2. 每次请求时，由系统根据uid 调用画像聚合服务，向请求中注入画像信息，再进行业务匹配
+
+[字节基于用户画像标签的分析及业务场景应用](https://mp.weixin.qq.com/s/WAgpvw-50UVLKOY42xYiRg) 未细读。
 
 ### 安全
 
