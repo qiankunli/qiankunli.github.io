@@ -88,6 +88,27 @@ $$
 Attention(Q,K,V) = softmax(\frac{QK^T}{\sqrt{d_k}})V
 $$
 
+### 评估指标
+
+在大语言模型推理中常会用到四个指标：Throughput（吞吐量）、First Token Latency（首字延迟）、Latency（延迟）和QPS（每秒请求数）。这四个性能指标会从四个不同的方面来衡量一个系统的服务提供能力。
+1. Throughput/吞吐量是指当系统的负载达到最大的时候，在单位时间内，能够执行多少个 decoding，即生成多少个字符。
+2. First Token Latency（首字延迟）。指的是当一批用户进入到推理系统之后，用户完成 Prefill 阶段的过程需要花多长时间。这也是系统生成第一个字符所需的响应时间。很多需求关注这一指标，希望用户在系统上输入问题后得到回答的时间小于 2~3 秒。
+3. Latency（延迟）。指的是每一个 decoding 所需要的时长。它反映的是大语言模型系统在线上处理的过程中，每生成一个字符的间隔是多长时间，也就是生成的过程有多么流畅。大部分情况下，我们希望生成的延迟小于 50 毫秒，也就是一秒钟生成 20 个字符。
+4.  QPS（每秒请求数）。反映了在线上系统的服务当中，一秒钟能够处理多少个用户的请求。
+First Token Latency 和 Latency 这两个指标会因为用户输入的长度不同、batch size 的不同而发生非常大的变化。用户输入的长度越长，首字延迟也会越高。decoding 延迟，只要不是千亿级别的模型，decoding 的延迟都会控制在 50 毫秒以内，主要受到 batch size 的影响，batch size 越大，推理延迟也会越大，但基本上增加的幅度不会很高。吞吐量其实也会受到这两个因素的影响。如果用户输入的长度和生成的长度很长，那么系统吞吐量也不会很高。如果用户输入长度和生成长度都不是很长，那么系统吞吐量可能会达到一个非常离谱的程度。
+
+### 耗时分布
+
+[高性能 LLM 推理框架的设计与实现](https://mp.weixin.qq.com/s/4o86rMuburB8jcbU0aYC7g)与传统的 CNN 模型推理不同，大语言模型的推理通常会分成 prefill 和 decoding 两个阶段。每一个请求发起后产生的推理过程都会先经历一个 Prefill 过程，prefill 过程会计算用户所有的输入，并生成对应的 KV 缓存（虽然计算量很大，因为要一次性完成用户输入的所有词的计算，但它只是一次性的过程，所以在整个推理中只占不到 10% 的时间。），再经历若干个 decoding 过程，每一个 decoding 过程，服务器都会生成一个字符，并将其放入到 KV 缓存当中，之后依次迭代。由于 decoding 过程是逐个字符生成的，每一段答案的生成都需要很长时间，会生成很多字符，所以 decoding 阶段的数量非常多，占到整个推理过程的 90% 以上。
+
+![](/public/upload/machine/llm_inference_two_stage.jpg)
+
+在 prefill 阶段，至少要做四件事情：第一件事情是把用户的输入进行向量化，tokenize 的过程指的是将用户输入的文本转换为向量，相对于 prefill 整个阶段来说，大概要占掉 10% 的时间，这是有代价的。之后就会进行真正的 prefill 计算，这一过程会占掉大概 80% 的时间。计算之后会进行 sampling，这个过程在 Pytorch 里面一般会用sample、top p。在大语言模型推理当中会用 argmax。总而言之，是根据模型的结果，生成最后词的一个过程。这个过程会占掉 10% 的时间。最后将 refill 的结果返回给客户，这需要的时间会比较短，大概占 2% 到 5% 的时间。
+
+Decoding 阶段不需要 tokenize，每一次做 decoding 都会直接从计算开始，整个decoding 过程会占掉 80% 的时间，而后面的 sampling，也就是采样生成词的过程，也要占掉 10% 的时间。但它会有一个 detokenize 的时间，detokenize 是指生成了一个词之后，这个生成的词是个向量，需要把它解码回文本，这一操作大概会占掉 5% 的时间，最后将这个生成的词返回给用户。
+
+新的请求进来，在进行完 prefill 之后，会不断迭代进行 decoding，每一个 decoding 阶段结束之后，都会将结果当场返回给客户。这样的生成过程在大语言模型里面是很常见的，我们称这样的方式为流式传输。
+
 ### KV Cache
 
 有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存。但是有一个问题就是KV Cache非常的大，比如说拿LLaMA-13B举例子，假设每个token在一层的大小有20KB，LLaMA-13B有40层，这样这个token大小就会达到800KB，而一个sequence一般来说会有几千的token，也就是说一个sequence就会达到几个G。[Transformers KV Caching Explained](https://medium.com/@joaolages/kv-caching-explained-276520203249) 动图实在太贴切了。
@@ -136,7 +157,7 @@ PS：Transformer （和Attention） layer 已经支持了缓存机制 (use_cache
 
 [图解大模型计算加速系列：Flash Attention V2，从原理到并行计算](https://mp.weixin.qq.com/s/gMRZV-ZCrFccKPKSkOpxsQ) 未读。
 
-### 调度优化
+### 调度优化/动态批处理
 
 Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的，将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。
 
@@ -160,6 +181,15 @@ Batching就是将一段时间内到达的用户请求合并到一起，提交到
 3. vLLM 的第三轮处理，waiting 队列中没有要处理的新请求，所以会从 running 队列中选择此轮要处理的请求（这些请求均处于生成阶段）。但由于没有多余的空间，vLLM 只会选择 s0 和 s1 进行处理。经过多轮调度和推理，最终完成 3 个请求的处理，以上就是 vLLM 的工作流。
 
 [让LLM推理加速的batching是什么技术（in-flight batching）](https://zhuanlan.zhihu.com/p/679723881)
+
+### 流水线优化
+
+流水线优化目的是尽可能让显卡利用率占满。在大语言模型推理过程中，tokenize、fast sample 和 detokenize 这些过程都与模型的计算无关。我们可以把整个大语言模型的推理想象成这样一个过程，在执行 prefill 的过程中，当我拿到了 fast sample 的词向量之后，就可以立刻开始下一个阶段 decoding，不用等到结果返回，因为结果已经在 GPU 上了。而当完成了一次 decoding 后，不用等待 detokenize 的完成，可以立刻开始下一次的 decoding。因为 detokenize 是个 CPU 过程，后面这两个过程，只涉及到用户的结果返回，不涉及任何 GPU 的运算。并且在执行完采样过程之后，就已经知道下一个生成的词是什么了，我们已经拿到了所需的所有数据，可以立刻开始下一次运算，不需要再等待后面两个过程的完成。在 PPL.LLM 的实现当中使用了三个线程池：
+1. 第一个线程池负责执行 tokenize 过程；
+2. 第三个线程池负责执行后面的 fast sample 以及返回结果的过程和 detokenize；
+3. 中间的线程池用来执行 computing 的过程。
+这三个线程池互相异步地把这三部分的延迟相互隔离，从而尽可能地将这三部分的延迟掩蔽掉。这将给系统带来 10% 到 20% 的 QPS 提升
+
 
 ## 一些材料
 
@@ -207,7 +237,7 @@ GPU编程基础：在执行model.generate(prompt)时，我们进行以下操作�
 
 函数计算推出 GPU 闲置计费功能，在保障性能的前提下，可以帮助您大幅降低 GPU 的成本开销。以往部署大型语言模型（LLM）可能需要昂贵的 GPU 支持，尤其在需要大量计算资源时。但请求处理并不是每时每刻都处于活跃状态，势必存在流量的潮汐现象，后端的计算资源会出现空载导致成本的浪费。借助函数计算 GPU 闲置计费功能，用户的开销将会根据实际计算负载动态调整。
 
-### 在线推理
+### 在线推理框架
 
 [揭秘大语言模型实践：分布式推理的工程化落地才是关键！](https://mp.weixin.qq.com/s/QeDmD-XlvkkJ7LMNJEynHg)与以往的模型不同，单张 GPU 卡的显存可能不足以支撑大语言模型。因此，需要使用模型并行技术，将大语言模型进行切分后，在多张 GPU 卡上进行推理。我们使用 DeepSpeed Inference 来部署大语言模型分布式推理服务。DeepSpeed Inference 是 Microsoft 提供的分布式推理解决方案，能够很好的支持 transformer 类型的大语言模型。。DeepSpeed Inference 提供了模型并行能力，在多 GPU 上对大模型并行推理。通过张量并行技术同时利用多个 GPU，提高推理性能。DeepSpeed 还提供了优化过的推理定制内核来提高 GPU 资源利用率，降低推理延迟。
 
@@ -217,6 +247,10 @@ GPU编程基础：在执行model.generate(prompt)时，我们进行以下操作�
 FasterTransformer 是真对于 Transofrmer 类型模型（也包括 encoder-only、decoder-only）的推理加速方案，其提供了 Kernel Fuse、Memory reuse、kv cache、量化等多种优化方案，同时也提供了 Tensor Parallel 和 Pipeline Parallel 两种分布式推理方案。
 
 [​揭秘NVIDIA大模型推理框架：TensorRT-LLM](https://mp.weixin.qq.com/s/xv3gBjmejoxJEpvFoeUXOg)
+
+[大模型推理优化实践：KV cache复用与投机采样](https://mp.weixin.qq.com/s/W9iVW7niyi_HvEWxOcnwuA)RTP-LLM 是阿里巴巴大模型预测团队开发的大模型推理加速引擎，该引擎与当前广泛使用的多种主流模型兼容，并通过采用高性能的 CUDA 算子来实现了如 PagedAttention 和 Continuous Batching 等多项优化措施。RTP-LLM 还支持包括多模态、LoRA、P-Tuning、以及 WeightOnly 动态量化等先进功能。
+
+[高性能 LLM 推理框架的设计与实现](https://mp.weixin.qq.com/s/4o86rMuburB8jcbU0aYC7g)PPL.LLM，商汤，开源。 
 
 ### 分布式推理
 
