@@ -196,15 +196,51 @@ func (f *DeltaFIFO) Get(obj interface{}) (item interface{}, exists bool, err err
 
 疑问：DeltaFIFO 是用来传递delta/event的，不是为了来传递obj 的，watch 得到 event 用queue 缓冲一些可以理解，为何底层要搞那么复杂呢？从设计看，**evnet 在队列里可能对堆积**，比如一个 add event 新增key=a，之后又有一个update event 将key=a改为b，其实此时可以 直接合并为一个 add event 即key=b。堆积之后 仍然让 消费者依次处理所有event(`Pop()`)，还是告诉它所有的event(`Get()`)，还是自动帮它做合并？PS: 很多能力 因为封装的太好，以至于不知道
 
-## Indexer（未完成）
+## workqueue
 
-因为etcd存储的缘故，k8s的性能 没有那么优秀，假设集群有几w个pod，list 就是一个巨耗时的操作，有几种优化方式
-1. list 时加上 label 限定查询范围。k8s apiserver 支持根据 label 对object 进行检索
-2. 使用client-go 本地cache，再进一步，根据经常查询的label/field 建立本地index。PS：apiserver 确实对label 建了索引，但是本地并没有自动建立。
+[Kubernetes client-go 源码分析 - workqueue](https://mp.weixin.qq.com/s/9zHYc266cJlXGcZa-xnOFA) 讲的很详细。
 
-[Kubernetes client-go 源码分析 - Indexer & ThreadSafeStore](https://mp.weixin.qq.com/s/YVl4z0Yr0cDp3dFg6Kwg5Q) 未细读
+![](/public/upload/kubernetes/workqueue.png)
 
-[client-go 之 Indexer 的理解](https://cloud.tencent.com/developer/article/1692517) 未细读
+如果想自定义控制器非常简单，我们直接注册handler就行。但是绝大部分k8s原生控制器中，handler并没有直接处理。而是统一遵守一套：add/update/del -> queue -> run -> runWorker -> syncHandler 处理的模式。有几个好处
+1. chan的功能过于单一，无法满足各类场景的需求，workqueue除了一个缓冲机制外，还有错误重试、限速等机制。
+2. 利用了Indexer本地缓存机制，queue里面只包括 key就行，数据indexer里有
+
+![](/public/upload/kubernetes/workqueue.jpg)
+
+[Kubernetes之controller-runtime事件再处理](https://mp.weixin.qq.com/s/NTRog9zrSv3en9MV5_nJuQ) 值得细读一下。
+
+workqueue 中内置了三种队列模型
+1. Interface，实现了基本的先进先出队列, **跟常规队列相比多了去重功能**。为什么队列需要去重功能?当一个资源对象被频繁变更, 然而同一个对象还未被消费, 没必要在在队列中存多份, 经过去重后只需要处理一次即可。
+2. DelayingInterface，在 Interface 的基础上, 实现了延迟队里功能。为什么需要 delay 延迟入队功能 ?有些 k8s controller 是需要延迟队列功能的, 比如像 cronjob 依赖延迟队列实现定时功能. 另外也可以实现延迟 backoff 时长后重入队.
+3. RateLimitingInterface，在 DelayingInterface 的基础上, 实现了 RateLimiter 限频器功能. 当插入元素的次数超过限频器规则时, 则把对象推到延迟队列中处理.
+
+```go
+type Interface interface {
+    Add(item interface{}) // 添加元素
+    Len() int // 获取队列的长度, queue 字段的长度
+    Get() (item interface{}, shutdown bool) // 从队列中获取元素
+    Done(item interface{}) // 标记元素执行完毕
+    ShutDown()  // 关闭
+    ShuttingDown() bool  // 是否关闭
+}
+type Type struct {
+    // 使用 slice 切片存放元素, 顺序为 fifo 模式, 写为 append 追加, 读则从头部获取.
+    queue []t
+    // 使用一个 set 集合做去重操作, 避免未消费的队列中相同的元素. 
+    dirty set
+    // 也是个 set 集合, 其目的是避免相同的元素被并发执行, 有了 processing 后, 当某个元素正在执行, 另一个生产者只能把元素放到 dirty 集合里做去重, 等待上一个元素干完了后, 这个元素才会重写入 dirty 里.  为什么不放到 queue slice 里, 因为放 queue slice 里, 并发消费场景下, 同一个元素会被多个协程并发处理. 
+    processing set
+    // 条件变量, 用来唤醒等待元素的协程
+    cond *sync.Cond
+    // 用来统计指标
+    metrics queueMetrics
+}
+```
+
+delayingQueue 的代码逻辑还是很清晰的. 首先使用数据结构小顶堆 minheap 来排列定时任务（使用readyAt作为大小依据）. 当添加定时任务时, 把该任务扔到一个 chan 里, 然后由一个独立的协程监听该 chan, 把任务扔到 heap 中, 该独立协程会从堆里找到最近到期的任务, 并对该任务的进行到期监听, 当定时后期后, 会把到期的定时任务添加到 queue 队列中.
+
+待确认：一个workqueue内只有一个类型的crd。
 
 ## controller.Run/ Watch event 消费
 
@@ -232,6 +268,16 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
 	return nil
 }
 ```
+
+## Indexer（未完成）
+
+因为etcd存储的缘故，k8s的性能 没有那么优秀，假设集群有几w个pod，list 就是一个巨耗时的操作，有几种优化方式
+1. list 时加上 label 限定查询范围。k8s apiserver 支持根据 label 对object 进行检索
+2. 使用client-go 本地cache，再进一步，根据经常查询的label/field 建立本地index。PS：apiserver 确实对label 建了索引，但是本地并没有自动建立。
+
+[Kubernetes client-go 源码分析 - Indexer & ThreadSafeStore](https://mp.weixin.qq.com/s/YVl4z0Yr0cDp3dFg6Kwg5Q) 未细读
+
+[client-go 之 Indexer 的理解](https://cloud.tencent.com/developer/article/1692517) 未细读
 
 ## processor 是如何处理数据的
 
@@ -330,51 +376,6 @@ func (p *processorListener) run() {
 
 一个eventhandler 会被封装为一个processListener，一个processListener 对应两个协程，run 协程负责 消费pendingNotifications 所有event 。pendingNotifications是一个ring buffer， 默认长度为1024，如果被塞满，则扩容至2倍大小。如果event 处理较慢，则会导致pendingNotifications 积压，event 处理的延迟增大。PS：业务实践上确实发现了 pod 因各种原因大量变更， 叠加 event 处理慢 导致pod ready 后无法及时后续处理的情况
 
-## workqueue
-
-[Kubernetes client-go 源码分析 - workqueue](https://mp.weixin.qq.com/s/9zHYc266cJlXGcZa-xnOFA) 讲的很详细。
-
-![](/public/upload/kubernetes/workqueue.png)
-
-如果想自定义控制器非常简单，我们直接注册handler就行。但是绝大部分k8s原生控制器中，handler并没有直接处理。而是统一遵守一套：add/update/del -> queue -> run -> runWorker -> syncHandler 处理的模式。有几个好处
-1. chan的功能过于单一，无法满足各类场景的需求，workqueue除了一个缓冲机制外，还有错误重试、限速等机制。
-2. 利用了Indexer本地缓存机制，queue里面只包括 key就行，数据indexer里有
-
-![](/public/upload/kubernetes/workqueue.jpg)
-
-[Kubernetes之controller-runtime事件再处理](https://mp.weixin.qq.com/s/NTRog9zrSv3en9MV5_nJuQ) 值得细读一下。
-
-workqueue 中内置了三种队列模型
-1. Interface，实现了基本的先进先出队列, 跟常规队列相比多了去重功能。为什么队列需要去重功能?当一个资源对象被频繁变更, 然而同一个对象还未被消费, 没必要在在队列中存多份, 经过去重后只需要处理一次即可。
-2. DelayingInterface，在 Interface 的基础上, 实现了延迟队里功能。为什么需要 delay 延迟入队功能 ?有些 k8s controller 是需要延迟队列功能的, 比如像 cronjob 依赖延迟队列实现定时功能. 另外也可以实现延迟 backoff 时长后重入队.
-3. RateLimitingInterface，在 DelayingInterface 的基础上, 实现了 RateLimiter 限频器功能. 当插入元素的次数超过限频器规则时, 则把对象推到延迟队列中处理.
-
-```go
-type Interface interface {
-    Add(item interface{}) // 添加元素
-    Len() int // 获取队列的长度, queue 字段的长度
-    Get() (item interface{}, shutdown bool) // 从队列中获取元素
-    Done(item interface{}) // 标记元素执行完毕
-    ShutDown()  // 关闭
-    ShuttingDown() bool  // 是否关闭
-}
-type Type struct {
-    // 使用 slice 切片存放元素, 顺序为 fifo 模式, 写为 append 追加, 读则从头部获取.
-    queue []t
-    // 使用一个 set 集合做去重操作, 避免未消费的队列中相同的元素. 
-    dirty set
-    // 也是个 set 集合, 其目的是避免相同的元素被并发执行, 有了 processing 后, 当某个元素正在执行, 另一个生产者只能把元素放到 dirty 集合里做去重, 等待上一个元素干完了后, 这个元素才会重写入 dirty 里.  为什么不放到 queue slice 里, 因为放 queue slice 里, 并发消费场景下, 同一个元素会被多个协程并发处理. 
-    processing set
-    // 条件变量, 用来唤醒等待元素的协程
-    cond *sync.Cond
-    // 用来统计指标
-    metrics queueMetrics
-}
-```
-
-delayingQueue 的代码逻辑还是很清晰的. 首先使用数据结构小顶堆 minheap 来排列定时任务（使用readyAt作为大小依据）. 当添加定时任务时, 把该任务扔到一个 chan 里, 然后由一个独立的协程监听该 chan, 把任务扔到 heap 中, 该独立协程会从堆里找到最近到期的任务, 并对该任务的进行到期监听, 当定时后期后, 会把到期的定时任务添加到 queue 队列中.
-
-待确认：一个workqueue内只有一个类型的crd。
 
 ## 细节
 

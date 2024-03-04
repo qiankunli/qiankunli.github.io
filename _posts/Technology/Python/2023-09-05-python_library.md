@@ -13,6 +13,15 @@ keywords: Python
 
 ## 前言（未完成）
 
+## 安装第三方包
+
+现在变成语言，大都会有一些对应的库，比如java可以使用第三方jar（通过配置maven依赖），go可以引入第三方包（`go get xx`），python安装第三方包有以下方法：
+
+1. 使用pip工具（`pip install xx`）
+2. 下载第三方包文件，执行其对应的安装脚本，`python setup.py install`（跟python安装pip的方式一样）
+
+其本质都是将第三方包文件放在约定目录。
+
 ## streamlit
 
 streamlit是一个开源的python库，它能够快速的帮助我们创建定制化的web应用，而且还非常便于和他人分享，特别是在机器学习和数据科学领域。整个过程不需要你了解任何前端的知识，包括html、css、javascript等，**对非前端开发人员非常的友好**。PS：nodejs让前端人员开发后端服务很方便。 
@@ -48,6 +57,34 @@ p = {"name": "Tom"}
 p = Person(**p)
 # 通过其他的实例化对象传入
     p2 = Person.copy(p) 
+```
+
+
+在 Pydantic 模型中，root_validator 装饰器用于定义根验证器，它可以用来在整个模型的数据被验证之前执行一些额外的验证逻辑。这对于需要跨越多个字段进行验证的情况非常有用。下面是一个示例：
+
+```python
+from pydantic import BaseModel, root_validator
+class User(BaseModel):
+    username: str
+    password: str
+    password_confirmation: str
+    @root_validator
+    def passwords_match(cls, values):
+        if 'password' in values and 'password_confirmation' in values:
+            if values['password'] != values['password_confirmation']:
+                raise ValueError('密码与确认密码不匹配')
+        return values
+        # 实际上还可以 使用 values['password'] 为User.password 赋值
+
+# 使用示例
+user_data = {
+    'username': 'user123',
+    'password': 'password123',
+    'password_confirmation': 'password123'
+}
+
+user = User(**user_data)
+print(user)
 ```
 
 ## FastAPI

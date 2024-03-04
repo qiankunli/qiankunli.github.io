@@ -34,6 +34,8 @@ A streaming platform has three key capabilities:
 
 书中源码基于0.10.0.1
 
+[这些年背过的面试题——Kafka篇](https://mp.weixin.qq.com/s/8UNtMIllJ03ULZwE9WtVdg)
+
 
 ### 宏观概念
 

@@ -148,6 +148,11 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
     2. 结合历史对话的重新表述，在进行多轮对话时，用户的提问中的某个词可能会指代上文中的部分信息，因此可以将历史信息和用户提问一并交给LLM重新表述。
     3. 假设文档嵌入（HyDE），核心思想是接收用户提问后，先让LLM在没有外部知识的情况下生成一个假设性的回复。然后，将这个假设性回复和原始查询一起用于向量检索。假设回复可能包含虚假信息，但蕴含着LLM认为相关的信息和文档模式，有助于在知识库中寻找类似的文档。
     4. 退后提示（Step Back Prompting）：如果原始查询太复杂或返回的信息太广泛，我们可以选择生成一个抽象层次更高的“退后”问题，与原始问题一起用于检索，以增加返回结果的数量。例如，原问题是“桌子君在特定时期去了哪所学校”，而退后问题可能是关于他的“教育历史”。这种更高层次的问题可能更容易找到答案。
+    5. 关键信息抽取：关键信息抽取是通过自然语言处理技术从用户提问中提取关键词或短语，以便更准确地检索信息。基于LLM的关键词抽取  [再看RAG在真实金融文档问答场景的实践方案：SMP2023 金融大模型挑战赛的两种代表实现思路](https://mp.weixin.qq.com/s/A4DzTgYE2cXzjhiqIn1niw)
+        1. 采用In-Context Learning的关键词抽取方案。通过构造history，模拟多轮对话的方式进行，让模型能稳定输出json，对于异常json通过调整temperature=1加上retry多次，使其更稳定输出。PS：有点意思，带有历史记录的 icl
+        ![](/public/upload/machine/icl_keyword_extraction.jpg)
+        2. 有监督方案
+        ![](/public/upload/machine/supervised_learning_keyword_extraction.jpg)
 2. Finetune 向量模型。embedding 模型 可能从未见过你文档的内容，也许你的文档的相似词也没有经过训练。在一些专业领域，通用的向量模型可能无法很好的理解一些专有词汇，所以不能保证召回的内容就非常准确，不准确则导致LLM回答容易产生幻觉（简而言之就是胡说八道）。可以通过 Prompt 暗示 LLM 可能没有相关信息，则会大大减少 LLM 幻觉的问题，实现更好的拒答。
     1. [大模型应用中大部分人真正需要去关心的核心——Embedding](https://mp.weixin.qq.com/s/Uqt3H2CfD0sr4P5u169yng) 
     2. [分享Embedding 模型微调的实现](https://mp.weixin.qq.com/s/1AzDW9Ubk9sWup2XJWbvlA) ，此外，原则上：embedding 所得向量长度越长越好，过长的向量也会造成 embedding 模型在训练中越难收敛。
@@ -156,6 +161,29 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
     5. [大模型落地技术总结：大模型幻觉的起因、评估及落地场景下基于知识图谱的缓解策略探索](https://mp.weixin.qq.com/s/BBE8ELr4GCGzCWsdv-G-_Q)
 3. 许多向量存储支持了对元数据的操作。LangChain 的 Document 对象中有个 2 个属性，分别是page_content和metadata，metadata就是元数据，我们可以使用metadata属性来过滤掉不符合条件的Document。元数据过滤的方法虽然有用，但需要我们手动来指定过滤条件，我们更希望让 LLM 帮我们自动过滤掉不符合条件的文档。SelfQueryRetriever
 4. **增加追问机制**。这里是通过Prompt就可以实现的功能，只要在Prompt中加入“如果无法从背景知识回答用户的问题，则根据背景知识内容，对用户进行追问，问题限制在3个以内”。这个机制并没有什么技术含量，主要依靠大模型的能力。不过大大改善了用户体验，用户在多轮引导中逐步明确了自己的问题，从而能够得到合适的答案。
+
+    ```python
+    def ask_questions(model, context, query, max_follow_ups=3):
+    follow_ups = 0
+    while follow_ups < max_follow_ups:
+        if model.can_answer(query, context):
+            return model.answer(query, context)
+        else:
+            follow_up_query = generate_follow_up_query(query, context)
+            query = follow_up_query
+            follow_ups += 1
+    return "I'm sorry, I couldn't find an answer to your question."
+    def generate_follow_up_query(current_query, context):
+        # 这里可以根据上下文和当前查询生成一个追问
+        # 例如，询问用户是否需要更具体的信息
+        return "Can you please provide more details or clarify your question?"
+    # 示例
+    context = "The capital of France is Paris."
+    query = "What is the capital?"
+    answer = ask_questions(model, context, query)
+
+    print(answer)
+    ```
 
 在专业的垂直领域，待检索的文档往往都是非常专业的表述，而用户的问题往往是非常不专业的白话表达。所以直接拿用户的query去检索，召回的效果就会比较差。Keyword LLM就是解决这其中GAP的。例如在ChatDoctor中会先让大模型基于用户的query生成一系列的关键词，然后再用关键词去知识库中做检索。ChatDoctor是直接用In-Context Learning的方式进行关键词的生成。我们也可以对大模型在这个任务上进行微调，训练一个专门根据用户问题生成关键词的大模型。这就是ChatLaw中的方案。
 
@@ -174,7 +202,9 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
     1. RRF，比单独的lexical search和单独的semantic search的效果要好，RRF存在两个问题：
         1. RRF只是对召回的topk数据的顺序进行近似排序计算，并有真正的对数据顺序计算。
         2. RRF只关注topk数据的位置，忽略了真实分数以及分布信息。
+    2. 用rerank 对query + chunk 相关性进行打分。 
 3. 动合并检索时首先需要将文档按特定的层次结构进行切割，比如按两层结构进行切割即首先将文档按块大小(chunk_size)为1024进行切割，切割成若干个大文档块，然后每个大文档块(chunk_size=1024)再被切分成4个块大小为512的子文档块，那么这些子文档块就是所谓的叶子节点，而子文档块所属的大文档块就是所谓的父节点，而在检索时只拿叶子节点和问题进行匹配，当某个父节点下的多数叶子节点都与问题匹配上则将该父节点作为context返回给LLM。
+    1. 在知识问答系统中，检索成本是一个不容忽视的问题。随着知识库的增长，可能需要遍历大量文档，导致检索速度缓慢，在检索大量信息时，如何确保检索结果的相关性和准确性也是一个挑战。层次检索是一种优化策略，它通过构建知识库的层次结构来减少检索范围，从而提高检索效率。实践方法：分析知识库的结构，建立层次索引；从顶层开始检索，逐步向下深入到具体的文档或信息片段；在每个层次上应用剪枝策略，只保留最相关的部分进行进一步检索。
 4. 多向量检索同样会给一个知识文档转化成多个向量存入数据库，不同的是，这些向量不仅包括文档在不同大小下的分块，还可以包括该文档的摘要，用户可能提出的问题等等有助于检索的信息。在使用多向量查询的情况下，每个向量可能代表了文档的不同方面，使得系统能够更全面地考虑文档内容，并在回答复杂或多方面的查询时提供更精确的结果。例如，如果查询与文档的某个具体部分或摘要更相关，那么相应的向量就可以帮助提高这部分内容的检索排名。
 
 [基于ElasticSearch的混合检索实战&原理分析](https://mp.weixin.qq.com/s/EBaGXFOnNHmF_rj_NLf_Ww)
@@ -192,11 +222,7 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
 
 1. 缓存
     1. LangChain 提供了 CacheBackedEmbeddings ， 可以提高 embedings 的二次加载和解析的效率，首次正常速度，后续有一个 3倍效率的提升。
-2. 基于LLM的关键词抽取  [再看RAG在真实金融文档问答场景的实践方案：SMP2023 金融大模型挑战赛的两种代表实现思路](https://mp.weixin.qq.com/s/A4DzTgYE2cXzjhiqIn1niw)
-    1. 采用In-Context Learning的关键词抽取方案。通过构造history，模拟多轮对话的方式进行，让模型能稳定输出json，对于异常json通过调整temperature=1加上retry多次，使其更稳定输出。PS：有点意思，带有历史记录的 icl
-        ![](/public/upload/machine/icl_keyword_extraction.jpg)
-    2. 有监督方案
-        ![](/public/upload/machine/supervised_learning_keyword_extraction.jpg)
+3. 多模态。如何从非文本内容中提取有用的信息，并将其转化为可检索的格式？如何将提取的多模态信息与文本信息融合，以便进行统一的检索和回答？如何构建一个能够索引多模态内容的知识库。
 
 
 ### Self-RAG

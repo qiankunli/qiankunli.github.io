@@ -52,7 +52,7 @@ Scale-up 和 Scale-out 实现了算力的弹性，弹性算力又是 Serverless 
 [零拷贝及一些引申内容](https://mp.weixin.qq.com/s/l_MRLyRW8lxvjtsKapT6HA)
 
 
-DMA 是一种外设**绕开CPU**独立直接访问内存的机制，零拷贝是一种绕开CPU 进行用户态和内核态之间数据拷贝的技术，包括mmap+write、sendfile、sendfile+DMA收集、splice等。
+DMA 是一种外设**绕开CPU**独立直接访问内存的机制，零拷贝是一种绕开CPU 进行用户态和内核态之间数据拷贝的技术，包括mmap+write、sendfile、sendfile+DMA收集、splice等。kafka 的零拷贝即为磁盘通过sendfile实现DMA 拷贝Socket buffer，减少内核态到用户态的拷贝。
 
 ## 用户态与内核态切换有什么代价呢？
 

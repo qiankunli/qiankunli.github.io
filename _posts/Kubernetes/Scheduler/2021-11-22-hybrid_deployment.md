@@ -68,7 +68,7 @@ PS： 理想状态：给到 pod 准确、实时的limit（更好的监控），�
 
 混部要解决的问题，分为单机层面和集群层面
 1. Noisy Neighbor Problem，
-  1. 资源层面：CPU、Memory L1/L2/L3、network、blkio。
+  1. 资源层面：CPU、Memory L1/L2/L3、network、blkio。[如何合理使用 CPU 管理策略，提升容器性能？](https://mp.weixin.qq.com/s/N7UWOjqEnZ8oojWgFGBOlQ)
   2. 硬件拓扑层面：NUMA、cpu cache、memory bandwidth、SMT
 2. 在线服务类/Latency Sensitive
   1. 容器混合部署时相互干扰

@@ -94,9 +94,23 @@ if __name__ == '__main__':
 
 ## FastChat
 
-[一文入门最热的LLM应用开发框架LangChain](https://mp.weixin.qq.com/s/bYzNNL3F0998Do2Jl0PQtw)
 
-FastChat功能覆盖训练，推理，评估的全过程。设计目标非常明确，就是在性能、功能及风格上全面对标OpenAI ChatGPT，以成为ChatGPT的开源平替。在生态集成上，由于它完全兼容OpenAI的风格，基于ChatGPT的langchain应用，可以无缝地使用FastChat替代。 推理侧类似工具Xinference/OpenLLM/RayLLM
+如何理解FastChat 都干了什么？本质是对下面的 原始的大模型推理代码进行抽象（模型加载、模型推理=tokenizer+model）和封装，对外提供rest api。
+
+```python
+from transformers import AutoTokenizer, AutoModel
+tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True)
+model = AutoModel.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True).half().cuda()
+model = model.eval()
+response, history = model.chat(tokenizer, "你好", history=[])
+print(response)
+你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。
+response, history = model.chat(tokenizer, "晚上睡不着应该怎么办", history=history)
+print(response)
+晚上睡不着可能会让你感到焦虑或不舒服,但以下是一些可以帮助你入睡的方法:...
+```
+
+[一文入门最热的LLM应用开发框架LangChain](https://mp.weixin.qq.com/s/bYzNNL3F0998Do2Jl0PQtw)FastChat功能覆盖训练，推理，评估的全过程。设计目标非常明确，就是在性能、功能及风格上全面对标OpenAI ChatGPT，以成为ChatGPT的开源平替。在生态集成上，由于它完全兼容OpenAI的风格，基于ChatGPT的langchain应用，可以无缝地使用FastChat替代。 推理侧类似工具Xinference/OpenLLM/RayLLM
 
 [FastChat](https://github.com/lm-sys/FastChat)是一个用于训练、服务和评估基于聊天机器人的大型语言模型的开放平台。The core features include:
 1. The training and evaluation code for state-of-the-art models (e.g., Vicuna).
@@ -132,6 +146,7 @@ fastchat
             /api_protocol.py
             /openai_api_protocol.py
         /serve
+            /multi_model_worker.py   # 维护了一个 worker_map, key=model name,value = ModelWorker
             /model_worker.py         # app = FastAPI()     ModelWorker
             /controller.py.          # app = FastAPI().    Controller
             /openai_api_server.py    # app = fastapi.FastAPI()
@@ -141,6 +156,7 @@ fastchat
 使用ModelWorker 加载model 提供http 接口 
 
 ```python
+# /fastchat/serve/model_worker.py
 app = FastAPI()
 @app.post("/worker_generate")
 async def api_generate(request: Request):
@@ -154,14 +170,16 @@ if __name__ == "__main__":
     worker = ModelWorker(...,args.model_path,)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 ```
+
 ModelWorker实现
+
 ```python
-BaseModelWorker
+class BaseModelWorker
      init_heart_beat
          # 将modelWorker id注册到controller，并保持心跳。均通过http接口
 
 # 加载模型，调用模型（底层都是调用流式接口）
-ModelWorker
+class ModelWorker(BaseModelWorker):
      def __init__():
           self.model, self.tokenizer = load_model(model_path, device=device,...)
             # load_model 对应一个专门的 ModelAdapter 抽象，用来适配模型的加载
@@ -173,9 +191,9 @@ ModelWorker
             pass
         return json.loads(x[:-1].decode())
 ```
-api => ModelWorker.generate_gate ==> ModelWorker.generate_stream_gate ==> ModelWorker.model.stream_generate
+从api handler 到请求被处理的过程： api => ModelWorker.generate_gate ==> ModelWorker.generate_stream_gate ==> ModelWorker.model.stream_generate，这里ModelWorker持有的model 是Transformer model 。
 ```python
-generate_stream_gate
+def generate_stream_gate
     get_generate_stream_function(model: torch.nn.Module, model_path: str)
        # 根据模型不同选择对应的函数 
        generate_stream_chatglm
@@ -195,20 +213,6 @@ generate_stream_gate
 4. ModelWorker 主要逻辑是执行 `generate_stream(model,tokenizer,params)` ，很常规的 `input_ids = tokenizer(prompt); output_ids = model(input_ids,xx)`。 如果模型的generate 逻辑有一些特别的处理，则需要自定义generate_stream_xx，并加入get_generate_stream_function 逻辑（根据模型名等 路由到不同的generate_stream_xx）
 5. (Optional) add the model name to the "Supported models" section above and add more information in `fastchat/model/model_registry.py.`
 
-如何理解FastChat 都干了什么？本质是对下面的 原始的大模型推理代码进行抽象（模型加载、模型推理=tokenizer+model）和封装，对外提供rest api。
-
-```python
-from transformers import AutoTokenizer, AutoModel
-tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True)
-model = AutoModel.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True).half().cuda()
-model = model.eval()
-response, history = model.chat(tokenizer, "你好", history=[])
-print(response)
-你好👋!我是人工智能助手 ChatGLM-6B,很高兴见到你,欢迎问我任何问题。
-response, history = model.chat(tokenizer, "晚上睡不着应该怎么办", history=history)
-print(response)
-晚上睡不着可能会让你感到焦虑或不舒服,但以下是一些可以帮助你入睡的方法:...
-```
 
 ## vllm 源码分析
 

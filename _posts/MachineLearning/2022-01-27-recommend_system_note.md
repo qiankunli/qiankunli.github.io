@@ -283,6 +283,8 @@ print('\n\nTest Loss {}, Test Accuracy {}'.format(test_loss, test_accuracy)
 
 [谈一谈LLM在推荐域的一些理解](https://mp.weixin.qq.com/s/9f87dKcFNfGm6Q-jJNdJEw)
 
+[百度基于云原生的推荐系统设计与实践](https://mp.weixin.qq.com/s/h-oNQNW8_97UX9PKixR--Q)
+
 ## 其它
 
 [推荐系统中比模型结构更重要的是什么？](https://mp.weixin.qq.com/s/I1ylBlPfqrToezs2Ml-Dtw) 未读。

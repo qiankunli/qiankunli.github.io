@@ -49,3 +49,11 @@ keywords: llm multimodal
 [​浅析多模态大模型的前世今生](https://mp.weixin.qq.com/s/DXoeQqjVoDLxGV2oZeL95Q) 未读
 
 [文生图模型发展简史与原理：DALL·E, Imagen, Stable Diffusion](https://mp.weixin.qq.com/s/3-p16x4e5XVRYuPj6QTnxg) 未读
+
+## 文生视频
+
+[领先99%小白的Sora关键信息](https://mp.weixin.qq.com/s/MsaCUnTsJYxJFgnNGT6DTA)
+
+[一文带你了解OpenAI Sora](https://mp.weixin.qq.com/s/Efk-gP8iuau3crWB2wWizg)
+
+[OpenAI 的 ​Sora 技术报告详解](https://mp.weixin.qq.com/s/MyWPPY19wwsJv8zdBMxdFg)
