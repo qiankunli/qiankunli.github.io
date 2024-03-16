@@ -12,7 +12,7 @@ keywords:  gpu
 * TOC
 {:toc}
 
-
+[Kubernetes容器平台下的 GPU 集群算力管控](https://mp.weixin.qq.com/s/KzyXgXAsGde_OeF-5TMd2A) 梳理了下gpu虚拟化（如何对gpu 进行细粒度切分、隔离，毕竟gpu还没有linux cgroup/namespace这些机制），gpu资源纳入k8s 体系，自然也会有常见的k8s 资源调度问题（碎片化等等）。
 
 ## 上报/调度/容器创建
 
@@ -134,3 +134,5 @@ Allocatable:
 4. mGPU Device Plugin: 单机上的 mGPU 资源管理插件。在本功能中负责：
   1. 发布 mGPU 资源 （最终将由 kubelet 上报到 Node 对象中）。
   2. 根据调度器的分配结果，将相应的环境变量注入到容器中。
+
+

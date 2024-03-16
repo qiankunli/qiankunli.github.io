@@ -16,7 +16,7 @@ keywords: spring cloud
 
 ## springboot 
 
-Spring Cloud是一个基于Spring Boot实现的云应用（cloud native）开发工具；Spring boot专注于快速、方便集成的单个个体，Spring Cloud基于 spring boot的、关注全局的服务治理框架。因此先简单说下 springboot
+Spring cloud 是一系列框架的有序集合。它利用 spring boot 的开发便利性巧妙地简化了分布式系统基础设施的开发，如服务发现注册、配置中心、消息总线、负载均衡、断路器、数据监控等，都可以用 spring boot 的开发风格做到一键启动和部署。SpringBoot是Spring推出用于解决传统框架配置文件冗余，装配组件繁杂的基于Maven的解决方案，旨在快速搭建单个微服务（内嵌容器，应用程序可以直接通过 Maven 命令编译成可执行的 jar 包，无需依赖Tomcat），SpringCloud是依赖于SpringBoot的，而SpringBoot并不是依赖与SpringCloud。
 
 [第二篇:Spring boot与Spring cloud 是什么关系？](https://zhuanlan.zhihu.com/p/30211072)
 

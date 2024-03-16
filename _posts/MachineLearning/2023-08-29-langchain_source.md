@@ -168,7 +168,7 @@ AI: "" "
 
 ## Chain
 
-LangChain是语言链的涵义，那么Chain就是其中的链结构，属于组合各个层的中间结构，可以称之为胶水层，将各个模块（models, document retrievers, other chains）粘连在一起，实现相应的功能，也是用于程序的调用入口。
+LangChain是语言链的涵义，那么Chain就是其中的链结构，**属于组合各个层的中间结构**，可以称之为胶水层，将各个模块（models, document retrievers, other chains）粘连在一起，实现相应的功能，也是用于程序的调用入口。
 
 Chain模块有一个基类Chain，是所有chain对象的基本入口，与用户程序的交互、用户的输入、其他模块的输入、内存的接入、回调能力。chain通过传入String值，控制接受的输入和给到的输出格式。Chain的子类基本都是担任某项专业任务的具体实现类，比如LLMChain，这就是专门为大语言模型准备的Chain实现类（一般是配合其他的chain一起使用）。PS： 注意，这些是Chain 的事情，模型层不做这些
 1. 针对每一种chain都有对应的load方法，load方法的命名很有规律，就是在chain的名称前面加上`_load`前缀
@@ -407,7 +407,7 @@ class RetrievalQA(BaseRetrievalQA):
 
 ## Memory
 
-记忆 ( memory )允许大型语言模型（LLM）记住与用户的先前交互。默认情况下，LLM/Chain 是 无状态 stateless 的，每次交互都是独立的，无法知道之前历史交互的信息。对于无状态代理 (Agents) 来说，唯一存在的是当前输入，没有其他内容。有许多应用场景，记住先前的交互非常重要，比如聊天机器人。
+记忆 ( memory )允许大型语言模型（LLM）记住与用户的先前交互。默认情况下，LLM/Chain 是 无状态 stateless 的，每次交互都是独立的，无法知道之前历史交互的信息。对于无状态代理 (Agents) 来说，唯一存在的是当前输入，没有其他内容。LangChain通过Memory工具类为Agent和Chain提供了记忆功能，让智能应用能够记住前一次的交互，比如在聊天环境中这一点尤为重要。
 
 LangChain使用Memory组件保存和管理历史消息，这样可以跨多轮进行对话，在当前会话中保留历史会话的上下文。Memory组件支持多种存储介质，可以与Monogo、Redis、SQLite等进行集成，以及简单直接形式就是Buffer Memory。常用的Buffer Memory有
 1. ConversationSummaryMemory ：以摘要的信息保存记录

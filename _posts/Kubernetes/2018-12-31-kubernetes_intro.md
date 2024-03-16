@@ -144,5 +144,5 @@ k8s 重新定义了上下游交付的标准。有了k8s 之前，公有云卖货
 
 [基础架构的未来是 K8s，那么 K8s 的未来在何方？](https://mp.weixin.qq.com/s/Gy06FxLJHnp1ZKt-KWkw4A)
 1. 微型虚拟机 (MicroVM)，微型虚拟机与容器的区别在于它不与宿主机共用内核，拥有自己的微内核，提供了与虚拟机一样的硬件虚拟化安全性。虚拟机抽象了内存、CPU、网络、存储和其他计算资源，而微型虚拟机是围绕应用程序来对资源进行抽象，只抽象了必要的资源，所以更加高效。
-1. WebAssembly：虚拟机模拟了完整的计算机；容器模拟了完整的操作系统；WebAssembly 仅仅模拟了进程。**容器大家都比较熟悉，它只模拟了完整操作系统的用户空间，不包含内核空间，也不包含硬件相关的抽象**。但是对于微服务和 Serverless 而言，它仍然很重，我只需要启动一个进程，你却让我先启动一个完整的操作系统再启动进程。这时候 WebAssembly 的价值就体现出来了，你只需要启动一个进程，而我恰好就只启动了进程，没有操作系统，也没有硬件虚拟化，只有孤单的进程，只是这个进程被放入了 WebAssembly 的沙盒中。
-3. [认识 WebAssembly 与 Rust 实践](https://mp.weixin.qq.com/s/NA3lXimLOzPe_C91KicysQ) wsam 性能好（相对也于js来说，SIMD 和 多线程）；很多语言写成的库可以转为wsam，js和wsam可以互操作 ==> 其它语言编写的库可以很好的去移植到 Web 中，和 JavaScript 的内容结合到一起使用，大多数 HTML/CSS/JavaScript 应用结合几个高性能的 WASM 模块（例如，绘图，模拟，图像/声音/视频处理，可视化，动画，压缩等等能够允许开发者像今天我们所用的 JS 库一样去重用流行的 WASM 库。。
+1. WebAssembly：虚拟机模拟了完整的计算机；容器模拟了完整的操作系统；WebAssembly 仅仅模拟了进程。**容器大家都比较熟悉，它只模拟了完整操作系统的用户空间，不包含内核空间，也不包含硬件相关的抽象**。但是对于微服务和 Serverless 而言，它仍然很重，我只需要启动一个进程，你却让我先启动一个完整的操作系统再启动进程。这时候 WebAssembly 的价值就体现出来了，你只需要启动一个进程，而我恰好就只启动了进程，没有操作系统，也没有硬件虚拟化，只有孤单的进程，只是这个进程被放入了 WebAssembly 的沙盒中。[在 Kubernetes 上使用 WebAssembly: 从容器到 Wasm](https://mp.weixin.qq.com/s/MbTRStn8ETB9GygWETy3Ng)
+3. [认识 WebAssembly 与 Rust 实践](https://mp.weixin.qq.com/s/NA3lXimLOzPe_C91KicysQ) wsam 性能好（相对也于js来说，SIMD 和 多线程）；很多语言写成的库可以转为wsam，js和wsam可以互操作 ==> 其它语言编写的库可以很好的去移植到 Web 中，和 JavaScript 的内容结合到一起使用，大多数 HTML/CSS/JavaScript 应用结合几个高性能的 WASM 模块（例如，绘图，模拟，图像/声音/视频处理，可视化，动画，压缩等等能够允许开发者像今天我们所用的 JS 库一样去重用流行的 WASM 库。

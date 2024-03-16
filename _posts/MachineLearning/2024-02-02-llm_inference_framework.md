@@ -39,6 +39,8 @@ print(response)
     1. 支持流式输出和普通输出
 2. 支持多实例，进而支持灰度发布等
 3. 支持通用的加速库比如vllm等
+4. prompt拼写：llm本质都是语言模型，因此提供的只有语言模型调用方式，将所有请求简化为输入一个string，输出一个string的模式。然而，从语言模型到chat应用之间仍然有一个gap：输入prompt的拼写。text-in-text-out的设计可以简化引擎开发，但是prompt拼写的难题就被丢给了用户。提供chat能力的核心需求是如何将多轮对话按照模型训练时的格式渲染成模型的input id。[从Language Model到Chat Application：对话接口的设计与实现](https://mp.weixin.qq.com/s/DfMJVZnqFpsubKJ60H8s7g)
+5. function call 的处理。以ReAct模板的prompt为例，在模型吐字时留上一小块buffer不返回，如果没有`\nAction:` 那就继续返回；如果遇到这个string，则说明模型可能要输出function call，在此收集输出直到遇到eos或者作为stop word 的`\nObservation:`，然后再把buffer一次性parse成函数并返回。
 
 设计思路
 1. 因为要支持不同的llm 库或加速库，比如Transformer、vllm等，且不同的llm在一些细节上有差异，因此推理侧必须有一个统一的LLM 抽象，在Fastchat里是XXModelWorker，在xinference 里是XXLLM
@@ -203,6 +205,30 @@ def generate_stream_gate
                   response = tokenizer.decode(output_ids)
                   response = process_response(response)
 ```
+
+### 请求参数转换
+
+![](/public/upload/machine/fastchat_request_flow.png)
+
+openai 参数转为  model_worker api 参数，最终转为 （Transformer库或类似）model.generate参数（比如input_ids、attention_mask等）。
+1. 用户输入（对于completion 接口是prompt，对于chat 接口是messages）被转为prompt，最终被model 对应的tokenizer 转为input_ids。
+2. 用户输入 在被转为prompt 过程对不同的模型有一些不同，因此要进行一些转换（其它的诸如stop token每个模型也有差异）。比如对于会话数据，转为chatglm3 的prompt 会类似于以下形式
+
+    ```
+    <|user|>
+    今天北京的天气怎么样？
+    <|assistant|>
+    好的，让我们来查看今天的天气
+    ```
+    当使用openai chat 接口时，传入的数据一般为
+    ```
+    completion = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "user", "content": "今天北京的天气怎么样？"}
+        ]
+    )
+    ```
 
 
 ### FastChat, How to support a new model?

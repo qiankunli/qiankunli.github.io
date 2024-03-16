@@ -55,6 +55,10 @@ Span 的数据结构应该足够简单，以便于能放在日志或者网络协
 
 [初探分布式链路追踪](https://mp.weixin.qq.com/s/0l-y-24UT3AB98H_1jhFHQ) 未读。
 
+## 数据分析
+
+[AIOps 智能运维：有没有比专家经验更优雅的错/慢Trace分析工具？](https://mp.weixin.qq.com/s/P7gOETO-EG3Ha7WjGs6Szg) 未读
+
 ## 其它
 
 

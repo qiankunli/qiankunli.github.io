@@ -170,6 +170,8 @@ PS：Transformer （和Attention） layer 已经支持了缓存机制 (use_cache
 
 ### 调度优化/动态批处理
 
+语言模型接收的每句话长度都不同，对于比较短的话，很快就结束了，是否可以在运行时插入后面一句话进行推理呢？这是语言模型的一个特点，与视觉不同，视觉推理的每个请求基本上都具有相对固定的维度，正因为语言模型存在每句话的长度都不同的特点，因此需要 Inflight Batching 特性。
+
 Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的，将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。
 
 ![](/public/upload/machine/iteration_level_batching.jpg)

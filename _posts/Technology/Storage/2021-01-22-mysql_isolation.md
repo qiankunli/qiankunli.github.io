@@ -114,8 +114,6 @@ keywords: mysql transaction isolation mvcc
     2. Next-Key Locks 是 (Shard/Exclusive Locks + Gap Locks) 的结合，当 session A 给某行记录 R 添加了互斥型的 Next-Key Locks 后， 相当于拥有了记录 R 的 X 锁和记录 R 的 Gap Locks，在可重复读隔离级别下，update 和 delete 操作默认都会给记录添加 Next-Key Locks。
     3. 插入意向锁 (Insert Intention Locks) 也是一种间隙锁，由 INSERT 操作在行数据插入之前获取在插入一条记录前，需要先定位到该记录在 B+ 树中的存储位置，然后判断待插入位置的下一条记录上是否添加了 Gap Locks，如果下一条记录上存在 Gap Locks，那么插入操作就需要阻塞等待，直到拥有 Gap Locks 的那个事务提交（间隙锁释放后插入意向锁也会释放）。同时执行插入操作等待的事务也会在内存中生成一个锁结构，表明有事务想在某个间隙中插入新记录，但目前处于阻塞状态，生成的锁结构就是插入意向锁。
 
-发生死锁后，innodb 会选择回滚undo 量最小的事务。
-
 ### 工作原理
 
 [浅析数据库并发控制](https://zhuanlan.zhihu.com/p/45339550)基于Lock实现的Scheduler需要在事务访问数据前加上必要的锁保护，为了提高并发，会根据实际访问情况分配不同模式的锁，常见的有读写锁，更新锁等。最简单地，需要长期持有锁到事务结束，为了尽可能的在保证正确性的基础上提高并行度，数据库中常用的加锁方式称为两阶段锁（2PL），Growing阶段可以申请加锁，Shrinking阶段只能释放，即在第一次释放锁之后不能再有任何加锁请求。需要注意的是2PL并不能解决死锁的问题，因此还需要有死锁检测及处理的机制，通常是选择死锁的事务进行Abort。PS：跟分布式事务有点一样
@@ -148,7 +146,52 @@ RR支持可重复度，也就是在一个事务中，多次执行相同的SELECT
 2. Next-key lock 保护包含这个record与其前一个record之间的左开右闭区间
 它们都是为了保护这个区间不能被别的事务插入新的record，实现RR。
 
+### 死锁
+
+死锁一般是下面情况导致
+```
+循环依赖不同锁，但加锁顺序不一致
+
+线程1   lock(l1x)  lock(l2x)
+线程2   lock(l2x)  lock(l1x)
+
+线程1   lock(l1s)  lock(l2x)
+线程2   lock(l2s)  lock(l1x)
+
+线程1   lock(l1s)  lock(l2x)
+线程2   lock(l2x)  lock(l1x)
+
+线程1   lock(l1x)  lock(l2x)
+线程2   lock(l2s)  lock(l1x)
+
+对同一个锁先共享后互斥
+线程1   lock(ls)  lock(lx)
+线程2   lock(ls)  lock(lx)
+```
+具体到mysql 则情况更为复杂，共享锁、排它锁、意向锁的兼容矩阵
+||X|IX|S|IS|
+|---|---|---|---|---|
+|X|冲突|冲突|冲突|冲突|
+|IX|冲突|兼容|冲突|兼容|
+|S|冲突|冲突|兼容|兼容|
+|IS|冲突|兼容|兼容|兼容|
+
+避免死锁的办法：对不同的锁，加锁要顺序一致。对同一个锁，要避免先读后写。减少事务的粒度（行锁是在需要的时候才加上的，**但并不是不需要了就立刻释放，而是要等到事务结束时才释放**）。
+
+查看当前数据库的死锁情况 `SHOW ENGINE INNODB STATUS;`
+
+查看一条sql 会加那些锁
+```
+mysql> begin; # 开启事务，注意一定要在事务里操作，否则sql 执行完了，啥也看不到。
+mysql> sql1;
+mysql> SELECT * FROM performance_schema.data_locks; # 查看有哪些事务申请了哪些锁
+...
+mysql> commit;
+```
+其它细节：同一个sql 不同的隔离级别可能会加不同的锁；发生死锁后，innodb 会选择回滚undo 量最小的事务。
+
 ## MVCC 为数据提供多个副本
+
 [数据库基础（四）Innodb MVCC实现原理 - 勤劳的小手的文章 - 知乎](https://zhuanlan.zhihu.com/p/52977862)一种无锁并发控制技术。通过数据库事务版本号、记录中的隐式字段、undo log、read view来实现的。
 1. 每次事务开启前都会从数据库获得一个自增长的事务ID，可以从事务ID判断事务的执行先后顺序。
 2. 记录的隐藏字段

@@ -248,6 +248,8 @@ Control group /:
 
 ## 其它
 
+[解读Kubernetes常见退出码](https://mp.weixin.qq.com/s/D9D862s0YUmsGErhjjEsbQ)
+
 [解密 Kubernetes Pod 中容器的有序部署：Kubexit 工具的妙用](https://mp.weixin.qq.com/s/bMbhcuIo-IcjGkej2LYPMw)
 未细读。
 
