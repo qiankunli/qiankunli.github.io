@@ -11,7 +11,7 @@ keywords: Python
 * TOC
 {:toc}
 
-## 前言（未完成）
+## 前言
 
 ## 安装第三方包
 
@@ -21,6 +21,14 @@ keywords: Python
 2. 下载第三方包文件，执行其对应的安装脚本，`python setup.py install`（跟python安装pip的方式一样）
 
 其本质都是将第三方包文件放在约定目录。
+
+
+sys.path 是一个 Python 列表，用于指定解释器在导入模块时搜索模块的路径。当你尝试导入一个模块时，Python 解释器会按照 sys.path 中的路径顺序从前往后（越靠前的路径优先级越高）进行搜索，直到找到对应的模块为止。sys.path 的值通常是由以下几部分组成：
+1. Python 安装目录下的 site-packages 目录，用于存放第三方库的安装包。
+2. 当前目录（即运行 Python 解释器的目录）。
+3. 通过 PYTHONPATH 环境变量设置的额外路径。
+4. 其他自定义的路径，可以通过在代码中使用 sys.path.append() 方法添加。
+可以在 Python 解释器中执行 `print(sys.path)`，查看当前 Python 解释器的 sys.path。
 
 ## streamlit
 
@@ -39,7 +47,7 @@ st.text_input('请输入最喜欢的编程语言', key="name")
 
 ## pydantic
 
-pydantic库是一种常用的用于数据接口schema定义与检查的库。PS： 有点像java的 apache commons 库
+pydantic 是一个基于Python类型提示来定义数据验证、序列化和文档(使用JSON模式)的库； 使用Python的类型提示来进行数据校验和settings管理； 可以在代码运行的时候提供类型提示，数据校验失败的时候提供友好的错误提示；
 1. 所有基于pydantic的数据类型本质上都是一个BaseModel类
 2. pydantic中的一些常用的基本类型 Dict, List, Sequence, Set, Tuple
 3. 高级数据结构：Enum, Optional、Union
@@ -47,18 +55,37 @@ pydantic库是一种常用的用于数据接口schema定义与检查的库。PS�
 5. 使用field可以灵活地定义模型中的字段，指定字段类型、默认值，添加校验函数、文档字符串等
 
 ```python
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 class Person(BaseModel):
-    name: str
+    name: str #必填字段（无默认值的时候，其为必填字段）
+    email: Optional[EmailStr] = None # 有默认值表示是可选字段
 # 直接传值，此时就不用定义 __init__ 了
 p = Person(name="Tom") 
 # 通过字典传入
 p = {"name": "Tom"} 
 p = Person(**p)
 # 通过其他的实例化对象传入
-    p2 = Person.copy(p) 
+p2 = Person.copy(p) 
 ```
 
+### 数据验证
+
+除了内置的验证器，我们还可以为我们的模型定义自定义验证器。假设我们想要确保用户年龄在18岁以上。我们可以使用@validator装饰器创建一个自定义验证器：
+
+```python
+from pydantic import BaseModel, EmailStr, validator
+class User(BaseModel):
+    name: str
+    age: int
+    email: EmailStr
+    phone: Optional[str] = None
+
+    @validator("age")
+    def check_age(cls, age):
+        if age < 18:
+            raise ValueError("用户年龄必须大于18岁")
+        return age
+```
 
 在 Pydantic 模型中，root_validator 装饰器用于定义根验证器，它可以用来在整个模型的数据被验证之前执行一些额外的验证逻辑。这对于需要跨越多个字段进行验证的情况非常有用。下面是一个示例：
 
@@ -86,6 +113,39 @@ user_data = {
 user = User(**user_data)
 print(user)
 ```
+Field用于在数据模型中定义字段的附加信息和约束。例如，你可以使用Field来定义字段的描述、默认值、取值范围等。
+
+```python
+from pydantic import BaseModel, Field
+class Product(BaseModel):
+    name: str
+    price: float = Field(..., description="商品价格", gt=1, lt=1000) # ...表示该字段是必填项。
+```
+
+Field函数提供了许多参数来定制字段的行为。以下是一些常用的参数：
+1. default：定义字段的默认值。如果未提供该值，则默认为None。
+2. alias：定义字段的别名。这在处理不符合Python变量命名规则的字段名时非常有用（例如，包含空格或连字符的字段名）。
+3. title：定义字段的标题。这在生成文档时非常有用。
+4. description：定义字段的描述信息。这在生成文档时非常有用。
+5. min_length和max_length：针对字符串类型的字段定义最小和最大长度限制。
+6. gt、ge、lt和le：针对数值类型的字段定义大于（gt）、大于等于（ge）、小于（lt）和小于等于（le）的限制。
+
+### 序列化
+
+BaseModel模型具有以下方法和属性：
+1. dict() 返回模型字段和值的字典；
+2. json() 返回一个 JSON 字符串表示dict()；
+3. copy() 返回模型的副本（默认为浅拷贝）；
+4. parse_obj() 如果对象不是字典，则用于将任何对象加载到具有错误处理的模型中的实用程序；
+5. parse_raw() 用于加载多种格式字符串的实用程序；
+6. parse_file() 喜欢parse_raw()但是对于文件路径；
+7. from_orm() 将数据从任意类加载到模型中；
+8. schema() 返回将模型表示为 JSON Schema 的字典；
+9. schema_json() schema()返回;的 JSON 字符串表示形式 
+10. construct() 无需运行验证即可创建模型的类方法；
+11. `__fields_set__` 初始化模型实例时设置的字段名称集
+12. `__fields__` 模型字段的字典
+13. `__config__` 模型的配置类，cf。模型配置
 
 ## FastAPI
 

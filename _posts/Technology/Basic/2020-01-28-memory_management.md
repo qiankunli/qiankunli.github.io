@@ -213,6 +213,14 @@ Void_t* public_mALLOc(size_t bytes){
 
 ### jvm
 
+JVM运行时数据区域
+
+![](/public/upload/basic/jvm_runtime_data.jpg)
+
+堆内存分配策略
+
+![](/public/upload/basic/jvm_allocate_obj.jpg)
+
 ### go runtime
 
 [Visualizing memory management in Golang](https://deepu.tech/memory-management-in-golang/#:~:text=collection%20comes%20in.-,Go%20Memory%20management,is%20well%20optimized%20and%20efficient.) 有动图建议细读

@@ -19,7 +19,9 @@ LangChain底层就是Prompt、大模型API、以及三方应用API调用三个�
 
 PS：看LangChain的感受就是：遇事不决问LLM。这跟常规的工程项目 严丝合缝的逻辑 + ifelse控制流非常不一样。 比如外挂知识库，LLM 不只用于最后一步 对topk 匹配的chunk 做一下润色给出anwser，前期的文档切分、存储、history的存储、选用，用户query的意图识别、转换都可能用到LLM。
 
-## OPENAI接口
+![](/public/upload/machine/langchain_overview.jpg)
+
+## 干活的基础：OPENAI接口
 
 **LangChain 本身不提供LLM，本质上就是对各种大模型提供的 API 的套壳**，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**
 
