@@ -42,6 +42,11 @@ keywords: llm multimodal
 
 ![](/public/upload/machine/multimodal_network.jpg)
 
+多模态的三条路：
+1. 用多模态数据端到端预训练的模型：Fuyu-8B,Gemini,LVM
+2. 使用“胶水层”粘接已经训练好的文本模型和各模态编码/解码器，使用多模态数据训练胶水层（projection layer） GPT-4V, MiniGPT-4/v2, LLaVA
+3. 使用文本粘接文本模型和多模态识别/生成模型，无需训练，例如语音：whisper语音识别+LLM文本模型+VITS语音合成
+
 ## 文生图
 
 [文生图模型发展简史与原理：DALL·E, Imagen, Stable Diffusion](https://mp.weixin.qq.com/s/u4t23yzx0Qli_NIlnvNNEA) 未读。 

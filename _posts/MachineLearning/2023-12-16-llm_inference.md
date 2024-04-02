@@ -123,7 +123,20 @@ Decoding 阶段不需要 tokenize，每一次做 decoding 都会直接从计算�
 
 ### KV Cache
 
-有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存。但是有一个问题就是KV Cache非常的大，比如说拿LLaMA-13B举例子，假设每个token在一层的大小有20KB，LLaMA-13B有40层，这样这个token大小就会达到800KB，而一个sequence一般来说会有几千的token，也就是说一个sequence就会达到几个G。[Transformers KV Caching Explained](https://medium.com/@joaolages/kv-caching-explained-276520203249) 动图实在太贴切了。
+有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存。
+
+![](/public/upload/machine/kv_cache.jpg)
+
+比如，当预测 今天天气真 ==> 好 时，使用kv cache后流程如下：
+1. 输入“真”的向量
+2. 提取“真”对应的 $Q_i$,$K_i$,$V_i$
+3. 拼接历史K、V的值，得到完整的K、V。
+4. 然后经过Attention计算，获得 $O_i$ 输出。
+5. 根据$O_i$ 计算得到“好”
+
+在推理的时候transformer本质上只需要计算出$O_i$ ，即一个字一个字地蹦。
+1. Attention的第i个输出只和第 i 个query有关，和其他query无关，所以query完全没有必要缓存，每次预测 $O_i$时只要计算最新的$O_i$，其他的丢弃即可。
+2. Attention的输出$O_i$的计算和完整的K和V有关，而K、V的历史值只和历史的O有关，和当前的O无关。那么就可以通过缓存历史的K、V，而避免重复计算历史K、V
 
 ```
 K = X * W_k
@@ -145,9 +158,17 @@ for x in X:  # 对每一个新的输入x
     output = Attention(Q, K_cache, V_cache)
 ```
 
+但是有一个问题就是KV Cache非常的大，比如说拿LLaMA-13B举例子，假设每个token在一层的大小有20KB，LLaMA-13B有40层，这样这个token大小就会达到800KB，而一个sequence一般来说会有几千的token，也就是说一个sequence就会达到几个G。[Transformers KV Caching Explained](https://medium.com/@joaolages/kv-caching-explained-276520203249) 动图实在太贴切了。
+
 Memory waste in KV Cache
 1. 内部碎片：推理过程具有非常大的动态性，输出的长度不能预先知道，传统的serving system为了保险起见，就会预留非常大的空间，比如模型支持的最大输出2048个token，它就会预留这么大的空间，那么如果我产生的输出仅有10个token，剩下的2038的slots就会作为内部碎片被浪费。
 2. 外部碎片：因为每个request长度不等，就像os中的malloc，长度不等，不停的malloc就会产生外部碎片。
+
+KV Cache的优化方法
+1. MQA、MHA减少KV Cache
+2. 窗口约束减少KV Cache
+3. 量化和稀疏
+4. PageAttention
 
 [如何解决LLM大语言模型的并发问题？](https://www.zhihu.com/question/613263140/answer/3271554389)vLLM：Efficient memory management for LLM inference 受到操作系统中的分页和虚拟内存的启发，将KV Block当做页，将Request当做进程，允许在非连续的内存空间中存储连续的KV。PagedAttention机制：传统要求将keys和values存到连续的内存空间，因为我们知道传统大家都是用TensorFlow、pytorch之类的，它是一个个tensor，所以很自然的就假设给它们一段连续的内存空间，但是对于LLM来说，这个假设就不是一个好的假设，因此PagedAttention允许在非连续内存空间中存储连续的keys和values，vLLM维护一个Block table，存放逻辑空间到物理空间的映射。现在有一个Prompt：Alan Turing is a computer scientist，当产生一个新的token时，会查看Block table中的Physical block no.,然后找到对应物理内存的地方存储进去，并更新Block table中的Filled slots内容。当产生“renowned”的时候，是新开了一个Block，所以也要更新Block table，新开一个物理内存（每个kv block中有固定的token数目）。
 
