@@ -130,7 +130,19 @@ metadata:
   - kubernetes
 ```
 
-`kubectl delete configmap/mymap` 只是给 mymap.deletionTimestamp 赋了一个值，当手动移除 finalizers （比如kubectl patch） 之后，才会真正删除mymap。
+`kubectl delete configmap/mymap` 只是给 mymap.deletionTimestamp 赋了一个值，当手动移除 finalizers （比如kubectl patch） 之后，才会真正删除mymap。通过脚本清理带有finalizers 的资源
+```sh
+#!/bin/bash
+NAMESPACE="ns-xx"
+# 获取 resource 资源列表
+resources=$(kubectl get resource -n $NAMESPACE --no-headers -o custom-columns=":metadata.name")
+# 遍历每个 resource 资源并执行 kubectl patch 命令
+for resource in $resources; do
+  echo "Processing resource: $resource"
+  kubectl patch resources/$resource -n $NAMESPACE --type json --patch='[ { "op": "remove", "path": "/metadata/finalizers" } ]'
+  kubectl delete resource -n $NAMESPACE $resource
+done
+```
 
 ## 日志
 
