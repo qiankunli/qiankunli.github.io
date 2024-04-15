@@ -89,6 +89,12 @@ Martin Fowler 认为软件架构是：重要并且难以改变的决策。
 
 ## 其它
 
+李云：我们在编程时，其实包含无意识的两大步骤：第一步完成的是根本任务，即构思好概念和概念之间的关系，这一步我称之为“软件设计”；第二步完成的是次要任务，即在满足时间冗余度和空间冗余度的情形下，将概念用编程语言表达出来，这一步就是编码工作。布鲁克斯指出，过去软件生产效率的巨大进步得益于在次要任务上投入了巨大的努力。比如，新的编程语言、更快的处理器等。然而，除非次要任务占整个软件开发活动的 90%，否则即便将次要任务所花费的时间缩减到零，也不能带来软件生产效率数量级的提高。这就是“没有银弹”四个字的核心所指。即便进入 21 世纪的今天，这一论断依然成立。软件行业在根本任务的生产效率上，并没有取得次要任务那样质的进步。回到“程序易于理解的核心是什么”这个问题上，我对好程序的第二层理解是：**好程序有着清晰、颗粒度合适、连贯且一致的概念**。强调概念质量的背后，表达的是对程序的软件设计质量的高要求，这样的程序才易于理解。概念能力是指个体理解、分析和处理复杂概念和问题的能力。这种能力通常涉及从现象中抽象出关键信息，形成整合的观念和理论，进而能够对复杂的情境进行有效的理解和处理。你知道吗？概念能力是人类应对复杂度的一种独特能力，帮助我们理解并解决大量个例问题。新概念的提出一开始会带来更高的概念成本，需要我们花一定的时间去学习和掌握。可一旦概念被普及，就能提升沟通的效率。那我们为什么最终会喜欢新的概念呢？因为概念将大大降低大脑需要处理的信息量，降低生物能耗，是进化带给我们的一种生存能力使然。在工作中，你可能听到过“分而治之”这个词，讲的是对一个复杂的软件系统，用以大化小、拼积木的方法来实现。当你知道了程序中概念的核心作用后，就可以理解为，复杂的软件系统是通过概念的切分与塑造来实现的。
+1. 第一层理解是：让人易于理解的程序才是好程序。
+2. 第二层理解是：好程序有着清晰、颗粒度合适、连贯且一致的概念。
+3. 好程序的第三层理解：好程序是让人容易修改的。
+“程序的性能、算法、内存开销等要素，为何没有作为好程序的评价指标？”好程序是通过优化而演进出来的。因此，只要程序易懂又好改，其他的问题都不是问题。
+
 [如何画好一张架构图？](https://mp.weixin.qq.com/s/2HjvNnfP7bLNQF5xh8PxIQ)
 1. I claim that you want to start communicating between independent modules no sooner than you absolutely HAVE to, and that you should avoid splitting things up until you really need to, because that communication complexity often swamps the complexity of the actual pieces involved in it.（让我们认识到一种现象，把复杂系统拆分成模块，似乎并没有降低整个系统的复杂度。它降低的只是子系统的复杂度。而整个系统的复杂度，反而会由于拆分后的模块之间，不得不进行交互，变得更加复杂。）
 2. The fundamental organization of a system, embodied in its components, their relationships to each other and the environment, and the principles governing its design and evolution.　Architecture = Structure of Component + Relationships + Principles & Guidelines。

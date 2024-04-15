@@ -50,6 +50,19 @@ DLRover 在 Kubernetes 上设计了一个 CRD ElasticJob，由 ElasticJob Contro
 ![](/public/upload/machine/dl_rover_elastic_job.jpg)
 不同场景对应不同的crd： ElasticJob ==> ps/worker; PytorchJob ==> Pytorch allreduce; TrainingJob+ScaleIn+ScaleOut ==> Elastic Horovod。
 
+[DLRover：蚂蚁开源大规模智能分布式训练系统](https://blog.csdn.net/SOFAStack/article/details/129394779)
+
+![](/public/upload/machine/dlrover_arch.jpg)
+
+DLRover 以 ElasticJob CRD 的形式将作业提交到集群。收到 CRD 后，ElasticJob Operator 会拉起一个 Master Pod 作为 Elastic Trainer。其从 Brain 服务中获取初始资源计划。Elastic Trainer 用它来创建 Scale CRD，并应用 Scale CRD 通知 ElasticJob Controller 启动所需的 Pod，每个 Pod 将在其上启动一个 Elastic Agent。在训练过程中，Elastic Trainer 的 Training Master 将数据分片分发给 Worker。同时，Cluster Monitor 监控每个作业的运行状态（i.e.每个节点的 Workload）和集群状态（i.e. 资源水位）。这些数据将定期报告给 Brain，Brain 将数据持久化到数据库中。然后 DLRover Brain 根据作业的运行状态，选择合适的算法生成新的资源计划，并通知 Elastic Trainer 开始资源调整。
+1. 自动资源推导：用户提交分布式作业时无需提供任何资源信息（不用配cpu/mem），帮助用户自动初始化训练资源，提升资源利用率与作业稳定性。
+2. 动态训练数据分片：针对不同 Worker 性能不通造成的木桶效应，根据实际消费速度分配训练数据，可配合 Failover 记录消费位点，数据不丢失。混部集群存在资源超卖和抢占的情况，部分节点消费数据慢，快节点需要等待慢节点，降低训练速度。DLRover 可以通过数据动态分发给慢节点少分发一些数据，减少等待。当扩容或者缩容时，需要有个全局协调者知道记录节点当前消费数据详情。当节点失败重启后，全局协调者需要知道节点已经消费和尚未消费的数据。如果这些逻辑让训练节点来做，训练节点和训练节点之间需要交互，增加训练节点逻辑的复杂性。DLRover Master 充当了这个全局协调者的角色。训练节点只管从 DLRover Master 获取 Shard，然后读取数据，不需要处理其他的逻辑。
+3. 单点容错：
+    1. 自动节点检测是指在训练中断时，系统会自动进行硬件和通信检测，识别并隔离故障节点，随后启动新的节点替代。
+    1. 提供单点容错的能力，不需要完整重启作业。例如集群中，很常见的一类错误是由于用户配置了不足的内存，导致训练 OOM。在 DLRover 的帮助下，我们可以自动拉起一个优化配置的节点来恢复失败的 Node。
+4. 资源弹性：支持运行时 Pod 级和 CPU/Memory 级的资源弹性扩缩容，动态全局优化决策。通过监控作业节点的 Workload，DLRover 可以分析资源配置的瓶颈。常见的资源瓶颈有：节点抢占、Workload 不平衡、CPU 不足导致算力低下、节点数目不足。DLRover 可以通过动态的资源热更新来持续优化训练性能。通常不同的模型训练作业，需要不同的资源配置。然而用户倾向于超额配置作业的资源以保障作业的成功率。这通常会导致大量的资源浪费。DLRover 的自动扩缩容能力，可以自动根据作业的真实需求配置资源，以最少的资源达到最优的训练性能，从而减少资源浪费。
+4. DLRover 支持用户使用任何自己的训练框架，底层训练代码通过提供约定的 API 接口以实现自动弹性扩缩等需要同底层分布式代码深度交互。集群中部署完成后，终端算法同学基本可以无感接入。
+
 ## train_script 的守护者elastic agent
 
 `python -m torch.distributed.run train_script.py ` 对于每一个node 有两个角色

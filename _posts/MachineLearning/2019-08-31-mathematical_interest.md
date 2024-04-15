@@ -158,6 +158,7 @@ https://zhuanlan.zhihu.com/p/46928319
 
 [对线性回归，logistic回归和一般回归的认识](https://www.cnblogs.com/jerrylead/archive/2011/03/05/1971867.html)
 [深度学习领域最常用的10个激活函数，一文详解数学原理及优缺点](https://mp.weixin.qq.com/s/bleTRzA_1X3umR5UXSpuHg)
+[这篇文章让你不再死记硬背交叉熵损失函数的原理](https://mp.weixin.qq.com/s/JbrklCzkvY2Ub-rycolJ4w)
 
 ## 从自动微分法来理解线性回归
 

@@ -62,3 +62,5 @@ keywords: llm multimodal
 [一文带你了解OpenAI Sora](https://mp.weixin.qq.com/s/Efk-gP8iuau3crWB2wWizg)
 
 [OpenAI 的 ​Sora 技术报告详解](https://mp.weixin.qq.com/s/MyWPPY19wwsJv8zdBMxdFg)
+
+[Sora 的基石：Diffusion Transformer 原理与源码解析](https://zhuanlan.zhihu.com/p/684125968) 未读

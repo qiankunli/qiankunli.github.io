@@ -272,142 +272,12 @@ class LLMChain(Chain):
 
 PS：用一个最复杂的场景比如 ConversationalRetrievalChain 打上断点，观察各个变量值的变化，有助于了解Chain的运行逻辑。 
 
-### Retriever
-
-检索器(retriever)是一个接口，它需要实现的功能是：对于给定的一个非结构化的查询，返回Document对象；它本身不需要存储数据，只是简单地返回数据。A retriever is an interface that returns documents given an unstructured query. It is more general than a vector store. A retriever does not need to be able to store documents, only to return (or retrieve) them. Vector stores can be used as the backbone of a retriever, but there are other types of retrievers as well. 比如 EnsembleRetriever 本身不存储数据，只是基于rrf 算法对 持有的Retriever 的返回结果进行汇总排序。
-
-**Document 对象的艺术之旅**（从加载、转换、存储、到查询结果都用Document 表示）
-
-![](/public/upload/machine/langchain_retriever.jpg)
-
-```python
-loader = TextLoader('./test.txt', encoding='utf8')
-docs = loader.load()
-print(docs)
-# [Document(page_content='ChatGPT是OpenAI开发的一个大型语言模型，...', metadata={'source': './test.txt'})]
-text_splitter = CharacterTextSplitter(separator = "\n\n",chunk_size = 1000,chunk_overlap  = 200,length_function = len,is_separator_regex = False,)
-texts = text_splitter.create_documents([d.page_content for d in docs])
-print(texts)
-# [
-#	Document(page_content='ChatGPT是OpenAI开发的一个大型语言模型，...', metadata={}), 
-#	Document(page_content='我们将探讨如何使用不同的提示工程技术来实现不同的目标。...', metadata={}), 
-#	Document(page_content='无论您是普通人、研究人员、开发人员，...', metadata={}), 
-#	Document(page_content='在整本书中，...', metadata={})
-#]
-embeddings = HuggingFaceEmbeddings(model_name='BAAI/bge-large-en',multi_process=True)
-db = Chroma.from_documents(texts, embeddings)
-query = "ChatGPT是什么？"
-docs = db.similarity_search(query)
-print(docs[0].page_content)
-# ChatGPT是OpenAI开发的一个大型语言模型，可以提供各种主题的信息
-retriever = db.as_retriever()
-retrieved_docs = retriever.invoke(query)
-print(retrieved_docs[0].page_content)
-```
-
-retriever.invoke(query) ==> retriever.get_relevant_documents ==> VectorStoreRetriever.similarity_search
-
-```python
-class BaseRetriever(ABC):
-    def invoke(self, input: str, config: Optional[RunnableConfig] = None) -> List[Document]:
-        config = config or {}
-        return self.get_relevant_documents(input,...)     
-    def get_relevant_documents(self, query: str, *, callbacks: Callbacks = None, **kwargs: Any) -> List[Document]:
-    @abstractmethod
-    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
-    async def aget_relevant_documents(self, query: str, *, callbacks: Callbacks = None, **kwargs: Any) -> List[Document]:
-class VectorStoreRetriever(BaseRetriever):
-    def _get_relevant_documents( self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
-        docs = self.vectorstore.similarity_search(query, **self.search_kwargs)
-        return docs
-```
-
-BaseRetriever 的基本工作就是 get_relevant_documents（留给子类 _get_relevant_documents实现），核心是vectorstore.similarity_search，对于 BaseRetriever 的扩展，则是在vectorstore.similarity_search 之前或之后做一些事情，这也是  retriever 和 VectorStore 要分为两个接口的原因，比如做以下的事儿
-1. 处理query，比如生成多个新的query，比如 MultiQueryRetriever
-2. 对找回的documents 进一步的查询、转换等，比如ParentDocumentRetriever
-3. 提供add_documents 接口，在存入 vectorstore 时即将 get_relevant_documents 用到的一些关联数据存入到docstore
-4. 比如 EnsembleRetriever 本身不存储数据，只是基于rrf 算法对 持有的Retriever 的返回结果进行汇总排序。也就是  BaseRetriever 的主要子类是 VectorStoreRetriever，但也不全是VectorStoreRetriever。
-5. Retriever 查询过程中支持回调 RetrieverManagerMixin 的 on_retriever_end 和 on_retriever_error方法，而vectorstore的执行过程不会触发回调。
-
-```python
-class MultiQueryRetriever(BaseRetriever):
-    retriever: BaseRetriever
-    llm_chain: LLMChain
-    def _get_relevant_documents(self,query: str,*,run_manager: CallbackManagerForRetrieverRun,) -> List[Document]:
-        queries = self.generate_queries(query, run_manager)
-        documents = self.retrieve_documents(queries, run_manager)
-        return self.unique_union(documents) 
-class MultiVectorRetriever(BaseRetriever):
-    id_key: str = "doc_id"
-    vectorstore: VectorStore
-    docstore: BaseStore[str, Document]
-    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
-        sub_docs = self.vectorstore.similarity_search(query, **self.search_kwargs)
-        ids = [] # We do this to maintain the order of the ids that are returned
-        for d in sub_docs:
-            if d.metadata[self.id_key] not in ids:
-                ids.append(d.metadata[self.id_key])
-        docs = self.docstore.mget(ids)
-        return [d for d in docs if d is not None]
-# 将文档拆分为较小的块，同时每块关联其父文档的id，小块用于提高检索准确度，大块父文档用于返回上下文
-class ParentDocumentRetriever(MultiVectorRetriever):
-    child_splitter: TextSplitter
-    parent_splitter: Optional[TextSplitter] = None
-    def add_documents(self,documents: List[Document],ids: Optional[List[str]] = None,add_to_docstore: bool = True,) -> None:
-        documents = self.parent_splitter.split_documents(documents)
-        docs = []
-        full_docs = []
-        for i, doc in enumerate(documents):
-            sub_docs = self.child_splitter.split_documents([doc])
-            for _doc in sub_docs:
-                _doc.metadata[self.id_key] = _id
-            docs.extend(sub_docs)
-            full_docs.append((_id, doc))
-        self.vectorstore.add_documents(docs)
-        self.docstore.mset(full_docs)
-```
-
-RetrievalQA 则是retriever 的包装类，有点retriever  工厂的意思，根据不同的参数 选择不同的llm、retriever 来实现QA。 
-
-```python
-qa = RetrievalQA.from_chain_type(llm=OpenAI(), chain_type="stuff",retriever=self.vector_db.as_retriever())
-answer = qa(query)                                          
-```
-其实质是 通过retriever 获取相关文档，并通过BaseCombineDocumentsChain 来获取答案。
-```
-RetrievalQA.from_chain_type 
-    ==> load_qa_chain ==> _load_stuff_chain ==> StuffDocumentsChain(xx)
-    ==> RetrievalQA(chain, retriever)
-```
-
-```python
-# langchain/chains/retrieval_qa/base.py
-@classmethod
-def from_chain_type(cls,llm: BaseLanguageModel,chain_type: str = "stuff",chain_type_kwargs: Optional[dict] = None,**kwargs: Any,) -> BaseRetrievalQA:
-    """Load chain from chain type."""
-    _chain_type_kwargs = chain_type_kwargs or {}
-    combine_documents_chain = load_qa_chain(llm, chain_type=chain_type, **_chain_type_kwargs)
-    return cls(combine_documents_chain=combine_documents_chain, **kwargs)
-# langchain/chains/question_answering/__init__.py
-def load_qa_chain(llm: BaseLanguageModel,chain_type: str = "stuff",verbose: Optional[bool] = None,callback_manager: Optional[BaseCallbackManager] = None,**kwargs: Any,) -> BaseCombineDocumentsChain:
-    loader_mapping: Mapping[str, LoadingCallable] = {
-        "stuff": _load_stuff_chain,
-        "map_reduce": _load_map_reduce_chain,
-        "refine": _load_refine_chain,
-        "map_rerank": _load_map_rerank_chain,
-    }
-    return loader_mapping[chain_type](
-        llm, verbose=verbose, callback_manager=callback_manager, **kwargs
-    )
-def _load_stuff_chain(...)-> StuffDocumentsChain:
-    _prompt = prompt or stuff_prompt.PROMPT_SELECTOR.get_prompt(llm)
-    llm_chain = LLMChain(llm=llm,prompt=_prompt,verbose=verbose,callback_manager=callback_manager,callbacks=callbacks,)
-    return StuffDocumentsChain(llm_chain=llm_chain,...) 
-class RetrievalQA(BaseRetrievalQA):
-    retriever: BaseRetriever = Field(exclude=True)
-```
 
 ## Memory
+
+通过Chain，LangChain相当于以“工作流”的形式，将LLM与IO组件进行了有秩序的连接，从而具备构建复杂AI工程流程的能力。而我们都知道LLM提供的文本生成服务本身不提供记忆功能，需要用户自己管理对话历史。因此引入Memory组件，可以很好地扩展AI工程的能力边界。
+
+![](/public/upload/machine/langchain_memory.jpg)
 
 记忆 ( memory )允许大型语言模型（LLM）记住与用户的先前交互。默认情况下，LLM/Chain 是 无状态 stateless 的，每次交互都是独立的，无法知道之前历史交互的信息。对于无状态代理 (Agents) 来说，唯一存在的是当前输入，没有其他内容。LangChain通过Memory工具类为Agent和Chain提供了记忆功能，让智能应用能够记住前一次的交互，比如在聊天环境中这一点尤为重要。
 
@@ -562,6 +432,143 @@ class BaseMessage(Serializable):
     additional_kwargs: dict = Field(default_factory=dict)
 ```
 
+## 消除幻觉/Retriever
+
+RAG中关键组件：DocumentLoader/TextSplitter/EmbeddingsModel/VectorStore/Retriever。
+
+检索器(retriever)是一个接口，它需要实现的功能是：对于给定的一个非结构化的查询，返回Document对象；它本身不需要存储数据，只是简单地返回数据。A retriever is an interface that returns documents given an unstructured query. It is more general than a vector store. A retriever does not need to be able to store documents, only to return (or retrieve) them. Vector stores can be used as the backbone of a retriever, but there are other types of retrievers as well. 比如 EnsembleRetriever 本身不存储数据，只是基于rrf 算法对 持有的Retriever 的返回结果进行汇总排序。
+
+**Document 对象的艺术之旅**（从加载、转换、存储、到查询结果都用Document 表示）
+
+![](/public/upload/machine/langchain_retriever.jpg)
+
+```python
+loader = TextLoader('./test.txt', encoding='utf8')
+docs = loader.load()
+print(docs)
+# [Document(page_content='ChatGPT是OpenAI开发的一个大型语言模型，...', metadata={'source': './test.txt'})]
+text_splitter = CharacterTextSplitter(separator = "\n\n",chunk_size = 1000,chunk_overlap  = 200,length_function = len,is_separator_regex = False,)
+texts = text_splitter.create_documents([d.page_content for d in docs])
+print(texts)
+# [
+#	Document(page_content='ChatGPT是OpenAI开发的一个大型语言模型，...', metadata={}), 
+#	Document(page_content='我们将探讨如何使用不同的提示工程技术来实现不同的目标。...', metadata={}), 
+#	Document(page_content='无论您是普通人、研究人员、开发人员，...', metadata={}), 
+#	Document(page_content='在整本书中，...', metadata={})
+#]
+embeddings = HuggingFaceEmbeddings(model_name='BAAI/bge-large-en',multi_process=True)
+db = Chroma.from_documents(texts, embeddings)
+query = "ChatGPT是什么？"
+docs = db.similarity_search(query)
+print(docs[0].page_content)
+# ChatGPT是OpenAI开发的一个大型语言模型，可以提供各种主题的信息
+retriever = db.as_retriever()
+retrieved_docs = retriever.invoke(query)
+print(retrieved_docs[0].page_content)
+```
+
+retriever.invoke(query) ==> retriever.get_relevant_documents ==> VectorStoreRetriever.similarity_search
+
+```python
+class BaseRetriever(ABC):
+    def invoke(self, input: str, config: Optional[RunnableConfig] = None) -> List[Document]:
+        config = config or {}
+        return self.get_relevant_documents(input,...)     
+    def get_relevant_documents(self, query: str, *, callbacks: Callbacks = None, **kwargs: Any) -> List[Document]:
+    @abstractmethod
+    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+    async def aget_relevant_documents(self, query: str, *, callbacks: Callbacks = None, **kwargs: Any) -> List[Document]:
+class VectorStoreRetriever(BaseRetriever):
+    def _get_relevant_documents( self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+        docs = self.vectorstore.similarity_search(query, **self.search_kwargs)
+        return docs
+```
+
+BaseRetriever 的基本工作就是 get_relevant_documents（留给子类 _get_relevant_documents实现），核心是vectorstore.similarity_search，对于 BaseRetriever 的扩展，则是在vectorstore.similarity_search 之前或之后做一些事情，这也是  retriever 和 VectorStore 要分为两个接口的原因，比如做以下的事儿
+1. 处理query，比如生成多个新的query，比如 MultiQueryRetriever
+2. 对找回的documents 进一步的查询、转换等，比如ParentDocumentRetriever
+3. 提供add_documents 接口，在存入 vectorstore 时即将 get_relevant_documents 用到的一些关联数据存入到docstore
+4. 比如 EnsembleRetriever 本身不存储数据，只是基于rrf 算法对 持有的Retriever 的返回结果进行汇总排序。也就是  BaseRetriever 的主要子类是 VectorStoreRetriever，但也不全是VectorStoreRetriever。
+5. Retriever 查询过程中支持回调 RetrieverManagerMixin 的 on_retriever_end 和 on_retriever_error方法，而vectorstore的执行过程不会触发回调。
+
+```python
+class MultiQueryRetriever(BaseRetriever):
+    retriever: BaseRetriever
+    llm_chain: LLMChain
+    def _get_relevant_documents(self,query: str,*,run_manager: CallbackManagerForRetrieverRun,) -> List[Document]:
+        queries = self.generate_queries(query, run_manager)
+        documents = self.retrieve_documents(queries, run_manager)
+        return self.unique_union(documents) 
+class MultiVectorRetriever(BaseRetriever):
+    id_key: str = "doc_id"
+    vectorstore: VectorStore
+    docstore: BaseStore[str, Document]
+    def _get_relevant_documents(self, query: str, *, run_manager: CallbackManagerForRetrieverRun) -> List[Document]:
+        sub_docs = self.vectorstore.similarity_search(query, **self.search_kwargs)
+        ids = [] # We do this to maintain the order of the ids that are returned
+        for d in sub_docs:
+            if d.metadata[self.id_key] not in ids:
+                ids.append(d.metadata[self.id_key])
+        docs = self.docstore.mget(ids)
+        return [d for d in docs if d is not None]
+# 将文档拆分为较小的块，同时每块关联其父文档的id，小块用于提高检索准确度，大块父文档用于返回上下文
+class ParentDocumentRetriever(MultiVectorRetriever):
+    child_splitter: TextSplitter
+    parent_splitter: Optional[TextSplitter] = None
+    def add_documents(self,documents: List[Document],ids: Optional[List[str]] = None,add_to_docstore: bool = True,) -> None:
+        documents = self.parent_splitter.split_documents(documents)
+        docs = []
+        full_docs = []
+        for i, doc in enumerate(documents):
+            sub_docs = self.child_splitter.split_documents([doc])
+            for _doc in sub_docs:
+                _doc.metadata[self.id_key] = _id
+            docs.extend(sub_docs)
+            full_docs.append((_id, doc))
+        self.vectorstore.add_documents(docs)
+        self.docstore.mset(full_docs)
+```
+
+RetrievalQA 则是retriever 的包装类，有点retriever  工厂的意思，根据不同的参数 选择不同的llm、retriever 来实现QA。 
+
+```python
+qa = RetrievalQA.from_chain_type(llm=OpenAI(), chain_type="stuff",retriever=self.vector_db.as_retriever())
+answer = qa(query)                                          
+```
+其实质是 通过retriever 获取相关文档，并通过BaseCombineDocumentsChain 来获取答案。
+```
+RetrievalQA.from_chain_type 
+    ==> load_qa_chain ==> _load_stuff_chain ==> StuffDocumentsChain(xx)
+    ==> RetrievalQA(chain, retriever)
+```
+
+```python
+# langchain/chains/retrieval_qa/base.py
+@classmethod
+def from_chain_type(cls,llm: BaseLanguageModel,chain_type: str = "stuff",chain_type_kwargs: Optional[dict] = None,**kwargs: Any,) -> BaseRetrievalQA:
+    """Load chain from chain type."""
+    _chain_type_kwargs = chain_type_kwargs or {}
+    combine_documents_chain = load_qa_chain(llm, chain_type=chain_type, **_chain_type_kwargs)
+    return cls(combine_documents_chain=combine_documents_chain, **kwargs)
+# langchain/chains/question_answering/__init__.py
+def load_qa_chain(llm: BaseLanguageModel,chain_type: str = "stuff",verbose: Optional[bool] = None,callback_manager: Optional[BaseCallbackManager] = None,**kwargs: Any,) -> BaseCombineDocumentsChain:
+    loader_mapping: Mapping[str, LoadingCallable] = {
+        "stuff": _load_stuff_chain,
+        "map_reduce": _load_map_reduce_chain,
+        "refine": _load_refine_chain,
+        "map_rerank": _load_map_rerank_chain,
+    }
+    return loader_mapping[chain_type](
+        llm, verbose=verbose, callback_manager=callback_manager, **kwargs
+    )
+def _load_stuff_chain(...)-> StuffDocumentsChain:
+    _prompt = prompt or stuff_prompt.PROMPT_SELECTOR.get_prompt(llm)
+    llm_chain = LLMChain(llm=llm,prompt=_prompt,verbose=verbose,callback_manager=callback_manager,callbacks=callbacks,)
+    return StuffDocumentsChain(llm_chain=llm_chain,...) 
+class RetrievalQA(BaseRetrievalQA):
+    retriever: BaseRetriever = Field(exclude=True)
+```
+
 ## Callback
 
 LangChain 的 Callback 机制允许你在应用程序的不同阶段进行自定义操作，如日志记录、监控和数据流处理，这个机制通过 CallbackHandler（回调处理器）来实现。回调处理器是 LangChain 中实现 CallbackHandler 接口的对象，为每类可监控的事件提供一个方法。当该事件被触发时，CallbackManager 会在这些处理器上调用适当的方法。
@@ -612,3 +619,15 @@ class AsyncCallbackHandler(BaseCallbackHandler):
     async def on_retriever_error(self,error: BaseException,...):
         """Run on retriever error."""
 ```
+
+## 工作流
+
+LangChain的表达式语言LCEL通过重载__or__运算符的思路，构建了类似Unix管道运算符的设计，实现更简洁的LLM调用形式。
+```python
+# 创建Chain
+chain = prompt | llm | output_parser
+# 调用Chain
+answer = chain.invoke({'question': '什么是图计算？'})
+print(answer)
+```
+但依然有DAG天然的设计限制，即不能支持“循环”。于是LangChain社区推出了一个新的项目——LangGraph，期望基于LangChain构建支持循环和跨多链的计算图结构，以描述更复杂的，甚至具备自动化属性的AI工程应用逻辑，比如智能体应用。

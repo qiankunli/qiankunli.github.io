@@ -63,6 +63,8 @@ GPT-3论文定义：如果需要（基于梯度下降为主的算法）对模型
 
 [人人都需要掌握的Prompt Engineering技巧](https://mp.weixin.qq.com/s/JvoBOzdHmagLXiT2k1nYPQ)对于一些复杂的问题，Prompt写得好不好，直接影响着大模型给出答案的正确与否。本质上，**LLM是一个概率模型，它只是在给定的信息的前提下，给出概率最大的结果，它并不保证结果的合理性和正确性**。要让LLM给出的结果尽可能地合理、正确，这是我们使用LLM的人的职责。
 
+![](/public/upload/machine/prompt_principle.jpg)
+
 AI界的大佬 --- Andrew NG推出过一个Prompt Engineering的短课程《ChatGPT Prompt Engineering for Developers》，提到写好Prompt的一些基本理念。PS： **ICL给示范/示例，CoT给思路**，老师教学也是这么搞的。
 1. 明确、具体是关键。我们发给LLM的批令，越明确、越具体，对于LLM越友好。
     ![](/public/upload/machine/prompt_tips.jpg)

@@ -248,6 +248,10 @@ openai 参数转为  model_worker api 参数，最终转为 （Transformer库或
 
 [vLLM（二）架构概览](https://zhuanlan.zhihu.com/p/681716326)
 
+[图解大模型计算加速系列：vLLM源码解析1，整体架构](https://mp.weixin.qq.com/s/r_t6_zMvPT7za82MZX4oRA) 未读
+
+[图解大模型计算加速系列：vLLM源码解析2，调度器策略(Scheduler)](https://mp.weixin.qq.com/s/UCdqQUM_9a36uXkO36wpSg) 未读
+
 ## TensorRT-LLM
 
 [LLM推理：GPU资源和推理框架选择](https://mp.weixin.qq.com/s/coxDO2z2_w17UbbiTseNpw)TensorRT-LLM是Nvidia开源的LLM推理引擎，由开源项目FastTransformer演进而来，TensorRT-LLM需要结合Triton Inference Server才能构建完整的LLM推理服务。如果需要支持基于RESTFul API的流式输出（例如，类似OpenAI的LLM推理API接口），还需要进一步配合FastAPI才能支持流式输出。TensorRT-LLM目前还不是完全开源的，例如，Batch Manager 目前是不开源的。

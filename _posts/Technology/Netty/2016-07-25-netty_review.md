@@ -16,6 +16,8 @@ keywords: JAVA netty review
 [从操作系统层面分析Java IO演进之路](https://mp.weixin.qq.com/s/KgJFyEmZApF7l5UUJeWf8Q) netty 和 kernel 交互图
 ![](/public/upload/netty/netty_kernel.png)
 
+[这些年背过的面试题——Netty篇](https://mp.weixin.qq.com/s/JZE22Ndvo0tWC2P-MD0ROg) 未读。
+
 ## netty做了什么工作
 
 Java 的标准类库，由于其基础性、通用性的定位，往往过于关注技术模型上的抽象，而不是从一线应用开发者的角度去思考。java nio类库的三个基本组件bytebuffer、channel、selector。java只是将这三个组件赤裸裸的提供给你，线程模型由我们自己决定采用，数据协议由我们自己制定并解析。
