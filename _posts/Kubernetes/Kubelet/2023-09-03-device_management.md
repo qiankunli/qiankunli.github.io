@@ -21,3 +21,5 @@ keywords:  kubelet 组件分析
 K8s 这种节点的设备管理能力一定程度上已经落后时代了，虽然现在最新的版本里支持了 DRA 分配机制（类似于已有的 PVC 调度机制），但是这个机制首先只在最新版本的 K8s 才支持。
 
 koord-scheduler 调度器根据 koordlet 上报的 Device CRD 分配设备（Koordinator Device CRD 用来描述节点的设备信息，包括 Device 的拓扑信息，这些信息可以指导调度器实现精细化的分配逻辑），并写入到 Pod Annotation 中，，再经 kubelet 拉起 Sandbox 和 Container，这中间 kubelet 会发起 CRI 请求到 containerd/docker。在 Koordinator 方案中，CRI 请求会被 koord-runtime-proxy 拦截并转发到 koordlet 内的 GPU 插件，感知 Pod Annotation 上的设备分配结果并生成必要的设备环境变量等信息返回给 koord-runtime-proxy，再最终把修改后的 CRI 请求转给 containerd/docker，最终再返回给 kubelet。这样就可以无缝的介入整个容器的生命周期实现自定义的逻辑。
+
+[K8s 动态资源分配 (DRA) 的重大变化](https://mp.weixin.qq.com/s/iBNYBSWjfBSK9iGW9OC4Aw) 未搞明白

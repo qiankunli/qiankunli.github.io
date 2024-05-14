@@ -46,9 +46,16 @@ Java 的标准类库，由于其基础性、通用性的定位，往往过于关
 
 ![](/public/upload/netty/netty_layer.png)
 
-1. 网络通信层：它执行网络 I/O 操作，核心组件包含 BootStrap、ServerBootStrap、Channel。——Channel 通道，提供了基础的 API 用于操作网络 IO，比如 bind、connect、read、write、flush 等等。它以 JDK NIO Channel 为基础，提供了更高层次的抽象，同时屏蔽了底层 Socket 的复杂性。Channel 有多种状态，比如连接建立、数据读写、连接断开。随着状态的变化，Channel 处于不同的生命周期，背后绑定相应的事件回调函数。
-2. 事件调度层：它的核心组件包含 EventLoopGroup、EventLoop。——EventLoop 本质是一个线程池，主要负责接收 Socket I/O 请求，并分配事件循环器来处理连接生命周期中所发生的各种事件。
-3. 服务编排层：它的职责实现网络事件的动态编排和有序传播——ChannelPipeline 基于责任链模式，方便业务逻辑的拦截和扩展；本质上它是一个双向链表将不同的 ChannelHandler 链接在一块，当 I/O 读写事件发生时, 会依次调用 ChannelHandler 对 Channel(Socket) 读取的数据进行处理。
+1. 网络通信层：网络通信层的职责是执行网络 I/O 的操作。当网络数据读取到内核缓冲区后，会触发各种网络事件。这些网络事件会分发给事件调度层进行处理。核心组件包含 BootStrap、ServerBootStrap、Channel。——Channel 通道，提供了基础的 API 用于操作网络 IO，比如 bind、connect、read、write、flush 等等。它以 JDK NIO Channel 为基础，提供了更高层次的抽象，同时屏蔽了底层 Socket 的复杂性。Channel 有多种状态，比如连接建立、数据读写、连接断开。随着状态的变化，Channel 处于不同的生命周期，背后绑定相应的事件回调函数。
+2. 事件调度层：事件调度层的职责是通过 Reactor 线程模型对各类事件进行聚合处理，通过 Selector 主循环线程集成多种事件(I/O 事件,信号事件,定时事件等)，实际的业务处理逻辑是交由服务编排层中相关的 Handler 完成。事件调度层主要由EventLoopGroup和EventLoop构成。——EventLoop 本质是一个线程池，主要负责接收 Socket I/O 请求，并分配事件循环器来处理连接生命周期中所发生的各种事件。
+3. 服务编排层：服务编排层的职责是通过组装各类handler来实现网络数据流的处理。它是 Netty 的核心处理链，用以实现网络事件的动态编排和有序传播。ChannelPipeline 基于责任链模式，方便业务逻辑的拦截和扩展；本质上它是一个双向链表将不同的 ChannelHandler 链接在一块，当 I/O 读写事件发生时, 会依次调用 ChannelHandler 对 Channel(Socket) 读取的数据进行处理。
+
+从服务端的视角简要的看一下Netty整个的运行流程。PS：感受一下cpu执行权在不同层次之间的转移。 
+1. 服务端启动的时把ServerSocketChannel注册到boss EventLoopGroup中某一个EventLoop上，暂时把这个EventLoop叫做server EventLoop；
+2. 当 serverEventLoop中监听到有建立网络连接的事件后会把底层的SocketChannel和serverSocketChannel封装成为NioSocketChannel；
+3. 开始把自定义的ChannelHandler加载到NioSocketChannel 里的pipeline中，然后把该NioSocketChannel注册到worker EventLoopGroup中某一个EventLoop上，暂时把这个EventLoop叫做worker  EventLoop；
+4. worker  EventLoop开始监听NioSocketChannel上所有网络事件；
+5. 当有读事件后就会调用pipeline中第一个InboundHandler的channelRead方法进行处理；
 
 ## channel
 
