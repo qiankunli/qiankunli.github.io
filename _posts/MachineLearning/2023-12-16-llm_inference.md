@@ -67,7 +67,6 @@ Attention(Q,K,V) = softmax(\frac{QK^T}{\sqrt{d_k}})V
 $$
 
 
-
 ### 评估指标
 
 在大语言模型推理中常会用到四个指标：Throughput（吞吐量）、First Token Latency（首字延迟）、Latency（延迟）和QPS（每秒请求数）。这四个性能指标会从四个不同的方面来衡量一个系统的服务提供能力。

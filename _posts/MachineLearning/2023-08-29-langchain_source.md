@@ -585,33 +585,26 @@ class AsyncCallbackHandler(BaseCallbackHandler):
         """Run when LLM starts running."""
     async def on_llm_end(self,response: LLMResult,...):
         """Run when LLM ends running.""" 
-
     async def on_chat_model_start(self,serialized: Dict[str, Any],messages: List[List[BaseMessage]],...):
         """Run when a chat model starts running."""
-        
     async def on_llm_new_token(self,token: str,...):
         """Run on new LLM token. Only available when streaming is enabled."""
-    
     async def on_chain_start(self,inputs: Dict[str, Any],...):
         """Run when chain starts running."""
     async def on_chain_end(self,outputs: Dict[str, Any],...):
         """Run when chain ends running."""
     async def on_chain_error(self,error: BaseException,...):
         """Run when chain errors."""
-
     async def on_tool_start(self,serialized: Dict[str, Any],input_str: str,...):
         """Run when tool starts running."""
     async def on_tool_end(self,output: str,...):
         """Run when tool ends running."""
     async def on_tool_error(self,error: BaseException, ...):
         """Run when tool errors."""
-        
-
     async def on_agent_action(self,action: AgentAction,...):
         """Run on agent action."""
     async def on_agent_finish(self,finish: AgentFinish,...):
-        """Run on agent end."""
-        
+        """Run on agent end."""       
     async def on_retriever_start(self,serialized: Dict[str, Any],query: str,...):
         """Run on retriever start."""
     async def on_retriever_end(self,documents: Sequence[Document],...):
@@ -619,15 +612,3 @@ class AsyncCallbackHandler(BaseCallbackHandler):
     async def on_retriever_error(self,error: BaseException,...):
         """Run on retriever error."""
 ```
-
-## 工作流
-
-LangChain的表达式语言LCEL通过重载__or__运算符的思路，构建了类似Unix管道运算符的设计，实现更简洁的LLM调用形式。
-```python
-# 创建Chain
-chain = prompt | llm | output_parser
-# 调用Chain
-answer = chain.invoke({'question': '什么是图计算？'})
-print(answer)
-```
-但依然有DAG天然的设计限制，即不能支持“循环”。于是LangChain社区推出了一个新的项目——LangGraph，期望基于LangChain构建支持循环和跨多链的计算图结构，以描述更复杂的，甚至具备自动化属性的AI工程应用逻辑，比如智能体应用。

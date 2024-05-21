@@ -20,6 +20,7 @@ In computing, reactive programming is a declaractive programming paradigm concer
 反应式思想也分为不同的层次， 有架构层面的，代码层面的——[rxjava1——概念](http://qiankunli.github.io/2018/06/20/rxjava.html) ReactiveX（RxJava/RxGo） 不等于反应式编程，仅仅是用于反应式编程的API。
 
 [响应式编程的复杂度和简化](https://mp.weixin.qq.com/s/7jUGbSmR87FkTRqsm20NFQ) 响应式代码的编写会有哪些复杂度，应该如何简化。 未读。
+[不要迷信响应式编程，它只是编程范式中的“小丑”](https://mp.weixin.qq.com/s/2l3ZoXBbYU0CaaS5eTrkXQ) 未读。
 
 ## 20200522补充
 

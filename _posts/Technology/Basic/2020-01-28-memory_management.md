@@ -30,6 +30,8 @@ keywords: memory management
 
 ![](/public/upload/go/mm_envole.png)
 
+[理解内存的Rank、位宽以及内存颗粒内部结构](https://mp.weixin.qq.com/s/wCzeFhTE8OEWaZmMhc0iUw) 未读
+
 ## 内存回收/gc
 
 独立成文。

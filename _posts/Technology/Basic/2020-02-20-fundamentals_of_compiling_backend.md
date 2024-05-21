@@ -308,7 +308,31 @@ LLVM提供了代表 LLVM IR 的一组对象模型，我们只要生成这些对�
 
 ## 即时编译JIT
 
-JIT Compilation 的全称为 “Just-In-Time Compilation”，翻译过来为“即时编译”。其最显著的特征是**代码的编译过程发生在程序的执行期间**，而非执行之前。
+JIT Compilation 的全称为 “Just-In-Time Compilation”，翻译过来为“即时编译”。其最显著的特征是**代码的编译过程发生在程序的执行期间**，而非执行之前。核心机制：
+1. 可写可执行的内存区域；把你要编译的 Java 方法翻译成机器码，写入到这块内存里。当需要再次调用原来的 Java 方法时，就转向调用这块内存。
+2. 基于采样的编译优化。
+    ```java
+    public static int test(boolean flag) {
+        int b = 0;
+        if (flag) {
+            b = 3;
+        }
+        else {
+            b = 2;
+        }
+        return b + 4;
+    }
+    // 当 JIT 编译器发现，test 方法被调用了 500 次（这个阈值由 JVM 参数指定），每一次 flag 的值都是 true，那它就可以合理地猜测，下一次可能还是 true，它就会把 test 方法优化成下面这个样子：
+    public static int test(boolean flag) {
+        return 7;
+    }
+    //  JVM 在 test 方法里留一个哨兵，当参数 flag 的值为 false 的时候，可以再退回到解释器执行。
+    public static int test(boolean flag) {
+    if (!flag)
+            deoptimize() // deoptimize 方法是 JVM 提供的内建方法，它的作用是由 JIT 编译器退回到解释器进行执行。
+        return 7;
+    }
+    ```
 
 传统的 JIT 编译器在实际动态生成机器码前，会首先对原始代码或其相应的 IR 中间代码进行一系列的分析（profiling）。通过这些分析过程，编译器能够找到可以通过 JIT 编译进行性能优化的“关键代码路径”。这里的取舍重点在于：对这些代码进行运行时优化而得到的性能提升收益，需要高于进行优化时所产生的性能开销。
 

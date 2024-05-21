@@ -257,7 +257,10 @@ Self-RAG 主要步骤概括如下：
 
 ![](/public/upload/machine/self_rag.jpg)
 
-Self-RAG 的一个重要创新是 Reflection tokens (反思字符)：通过生成反思字符这一特殊标记来检查输出。这些字符会分为 Retrieve 和 Critique 两种类型，会标示：检查是否有检索的必要，完成检索后检查输出的相关性、完整性、检索片段是否支持输出的观点。模型会基于原有词库和反思字段来生成下一个 token。
+Self-RAG 的一个重要创新是 Reflection tokens (反思字符)：通过生成反思字符这一特殊标记来检查输出。这些字符会分为 Retrieve 和 Critique 两种类型，会标示：检查是否有检索的必要，完成检索后检查输出的相关性、完整性、检索片段是否支持输出的观点。模型会基于原有词库和反思字段来生成下一个 token。PS： 需要进行模型微调以生成 Reflection tokens
+
+[一文彻底搞懂Self-RAG【上】：自省式RAG的原理与应用](https://mp.weixin.qq.com/s/3e8GG6iO7DVat5TSUFbCUQ) 建议细读。
+[一文彻底搞懂Self-RAG【下】：构建自省式的RAG应用与模型微调](https://mp.weixin.qq.com/s/pPthX3fUdk9SCuTI1T5w4g)
 
 
 ## 要不要微调

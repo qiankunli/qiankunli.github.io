@@ -45,7 +45,7 @@ st.text_input('请输入最喜欢的编程语言', key="name")
 ![](/public/upload/python/streamlit_text_input.jpg)
 
 
-## pydantic
+## pydantic(py+pedantic=Pydantic)
 
 pydantic 是一个基于Python类型提示来定义数据验证、序列化和文档(使用JSON模式)的库； 使用Python的类型提示来进行数据校验和settings管理； 可以在代码运行的时候提供类型提示，数据校验失败的时候提供友好的错误提示；
 1. 所有基于pydantic的数据类型本质上都是一个BaseModel类

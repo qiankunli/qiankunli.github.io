@@ -444,6 +444,8 @@ def generate(self,
 
 以上策略体现在代码上 就是：经过多个AttentionLayer  hidden_states，Normalization之后得到 outputs.logits，将 logits 传递给 logits_processor 和 logits_warper（包含TopKLogitsWarper/TopPLogitsWarper等），最后，使用 softmax 函数将经过预处理的 logits 转换为概率分布，并利用 multinomial 方法从中采样得到下一个 token。
 
+![](/public/upload/machine/llm_logprobs.jpg)
+
 ## 训练/Trainer
 
 transformer 支持自定义dataset，自定义model实现forward（forward 支持的参数均可以作为dataset的column），forward 过程中还计算loss，模型的差异性基本已经兜住了，这也是为何 只要提供包含特定column的dataset，剩下的训练代码都可以交给trainer封装掉。
