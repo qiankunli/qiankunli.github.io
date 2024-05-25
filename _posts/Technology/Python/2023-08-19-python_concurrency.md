@@ -134,8 +134,7 @@ if __name__ == "__main__":
 
 ## 协程
 
-异步编程是以进程、线程、协程、函数/方法作为执行任务程序的基本单位，结合回调、事件循环、信号量等机制，以提高程序整体执行效率和并发能力的编程方式。**协程即可以挂起并移交控制权的函数**，协程拥有自己的寄存器上下文和栈（每个线程不再只有一个堆栈）。协程调度切换时，将寄存器上下文和栈保存到其他地方，在切回来时，恢复先前保存的寄存器上下文和栈。因此它在执行过程中可以中断，转而执行其他的协程，在适当的时候再回来继续执行。
-
+异步编程是以进程、线程、协程、函数/方法作为执行任务程序的基本单位，结合回调、事件循环、信号量等机制，以提高程序整体执行效率和并发能力的编程方式。**协程即可以挂起并移交控制权的函数**，协程拥有自己的寄存器上下文和栈（每个线程不再只有一个堆栈）。协程调度切换时，将寄存器上下文和栈保存到其他地方，在切回来时，恢复先前保存的寄存器上下文和栈。因此它在执行过程中可以中断，转而执行其他的协程，在适当的时候再回来继续执行。如果熟知了python生成器，还可以将协程理解为生成器+调度策略，生成器中的yield关键字，就可以让生成器函数发生中断，而调度策略，可以驱动着协程的执行和恢复。
 
 ```python
 # 同步函数，同步函数本身是一个 Callable 对象，调用这个函数的时候，函数体内的代码被执行。
@@ -157,6 +156,50 @@ print(async_function())
 ```
 
 async 修饰词声明异步函数，而调用异步函数，我们便可得到一个协程对象（coroutine object）。
+
+```python
+import asyncio
+import time
+
+async def say_after(delay, what):
+    await asyncio.sleep(delay)
+    print(what)
+
+async def main():
+    print(f"started at {time.strftime('%X')}")
+    await say_after(1, 'hello')
+    await say_after(2, 'world')
+    print(f"finished at {time.strftime('%X')}")
+
+asyncio.run(main())
+# 
+# started at 14:07:43
+# hello
+# world
+# finished at 14:07:46
+```
+
+按道理应该是间隔了2s，可是实际间隔3s。Python中的异步执行模式依赖于Event Loop，在等待的间隙中需要从Event Loop中找其它可以运行的程序，await关键字就是将coroutine转化成一个task加入到Event Loop中去，而执行第一个say_after的时候，第二个say_after并没有加入到Event Loop中去，所以在第一个say_after等待的时候无法去执行第二个say_after，最终导致的结果就是程序运行了3s，并没有达到异步的效果。有两种方式解决这个问题
+1. 提前将两个say_after加入到eventloop中
+    ```python
+    async def main():
+    task1 = asyncio.create_task(say_after(1, 'hello'))
+    task2 = asyncio.create_task(say_after(2, 'world'))
+    print(f"started at {time.strftime('%X')}")
+    await task1
+    await task2
+    print(f"finished at {time.strftime('%X')}")
+    ```
+2. 使用gather方法
+    ```python
+    async def main():
+    print(f"started at {time.strftime('%X')}")
+    await asyncio.gather(
+        say_after(1, 'hello'),
+        say_after(2, 'world')
+    )
+    print(f"finished at {time.strftime('%X')}")
+    ```
 
 ###  Task
 
@@ -202,7 +245,7 @@ Python 3.4 加入了asyncio 库，使得Python有了支持异步IO的官方库�
 
 多线程还是 Asyncio？如果是 I/O bound，并且 I/O 操作很慢，需要很多任务 / 线程协同实现，那么使用 Asyncio 更合适。如果是 I/O bound，但是 I/O 操作很快，只需要有限数量的任务 / 线程，那么使用多线程就可以了。如果是 CPU bound，则需要使用多进程来提高程序运行效率。I/O 操作 heavy 的场景下，Asyncio 比多线程的运行效率更高。因为 Asyncio 内部任务切换的损耗，远比线程切换的损耗要小；并且 Asyncio 可以开启的任务数量，也比多线程中的线程数量多得多。但需要注意的是，很多情况下，使用 Asyncio 需要特定第三方库的支持。
 
-使用 asyncio 并不是将代码转换成多线程，它不会导致多条Python指令同时执行，也不会以任何方式让你避开所谓的全局解释器锁（Global Interpreter Lock，GIL）。有些应用受 IO 速度的限制，即使 CPU 速度再快，也无法充分发挥 CPU 的性能。这些应用花费大量时间从存储或网络设备读写数据，往往需要等待数据到达后才能进行计算，在等待期间，CPU 什么都做不了。asyncio 的目的就是为了给 CPU 安排更多的工作：当前单线程代码正在等待某个事情发生时，另一段代码可以接管并使用 CPU，以充分利用 CPU 的计算性能。**asyncio 更多是关于更有效地使用单核，而不是如何使用多核**。
+使用 asyncio 并不是将代码转换成多线程，它不会导致多条Python指令同时执行，也不会以任何方式让你避开所谓的全局解释器锁（Global Interpreter Lock，GIL）。有些应用受 IO 速度的限制，即使 CPU 速度再快，也无法充分发挥 CPU 的性能。这些应用花费大量时间从存储或网络设备读写数据，往往需要等待数据到达后才能进行计算，在等待期间，CPU 什么都做不了。asyncio 的目的就是为了给 CPU 安排更多的工作：当前单线程代码正在等待某个事情发生时，另一段代码可以接管并使用 CPU，以充分利用 CPU 的计算性能。**asyncio 更多是关于更有效地使用单核，而不是如何使用多核**。python协程单线程内切换，适用于IO密集型程序中，可以最大化IO多路复用的效果。**协程间完全同步**，不会并行，不需要考虑数据安全。PS：与Go协程不同的地方。
 
 ### 事件
 

@@ -11,6 +11,18 @@ keywords: langchain langgraph lcel
 * TOC
 {:toc}
 
+## 不再是简单的顺序调用
+
+从顺序式为主的简单架构走向复杂的WorkFlow，推理阶段的RAG Flow分成四种主要的基础模式：顺序、条件、分支与循环。PS： 一个llm 业务有各种基本概念，prompt/llm/memory，整个工作流产出一个流式输出，处理链路上包含多个step，且step有复杂的关系（顺序、条件、分支与循环）。一个llm 业务开发的核心就是个性化各种原子能力 以及组合各种原子能力。
+
+以一个RAG Agent 的工作流程为例
+1. 根据问题，路由器决定是从向量存储中检索上下文还是进行网页搜索。
+2. 如果路由器决定将问题定向到向量存储以进行检索，则从向量存储中检索匹配的文档；否则，使用 tavily-api 进行网页搜索。
+3. 文档评分器然后将文档评分为相关或不相关。
+4. 如果检索到的上下文被评为相关，则使用幻觉评分器检查是否存在幻觉。如果评分器决定响应缺乏幻觉，则将响应呈现给用户。
+5. 如果上下文被评为不相关，则进行网页搜索以检索内容。
+6. 检索后，文档评分器对从网页搜索生成的内容进行评分。如果发现相关，则使用 LLM 进行综合，然后呈现响应。
+
 ## LCEL 
 
 [langchain入门3-LCEL核心源码速通](https://juejin.cn/post/7328204968636252198)LCEL实际上是langchain定义的一种DSL，可以方便的将一系列的节点按声明的顺序连接起来，实现固定流程的workflow编排。LCEL语法的核心思想是：一切皆为对象，一切皆为链。这意味着，LCEL语法中的每一个对象都实现了一个统一的接口：Runnable，它定义了一系列的调用方法（invoke, batch, stream, ainvoke, …）。这样，你可以用同样的方式调用不同类型的对象，无论它们是模型、函数、数据、配置、条件、逻辑等等。而且，你可以将多个对象链接起来，形成一个链式结构，这个结构本身也是一个对象，也可以被调用。这样，你可以将复杂的功能分解成简单的组件，然后用LCEL语法将它们组合起来，形成一个完整的应用。
@@ -35,6 +47,16 @@ chain.stream("dog")
 `chain = prompt | model | output_parser`。我们可以看到这段代码中使用了运算符`|`，熟悉python的同学肯定知道，这里使用了python的magic method，也就是说它一定具有`__or__`函数。`prompt | model`就相当于`prompt.__or__(model)`。实际上，prompt实现了`__ror__`，这个magic method支持从右往左的or运算，`dict|prompt`,相当于`prompt.__ror__(dict)` 。
 
 ![](/public/upload/machine/langchain_lcel.jpg)
+
+
+|Component|	Input Type|	Output Type|
+|---|---|---|
+|Prompt|	Dictionary|	PromptValue|
+|ChatModel|	Single string, list of chat messages or a PromptValue|	ChatMessage|
+|LLM|	Single string, list of chat messages or a PromptValue|	String|
+|OutputParser|	The output of an LLM or ChatModel|	Depends on the parser|
+|Retriever|	Single string|	List of Documents|
+|Tool|	Single string or dictionary, depending on the tool|	Depends on the tool|
 
 我们使用的所有LCEL相关的组件都继承自RunnableSerializable，RunnableSequence 顾名思义就按顺序执行的Runnable，分为两部分Runnable和Serializable。其中Serializable是继承自Pydantic的BaseModel。（py+pedantic=Pydantic，是非常流行的参数验证框架）Serializable提供了，将Runnable序列化的能力。而Runnable，则是LCEL组件最重要的一个抽象类，它有几个重要的抽象方法。
 

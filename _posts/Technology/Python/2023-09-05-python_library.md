@@ -47,6 +47,46 @@ st.text_input('请输入最喜欢的编程语言', key="name")
 
 ## pydantic(py+pedantic=Pydantic)
 
+对象的属性，我们都是通过把变量值赋值给对象本身来实现的。直接赋值会存在一个问题，就是无法对属性值进行合法性较验，比如我给 age 赋值的是负数，在业务上这种数据是不合法的。
+
+```
+>>> class Student:pass
+...
+>>>
+>>> s = Student()
+>>> s.name = "xx"
+>>> s.age = 27
+```
+
+一个实现了 描述符协议 的类就是一个描述符。描述符协议：在类里实现了 __get__()、__set__()、__delete__() 其中至少一个方法。
+1. `__get__`： 用于访问属性。它返回属性的值，若属性不存在、不合法等都可以抛出对应的异常。
+2. `__set__`：将在属性分配操作中调用。不会返回任何内容。
+3. `__delete__`：控制删除操作。不会返回内容。
+
+```python
+class Student:
+    def __init__(self, name, math, chinese, english):
+        self.name = name
+        self.math = math
+        self.chinese = chinese
+        self.english = english
+class Score:
+    def __init__(self, default=0):
+        self._score = default
+    def __set__(self, instance, value):
+        if not isinstance(value, int):
+            raise TypeError('Score must be integer')
+        if not 0 <= value <= 100:
+            raise ValueError('Valid value must be in [0, 100]')
+        self._score = value
+
+    def __get__(self, instance, owner):
+        return self._score
+    def __delete__(self):
+        del self._score
+```
+Student类里的三个属性，math、chinese、english，三个变量的合法性逻辑都是一样的，只要大于0，小于100 就可以。Score 类是一个描述符，当从 Student 的实例访问 math、chinese、english这三个属性的时候，都会经过 Score 类里的三个特殊的方法。这里的 Score 避免了 使用Property 出现大量的校验代码无法复用的尴尬。我们熟悉的@property 、@classmethod 、@staticmethod 和 super 等特性的底层实现机制都是基于 描述符协议 的。
+
 pydantic 是一个基于Python类型提示来定义数据验证、序列化和文档(使用JSON模式)的库； 使用Python的类型提示来进行数据校验和settings管理； 可以在代码运行的时候提供类型提示，数据校验失败的时候提供友好的错误提示；
 1. 所有基于pydantic的数据类型本质上都是一个BaseModel类
 2. pydantic中的一些常用的基本类型 Dict, List, Sequence, Set, Tuple
