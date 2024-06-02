@@ -92,7 +92,13 @@ AI界的大佬 --- Andrew NG推出过一个Prompt Engineering的短课程《Chat
 
 [硬核Prompt赏析：HuggingGPT告诉你Prompt可以有多“工程”](https://mp.weixin.qq.com/s/Cu2BpzWOuphrVsZ69JR9Hw) 值得细读。
 
-## 代码示例
+### 不同角色的Prompt
+
+System message 在大模型内部是每次加在了用户输入的前面。在 OpenAI 的大模型设计的时候，有三种不同的 message 类型，分别是System Message、Assistant Message 以及 User Message，这三者是有明显区别的。其中 User Message 最好理解，就是我们用户写的信息，Assistant Message 就是大模型写的信息，而 System Message 则是对大模型的角色进行定义，并输入一些基础的指令，包括大模型的身份、一些用于提高安全性的指令。
+1. System Message 和 User Message 的不同之处就是，System Message 一般都是出现在输入的开始，根据大模型注意力机制的公式，在开始和结尾处的文字更容易被重视。因此，在这些地方出现的内容，更容易被大模型识别和理解。所以，一个完整的提示词，或者多轮对话的场景一般是按照下面的流程去拼接和组装提示词的：`System Message、User Message、Assistant Message、User Message 。。。、Assistant Message`，在这种对话下，Assistant Message 主要是向大模型展示他历史聊天记录的内容，并告知大模型其中的哪些内容是由用户的输入生成的。按照这种模式进行训练和微调的大模型就会意识到，那些内容并不是用户真实的输入，而是一个聊天对话的历史信息，这样大模型就不仅能理解历史的信息，还能更好的回答你接下来的问题。
+2. 为什么 System Message 并不和 User Message 合并在一起呢？我们在微调的时候，可以定义不同的消息类型，去避免一些提示词注入和攻击的问题。这个时候，只需要在 System Message 中定义好大模型的角色，而将其他内容放在 User Message 中，就可以避免一些简单的提示词攻击和泄露的情况。而且当我们做成应用的时候，System Message 是对用户不可见的，在这个地方定义的规则、角色由于得到了充分的训练，就具有最高的优先级。大模型就会在很大概率上遵循这个定义，而不是随着用户输入的改变而输出一些违背开发者原来意思的内容。当然，指定 System Message 并不能完全的抵御外来的攻击，之前 GPT4 还是出现过 System Prompt 被套出来的情况，这种情况下，就需要对用户输入的内容或者大模型输出的内容进行二次校验或许是一个更好的方案。
+
+### 代码示例
 
 零样本
 ```python

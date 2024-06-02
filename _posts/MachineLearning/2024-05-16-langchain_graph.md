@@ -11,9 +11,11 @@ keywords: langchain langgraph lcel
 * TOC
 {:toc}
 
-## 不再是简单的顺序调用
+## 从顺序式为主的简单架构走向复杂的WorkFlow
 
-从顺序式为主的简单架构走向复杂的WorkFlow，推理阶段的RAG Flow分成四种主要的基础模式：顺序、条件、分支与循环。PS： 一个llm 业务有各种基本概念，prompt/llm/memory，整个工作流产出一个流式输出，处理链路上包含多个step，且step有复杂的关系（顺序、条件、分支与循环）。一个llm 业务开发的核心就是个性化各种原子能力 以及组合各种原子能力。
+编程语言大类上可以分为命令式编程和声明式编程，前者深入细节，各种 if else、各种 while/for，程序员掌控每个像素；后者把任务「描述」清楚，重点在业务流程翻译成所用的语言上，具体怎么实现甩给别人（大部分是系统自带）。由于这一波 LLMs 强大的理解、生成能力，关注细节的命令式编程似乎不再需要，而偏重流程或者说业务逻辑编排的 pipeline 能力的声明式编程，成了主流「编程」方式。
+
+推理阶段的RAG Flow分成四种主要的基础模式：顺序、条件、分支与循环。PS： 一个llm 业务有各种基本概念，prompt/llm/memory，整个工作流产出一个流式输出，处理链路上包含多个step，且step有复杂的关系（顺序、条件、分支与循环）。一个llm 业务开发的核心就是个性化各种原子能力 以及组合各种原子能力。
 
 以一个RAG Agent 的工作流程为例
 1. 根据问题，路由器决定是从向量存储中检索上下文还是进行网页搜索。
@@ -24,6 +26,8 @@ keywords: langchain langgraph lcel
 6. 检索后，文档评分器对从网页搜索生成的内容进行评分。如果发现相关，则使用 LLM 进行综合，然后呈现响应。
 
 ## LCEL 
+
+在 LangChain 里只要实现了Runnable接口，并且有invoke方法，都可以成为链。实现了Runnable接口的类，可以拿上一个链的输出作为自己的输入。
 
 [langchain入门3-LCEL核心源码速通](https://juejin.cn/post/7328204968636252198)LCEL实际上是langchain定义的一种DSL，可以方便的将一系列的节点按声明的顺序连接起来，实现固定流程的workflow编排。LCEL语法的核心思想是：一切皆为对象，一切皆为链。这意味着，LCEL语法中的每一个对象都实现了一个统一的接口：Runnable，它定义了一系列的调用方法（invoke, batch, stream, ainvoke, …）。这样，你可以用同样的方式调用不同类型的对象，无论它们是模型、函数、数据、配置、条件、逻辑等等。而且，你可以将多个对象链接起来，形成一个链式结构，这个结构本身也是一个对象，也可以被调用。这样，你可以将复杂的功能分解成简单的组件，然后用LCEL语法将它们组合起来，形成一个完整的应用。
 
@@ -48,7 +52,6 @@ chain.stream("dog")
 
 ![](/public/upload/machine/langchain_lcel.jpg)
 
-
 |Component|	Input Type|	Output Type|
 |---|---|---|
 |Prompt|	Dictionary|	PromptValue|
@@ -58,16 +61,52 @@ chain.stream("dog")
 |Retriever|	Single string|	List of Documents|
 |Tool|	Single string or dictionary, depending on the tool|	Depends on the tool|
 
+### 源码分析
+
 我们使用的所有LCEL相关的组件都继承自RunnableSerializable，RunnableSequence 顾名思义就按顺序执行的Runnable，分为两部分Runnable和Serializable。其中Serializable是继承自Pydantic的BaseModel。（py+pedantic=Pydantic，是非常流行的参数验证框架）Serializable提供了，将Runnable序列化的能力。而Runnable，则是LCEL组件最重要的一个抽象类，它有几个重要的抽象方法。
 
-```
-invoke/ainvoke: 单个输入转为输出。
-batch/abatch:批量转换。
-stream/astream: 单个流式处理。
-astream_log:从输入流流式获取结果与中间步骤。
+```python
+class Runnable(Generic[Input, Output], ABC):
+    @abstractmethod
+    def invoke(self, input: Input, config: Optional[RunnableConfig] = None) -> Output:
 ```
 
-同时Runnbale也实现了两个重要的magic method ，就是前面说的用于支持管道操作符|的 `__or__` 与`__ror__`。Runnable之间编排以后，会生成一个RunnableSequence。如果我们运行最终编排好的Chain，例如chain.invoke({"topic": "ice cream"})，实际上就是执行了RunnableSequence的invoke。那我们先来看看invoke函数。
+1. invoke/ainvoke: 单个输入转为输出。
+2. batch/abatch:批量转换。
+3. stream/astream: 单个流式处理。
+4. astream_log:从输入流流式获取结果与中间步骤。
+
+
+同时Runnbale也实现了两个重要的magic method ，就是前面说的用于支持管道操作符|的 `__or__` 与`__ror__`。Runnable之间编排以后，会生成一个RunnableSequence。
+
+```python
+class Runnable(Generic[Input, Output], ABC):
+    def __or__(
+        self,
+        other: Union[
+            Runnable[Any, Other],
+            Callable[[Any], Other],
+            Callable[[Iterator[Any]], Iterator[Other]],
+            Mapping[str, Union[Runnable[Any, Other], Callable[[Any], Other], Any]],
+        ],
+    ) -> RunnableSerializable[Input, Other]:
+        """Compose this runnable with another object to create a RunnableSequence."""
+        return RunnableSequence(self, coerce_to_runnable(other))
+
+    def __ror__(
+        self,
+        other: Union[
+            Runnable[Other, Any],
+            Callable[[Other], Any],
+            Callable[[Iterator[Other]], Iterator[Any]],
+            Mapping[str, Union[Runnable[Other, Any], Callable[[Other], Any], Any]],
+        ],
+    ) -> RunnableSerializable[Other, Output]:
+        """Compose this runnable with another object to create a RunnableSequence."""
+        return RunnableSequence(coerce_to_runnable(other), self)
+```
+
+如果我们运行最终编排好的Chain，例如chain.invoke({"topic": "ice cream"})，实际上就是执行了RunnableSequence的invoke。那我们先来看看invoke函数。
 
 ```python
 # config对象，可以设置一些并发数、标签等等配置，默认情况下为空。
@@ -103,6 +142,69 @@ def invoke(self, input: Input, config: Optional[RunnableConfig] = None) -> Outpu
         return cast(Output, input)
 ```
 
+### 一些实践
+
+```python
+def add_one(x: int) -> int:
+    return x + 1
+def mul_two(x: int) -> int:
+    return x * 2
+runnable_1 = RunnableLambda(add_one) # RunnableLambda 可以把一个Callable类转成Runnable类（python所有可调用对象都是Callable 类型），从而可以将你自定义的函数集成到chain中
+runnable_2 = RunnableLambda(mul_two)
+sequence = runnable_1 | runnable_2
+sequence.invoke(1)
+
+def mul_three(x: int) -> int:
+    return x * 3
+sequence = runnable_1 | {  # Runnable对象的列表或字典/this dict is coerced to a RunnableParallel
+    "mul_two": runnable_2,
+    "mul_three": runnable_3,
+}
+sequence.invoke(1) # 会输出一个dict {'mul_two':4, 'mul_three':6}
+
+branch = RunnableBranch(
+    (lambda x: isinstance(x, str), lambda x: x.upper()),
+    (lambda x: isinstance(x, int), lambda x: x + 1),
+    (lambda x: isinstance(x, float), lambda x: x * 2),
+    lambda x: "goodbye",
+)
+branch.invoke("hello") # "HELLO"
+branch.invoke(None) # "goodbye"
+```
+
+RunnableParallel 的使用可以有以下三种形式，三种形式等价：
+```
+{"context": retriever, "question": RunnablePassthrough()}
+RunnableParallel({"context": retriever, "question": RunnablePassthrough()})
+RunnableParallel(context=retriever, question=RunnablePassthrough())
+```
+在使用LCEL构建链时，原始用户输入可能不仅要传给第一个组件，还要传给后续组件，这时可以用RunnablePassthrough。RunnablePassthrough可以透传用户输入。
+```python
+# 用户输入的问题，不止组件1的检索器要用，组件2也要用它来构建提示词，因此组件1使用RunnablePassthrough方法把原始输入透传给下一步。
+chain = (
+    # 由于组件2 prompt的输入要求是字典类型，所以组件1把检索器和用户问题写成字典格式，并用组件2的变量作为键。
+    {"context": retriever, "question": RunnablePassthrough()}
+    | prompt
+    | model
+    | StrOutputParser()
+)
+```
+
+目前Memory模块还是Beta版本，创建带Memory功能的Chain，并不能使用统一的LCEL语法。但是，LangChain提供了工具类RunnableWithMessageHistory，支持了为Chain追加History的能力，从某种程度上缓解了上述问题。不过需要指定Lambda函数get_session_history以区分不同的会话，并需要在调用时通过config参数指定具体的会话ID。
+
+```python
+llm = xx
+prompt =  xx
+chain = prompt | llm | output_parser
+history = ChatMessageHistory()
+chain_with_history = RunnableWithMessageHistory(
+    chain,
+    lambda session_id: history,
+    input_messages_key="question",
+    history_messages_key="chat_history",
+)
+```
+
 LCEL提供了多种优势，例如一流的流支持、异步支持、优化的并行执行、支持重试和回退、访问中间结果、输入和输出模式以及无缝 LangSmith 跟踪集成。但因为语法上的问题，要实现 loop 和 condition 的情况就比较困难。于是LangChain社区推出了一个新的项目——LangGraph，期望基于LangChain构建支持循环和跨多链的计算图结构，以描述更复杂的，甚至具备自动化属性的AI工程应用逻辑，比如智能体应用。
 
 ## LangGraph
@@ -122,6 +224,8 @@ LCEL提供了多种优势，例如一流的流支持、异步支持、优化的�
 LangGraph的实现方式是把之前基于AgentExecutor的黑盒调用过程用一种新的形式来构建：状态图（StateGraph）。把基于LLM的任务（比如RAG、代码生成等）细节用Graph进行精确的定义（定义图的节点与边），最后基于这个图来编译生成应用；在任务运行过程中，维持一个中央状态对象(state)，会根据节点的跳转不断更新，状态包含的属性可自行定义。
 
 ![](/public/upload/machine/lang_graph_agent.jpg)
+
+langgraph正在成为构建Agent的推荐方式。
 
 ## 示例
 

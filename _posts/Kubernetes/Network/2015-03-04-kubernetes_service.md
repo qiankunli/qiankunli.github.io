@@ -24,6 +24,8 @@ keywords: Kubernetes Service
 
 [Kubernetes 集群中流量暴露的几种方案](https://mp.weixin.qq.com/s/0jUVHrZx0k2SmHFmHlBz2w) 侧重于南北流量。 
 
+[浅谈 K8s Service 网络机制](https://mp.weixin.qq.com/s/0Hq8CuqEoEYY7afMePXKjQ) 未读
+
 ## What is a service?
 
 kube-proxy 运行在所有节点上，它监听 apiserver 中 service 和 endpoint 的变化情况，创建路由规则以提供服务 IP 和负载均衡功能。简单理解此进程是 Service 的透明代理兼负载均衡器，其核心功能是将到某个 Service 的访问请求转发到后端的多个 Pod 实例上。PS：service 相当于是 kube-proxy工作的配置文件。

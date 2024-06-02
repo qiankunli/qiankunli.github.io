@@ -424,8 +424,9 @@ def generate(self,
 
 ![](/public/upload/machine/llm_last_token.jpg)
 
-当得到了整个词表中的单词作为下一个token的概率之后，GPT是选择概率最大（贪心）的那个作为输出吗？显然不是的。因为使用这样的策略，对于相同的输入GPT每次都会给出一样的回答（推理模式下所有参数都固定，不存在随机性）。而理解GPT回答的多样性就需要介绍一些生成策略了。
-1. Beam search，当输入为“I am a”, 设置num_beams=2，beam search的过程可表达为：假设A,B,C对应的概率分别为0.5,0.2,0.3。那么此时选择每个token并组成序列的概率分别为：
+[Transformer中的解码策略](https://mp.weixin.qq.com/s/x5o4BGHLScriYM36AKhesA)解码（Decoding）就是在词表中抓阄。具体而言：模型根据下一个词的概率分布，从词表中选择下一个词。这个选择的策略就是解码策略，也称解码算法、解码方法等。
+1. 贪心搜索（Greedy Search）
+1. Beam search，保留num_beams个概率较大的句子，最后从num_beams个句子中输出最大概率的句子。当输入为“I am a”, 设置num_beams=2，beam search的过程可表达为：假设A,B,C对应的概率分别为0.5,0.2,0.3。那么此时选择每个token并组成序列的概率分别为：
     ```
     “I am a A”: 0.5
     “I am a B”: 0.3
@@ -433,7 +434,7 @@ def generate(self,
     ```
     beam search会选择概率最大的num_beams=2个序列，参与后续的生成。因此“I am a A”和“I am a B”会参与下一个token的预测。假设得到六个可能序列对应的概率。此时再保留num_beams=2个最大概率的序列，比如是”I am a A C”=0.25, ”I am a B C”=0.27，再把这两个序列送到下一个token的预测中。上述步骤会一直重复，直到遇到结束符或指定的长度。最终，会有num_beams个序列被预测出来。此时可以对这几个概率最大的序列做进一步的处理，例如选一个概率最大的作为最终的输出，或者根据概率做个采样作为输出。beam search有什么好处呢？相比于每次都选最大的贪心，beam search显然增大了搜索空间。而且更重要的是，beam search会防止潜在概率很大的序列被过早的抛弃。例如”I am a B C”，在预测到B的时候序列的概率还是不大的，但是到C就变得更大了。当num_beams=1时，beam search等价于贪心。
 2. Top-k sampling，就是每一步只考虑概率最大的k个token，并且把这k个token的概率做重归一化，并随机采样得到预测的token。假设在一步中，ABC对应的概率ligits是[5,3,2]，k设置为2。那么会选出字母A,B，并把其对应的概率logits[5,3]进行重新归一化softmax([5,3]) = [0.88,0.12]。随后基于归一化后的概率随机选A或B，拼接到“I am a”后面，并进行下一个token的预测，如此反复。top-k和beam search有什么区别呢？top-k自始至终只有一个序列进行预测，k只用于规定采样的范围，每步只采样一个token作为结果。而beam search会保留num_beams个序列进行预测。
-3. top-p sampling，这种策略会把token的概率按照递减的次序累加，直到累加的概率值超过了阈值p，在这些token中做采样得到预测。假设p=0.7，ABC在第一步预测的概率分布为[0.5,0.3,0.2]。那么A和B的概率值加起来超过了0.7，第一步就会在A,B中采样得到预测。假设第二步概率分布为[0.3,0.3,0.4]，那么ABC三个加起来才会超过0.7，此时第二步就会在这三个里面采样，如此反复。可以看出top-p的每一步实际上会在一个动态长度的范围里做采样。。这样的优点是可以排除一些概率不高的单词，例如分布为[0.9,0.05,0.05]时，只考虑第一个就足够了，而top-k还是会考虑前k个。并且在分布相对均衡时，top-p会增加输出的多样性。
+3. top-p sampling，Top-p采样中的p表示累积概率。这种策略会把token的概率按照递减的次序累加，直到累加的概率值超过了阈值p，在这些token中做采样得到预测。假设p=0.7，ABC在第一步预测的概率分布为[0.5,0.3,0.2]。那么A和B的概率值加起来超过了0.7，第一步就会在A,B中采样得到预测。假设第二步概率分布为[0.3,0.3,0.4]，那么ABC三个加起来才会超过0.7，此时第二步就会在这三个里面采样，如此反复。可以看出top-p的每一步实际上会在一个动态长度的范围里做采样。这样的优点是可以排除一些概率不高的单词，例如分布为[0.9,0.05,0.05]时，只考虑第一个就足够了，而top-k还是会考虑前k个。并且在分布相对均衡时，top-p会增加输出的多样性。
 4. 温度系数，在上面提到的归一化中，我们还可以引入温度系数调整概率分布
 
     $$
@@ -445,6 +446,12 @@ def generate(self,
 以上策略体现在代码上 就是：经过多个AttentionLayer  hidden_states，Normalization之后得到 outputs.logits，将 logits 传递给 logits_processor 和 logits_warper（包含TopKLogitsWarper/TopPLogitsWarper等），最后，使用 softmax 函数将经过预处理的 logits 转换为概率分布，并利用 multinomial 方法从中采样得到下一个 token。
 
 ![](/public/upload/machine/llm_logprobs.jpg)
+
+在transformers库中，其【Generationmixin.generate()】实现了各种解码策略。generate与forword的区别主要有：
+1. generate只用于推理场景，forward既用于推理场景，也用于训练场景。
+2. generate是基于forward实现的。
+3. generate利用各种解码策略，生成文本；而forward最主要的作用就是提供logits（未归一化的分布）。
+4. 解码策略对于文本的生成是非常重要的。我们可以不使用generate，而直接根据forward的logits进行解码，只要自己实现各类解码策略即可。这在自定义解码策略时非常有用。
 
 ## 训练/Trainer
 
