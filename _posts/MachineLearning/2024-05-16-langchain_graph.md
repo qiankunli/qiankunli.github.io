@@ -13,7 +13,7 @@ keywords: langchain langgraph lcel
 
 ## 从顺序式为主的简单架构走向复杂的WorkFlow
 
-编程语言大类上可以分为命令式编程和声明式编程，前者深入细节，各种 if else、各种 while/for，程序员掌控每个像素；后者把任务「描述」清楚，重点在业务流程翻译成所用的语言上，具体怎么实现甩给别人（大部分是系统自带）。由于这一波 LLMs 强大的理解、生成能力，关注细节的命令式编程似乎不再需要，而偏重流程或者说业务逻辑编排的 pipeline 能力的声明式编程，成了主流「编程」方式。
+编程语言大类上可以分为命令式编程和声明式编程，前者深入细节，各种 if else、各种 while/for，程序员掌控每个像素；后者把任务「描述」清楚，重点在业务流程翻译成所用的语言上，具体怎么实现甩给别人（大部分是系统自带）。由于这一波 LLMs 强大的理解、生成能力，**关注细节的命令式编程似乎不再需要**，而偏重流程或者说业务逻辑编排的 pipeline 能力的声明式编程，成了主流「编程」方式。
 
 推理阶段的RAG Flow分成四种主要的基础模式：顺序、条件、分支与循环。PS： 一个llm 业务有各种基本概念，prompt/llm/memory，整个工作流产出一个流式输出，处理链路上包含多个step，且step有复杂的关系（顺序、条件、分支与循环）。一个llm 业务开发的核心就是个性化各种原子能力 以及组合各种原子能力。
 
@@ -61,7 +61,7 @@ chain.stream("dog")
 |Retriever|	Single string|	List of Documents|
 |Tool|	Single string or dictionary, depending on the tool|	Depends on the tool|
 
-### 源码分析
+### 基石Runnable
 
 我们使用的所有LCEL相关的组件都继承自RunnableSerializable，RunnableSequence 顾名思义就按顺序执行的Runnable，分为两部分Runnable和Serializable。其中Serializable是继承自Pydantic的BaseModel。（py+pedantic=Pydantic，是非常流行的参数验证框架）Serializable提供了，将Runnable序列化的能力。而Runnable，则是LCEL组件最重要的一个抽象类，它有几个重要的抽象方法。
 
@@ -71,10 +71,12 @@ class Runnable(Generic[Input, Output], ABC):
     def invoke(self, input: Input, config: Optional[RunnableConfig] = None) -> Output:
 ```
 
+Runnable所有接口都接收可选的配置参数，可用于配置执行、添加标签和元数据，以进行跟踪和调试。
 1. invoke/ainvoke: 单个输入转为输出。
 2. batch/abatch:批量转换。
 3. stream/astream: 单个流式处理。
 4. astream_log:从输入流流式获取结果与中间步骤。
+有时我们希望 使用常量参数调用Runnable 调用链中的Runnable对象，这些常量参数不是序列中前一个Runnable 对象输出的一部分，也不是用户输入的一部分，我们可以使用Runnable.bind 方法来传递这些参数。
 
 
 同时Runnbale也实现了两个重要的magic method ，就是前面说的用于支持管道操作符|的 `__or__` 与`__ror__`。Runnable之间编排以后，会生成一个RunnableSequence。
@@ -106,7 +108,7 @@ class Runnable(Generic[Input, Output], ABC):
         return RunnableSequence(coerce_to_runnable(other), self)
 ```
 
-如果我们运行最终编排好的Chain，例如chain.invoke({"topic": "ice cream"})，实际上就是执行了RunnableSequence的invoke。那我们先来看看invoke函数。
+**Runnable 对象表示一个可调用的函数或操作单元，RunnableSequence 可以看成由lcel 构建的调用链的实际载体**。如果我们运行最终编排好的Chain，例如chain.invoke({"topic": "ice cream"})，实际上就是执行了RunnableSequence的invoke。那我们先来看看invoke函数。
 
 ```python
 # config对象，可以设置一些并发数、标签等等配置，默认情况下为空。
@@ -140,6 +142,24 @@ def invoke(self, input: Input, config: Optional[RunnableConfig] = None) -> Outpu
     else:  
         run_manager.on_chain_end(input)  
         return cast(Output, input)
+```
+Runnable 还有很多增强/装饰方法，对underlying runnable 增加一些配置、逻辑得到一个新的Runnable，以openai为例，**底层实质扩充了openai.ChatCompletion.create 前后逻辑或调用参数**。
+```python
+class Runnable(Generic[Input, Output], ABC):
+    def assign(self,**kwargs)-> RunnableSerializable[Any, Any]:
+        return self | RunnableAssign(RunnableParallel(kwargs))
+    # Bind kwargs to pass to the underlying runnable when running it.
+    def bind(self, **kwargs: Any) -> Runnable[Input, Output]:
+        return RunnableBinding(bound=self, kwargs=kwargs, config={})
+    # Bind config to pass to the underlying runnable when running it.
+    def with_config(self,config: Optional[RunnableConfig] = None,**kwargs: Any,) -> Runnable[Input, Output]:
+        return RunnableBinding(...)
+    # Bind a retry policy to the underlying runnable.
+    def with_retry(self,retry_if_exception_type,...) -> Runnable[Input, Output]:
+        return RunnableRetry(...)
+    # Bind a fallback policy to the underlying runnable.
+    def with_fallbacks(self,fallbacks,...)-> RunnableWithFallbacksT[Input, Output]:
+        return RunnableWithFallbacks(self,fallbacks,...)
 ```
 
 ### 一些实践
@@ -190,6 +210,11 @@ chain = (
 )
 ```
 
+两个Runnable 对象之间（很多时候是第一个）需要一些数据处理、转换、透传的逻辑
+1. 在构建复杂的RunnableSequence时，我们可能需要将很多信息从上游传递到下游，此时可以用到RunnablePassthrough。此外，还可以使用RunnablePassthrough.assign 方法在透传上游数据的同时添加一些新的的数据。 
+2. RunnableMap，底层是RunnableParallel，通常以一个dict 结构出现，value 是一个Runnable对象，lcel 会并行的调用 value部分的Runnable对象 并将其返回值填充dict，之后将填充后的dict 传递给RunnableSequence 的下一个Runnable对象。
+
+
 目前Memory模块还是Beta版本，创建带Memory功能的Chain，并不能使用统一的LCEL语法。但是，LangChain提供了工具类RunnableWithMessageHistory，支持了为Chain追加History的能力，从某种程度上缓解了上述问题。不过需要指定Lambda函数get_session_history以区分不同的会话，并需要在调用时通过config参数指定具体的会话ID。
 
 ```python
@@ -211,7 +236,7 @@ LCEL提供了多种优势，例如一流的流支持、异步支持、优化的�
 
 [彻底搞懂LangGraph：构建强大的Multi-Agent多智能体应用的LangChain新利器 ](https://mp.weixin.qq.com/s/MzLz4lJF0WMsWrThiOWPog)相对于Chain.invoke()直接运行，Agent_executor的作用就是为了能够实现多次循环ReAct的动作，以最终完成任务。为什么需要将循环引入运行时呢？考虑一个增强的RAG应用：我们可以对语义检索出来的关联文档（上下文）进行评估：如果评估的文档质量很差，可以对检索的问题进行重写（Rewrite，比如把输入的问题结合对话历史用更精确的方式来表达），并把重写结果重新交给检索器，检索出新的关联文档，这样有助于获得更精确的结果。这里把Rewrite的问题重新交给检索器，就是一个典型的“循环”动作。而在目前LangChain的简单链中是无法支持的。其他一些典型的依赖“循环”的场景包括：代码生成时的自我纠正：当借助LLM自动生成软件代码时，根据代码执行的结果进行自我反省，并要求LLM重新生成代码；Web访问自动导航：每当进入下一界面时，需要借助多模态模型来决定下一步的动作（点击、滚动、输入等），直至完成导航。
 
-那么，如果我们需要在循环中调用LLM能力，就需要借助于AgentExecutor。其调用的过程主要就是两个步骤：
+那么，如果我们需要在循环中调用LLM能力，就需要借助于AgentExecutor，将Agent 置于一个循环执行环境（PS：所谓自主运行就是靠循环）。其调用的过程主要就是两个步骤：
 1. 通过大模型来决定采取什么行动，使用什么工具，或者向用户输出响应（如运行结束时）；
 2. 执行1步骤中的行动，比如调用某个工具，并把结果继续交给大模型来决定，即返回步骤1；
 这里的AgentExecute存在的问题是：过于黑盒，所有的决策过程隐藏在AgentExecutor背后，缺乏更精细的控制能力，在构建复杂Agent的时候受限。这些精细化的控制要求比如：
@@ -269,11 +294,13 @@ for s in app.stream(inputs):
 
 ### 原理
 
-1. StateGraph，它将该对象传递给每个节点。然后，节点会以键值对的形式，返回对状态属性的操作。这些操作可以是在状态上设置特定属性（例如，覆盖现有值）或者添加到现有属性。
-2. 在创建了StateGraph之后，我们需要向其中添加Nodes（节点）。添加节点是通过`graph.add_node(name, value)`语法来完成的。其中，`name`参数是一个字符串，用于在添加边时引用这个节点。`value`参数应该可以是函数或runnable 接口，它们将在节点被调用时执行。它们可以接受一个字典作为输入，这个字典的格式应该与State对象相同，在执行完毕之后也会输出一个字典，字典中的键是State对象中要更新的属性。说白了，Nodes（节点）的责任是“执行”，在执行完毕之后会更新StateGraph的状态。
+LangGraph 三个核心要素
+1. StateGraph，LangGraph 在图的基础上增添了全局状态变量，是一组键值对的组合，可以被整个图中的各个节点访问与更新，从而实现有效的跨节点共享及透明的状态维护。它将该对象传递给每个节点。然后，节点会以键值对的形式，返回对状态属性的操作。这些操作可以是在状态上设置特定属性（例如，覆盖现有值）或者添加到现有属性。
+2. 在创建了StateGraph之后，我们需要向其中添加Nodes（节点）。添加节点是通过`graph.add_node(name, value)`语法来完成的。其中，`name`参数是一个字符串，用于在添加边时引用这个节点。`value`参数应该可以是函数或runnable 接口，它们将在节点被调用时执行。其输入应为状态图的全局状态变量，在执行完毕之后也会输出一组键值对，字典中的键是State对象中要更新的属性。说白了，Nodes（节点）的责任是“执行”，在执行完毕之后会更新StateGraph的状态。
 3. 节点通过边相互连接，形成了一个有向无环图（DAG），边有几种类型：
     1. Normal Edges：即确定的状态转移，这些边表示一个节点总是要在另一个节点之后被调用。
-    2. Conditional Edges：输入是一个节点，输出是一个mapping，连接到所有可能的输出节点，同时附带一个判断函数，根据输入判断流转到哪一个输出节点上。
+    2. Conditional Edges：输入是一个节点，输出是一个mapping，连接到所有可能的输出节点，同时附带一个判断函数，根据全局状态变量的当前值判断流转到哪一个输出节点上，以充分发挥大语言模型的思考能力。
 
+当我们使用这三个核心要素构建图之后，通过图对象的compile方法可以将图转换为一个 Runnable对象（Runnable也有Runnable.get_graph 转为Graph对象），之后就能使用与lcel完全相同的接口调用图对象。
 
 

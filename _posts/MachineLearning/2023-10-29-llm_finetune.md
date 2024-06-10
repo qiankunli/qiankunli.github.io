@@ -416,3 +416,8 @@ PS: 深度学习都得指定features/labels。在llm 场景下，features 和lab
         tokenized_dataset = dataset.map(tokenize_function, batched=True)
     ```
 3. 之后就是对output_ids 和 labels 计算loss。
+
+## 微调实践
+
+1. 合适的损失曲线：训练过程中可能会有波动，但整体是呈现一个下降的趋势，一般模型微调后，最终的训练集损失降低到1以下是合适的，特别低可能会过拟合，但一般使用特定领域知识做微调的话，建议往先过拟合靠拢，优先保证模型能精准回答知识库中的内容。
+2. 无规律波动且不收敛：一般是learningRate太大导致，无法呈现稳定的下降趋势，如果训练中出现这个趋势持续到3~5轮，可以提前关闭训练任务，尝试将学习率learningRate降低一个数量级。

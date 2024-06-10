@@ -76,7 +76,7 @@ PS： 理想状态：给到 pod 准确、实时的limit（更好的监控），�
 3. 批处理任务
   1. 分级可靠地资源超卖，满足差异化的QoS需求
   2. 及时识别干扰源，避免影响LS应用
-4. 资源抽象：Kubernetes 原生 QoS 分级无法满足大规模生产环境的要求。 PS：**卖的资源是“已经卖出去的”的资源**。 
+4. 资源抽象：Kubernetes 原生 QoS 分级无法满足大规模生产环境的要求。QoS 等级在多个维度反映了服务对资源质量的要求，比如在资源隔离上的一些配置，以及在资源竞争比较激烈时，驱逐时的顺序等。各大厂实现都自定义了自己的QoS。 PS：**卖的资源是“已经卖出去的”的资源**。 
 
 [Kubernetes解决Noisy Neighbors场景的探索](https://mp.weixin.qq.com/s/g28ett0Z5LR0sHTyOljCRg) RDT机制 按照应用程序和线程的服务分类来限制和分配其使用的L1/L2/L3缓存。 [Koordinator 最佳实践系列：精细化 CPU 编排](https://mp.weixin.qq.com/s/ps9eLWdvmCBLkcIP96bKMA)
 
@@ -140,13 +140,21 @@ Koordinator，名字取自 coordinator，K for Kubernetes，发音相同。语�
 
 ### 规范NRI（发展中）
 
+kubelet 的 CPU Manager 和 Memory Manager 对 CPU 和内存的管理策略比较朴素，且没有提供扩展机制。
+
 [NRI：下一代节点细粒度资源控制方案](https://mp.weixin.qq.com/s/gwww7Is2_lG7m20wdAeWSg)为了满足不同业务应用场景的需求，特别是在在线任务与离线任务混布的场景下，在提高资源利用率的同时，也要保证延迟敏感服务可以得到充分的资源保证，这就需要 Kubernetes 提供更加细粒度的资源管理功能，增强容器的隔离性，减少容器之间的互相干扰。例如，CPU 编排，内存分层，缓存管理，IO 管理等。目前有很多方案，但是都有其一定的局限性。
 1. Proxy 模式，在客户端(Kubelet)和 CRI Runtime(containerd,CRI-O 等) 之间增加一个 CRI Proxy **中继请求和响应**，在 Proxy 中劫持 Pod 以及 Container 的创建/更新/删除事件，对 Pod 的 Spec 进行修改或者完善，将硬件感知的资源分配策略应用于容器中。缺点：增加了 Pod 创建管理流程的链路以及部署和维护成本
 2. Standalone 模式，在每一个 Work Node 上创建一个 Agent，当这个 Agent 监听到在本节点的 Pod 创建或者修改事件的时候，再根据 Pod Spec 中的 annotation，转换成细粒度资源配置的 Spec，然后调用 CRI Runtime 实现对 Pod 的更新。缺点：在侦听到 Pod 创建以及修改的事件后，才会对 Pod 进行更新，会有一定的延迟。
 
-NRI(Node Resource Interface), 是用于控制节点资源的公共接口, 是 CRI 兼容的容器运行时插件扩展的通用框架。它为扩展插件提供了跟踪容器状态，并对其配置进行有限修改的基本机制。
+NRI(Node Resource Interface), 是用于控制节点资源的公共接口, 是 CRI 兼容的容器运行时插件扩展的通用框架。它为扩展插件提供了跟踪容器状态，并对其配置进行有限修改的基本机制。主要由两个部分组成，一个是集成在 CRI 运行时中的 Adaptation，另一个是用户自定义的 NRI 插件。Adaptation 和 NRI 插件之间通过 Unix Socket 进行通信。
 
 ![](/public/upload/kubernetes/nri.jpg)
+
+NRI 插件有两种运行方式。
+1. 一种是 NRI 插件作为一个独立的进程，通过 NRI Socket 与 CRI 运行时进行通信。这种情况下可以把 NRI 插件部署成为一个 DaemonSet，更方便在 Kubernetes 上管理。
+2. 另一种是可以把编译好的 NRI 插件二进制文件放在 containerd 的指定路径下，由 containerd 发起对 NRI 插件的调用，这种方式有点类似于 CNI 的机制。
+
+NRI 为扩展插件提供了跟踪容器状态，并对其配置进行有限修改的基本机制。它几乎覆盖了 Pod/Container 所有的生命周期事件，对容器常用的修改主要有三部分：Annotation、环境变量、系统资源。NRI 可以 Hook 的 Pod 的生命周期事件有 3 个，Container 的事件有 8 个。NRI 插件除了可以通过 Hook 的方式获取容器事件，NRI 提供了一个 stub.UpdateContainer 的方法也可以主动对容器进行更新。
 
 
 ### 腾讯

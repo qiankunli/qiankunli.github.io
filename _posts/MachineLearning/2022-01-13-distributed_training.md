@@ -58,6 +58,12 @@ keywords:  distributed training
 
 在实践中，模型并行可以包括流水并行和张量并行的组合。一个节点可以负责模型的一部分（模型并行），同时处理不同的微批次（流水并行），并且在这个节点内部，大型的矩阵运算可以进一步在多个处理器间分割（张量并行）。这样的组合可以充分利用分布式计算资源，提高大规模模型训练的效率。
 
+[深度学习分布式训练框架——基础知识](https://mp.weixin.qq.com/s/djGvx3fNJfKCXmjwTfJ-CA)
+1. 中心化分布式，存在一个中心节点，它的作用是汇总并分发其他计算节点的计算结果，更进一步，中心节点可以采用同步更新策略（Synchronous updating），也可以采用异步更新策略（Asynchronous updating）。一般情况下，参数服务器数目远少于工作机器，导致参数服务器端极易成为网络瓶颈。
+2. 去中心化分布式
+
+embedding 场景下架构模式选择： 参数服务器适合的是高纬稀疏模型训练，它利用的是维度稀疏的特点，每次 pull or push 只更新有效的值。但是深度学习模型是典型的dense场景，embedding做的就是把稀疏变成稠密。所以这种 pull or push 的不太适合。而网络通信上更优化的 all-reduce 适合中等规模的深度学习。又比如由于推荐搜索领域模型的 Embedding 层规模庞大以及训练数据样本长度不固定等原因，导致容易出现显存不足和卡间同步时间耗费等问题，所以 all-reduce 架构很少被用于搜索推荐领域。
+
 ### 代码示例
 
 数据并行可以直接使用pytroch DataParallel或DistributedDataParallel，模型并行示例代码
@@ -271,6 +277,17 @@ struct ncclComm {
 1. Gloo是facebook开源的用于机器学习任务中的集合通信库. It comes with a number of collective algorithms useful for machine learning applications. These include a barrier, broadcast, and allreduce. Gloo 为CPU和GPU提供了集合通信程序的优化实现。但如果是在使用NVIDIA-硬件的情况下，主流的选择是NVIDIA自家的NCCL。
 2. [利用多 GPU 加速深度学习模型训练](https://mp.weixin.qq.com/s/wiqOHIVfL2gKnRUhY62EBA)多机软件设计一般采用 MPI（Message Passing Interface）实现数据交互。MPI 是一种消息传递库接口描述标准，规定了点对点消息传递、协作通信、组和通讯员概念、进程拓扑、环境管理等各项内容，支持 C 和 Fortran 语言。**NCCL 出现得更晚一些，参考并兼容了 MPI 已有 API**。**NCCL 更多考虑了 GPU 的特性**，例如任意两块 GPU 之间的通信开销是有区别的，跨 QPI 情况与同一 PCIe Switch 情况，以及有 NVLink/ 无 NVLink 情况就有明显差异，但 MPI 认为两种情况下 GPU 与 GPU 都是等同的，甚至 **MPI 认为跨机器的 GPU 也是等同的**，这对于多 GPU 通信效率会有影响。MPI 可以和 NCCL 结合，实现**层次化的**并行通信机制，即同一台机器上的不同 GPU 之间采用 NCCL 通信，而不同机器上的 GPU 之间采用 MPI 辅助通信。[NCCL and MPI](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/mpi.html)
 
+
+
+## 资源调度
+
+Kubernetes 设计之初目标支撑的主要场景是无状态类工作负载（比如 Web 应用和微服务），后来随着系统稳定性和存储卷管理能力的增强，很多有状态类负载也被跑在 Kubernetes 上，比如数据库、分布式中间件等。到这里，Kubernetes 的核心架构都还没有碰到特别大的挑战。明显的变化发生在 AI 时代，尤其以深度学习为代表的 AI 任务，与以 Spark 批和 Flink 流为代表的大数据处理任务，被大家尝试运行在 Kubernetes 集群上。而在 GPU 管理和推理方面，大家首先要面对的也是最大的一个问题，就是调度和资源管理。
+1. 在资源调度方面，Kubernetes 需要能够针对各类异构设备的体系结构、软硬件协同手段和设备间的约束（共享、隔离、连接等），通过资源调度，最大化集群整体资源利用率。
+2. 任务级调度方面，Kubernetes 需要能够从面向单个 Pod 的调度，扩展到面向一组 Pods 的调度，满足 Pods 间的各种依赖、关联和约束，提升任务整体效率。Scheduler-framework 架构，就是 Kubernetes 调度管理 AI 任务的关键改进之一。本质上，需要 Kubernetes 能够高效支撑一个大规模的任务系统。从架构上，除了调度器（batch scheduler）和任务对象的生命周期控制器（job controller），还缺少重要的一个组件——任务队列（job queue）。
+3. 另外，AI 任务是典型的数据密集型负载，且需要 GPU 此类高性能计算资源支撑。而在存算分离架构下，必然要管理和优化计算任务使用数据的效率问题。CNCF 社区内已经有项目在着手填补这里的能力空白，比如 Fluid 提供面向 AI/ 大数据任务的弹性 Dataset 管理、调度和访问加速，最大化降低 Data IO 对 GPU 计算效率的影响。
+4. 在训练过程中，辅助的监控和运维系统的建设并不是特别完善。尤其是在大规模训练时，如何监控 GPU 的功率并准确判断用户的任务是停止了还是仍在训练中，仍是一个挑战。举个例子，如果用户在训练模型时，发现模型训练框架在运行过程中突然停掉了，然而，使用传统的 CPU 或 GPU 监控方案并不能有效检测到这种情况。这里可能有一个关键指标，即 GPU 的功率。当 GPU 的功率下降时，意味着任务已经停止。在这种情况下，当任务停止后，如何快速启动新任务以加速训练进程？这表明在大规模训练过程中，监控和运维系统的改进空间依然很大。
+5. 此外，在 GPU 虚拟化方面，目前已有一些成熟的方案，如 QGPU、VGPU、 mGPU和cGPU。然而，在 GPU 应用场景下，很少有关于 GPU 利用率的数据出现。在 CPU 利用率方面，业界通常会提到 60% 或 80% 的利用率，但对于 GPU 利用率，什么情况下算是完全压榨了 GPU 的性能，几乎没有相应的讨论和说明。这表明在这一领域的问题仍未得到充分解决，并且缺乏完整的行业解决方案。往后看的话，一旦LLM这个事情有一定冷却，有更多的实际业务场景落地并进入商业化阶段，GPU 利用率就会成为这些公司最重要的事情之一。大家就会关注在 GPU 场景下，怎么去做大规模算力的支撑，怎么去优化网络、存储和并行计算架构的高效使用，这也会成为整个容器或云原生应用未来探索的方向。而且它会带来大量的岗位和职业，也会给企业带来大量的利润。
+
 ## 优化手段
 
 ![](/public/upload/machine/distributed_trainning_optimize.png)
@@ -284,13 +301,3 @@ struct ncclComm {
 3. ZeRO-Offload
 4. ZeRO-Infinity
 5. 3D Parallelism
-
-## 数据并行ps/allreduce
-
-[深度学习分布式训练框架——基础知识](https://mp.weixin.qq.com/s/djGvx3fNJfKCXmjwTfJ-CA)
-1. 中心化分布式，存在一个中心节点，它的作用是汇总并分发其他计算节点的计算结果，更进一步，中心节点可以采用同步更新策略（Synchronous updating），也可以采用异步更新策略（Asynchronous updating）。一般情况下，参数服务器数目远少于工作机器，导致参数服务器端极易成为网络瓶颈。
-2. 去中心化分布式
-
-
-embedding 场景下架构模式选择： 参数服务器适合的是高纬稀疏模型训练，它利用的是维度稀疏的特点，每次 pull or push 只更新有效的值。但是深度学习模型是典型的dense场景，embedding做的就是把稀疏变成稠密。所以这种 pull or push 的不太适合。而网络通信上更优化的 all-reduce 适合中等规模的深度学习。又比如由于推荐搜索领域模型的 Embedding 层规模庞大以及训练数据样本长度不固定等原因，导致容易出现显存不足和卡间同步时间耗费等问题，所以 all-reduce 架构很少被用于搜索推荐领域。
-

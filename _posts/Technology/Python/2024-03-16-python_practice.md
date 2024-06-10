@@ -24,17 +24,17 @@ return和yield异同
 
 ## 装饰器
 
-所谓的装饰器，其实就是通过装饰器函数，**来修改原函数的一些功能，使得原函数不需要修改**。Python装饰器（decorator）在实现的时候，被装饰后的函数其实已经是另外一个函数了（函数名等函数属性会发生改变），为了不影响，Python的functools包中提供了一个叫wraps的decorator来消除这样的副作用。
+所谓的装饰器，其实就是通过装饰器函数，**来修改原函数的一些功能，使得原函数不需要修改**。装饰器实际上是通过创建一个新方法执行旧方法的代码而已。Python装饰器（decorator）在实现的时候，被装饰后的函数其实已经是另外一个函数了（函数名等函数属性会发生改变 ==> 函数签名变了），为了不影响，Python的functools包中提供了一个叫wraps的decorator来消除这样的副作用。
 
 ```python
 def timer(func):
 """装饰器：打印函数耗时"""
-def decorated(*args, **kwargs): # 一般把 decorated 叫作“包装函数”，接收任意数目的可变参数 (*args, **kwargs)，主要通过调用原始函数 func 来完成工作。在包装函数内部，常会增加一些额外步骤，比如打印信息、修改参数等。
-    st = time.perf_counter()
-    ret = func(*args, **kwargs)
-    print('time cost: {} seconds'.format(time.perf_counter() - st))
-    return ret
-return decorated
+    def decorated(*args, **kwargs): # 一般把 decorated 叫作“包装函数”，接收任意数目的可变参数 (*args, **kwargs)，主要通过调用原始函数 func 来完成工作。在包装函数内部，常会增加一些额外步骤，比如打印信息、修改参数等。
+        st = time.perf_counter()
+        ret = func(*args, **kwargs)
+        print('time cost: {} seconds'.format(time.perf_counter() - st))
+        return ret
+    return decorated
 ```
 
 绝大多数情况下，我们会选择用嵌套函数来实现装饰器，但这并非构造装饰器的唯一方式。事实上，某个对象是否能通过装饰器（@decorator）的形式使用只有一条判断标准，那就是 decorator 是不是一个可调用的对象。类同样也是可调用对象。
@@ -67,6 +67,21 @@ hello world
 
 装饰器将额外增加的功能，封装在自己的装饰器函数或类中；如果你想要调用它，只需要在原函数的顶部，加上 @decorator 即可。显然，这样做可以让你的代码得到高度的抽象、分离与简化。
 
+
+原始的装饰器一般简单写法是两层嵌套，如果使用decorator库，将原始嵌套的写法改造成单层的写法，两层的参数合并了，且使用decorator库实现的装饰器实现了签名不变。
+```python
+def log(func):
+    def wrapper(*args, **kw):
+        print 'before run'
+        return func(*args, **kw)
+    return wrapper
+###########################
+from decorator import decorator
+@decorator
+def log(func, *args, **kw):
+    print 'before run'
+    return func(*args, **kw)
+```
 
 ## with和上下文管理器
 

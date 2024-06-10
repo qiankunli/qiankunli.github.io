@@ -13,7 +13,7 @@ keywords: publish system
 
 
 1. 代码 ==> 镜像 ==> k8s 集群自动化
-2. 支持常规操作：发布、灰度发布、回滚、重启等
+2. 支持常规操作：发布、灰度发布、回滚、重启等 [Master-Worker 架构的灰度发布难题](https://mp.weixin.qq.com/s/GpgfL9O_fHzpMDCfr_3fWQ)
 3. 支持容器的调度需求：项目之间亲和性、节点负载等
 4. 发布过程、 结果的信息展示，防止开发困惑
 
