@@ -15,7 +15,7 @@ keywords: langchain langgraph lcel
 
 编程语言大类上可以分为命令式编程和声明式编程，前者深入细节，各种 if else、各种 while/for，程序员掌控每个像素；后者把任务「描述」清楚，重点在业务流程翻译成所用的语言上，具体怎么实现甩给别人（大部分是系统自带）。由于这一波 LLMs 强大的理解、生成能力，**关注细节的命令式编程似乎不再需要**，而偏重流程或者说业务逻辑编排的 pipeline 能力的声明式编程，成了主流「编程」方式。
 
-推理阶段的RAG Flow分成四种主要的基础模式：顺序、条件、分支与循环。PS： 一个llm 业务有各种基本概念，prompt/llm/memory，整个工作流产出一个流式输出，处理链路上包含多个step，且step有复杂的关系（顺序、条件、分支与循环）。一个llm 业务开发的核心就是个性化各种原子能力 以及组合各种原子能力。
+RAG 流程是指在 RAG 系统中，从输入查询到输出生成文本的整个工作流程。这个流程通常涉及多个模块和操作符的协同工作，包括但不限于检索器、生成器以及可能的预处理和后处理模块。RAG 流程的设计旨在使得 LLM（大语言模型）能够在生成文本时利用外部知识库或文档集，从而提高回答的准确性和相关性。推理阶段的RAG Flow分成四种主要的基础模式：顺序、条件、分支与循环。PS： 一个llm 业务有各种基本概念，prompt/llm/memory，整个工作流产出一个流式输出，处理链路上包含多个step，且step有复杂的关系（顺序、条件、分支与循环）。一个llm 业务开发的核心就是个性化各种原子能力 以及组合各种原子能力。
 
 以一个RAG Agent 的工作流程为例
 1. 根据问题，路由器决定是从向量存储中检索上下文还是进行网页搜索。
@@ -24,6 +24,52 @@ keywords: langchain langgraph lcel
 4. 如果检索到的上下文被评为相关，则使用幻觉评分器检查是否存在幻觉。如果评分器决定响应缺乏幻觉，则将响应呈现给用户。
 5. 如果上下文被评为不相关，则进行网页搜索以检索内容。
 6. 检索后，文档评分器对从网页搜索生成的内容进行评分。如果发现相关，则使用 LLM 进行综合，然后呈现响应。
+
+[高级 RAG 检索策略之流程与模块化](https://mp.weixin.qq.com/s/WeAcAevUPemPKhQLhId3Vg)业界一个共识是RAG的演进：Naive RAG ==> Advanced RAG ==> Modular RAG。要落地Modular RAG，便是定义模块以及将模块串起来的Pipeline。比如LlamaIndex 的探索。PS： pipeline/add_modules/add_link
+```
+retriever =  index.as_retriever()
+p = QueryPipeline(verbose=True)
+p.add_modules(
+    {
+        "input": InputComponent(),
+        "retriever": retriever,
+        "output": SimpleSummarize(),
+    }
+)
+p.add_link("input", "retriever")
+p.add_link("input", "output", dest_key="query_str")
+p.add_link("retriever", "output", dest_key="nodes")
+```
+完整的流水线
+```
+evaluator = RagasComponent()
+p = QueryPipeline(verbose=True)
+p.add_modules(
+    {
+        "input": InputComponent(),
+        "query_rewriter": query_rewriter,
+        "retriever": retriever,
+        "meta_replacer": meta_replacer,
+        "reranker": reranker,
+        "output": TreeSummarize(),
+        "evaluator": evaluator,
+    }
+)
+p.add_link("input", "query_rewriter")
+p.add_link("input", "query_rewriter", src_key="input")
+p.add_link("query_rewriter", "retriever")
+p.add_link("retriever", "meta_replacer")
+p.add_link("input", "reranker", dest_key="query_str")
+p.add_link("input", "reranker", src_key="input", dest_key="query_str")
+p.add_link("meta_replacer", "reranker", dest_key="nodes")
+p.add_link("input", "output", dest_key="query_str")
+p.add_link("input", "output", src_key="input", dest_key="query_str")
+p.add_link("reranker", "output", dest_key="nodes")
+p.add_link("input", "evaluator", src_key="input", dest_key="question")
+p.add_link("input", "evaluator", src_key="ground_truth", dest_key="ground_truth")
+p.add_link("reranker", "evaluator", dest_key="nodes")
+p.add_link("output", "evaluator", dest_key="answer")
+```
 
 ## LCEL 
 
@@ -61,7 +107,7 @@ chain.stream("dog")
 |Retriever|	Single string|	List of Documents|
 |Tool|	Single string or dictionary, depending on the tool|	Depends on the tool|
 
-### 基石Runnable
+### 模块化抽象Runnable
 
 我们使用的所有LCEL相关的组件都继承自RunnableSerializable，RunnableSequence 顾名思义就按顺序执行的Runnable，分为两部分Runnable和Serializable。其中Serializable是继承自Pydantic的BaseModel。（py+pedantic=Pydantic，是非常流行的参数验证框架）Serializable提供了，将Runnable序列化的能力。而Runnable，则是LCEL组件最重要的一个抽象类，它有几个重要的抽象方法。
 
@@ -162,7 +208,7 @@ class Runnable(Generic[Input, Output], ABC):
         return RunnableWithFallbacks(self,fallbacks,...)
 ```
 
-### 一些实践
+### Runnable串联
 
 ```python
 def add_one(x: int) -> int:
@@ -299,8 +345,75 @@ LangGraph 三个核心要素
 2. 在创建了StateGraph之后，我们需要向其中添加Nodes（节点）。添加节点是通过`graph.add_node(name, value)`语法来完成的。其中，`name`参数是一个字符串，用于在添加边时引用这个节点。`value`参数应该可以是函数或runnable 接口，它们将在节点被调用时执行。其输入应为状态图的全局状态变量，在执行完毕之后也会输出一组键值对，字典中的键是State对象中要更新的属性。说白了，Nodes（节点）的责任是“执行”，在执行完毕之后会更新StateGraph的状态。
 3. 节点通过边相互连接，形成了一个有向无环图（DAG），边有几种类型：
     1. Normal Edges：即确定的状态转移，这些边表示一个节点总是要在另一个节点之后被调用。
-    2. Conditional Edges：输入是一个节点，输出是一个mapping，连接到所有可能的输出节点，同时附带一个判断函数，根据全局状态变量的当前值判断流转到哪一个输出节点上，以充分发挥大语言模型的思考能力。
+    2. Conditional Edges：输入是一个节点，输出是一个mapping，连接到所有可能的输出节点，同时附带一个判断函数（输入是StateGraph，输出是Literal），根据全局状态变量的当前值判断流转到哪一个输出节点上，以充分发挥大语言模型的思考能力。
 
 当我们使用这三个核心要素构建图之后，通过图对象的compile方法可以将图转换为一个 Runnable对象（Runnable也有Runnable.get_graph 转为Graph对象），之后就能使用与lcel完全相同的接口调用图对象。
 
+```python
+class Graph:
+    def __init__(self) -> None:
+        self.nodes: dict[str, Runnable] = {}
+        self.edges = set[tuple[str, str]]()
+        self.branches: defaultdict[str, dict[str, Branch]] = defaultdict(dict)
+        self.support_multiple_edges = False
+        self.compiled = False
+```
 
+langgraph 代码的主要流程 构建node、edge，然后将其组为graph，自然 langchain 会提供很多现成封装，将各种组件封装为 node/edge。比如两个 为tool 提供了 ToolNode（将tool转为 node，因为node 一般入参是stateGraph，出餐是dict）, tools_condition（是一个入参包含stateGraph 的函数，返回Literal）
+
+```python
+web_search_tool = TavilySearchResults(k=3)
+tools = [web_search_tool]
+retrieve = ToolNode(tools)
+...
+workflow.add_conditional_edges(
+    "agent",
+    # Assess agent decision
+    tools_condition,
+    {
+        # Translate the condition outputs to nodes in our graph
+        "tools": "retrieve",
+        END: END,
+    },
+)
+workflow.add_node("retrieve", retrieve) 
+```
+
+```python
+from langgraph_core.tools import BaseTool
+class BaseTool(RunnableSerializable[Union[str, Dict], Any]):
+    name: str
+    description: str
+    def invoke(self, input: Union[str, Dict],config: Optional[RunnableConfig] = None,**kwargs: Any,) -> Any:
+        ...
+        return self.run(...)
+class Tool(BaseTool):
+    description: str = ""
+    func: Optional[Callable[..., str]]
+    coroutine: Optional[Callable[..., Awaitable[str]]] = None
+
+from langgraph.prebuilt import ToolNode
+class ToolNode(RunnableCallable):
+    def __init__( self,tools: Sequence[BaseTool],*,name: str = "tools",tags: Optional[list[str]] = None,) -> None:
+        super().__init__(self._func, self._afunc, name=name, tags=tags, trace=False)
+        self.tools_by_name = {tool.name: tool for tool in tools}
+    def _func(self, input: Union[list[AnyMessage], dict[str, Any]], config: RunnableConfig) -> Any:
+        message = messages[-1]
+        def run_one(call: ToolCall):
+            output = self.tools_by_name[call["name"]].invoke(call["args"], config)
+            return ToolMessage(...output...)
+        with get_executor_for_config(config) as executor:
+            outputs = [*executor.map(run_one, message.tool_calls)]
+            return outputs 或者 {"messages": outputs}
+
+def tools_condition(state: Union[list[AnyMessage], dict[str, Any]],) -> Literal["tools", "__end__"]:
+    if isinstance(state, list):
+        ai_message = state[-1]
+    elif messages := state.get("messages", []):
+        ai_message = messages[-1]
+    else:
+        raise ValueError(f"No messages found in input state to tool_edge: {state}")
+    if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
+        return "tools"
+    return "__end__"
+```

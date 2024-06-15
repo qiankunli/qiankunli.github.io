@@ -260,5 +260,6 @@ The factory pattern is a design pattern that is used to encapsulate complex logi
 
 ## 其它
 
-* IdentityHashMap，This class implements the Map interface with a hash table, using reference-equality in place of object-equality when comparing keys (and values).  In other words, in an IdentityHashMap, two keys k1 and k2 are considered equal if and only if
- (k1==k2)
+们使用框架，主要是复用框架的能力（function）。而对于框架而言，他最主要的职责是帮用户处理“数据”，对于用户数据，我们在框架中通常叫它们Context（上下文）。我们可以将框架中的Context进一步分为Procedure Context（过程上下文）和Global Context（全局上下文）：
+1. 所谓Procedure Context，是指用户每次调用框架所需要携带的数据。这个Context一般被设计为函数参数，在框架内部传递，当调用链结束，即被销毁。简单理解就是Context per request。例如，web容器框架中的每一个http请求都会有一个HttpServletRequest，就属于Procedure Context。
+2. 所谓Global Context，一般存储的是用户对框架的配置信息，它是全局共享的，在框架的整个生命周期都有效。比如，web容器中的ServletContext，一个容器只有一个是Global的。

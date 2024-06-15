@@ -34,7 +34,7 @@ keywords: Permission
 1. 我自己曾经一个简单实现，`uid,资源id，optype(新增、删除等)`
 2. 一些材料展示，类似于`uid,url`
 
-数据权限设计，建议使用规则引擎。
+数据权限设计，建议使用规则引擎。规则引擎的核心是Rule，而所谓的Rule 就是 if(Condition) then do(Action)。
 
 具体的技术操作上，功能权限可以在系统上加filter，对某个url 没有权限，则直接滤掉。（在材料3中称为功能操作表）
 

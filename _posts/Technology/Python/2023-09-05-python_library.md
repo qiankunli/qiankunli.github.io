@@ -44,6 +44,44 @@ st.text_input('请输入最喜欢的编程语言', key="name")
 
 ![](/public/upload/python/streamlit_text_input.jpg)
 
+## 类型注解 typing
+
+Python是一门动态语言，很多时候我们可能不清楚函数参数类型或者返回值类型，很有可能导致一些类型没有指定方法，在写完代码一段时间后回过头看代码，很可能忘记了自己写的函数需要传什么参数，返回什么类型的结果。typing提供了类型提示和类型注解的功能，用于对代码进行静态类型检查和类型推断。
+1. 类型注解：typing包提供了多种用于类型注解的工具，包括基本类型（如int、str）、容器类型（如List、Dict）、函数类型（如Callable、Tuple）、泛型（如Generic、TypeVar）等。通过类型注解，可以在函数声明、变量声明和类声明中指定参数的类型、返回值的类型等，以增加代码的可读性和可靠性。
+2. 泛型支持：typing模块提供了对泛型的支持，使得可以编写更通用和灵活的代码。通过泛型，可以在函数和类中引入类型参数，以处理各种类型的数据。
+3. 类、函数和变量装饰器：typing模块提供了一些装饰器，如@overload、@abstractmethod、@final等，用于修饰类、函数和变量，以增加代码的可读性和可靠性。
+
+泛型:
+1. Generic: 泛型基类，用于创建泛型类或泛型函数。继承自Generic的类在编写需要处理多种数据类型的代码时非常有用，它们提供了一种类型安全的方式来编写灵活和可重用的组件。
+2. TypeVar: 类型变量，用于创建表示不确定类型的占位符
+
+    ```python
+    # 定义一个泛型类型T
+    T = TypeVar('T')
+    # 表示入参 和 出参 list内 什么数据类型都可以，但必须一致
+    def reverse_list(items: List[T]) -> List[T]:
+        """反转列表"""
+        return items[::-1]
+    ```
+
+3. Callable: 可调用对象类型，用于表示函数类型
+4. Optional: 可选类型，表示一个值可以为指定类型或None
+5. Iterable: 可迭代对象类型
+6. Mapping: 映射类型，用于表示键值对的映射
+7. Sequence: 序列类型，用于表示有序集合类型
+8. Type:泛型类，用于表示类型本身
+
+```
+class Point2D(TypedDict):
+    x: int
+    y: int
+    label: str
+a: Point2D = {'x': 1, 'y': 2, 'label': 'good'}  # OK
+b: Point2D = {'z': 3, 'label': 'bad'}           # Fails type check
+```
+
+
+
 
 ## pydantic(py+pedantic=Pydantic)
 

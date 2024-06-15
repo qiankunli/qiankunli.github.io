@@ -240,7 +240,66 @@ type Type struct {
 
 delayingQueue 的代码逻辑还是很清晰的. 首先使用数据结构小顶堆 minheap 来排列定时任务（使用readyAt作为大小依据）. 当添加定时任务时, 把该任务扔到一个 chan 里, 然后由一个独立的协程监听该 chan, 把任务扔到 heap 中, 该独立协程会从堆里找到最近到期的任务, 并对该任务的进行到期监听, 当定时后期后, 会把到期的定时任务添加到 queue 队列中.
 
-待确认：一个workqueue内只有一个类型的crd。
+一个workqueue内只有一个类型的crd？manager中可以设置多个controller，但是一个controller中只有一个Reconciler。一个Reconciler 一般只处理单个crd，一个controller会持有一个workequeue，进而可以认为一个workqueue内只有一个类型的crd。 
+
+### 限速为何不好使
+
+一次在开发业务时，有碰到一个场景，crd 变更 ==> workqueue ==> reconcile，在reconcile中故意 `return ctrl.Result{RequeueAfter: 5s}, nil`，则链路变成了 crd 变更 ==> workqueue ==> reconcile ==> workqueue ==> reconcile...，每5s就可以触发一次reconcile运行（为了实现每5s调用某个外部的api接口），难点来了，外部api 有限速要求，为此为controller queue配了ratelimiter，结果发现不好使。从 controller-runtime reconcileHandler代码可以看到，限速逻辑只有在err!=nil 等非延迟场景有效，RequeueAfter非空时，执行了 c.Queue.AddAfter 而不是 c.Queue.AddRateLimited。 因此 使用 RequeueAfter 来让step reconcile方法每隔xx秒 执行时，配的ratelimit 没用上。
+
+```go
+func (c *Controller) processNextWorkItem(ctx context.Context) bool {
+        obj, shutdown := c.Queue.Get()
+        ...
+        defer c.Queue.Done(obj)
+        c.reconcileHandler(ctx, obj)
+        return true
+}
+func (c *Controller) reconcileHandler(ctx context.Context, obj interface{}) {
+        ...
+        result, err := c.Reconcile(ctx, req)
+        switch {
+        case err != nil:
+                c.Queue.AddRateLimited(req)
+        case result.RequeueAfter > 0:
+                c.Queue.Forget(obj)
+                c.Queue.AddAfter(req, result.RequeueAfter)
+        case result.Requeue:
+                c.Queue.AddRateLimited(req)
+        default:
+                c.Queue.Forget(obj)
+}
+```
+
+为了让 ratelimit 有用，crd create event 首次进入workqueue 时就应该限速，进而 `crd 变更 ==> workqueue ==> reconcile ==> workqueue ==> reconcile...` 整个循环 就成限速的了。也就是应该改controller的resource event handler，即自定义controller.Watches方法。
+```go
+func Add(mgr ctrl.Manager, ctx *manager.ShuttleContext, options controller.Options) error {
+	r := &Reconciler{
+		Client:           mgr.GetClient(),
+		log:              ctrl.Log.WithName("xx"),
+	}
+	ctrl.NewControllerManagedBy(mgr).
+			WithOptions(options).
+			For(&v1.xx{}).
+			Watches(r.xxEventHandler()).
+			Complete(r)
+}
+func (r *Reconciler) xxEventHandler() handler.EventHandler {
+	return handler.Funcs{
+		CreateFunc: func(e event.CreateEvent, queue workqueue.RateLimitingInterface) {
+			req = xx(e.Object)
+			queue.AddRateLimited(req)
+		},
+		DeleteFunc: func(e event.DeleteEvent, queue workqueue.RateLimitingInterface) {
+			req = xx(e.Object)
+			queue.AddRateLimited(req)
+		},
+		UpdateFunc: func(e event.UpdateEvent, queue workqueue.RateLimitingInterface) {
+			req = xx(e.ObjectNew)
+			queue.AddRateLimited(req)
+		},
+	}
+}
+```
 
 ## controller.Run/ Watch event 消费
 
