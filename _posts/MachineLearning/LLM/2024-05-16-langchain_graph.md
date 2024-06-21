@@ -417,3 +417,26 @@ def tools_condition(state: Union[list[AnyMessage], dict[str, Any]],) -> Literal[
         return "tools"
     return "__end__"
 ```
+
+## 其它
+
+从llamaindex的代码看，问答链路多种多样（比如RouterQueryEngine/MultiStepQueryEngine等），一种链路是一种queryEngine，每种queryEngine有不同的组件，比如RouterQueryEngine提出了 BaseSelector（可以EmbeddingSingleSelector 也可以是LLMSingleSelector） summarizer（BaseSynthesizer子类） 抽象，有分有合。langchain类似，会提各种xxChain，创建chain的时候也会指定一些抽象，比如xxComprossor（实质就是rerank）但不如llamaindex 明显。
+```
+class RouterQueryEngine(BaseQueryEngine):
+    def __init__( self,
+        selector: BaseSelector,
+        query_engine_tools: Sequence[QueryEngineTool],
+        llm: Optional[LLM] = None,
+        summarizer: Optional[TreeSummarize] = None,
+    ) -> None:
+        ...
+```
+也就是，问答链路复杂了，有多个step， step 如何串成piipeline， spep 之间如何传递数据，此时有几种选择
+1. 每个组件都遵守比如Runnable 接口（输入输出是dict 或很宽泛的Input/Oupput，也是一种抽象，但这种抽象几乎意义不大），然后串起来。 此时要解决 控制流（分支、循环）以及组件间的参数传递问题。
+2. 每种链路提出一个抽象
+  1. 控制流：一个抽象固化了问答的先后顺序，比如 RouterQueryEngine/MultiStepQueryEngine。langchain的各种xxChain。
+  2. 组件抽象：具体到链路的每个step也逐步提出一些抽象，比如MultiStepQueryEngine.selector 和 MultiStepQueryEngine.summarizer，selector/summarizer实质都是llm 调用，主要是用的prompt以及附带的入参不同。稍微复杂一点的复用，可以抽象为tool。比如对于MultiStepQueryEngine 链路就是：selector ==> tool ==> selector == tool ==>summarizer。业务开发时，自己手撸方法 子方法，相当于是RouterQueryEngine及BaseSelector 的丐版。
+  3. 参数传递：参数的传递可以通过QueryEngine/XXChain 的成员变量
+3. langgraph 是一种中间态，复用靠把箭头指向原有链路，一条子链路存在的本身就是一种抽象，信息传递靠GraphState。
+
+框架的作用，很多时候也不是没它不行，框架是一个约束和规范，没有它经常会跑偏。

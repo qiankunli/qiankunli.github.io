@@ -31,6 +31,8 @@ Allreduce在单机不同架构下的速度比较
 
 [用Reduction Server加速梯度聚合](https://mp.weixin.qq.com/s/P50A3bGJfoekGcIxImv16A)All-reduce有很多具体的实现，通常是可以由两步组合而成，通常分别是由reduce-scatter和all-gather的两步组合而成。Reduce-scatter完成之后，每个节点各自拥有1/N完整规约过后的数据。下一步的all-gather则是将各个节点上1/N的规约结果发送到所有的节点。效果上等价于N次的broadcast。[用Reduction Server加速梯度聚合](https://mp.weixin.qq.com/s/P50A3bGJfoekGcIxImv16A) 也提到了用 Reduction Server 对all-reduce 进一步优化。
 
+在 all_reduce 操作中，我们发送的梯度是网络参数的两倍。例如，当对 Llama 70B 的 fp16 梯度求和时，我们需要在每次迭代中在 GPU 之间发送 280 GB 的数据。在当今的集群中，这需要相当长的时间。
+
 ## 《用python实现深度学习框架》 api示例（待补充）
 
 Ring AllReduce 分为Split/ScatterReudce/AllGather 三个步骤(《用python实现深度学习框架》配图解释的非常好)，对于每个worker 来说，它既是右邻居的client，要把自身的梯度发送出去，又是左邻居的server，接收来自左邻居的梯度。AllReduce 的gprc 定义

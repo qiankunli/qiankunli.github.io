@@ -287,6 +287,14 @@ Kubernetes 原本的资源模型存在局限性（引入动态资源视图）。
 
 某些时候要对pod做绑核处理，或者是保护这个业务进程，或者是避免这个业务频繁切换干扰其它业务进程。尽量将同一个物理核上的逻辑核同时绑定给一个业务使用。否则，如果在线任务和混部任务分别跑在一个物理核的两个逻辑核上，在线任务还是有可能受到“noisy neighbor”干扰。
 
+Linux Core Scheduling支持在用户态定义可以共享物理核的任务分组。属于同一分组的任务将赋予相同的 cookie 作为标识，同一物理核（SMT 维度）在同一时刻只会运行一种 cookie 的任务。通过将这种机制应用到安全方面或性能方面，我们可以做到以下事情：
+1. 对不同租户的任务进行物理核维度的隔离。对 Pods 进行分组，不同分组的 Pods 不能同时共享物理核，保障多租户隔离。
+2. 避免离线任务争抢在线服务的物理资源。
+
+下一代 CPU QoS 策略，Koordinator 基于 Anolis OS 内核提供的 Core Scheduling 和 CGroup Idle 机制，构建了新的 CPU QoS 策略。
+1. BE 容器启用 CGroup Idle 特性，最小化调度权重和优先级。
+2. LSR/LS 容器启用 Core Scheduling 特性，支持驱逐物理核上同分组的 BE 任务。
+
 ## 其它
 
 [如何正确获取容器的CPU利用率？](https://mp.weixin.qq.com/s/nKedQRFxmIgPBxtlIJasZw)
