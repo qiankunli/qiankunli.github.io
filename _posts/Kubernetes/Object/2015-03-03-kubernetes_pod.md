@@ -155,6 +155,16 @@ type PodStatus struct {
 
 ## kubectl drain 发生了什么
 
+Pod 驱逐分为两种情况：
+1. 较安全驱逐 & 提高稳定性的良性驱逐
+   1. API  发起驱逐，典型案例：kubectl drain
+   2. Node Not Ready 时，Controller Manager 发起的驱逐
+2. 有风险的驱逐
+   1. 节点压力驱逐：节点磁盘空间不足、内存不足 或 Pid 不足， kubelet 发起驱逐；节点内存不足，内核发起 OOM
+   2. 节点打污点（NoExecute），导致 Pod 被驱逐，或者移除亲和性标签，导致 Pod 被驱逐， Controller Manager 发起的驱逐
+   3. Pod 超过自身 Limit 限制， 内核用满，临时存储用满等
+   4. 优先级抢占驱逐
+
 [Kubernetes Pod 删除操作源码解析](https://mp.weixin.qq.com/s/L-CQhYzxqxOoy9xYp6-JMA)
 
 kubectl drain 将以某种方式驱逐 Pod。drain 将向控制平面发出删除目标节点上的 Pod 的请求。通过 API 将 Pod 从集群中删除后，所有发生的事情就是该 Pod 在元数据服务器中被标记为要删除。这会向所有相关子系统发送一个 Pod 删除通知

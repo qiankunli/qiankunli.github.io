@@ -80,8 +80,8 @@ $$
 
 在大语言模型推理中常会用到四个指标：Throughput（吞吐量）、First Token Latency（首字延迟）、Latency（延迟）和QPS（每秒请求数）。这四个性能指标会从四个不同的方面来衡量一个系统的服务提供能力。
 1. Throughput/吞吐量是指当系统的负载达到最大的时候，在单位时间内，能够执行多少个 decoding，即生成多少个字符。
-2. First Token Latency（首字延迟）。指的是当一批用户进入到推理系统之后，用户完成 Prefill 阶段的过程需要花多长时间。这也是系统生成第一个字符所需的响应时间。很多需求关注这一指标，希望用户在系统上输入问题后得到回答的时间小于 2~3 秒。
-3. Latency（延迟）。指的是每一个 decoding 所需要的时长。它反映的是大语言模型系统在线上处理的过程中，每生成一个字符的间隔是多长时间，也就是生成的过程有多么流畅。大部分情况下，我们希望生成的延迟小于 50 毫秒，也就是一秒钟生成 20 个字符。
+2. First Token Latency/TTFT（首字延迟 Time To First Token）。指的是当一批用户进入到推理系统之后，**用户完成 Prefill 阶段的过程需要花多长时间**。这也是系统生成第一个字符所需的响应时间。很多需求关注这一指标，希望用户在系统上输入问题后得到回答的时间小于 2~3 秒。
+3. Latency/TBT（延迟 Time between tokens）。**指的是每一个 decoding 所需要的时长**。它反映的是大语言模型系统在线上处理的过程中，每生成一个字符的间隔是多长时间，也就是生成的过程有多么流畅。大部分情况下，我们希望生成的延迟小于 50 毫秒，也就是一秒钟生成 20 个字符。
 4.  QPS（每秒请求数）。反映了在线上系统的服务当中，一秒钟能够处理多少个用户的请求。
 First Token Latency 和 Latency 这两个指标会因为用户输入的长度不同、batch size 的不同而发生非常大的变化。用户输入的长度越长，首字延迟也会越高。decoding 延迟，只要不是千亿级别的模型，decoding 的延迟都会控制在 50 毫秒以内，主要受到 batch size 的影响，batch size 越大，推理延迟也会越大，但基本上增加的幅度不会很高。吞吐量其实也会受到这两个因素的影响。如果用户输入的长度和生成的长度很长，那么系统吞吐量也不会很高。如果用户输入长度和生成长度都不是很长，那么系统吞吐量可能会达到一个非常离谱的程度。
 除了首token时延，LLM在线服务也可能会把尾token时延（即完成response的时延）作为优化目标，例如，当LLM推理服务作为中间环节时，就会希望response的尾token时延越小越好。
@@ -94,7 +94,7 @@ First Token Latency 和 Latency 这两个指标会因为用户输入的长度不
 
 在 prefill 阶段，至少要做四件事情：第一件事情是把用户的输入进行向量化，tokenize 的过程指的是将用户输入的文本转换为向量，相对于 prefill 整个阶段来说，大概要占掉 10% 的时间，这是有代价的。之后就会进行真正的 prefill 计算，这一过程会占掉大概 80% 的时间。计算之后会进行 sampling，这个过程在 Pytorch 里面一般会用sample、top p。在大语言模型推理当中会用 argmax。总而言之，是根据模型的结果，生成最后词的一个过程。这个过程会占掉 10% 的时间。最后将 refill 的结果返回给客户，这需要的时间会比较短，大概占 2% 到 5% 的时间。
 
-Decoding 阶段不需要 tokenize，每一次做 decoding 都会直接从计算开始，整个decoding 过程会占掉 80% 的时间，而后面的 sampling，也就是采样生成词的过程，也要占掉 10% 的时间。但它会有一个 detokenize 的时间，detokenize 是指生成了一个词之后，这个生成的词是个向量，需要把它解码回文本，这一操作大概会占掉 5% 的时间，最后将这个生成的词返回给用户。
+**Decoding 阶段不需要 tokenize**，每一次做 decoding 都会直接从计算开始，整个decoding 过程会占掉 80% 的时间，而后面的 sampling，也就是采样生成词的过程，也要占掉 10% 的时间。但它会有一个 detokenize 的时间，detokenize 是指生成了一个词之后，这个生成的词是个向量，需要把它解码回文本，这一操作大概会占掉 5% 的时间，最后将这个生成的词返回给用户。
 
 新的请求进来，在进行完 prefill 之后，会不断迭代进行 decoding，每一个 decoding 阶段结束之后，都会将结果当场返回给客户。这样的生成过程在大语言模型里面是很常见的，我们称这样的方式为流式传输。
 
@@ -210,6 +210,10 @@ PS：Transformer （和Attention） layer 已经支持了缓存机制 (use_cache
 [LLM推理入门指南②：深入解析KV缓存](https://mp.weixin.qq.com/s/WxbMFoSrKl0xqsUkzPLJHw) 未读
 
 System Prompt Caching，也称为 Prefix Sharing，其基本思想是对System Prompt部分进行一次计算，并缓存其对应的Key和Value值（例如，存放在GPU显存中），当LLM推理再次遇到相同的（甚至部分相同的）System Prompt时，则可以直接利用已经缓存的System Prompt对应的Key和Value值，这样就避免了对于System Prompt的重复计算。
+
+[Mooncake: A KVCache-centric Disaggregated Architecture for LLM Serving](https://zhuanlan.zhihu.com/p/706109023)Mooncake的核心是其以KVCache为中心的调度器，将预填充/prefill服务器与解码/decoding服务器分开，因为LLM服务的这两个阶段具有非常不同的计算特性，Prefill是计算密集，受限算力带宽用不满，Decode是访存密集性，受限带宽算力用不满。所以用同一种硬件部署两阶段往往顾此失彼，不是最有性价比。拆分Prefill/Decode之后，LLM推理系统就更像一个分布式内存系统+流处理系统，其中KVCache随着请求从预填充移动到解码服务器而转移，将KVCache和计算分离开，它将GPU集群的CPU、DRAM、SSD和RDMA资源分组组成Distributed KVCache Pool，KVCache也是分块以Paged方式管理，KVCache Blocks如何在Pool中调度，请求和复用KVCache乃精髓。这就是传统计算机系统研究者最擅长的领域，sys三板斧，batch， cache，调度都可以招呼上，比如
+1. Prefill阶段可以利用request间存在共同前缀的机会，尽可能复用KVCache。PS：比如agent 循环调用 多次请求的prompt prefix是一样的。
+2. Decode可以进一步拆成Attention和非Attention算子分离调度。
 
 ### Flash Attention
 
