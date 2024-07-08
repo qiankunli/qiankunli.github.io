@@ -120,8 +120,24 @@ class Runnable(Generic[Input, Output], ABC):
 Runnable所有接口都接收可选的配置参数，可用于配置执行、添加标签和元数据，以进行跟踪和调试。
 1. invoke/ainvoke: 单个输入转为输出。
 2. batch/abatch:批量转换。
-3. stream/astream: 单个流式处理。
-4. astream_log:从输入流流式获取结果与中间步骤。
+3. stream/astream: 单个流式处理。PS： 如果没有这个，只能通过callbackhandler.on_llm_new_token 获取llm的吐字了
+    ```
+    chunks = []
+    async for chunk in model.astream("你好。告诉我一些关于你自己的事情"):
+        chunks.append(chunk)
+        print(chunk.content, end="|", flush=True)
+    ```
+4. stream_events:从输入流流式获取结果与中间步骤。 PS： 有点替换 callbackhandler 的味道。
+
+    ```
+    async for event in model.astream_events("hello", version="v1"):
+        kind = event["event"]
+        if kind == "on_chat_model_stream":
+            ...
+        if kind == "on_parser_stream":
+            ...
+    ```
+
 有时我们希望 使用常量参数调用Runnable 调用链中的Runnable对象，这些常量参数不是序列中前一个Runnable 对象输出的一部分，也不是用户输入的一部分，我们可以使用Runnable.bind 方法来传递这些参数。
 
 
@@ -296,9 +312,43 @@ LangGraph的实现方式是把之前基于AgentExecutor的黑盒调用过程用�
 
 ![](/public/upload/machine/lang_graph_agent.jpg)
 
-langgraph正在成为构建Agent的推荐方式。
 
-## 示例
+
+## 构建Agent
+
+### lcel示例
+
+```python
+tools: Sequence[BaseTool] = xx
+# A Runnable sequence representing an agent. It takes as input all the same input variables as the prompt passed in does. It returns as output either an AgentAction or AgentFinish.
+agent = (
+    RunnablePassthrough.assign(
+        agent_scratchpad=lambda x: format_log_to_str(x["intermediate_steps"]),
+    )
+    | prompt
+    | llm_with_stop
+    | JSONAgentOutputParser()
+)
+executor = AgentExecutor(agent=agent, tools=tools, callbacks=callbacks)
+```
+构造 AgentExecutor的时候，如果发现agent 是一个Runable，则会将其转为RunnableAgent。Agent输入输出比较明确
+1. 输入 prompt [hwchase17/structured-chat-agent](https://smith.langchain.com/hub/hwchase17/structured-chat-agent) 和 intermediate_steps
+2. 输出 AgentAction 和 AgentFinish
+```
+class RunnableAgent(BaseSingleActionAgent): 
+    def plan(
+        self,
+        intermediate_steps: List[Tuple[AgentAction, str]],
+        callbacks: Callbacks = None,
+        **kwargs: Any,
+    ) -> Union[AgentAction, AgentFinish]:
+        ...
+```
+AgentExecutor 循环执行Agent.plan，Agent.plan返回AgentAction，AgentExecutor 执行AgentAction.tool 得到observation， AgentExecutor  会将action和observation包装为 AgentStep 塞到intermediate_steps里，并在下次执行Agent.plan时塞给Agent.plan。
+
+### langgraph示例
+
+langgraph正在成为构建Agent的推荐方式。
 
 一个最基础的ReAct范式的Agent应用对应的Graph如下：
 
@@ -338,7 +388,7 @@ for s in app.stream(inputs):
     print("----")
 ```
 
-### 原理
+## LangGraph原理
 
 LangGraph 三个核心要素
 1. StateGraph，LangGraph 在图的基础上增添了全局状态变量，是一组键值对的组合，可以被整个图中的各个节点访问与更新，从而实现有效的跨节点共享及透明的状态维护。它将该对象传递给每个节点。然后，节点会以键值对的形式，返回对状态属性的操作。这些操作可以是在状态上设置特定属性（例如，覆盖现有值）或者添加到现有属性。

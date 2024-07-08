@@ -143,17 +143,9 @@ rootfs是基于内存的文件系统，所有操作都在内存中完成；也�
 
 What is initramfs?
 
-All 2.6 Linux kernels contain a gzipped "cpio" format archive, which is
-extracted into rootfs when the kernel boots up.  After extracting, the kernel
-checks to see if rootfs contains a file "init", and if so it executes it as PID
-1.  If found, this init process is responsible for bringing the system the
-rest of the way up, including locating and mounting the real root device (if
-any).  If rootfs does not contain an init program after the embedded cpio
-archive is extracted into it, the kernel will fall through to the older code
-to locate and mount a root partition, then exec some variant of /sbin/init
-out of that.
+All 2.6 Linux kernels contain a gzipped "cpio" format archive, which is extracted into rootfs when the kernel boots up.  After extracting, the kernel checks to see if rootfs contains a file "init", and if so it executes it as PID1.  If found, this init process is responsible for bringing the system the rest of the way up, including locating and mounting the real root device (if any).  If rootfs does not contain an init program after the embedded cpio archive is extracted into it, the kernel will fall through to the older code to locate and mount a root partition, then exec some variant of /sbin/init out of that.
 
-所以一个linux的启动过程经历了rootfs ==> 挂载initramfs ==> 挂载磁盘上的真正的fs
+所以一个linux的启动过程经历了rootfs ==> 挂载initramfs ==> 挂载磁盘上的真正的fs。**为什么还要使用initramfs呢？**因为，现实中的根文件系统的挂载过程可能非常复杂，因为根文件系统并不一定存在于本地硬盘上，它可能是在一个网络节点上，甚至它还有可能被压缩被加密等等，如果想在内核里处理所有这些情况，是完全不现实的。所以，内核的当前状态是，提供了一个内置的挂载简单根文件系统的逻辑，而针对复杂的根文件系统挂载，则可以使用initramfs的方式，由用户自行处理。
 
 [存储之道 - 51CTO技术博客 中的《一个IO的传奇一生》](http://alanwu.blog.51cto.com/3652632/d-8)
 

@@ -240,18 +240,6 @@ openai 参数转为  model_worker api 参数，最终转为 （Transformer库或
 5. (Optional) add the model name to the "Supported models" section above and add more information in `fastchat/model/model_registry.py.`
 
 
-## vllm 源码分析
-
-[vLLM代码及逻辑介绍](https://zhuanlan.zhihu.com/p/675322419) 值得细读。
-
-[如何让vLLM适配一个新模型](https://zhuanlan.zhihu.com/p/680636375)
-
-[vLLM（二）架构概览](https://zhuanlan.zhihu.com/p/681716326)
-
-[图解大模型计算加速系列：vLLM源码解析1，整体架构](https://mp.weixin.qq.com/s/r_t6_zMvPT7za82MZX4oRA) 未读
-
-[图解大模型计算加速系列：vLLM源码解析2，调度器策略(Scheduler)](https://mp.weixin.qq.com/s/UCdqQUM_9a36uXkO36wpSg) 未读
-
 ## TensorRT-LLM
 
 [​揭秘NVIDIA大模型推理框架：TensorRT-LLM](https://mp.weixin.qq.com/s/z8gDDluDwjRwfeu5GruLIA) 未读

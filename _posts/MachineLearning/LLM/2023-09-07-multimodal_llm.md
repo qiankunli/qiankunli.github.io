@@ -11,8 +11,7 @@ keywords: llm multimodal
 * TOC
 {:toc}
 
-## 前言（未完成）
-
+## 前言
 为什么我们需要能够处理多种数据类型的AI模型呢？原因很简单：我们的世界是多模态的。我们交流和感知世界不仅仅通过语言，还包括视觉、听觉等多种方式。多模态模型能够更全面地理解和模拟人类的交流和感知方式，使得AI能够更自然地与人类互动。
 多模态模型就像是我们的大脑，能够同时处理和理解来自眼睛（视觉信息）、耳朵（听觉信息）和其他感官的数据。作用主要体现在以下几个方面：
 1. 信息整合：能够将不同类型的信息整合在一起，提高理解和分析的准确性。
@@ -33,6 +32,8 @@ keywords: llm multimodal
 5. 其他模态：如传感器数据、生物特征数据等其他形式的信息。
 
 ## Transformer与多模态
+
+![](/public/upload/machine/mllm.jpg)
 
 [为什么Transformer适合做多模态任务？](https://mp.weixin.qq.com/s/zGUwdaS5qlET_PZ6O2amxg)
 1. 其实不是“Transformer适合做多模态任务”，而是Transformer中的Attention适合做多模态任务，准确的说，应该是“Transformer中的Dot-product Attention适合做多模态任务”。PS： Transformer提出了深度学习领域既MLP、CNN、RNN后的第4大特征提取器。
@@ -59,6 +60,74 @@ keywords: llm multimodal
 2. 使用“胶水层”粘接已经训练好的文本模型和各模态编码/解码器，使用多模态数据训练胶水层（projection layer） GPT-4V, MiniGPT-4/v2, LLaVA
 3. 使用文本粘接文本模型和多模态识别/生成模型，无需训练，例如语音：whisper语音识别+LLM文本模型+VITS语音合成
 
+
+[VLMs多模态大模型当下进展与思考](https://mp.weixin.qq.com/s/BkV3v3_NdXZ0jKt1DTj5Xw)
+
+## 图片理解
+1. 如何将图片数据转为模型输入
+1. 高分辨率问题
+
+```
+import torch
+from PIL import Image
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+device = "cuda"
+
+tokenizer = AutoTokenizer.from_pretrained("THUDM/glm-4v-9b", trust_remote_code=True)
+
+query = '描述这张图片'
+image = Image.open("your image").convert('RGB')
+inputs = tokenizer.apply_chat_template([{"role": "user", "image": image, "content": query}],
+                                       add_generation_prompt=True, tokenize=True, return_tensors="pt",
+                                       return_dict=True)  # chat mode
+
+inputs = inputs.to(device)
+model = AutoModelForCausalLM.from_pretrained(
+    "THUDM/glm-4v-9b",
+    torch_dtype=torch.bfloat16,
+    low_cpu_mem_usage=True,
+    trust_remote_code=True
+).to(device).eval()
+
+gen_kwargs = {"max_length": 2500, "do_sample": True, "top_k": 1}
+with torch.no_grad():
+    outputs = model.generate(**inputs, **gen_kwargs)
+    outputs = outputs[:, inputs['input_ids'].shape[1]:]
+    print(tokenizer.decode(outputs[0]))
+```
+
+```
+curl  https://api.openai-hk.com/v1/chat/completions \
+  -H 'Authorization: Bearer hk-替换为你的key' \
+  -H "Content-Type: application/json" \
+  -d '{
+    "max_tokens": 1200,
+    "model": "gpt-4-vision-preview",
+    "messages": [
+        {
+            "role": "system",
+            "content": "You are an expert Tailwind developer\nYou take screenshots of a reference web page from the user, ..."
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "将图片生成网页代码"
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "data:image/jpeg;base64,${图片链接或者图片base64}"
+                    }
+                }
+            ]
+        }
+    ]
+}'
+```
+
 ## 文生图
 
 [文生图模型发展简史与原理：DALL·E, Imagen, Stable Diffusion](https://mp.weixin.qq.com/s/u4t23yzx0Qli_NIlnvNNEA) 未读。 
@@ -66,6 +135,30 @@ keywords: llm multimodal
 [​浅析多模态大模型的前世今生](https://mp.weixin.qq.com/s/DXoeQqjVoDLxGV2oZeL95Q) 未读
 
 [文生图模型发展简史与原理：DALL·E, Imagen, Stable Diffusion](https://mp.weixin.qq.com/s/3-p16x4e5XVRYuPj6QTnxg) 未读
+
+```
+curl  https://api.openai-hk.com/v1/images/generations \
+  -H 'Authorization: Bearer hk-替换为你的key' \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "dall-e-3",
+    "prompt": "a white siamese cat",
+    "n": 1,
+    "size": "1024x1024"
+  }'
+```
+
+```
+{
+    "created": 1719924224,
+    "data": [
+        {
+            "revised_prompt": "A close-up image of a Siamese cat with creamy white fur. Its blue almond-shaped eyes are striking, showing curiosity and alertness. Its face has distinct dark brown points on its ears, muzzle, paws, and tail, characteristic of the Siamese breed. It's sitting relaxingly with its tail curled around its body, exuding elegance and tranquility.",
+            "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-kOhHNKvXL29o3pG0HmQBc5Ba/user-KfXfmNUDI7WFshn1EGmdABuT/img-ipwM5u6uaI005p9vACY2MVlG.png?st=2024-07-02T11%3A43%3A44Z&se=2024-07-02T13%3A43%3A44Z&sp=r&sv=2023-11-03&sr=b&rscd=inline&rsct=image/png&skoid=6aaadede-4fb3-4698-a8f6-684d7786b067&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2024-07-02T01%3A55%3A22Z&ske=2024-07-03T01%3A55%3A22Z&sks=b&skv=2023-11-03&sig=P4QLWf6kAuBiWQJFiLCojKbNkO//qB09PpMnSE3eimM%3D"
+        }
+    ]
+}
+```
 
 ## 文生视频
 

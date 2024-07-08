@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: LLM工作流编排
+title: Multi-Agent探索
 category: 技术
 tags: MachineLearning
 keywords: langchain langgraph lcel
@@ -12,6 +12,12 @@ keywords: langchain langgraph lcel
 {:toc}
 
 
+## 必要性
+
+以rag系统为例
+1. 简单的rewrite ==> retrieve ==> generate
+2. [rag的尽头是agent](https://mp.weixin.qq.com/s/iZjfHEe2TXCJYPAGQ6beUQ) `rewrite ==> retrieve ==> generate` 可以解决的问题终归有限， 这里涉及到很多花活，比如拆分子问题、联网、ircot等，需要agent 根据当前的已知信息，判断下一步 ==> 行动 ==> 根据观察判断下一步
+3. [rag的尽头是multi-agent](https://mp.weixin.qq.com/s/uSHGFKpPzdrJjDL3BZVDWw)  单个agent 可以解决的问题也终归有限，用户的“知识”不只在文档里，也在数据库表里，也是知识图谱里，都编排在一个agent里，对路由器/plan 组件的要求很高，很多时候即便人也无法判断，这时候就要“三个臭皮匠，顶一个诸葛亮”了。
 
 ## 多Agent框架
 
