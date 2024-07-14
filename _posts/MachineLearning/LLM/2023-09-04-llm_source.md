@@ -1,10 +1,10 @@
 ---
 
 layout: post
-title: LLM部分技术源码学习
+title: Transformers源码学习
 category: 技术
 tags: MachineLearning
-keywords: llm source
+keywords: llm Transformers 
 
 ---
 
@@ -17,13 +17,13 @@ keywords: llm source
 1. 参数集：这是模型的"大脑"，包含了通过训练学习到的神经网络权重。
 2. 执行代码：这是模型的"引擎"，包含用于运行参数集的软件代码，可以采用任何编程语言实现。
 
-## Transformers
-
 [NLP Course](https://huggingface.co/learn/nlp-course) 官方教程，建议从头到尾细看一下。
 
 [Transformers快速入门](https://transformers.run/)Hugging Face 专门为使用 Transformer 模型编写了一个 Transformers 库，建立在 Pytorch 框架之上（Tensorflow 的版本功能并不完善），所有 Transformer 模型都可以在 Hugging Face Hub 中找到并且加载使用，包括训练、推理、量化等。
 
 ![](/public/upload/machine/transformers_overview.png)
+
+## 使用
 
 ### pipelines
 
@@ -49,7 +49,7 @@ results = generator("In this course, we will teach you how to")
 print(results)
 ```
 
-### 基础
+### 基础组件
 
 transformers开源库的核心组件包括3个：Conﬁguration、Tokenizer、Model
 1. 「Conﬁguration」：配置类，通常继承自「PretrainedConﬁg」，保存model或tokenizer的超参数，例如词典大小，隐层维度数，dropout rate等。配置类主要可用于复现模型。
@@ -502,6 +502,215 @@ def generate(self,
 2. generate是基于forward实现的。
 3. generate利用各种解码策略，生成文本；而forward最主要的作用就是提供logits（未归一化的分布）。
 4. 解码策略对于文本的生成是非常重要的。我们可以不使用generate，而直接根据forward的logits进行解码，只要自己实现各类解码策略即可。这在自定义解码策略时非常有用。
+
+### forward实现
+
+[Qwen整体介绍](https://github.com/datawhalechina/tiny-universe/tree/main/content/Qwen-blog) 以代码组织的视角来看下 transformer的设计图。
+
+![](/public/upload/machine/qwen_code_view.jpg)
+
+```python
+def run_qwen2():
+    qwen2config = Qwen2Config(vocab_size=151936,...)
+    qwen2model = Qwen2Model(config=qwen2config)
+    input_ids = torch.randint(0,qwen2config.vocab_size,(4,30))
+    res = qwen2model(input_ids)
+    print(type(res))
+```
+Qwen2Model 干活的三个主力（3个成员）：嵌入层（embed_tokens）、解码器层（layers）、归一化层（norm）。Qwen2Model 及其成员都是一个 nn.Module。**最上层是Qwen2Model.forward  最底层是pytorch 运算，中间是一系列 nn.Module 用于抽象和复用**，上一层的nn.Module.forward 通过驱动其成员的forward 干活儿。
+```python
+class Qwen2Model(Qwen2PreTrainedModel):
+    def __init__(self, config: Qwen2Config):
+        super().__init__(config)
+        self.padding_idx = config.pad_token_id
+        self.vocab_size = config.vocab_size
+
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        self.layers = nn.ModuleList(
+            [Qwen2DecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
+        )
+        self.norm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+
+        self.gradient_checkpointing = False
+        # Initialize weights and apply final processing
+        self.post_init()
+    def forward(input_ids,attention_mask,position_ids,...) -> Union[...]:
+        inputs_embeds = self.embed_tokens(input_ids)
+        # embed positions
+        hidden_states = inputs_embeds
+        for idx, decoder_layer in enumerate(self.layers):
+            # 将所有的hidden_states保存成tuple
+            if output_hidden_states:
+                all_hidden_states += (hidden_states,)
+            # 将hs送入每一层decoder_layer
+            layer_outputs = decoder_layer(
+                hidden_states,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_value,
+                output_attentions=output_attentions,
+                use_cache=use_cache,
+            )
+            # 取出上一层decoder_输出的hs,再传入下一个layer
+            # 只要第一个,第二个是cache的一个类，然后进入下一个layer
+            hidden_states = layer_outputs[0]
+        # 将最后layers输出后的hidden_states进行标准化  
+        hidden_states = self.norm(hidden_states)   
+        # 加上最后一层的hidden_states
+        if output_hidden_states:
+            all_hidden_states += (hidden_states,) 
+```
+重点转到了 Qwen2DecoderLayer，三件套对应3个成员:attn+MLP+norm。forward逻辑：首先复制一份hidden_states为residual,然后将hidden_states送入Norm,再送入attn模块。得到attn的输出后，再复制一份residual，再将hidden_states送入Norm，mlp，再与residual进行相加。最后输出的就是这个hidden_states啦。
+
+```python
+# 为了提高性能，ATTENTION layer 有一些优化实现，比如flash attention，sdpa
+QWEN2_ATTENTION_CLASSES = {
+    "eager": Qwen2Attention,  # 一般情况下是这个
+    "flash_attention_2": Qwen2FlashAttention2,
+    "sdpa": Qwen2SdpaAttention,
+}
+class Qwen2DecoderLayer(nn.Module):
+    def __init__(self, config: Qwen2Config):
+        super().__init__()
+        self.hidden_size = config.hidden_size
+        self.self_attn = QWEN2_ATTENTION_CLASSES[config._attn_implementation](config, layer_idx)
+
+        self.mlp = Qwen2MLP(config)
+        # input_layernorm和post_attention_layernorm内容是一样的，只是应用的顺序不一样。
+        self.input_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.post_attention_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+    def forward(hidden_states,attention_mask,position_ids,...) -> Union[...]:
+        residual = hidden_states 
+        #  标准化后送入attn
+        hidden_states = self.input_layernorm(hidden_states)  # RMSNorm标准化
+        # Self Attention
+        hidden_states, self_attn_weights, present_key_value = self.self_attn(  
+            hidden_states=hidden_states,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_value=past_key_value,
+            output_attentions=output_attentions,
+            use_cache=use_cache,
+            **kwargs,
+        )
+        # 残差与新的hidden_states相加
+        hidden_states = residual + hidden_states
+        # Fully Connected
+        residual = hidden_states
+        # 同样的RMSNorm标准化
+        hidden_states = self.post_attention_layernorm(hidden_states)
+        hidden_states = self.mlp(hidden_states)
+        hidden_states = residual + hidden_states
+        outputs = (hidden_states,)
+        return outputs
+```
+重点转到 Qwen2Attention，forward逻辑：首先将hidden_states送入Linear中得到query、key与value。使用旋转位置嵌入操作rotary_emb，使用了旋转位置嵌入的余弦和正弦部分，将他们与query和key相乘，并将结果相加，从而实现旋转位置嵌入的效果。将key_states和value_states重复group次，再执行dot attn操作。在dot attn操作后得到attn_weights,加上attention_mask从而实现读取掩盖操作，在经过softmax与value_states相乘。得到attn_output。再将上述的attn_output进行reshape操作，送入o_proj，得到最终的输出。
+```python
+class Qwen2Attention(nn.Module):
+    """Multi-headed attention from 'Attention Is All You Need' paper"""
+    def __init__(self, config: Qwen2Config):
+        super().__init__()
+        self.config = config
+        self.layer_idx = layer_idx
+        self.hidden_size = config.hidden_size
+        self.num_heads = config.num_attention_heads
+        self.head_dim = self.hidden_size // self.num_heads
+        self.num_key_value_heads = config.num_key_value_heads # 键值对的头数
+        self.num_key_value_groups = self.num_heads // self.num_key_value_heads # 键值对的组数
+        self.max_position_embeddings = config.max_position_embeddings
+        self.rope_theta = config.rope_theta
+        self.is_causal = True
+        self.attention_dropout = config.attention_dropout
+
+        if (self.head_dim * self.num_heads) != self.hidden_size:
+            raise ValueError(
+                f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"
+                f" and `num_heads`: {self.num_heads})."
+            )
+        # 后续LoRa也基本都对q_proj/k_proj/v_proj/o_proj 四个Linear操作动的刀子
+        self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.head_dim, bias=config.attention_bias)
+        self.k_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias)
+        self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias)
+        self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.hidden_size, bias=config.attention_bias)
+        
+        self.rotary_emb = Qwen2RotaryEmbedding(
+            self.head_dim,
+            max_position_embeddings=self.max_position_embeddings,
+            base=self.rope_theta,
+        )
+    def forward(hidden_states,attention_mask,position_ids,...) -> Union[...]:
+        # 获取形状信息,hidden_states输入的为(bs,T,hd)
+        bsz, q_len, _ = hidden_states.size()
+        # 对hidden_states进行Linear生成query、key、value
+        query_states = self.q_proj(hidden_states)
+        key_states = self.k_proj(hidden_states)
+        value_states = self.v_proj(hidden_states)
+        # reshape多头处理--分块--(bs,T,heads,hd_d)
+        query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        # 将旋转位置嵌入应用于查询和键张量。使用了旋转位置嵌入的余弦和正弦部分，将它们与查询和键张量相乘，并将结果相加，从而实现旋转位置嵌入的效果
+        cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+        # 先将key_states和value_states重复了num_key_value_groups次
+        key_states = repeat_kv(key_states, self.num_key_value_groups)
+        value_states = repeat_kv(value_states, self.num_key_value_groups)
+        # 使用dot attn实现q*kT/hd_d^0.5
+        attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+        # 然后 attn_weights 加上 attention_mask，实现读取顺序
+        attn_weights = attn_weights + attention_mask
+        # softmax + dropout + values_states相乘
+        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
+        attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
+        attn_output = torch.matmul(attn_weights, value_states)
+        # 转置，修改形状等reshape操作
+        attn_output = attn_output.transpose(1, 2).contiguous()
+        attn_output = attn_output.reshape(bsz, q_len, self.hidden_size)
+        # 最后在进行一次o_proj
+        attn_output = self.o_proj(attn_output)
+        # 返回结果
+        return attn_output, attn_weights, past_key_value
+```
+
+Qwen2 MLP 输入hidden_state并行送入两个Linear层，其中一个激活一下，再与另一个相乘，最终再经过一个Linear，输出最终结果。
+```python
+class Qwen2MLP(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        # 这俩不必多说
+        self.config = config
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+
+        # 三个全连接层
+        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
+        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
+        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)
+        self.act_fn = ACT2FN[config.hidden_act]
+
+    def forward(self, x):
+        down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
+        return down_proj
+```
+
+Qwen2RMSNorm 
+```python
+class Qwen2RMSNorm(nn.Module):  # 标准化层
+    def __init__(self, hidden_size, eps=1e-6):
+        """
+        Qwen2RMSNorm is equivalent to T5LayerNorm
+        """
+        super().__init__()
+        self.weight = nn.Parameter(torch.ones(hidden_size))
+        self.variance_epsilon = eps
+
+    def forward(self, hidden_states):
+        input_dtype = hidden_states.dtype
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        return self.weight * hidden_states.to(input_dtype)
+```
 
 ## 训练/Trainer
 

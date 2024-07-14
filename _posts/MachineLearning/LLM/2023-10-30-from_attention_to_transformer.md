@@ -27,8 +27,9 @@ Transformer模型采用的也是编码器-解码器架构，但是在该模型�
 
 ![](/public/upload/machine/transformer_internal.jpg)
 
-1. Encoder具有两层结构，self-attention和前馈神经网络。self-attention计算句子中的每个词都和其他词的关联，从而帮助模型更好地理解上下文语义，引入Muti-Head attention后，每个头关注句子的不同位置，增强了Attention机制关注句子内部单词之间作用的表达能力。前馈神经网络为encoder引入非线性变换，增强了模型的拟合能力。本质上，自注意力机制使得模型能理解语句中不同单词间的关系。而且**跟以往按固定顺序处理单词**的传统模型不同，transformers 其实是同时检查所有单词，并根据每个词跟句中其他词之间的相关性，为各词分配所谓“注意力得分”指标。
-2. 跟编码器类似，解码器同样由多层自注意力加前馈神经网络组成。解码器的第一个注意力层只计算已翻译输入的注意力，第二个注意力层则使用了编码器的输出，保证解码器在生成输出时考虑到来自输入序列的相关信息。 解码器中第一个注意力层的注意力掩码可用于编码器或解码器，来保证不会对一些特殊token计算注意力。例如计算批量文本的时候，由于文本长度不一致，需要进行补齐操作（那些补齐token是没有意义的），那么使用注意力掩码可以防止计算注意力时也把补齐字符考虑进去。
+在经典的 Attention 机制中，Q 往往来自于一个序列，K 与 V 来自于另一个序列，都通过参数矩阵计算得到，从而可以拟合这两个序列之间的关系。
+1. 在 Transformer 的 Decoder 结构中，Q 来自于 Decoder 的输入，K 与 V 来自于 Encoder 的输出， 从而拟合了编码信息与历史信息之间的关系，便于综合这两种信息实现未来的预测。
+1. 在 Transformer 的 Encoder 结构中，使用的是 Attention 机制的变种 —— self-attention （自注意力）机制。 所谓自注意力，即是计算本身序列中每个元素都其他元素的注意力分布， 即在计算过程中，Q、K、V 都由同一个输入通过不同的参数矩阵计算得到。 从而拟合输入语句中每一个 token 对其他所有 token 的关系，从而建模文本之间的依赖关系。​
 
 Transformer 模型本来是为了翻译任务而设计的。在训练过程中，Encoder 接受源语言的句子作为输入，而 Decoder 则接受目标语言的翻译作为输入。在 Encoder 中，由于翻译一个词语需要依赖于上下文，因此注意力层可以访问句子中的所有词语；而 Decoder 是顺序地进行解码，在生成每个词语时，注意力层只能访问前面已经生成的单词。例如，假设翻译模型当前已经预测出了三个词语，我们会把这三个词语作为输入送入 Decoder，然后 Decoder 结合 Encoder 所有的源语言输入来预测第四个词语。每一个部分都有公式对应。
 
@@ -66,7 +67,9 @@ transformer中，模型输入encoder的每个token向量由两部分加和而成
 2. 可以将离散的位置值转化为连续值
 3. 可以借助正余弦函数的特性，对于某个偏移量k ，可以基于$PE_{pos}$通过线性变换快速计算出相对位置的 $PE_{pos+k}$
 
-## self-attention 机制
+## attention层
+
+### self-attention 机制
 
 在处理每个单词的表示时，要对你传递给它的句子中某些单词特别关注（并且忽略其他单词）。一个单词本身具有意义，但是该意义深受上下文影响，这可以是正在研究的单词之前或之后的任何其他单词（或多个）。self-attention 机制用于计算句子中当前词与其他词的联系，每个单词的新表示形式是由它自己和其他单词的交互得到的。举个例子：
 
@@ -91,7 +94,7 @@ $$
 
 所谓的Q K V矩阵、查询向量之类的字眼，其来源是X与矩阵的乘积，本质上都是X的线性变换，经过不同的权重矩阵$W_Q$$W_K$$W_V$投影到不同的空间中。为什么不直接使用X而要对其进行线性变换？当然是为了提升模型的拟合能力，矩阵W都是可以训练的，起到一个缓冲的效果。所以 self-Attention最原始的形态其实是 $softmax(XX^T)X$。
 
-1. $XX^T$代表什么？一个矩阵（一个句子）乘以它自己的转置，会得到什么结果，有什么意义？我们知道，矩阵可以看作由一些向量组成，**一个矩阵乘以它自己转置的运算，其实可以看成这些向量分别与其他向量计算内积**（一个句子的各个词向量的内积）。向量的内积，其几何意义是什么？表征两个向量的夹角，表征一个向量在另一个向量上的投影。**投影的值大，说明两个向量相关度高**（两个词相关度越高）。如果两个向量夹角是九十度，那么这两个向量线性无关，完全没有相关性！更进一步，这个向量是词向量，是词在高维空间的数值映射。词向量之间相关度高表示什么？是不是在一定程度上（不是完全）表示，在关注词A的时候，应当给予词B更多的关注？
+1. $XX^T$代表什么？一个矩阵（一个句子）乘以它自己的转置，会得到什么结果，有什么意义？我们知道，矩阵可以看作由一些向量组成，**一个矩阵乘以它自己转置的运算，其实可以看成这些向量分别与其他向量计算内积**（一个句子的各个词向量的内积）。向量的内积，其几何意义是什么？表征两个向量的夹角，表征一个向量在另一个向量上的投影。**投影的值大，说明两个向量相关度高**（两个词相关度越高）。如果两个向量夹角是九十度，那么这两个向量线性无关，完全没有相关性！更进一步，这个向量是词向量，是词在高维空间的数值映射。词向量之间相关度高表示什么？是不是在一定程度上（不是完全）表示，在关注词A的时候，应当给予词B更多的关注？对应到qkv，$qK^T$基于矩阵乘法的定义，$qK^T$ 即为 q 与每一个 k 值的点积，反映了 Query 和每一个 Key 的相似程度。
   ![](/public/upload/machine/self_attention_xxt.jpg)
 2. Softmax操作的意义是什么呢？归一化。 Softmax之后，这些数字的和为1了。当我们关注"早"这个字的时候，我们应当分配0.4的注意力给它本身，剩下0.4关注"上"，0.2关注"好"。
   ![](/public/upload/machine/self_attention_softmax_xxt.jpg)
@@ -102,6 +105,19 @@ $$
   ![](/public/upload/machine/self_attention_softmax_xxt_x_matrix.jpg)
 4. $\sqrt{d_k}$的意义。假设Q,K里的元素的均值为0，方差为1，那么$A^T=Q^TK$中元素的均值为0，方差为d。当d变得很大时，A中的元素的方差也会变得很大，如果A中的元素方差很大，那么softmax(A)的分布会趋于陡峭(分布的方差大，分布集中在绝对值大的区域)。总结一下就是softmax(A)的分布会和d有关。因此A中每一个元素除以$\sqrt{d_k}$后，方差又变为1。这使得softmax(A)的分布“陡峭”程度与d解耦，从而使得训练过程中梯度值保持稳定。
 
+```python
+'''注意力计算函数'''
+from torch.nn import functional as F
+def attention(q, k, v):
+    # 此处我们假设 q、k、v 维度都为 (B, T, n_embed)，分别为 batch_size、序列长度、隐藏层维度
+    # 计算 QK^T / sqrt(d_k)，维度为 (B, T, n_embed) x (B, n_embed, T) -> (B, T, T)
+    att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+    # 计算 softmax，维度为 (B, T, T)
+    att = F.softmax(att, dim=-1)
+    # V * Score，维度为(B, T, T) x (B, T, n_embed) -> (B, T, n_embed)
+    y = att @ v 
+    return y
+```
 
 [小白看得懂的 Transformer (图解)](https://mp.weixin.qq.com/s/VrzkxEVBAO6abJcUsYGr0Q)计算自注意力的步骤
 1. 从每个编码器的输入向量（每个单词的embedding向量，512维）与矩阵相乘，这个矩阵是随机初始化的，维度为（64，512），生成三个向量（QKV，64维）。
@@ -129,9 +145,9 @@ Attention机制的目标是输入$x_n$，输出$z_n$。这个过程可以简单�
 
 [Transformer内部原理四部曲3D动画展示](https://mp.weixin.qq.com/s/QEvdSPaf6Ikz15iaEJXjlw)
 
-## MultiHeadAttention
+### MultiHeadAttention
 
-自注意力机制的方式确实解决了“传统序列模型在编码过程中都需顺序进行的弊端”的问题，有了自注意力机制后，仅仅只需要对原始输入进行几次矩阵变换便能够得到最终包含有不同位置注意力信息的编码向量。**模型在对当前位置的信息进行编码时，会过度的将注意力集中于自身的位置**（虽然每个编码都在z1中有或多或少的体现），因此作者提出了通过多头注意力机制来解决这一问题。同时，使用多头注意力机制还能够给予注意力层的输出包含有不同子空间中的编码表示信息，从而增强模型的表达能力（这些集合中的每一个W都是随机初始化的，在训练之后，每个集合都被用来将输入词嵌入(或来自较低编码器/解码器的向量)投影到不同的表示子空间中）。
+​Attention 机制可以实现并行化与长期依赖关系拟合，但一次注意力计算只能拟合一种相关关系，单一的 Attention 机制很难全面拟合语句序列里的相关关系。因此 Transformer 使用了 Multi-Head attention 机制，即同时对一个语料进行多次注意力计算，每次注意力计算都能拟合不同的关系，将最后的多次结果拼接起来作为最后的输出，即可更全面深入地拟合语言信息。（这些集合中的每一个W都是随机初始化的，在训练之后，每个集合都被用来将输入词嵌入(或来自较低编码器/解码器的向量)投影到不同的表示子空间中）。
 
 $$
 head_i = Attention(QW{_i}{^Q},KW{_i}{^K},VW{_i}{^V})
@@ -168,7 +184,7 @@ $$
 ![](/public/upload/machine/end_to_end_multi_head.jpg)
 PS: head的概念类似卷积中的通道，只不过每个通道的输入都是一样的，类似于把一个通道的数据复制多次。多头注意力的计算过程类似深度可分离卷积，把通道分开计算，再融合到一起。经过注意力层，**输入向量和输出向量的shape是一致的**，可以看做向量相互"交流"并根据彼此信息更新自身的值。Attention模块的作用就是要确定上下文中哪些词对更新其他词的意义有关，以及应该如何准确地更新这些含义。
 
-## Position-wise Feed Forward
+### Position-wise Feed Forward
 
 Attention模块的作用就是确定上下文中哪些词之间有语义关系，以及如何准确地理解这些含义（更新相应的向量）。这里说的“含义”meaning指的是编码在向量中的信息。Attention模块让输入向量们彼此充分交换了信息（例如machine learning model和fashion model，单词“model”指的应该是“模特”还是“模型”）， 然后，这些向量会进入第三个处理阶段：Feed-forward / MLPs。针对所有向量做一次性变换。这个阶段，向量不再互相"交流"，而是并行地经历同一处理。**Transformer基本不断重复Attention和Feed-forward这两个基本结构，这两个模块的组合成为神经网络的一层**。输入向量通过attention更新彼此；feed-forward 模块将这些更新之后的向量做统一变换，得到这一层的输出向量；在Attention模块和多层感知机（MLP）模块之间不断切换，直到最后期望通过某种方式，使得文章的核心意义已经被完全融入到序列的最后一个向量中。 
 
@@ -179,14 +195,33 @@ FFN(x) = max(0,xW_1+b1)W_2+b_2
 $$
 2. 前馈神经网络的输入是self-attention的输出，是一个矩阵（即上图Z），矩阵的维度是（序列长度×D词向量），之后前馈神经网络的输出也是同样的维度。self-attention + 前馈神经网络 就是一个小编码器的内部构造了，一个大的编码部分就是将这个过程重复了6次，最终得到整个编码部分的输出。为了解决梯度消失的问题，在Encoders和Decoder中都是用了残差神经网络的结构，即每一个前馈神经网络的输入不光包含上述self-attention的输出Z，还包含最原始的输入。
 
+```python
+'''全连接模块'''
+class MLP(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        # Transformer 的全连接模块有两个线性层，中间加了一个 RELU 激活函数
+        # 此处我们将隐藏层维度设为输出层的四倍，也可以设置成其他维度
+        self.c_fc    = nn.Linear(config.n_embd, 4 * config.n_embd, bias=config.bias)
+        self.relu    = nn.ReLU()
+        self.c_proj  = nn.Linear(4 * config.n_embd, config.n_embd, bias=config.bias)
+        self.dropout = nn.Dropout(config.dropout)
+    def forward(self, x):
+        x = self.c_fc(x)
+        x = self.relu(x)
+        x = self.c_proj(x)
+        x = self.dropout(x)
+        return x
+```
+
 其它
 
 1. 大语言模型中的参数都用在哪了？可以看到在百亿参数量以上，差不多三分之二的参数实际上是 FFN 参数，剩下的基本都是 attention 参数。所以虽然论文名叫 attention is all you need，但实际上 FFN 仍然起到了很重要的作用。
 2. transformer 中最重要的是self-attention，self-attention 由三个线性矩阵Q、K、V 决定，如果我们把Q、K矩阵设置为零，那么self-attention 就变成了FFN，$Z_0 =V_0*X$，也就是说，FFN是self-attention 的一个特例，FFN能表达的逻辑，self-attention 也可以，但反过来却不成立。至于transformer 中的FFN部分，当初设计是为了输入输出维度的对齐，毕竟多注意力的输出 $W_0$的维度比输入X维度高很多。但如果一定要用FFN去表达self-attention的逻辑，也是可以的，但需要的参数量却要大很多，感兴趣的可以去试验一下，用FFN去拟合self-attention 的逻辑。就好像乘法能计算的东西，单纯用加法依然可以做到，但效率要低很多，self-attention就是乘法，FFN就是加法。
 
-##  Layer Normalization
+###  Layer Normalization
 
-这些都是用于Normalization激活的技术，可以加速学习，提高模型的性能。在每个block中，最后出现的是Layer Normalization，其作用是规范优化空间，加速收敛。当我们使用梯度下降算法做优化时，我们可能会对输入数据进行归一化，但是经过网络层作用后，我们的数据已经不是归一化的了。随着网络层数的增加，数据分布不断发生变化，偏差越来越大，导致我们不得不使用更小的学习率来稳定梯度。Layer Normalization 的作用就是保证数据特征分布的稳定性，将数据标准化到ReLU激活函数的作用区域，可以使得激活函数更好的发挥作用
+归一化核心是为了让不同层输入的取值范围或者分布能够比较一致。由于深度神经网络中每一层的输入都是上一层的输出，因此多层传递下，对网络中较高的层，之前的所有神经层的参数变化会导致其输入的分布发生较大的改变。也就是说，随着神经网络参数的更新，各层的输出分布是不相同的，且差异会随着网络深度的增大而增大。但是，需要预测的条件分布始终是相同的，从而也就造成了预测的误差。因此，在深度神经网络中，往往需要归一化操作，将每一层的输入都归一化成标准正态分布。
 
 Normalization有两种方法，Batch Normalization和Layer Normalization。关于两者区别不再详述。
 
@@ -194,16 +229,25 @@ Normalization有两种方法，Batch Normalization和Layer Normalization。关�
 
 **在 Transformer 里面，或者说正常的 RNN 里面，它的输入是一个三维的矩阵**。因为 输入的是一个序列的样本，即每一个样本里面有很多个元素。一个序列，如：一个句子里面有 n 个词，所以每个词表示为一个向量的话，还有一个 batch 维度，那么就是个 3D 的输入。列不再是特征，而是序列的长度，对每一个 sequence 就是 每个词，每个词有自己对应的向量。如果是 layernorm 的话，那么就是对每个样本切一下（横着切一下）。为什么 layer norm 用的多一点？一个原因是：在 时序的序列模型 里面，每个样本的长度可能会发生变化。那些不够 sequence 的长度 n 的样本 ，一般是补 0。 layernorm 是对 每个样本来做，所以不管样本是长还是短，反正算均值是在样本自己算的，这样的话相对来说它稳定一些。
 
+### Residual Network 残差网络
 
-## Residual Network 残差网络
-
-残差网络是深度学习中一个重要概念。在神经网络可以收敛的前提下，随着网络深度的增加，网络表现先是逐渐增加至饱和，然后迅速下降，这就是我们经常讨论的网络退化问题。事实上，现在几乎不可能看到一个不使用残差连接的神经网络模型。残差连接缓解了梯度不稳定问题，有助于模型更快收敛。
+由于 Transformer 模型结构较复杂、层数较深，​为了避免模型退化，Transformer 采用了残差连接的思想来连接每一个子层。残差连接，即下一层的输入不仅是上一层的输出，还包括上一层的输入。残差连接允许最底层信息直接传到最高层，让高层专注于残差的学习。​例如，在 Encoder 中，在第一个子层，输入进入多头自注意力层的同时会直接传递到该层的输出，然后该层的输出会与原输入相加，再进行标准化。在第二个子层也是一样。
 
 在神经网络中，每个层通常由一个非线性变换函数和一个线性变换函数组成，非线性变换函数通常由激活函数，例如ReLU、Sigmoid、Tanh等实现，而线性变换函数则通常由矩阵乘法实现。在传统的神经网络中，这些变换函数直接作用于输入数据，然后传递到下一层。而在使用残差连接的神经网络中，每个层都添加了一个跨层连接，可以将输入数据直接连接到输出数据，也可以将输入数据直接传递到后续层次，从而提高信息的传递效率和网络的训练速度。同时，残差连接还可以解决梯度消失和梯度爆炸的问题，从而提供网络的性能和稳定性。
 
 在transformer模型中，encoder和decoder各有6层，为了使当模型中的层数较深时仍然能得到较好的训练效果，模型中引入了残差网络，**将输入和输出直接相加**。
 
 ![](/public/upload/machine/residual_network.jpg)
+
+```python
+def forward(self, x):
+    # 此处通过加x实现了残差连接
+    x = self.ln_1(x)
+    # Encoder 使用 Self Attention，所以 Q、K、V 都是 x
+    x = x + self.attn(x, x, x)
+    x = x + self.mlp(self.ln_2(x))
+    return x
+```
 
 ## Linear & Softmax
 
@@ -279,43 +323,148 @@ $$
 
 ### 代码
 
-[以LLAMA为例，快速入门LLM的推理过程](https://mp.weixin.qq.com/s/5lbrqbqiHPZIARsVW6l6tA)
 
-```
-model = LlamaForCausalLM.from_pretrained(model, torch_dtype='auto')
-print(model)
-```
-可以通过print看模型结构：
-```
-LlamaForCausalLM(
-  (model): LlamaModel(
-    (embed_tokens): Embedding(32000, 4096, padding_idx=31999)
-    (layers): ModuleList(
-      (0-31): 32 x LlamaDecoderLayer(
-        (self_attn): LlamaAttention(
-          (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
-          (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
-          (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
-          (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
-          (rotary_emb): LlamaRotaryEmbedding()
-        )
-        (mlp): LlamaMLP(
-          (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
-          (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
-          (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
-          (act_fn): SiLUActivation()
-        )
-        (input_layernorm): LlamaRMSNorm()
-        (post_attention_layernorm): LlamaRMSNorm()
-      )
-    )
-    (norm): LlamaRMSNorm()
-  )
-  (lm_head): Linear(in_features=4096, out_features=32000, bias=False)
-)
+```python
+'''整体模型'''
+class Transformer(nn.Module):
+
+    def __init__(self, config):
+        super().__init__()
+        # 必须输入词表大小和 block size
+        assert config.vocab_size is not None
+        assert config.block_size is not None
+        self.config = config
+        self.transformer = nn.ModuleDict(dict(
+            wte = nn.Embedding(config.vocab_size, config.n_embd),
+            wpe = PositionalEncoding(config),
+            drop = nn.Dropout(config.dropout),
+            encoder = Encoder(config),
+            decoder = Decoder(config),
+        ))
+        # 最后的线性层，输入是 n_embd，输出是词表大小
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
+        # 初始化所有的权重
+        self.apply(self._init_weights)
+
+        # 查看所有参数的数量
+        print("number of parameters: %.2fM" % (self.get_num_params()/1e6,))
+
+    '''统计所有参数的数量'''
+    def get_num_params(self, non_embedding=False):
+        # non_embedding: 是否统计 embedding 的参数
+        n_params = sum(p.numel() for p in self.parameters())
+        # 如果不统计 embedding 的参数，就减去
+        if non_embedding:
+            n_params -= self.transformer.wpe.weight.numel()
+        return n_params
+
+    '''初始化权重'''
+    def _init_weights(self, module):
+        # 线性层和 Embedding 层初始化为正则分布
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+    
+    '''前向计算函数'''
+    def forward(self, idx, targets=None):
+        # 输入为 idx，维度为 (batch size, sequence length)；targets 为目标序列，用于计算 loss
+        device = idx.device
+        b, t = idx.size()
+        assert t <= self.config.block_size, f"不能计算该序列，该序列长度为 {t}, 最大序列长度只有 {self.config.block_size}"
+
+        # 通过 self.transformer
+        # 首先将输入 idx 通过 Embedding 层，得到维度为 (batch size, sequence length, n_embd)
+        print("idx",idx.size())
+        # 通过 Embedding 层得到的维度是 (batch size, sequence length, vocab_size, n_embd)，因此我们去掉倒数第二个维度
+        tok_emb = self.transformer.wte(idx)
+        print("tok_emb",tok_emb.size())
+        # 然后通过位置编码
+        pos_emb = self.transformer.wpe(tok_emb) 
+        # 再进行 Dropout
+        x = self.transformer.drop(pos_emb)
+        # 然后通过 Encoder
+        print("x after wpe:",x.size())
+        enc_out = self.transformer.encoder(x)
+        print("enc_out:",enc_out.size())
+        # 再通过 Decoder
+        x = self.transformer.decoder(x, enc_out)
+        print("x after decoder:",x.size())
+
+        if targets is not None:
+            # 训练阶段，如果我们给了 targets，就计算 loss
+            # 先通过最后的 Linear 层，得到维度为 (batch size, sequence length, vocab size)
+            logits = self.lm_head(x)
+            # 再跟 targets 计算交叉熵
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+        else:
+            # 推理阶段，我们只需要 logits，loss 为 None
+            # 取 -1 是只取序列中的最后一个作为输出
+            logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
+            loss = None
+
+        return logits, loss
+
+    '''配置优化器'''
+    def configure_optimizers(self, weight_decay, learning_rate, betas, device_type):
+        # weight_decay: 权重衰减系数，learning_rate: 学习率，betas: AdamW 的 betas，device_type: 设备类型
+        # 首先获取所有命名参数
+        param_dict = {pn: p for pn, p in self.named_parameters()}
+        # 过滤掉不需要更新的参数
+        param_dict = {pn: p for pn, p in param_dict.items() if p.requires_grad}
+        # 参数根据维度分为两组。
+        # 维度大于等于2的参数（通常是权重）会应用权重衰减，而维度小于2的参数（通常是偏置和层归一化参数）不会应用权重衰减。
+        decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
+        nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
+        optim_groups = [
+            {'params': decay_params, 'weight_decay': weight_decay},
+            {'params': nodecay_params, 'weight_decay': 0.0}
+        ]
+        # 打印一下参数数量
+        num_decay_params = sum(p.numel() for p in decay_params)
+        num_nodecay_params = sum(p.numel() for p in nodecay_params)
+        print(f"应用权重衰减的层数: {len(decay_params)}； 总参数量为：{num_decay_params:,}")
+        print(f"不应用权重衰减的层数: {len(nodecay_params)}, 总参数量为：{num_nodecay_params:,}")
+        # 检查 torch.optim.AdamW 是否支持融合版本（fused version），这是针对 CUDA 设备优化的版本。如果可用且 device_type 为 'cuda'，则使用融合版本。
+        fused_available = 'fused' in inspect.signature(torch.optim.AdamW).parameters
+        use_fused = fused_available and device_type == 'cuda'
+        extra_args = dict(fused=True) if use_fused else dict()
+        # 创建优化器
+        optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=betas, **extra_args)
+        print(f"是否使用 fused AdamW: {use_fused}")
+
+        return optimizer
+
+    '''进行推理'''
+    @torch.no_grad()
+    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+        # 推理阶段，输入为 idx，维度为 (batch size, sequence length)，max_new_tokens 为最大生成的 token 数量即按序推理 max_new_tokens 次
+        for _ in range(max_new_tokens):
+            # 如果输入序列太长，我们需要将它截断到 block_size
+            idx_cond = idx if idx.size(1) <= self.config.block_size else idx[:, -self.config.block_size:]
+            # 前向计算，得到 logits，维度为 (batch size, sequence length, vocab size)
+            logits, _ = self(idx_cond)
+            # 使用最后一个 token 的 logits 作为当前输出，除以温度系数控制其多样性
+            logits = logits[:, -1, :] / temperature
+            # 如果使用 Top K 采样，将 logits 中除了 top_k 个元素的概率置为 0
+            if top_k is not None:
+                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                logits[logits < v[:, [-1]]] = -float('Inf')
+            # 对输出结果进行 Softmax
+            probs = F.softmax(logits, dim=-1)
+            # 对结果概率进行采样
+            idx_next = torch.multinomial(probs, num_samples=1)
+            # 将输出结果拼接到输入序列后面，作为下一次的输入
+            idx = torch.cat((idx, idx_next), dim=1)
+            # print("idx:", idx)
+
+        return idx
 ```
 
-LLAMA属于Decoder-only models，有32个LlamaDecoderLayer，每个Decoder包含一个LlamaAttention和LlamaMLP，然后是LlamaRMSNorm和head部分，核心的结构是LlamaDecoderLayer。30B的话有60个LlamaDecoderLayer，30B和7B的差别也就是decoder的个数和decoder的不同配置。
+
 
 ### mask
 
@@ -359,13 +508,20 @@ Sequence Mask， 上述训练过程是挨个单词串行进行的，那么能不
 <bos>，"i"，"love "，"machine"，"learning"
 <bos>，"i"，"love "，"machine"，"learning"
 ```
-然后将上述矩阵矩阵乘以一个 mask矩阵就得到了。
 ```
 1 0 0 0 0
 1 1 0 0 0
 1 1 1 0 0
 1 1 1 1 0
 1 1 1 1 1 
+```
+然后将上述矩阵矩阵乘以一个 mask矩阵就得到了。
+```
+<bos>，MASK 【MASK】  【MASK】   【MASK】
+<bos>，"i"，【MASK】  【MASK】   【MASK】
+<bos>，"i"，"love "， 【MASK】   【MASK】
+<bos>，"i"，"love "，"machine"， 【MASK】
+<bos>，"i"，"love "，"machine"，"learning"
 ```
 这个mask矩阵就是 sequence mask，其实它和encoder中的padding mask 异曲同工。这样将这个矩阵输入到decoder（其实你可以想一下，此时这个矩阵是不是类似于批处理，矩阵的每行是一个样本，只是每行的样本长度不一样，每行输入后最终得到一个输出概率分布，作为矩阵输入的话一下可以得到5个输出概率分布）。这样我们就可以进行并行计算进行训练了。
 
