@@ -138,10 +138,8 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
         ![](/public/upload/machine/supervised_learning_keyword_extraction.jpg)
 2. Finetune 向量模型。embedding 模型 可能从未见过你文档的内容，也许你的文档的相似词也没有经过训练。在一些专业领域，通用的向量模型可能无法很好的理解一些专有词汇，所以不能保证召回的内容就非常准确，不准确则导致LLM回答容易产生幻觉（简而言之就是胡说八道）。可以通过 Prompt 暗示 LLM 可能没有相关信息，则会大大减少 LLM 幻觉的问题，实现更好的拒答。
     1. [大模型应用中大部分人真正需要去关心的核心——Embedding](https://mp.weixin.qq.com/s/Uqt3H2CfD0sr4P5u169yng) 
-    2. [分享Embedding 模型微调的实现](https://mp.weixin.qq.com/s/1AzDW9Ubk9sWup2XJWbvlA) ，此外，原则上：embedding 所得向量长度越长越好，过长的向量也会造成 embedding 模型在训练中越难收敛。
-    3. [手工微调embedding模型，让RAG应用检索能力更强](https://mp.weixin.qq.com/s/DuxqXcpW5EyLI3lj4ZJXdQ) 未细读
-    4. [如何提高LLMs的文本表征(Text Embedding)能力?](https://mp.weixin.qq.com/s/ZIXjMWKIkgWsFZJGJGgfFQ)
-    5. [大模型落地技术总结：大模型幻觉的起因、评估及落地场景下基于知识图谱的缓解策略探索](https://mp.weixin.qq.com/s/BBE8ELr4GCGzCWsdv-G-_Q)
+    2. [分享Embedding 模型微调的实现](https://mp.weixin.qq.com/s/1AzDW9Ubk9sWup2XJWbvlA) ，此外，原则上：embedding 所得向量长度越长越好，过长的向量也会造成 embedding 模型在训练中越难收敛。 [手工微调embedding模型，让RAG应用检索能力更强](https://mp.weixin.qq.com/s/DuxqXcpW5EyLI3lj4ZJXdQ) 未细读
+    3. embedding训练过程本质上偏向于训练数据的特点，这使得它在为数据集中（训练时）未见过的文本片段生成有意义的 embeddings 时表现不佳，特别是在含有丰富特定领域术语的数据集中，这一限制尤为突出。微调有时行不通或者成本较高。微调需要访问一个中到大型的标注数据集，包括与目标领域相关的查询、正面和负面文档。此外，创建这样的数据集需要领域专家的专业知识，以确保数据质量，这一过程十分耗时且成本高昂。而bm25等往往是精确匹配的，信息检索时面临词汇不匹配问题（查询与相关文档之间通常缺乏术语重叠）。幸运的是，出现了新的解决方法：学习得到的稀疏 embedding。通过优先处理关键文本元素，同时舍弃不必要的细节，学习得到的稀疏 embedding 完美平衡了捕获相关信息与避免过拟合两个方面，从而增强了它们在各种检索任务中的应用价值。支持稀疏向量后，一个chunk 在vdb中最少包含: id、text、稠密向量、稀疏向量等4个字段。
 3. 许多向量存储支持了对元数据的操作。LangChain 的 Document 对象中有个 2 个属性，分别是page_content和metadata，metadata就是元数据，我们可以使用metadata属性来过滤掉不符合条件的Document。元数据过滤的方法虽然有用，但需要我们手动来指定过滤条件，我们更希望让 LLM 帮我们自动过滤掉不符合条件的文档。SelfQueryRetriever
 4. **增加追问机制**。这里是通过Prompt就可以实现的功能，只要在Prompt中加入“如果无法从背景知识回答用户的问题，则根据背景知识内容，对用户进行追问，问题限制在3个以内”。这个机制并没有什么技术含量，主要依靠大模型的能力。不过大大改善了用户体验，用户在多轮引导中逐步明确了自己的问题，从而能够得到合适的答案。
 

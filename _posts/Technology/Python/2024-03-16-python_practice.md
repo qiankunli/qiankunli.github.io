@@ -44,6 +44,18 @@ f()
 所谓的装饰器，其实就是通过装饰器函数，**来修改原函数的一些功能，使得原函数不需要修改**。装饰器实际上是通过创建一个新方法执行旧方法的代码而已。Python装饰器（decorator）在实现的时候，被装饰后的函数其实已经是另外一个函数了（函数名等函数属性会发生改变 ==> 函数签名变了），为了不影响，Python的functools包中提供了一个叫wraps的decorator来消除这样的副作用。
 
 ```python
+def func():
+    ...
+def timer(func, *args, **kwargs):
+     def decorated(*args, **kwargs): 
+        st = time.perf_counter()
+        ret = func(*args, **kwargs)
+        print('time cost: {} seconds'.format(time.perf_counter() - st))
+        return ret
+    # 返回一个函数指针，这样才能赋值给func
+    return decorated
+func = timer(func1)
+# func = timer(func1) 这样的写法麻烦且不具有共通性，所以python提供了一种装饰器的标准用法
 def timer(func):
 """装饰器：打印函数耗时"""
     def decorated(*args, **kwargs): # 一般把 decorated 叫作“包装函数”，接收任意数目的可变参数 (*args, **kwargs)，主要通过调用原始函数 func 来完成工作。在包装函数内部，常会增加一些额外步骤，比如打印信息、修改参数等。
@@ -98,6 +110,17 @@ def log(func, *args, **kw):
     print 'before run'
     return func(*args, **kw)
 ```
+
+装饰器的用途：一般写完一个类，创建对象时可以通过init方法，也可以 定义`from_xx(cls,xx)` 类方法，也可以通过装饰器，将一个函数转换成类对象（只要这个类对象实现了 `__call__`），以下面代码为例，func_p 即可以作为一个函数，也可以作为一个Tool 对象使用。
+```python
+def tool(func):
+    t = Tool(func,xxx)
+    return t
+@tool
+def func_xx():
+    business
+func_p = func_xx
+``` 
 
 ## with和上下文管理器
 

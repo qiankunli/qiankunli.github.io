@@ -54,6 +54,10 @@ Spark框架除了提供Spark应用程序的计算框架外，还提供了一套�
 
 ### 整体设计
 
+执行一个动作 API 产生一个 Job。
+1. DAGscheduler进行任务的划分，血缘的构建。Spark 会在 DAGscheduler 阶段来划分不同的 Stage， Stage 分为 ShuffleMapStage 和 ResultStage 两种。每个 Stage 中都会按照 RDD 的 Partition 数量创建多个 Task。ShuffleMapStage 中的 Task 为 ShuffleMapTask。ResultStage 中的 Task 为 ResultTask，类似于 Hadoop 中的 Map 任务和 Reduce 任务。
+2. TaskScheduler 进行资源的调度。Task 调度（TaskScheduler）负责按照 FIFO 或者 FAIR 等调度算法对批量 Task 进行调度；将 Task 发送到集群管理器，分配给当前应用的 executor，由 executor 负责执行工作。以 Yarn 为例，Yarn 把资源分配给 Spark Driver 后，Spark Driver 与 Yarn 的 NodeManager 进行通信，NodeManager 会帮 Spark 启动对应的 Executor，之后 Spark Diver 会分发任务到 Executor 上，**Executor 会在本地的 JVM 中经过反序列化之后去调用对应的方法函数**。
+
 ![](/public/upload/compute/spark_run.png)
 
 代码上

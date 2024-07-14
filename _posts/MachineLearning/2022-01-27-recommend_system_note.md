@@ -285,6 +285,11 @@ print('\n\nTest Loss {}, Test Accuracy {}'.format(test_loss, test_accuracy)
 
 [百度基于云原生的推荐系统设计与实践](https://mp.weixin.qq.com/s/h-oNQNW8_97UX9PKixR--Q)
 
+推荐系统
+1. 采用两阶段方式融入大模型大模型负责生产知识，这些知识以结构化形式或以文本形式存储；第二阶段，推荐模型消费这些由大模型生产出的知识图谱，实现推荐。
+2. 通过蒸馏技术，将大模型如 ChatGPT 的推理能力逐步转移到更轻量级的模型，如 LLAMA 及序列模型，最终部署这些轻量级的模型到线上，实现效果和计算开销的平衡。
+3. 核心还是让大模型来提供推理知识，但并不需要为每个用户生成推理知识，而是只需要一个核心的种子用户群，为其生成推理知识，其他用户只需要检索种子用户池，生成所有用户的 embedding，线上模型只要 serving 这种 embedding 即可。
+
 ## 其它
 
 [推荐系统中比模型结构更重要的是什么？](https://mp.weixin.qq.com/s/I1ylBlPfqrToezs2Ml-Dtw) 未读。

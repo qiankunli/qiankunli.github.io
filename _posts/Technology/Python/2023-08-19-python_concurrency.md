@@ -206,6 +206,7 @@ asyncio.run(main())
 调用异步函数并不能执行函数，**异步函数就不能由我们自己直接执行**（这也是函数与协程的区别），异步代码是以 Task 的形式去运行，被 Event Loop 管理和调度的。`result = async_function()` 协程对象 result 虽然生成了，但是还没有运行，要使代码块实际运行，需要使用 asyncio 提供的其他工具。
 1. 最常见的是 await 关键字。当我们await一个Coroutine，这个异步函数就会被提交给asyncio底层，然后asyncio就会开始执行这个函数。
     1. 如果一个对象可以在 await 语句中使用，那么它就是 可等待 对象。许多 asyncio API 都被设计为接受可等待对象。可等待 对象有三种主要类型: 协程, Task  和 Future.
+    2. 使用 await 关键字时，当遇到耗时操作时，将暂停当前函数的执行，并等待耗时操作完成，同时它会释放出事件循环来处理其他任务。
 2. `result = asyncio.run(async_function())`。 这是程序入口处专用的。run里边就不能再run了。
 3. `asyncio.create_task(async_function())`，创建一个 Task 对象实例，异步函数被包在了Task，Task 对象实例立即被运行。这一点与await不同，**如果我们有一个Coroutine，我们必须await它，才能把相应的异步函数提交给asyncio（然后才开始运行）**。当然了，虽然Task不await也能执行，但我们通常还是需要await各个Task。因为这可以确保它们执行完成并收集运行结果，不然我们就得用Future。
     1. 任务可以便捷和安全地取消。 当任务被取消时，asyncio.CancelledError 将在遇到机会时在任务中被引发。
@@ -241,13 +242,24 @@ EventLoop是用于在单个线程中执行协程的环境。EventLoop是异步�
 
 Asyncio 和其他 Python 程序一样，是单线程的，它只有一个主线程，Future 是一个可以被等待的对象，Task 在 Future 的基础上加入了一个 coroutine。他们都是 asyncio 的核心，但是他们都需要一个 EventLoop 来运行。任务只有两个状态：一是预备状态；二是等待状态。event loop 会维护两个任务列表，分别对应这两种状态；并且选取预备状态的一个任务（具体选取哪个任务，和其等待的时间长短、占用的资源等等相关），使其运行，一直到这个任务把控制权交还给 event loop 为止。当任务把控制权交还给 event loop 时，event loop 会根据其是否完成，把任务放到预备或等待状态的列表，然后遍历等待状态列表的任务，查看他们是否完成。如果完成，则将其放到预备状态的列表；这样，当所有任务被重新放置在合适的列表后，新一轮的循环又开始了：event loop 继续从预备状态的列表中选取一个任务使其执行…如此周而复始，直到所有任务完成。
 
+协程实现的几种方式?     
+- python2.X:利用生成器通过yield+send实现协程     
+- python3.4:利用asyncio+yield from实现协程      
+- python3.5:asyncio+async/await(比较熟悉)       
+- python3.7:引入了asyncio.create_task和asyncio.run两个高级接口
+
 Python 3.4 加入了asyncio 库，使得Python有了支持异步IO的官方库。这个库，底层是事件循环（EventLoop），上层是协程和任务。每个线程都有一个被称为事件循环（Event Loop）的对象（可以理解成 while True 循环），Event Loop 中包含一个称为任务（Task）的对象列表。每个 Task 维护一个堆栈，以及它自己的 Instruction Pointer。在任意时刻，Event Loop 只能有一个 Task 实际执行，毕竟 CPU 在某一时刻只能做一件事，当 Task 遇到需要等待的事情，比如 IO bound 应用需要等待数据到达。此时，Task 中的代码不再等待，而是让出控制权。Event Loop 暂停正在运行的 Task。未来的某个时刻，当这个 Task 所等待的事情已经成熟，Event Loop 将再次唤醒这个 Task。Task 让出控制权后，Event Loop 唤醒某个休眠的 Task，并将这个新唤醒的 Task 设置为当前执行的 Task。线程会遍历各个任务，在前面任务IO等待的过程中，进行后面任务的CPU计算，**使得 CPU 闲置的时间更少**。循环往复，直到所有任务执行完毕。Python在3.5版本中引入了关于协程的语法糖async和await，Python 3.7 又进行了优化，**把API分组为高层级API和低层级API**，把EventLoop相关的API归入到低层级API。
 
 多线程还是 Asyncio？如果是 I/O bound，并且 I/O 操作很慢，需要很多任务 / 线程协同实现，那么使用 Asyncio 更合适。如果是 I/O bound，但是 I/O 操作很快，只需要有限数量的任务 / 线程，那么使用多线程就可以了。如果是 CPU bound，则需要使用多进程来提高程序运行效率。I/O 操作 heavy 的场景下，Asyncio 比多线程的运行效率更高。因为 Asyncio 内部任务切换的损耗，远比线程切换的损耗要小；并且 Asyncio 可以开启的任务数量，也比多线程中的线程数量多得多。但需要注意的是，很多情况下，使用 Asyncio 需要特定第三方库的支持。
 
 使用 asyncio 并不是将代码转换成多线程，它不会导致多条Python指令同时执行，也不会以任何方式让你避开所谓的全局解释器锁（Global Interpreter Lock，GIL）。有些应用受 IO 速度的限制，即使 CPU 速度再快，也无法充分发挥 CPU 的性能。这些应用花费大量时间从存储或网络设备读写数据，往往需要等待数据到达后才能进行计算，在等待期间，CPU 什么都做不了。asyncio 的目的就是为了给 CPU 安排更多的工作：当前单线程代码正在等待某个事情发生时，另一段代码可以接管并使用 CPU，以充分利用 CPU 的计算性能。**asyncio 更多是关于更有效地使用单核，而不是如何使用多核**。python协程单线程内切换，适用于IO密集型程序中，可以最大化IO多路复用的效果。**协程间完全同步**，不会并行，不需要考虑数据安全。PS：与Go协程不同的地方。
 
-### 事件
+### 异步任务之间的数据交互
+
+异步任务之间的数据交互是完全可能的，且在多任务异步程序中非常常见。
+1. 使用共享变量，如果异步任务运行在同一线程中（通常情况下是这样），可以使用全局变量或闭包变量共享数据。
+2. asyncio.Queue，支持在生产者和消费者之间安全地传递消息。PS：有些go channel的味道
+3. 使用 Futures  和 Events，适合于任务间的事件通知和状态同步。Future是对协程的封装(提供了取消/回调等)，代表一个未来对象，执行结束后会把最终结果设置到Future对象上。
 
 `class asyncio.Event`可用于通知多个 asyncio 任务某个事件已发生。asyncio.Event管理一个内部标志，该标志可以使用set() 方法设置为true，并使用clear() 方法重置为false。 wait() 方法阻塞，直到标志设置为 true 。该标志最初设置为false。
 

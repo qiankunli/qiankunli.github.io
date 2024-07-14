@@ -331,10 +331,10 @@ agent = (
 )
 executor = AgentExecutor(agent=agent, tools=tools, callbacks=callbacks)
 ```
-构造 AgentExecutor的时候，如果发现agent 是一个Runable，则会将其转为RunnableAgent。Agent输入输出比较明确
+AgentExecutor初始化的时候，如果发现agent 是一个Runable，则会将其转为RunnableAgent。Agent输入输出比较明确
 1. 输入 prompt [hwchase17/structured-chat-agent](https://smith.langchain.com/hub/hwchase17/structured-chat-agent) 和 intermediate_steps
 2. 输出 AgentAction 和 AgentFinish
-```
+```python
 class RunnableAgent(BaseSingleActionAgent): 
     def plan(
         self,
@@ -344,7 +344,7 @@ class RunnableAgent(BaseSingleActionAgent):
     ) -> Union[AgentAction, AgentFinish]:
         ...
 ```
-AgentExecutor 循环执行Agent.plan，Agent.plan返回AgentAction，AgentExecutor 执行AgentAction.tool 得到observation， AgentExecutor  会将action和observation包装为 AgentStep 塞到intermediate_steps里，并在下次执行Agent.plan时塞给Agent.plan。
+AgentExecutor 循环执行Agent.plan，Agent.plan返回AgentAction，之后AgentExecutor 执行AgentAction.tool 得到observation， AgentExecutor  会将action和observation包装为 AgentStep 塞到临时变量intermediate_steps里，并在下次执行Agent.plan时塞给Agent.plan。AgentExecutor 驱动 Agent.plan 和 tool.run 一般相对固定，个性化逻辑主要是 Agent，主要体现在个性化 prompt 及tool description。
 
 ### langgraph示例
 
