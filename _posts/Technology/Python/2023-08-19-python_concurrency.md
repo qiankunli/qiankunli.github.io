@@ -25,7 +25,7 @@ Python有两大类并行方式：多线程与多进程。由于GIL的存在，�
 1. 多线程可以直接共享数据，但至多只能用一个CPU核。Python有一个GIL来保证同一时间只能有一个线程来执行，但也保证了任何时间点对应的线程都在做事（所以还是比单线程好一些）。当然，GIL 在较新的python版本已经退出历史舞台了。
 2. 多进程可以用多个CPU核，但各进程的数据相互独立（可shared_memory等机制共享数据）
 
-PS： 但使用体验上都很类似
+fluent python：导致并发编程困难的因素很多，但最基本的因素：启动进程、线程十分容易，关键是如何跟踪进程或线程。调用一个函数，发出调用的代码开始阻塞，直到函数返回。因此你知道函数什么时候执行完毕，而且能轻松得到函数的返回值。如果函数抛出异常，则把函数放在try/except里，捕获错误。这些熟悉的概念在你启动线程/进程后都不可用了：你无法轻松得知操作何时结束，若想获取结果或捕获错误，则需要设置某种通信信道，例如消息队列。如果不需要了，如退出呢？怎么样退出才能不中断作业，避免留下未处理完毕的数据和未释放的资源呢？解决这些问题通常也涉及到消息队列。
 
 ## 线程
 
@@ -58,9 +58,13 @@ if __name__ == '__main__':
     print('主线程')
 ```
 
+在python中，协调线程的信号机制，使用threading.Event类最简单，threading.Event有一个内部bool标志，一开始是False，调用Event.set() 可以将标志设为True。这个标志为False时，在一个线程中调用Event.wait() 该线程将被阻塞，直到另一个线程调用Event.set()，致使Event.wait() 返回True。PS： threading.Event 对应有multiprocessing.Event,asyncio.Event。
+
+
 ## 进程
 
-multiprocess模块的完全模仿了threading模块的接口，二者在使用层面，有很大的相似性
+multiprocess模块的完全模仿了threading模块的接口，二者在使用层面，有很大的相似性。创建multiprocessing.Process实例后，一个全新的Python解释器以子进程的形式在后台启动。
+
 
 ```python
 def function1(id):  # 这里是子进程。 和线程一样，也可以定义一个进程对象继承Process
@@ -304,7 +308,7 @@ async for result in async_generator():
 
 ## GIL
 
-GIL，是最流行的 Python 解释器 CPython 中的一个技术术语。它的意思是全局解释器锁，每一个 Python 线程，在 CPython 解释器中执行时，都会锁住GIL，阻止别的线程执行，同样的，每一个线程执行完一段后，会释放 GIL，以允许别的线程开始利用资源（CPython 中还有另一个机制，叫做 check_interval，意思是 CPython 解释器会去轮询检查线程 GIL 的锁住情况。每隔一段时间，Python 解释器就会强制当前线程去释放 GIL，这样别的线程才能有执行的机会）。CPython轮流执行 Python 线程。这样一来，用户看到的就是“伪并行”——Python 线程在交错执行，来模拟真正并行的线程。
+GIL，是最流行的 Python 解释器 CPython 中的一个技术术语。它的意思是全局解释器锁，每一个 Python 线程，在 CPython 解释器中执行时，都会锁住GIL，阻止别的线程执行，同样的，每一个线程执行完一段后，会释放 GIL，以允许别的线程开始利用资源（CPython 中还有另一个机制，叫做 check_interval，默认5ms，意思是 CPython 解释器会去轮询检查线程 GIL 的锁住情况。每隔一段时间，Python 解释器就会强制当前线程去释放 GIL，这样别的线程才能获取GIL有执行的机会）。CPython轮流执行 Python 线程。这样一来，用户看到的就是“伪并行”——Python 线程在交错执行，来模拟真正并行的线程。python标准库发起的系统调用均可以释放GIL，包括磁盘io、网络io、time.sleep等，因此GIL 对与网路编程的影响较小。
 
 为什么 CPython 需要 GIL 呢？这其实和 CPython 的实现有关。CPython 使用引用计数来管理内存，所有 Python 脚本中创建的实例，都会有一个引用计数，来记录有多少个指针指向它。当引用计数只有 0 时，则会自动释放内存。如果有两个 Python 线程同时引用了 a，就会造成引用计数的 race condition，引用计数可能最终只增加 1，这样就会造成内存被污染。因为第一个线程结束时，会把引用计数减少 1，这时可能达到条件释放内存，当第二个线程再试图访问 a 时，就找不到有效的内存了。所以说，CPython 引进 GIL 其实主要就是这么两个原因：
 1. 设计者为了规避类似于内存管理这样的复杂的竞争风险问题（race condition）；
