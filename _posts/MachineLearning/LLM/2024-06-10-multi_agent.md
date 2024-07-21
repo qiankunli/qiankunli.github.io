@@ -39,6 +39,75 @@ PS： 你要是上万个tool的话，llm 上下文塞不下，此时让一个llm
 
 ### AutoGen
 
+in AutoGen
+1. 收发消息、生成回复：an agent is an entity that can send messages, receive messages and generate a reply using models, tools, human inputs or a mixture of them. This abstraction not only allows agents to model real-world and abstract entities, such as people and algorithms, but it also simplifies implementation of complex workflows as collaboration among agents.
+2. 可扩展、可组合：Further, AutoGen is extensible and composable: you can extend a simple agent with customizable components and create workflows that can combine these agents and power a more sophisticated agent, resulting in implementations that are modular and easy to maintain.
+
+一个agent 具备干活儿所需的所有必要资源：An example of such agents is the built-in ConversableAgent which supports the following components:
+1. A list of LLMs
+2. A code executor
+3. A function and tool executor
+4. A component for keeping human-in-the-loop
+You can switch each component on or off and customize it to suit the need of your application. For advanced users, you can add additional components to the agent by using registered_reply.
+
+```python
+class Agent:
+    def __init__(self, name: str,):
+        self._name = name
+    def send(self, message: Union[Dict, str], recipient: "Agent", request_reply: Optional[bool] = None):
+        """(Abstract method) Send a message to another agent."""
+    def receive(self, message: Union[Dict, str], sender: "Agent", request_reply: Optional[bool] = None):
+        """(Abstract method) Receive a message from another agent."""
+    def generate_reply(self,messages: Optional[List[Dict]] = None,sender: Optional["Agent"] = None,**kwargs,) -> Union[str, Dict, None]:
+        """(Abstract method) Generate a reply based on the received messages."""
+class ConversableAgent(Agent):
+    def __init__( self,name: str,system_message,...):
+        self._oai_messages = ... #  Dict[Agent, List[Dict]] 存储了Agent 发来的消息（也包含自己的发出的消息？）
+        
+    def register_reply(self,trigger,reply_func,...):
+        """Register a reply function.The reply function will be called when the trigger matches the sender."""
+    def initiate_chat( self, recipient: "ConversableAgent", clear_history,...)
+        """Initiate a chat with the recipient agent."""
+    def register_for_llm(self,*,name,description, api_style: Literal["function", "tool"] = "tool",) -> Callable[[F], F]:
+       """Decorator factory for registering a function to be used by an agent."""
+       # 数据进入到 self.llm_config["functions"] 或 self.llm_config["tools"]
+    def register_for_execution( self, name: Optional[str] = None, ) -> Callable[[F], F]:
+       """Decorator factory for registering a function to be executed by an agent."""
+       # 数据进入到  self._function_map
+```
+一个开启llm，关闭code executor、第三方工具、不需要人输入的agent
+```python
+import os
+from autogen import ConversableAgent
+agent = ConversableAgent(
+    "chatbot",
+    llm_config={"config_list": [{"model": "gpt-4", "api_key": os.environ.get("OPENAI_API_KEY")}]},
+    code_execution_config=False,  # Turn off code execution, by default it is off.
+    function_map=None,  # No registered functions, by default it is None.
+    human_input_mode="NEVER",  # Never ask for human input.
+)
+reply = agent.generate_reply(messages=[{"content": "Tell me a joke.", "role": "user"}])
+print(reply)
+```
+一个绑定了角色的Agent.  assign different roles to two agents by setting their system_message.
+```python
+cathy = ConversableAgent(
+    "cathy",
+    system_message="Your name is Cathy and you are a part of a duo of comedians.",
+    llm_config={"config_list": [{"model": "gpt-4", "temperature": 0.9, "api_key": os.environ.get("OPENAI_API_KEY")}]},
+    human_input_mode="NEVER",  # Never ask for human input.
+)
+joe = ConversableAgent(
+    "joe",
+    system_message="Your name is Joe and you are a part of a duo of comedians.",
+    llm_config={"config_list": [{"model": "gpt-4", "temperature": 0.7, "api_key": os.environ.get("OPENAI_API_KEY")}]},
+    human_input_mode="NEVER",  # Never ask for human input.
+)
+# 让两人说一段喜剧show
+result = joe.initiate_chat(cathy, message="Cathy, tell me a joke.", max_turns=2)
+```
+除了两个agent 互相对话之外，支持多个agent群聊（Group Chat），An important question in group chat is: What agent should be next to speak? To support different scenarios, we provide different ways to organize agents in a group chat: We support several strategies to select the next agent: round_robin, random, manual (human selection), and auto (Default, using an LLM to decide).
+
 ### AutoGPT
 
 Andrej Karpathy 在 2017 年提出的 Software 2.0：基于神经网络的软件设计。真的很有前瞻性了。这进一步引出了当前正在迅速发展的 Agent Ecosystem。AutoGPT ，BabyAGI 和 HuggingGPT 这些项目形象生动地为我们展示了 LLM 的潜力除了在生成内容、故事、论文等方面，它还具有强大的通用问题解决能力。如果说 ChatGPT 本身的突破体现在人们意识到**语言可以成为一种服务**，成为人和机器之间最自然的沟通接口，这一轮新发展的关键在于人们意识到语言（不一定是自然语言，也包括命令、代码、错误信息）也是模型和自身、模型和模型以及模型和外部世界之间最自然的接口，让 AI agent 在思考和表达之外增加了调度、结果反馈和自我修正这些新的功能模块。于是**在人类用自然语言给 AI 定义任务目标（只有这一步在实质上需要人类参与）之后可以形成一个自动运行的循环**：
