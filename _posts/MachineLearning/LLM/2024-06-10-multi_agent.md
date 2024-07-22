@@ -16,7 +16,7 @@ keywords: langchain langgraph lcel
 
 [Multi-Agent ，知多少？](https://mp.weixin.qq.com/s/Z970vS3mGA20YOoqIQMOdw)
 1.  Single-Agent 系统的知识获取和认知范畴高度依赖于其训练数据集和模型算法，这使得它难以全面把握多元异构的信息要素，以及复杂环境中瞬息万变的细微变化。 Single-Agent 很容易产生知识盲区和认知偏差，从而在面临新的情景时无法作出前瞻性的正确决策，导致决策失误。
-2. 即便是当下最先进的 Single-Agent ，其可用的算力资源和计算能力在物理层面仍有明确的上限，无法做到无限扩展。一旦面临极其错综复杂、计算量密集的任务， Single-Agent 无疑会遭遇算力瓶颈，无法高效完成处理，性能将大打折扣。
+2. 即便是当下最先进的 Single-Agent ，其可用的算力资源和计算能力在物理层面仍有明确的上限，无法做到无限扩展。一旦面临极其错综复杂、计算量密集的任务， Single-Agent 无疑会遭遇算力瓶颈，无法高效完成处理，性能将大打折扣。Agent一般都通过XoT (CoT、ToT、GoT) + React等方法来规划和思考，上下文会不断的加长，迟早会突破窗口限制。因此拆分Agent的功能避免超过上下文窗口限制是一个很有效的方法。 而且，Prompt是Agent工作的中很关键的因素，单一的Agent如果维护的大量的上下文，难免"脑子"会乱。如果只执行特定的任务，掌握特定技能，当然理论上表现会更好。
 3. Single-Agent 系统本质上是一种集中式的架构模式，这决定了它存在着极高的故障风险。一旦核心代理发生故障或遭受攻击，整个系统将完全瘫痪，难以继续运转，缺乏有效的容错和备份机制，无法确保关键任务的连续性和可靠性。
 4. 复杂环境下的决策往往需要各种异构智能算法模型的协同配合，而封闭的 Single-Agent 系统难以灵活整合不同AI范式，无法充分挖掘多元异质智能的协同潜能，解决复杂问题的能力相对有限。
 5. Single-Agent 系统通常是封闭式的，**新的功能、知识很难被快速注入和更新，整体的可扩展性和可升级性较差**，无法高效适应不断变化的复杂业务需求，存在架构上的先天缺陷。
@@ -32,14 +32,14 @@ keywords: langchain langgraph lcel
 
 ## 多Agent框架
 
-智能体的发展：从单任务到多代理协同与人代理交互。
+智能体的发展：从单任务到多代理协同与人代理交互。多智能体应用让不同的Agent之间相互交流沟通来解决问题。
 
 AutoGen、ChatDev、CrewAI [CrewAI：一个集众家所长的MutiAgent框架](https://mp.weixin.qq.com/s/BmXVkCz7Atw0iVZRRYg-3Q)
 PS： 你要是上万个tool的话，llm 上下文塞不下，此时让一个llm 针对一个问题决策使用哪一个tool 就很难（ToolLLaMa已经支持16k+了），此时很自然的就需要多层次的Agent，低层次的Agent 更专业聚焦一些。
 
-### AutoGen
+## AutoGen
 
-in AutoGen
+AutoGen 代理是可定制的、可对话的，并且无缝地允许人类参与。in AutoGen
 1. 收发消息、生成回复：an agent is an entity that can send messages, receive messages and generate a reply using models, tools, human inputs or a mixture of them. This abstraction not only allows agents to model real-world and abstract entities, such as people and algorithms, but it also simplifies implementation of complex workflows as collaboration among agents.
 2. 可扩展、可组合：Further, AutoGen is extensible and composable: you can extend a simple agent with customizable components and create workflows that can combine these agents and power a more sophisticated agent, resulting in implementations that are modular and easy to maintain.
 
@@ -49,6 +49,15 @@ in AutoGen
 3. A function and tool executor
 4. A component for keeping human-in-the-loop
 You can switch each component on or off and customize it to suit the need of your application. For advanced users, you can add additional components to the agent by using registered_reply.
+
+### 核心概念
+
+AutoGen先声明了一个Agent的协议(protocol)，规定了作为一个Agent基本属性和行为：
+1. name属性：每个Agent必须有一个属性。
+2. description属性：每个Agent必须有个自我介绍，描述自己的能干啥和一些行为模式。
+3. send方法：发送消息给另一个Agent。
+4. receive方法：接收来自另一个代理的消息Agent。
+5. generate_reply方法：基于接收到的消息生成回复，也可以同步或异步执行。
 
 ```python
 class Agent:
@@ -75,6 +84,8 @@ class ConversableAgent(Agent):
        """Decorator factory for registering a function to be executed by an agent."""
        # 数据进入到  self._function_map
 ```
+ConversableAgent核心是receive，当ConversableAgent收到一个消息之后，它会调用generate_reply去生成回复，然后调用send把消息回复给指定的接收方。同时ConversableAgent还负责实现对话消息的记录，一般都记录在ChatResult里，还可以生成摘要等。
+
 一个开启llm，关闭code executor、第三方工具、不需要人输入的agent
 ```python
 import os
@@ -89,6 +100,9 @@ agent = ConversableAgent(
 reply = agent.generate_reply(messages=[{"content": "Tell me a joke.", "role": "user"}])
 print(reply)
 ```
+
+AutoGen在ConversableAgent的基础上实现了AssistantAgent，UserProxyAgent和GroupChatAgent三个比较常用的Agent类，这三个类在ConversableAgent的基础上添加了特定的system_message和description。其实就是添加了一些基本的prompt而已。
+
 一个绑定了角色的Agent.  assign different roles to two agents by setting their system_message.
 ```python
 cathy = ConversableAgent(
@@ -106,9 +120,26 @@ joe = ConversableAgent(
 # 让两人说一段喜剧show
 result = joe.initiate_chat(cathy, message="Cathy, tell me a joke.", max_turns=2)
 ```
-除了两个agent 互相对话之外，支持多个agent群聊（Group Chat），An important question in group chat is: What agent should be next to speak? To support different scenarios, we provide different ways to organize agents in a group chat: We support several strategies to select the next agent: round_robin, random, manual (human selection), and auto (Default, using an LLM to decide).
 
-### AutoGPT
+决定Agent的行为模式就有几点关键：
+1. 提示词，system_message，就是这个Agent的基本提示词
+2. 能调用的工具，取决于给Agent提供了哪些工具，在AssistantAgent默认没有配置任何工具，但是提示它可以生成python代码，交给UserProxyAgent来执行获得返回，相当于变相的拥有了工具
+3. 回复逻辑，如果你希望在过程中掺入一点私货而不是完全交给LLM来决定，那么可以在generate_reply的方法中加入一点其他逻辑来控制Agent返回回复的逻辑，例如在生成回复前去查询知识库，参考知识库的内容来生成回复。
+
+### 群聊
+
+除了两个agent 互相对话之外，支持多个agent群聊（Group Chat），An important question in group chat is: What agent should be next to speak? To support different scenarios, we provide different ways to organize agents in a group chat: We support several strategies to select the next agent: round_robin, random, manual (human selection), and auto (Default, using an LLM to decide). Group Chat由GroupChatManager来进行的，GroupChatManager也是一个ConversableAgent的子类。它首选选择一个发言的Agent，然后发言Agent会返回它的响应，然后GroupChatManager会把收到的响应广播给聊天室内的其他Agent，然后再选择下一个发言者。直到对话终止的条件被满足。GroupChatManager选择下一个发言者的方法有：
+1. 自动选择: "auto"下一个发言者由LLM来自动选择；
+2. 手动选择："manual"由用户输入来决定下一个发言者；
+3. 随机选择："random"随机选择下一个发言者；
+4. 顺序发言："round_robin" ：根据Agent顺序轮流发言
+5. 自定义的函数：通过调用函数来决定下一个发言者；
+
+如果聊天室里Agent比较多，还可以通过设置GroupChat类中设置allowed_or_disallowed_speaker_transitions参数来规定当特定的Agent发言时，下一个候选的Agent都有哪些。例如可以规定AgentB发言时，只有AgentC才可以响应。通过这些发言控制的方法，可以将Agent组成各种不同的拓扑。例如层级化、扁平化。甚至可以通过传入一个图形状来控制发言的顺序。
+
+AutoGen允许在一个群聊中，调用另外一个Agent群聊来执行对话(嵌套对话Nested Chats)。这样做可以把一个群聊封装成单一的Agent，从而实现更加复杂的工作流。
+
+## AutoGPT
 
 Andrej Karpathy 在 2017 年提出的 Software 2.0：基于神经网络的软件设计。真的很有前瞻性了。这进一步引出了当前正在迅速发展的 Agent Ecosystem。AutoGPT ，BabyAGI 和 HuggingGPT 这些项目形象生动地为我们展示了 LLM 的潜力除了在生成内容、故事、论文等方面，它还具有强大的通用问题解决能力。如果说 ChatGPT 本身的突破体现在人们意识到**语言可以成为一种服务**，成为人和机器之间最自然的沟通接口，这一轮新发展的关键在于人们意识到语言（不一定是自然语言，也包括命令、代码、错误信息）也是模型和自身、模型和模型以及模型和外部世界之间最自然的接口，让 AI agent 在思考和表达之外增加了调度、结果反馈和自我修正这些新的功能模块。于是**在人类用自然语言给 AI 定义任务目标（只有这一步在实质上需要人类参与）之后可以形成一个自动运行的循环**：
 1. agent 通过语言思考，分解目标为子任务
