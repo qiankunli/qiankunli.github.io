@@ -17,9 +17,9 @@ Paul Graham： 代码中任何外加的形式都是一个信号，表明我对�
 
 ## 魔法函数 
 
-魔法函数。允许你在类中自定义函数（函数名格式一般为`__xx__`），并绑定到类的特殊方法中。比如在类A中自定义__str__()函数，则在调用str(A())时，会自动调用`__str__()`函数，并返回相应的结果。Python中的魔法函数可以大概分为以下几类（看到魔法函数 就可以去查表）：
+魔法函数。允许你在类中自定义函数（函数名格式一般为`__xx__`），并绑定到类的特殊方法中。比如在类A中自定义`__str__()`函数，则在调用str(A())时，会自动调用`__str__()`函数，并返回相应的结果。Python中的魔法函数可以大概分为以下几类（看到魔法函数 就可以去查表）：
 1. 类的构造、删除：  `object.__new__(self, ...)` `object.__init__(self, ...)` `object.__del__(self)`
-2. 二元操作符： 加减乘除等，比如 + 对应 `object.__add__(self, other)`
+2. 二元操作符： 加减乘除等，比如 + 对应 `object.__add__(self, other)`。矩阵乘法matrix multiplication a @ b 对应 `object.__matmul__(self, other)`。
 3. 扩展二元操作符：+=/-=
 4. 一元操作符：取负等
 5. 比较函数：<=/>
@@ -31,6 +31,8 @@ Paul Graham： 代码中任何外加的形式都是一个信号，表明我对�
 2. 对象的字符串表示形式。对应 `__str__` 和 `__repr__`
 3. 对象的布尔值。对应 `__bool__`
 4. 实现容器
+
+支持运算符重载，这或许是python 在数据科学领域取得巨大成功的关键原因。在python中，函数调用`()`(`__call__`) 、属性访问`.`(`__getattr__`) 以及项访问和切片`[]`也是运算符。
 
 ## yield和生成器
 
@@ -271,7 +273,9 @@ with file_manager('test.txt', 'w') as f:
 
 需要注意的是，当我们用 with 语句执行上下文管理器的操作时，一旦有异常抛出，异常的类型、值等具体信息，都会通过参数传入“__exit__()”函数中。你可以自行定义相关的操作对异常进行处理，而处理完异常后，也别忘了加上“return True”这条语句，否则仍然会抛出异常。
 
-## 动态属性
+## 动态语言
+
+### 动态属性
 
 在python 中，数据属性和方法统称属性 attribute，方法是可调用的attribute，动态属性的接口与数据属性一样（obj.attr），不过按需计算。 在python 中实现动态属性有以下几种
 1. @property
@@ -292,8 +296,55 @@ x = make(Foo, 'bar')
 
 `__init_subclass__` 是python面向对象编程里的一个魔法方法，它在初始化子类时被调用。在` __new__` 函数的内部，会检测要创建的类所继承的父类，有没有定义 `__init_subclass__`。如果有，则执行。可用于检查子类的定义是否符合要求，比如要求子类必须实现某个方法
 
+### 动态方法
+
+猴子补丁，在运行时修改类或模块，而不改变源码。
+
+```python
+def set_card(deck, position, card): # python 方法说到底就是普通函数，第一个参数命名为self 只是约定
+    deck._cards[position] = card
+FrenchDeck.__setitem__ = set_card  
+# 等同于
+class FrenchDeck:
+    def set_card(self,position, card):
+        deck._cards[position] = card
+```
+
+在抽象基类上调用register 方法，注册的类就成了抽象基类的虚拟子类。issubclass 能够识别这种关系。类的继承关系是在一个名为 `__mro__`的特殊类属性中指定的，它会按顺序列出类及其超类，python 会按这个顺序搜索方法。 
+```python
+A.register(B)
+@A.register # A.register 也可以作为装饰器使用
+class B:
+```
+
+### 类型检查
+
+python dict 有时候被当做记录使用，以key表示字段名称，value 可以是不同的类型。 比如用json 描述一本书的记录
+```json
+{
+    "isbc":"xx",
+    "title":"xx",
+    "authors": ["xx","xx"],
+    "pagecount":478
+}
+```
+在python 3.8 之前没有什么好方法可以注解这段记录，因为dict value 必须是同一类型。下面两个注解都不完美。
+1. Dict[str,Any]，值可以是任何类型
+2. Dict[str,Union[str,int,List[str]]]，难以理解
+TypedDict 解决了这个问题。
+```python
+from typing import TypedDict 
+class BookDict(TypedDict):
+    isbc:str
+    title:str
+    authors:list[str]
+    pagecount:int
+```
+TypedDict 仅为类型检查工具而生，在运行时没有作用。
+
 ## 其它
 
 在Lisp或Dylan中， 23个设计模式中有16个的实现方式比在C++中更简单，而且能保持同等质量。 有时，设计模式或API要求组件实现单方法接口，而该方法有一个很宽泛的名称，例如execute、run、do_it。在python中，这些模式或api通常可以使用作为一等对象的函数实现，从而减少样板代码。
 
 classmethod 最常见的用途是定义备选构造函数，staticmethod 修饰的函数就是普通函数，只是碰巧位于类的定义体中，而不是在模块层定义。
+
