@@ -15,6 +15,9 @@ keywords: ml framework
 * TOC
 {:toc}
 
+
+**深度学习框架最重要的是什么？答：是自动求导系统**。为什么要自动求导系统？答：因为目前的损失函数的优化方法全都基于一阶梯度信息进行梯度下降。如何实现梯度的计算？答：计算图。因此，pytorch 的 tensor 和 numpy 的 np.ndarray 最大的区别在于当你使用 tensor 进行加减乘除运算时，**torch 后台会自动帮你构建出计算图**，当你计算完成后，通过运算结果的 backward 函数反向传播后，你就可以得到一路上所有 requires_grad=True 的 tensor 的梯度了（必须是叶子节点）。因为这个过程中，每个 tensor 是计算图上的一个节点，在 HPC 或者 infra 工程师的语境中，我们更喜欢用 node 而非 tensor 来描述参与运算的单元。
+
 [手把手教你如何自己设计实现一个深度学习框架（附代码实现）](https://mp.weixin.qq.com/s/LKhxaX9_qRNzb6UMZyhmiA) 对机器学习在工程上的实现和抽象说的比较透。[tinynn](https://github.com/borgwang/tinynn) 只是一个「玩具」版本的深度学习框架，一个成熟的深度学习框架至少还需要：支持自动求导、高运算效率（静态语言加速、支持 GPU 加速）、提供丰富的算法实现、提供易用的接口和详细的文档等等。
 
 [从 0 到 1 实现神经网络（Python）](https://mp.weixin.qq.com/s/YDyNr91IveU01oyd0kPNNw) 未读。
@@ -25,6 +28,8 @@ keywords: ml framework
 
 ## 发展脉络
 
+### 发展脉络
+
 [大模型时代，AI框架的机遇和挑战](https://mp.weixin.qq.com/s/h7UsG1FU8eqbeE04MtP67Q)AI框架经历了四个阶段的发展：
 1. 早期主要用于研究比如Theano；
 2. 随着CV的兴起，为了追求极致的性能加速，发展出了基于静态图的AI框架比如TensorFlow，它大大提升了性能和部署效率；
@@ -34,6 +39,143 @@ keywords: ml framework
     2. 模型的规模大，达到百亿/千亿级别，训练推理成本高，训练时间长。
 
 所谓的“模型”本质上是两个部分的合体：计算图和模型参数——神经网络的本质是一个数学定义下的函数，它自身不是一个可执行的程序。举个简单的例子，假设某个模型的函数实际上就是一个二次函数$f(x)=x^2+2x+1$，那它的“计算图”就是$ax^2+bx+c$（简写，实际要变成图结构），参数就是一个字典：`{a:1,b:2,c:1}`。所以**pytorch保存的模型文件实际上是一个python字典（key是模型层的名称，value是对应参数）**，你用pytorch载入一个保存好的模型，需要先在代码里import 模型定义，然后再load_state_dict。换句话说，实际发布的“模型”本身需要依附于框架而存在，不是一个可执行文件。
+
+### 基本思想
+
+神经网络的几种表示
+1. 神经网络的拓扑结构，拓扑图结构中，不展示具体程序中变量的数据结构，只展示网络中输入数据维度的变化。这样做可以很直观的展示出张量在不同的模式空间中的变化情况。
+2. 还有一种更加简单的表示方式——直接用流程图。PS：比如介绍transformer那张图。
+3. 计算图。目前绝大多数深度学习框架都是通过计算图来实现的。以tensorflow为例，其计算图的图节点共分为三种：Placeholder，Variable和Operation。而拓扑图中张量从不同模式空间内的变换都可以转化为计算图上节点与节点直接的连线，类似数据结构课上通过构建符号树来完成一条数学表达式计算的情形。事实上，许多的商业级数学软件内部都是通过建立一颗语法树来完成对一条数学表达式的诸多操作，而神经网络内部本来就是输入数据经过一条条数学公式的变换。但是由于树不能存在环，而神经网络中的一个中间变量可能会被利用多次，而最终的输出只有一个，因此，神经网络的树结构可能存在环，因此，我们选择用图来表示神经网络是合情合理的。
+
+所有的节点分为数据和操作是可以理解的，但是为什么数据还要分为Variable和Placeholder呢？在神经网络中，有两部分数据是不会变的，它们是输入和标签，这两部分数据实际上是和网络独立的，只有那些网络参数会永远存在于网络中，而外部的数据随着使用的数据集的变化而变化。所以我们将那些外部输入的数据存储在Placeholder中，其余的网络参数存储在Variable中。作为网络参数，Variable在反向传播中会被更新，而输入的Placeholder虽然也会有梯度，但是Placeholder存储的是外部数据，当然不需要更新。**所以有一个废话向的话语：前向运算中只有Operation中的数据需要更新，反向传播后的参数更新中只有Variable中的数据需要更新**。因此三种节点的职能为：
+1. Placeholder: 存储外部输入数据，不参与任何的数据更新。
+2. Variable: 存储内部网络参数，参与反向传播后的参数更新。
+3. Operation: 存储该节点的运算符信息和此运算得到的运算结果，参数网络前向运算的数据更新。程序中，Operation类会派生出具体的算子类。
+
+在具体程序中，以上的三种节点我们会写成三个类，为了更好的代码结构（其实是为了少写几行代码），这三个节点都是计算图中的节点，所以它们会具有一些相同的属性和方法。因此我们会用一个Node基类来派生出这三类节点。同样，具体的算子类和Operation类也存在继承关系。
+
+我们先完成Node基类。考虑到每个节点都存有数据，而且我们更加习惯使用+-*/来直接操作变量，所以我们需要重载Node的一些运算符。
+
+```python
+class Node(object):
+    def __init__(self):
+        """
+            base for all types of node in the static calculation graph
+        """
+        self.next_nodes = []    # self.next_nodes中存储了该节点的所有后继节点
+        self.data = None        # 代表该节点存储的数据，在第一次前向运算之前，所有的节点的data都是None。
+        _default_graph.append(self)
+    
+    def __neg__(self):
+        return negative(self)
+
+    def __add__(self, node : Node):
+        return add(self, node)
+    ...
+```
+
+我们希望节点创建完后就自动完成了计算图的创建，因此我们需要在每个节点创建完后为其next_nodes添加元素。但是这样不怎么好写，毕竟你又不知道创建完这个节点后，后面会有什么节点。而且能够起到连接作用的只有Operation，因为计算图中的连线可以理解为数据往函数送的过程，因此只要有连线，**连线的右侧一定是Operation**。因此，只要把握住每个Operation节点的前后，就可以完整地描述这一整张计算图。说得具体点吧，我们只需要为Operation节点添加一个成员input_nodes，并且在创建Operation节点时，将传入的Node填入input_nodes中，并在这个时候更新那些传入的Node的next_nodes就Ok了。
+
+```python
+class Operation(Node):
+    def __init__(self, input_nodes : List[Node] = []):
+        super().__init__()
+        self.input_nodes = input_nodes
+        for node in input_nodes:
+            node.next_nodes.append(self)
+    
+    def compute(self, *args): # compute方法是所有具体的算子类必须实现的方法
+        pass
+```
+
+
+```python
+class Placeholder(Node):
+    def __init__(self):
+        super().__init__()
+
+class Variable(Node):
+    def __init__(self, init_value : Union[np.ndarray, list] = None):
+        super().__init__()
+        self.data = init_value
+```
+
+这样一来，当我们创建节点后，计算图就自动生成了，你可以从通过最后一个节点（一定是Operation）的input_node往前BFS或DFS得到图中的所有点，或者直接打印_default_graph就可以得到计算图的拓扑排序。至此，我们简单框架的所有的节点类就全部创建完成了，我们不妨通过简单的创建来检查一下计算图的构建是否正常，假设你现在要做波士顿房价预测，那么假如只是搭建一个单层感知机，那么会这么写：
+
+```python
+if __name__ == "__main__":
+    X = Placeholder()
+    W = Variable(np.random.randn(13, 1))
+    b = Variable(np.random.randn(1, 1))
+
+    out = X @ W + b
+    from pprint import pprint
+    pprint(_default_graph)
+```
+
+不过许多的深度学习框架不会像这样给你提供创建矩阵变量的API，将MLP化成“表面上”的矩阵出来做矩阵乘法。它们大部分是提供一个API，告诉你调用这个API会得到一个线性层，而且这玩意儿能当函数用，比如keras的Dense，pytorch的Linear，paddlepaddle的fc（2.0版本之前，2.X的paddlepaddle的线性层创建API也改名为Linear了）。
+
+```python
+def Linear(input_dim : int, output_dim : int, bias : bool = True):
+    W = Variable(np.random.randn(input_dim, output_dim))
+    if bias:
+        b = Variable(np.random.randn(1, output_dim))
+        return lambda X : X @ W + b
+    else:
+        return lambda X : X @ W
+if __name__ == "__main__":
+    X = Placeholder()
+    out = Linear(13, 1, bias=True)(X)
+
+    from pprint import pprint
+    pprint(_default_graph)
+```
+
+常用深度学习框架提供的Linear算子中，有时可以通过"act"参数让线性层的值激活输出，而act参数是str对象，所以怎么通过一个字符串得到对应的激活函数类（Operation的派生类）呢？此处我们可以使用python的装饰器来实现激活函数类的注册，通过注册字典，我们就可以通过字符串映射到对应的激活函数类了
+
+```python
+_register_act_functions = Register()
+# 在已经实现的激活函数的上面使用装饰器装饰，装饰函数参数填对应的激活函数的名字
+@_register_act_functions("sigmoid")
+class sigmoid(Operation):
+    def __init__(self, x : Node):
+        super().__init__(input_nodes=[x])
+    
+    def compute(self, x_v : np.ndarray):
+        return 1 / (1 + np.exp(-1. * x_v))
+# 我们的Linear算子修改为一个class，并且在__call__方法中添加一个act参数，用来为线性层增加激活函数
+class Linear(object):
+    def __init__(self, input_dim : int, output_dim : int, bias : bool = True, act : str = None):
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        if act and act not in _register_act_functions:
+            raise ValueError(f"input activate function '{act}' is not in registered activate function list:{list(_register_act_functions.keys())}")
+        self.act = act
+        self.W = Variable(np.random.randn(input_dim, output_dim))
+        if bias:
+            self.b = Variable(np.random.randn(1, output_dim))
+    
+    def __call__(self, X : Node):
+        if not isinstance(X, Node):
+            raise ValueError("Linear's parameter X must be a Node!")
+        out = X @ self.W + self.b
+        if self.act:
+            act_func = _register_act_functions[self.act]
+            return act_func(out)
+        else:
+            return out
+if __name__ == "__main__":
+    X = Placeholder()
+    fc = Linear(13, 1, bias=True, act="relu")
+    out = fc(X)
+
+    from pprint import pprint
+    pprint(_default_graph)
+```
+
+而在创建完图后，我们需要跑图来完成一次前向运算和反向传播。而跑图需要基本函数run和其余的辅助函数我们会全部写在一个Session类中，也就是所谓的会话，会话类的run方法可以完成图的遍历和前向参数的更新。而反向传播的工作我们会交给优化器类，有关反向传播获取指定节点（一般是损失值对应的节点）对于之前每个节点的梯度的方法和具体的优化方法迭代更新网络参数的逻辑会写在优化器类中。优化器类的minimize方法会帮助我们完成图的各个节点梯度表的获取和优化算法的参数更新。PS：因为不同的优化器算法要用到 这些成员。
+
+
 
 ## 抽象层
 

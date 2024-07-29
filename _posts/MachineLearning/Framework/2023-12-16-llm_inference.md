@@ -153,7 +153,7 @@ LLM推理需要的芯片形态，最重要的是内存带宽和互联带宽，�
 
 ### KV Cache
 
-有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。
+有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。 KVCache 主要用于加速生成 token 时的 attention 计算。
 
 ![](/public/upload/machine/kv_cache.jpg)
 
@@ -163,6 +163,9 @@ LLM推理需要的芯片形态，最重要的是内存带宽和互联带宽，�
 3. 拼接历史K、V的值，得到完整的K、V。
 4. 然后经过Attention计算，获得 $O_i$ 输出。
 5. 根据$O_i$ 计算得到“好”
+
+
+![](/public/upload/machine/attention_kvcache.png)
 
 在推理的时候transformer本质上只需要计算出$O_i$ ，即一个字一个字地蹦。
 1. Attention的第i个输出只和第 i 个query有关，和其他query无关，所以query完全没有必要缓存，每次预测 $O_i$时只要计算最新的$O_i$，其他的丢弃即可。
@@ -215,6 +218,8 @@ System Prompt Caching，也称为 Prefix Sharing，其基本思想是对System P
 1. Prefill阶段可以利用request间存在共同前缀的机会，尽可能复用KVCache。PS：比如agent 循环调用 多次请求的prompt prefix是一样的。
 2. Decode可以进一步拆成Attention和非Attention算子分离调度。
 
+[LLM推理加速：decode阶段的Attention在GPU上的优化](https://mp.weixin.qq.com/s/Sek1cnmPshuk9kK-XR59iw) 结合Attention计算、kvcache与gpu硬件架构如何加快Attention 的计算。建议细读。一直以来缺一个 llm 架构与gpu 架构结合怎么优化计算的问题，各个概念怎么映射。
+
 ### Flash Attention
 
 [图解大模型计算加速系列：Flash Attention V1，从硬件到计算逻辑](https://mp.weixin.qq.com/s/J2i2MDv4us_GMwCyku0tnw)在矩阵分块的时候设计好一个能够充分利用高速访存HBM的分块方法，让一次搬运进HBM中的参数可以全部和该做乘加操作的算子都计算完再丢弃，达到数量单次访存利用率最大化。
@@ -228,9 +233,15 @@ System Prompt Caching，也称为 Prefix Sharing，其基本思想是对System P
 
 ### 调度优化/动态批处理
 
-语言模型接收的每句话长度都不同，对于比较短的话，很快就结束了，是否可以在运行时插入后面一句话进行推理呢？这是语言模型的一个特点，与视觉不同，视觉推理的每个请求基本上都具有相对固定的维度，正因为语言模型存在每句话的长度都不同的特点，因此需要 Inflight Batching 特性。
+提升模型服务吞吐最重要的手段是 Batching 策略，Batching主要包含以下三个步骤：
 
-Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的，将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。
+1. 模型服务调度层将多个不同的请求组成一个 batch 的模型输入；
+2. 将batch 化的模型输入放入推理后端进行推理，得到一个 batch 结果；
+3. 再将推理的 batch 结果拆分，并封装成不同的 Response 返回到对应的请求中。
+
+一般来说，合并越多的请求作为单次推理的输入，服务吞吐越高。所以从请求 Batching 的角度去提升模型服务吞吐的本质是提升单次推理的最大合并请求数，即 batch size。对于模型服务来说，单次推理最大合并请求数主要受显存制约。合并越多的请求，batch size 越大，KVCache 的显存占用则越大。KVCache 的显存占用上限可简单的通过显卡的最大显存减去模型权重显存计算得到。
+
+Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的（Request-Level），将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。
 
 ![](/public/upload/machine/iteration_level_batching.jpg)
 

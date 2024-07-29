@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: LLM微调理论及实践
+title: LLM微调理论
 category: 技术
 tags: MachineLearning
 keywords: llm finetune
@@ -27,6 +27,7 @@ keywords: llm finetune
 4. 有多少标记的训练数据可用？微调LLM以适应特定任务或领域在很大程度上取决于可用标记数据的质量和数量。丰富的数据集可以帮助模型深入理解特定领域的细微差别、复杂性和独特模式，从而使其能够生成更准确且与上下文相关的响应。然而，如果我们使用有限的数据集，微调带来的改进可能微乎其微。从本质上讲，如果我们拥有大量的标记数据来捕获该领域的复杂性，那么微调可以提供更加定制和完善的模型行为。但在此类数据有限的情况下，RAG 系统提供了一个强大的替代方案，确保应用程序通过其检索功能保持数据知情和上下文感知。
 5. 抑制幻觉有多重要？
 6. 数据的静态/动态程度如何？在特定数据集上微调 LLM 意味着模型的知识成为训练时该数据的静态快照。如果数据频繁更新、更改或扩展，模型很快就会过时。相比之下，RAG 系统在动态数据环境中具有固有的优势。他们的检索机制不断查询外部来源，确保他们提取用于生成响应的信息是最新的。
+fintune 提供比prompt 更多的数据，你的模型从该数据中进行学习，而不仅仅是访问数据，此外，还可以引导模型产生更一致的输出或行为，减少幻觉。
 
 ## 整体思路
 
@@ -261,163 +262,6 @@ Prompt Tuning 可以看作是 Prefix Tuning 的简化版本，它给每个任务
 
 [克服微调垂类领域模型导致的通用领域知识遗忘的好方法——llama_pro](https://mp.weixin.qq.com/s/5V3sw0yvjfQ36XR1DO1PWA)
 
-## 代码
-
-### 手写
-
-1. 加载数据集，pytorch Dataset/DataLoader
-2. 构建模型，在实际操作中，除了使用预训练模型编码文本外，我们通常还会进行许多自定义操作，因此在大部分情况下我们都需要自己编写模型，不过不用从0写，更为常见的写法是继承 Transformers 库中的预训练模型来创建自己的模型。
-    ```python
-    class BertForPairwiseCLS(BertPreTrainedModel):     # 继承 BERT 模型（BertPreTrainedModel 类）
-        def __init__(self, config):
-            super().__init__(config)
-            self.bert = BertModel(config, add_pooling_layer=False)
-            self.dropout = nn.Dropout(config.hidden_dropout_prob)
-            self.classifier = nn.Linear(768, 2)
-            self.post_init()
-        
-        def forward(self, x):
-            bert_output = self.bert(**x)
-            cls_vectors = bert_output.last_hidden_state[:, 0, :]
-            cls_vectors = self.dropout(cls_vectors)
-            logits = self.classifier(cls_vectors)
-            return logits
-    config = AutoConfig.from_pretrained(checkpoint) # 通过预置的 from_pretrained 函数来加载模型参数
-    model = BertForPairwiseCLS.from_pretrained(checkpoint, config=config).to(device) # 加载 预置模型
-    print(model)
-    # Transformers 库同样实现了很多的优化器，相比 Pytorch 固定学习率，Transformers 库的优化器会随着训练过程逐步减小学习率（通常会产生更好的效果）
-    optimizer = AdamW(model.parameters(), lr=learning_rate)
-    def train_loop(dataloader, model, loss_fn, optimizer,...): ...
-    def test_loop(dataloader, model, mode='Test'): ...
-    for t in range(epoch_num):
-        total_loss = train_loop(train_dataloader, model, loss_fn, optimizer, lr_scheduler, t+1, total_loss)
-        valid_acc = test_loop(valid_dataloader, model, mode='Valid')
-        if valid_acc > best_acc:
-            best_acc = valid_acc
-            print('saving new weights...\n')
-            torch.save(model.state_dict(), ...) #     # 保存模型
-    ```
-
-### 使用huggingface的Trainer API进行模型微调
-
-[Fine-tuning a model with the Trainer API](https://huggingface.co/learn/nlp-course/chapter3/3)Transformers provides a Trainer class to help you fine-tune any of the pretrained models it provides on your dataset. Once you’ve done all the data preprocessing work in the last section, you have just a few steps left to define the Trainer. The hardest part is likely to be preparing the environment to run `Trainer.train()`
-
-```python
-from datasets import load_dataset
-from transformers import AutoTokenizer, DataCollatorWithPadding
-
-raw_datasets = load_dataset("glue", "mrpc")
-checkpoint = "bert-base-uncased"
-tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-def tokenize_function(example):
-    return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
-tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
-data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-
-from transformers import TrainingArguments
-training_args = TrainingArguments("test-trainer")
-
-from transformers import AutoModelForSequenceClassification
-model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
-from transformers import Trainer
-trainer = Trainer(
-    model,
-    training_args,
-    train_dataset=tokenized_datasets["train"],
-    eval_dataset=tokenized_datasets["validation"],
-    data_collator=data_collator,
-    tokenizer=tokenizer,
-)
-# To fine-tune the model on our dataset, we just have to call the train() method of our Trainer
-trainer.train()
-```
-
-[A full training](https://huggingface.co/learn/nlp-course/chapter3/4)  手写train loop。
-
-[使用医患对话数据训练新冠诊疗模型的例子](https://github.com/hiyouga/ChatGLM-Efficient-Tuning/blob/main/examples/covid_doctor.md)
-
-```
-LLaMA-Factory
-    /src
-        /llmtuner
-            /train
-                /data 
-                    /loader.py     # get_dataset
-                    /preprocess.py # preprocess_dataset
-                /model
-                    /loader.py     # load_model_and_tokenizer
-                /dpo
-                    /trainer.py     # 一些trainer 用到的函数
-                    /workflow.py    # run_dpo
-                /ppo
-                    /trainer.py     # 一些trainer 用到的函数
-                    /workflow.py    # run_ppo
-                /pt
-                    /trainer.py     # 一些trainer 用到的函数
-                    /workflow.py    # run_pt
-                /rm
-                    /trainer.py     # 一些trainer 用到的函数
-                    /workflow.py    # run_rm
-                /sft
-                    /trainer.py     # 一些trainer 用到的函数
-                    /workflow.py    # run_sft
-```
-
-workflow.py 的逻辑言简意赅，就是拼凑运行 Trainer的dataset、model、tokenizer、data_collator等参数
-1. 对于dataset 有一个load_dataset 和preprocess_dataset 的过程，preprocess_dataset 会根据任务目标不同，处理逻辑不同，也就是将数据转为input_ids 的方式不同。 最终转为trainer 也就是transformer model 可以接受的dataset，包含列 input_ids/attention_task/labels（或其它model.forward 可以支持的参数）。 
-2. Trainer 对训练逻辑已经封的很好了，内部也支持了accelerate 和 deepspeed，只要合适的配置 training_args 即可。
-
-以pt对应的workflow.py 为例
-
-```python
-def run_pt(model_args: "ModelArguments",data_args: "DataArguments",training_args: "Seq2SeqTrainingArguments",finetuning_args: "FinetuningArguments",callbacks: Optional[List["TrainerCallback"]] = None):
-    dataset = get_dataset(model_args, data_args)
-    model, tokenizer = load_model_and_tokenizer(model_args, finetuning_args, training_args.do_train, stage="pt")
-    dataset = preprocess_dataset(dataset, tokenizer, data_args, training_args, stage="pt")
-    data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
-    trainer = Trainer(model,training_args,tokenizer,data_collator,callbacks,**split_dataset(dataset, data_args, training_args)
-    # Training
-    if training_args.do_train:
-        train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
-        trainer.log_metrics("train", train_result.metrics)
-        trainer.save_metrics("train", train_result.metrics)
-        trainer.save_state()
-        trainer.save_model()
-        if trainer.is_world_process_zero() and model_args.plot_loss:
-            plot_loss(training_args.output_dir, keys=["loss", "eval_loss"])
-     # Evaluation
-    if training_args.do_eval:
-        metrics = trainer.evaluate(metric_key_prefix="eval")
-        perplexity = math.exp(metrics["eval_loss"])
-        metrics["perplexity"] = perplexity
-        trainer.log_metrics("eval", metrics)
-        trainer.save_metrics("eval", metrics)
-```
-
-不管是PreTraining阶段还是SFT阶段，loss函数都是一样的，只是计算的方式存在差异，PreTraining阶段计算的是整段输入文本的loss，而SFT阶段计算的是response部分的loss。
-1. preprocess_pretrain_dataset处理PreTraining阶段的数据，数据组成形式：
-    1. 输入input： `<bos> X1 X2 X3`
-    2. 标签labels：`X1 X2 X3 </s>`
-    典型的Decoder架构的数据训练方式；
-2. preprocess_supervised_dataset处理SFT阶段的数据，数据组成形式：
-    1. 输入input：`<bos> prompt response`
-    2. 标签labels： `-100 ... -100 response </s>`
-对于prompt部分的labels被-100所填充，这样在计算loss的时候模型只计算response部分的loss，-100的部分被忽略了。这个机制得益于torch的CrossEntropyLossignore_index参数，ignore_index参数定义为如果labels中包含了指定了需要忽略的类别号（默认是-100），那么在计算loss的时候就不会计算该部分的loss也就对梯度的更新不起作用。
-
-PS: 深度学习都得指定features/labels。在llm 场景下，features 和labels 有几个特点
-1. llm 有base model、sft model 等，不同的model 数据集格式不同，一般分为几个部分，比如sft 的`{"question:":"xx","answer":"xx"}`，各家模型都不太一样，很多数据集是不公开的。但不管如何，这几部分都会拼为一个sentence（中间可能有一些特殊字符起到连接作用），然后把sentence通过tokenizer转换成input_ids，之后再走embedding 模块等等就是Transformer系列模型内的事儿了，最后得到output_ids.
-2. 模型输入格式，模型输入dict 一般包含3个key： input_ids,attention_mask,labels
-    1. 有些模型内置从input ids 提取attention mask的操作
-    2. 预训练场景 labels 一般由input_ids copy而来，然后做一些处理，比如labels 全部左移一位（预训练）
-    3. 明确指定labels 的话，一般是要微调，比如sft时，sentence部分中question 的位置都置为-100，-100表示在计算loss的时候会被忽略，这个由任务性质决定。
-2. 预处理（将dataset 转为模型输入）过程由​ Dataset.map() + tokennizer 来办。
-    ```python
-        def tokenize_function(example):
-            # example 表示数据集中的一行数据
-            return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
-        tokenized_dataset = dataset.map(tokenize_function, batched=True)
-    ```
-3. 之后就是对output_ids 和 labels 计算loss。
 
 ## 微调实践
 

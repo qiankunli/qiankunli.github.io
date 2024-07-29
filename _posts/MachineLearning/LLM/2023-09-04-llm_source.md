@@ -219,50 +219,6 @@ print(squad_it_dataset) # 包括 train 和 test 的 DatasetDict 对象
     ```
 4. 用于预训练 GPT-2 的 WebText 语料库包含超过 800 万个文档和 40 GB 的文本，全加载到计算机内存吃不消，`pubmed_dataset_streamed = load_dataset("json", data_files=data_files, split="train", streaming=True)`，streaming=True 返回的对象是一个 IterableDataset
 
-## 多轮对话怎么转化为模型接受的input和用于计算loss的label
-
-### 预训练
-
-通常，我们把经过预训练（pretrain）阶段得到的模型称为base模型。这个阶段主流的数据组织方式叫packing。在不采用packing的时候，为了将不同长度的句子组成一个batch tensor，我们需要进行填充（pad），这个填充过程既可以按照batch内最长句子填充，也可以按照模型最长输入长度填充。为了防止一个batch内存在许多的`<pad>token`，浪费计算资源，packing直接采取多条示例的拼接方法。下图是传统方法和packing的对比：
-
-![](/public/upload/machine/pretrain_padding.jpg)
-
-左侧是传统的padding做法，右侧是packing，其中红色部分代表pad token，黄色部分代表sep token。为了区分不同的训练示例，我们在不同示例之间加上一个分割标记sep token，注意力窗口不会跨示例。这个注意力模式叫块对角矩阵（BlockDiagonalMask）【本质上是在示例内的下三角矩阵】，而不是传统的全局下三角矩阵。由此，就消除了对pad token的需要，所以开源大模型刚问世的时候（2023-3那阵子），存在很多base model放出来的tokenizer并没有pad token，比如llama-base。需要注意，packing时示例3可能会被截断，这个行为在预训练时是可以接受的。注意，这个时候的**学习模式**非常的简单，就是next token prediction。
-
-### 指令微调
-
-指令微调不仅仅考虑了对人类指令和多任务的适应性，更是希望能将角色系统融入大模型中，从而让大模型变成chat模型，指令微调并不直接产生chat model，只是其中必不可少的一步。其中比较特殊的数据形式就是多轮对话。对话里必不可少的存在“角色”这个概念，因为和大模型的对话仅限于用户和模型，所以极大多数的对话模板（template）里都只考虑了两个角色——user和assistant。注意，对话模板只有非base模型才需要，所以很多的base模型的tokenizer里并不携带chat_template。
-
-举个例子，比如：LLAMA2-chat的对话模板中user标识 是 `[INST]` ， assistant 标识是`[/INST]`，下面是一个单轮的例子
-```
-chat_dict = [
-                {"role": "user", "content": 你好},
-                {"role": "assistant", "content": 你也好},
-            ]
-```
-因为模型输入只能是非结构化的，我们`利用模板将其非结构化`。得到的字符串就是`[INST]你好[/INST]你也好`。那么假如我们现在获得了一个现成的训练数据
-```
-chat_dict = [
-                {"role": "user", "content": U1},
-                {"role": "assistant", "content": A1},
-                {"role": "user", "content": U2},
-                {"role": "assistant", "content": A2},
-            ]
-```
-模型的input_ids和对应的labels应该是什么呢？最常规的做法应该是在每一轮首尾用`[BOS]`和`[EOS]`包裹，轮次内部正常用模板非结构化就行。上例可以转换为input_ids= `[BOS][INST]U1[\INST]A1[EOS][BOS][INST]U2[\INST]A2[EOS]`，难点在于LABELS应该是什么呢？ 我们可以根据学习模式来确定LABELS。
-1. 在推理场景下，假如是第一轮对话开始，我们会输入给模型[BOS][INST]U1[\INST]，那么我们希望模型吐出的是什么呢？是A1和[EOS]，A1是模型自己的回答，EOS是为了告诉解码系统生成结束了，否则模型将一直生成到最大长度才会停止。我们获得了一个初步的学习模式需求，就是根据`[BOS][INST]U[\INST] → A[EOS]`。
-    |input|`[BOS]`|`[INST]`|U|`[/INST]`|A|
-    |---|---|---|---|---|---|
-    |label|-100|-100|-100|A|`[EOS]`|
-
-    在多轮的场景下，也只是复制这个过程。
-
-    |input|`[BOS]`|`[INST]`|U|`[/INST]`|A|`[EOS]`|`[BOS]`|`[INST]`|U2|`[/INST]`|A2|
-    |---|---|---|---|---|---|---|---|---|---|---|---|
-    |label|-100|-100|-100|A|`[EOS]`| X| X| X| X| A2| `[EOS]`|
-
-2. 在llama factory里有一个参数叫 Efficient EOS，所谓efficient eos并不代表是一个新的token，而是一个特殊的input和label的设计方式。 [多轮对话的训练过程详解](https://zhuanlan.zhihu.com/p/695202364)
-
 
 ## 源码分析
 
@@ -712,84 +668,6 @@ class Qwen2RMSNorm(nn.Module):  # 标准化层
         return self.weight * hidden_states.to(input_dtype)
 ```
 
-## 训练/Trainer
-
-transformer 支持自定义dataset，自定义model实现forward（forward 支持的参数均可以作为dataset的column），forward 过程中还计算loss，模型的差异性基本已经兜住了，这也是为何 只要提供包含特定column的dataset，剩下的训练代码都可以交给trainer封装掉。
-
-在我们定义 Trainer 之前首先要定义一个 TrainingArguments 类，它将包含 Trainer用于训练和评估的所有超参数，也内置了Accelerate和deepspeed等支持。唯一必须提供的参数是保存训练模型的目录，以及训练过程中的检查点。对于其余的参数，可以保留默认值。
-
-```python
-from transformers import TrainingArguments
-raw_datasets = load_dataset("glue", "mrpc")
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-def tokenize_function(example):
-    return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
-tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
-data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-
-training_args = TrainingArguments("test-trainer")
-model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
-trainer = Trainer(
-    model,
-    training_args,
-    train_dataset=tokenized_datasets["train"],
-    eval_dataset=tokenized_datasets["validation"],
-    data_collator=data_collator,
-    tokenizer=tokenizer,
-)
-trainer.train()
-```
-不用trainer，纯手工实现训练过程，也是trainer帮我们自动化的部分
-```python
-raw_datasets = load_dataset("glue", "mrpc")
-
-# data preprocessing
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-def tokenize_function(example):
-    return tokenizer(example["sentence1"], example["sentence2"], truncation=True)
-tokenized_datasets = raw_datasets.map(tokenize_function, batched=True)
-data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-
-tokenized_datasets = tokenized_datasets.remove_columns(["sentence1", "sentence2", "idx"])
-tokenized_datasets = tokenized_datasets.rename_column("label", "labels")
-tokenized_datasets.set_format("torch")
-## tokenized_datasets column_names: ["attention_mask", "input_ids", "labels", "token_type_ids"]
-train_dataloader = DataLoader(
-    tokenized_datasets["train"], shuffle=True, batch_size=8, collate_fn=data_collator
-)
-eval_dataloader = DataLoader(
-    tokenized_datasets["validation"], batch_size=8, collate_fn=data_collator
-)
-
-model = AutoModelForSequenceClassification.from_pretrained(checkpoint, num_labels=2)
-optimizer = AdamW(model.parameters(), lr=3e-5)
-## put our model and our batches on GPU
-device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-model.to(device)
-num_epochs = 3
-num_training_steps = num_epochs * len(train_dataloader)
-lr_scheduler = get_scheduler(   #  the learning rate scheduler 
-    "linear",
-    optimizer=optimizer,
-    num_warmup_steps=0,
-    num_training_steps=num_training_steps,
-)
-progress_bar = tqdm(range(num_training_steps))
-
-model.train()
-for epoch in range(num_epochs):
-    for batch in train_dataloader:
-        batch = {k: v.to(device) for k, v in batch.items()}
-        outputs = model(**batch)
-        loss = outputs.loss
-        loss.backward()
-
-        optimizer.step()
-        lr_scheduler.step()
-        optimizer.zero_grad()
-        progress_bar.update(1)
-```
-
 
 
 ## GPT-2养成记 
@@ -938,3 +816,10 @@ print('GENERATION=', tokenizer.batch_decode(out.cpu()))
 ```
 How exactly is GPT-3 trained on such examples? We are not exactly sure (OpenAI is very secretive), but perhaps the two sequences of tokens are concatenated together, then GPT-3 is trained on such examples, **but the loss is only calculated in the “completion” part**. PS: 终于知道为何要分成两段，而不是喂一个文本就算了。labels 中prompt部分的位置都置为-100，-100表示在计算loss的时候会被忽略，这个由任务性质决定。
 
+## 其它
+
+[LLama3 405B 技术解读](https://mp.weixin.qq.com/s/51h70Zg-bfbvnQWr6UH1ZQ)大模型之所以能力仍在快速提升，主要驱动力有三个：
+1. 首先就是不断扩大模型和数据规模（Scaling Law）。
+2. 一个是越来越强调数据质量的作用，各种数据筛选方法和工具越来越多，保证质量是第一位的
+3. 不断增加数学、逻辑、代码这种能够提升大模型理性能力的数据配比比例，包括在预训练阶段（增加预训练数据此类数据比例，且在预训练后面阶段来上采样此类数据，就是说**同样数据多执行几遍，以增加其对模型参数影响的权重**）和Post-Training阶段（增加此类数据占比，Llama3的经过instruct的模型比仅做预训练模型相比，各种尺寸的效果提升都很大）皆是如此。
+目前看，在通用数据快被用完情况下，第三个因素会成为之后大模型进步的主导力量，包括使用数学、逻辑、代码合成数据在Post-Training阶段的应用，目前技术也越来越成熟，其质量和数量会是决定未来大模型效果差异的最关键因素。
