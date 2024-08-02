@@ -80,7 +80,7 @@ def gen():
     yield 2
 ```
 
-## 闭包
+## 闭包/Closures
 
 在虚拟机中，函数机制的实现都离不开 FunctionObject 和 FrameObject 这两个对象。有了 FunctionObject，一个函数就可以像普通的整数或者字符串那样，作为参数传递给另外一个函数，也可以作为返回值被传出函数。所以，在 Python 语言中，函数也和整数类型、字符串类型一样，是第一类公民（first class citizen）。把函数作为第一类公民，使新的编程范式成为可能，但它也引入了一些必须要解决的问题，例如自由变量和闭包的问题。
 
@@ -105,7 +105,7 @@ f()
 
 ## 装饰器
 
-fluent python：装饰器是一种可调用对象，其参数是另一个函数（被装饰的函数）。装饰器可能会对被修饰的函数做些处理，然后返回函数，或者把函数替换成另一个函数或可调用对象（也就是类）。**装饰器在加载模块时立即执行，通常是在导入时**，很多python框架会使用这样的装饰器把函数添加到某个中央注册处，比如注册http handler。严格来说，装饰器只是语法糖。
+fluent python：装饰器是一种可调用对象，其参数是另一个函数（被装饰的函数），本质上就是一个高阶函数。装饰器可能会对被修饰的函数做些处理，然后返回函数，或者把函数替换成另一个函数或可调用对象（也就是类）。**装饰器在加载模块时立即执行，通常是在导入时**，很多python框架会使用这样的装饰器把函数添加到某个中央注册处，比如注册http handler。严格来说，装饰器只是语法糖。
 
 所谓的装饰器，其实就是通过装饰器函数，来修改原函数的一些功能，使得原函数不需要修改。**装饰器通常返回在装饰器内部定义的函数，取代被装饰的函数**。Python装饰器（decorator）在实现的时候，被装饰后的函数其实已经是另外一个函数了（函数名等函数属性会发生改变 ==> 函数签名变了），为了不影响，Python的functools包中提供了一个叫wraps的decorator来消除这样的副作用。
 
@@ -186,6 +186,45 @@ def f1():
 def f2():
     print('running f2()')
 ```
+```
+cur1 = register(active=True)
+cur2 = decorate(func)
+cur2()
+```
+
+### 带属性的装饰器
+
+如果你是一个程序员，你面临一个变动很频繁的业务，你无法预知之后的需求情况，想要代码有足够大的机动余地，这个时候可以利用强大的setattr给程序留一个“后门”，方便后面临时修改。比如在装饰器当中定义一个dict，用来存储自定义的函数。再实现一个set_func方法将自定义的函数存储进这个dict当中，只有就可以通过参数，在不修改装饰器的情况下自由变更装饰器内的逻辑了。
+
+
+```python
+def decorate(func):
+    func_dict = {}
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # 通过key来选择应该调用哪一个函数作为装饰器的逻辑
+        if kwargs.get('key') is not None:
+            func_dict[kwargs['key']](*args, **kwargs)
+        return func(*args, **kwargs)
+        
+    # 将函数名和函数作为参数传入，存储在dict中
+    @attach(wrapper)
+    def set_func(func_name, func):
+        nonlocal func_dict
+        func_dict[func_name] = func
+
+    return wrapper
+```
+来看一个使用的例子：
+```
+def test(*args, **kw):
+    print('test')
+add.set_func('test', test)
+add(3, 4, key='test')
+```
+
+一般情况下我们用不到这样的骚操作，但是能够写出来或者说看懂这样的功能。
 
 ### decorator库
 
@@ -317,30 +356,195 @@ A.register(B)
 class B:
 ```
 
-### 类型检查
+### slots
 
-python dict 有时候被当做记录使用，以key表示字段名称，value 可以是不同的类型。 比如用json 描述一本书的记录
-```json
-{
-    "isbc":"xx",
-    "title":"xx",
-    "authors": ["xx","xx"],
-    "pagecount":478
-}
-```
-在python 3.8 之前没有什么好方法可以注解这段记录，因为dict value 必须是同一类型。下面两个注解都不完美。
-1. Dict[str,Any]，值可以是任何类型
-2. Dict[str,Union[str,int,List[str]]]，难以理解
-TypedDict 解决了这个问题。
+__slots__关键字究竟是做什么的呢？
+1. 限制用户的使用。我们都知道Python是一门非常灵活的动态语言，很多在其他语言看起来完全不能容忍的事情在Python当中是可行的，这也是Python的设计理念，为了灵活和代码方便牺牲了效率。比如类的成员甚至可以在类创建好了之后动态创建。这在静态语言当中是绝对不行的，我们只能调用类当中已有的属性，是不能或者很难添加新属性的，从一方面来看，这当然非常灵活，但是另一方面，这也留下了隐患。如果用户随意添加属性，可能会导致未知的问题，尤其在复杂的系统当中。所以有些时候为了严谨，我们会不希望用户做这种动态的修改。__slots__正是用来做这个的。
+    ```python
+    class Exp:
+        def __init__(self):
+            self.a = None
+            self.b = None
+        if __name__ == "__main__":
+            exp = Exp()
+            exp.c = 3   # 运行了之后它会将c添加进这个实例当中
+            print(exp.c)
+
+    class Exp:
+        __slots__ = ['a', 'b']  # 运用__slots__这个关键字当中定义的成员，对于没有定义的成员不能随意创建，这样就限制了用户的使用。
+        def __init__(self):
+            self.a = None
+            self.b = None
+
+        if __name__ == "__main__":
+            exp = Exp()
+            exp.c = 3   # 得到一个报错，提示你Exp这个对象当中并没有c这个成员
+            print(exp.c)
+    ```
+2. 节省内存。虽然现在大部分人使用这个关键字都是报着第一个目的，但是很遗憾的是，Python创建者的初衷其实并不是这个。如果了解过Python底层的实现原理，你会发现在Python当中为每一个实例都创建了一个字典，就是大名鼎鼎的__dict__字典。正是因为背后有一个字典，所以我们才可以创造出原本不存在的成员，也才支持这样动态的效果。使用dict来维护实例，会消耗大量的内存，额外存储了许多数据，而使用__slots__之后，Python内部将不再为实例创建一个字典来维护，而是会使用一个固定大小的数组，这样就节省了大量的空间。这个节省可不是一点半点，一般可以节省一半以上。也就是说牺牲了一定的灵活性，保证了性能。
+
+
+### property
+
+作为一个前Java程序员为类当中所有变量加上get和set方法几乎成了政治正确，但是这是不对的，加上property是非常耗时的，所以如非必要不要这么做，那么我们又为什么要用到property呢？为了校验变量类型。由于Python是动态语言，并且是隐式类型的，所以我们拿到变量的时候并不知道它究竟是什么类型，也不知道用户为给它赋值成什么类型。所以在一些情况下我们可能会希望做好限制，告诉用户只能将这个变量赋值成这个类型，否则就会报错。通过使用property，我们可以很方便地做到这点。
+
 ```python
-from typing import TypedDict 
-class BookDict(TypedDict):
-    isbc:str
-    title:str
-    authors:list[str]
-    pagecount:int
+class Exp:
+    def __init__(self, param):
+        self.param = param
+
+    @property
+    def param(self):
+        return self._param
+
+    @param.setter
+    def param(self, value):
+        if not isinstance(value, str):
+            raise TypeError('Want a string')
+        self._param = value
 ```
-TypedDict 仅为类型检查工具而生，在运行时没有作用。
+
+对于 setattr和getattr，我们不禁有一个问题，我们通过`.`操作不香吗，为什么还要搞一个setattr和getattr出来呢？如果我们自己写代码写着玩，当然是用`.`操作更方便，但如果是实际的开发场景。很有可能我们需要添加的属性的名称是个变量，而不是写死的，也就是说是可配置的。这个时候就不能通过`.`了。
+
+### 元类/动态创建、修改类
+
+元类的概念和动态类、动态语言的概念有关，如果我们把Python的元类和装饰器做一个类比的话，会发现两者的核心逻辑是很类似的。本质上都是在原有的逻辑之外封装新的逻辑，只不过装饰器针对的是一段逻辑，而元类针对的是类的属性和创建过程。
+
+在Python当中__init__并不是构造函数，__new__才是。如果__new__才是构造函数，那么为什么我们创建类的时候从来不用它呢？首先我们回顾一下__init__的用法，我们随便写一段代码：
+
+```python
+class Student:
+    def __init__(self, name, gender):
+        self.name = name
+        self.gender = gender
+```
+
+我们换一个问题，我们在Python当中怎么实现单例(Singleton)的设计模式呢？怎么样实现工厂呢？从这个问题出发，你会发现只使用__init__函数是不可能完成的，因为__init__并不是构造函数，它只是初始化方法。也就是说在调用__init__之前，我们的实例就已经被创建好了，__init__只是为这个实例赋上了一些值。如果我们把创建实例的过程比喻成做一个蛋糕，__init__方法并不是烘焙蛋糕的，只是点缀蛋糕的。那么显然，在点缀之前必须先烘焙出一个蛋糕来才行，那么这个烘焙蛋糕的函数就是__new__。我们来看下__new__这个函数的定义，我们在使用Python面向对象的时候，一般都不会重构这个函数，而是使用Python提供的默认构造函数，Python默认构造函数的逻辑大概是这样的：
+```
+def __new__(cls, *args, **kwargs):
+    return super().__new__(cls, *args, **kwargs)
+```
+
+从代码可以看得出来，函数当中基本上什么也没做，就原封不动地调用了父类的构造函数。这里隐藏着Python当中类的创建逻辑，是根据继承关系一级一级创建的。根据逻辑关系，我们可以知道，当我们创建一个实例的时候，实际上是先调用的__new__函数创建实例，然后再调用__init__对实例进行的初始化。那么我们重载__new__函数可以做什么呢？一般都是用来完成__init__无法完成的事情，比如前面说的单例模式，通过__new__函数就可以实现。我们来简单实现一下：
+
+```python
+class SingletonObject:
+    def __new__(cls, *args, **kwargs):
+        if not hasattr(SingletonObject, "_instance"):
+            SingletonObject._instance = object.__new__(cls)
+        return SingletonObject._instance
+    
+    def __init__(self):
+        pass
+```
+当然，如果是在并发场景当中使用，还需要加上线程锁防止并发问题，但逻辑是一样的。除了可以实现一些功能之外，还可以控制实例的创建。因为Python当中是先调用的__new__再调用的__init__，所以如果当调用__new__的时候返回了None，那么最后得到的结果也是None。通过这个特性，我们可以控制类的创建。比如设置条件，只有在满足条件的时候才能正确创建实例，否则会返回一个None。除此之外，另一个经常使用__new__场景是元类。
+
+在Python中“一切皆对象”，object是一切类的父类（包括type这个类）。那么是不是说类其实也是一个对象呢？在Python面向对象当中，所有的类的根本来源就是type。也就是说Python当中的每一个类都是type的实例。type是Python当中内置的元类，我们也可以自己创建我们需要的元类。通过元类，我们创建的对象也是一个类，而不是一个实例。
+
+```python
+# 创建一个类常规方式
+class Duck(object):     # 继承自object，通常object也可以不写
+    def quack(self):
+        print("GaGaGa!")
+
+# 通过type实例化创建一个类，type函数接收3个参数，分别是类型的名称，父类的元组（实现类的继承），以及一个字典。
+def quack(self):
+    print("GaGaGa!")
+Duck = type("Duck", (object, ), {'a': 1, 'quack': quack}) # 注意，type返回的结果是一个类，而不是一个实例。创建出来的类与上面等价。
+duck = Duck()
+```
+也就是说，**我们可以先把函数实现，然后再根据任务的需要把这些函数组装成新的类**。显然，这和传统的C++以及Java这些静态类型的语言相比，要灵活得多。
+
+```python
+class AddInfo(type):
+    def __new__(cls, name, bases, attr):
+        attr['info'] = 'add by metaclass'
+        return super().__new__(cls, name, bases, attr)
+        
+class Test(metaclass=AddInfo):
+    pass
+```
+根据上面的逻辑，Test类在创建的时候就被赋予了类属性info。 
+
+元类的作用：比如ORM框架是后端工程师常用的一个框架，它的英文全称是Object Relational Mapping，即对象-关系映射框架。ORM框架做的事情是将这些关系映射成类，这样我们可以将这张表当中增删改查的功能抽象成类当中的方法。这样我们就可以通过调用类的方式来操作数据库了，从而达到高度抽象业务逻辑、降低用户使用难度的目的。
+
+```python
+class User(Model):
+    # 定义类的属性到列的映射：
+    id = IntegerField('id')
+    name = StringField('username')
+    email = StringField('email')
+    password = StringField('password')
+```
+我们希望User类型的实例就对应User表当中的一条记录，并且我们可以通过调用实例当中的方法，来操作这张表进行增删改查。
+
+```python
+# 创建一个实例：
+u = User(id=12345, name='Michael', email='test@orm.org', password='my-pwd')
+# 保存到数据库：
+u.save()
+```
+
+最关键的部分就是Model类的实现。我们先来分析一下我们希望Model这个类拥有的功能，由于它是我们定义出来的每一张表的父类，所以它应该能够获取子类当中的字段，并且将它存放在一个容器当中。由于我们需要存储的是字段名和类型的映射，所以将它存储在dict当中比较合理。另外一个功能是我们希望它能够提供增删改查的接口，能够根据子类当中定义的字段自动生成相应的SQL语句去调用数据库。这个也是ORM框架的意义所在。
+
+第一个功能有些麻烦，它也是元类的意义所在。因为**父类当中的方法是无法获取子类中定义的类属性的**，只能通过元类，在构建类的时候可以拿到属性的信息。
+
+```python
+class ModelMetaclass(type):
+    def __new__(cls, name, bases, attrs):
+        # 创建model类的时候不做任何处理
+        if name=='Model':
+            return type.__new__(cls, name, bases, attrs)
+        # 打印表名的信息
+        print('Found model: %s' % name)
+        # mappings用来存储字段的信息
+        mappings = dict()
+        for k, v in attrs.items():
+            # 判断v的类型，只有是Field的子类才会存储起来
+            if isinstance(v, Field):
+                print('Found mapping: %s ==> %s' % (k, v))
+                mappings[k] = v
+        # 将mappings当中的数据从类属性当中移除，防止关键字冲突
+        for k in mappings.keys():
+            attrs.pop(k)
+        attrs['__mappings__'] = mappings # 保存属性和列的映射关系
+        attrs['__table__'] = name # 假设表名和类名一致
+        return type.__new__(cls, name, bases, attrs)
+```
+为Model 新增crud 方法
+```python
+class Model(dict, metaclass=ModelMetaclass):
+    def __init__(self, **kw):
+        # 由于Model的基类是dict，所以创造Model的字段会被解析成dict的构造参数
+        # 也就是说字段名和字段值的映射会存储在dict当中
+        super(Model, self).__init__(**kw)
+        
+    def __getattr__(self, key):
+        try:
+            return self[key]
+        except KeyError:
+            raise AttributeError(r"'Model' object has no attribute '%s'" % key)
+
+    def __setattr__(self, key, value):
+        self[key] = value
+
+    def save(self):
+        fields = []
+        params = []
+        args = []
+        for k, v in self.__mappings__.items():
+            # fields存储字段名
+            fields.append(v.name)
+            # params填充问号
+            params.append('?')
+            # 获取字段的值
+            args.append(getattr(self, k, None))
+        sql = 'insert into %s (%s) values (%s)' % (self.__table__, ','.join(fields), ','.join(params))
+        print('SQL: %s' % sql)
+        print('ARGS: %s' % str(args))
+```
+在整个ORM框架实现的过程当中，最重要的是我们对Model这个类创建了元类，但是真正应用的地方却是在Model的子类。实际上在实际创建User类的时候，解释器会先搜索User内部是否定义了元类，如果没有，会上一层去往User的父类也就是Model类搜索元类，如果找到了元类，就会使用元类来创建User。相当于元类被隐形地继承了下来，但是我们在使用子类的时候却感知不到。
+
 
 ## 其它
 

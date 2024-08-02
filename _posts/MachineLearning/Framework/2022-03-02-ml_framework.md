@@ -41,8 +41,7 @@ keywords: ml framework
 所谓的“模型”本质上是两个部分的合体：计算图和模型参数——神经网络的本质是一个数学定义下的函数，它自身不是一个可执行的程序。举个简单的例子，假设某个模型的函数实际上就是一个二次函数$f(x)=x^2+2x+1$，那它的“计算图”就是$ax^2+bx+c$（简写，实际要变成图结构），参数就是一个字典：`{a:1,b:2,c:1}`。所以**pytorch保存的模型文件实际上是一个python字典（key是模型层的名称，value是对应参数）**，你用pytorch载入一个保存好的模型，需要先在代码里import 模型定义，然后再load_state_dict。换句话说，实际发布的“模型”本身需要依附于框架而存在，不是一个可执行文件。
 
 ### 基本思想
-
-神经网络的几种表示
+[纯Python实现原理级深度学习框架（一）计算图的原理，节点类的实现和计算图的可视化](https://zhuanlan.zhihu.com/p/351961835)神经网络的几种表示
 1. 神经网络的拓扑结构，拓扑图结构中，不展示具体程序中变量的数据结构，只展示网络中输入数据维度的变化。这样做可以很直观的展示出张量在不同的模式空间中的变化情况。
 2. 还有一种更加简单的表示方式——直接用流程图。PS：比如介绍transformer那张图。
 3. 计算图。目前绝大多数深度学习框架都是通过计算图来实现的。以tensorflow为例，其计算图的图节点共分为三种：Placeholder，Variable和Operation。而拓扑图中张量从不同模式空间内的变换都可以转化为计算图上节点与节点直接的连线，类似数据结构课上通过构建符号树来完成一条数学表达式计算的情形。事实上，许多的商业级数学软件内部都是通过建立一颗语法树来完成对一条数学表达式的诸多操作，而神经网络内部本来就是输入数据经过一条条数学公式的变换。但是由于树不能存在环，而神经网络中的一个中间变量可能会被利用多次，而最终的输出只有一个，因此，神经网络的树结构可能存在环，因此，我们选择用图来表示神经网络是合情合理的。
@@ -64,14 +63,22 @@ class Node(object):
         """
         self.next_nodes = []    # self.next_nodes中存储了该节点的所有后继节点
         self.data = None        # 代表该节点存储的数据，在第一次前向运算之前，所有的节点的data都是None。
-        _default_graph.append(self)
+        _default_graph.append(self) # 保存计算图上的所有node
     
-    def __neg__(self):
-        return negative(self)
-
+    def __neg__(self):          # python 魔术方法，自定义运算符的行为
+        return negative(self) 
     def __add__(self, node : Node):
         return add(self, node)
+    def __mul__(self, node : Node): 
+        return multiply(self, node)  # 乘法运算改为 multiply.__init__ + multiply.compute
     ...
+
+class multiply(Operation):
+    def __init__(self, x : Node, y : Node, node_name: str=""):
+        super().__init__(input_nodes=[x, y], node_name=node_name)
+    
+    def compute(self, x_v : np.ndarray, y_v : np.ndarray):
+        return x_v * y_v
 ```
 
 我们希望节点创建完后就自动完成了计算图的创建，因此我们需要在每个节点创建完后为其next_nodes添加元素。但是这样不怎么好写，毕竟你又不知道创建完这个节点后，后面会有什么节点。而且能够起到连接作用的只有Operation，因为计算图中的连线可以理解为数据往函数送的过程，因此只要有连线，**连线的右侧一定是Operation**。因此，只要把握住每个Operation节点的前后，就可以完整地描述这一整张计算图。说得具体点吧，我们只需要为Operation节点添加一个成员input_nodes，并且在创建Operation节点时，将传入的Node填入input_nodes中，并在这个时候更新那些传入的Node的next_nodes就Ok了。
@@ -173,9 +180,106 @@ if __name__ == "__main__":
     pprint(_default_graph)
 ```
 
-而在创建完图后，我们需要跑图来完成一次前向运算和反向传播。而跑图需要基本函数run和其余的辅助函数我们会全部写在一个Session类中，也就是所谓的会话，会话类的run方法可以完成图的遍历和前向参数的更新。而反向传播的工作我们会交给优化器类，有关反向传播获取指定节点（一般是损失值对应的节点）对于之前每个节点的梯度的方法和具体的优化方法迭代更新网络参数的逻辑会写在优化器类中。优化器类的minimize方法会帮助我们完成图的各个节点梯度表的获取和优化算法的参数更新。PS：因为不同的优化器算法要用到 这些成员。
+而在创建完图（_default_graph）后，我们需要跑图来完成一次前向运算和反向传播。而跑图需要基本函数run和其余的辅助函数我们会全部写在一个Session类中，也就是所谓的会话，会话类的run方法可以完成图的遍历和前向参数的更新。而反向传播的工作我们会交给优化器类Optimizer，有关反向传播获取指定节点（一般是损失值对应的节点）对于之前每个节点的梯度的方法和具体的优化方法迭代更新网络参数的逻辑会写在优化器类中。优化器类的minimize方法会帮助我们完成图的各个节点梯度表的获取和优化算法的参数更新。PS：因为不同的优化器算法要用到 这些成员。
 
+[纯Python实现原理级深度学习框架（二）前向运算和反向传播的实现，简单MLP实现boston预测](https://zhuanlan.zhihu.com/p/352130729)
 
+```python
+# create session to update nodes' data in the graph
+class Session(object):
+    def run(self, root_op : Operation, feed_dict : dict = {}):
+        for node in _default_graph:
+            if isinstance(node, Variable):
+                node.data = np.array(node.data)     # 本身的data就是data
+            elif isinstance(node, Placeholder):
+                node.data = np.array(feed_dict[node])   # 从输入的字典中获取对应的值
+            else:
+                input_datas = [n.data for n in node.input_nodes]
+                node.data = node.compute(*input_datas) # 获取其input_nodes的data，并作为参数送入Operation的compute方法中，compute返回的值就是Operation的data
+        return root_op
+```
+
+注册梯度函数：为了能够只通过函数名称就能关联到它所对应的梯度函数，添加一个_register_grad_functions，作为我们注册梯度函数的字典，接下来我们需要为每一个我们实现的Operation派生类写其对应的梯度函数，且这个梯度函数的注册名就是其对应的Operation派生类的类名。PS：此处的算子的bp方法注册有些麻烦，pytorch 思路类似于node class 既有compute 又有grad_fn。
+
+```python
+class negative(Operation):
+    def __init__(self, x : Node):
+        super().__init__(input_nodes=[x])
+    
+    def compute(self, x_v : np.ndarray):
+        return -1. * x_v
+# negative对应的梯度函数，op_node为当前需要更新的节点的后继节点（所有节点的后继节点一定是Operation），grad为目标节点关于op_node节点值的梯度
+@_register_grad_functions("negative")
+def __negative_gradient(op_node : Operation, grad : np.ndarray):
+    return np.array([-1. * grad])
+```
+Optimizer只是一个基类，它会是所有具体的优化器（比如SGD，Adam，RMSprop等）的基类，因为这些优化器有许多的方法和变量成员是一样的，比如都需要BP来获取梯度值。所以此处，我将这些共性写入基类Optimizer中。其中的__backwards就是BP算法的实现，而minimize则是具体的优化算法实现的地方，对于基类，我们只需要实现__backwards，具体的优化逻辑（minimize方法）的实现就交给Optimizer的派生类吧。
+```python
+# optimizer
+class Optimizer(object):
+    def __init__(self, learning_rate : float = 1e-3):
+        """
+            base for all the optimizer
+        """
+        self.learning_rate = learning_rate
+    # BP算法的实现，大致过程是从目标节点（一般是损失函数节点，后面统称为loss节点）往前的一个BFS。
+    def __backwards(self, op_node : Operation):
+        """
+            do the BP from the op_node, 
+            return a gradient dict including op_node's gradients with respect to all the nodes before op_node
+        """
+        grad_table = {} # 创建一个梯度字典，用来存放各个节点的梯度。
+        grad_table[op_node] = 1.    # 首先将loss节点加入梯度字典中，值为1，毕竟自己对自己的梯度肯定是1嘛
+        visit_nodes = set()
+        queue = Queue()
+        visit_nodes.add(op_node)
+        queue.put(op_node)
+
+        while not queue.empty():    # 然后开始从loss往前BFS，在BFS的过程中，用当前节点的后继节点来更新该点的梯度值
+            cur_node = queue.get()
+
+            if cur_node != op_node:
+                grad_table[cur_node] = 0.
+                for next_node in cur_node.next_nodes:
+                    grad_loss_wrt_next_node = grad_table[next_node]    # loss gradient of next_node
+                    next_node_op_name = next_node.__class__.__name__   # next_node must be an Operation, we get its name
+                    gradient_func = _register_grad_functions[next_node_op_name]  # get next_node's corresponding gradient function
+                    grad_loss_wrt_cur_node = gradient_func(next_node, grad_loss_wrt_next_node) # call the gradient function to get the sub-gradient
+                    
+                    if len(next_node.input_nodes) == 1: # if next_node represents monocular operators, then add to total gradient directly
+                        grad_table[cur_node] += grad_loss_wrt_cur_node
+                    else:                               # else get the portion size of gradient
+                        cur_node_in_next_node_index = next_node.input_nodes.index(cur_node)
+                        grad_table[cur_node] += grad_loss_wrt_cur_node[cur_node_in_next_node_index]
+
+            if isinstance(cur_node, Operation):         # put next op node into queue to do the BFS
+                for input_node in cur_node.input_nodes:
+                    if input_node not in visit_nodes:   # only add nodes which haven't been updated/visited yet
+                        visit_nodes.add(input_node)
+                        queue.put(input_node)
+
+        return grad_table
+    # 优化算法实现的地方，会涉及到一些最优化的理论
+    def minimize(self, loss_node : Operation):
+        """
+            concrete optimizer method, 
+            this method will update parameters before "loss" node(include loss)
+        """
+        pass
+class SGD(Optimizer):   # Stochastic gradient descent 
+    def __init__(self, learning_rate : float = 1e-3):
+        super().__init__(learning_rate=learning_rate)
+    
+    def minimize(self, loss_node : Operation):
+        lr = self.learning_rate
+        grad_table = self._Optimizer__backwards(op_node=loss_node)
+        for node in grad_table:
+            if isinstance(node, Variable):
+                grad = grad_table[node]
+                node.data -= lr * grad # 根据当前node 梯度更新当前 Variable node.data
+        return grad_table
+```
+PS：最上层是model.generate/model.forward，model 由多个layer构成，layer由Tensor运算构成，Tensor运算的过程中，通过魔术方法将node注册到graph，model.forward 即为graph 的拓扑排序遍历。Optimizer.backward 即为对 graph的bfs（调用的是每个node的gradient_func），得到一个grad_table。minimize 即为对grad_table 所有 Variable node 更新node.data = func(lr,grad)。
 
 ## 抽象层
 

@@ -30,6 +30,9 @@ sys.path 是一个 Python 列表，用于指定解释器在导入模块时搜索
 4. 其他自定义的路径，可以通过在代码中使用 sys.path.append() 方法添加。
 可以在 Python 解释器中执行 `print(sys.path)`，查看当前 Python 解释器的 sys.path。
 
+1. requirements.txt。requirements.txt 是一个纯文本文件，它列出了项目所需的所有Python包及其版本。适合小型到中型项目，或者是那些不需要复杂依赖管理的项目。它的缺点是不支持条件依赖（例如，某些依赖只在特定操作系统上需要），也不支持包的替代。这个文件通常与pip工具一起使用
+2. pyproject.toml 是一个TOML格式的配置文件，它是Python包管理工具pipenv使用的配置文件。 支持更复杂的依赖管理，例如条件依赖、开发依赖和包的替代。
+
 ## streamlit
 
 streamlit是一个开源的python库，它能够快速的帮助我们创建定制化的web应用，而且还非常便于和他人分享，特别是在机器学习和数据科学领域。整个过程不需要你了解任何前端的知识，包括html、css、javascript等，**对非前端开发人员非常的友好**。PS：nodejs让前端人员开发后端服务很方便。 
@@ -71,7 +74,7 @@ Python是一门动态语言，很多时候我们可能不清楚函数参数类�
 7. Sequence: 序列类型，用于表示有序集合类型
 8. Type:泛型类，用于表示类型本身
 
-```
+```python
 class Point2D(TypedDict):
     x: int
     y: int
@@ -80,7 +83,28 @@ a: Point2D = {'x': 1, 'y': 2, 'label': 'good'}  # OK
 b: Point2D = {'z': 3, 'label': 'bad'}           # Fails type check
 ```
 
-
+python dict 有时候被当做记录使用，以key表示字段名称，value 可以是不同的类型。 比如用json 描述一本书的记录
+```json
+{
+    "isbc":"xx",
+    "title":"xx",
+    "authors": ["xx","xx"],
+    "pagecount":478
+}
+```
+在python 3.8 之前没有什么好方法可以注解这段记录，因为dict value 必须是同一类型。下面两个注解都不完美。
+1. Dict[str,Any]，值可以是任何类型
+2. Dict[str,Union[str,int,List[str]]]，难以理解
+TypedDict 解决了这个问题。
+```python
+from typing import TypedDict 
+class BookDict(TypedDict):
+    isbc:str
+    title:str
+    authors:list[str]
+    pagecount:int
+```
+TypedDict 仅为类型检查工具而生，在运行时没有作用。
 
 
 ## pydantic(py+pedantic=Pydantic)
@@ -292,4 +316,57 @@ class HTMLResponse(Response):
     media_type = "text/html"
 class PlainTextResponse(Response):
     media_type = "text/plain"
+```
+
+### 依赖注入
+
+依赖注入用于把一些可复用的逻辑抽离出来，减少代码重复。依赖的定义是一个 callable, 也就是说函数或者类都可以。依赖可以在三个地方添加：handler 函数参数，路径装饰器，全局 app 实例。如果在 handler 函数的 参数中添加，那么依赖的返回值会作为参数传递进去，就像其他参数一样。其他两种方式返回值都会被丢弃。PS： 感觉就是在把依赖的callable执行了一下，省的在代码里调用了。 
+
+```python
+# 使用函数作为依赖
+from fastapi import Depends
+
+async def pagination(page: int, size: int):
+    return {"page": page, "size": size}
+
+@app.get("/users")
+def get_users(pagination: dict=Depends(pagination)):
+    users = user_model.get(**pagination)
+    return users
+```
+
+### fastapi_sqlalchemy
+
+常规使用 sqlalchemy 就是构建engine，获取session，之后就可以session.crud了。 session 的创建与销毁都在dao层做，sesion的获取和销毁用一个装饰器包一下。
+```python
+engine = create_engine(
+    settings.SQLALCHEMY_DATABASE_URI,
+    json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False), echo=True
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+db = SessionLocal()
+db.crud(...)
+db.close()
+```
+fastapi与sqlalchemy 结合了之后，一般倾向于db/session 的生命周期与api handler 一致，进入api handler时创建好，api handler执行完毕后销毁。与 fastapi 结合更紧密的方式是
+```python
+from fastapi import FastAPI
+from fastapi_sqlalchemy import DBSessionMiddleware, db
+
+app = FastAPI()
+
+app.add_middleware(DBSessionMiddleware, db_url="sqlite:///./test.db")
+
+# 模型定义
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True)
+
+# API路由
+@app.post("/users")
+def create_user(username: str):
+    user = User(username=username)
+    db.session.add(user)
+    db.session.commit()
+    return {"message": "User created successfully"}
 ```

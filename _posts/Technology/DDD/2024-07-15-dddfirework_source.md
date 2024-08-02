@@ -13,6 +13,9 @@ keywords: ddd cqrs dddfirework
 * TOC
 {:toc}
 
+ddd这么多年一直曲高和寡的一部分原因是，在代码层面缺少框架支持，用户从0到1使用ddd从概念理解上和代码实现上都成本非常大，给人带来的困惑、给团队带来的争论相比便利来说一点都不少，这点相对“声明式API + 控制器模型”之于kubebuilder/controller-runtime 都差距很大。既提供了大量辅助代码（比如client、workqueue等）、自动生成代码（比如clientset）以减少代码量，又显式定义了实现规范（比如crd包含spec和status）和约束（实现reconcile等）。所以落地声明式api 大家会有更多细节上的直观感受。
+
+
 [dddfirework](https://github.com/bytedance/dddfirework) 是一个支持 DDD （领域驱动设计）实现的引擎框架，他提供对领域实体从创建，修改，持久化，发送事件，事件监听等完整生命周期的封装，以及锁，数据库，事件总线等组件的集成。笔者有幸参与贡献了一部分源码。
 
 ## 缘起
@@ -26,14 +29,14 @@ keywords: ddd cqrs dddfirework
 3. 从CQRS命令查询职责分离的角度看DDD，主要是读写分离，将没有领域模型的查询功能，从命令中分离出来。
    ![](/public/upload/ddd/ddd_with_cqrs.jpg)
 
-ddd这么多年一直曲高和寡的一部分原因是，在代码层面缺少框架支持，用户从0到1使用ddd从概念理解上和代码实现上都成本非常大。反之，比如“声明式API + 控制器模型”之于kubebuilder/controller-runtime，既提供了大量辅助代码（比如client、workqueue等）、自动生成代码（比如clientset）以减少代码量，又显式定义了实现规范（比如crd包含spec和status）和约束（实现reconcile等）。所以落地声明式api 大家会有更多细节上的直观感受。
-
 比如以http handler作为ddd逻辑的入口，对于cqrs command 操作来说，一般会有以下逻辑
 ```
 1. 构建domain 对象
 2. 触发domain 对象执行业务方法，domain.bizfunc()
 3. 持久化domain对象
 ```
+
+![](/public/upload/ddd/ddd_engine_run_command.png)
 
 以上是构建一个cqrs command 的基本动作，我们对其提取一个ICommand。整个ddd引擎抽象为一个engine/bootstrap。则engine 的核心工作即为驱动ICommand执行，ICommand 的操作对象是实体，抽象为IEntity，IEntity 的读取和存储离不开PO。 所以我们可以说 一个ddd+cqrs 框架包含 engine、ICommand、IEntity、PO 等核心概念，它们的各层的体现如下：
 1. 用户接口层

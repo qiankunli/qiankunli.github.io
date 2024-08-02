@@ -151,3 +151,5 @@ go tool trace 能够跟踪捕获各种执行中的事件，例如：
 ## 其它
 
 Linux perf 使用 PMU（Performance Monitor Unit）计数器进行采样。你指示 PMU 在某些事件发生 N 次后产生一个中断。一个例子，可能是每 1000 个 CPU 时钟周期进行一次采样。一旦数据收集回调被定期触发，剩下的就是收集堆栈痕迹并适当地汇总。Linux perf 使用 `perf_event_open(PERF_SAMPLE_STACK_USER,...)` 来获取堆栈追踪信息。捕获的堆栈痕迹通过 mmap'd 环形缓冲区写到用户空间。
+
+[一个全新的 Go pprof 视角 - 对象引用分析](https://mp.weixin.qq.com/s/oq3p_8H5ITpNpWIllbLV-Q) 未细读。

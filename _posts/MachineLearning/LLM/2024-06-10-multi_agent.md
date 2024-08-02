@@ -181,3 +181,7 @@ while True:
 ### 用于RAG 
 
 https://github.com/padas-lab-de/PersonaRAG 未读
+
+## 未来
+
+[REAPER——一种基于推理的规划器，专为处理复杂查询的高效检索而设计](https://zhuanlan.zhihu.com/p/712032784)

@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: Python并发
+title: Python协程实现
 category: 技术
 tags: Python
 keywords: Python
@@ -203,6 +203,85 @@ class BaseEventLoop(events.AbstractEventLoop):
 
 像netty eventloop一样，可以为eventloop 设置执行器executor，把包含阻塞调用的任务包装成协程。
 
+## 协程上下文
+[使用 contextvars 管理上下文变量](https://mp.weixin.qq.com/s/e2myTR6wMffuUAcRIGUezg)Python 在 3.7 的时候引入了一个模块：contextvars，从名字上很容易看出它指的是上下文变量（Context Variables）。
+
+先讲下 ThreadLocal，从名字上看可以得出它肯定是和线程相关的。没错，它专门用来创建局部变量，并且创建的局部变量是和线程绑定的。
+
+```python
+import threading
+
+# 创建一个 local 对象
+local = threading.local()
+
+def get():
+    name = threading.current_thread().name
+    # 获取绑定在 local 上的 value
+    value = local.value
+    print(f"线程: {name}, value: {value}")
+
+def set_():
+    name = threading.current_thread().name
+    # 为不同的线程设置不同的值
+    if name == "one":
+        local.value = "ONE"
+    elif name == "two":
+        local.value = "TWO"
+    # 执行 get 函数
+    get()
+
+t1 = threading.Thread(target=set_, name="one")
+t2 = threading.Thread(target=set_, name="two")
+t1.start()
+t2.start()
+"""
+线程 one, value: ONE
+线程 two, value: TWO
+"""
+```
+可以看到两个线程之间是互不影响的，因为每个线程都有自己唯一的 id，在绑定值的时候会绑定在当前的线程中，获取也会从当前的线程中获取。可以把 ThreadLocal 想象成一个字典：
+```python
+{
+    "thread_id1": {"value": "ONE"},
+    "thread_id2": {"value": "TWO"}
+}
+```
+ThreadLocal 就可以理解为是一种上下文，只是 threading.local 是针对线程的。如果是使用 async def 定义的协程该怎么办呢？如何实现每个协程的上下文隔离呢？所以终于引出了我们的主角：contextvars。该模块提供了一组接口，可用于在协程中管理、设置、访问局部 Context 的状态。
+
+ContextVar 提供了两个方法，分别是 get 和 set，用于获取值和设置值。我们看到效果和 ThreadingLocal 类似，数据在协程之间是隔离的，不会受到彼此的影响。和 Go 在 1.7 版本引入的 context 模块比较相似。
+
+```python
+import asyncio
+import contextvars
+
+c = contextvars.ContextVar("只是一个标识, 用于调试")
+
+async def get():
+    # 获取值
+    return c.get() + "~~~"
+
+async def set_(val):
+    # 设置值
+    c.set(val)
+    print(await get()) 
+
+async def main():
+    coro1 = set_("协程1")
+    coro2 = set_("协程2")
+    await asyncio.gather(coro1, coro2)
+
+
+asyncio.run(main())
+"""
+协程1~~~
+协程2~~~
+"""
+```
+
+await get() 相当于是开启了一个新的协程，那么意味着设置值和获取值不是在同一个协程当中？Python 的协程是无栈协程，通过 await 可以实现级联调用。
+
+ContextVar 除了可以作用在协程上面，它也可以用在线程上面，可以替代 threading.local。
+
 ## 应用场景
 
 多线程还是 Asyncio？如果是 I/O bound，并且 I/O 操作很慢，需要很多任务 / 线程协同实现，那么使用 Asyncio 更合适。如果是 I/O bound，但是 I/O 操作很快，只需要有限数量的任务 / 线程，那么使用多线程就可以了。如果是 CPU bound，则需要使用多进程来提高程序运行效率。I/O 操作 heavy 的场景下，Asyncio 比多线程的运行效率更高。因为 Asyncio 内部任务切换的损耗，远比线程切换的损耗要小；并且 Asyncio 可以开启的任务数量，也比多线程中的线程数量多得多。但需要注意的是，很多情况下，使用 Asyncio 需要特定第三方库的支持。
@@ -210,7 +289,6 @@ class BaseEventLoop(events.AbstractEventLoop):
 使用 asyncio 并不是将代码转换成多线程，它不会导致多条Python指令同时执行，也不会以任何方式让你避开所谓的全局解释器锁（Global Interpreter Lock，GIL）。有些应用受 IO 速度的限制，即使 CPU 速度再快，也无法充分发挥 CPU 的性能。这些应用花费大量时间从存储或网络设备读写数据，往往需要等待数据到达后才能进行计算，在等待期间，CPU 什么都做不了。asyncio 的目的就是为了给 CPU 安排更多的工作：当前单线程代码正在等待某个事情发生时，另一段代码可以接管并使用 CPU，以充分利用 CPU 的计算性能。**asyncio 更多是关于更有效地使用单核，而不是如何使用多核**。python协程单线程内切换，适用于IO密集型程序中，可以最大化IO多路复用的效果。**协程间完全同步**，不会并行，不需要考虑数据安全。PS：与Go协程不同的地方。
 
 ## 其它
-
 
 ```python
 # 同步函数，同步函数本身是一个 Callable 对象，调用这个函数的时候，函数体内的代码被执行。
