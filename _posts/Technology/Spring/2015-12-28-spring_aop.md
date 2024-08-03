@@ -24,6 +24,8 @@ AOP是一套编程思想，是一种功能分解的方法，类似于责任链�
 
 AOP是一个编程模型，aspectj和jboss AOP对于Aop模型进行了具体的实现。Spring AOP则将aspectj的实现加入到Spring平台中，使得AOP与Spring可以更好的融合起来为开发提供方便的服务。具体的说，**spring aop本身不做aop的事，只是提供一种手段（封装和引入），将aop与spring ioc整合在一起**（就好像spring本身不提供kafka，而是通过spring-kafka 将kafka的功能引入到ioc）。
 
+[“JVM” 上的AOP：Java Agent 实战](https://mp.weixin.qq.com/s/mX7v5lgfC7JXj-X6xUE3hw) 未读。
+
 ## 使用
 
 配置方式有两种

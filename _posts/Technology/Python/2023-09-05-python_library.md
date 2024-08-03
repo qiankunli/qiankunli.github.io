@@ -49,13 +49,16 @@ st.text_input('请输入最喜欢的编程语言', key="name")
 
 ## 类型注解 typing
 
+Python 3.5前，为弱类型语言，类型不显式声明，运行时可根据上下文推断变量或参数类型；Python 3.5后，引入的typing模块支持Python的静态类型注解，可显式注明变量、函数参数和返回值的类型；
+
 Python是一门动态语言，很多时候我们可能不清楚函数参数类型或者返回值类型，很有可能导致一些类型没有指定方法，在写完代码一段时间后回过头看代码，很可能忘记了自己写的函数需要传什么参数，返回什么类型的结果。typing提供了类型提示和类型注解的功能，用于对代码进行静态类型检查和类型推断。
 1. 类型注解：typing包提供了多种用于类型注解的工具，包括基本类型（如int、str）、容器类型（如List、Dict）、函数类型（如Callable、Tuple）、泛型（如Generic、TypeVar）等。通过类型注解，可以在函数声明、变量声明和类声明中指定参数的类型、返回值的类型等，以增加代码的可读性和可靠性。
+    1. 数据容器：typing模块提供了多种数据容器类型，如List、Tuple、Dict和Set。
 2. 泛型支持：typing模块提供了对泛型的支持，使得可以编写更通用和灵活的代码。通过泛型，可以在函数和类中引入类型参数，以处理各种类型的数据。
 3. 类、函数和变量装饰器：typing模块提供了一些装饰器，如@overload、@abstractmethod、@final等，用于修饰类、函数和变量，以增加代码的可读性和可靠性。
 
 泛型:
-1. Generic: 泛型基类，用于创建泛型类或泛型函数。继承自Generic的类在编写需要处理多种数据类型的代码时非常有用，它们提供了一种类型安全的方式来编写灵活和可重用的组件。
+1. Generic: 泛型基类，用于创建泛型类或泛型函数。
 2. TypeVar: 类型变量，用于创建表示不确定类型的占位符
 
     ```python
@@ -73,6 +76,8 @@ Python是一门动态语言，很多时候我们可能不清楚函数参数类�
 6. Mapping: 映射类型，用于表示键值对的映射
 7. Sequence: 序列类型，用于表示有序集合类型
 8. Type:泛型类，用于表示类型本身
+
+### TypedDict
 
 ```python
 class Point2D(TypedDict):
@@ -106,6 +111,40 @@ class BookDict(TypedDict):
 ```
 TypedDict 仅为类型检查工具而生，在运行时没有作用。
 
+### 泛型编程
+
+在 Python 中，T 通常用作一个占位符，表示一个类型变量，这是泛型编程的一部分。T 通常与 typing.Generic 类一起使用来定义泛型类型，`typing.Generic[T]` 来定义一个可以接收任何类型参数 T 的泛型类或函数。继承自Generic的类在编写需要处理多种数据类型的代码时非常有用，它们提供了一种类型安全的方式来编写灵活和可重用的组件。
+
+```python
+from typing import Generic, TypeVar, List
+
+# 定义一个类型变量 T
+T = TypeVar('T')
+
+# 定义一个泛型类，它可以持有任何类型的数据
+class Stack(Generic[T]):
+    def __init__(self):
+        self.items: List[T] = []
+
+    def push(self, item: T) -> None:
+        self.items.append(item)
+
+    def pop(self) -> T:
+        if not self.items:
+            raise IndexError("pop from empty stack")
+        return self.items.pop()
+
+# 使用泛型 Stack 类
+int_stack = Stack[int]()  # 指定 T 为 int
+int_stack.push(1)
+int_stack.push(2)
+print(int_stack.pop())  # 输出 2
+
+str_stack = Stack[str]()  # 指定 T 为 str
+str_stack.push("hello")
+str_stack.push("world")
+print(str_stack.pop())  # 输出 "world"
+```
 
 ## pydantic(py+pedantic=Pydantic)
 
@@ -249,124 +288,3 @@ BaseModel模型具有以下方法和属性：
 12. `__fields__` 模型字段的字典
 13. `__config__` 模型的配置类，cf。模型配置
 
-## FastAPI
-
-[三万字长文让你彻底掌握 FastAPI](https://mp.weixin.qq.com/s/b7-zb0FygFhiL6kfbNoazw)Python FastAPI是一个快速（高性能）的Web框架，用于构建基于Python的RESTful API，使用异步编程模型、WebSocket，支持类型检查和自动文档生成等功能，支持Swagger和JSON Schema规范，可以方便地与其他API工具进行集成。
-
-```python
-# main.py
-from fastapi import FastAPI
-# 创建一个FastAPI应用。
-app = FastAPI()
-
-# FastAPI使用装饰器来定义路由
-@app.get(“/”)
-async def root():
-    return {“message”: “Hello, FastAPI!”}
-
-# 可以使用查询参数、路径参数、请求体等来接收请求数据，并使用响应模型和状态码返回响应数据
-@app.get(“/items/{item_id}”)
-async def read_item(item_id: int, q: str = None):
-    return {“item_id”: item_id, “q”: q}
-
-@app.get("/girl/{user_id}")
-async def read_info(user_id: str,request: Request):         
-    # 查询参数
-    query_params = request.query_params
-    data = {"name": query_params.get("name"),
-            "age": query_params.get("age"),
-            "hobby": query_params.getlist("hobby")}
-    # 实例化一个 Response 对象
-    response = Response(
-        
-        orjson.dumps(data), # content，手动转成 json
-        201,    # status_code，状态码
-        {"Token": "xxx"}, # headers，响应头
-        "application/json", # media_type，就是 HTML 中的 Content-Type，content 只是一坨字节流，需要告诉客户端响应类型这样客户端才能正确的解析
-    )
-    response.headers["ping"] = "pong" # 拿到 response 的时候，还可以单独对响应头和 cookie进行设置
-    response.set_cookie("SessionID", "abc123456") # 设置 cookie 的话，通过 response.set_cookie。也可以通过 response.delete_cookie 删除 cookie
-    return response
-
-if __name__ == "__main__":
-    # 启动服务"main:app" ，因为我们这个文件叫做 main.py，所以需要启动 main.py 里面的 app
-    uvicorn.run("main:app", host="0.0.0.0", port=5555)
-```
-
-Response通过 Response 我们可以实现请求头、状态码、cookie 的自定义。内部接收如下参数：
-
-1. content：返回的数据；
-2. status_code：状态码；
-3. headers：返回的响应头；
-4. media_type：响应类型（就是响应头里面的 Content-Type，这里单独作为一个参数出现了，其实通过 headers 参数设置也是可以的）；
-5. background：接收一个任务，Response 在返回之后会自动异步执行；
-
-除了 Response 之外还有很多其它类型的响应，比如：
-
-1. FileResponse：用于返回文件；
-2. HTMLResponse：用于返回 HTML；
-3. PlainTextResponse：用于返回纯文本；
-4. JSONResponse：用于返回 JSON；
-5. RedirectResponse：用于重定向；
-6. StreamingResponse：用于返回二进制流；
-它们都继承了 Response，只不过会自动帮你设置响应类型
-
-```python
-class HTMLResponse(Response):
-    media_type = "text/html"
-class PlainTextResponse(Response):
-    media_type = "text/plain"
-```
-
-### 依赖注入
-
-依赖注入用于把一些可复用的逻辑抽离出来，减少代码重复。依赖的定义是一个 callable, 也就是说函数或者类都可以。依赖可以在三个地方添加：handler 函数参数，路径装饰器，全局 app 实例。如果在 handler 函数的 参数中添加，那么依赖的返回值会作为参数传递进去，就像其他参数一样。其他两种方式返回值都会被丢弃。PS： 感觉就是在把依赖的callable执行了一下，省的在代码里调用了。 
-
-```python
-# 使用函数作为依赖
-from fastapi import Depends
-
-async def pagination(page: int, size: int):
-    return {"page": page, "size": size}
-
-@app.get("/users")
-def get_users(pagination: dict=Depends(pagination)):
-    users = user_model.get(**pagination)
-    return users
-```
-
-### fastapi_sqlalchemy
-
-常规使用 sqlalchemy 就是构建engine，获取session，之后就可以session.crud了。 session 的创建与销毁都在dao层做，sesion的获取和销毁用一个装饰器包一下。
-```python
-engine = create_engine(
-    settings.SQLALCHEMY_DATABASE_URI,
-    json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False), echo=True
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-db = SessionLocal()
-db.crud(...)
-db.close()
-```
-fastapi与sqlalchemy 结合了之后，一般倾向于db/session 的生命周期与api handler 一致，进入api handler时创建好，api handler执行完毕后销毁。与 fastapi 结合更紧密的方式是
-```python
-from fastapi import FastAPI
-from fastapi_sqlalchemy import DBSessionMiddleware, db
-
-app = FastAPI()
-
-app.add_middleware(DBSessionMiddleware, db_url="sqlite:///./test.db")
-
-# 模型定义
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True)
-
-# API路由
-@app.post("/users")
-def create_user(username: str):
-    user = User(username=username)
-    db.session.add(user)
-    db.session.commit()
-    return {"message": "User created successfully"}
-```

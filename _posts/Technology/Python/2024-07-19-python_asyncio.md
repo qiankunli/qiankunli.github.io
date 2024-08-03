@@ -278,7 +278,34 @@ asyncio.run(main())
 """
 ```
 
-await get() 相当于是开启了一个新的协程，那么意味着设置值和获取值不是在同一个协程当中？Python 的协程是无栈协程，通过 await 可以实现级联调用。
+`await get()` 相当于是开启了一个新的协程，那么意味着设置值和获取值不是在同一个协程当中？Python 的协程是无栈协程，通过 await 可以实现级联调用。
+
+当我们调用 c.set 的时候，其实会返回一个 Token 对象：
+```python
+import contextvars
+c = contextvars.ContextVar("context_var")
+token = c.set("val")
+print(token)
+"""
+<Token var=<ContextVar name='context_var' at 0x00..> at 0x00...>
+"""
+```
+Token 对象有一个 var 属性，它是只读的，会返回指向此 token 的 ContextVar 对象。
+```python
+import contextvars
+
+c = contextvars.ContextVar("context_var")
+token = c.set("val")
+
+print(token.var is c)  # True
+print(token.var.get())  # val
+
+print(
+    token.var.set("val2").var.set("val3").var is c
+)  # True
+print(c.get())  # val3
+```
+Token 对象还有一个 old_value 属性，它会返回上一次 set 设置的值，如果是第一次 set，那么会返回一个 `<Token.MISSING>`。那么这个 Token 对象有什么作用呢？它最大的用处就是和 reset 搭配使用，可以对状态进行重置。PS： 比如fastapi_sqlalchemy 将db session 对象保存在ContextVar中，api handler开始时存入，api handler 结合时重置。
 
 ContextVar 除了可以作用在协程上面，它也可以用在线程上面，可以替代 threading.local。
 

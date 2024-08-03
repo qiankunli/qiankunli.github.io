@@ -134,9 +134,12 @@ def timer(func):
     return decorated
 ```
 
+
+装饰器是一种特殊类型的函数，它接受另一个函数作为输入参数。这意味着你可以在修饰器内部**访问和操作这个被传入的函数**。装饰器将额外增加的功能，封装在自己的装饰器函数或类中；当使用 @decorator 语法应用装饰器到一个函数上的时候，Python 会用装饰器返回的新函数来替换原始函数。这样一来，每当尝试调用原始函数的时候，实际上是调用了装饰器返回的那个新函数。修饰器不过是类似函数调用`add = call_cnt(add)`的一种语法上的简写、语法糖。在vm实现，如果一个方法被装饰器修饰，**则函数调用的字节码会从CALL_FUNCTION改为CALL_FUNCTION_EX**，解释器会帮忙将add 调用改为 `add=call_cnt(add)` 后的add。PS：所以是不是可以认为，语法糖的实现都有解释器帮忙？
+
 ### 类装饰器
 
-绝大多数情况下，我们会选择用嵌套函数来实现装饰器，但这并非构造装饰器的唯一方式。事实上，某个对象是否能通过装饰器（@decorator）的形式使用只有一条判断标准，那就是 decorator 是不是一个可调用的对象。类同样也是可调用对象。
+绝大多数情况下，我们会选择用嵌套函数来实现装饰器，但这并非构造装饰器的唯一方式。事实上，某个对象是否能通过装饰器（@decorator）的形式使用只有一条判断标准，那就是 decorator 是不是一个可调用的对象。类同样也是可调用对象。类装饰器主要依赖于 `__call__` 方法，当一个类的实例被当作函数调用时，`__call__` 方法就会被执行。PS： 把函数变成了一个类
 
 ```python
 class Count:
@@ -164,7 +167,6 @@ hello world
 ...
 ```
 
-装饰器是一种特殊类型的函数，它接受另一个函数作为输入参数。这意味着你可以在修饰器内部**访问和操作这个被传入的函数**。装饰器将额外增加的功能，封装在自己的装饰器函数或类中；当使用 @decorator 语法应用装饰器到一个函数上的时候，Python 会用装饰器返回的新函数来替换原始函数。这样一来，每当尝试调用原始函数的时候，实际上是调用了装饰器返回的那个新函数。修饰器不过是类似函数调用`add = call_cnt(add)`的一种语法上的简写、语法糖。在vm实现，如果一个方法被装饰器修饰，则函数调用的字节码会从CALL_FUNCTION改为CALL_FUNCTION_EX，解释器会帮忙将add 调用改为 `add=call_cnt(add)` 后的add。PS：所以是不是可以认为，语法糖的实现都有解释器帮忙？
 
 ### 参数化装饰器
 
@@ -294,7 +296,7 @@ ready to write to file
 calling __exit__ method
 ```
 
-基于生成器的上下文管理器，可以使用装饰器 contextlib.contextmanager，来定义自己所需的基于生成器的上下文管理器，用以支持 with 语句。使用@contextmanager 能减少创建上下文管理器的样板代码，不用编写一个完整的类来定义`__enter__()` 和`__exit__()` 方法，而只需实现一个含有yield 语句的生成器，生成想让`__enter__()` 方法返回的值。yield 把函数主体分为两部分：在yield 之前的所有代码在调用`__enter__()` 方法时执行，yield 之后的代码在调用`__exit__()` 方法时执行。
+某些时候，如果只有很少的上下文需要管理，那么定义一个类便会有些麻烦。可以使用装饰器 contextlib.contextmanager将一个生成器函数转换为上下文管理器，来定义自己所需的基于生成器的上下文管理器，用以支持 with 语句。使用@contextmanager 能减少创建上下文管理器的样板代码，不用编写一个完整的类来定义`__enter__()` 和`__exit__()` 方法，而只需实现一个含有yield 语句的生成器，生成想让`__enter__()` 方法返回的值。yield 把函数主体分为两部分：在yield 之前的所有代码在调用`__enter__()` 方法时执行，yield 之后的代码在调用`__exit__()` 方法时执行。
 
 ```python
 from contextlib import contextmanager
@@ -309,8 +311,51 @@ def file_manager(name, mode):
 with file_manager('test.txt', 'w') as f:
     f.write('hello world')
 ```
+[通过 contextlib 模块详细复习一下 with 语句的用法](https://mp.weixin.qq.com/s/NyP_zyOe4uhICWCbhhkg-w)手动实现 contextmanager 函数，contextlib 中实现的比较复杂，主要是最后对异常进行了很多的检测。我们可以适当简化，把主要的逻辑实现一下。PS： 把函数变成了一个类，还给它加了方法
+```python
+from functools import wraps
 
-需要注意的是，当我们用 with 语句执行上下文管理器的操作时，一旦有异常抛出，异常的类型、值等具体信息，都会通过参数传入“__exit__()”函数中。你可以自行定义相关的操作对异常进行处理，而处理完异常后，也别忘了加上“return True”这条语句，否则仍然会抛出异常。
+def contextmanager(func):
+    class GeneratorContextManager:
+        def __init__(self, func, *args, **kwargs):
+            self.gen = func(*args, **kwargs)
+
+        def __enter__(self):
+            try:
+                assert hasattr(self.gen, "__next__")
+                return next(self.gen)
+            except AssertionError:
+                raise RuntimeError("函数中必须出现、且只能出现一个yield")
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            try:
+                next(self.gen)
+            except StopIteration:
+                return False
+            else:
+                raise RuntimeError("函数中必须出现、且只能出现一个yield")
+
+    @wraps(func)
+    def inner(*args, **kwargs):
+        return GeneratorContextManager(func, *args, **kwargs)
+    return inner
+
+@contextmanager
+def foo(name, where):
+    print(f"我的名字是: {name}, 居住在: {where}")
+    yield "baka⑨"
+    print(f"{where}是一个很美的地方")
+
+with foo("古明地觉", "地灵殿") as f:
+    print(f.upper())
+"""
+我的名字是: 古明地觉, 居住在: 地灵殿
+BAKA⑨
+地灵殿是一个很美的地方
+"""
+```
+
+需要注意的是，当我们用 with 语句执行上下文管理器的操作时，一旦有异常抛出，异常的类型、值等具体信息，都会通过参数传入“__exit__()”函数中。你可以自行定义相关的操作对异常进行处理，而处理完异常后，也别忘了加上“return True”这条语句。如果 __exit__ 方法最后返回了一个布尔类型为 True 的值，那么会把塞进嘴里的异常吞下去，程序不报错正常执行。如果返回布尔类型为 False 的值，则会在执行完 __exit__ 方法之后再把异常吐出来，引发程序崩溃。
 
 ## 动态语言
 
@@ -410,7 +455,7 @@ class Exp:
 
 元类的概念和动态类、动态语言的概念有关，如果我们把Python的元类和装饰器做一个类比的话，会发现两者的核心逻辑是很类似的。本质上都是在原有的逻辑之外封装新的逻辑，只不过装饰器针对的是一段逻辑，而元类针对的是类的属性和创建过程。
 
-在Python当中__init__并不是构造函数，__new__才是。如果__new__才是构造函数，那么为什么我们创建类的时候从来不用它呢？首先我们回顾一下__init__的用法，我们随便写一段代码：
+在Python当中`__init__`并不是构造函数，`__new__`才是。如果`__new__`才是构造函数，那么为什么我们创建类的时候从来不用它呢？首先我们回顾一下`__init__`的用法，我们随便写一段代码：
 
 ```python
 class Student:
@@ -420,12 +465,13 @@ class Student:
 ```
 
 我们换一个问题，我们在Python当中怎么实现单例(Singleton)的设计模式呢？怎么样实现工厂呢？从这个问题出发，你会发现只使用__init__函数是不可能完成的，因为__init__并不是构造函数，它只是初始化方法。也就是说在调用__init__之前，我们的实例就已经被创建好了，__init__只是为这个实例赋上了一些值。如果我们把创建实例的过程比喻成做一个蛋糕，__init__方法并不是烘焙蛋糕的，只是点缀蛋糕的。那么显然，在点缀之前必须先烘焙出一个蛋糕来才行，那么这个烘焙蛋糕的函数就是__new__。我们来看下__new__这个函数的定义，我们在使用Python面向对象的时候，一般都不会重构这个函数，而是使用Python提供的默认构造函数，Python默认构造函数的逻辑大概是这样的：
-```
+
+```python
 def __new__(cls, *args, **kwargs):
     return super().__new__(cls, *args, **kwargs)
 ```
 
-从代码可以看得出来，函数当中基本上什么也没做，就原封不动地调用了父类的构造函数。这里隐藏着Python当中类的创建逻辑，是根据继承关系一级一级创建的。根据逻辑关系，我们可以知道，当我们创建一个实例的时候，实际上是先调用的__new__函数创建实例，然后再调用__init__对实例进行的初始化。那么我们重载__new__函数可以做什么呢？一般都是用来完成__init__无法完成的事情，比如前面说的单例模式，通过__new__函数就可以实现。我们来简单实现一下：
+从代码可以看得出来，函数当中基本上什么也没做，就原封不动地调用了父类的构造函数。这里隐藏着Python当中类的创建逻辑，是根据继承关系一级一级创建的。根据逻辑关系，我们可以知道，当我们创建一个实例的时候，实际上是先调用的__new__函数创建实例，然后再调用`__init__`对实例进行的初始化。那么我们重载__new__函数可以做什么呢？一般都是用来完成`__init__`无法完成的事情，比如前面说的单例模式，通过`__new__`函数就可以实现。我们来简单实现一下：
 
 ```python
 class SingletonObject:
@@ -455,6 +501,11 @@ duck = Duck()
 ```
 也就是说，**我们可以先把函数实现，然后再根据任务的需要把这些函数组装成新的类**。显然，这和传统的C++以及Java这些静态类型的语言相比，要灵活得多。
 
+
+一般来说，定义的元类应该重新实现`__init__()`与`__new__()`方法。
+1. 如果需要修改类的属性，使用元类的`__new__`方法
+2. 如果只是做一些类属性检查的工作，使用元类的`__init__`方法。
+
 ```python
 class AddInfo(type):
     def __new__(cls, name, bases, attr):
@@ -465,6 +516,23 @@ class Test(metaclass=AddInfo):
     pass
 ```
 根据上面的逻辑，Test类在创建的时候就被赋予了类属性info。 
+
+事实上，`__metaclass__`实际上可以被任意调⽤，它只是规定了类“按照什么样的规则去生成”，并不需要是⼀个正式 的类。比如，我们有一个比较二的需求：你决定在你的模块⾥，所有的类的属性都应该是⼤写形式。
+
+```python
+>>> def upper_attr(future_class_name, future_class_parents, future_class_attr):
+...     """遍历属性字典，把不是__开头的属性名字变为⼤写"""
+...     newAttr = {}
+...     for name,value in future_class_attr.items():
+...             if not name.startswith("__"):
+...                     newAttr[name.upper()] = value
+...     return type(future_class_name, future_class_parents, newAttr)
+​
+>>> class Foo(object, metaclass=upper_attr):
+...     bar= 'bip'
+```
+
+其实在开头引用TimPeters的话（元类就是深度的魔法，99%的⽤户应该根本不必为此操⼼。如果你想搞清楚 究竟是否需要⽤到元类，那么你就不需要它。那些实际⽤到元类的⼈都⾮常 清楚地知道他们需要做什么，⽽且根本不需要解释为什么要⽤元类。）就说明，不要随意在生产代码中使用元类，而且现有的编码规范也极不推荐使用。代码可读性不高，不易维护。
 
 元类的作用：比如ORM框架是后端工程师常用的一个框架，它的英文全称是Object Relational Mapping，即对象-关系映射框架。ORM框架做的事情是将这些关系映射成类，这样我们可以将这张表当中增删改查的功能抽象成类当中的方法。这样我们就可以通过调用类的方式来操作数据库了，从而达到高度抽象业务逻辑、降低用户使用难度的目的。
 
