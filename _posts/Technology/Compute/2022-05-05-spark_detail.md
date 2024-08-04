@@ -10,6 +10,8 @@ keywords: Spark
 
 ## 前言
 
+[Apache Spark SQL 原理](https://mp.weixin.qq.com/s/SU3VksnBcc5zL12gECSW2g) 未细读
+
 ## 内存划分及用途
 
 ![](/public/upload/compute/spark_mem.png)
