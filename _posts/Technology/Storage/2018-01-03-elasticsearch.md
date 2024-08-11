@@ -8,7 +8,7 @@ keywords: elasticsearch
 
 ---
 
-## 前言（持续更新）
+## 前言
 
 * TOC
 {:toc}
@@ -168,6 +168,49 @@ database(es叫索引)只是一个用来指向多个shard（默认一个index被�
             }
         }
     }
+
+## 查询dsl
+
+[Query DSL](https://opensearch.org/docs/latest/query-dsl/)
+
+1. leaf queries:   Leaf queries search for a specified value in a certain field or fields. PS：可以看做是基本的筛选语句/表达式，后续都是最这些表达式的组合。
+    1. Term-level queries: term
+	2. Full-text queries: match
+    3. ...
+2. Compound queries: Compound queries serve as wrappers for multiple leaf or compound clauses either to combine their results or to modify their behavior.
+	1. bool 
+		a. must，对应 and 。表示查询条件必须匹配。如果有多个must条件，文档必须同时满足所有这些条件。
+		b. must_not，对应not。表示查询条件必须不匹配。
+		c. should，对应or，匹配的条数越多分越高.表示查询条件是首选的，但不是必需的。should查询可以有多个条件，文档至少满足其中一个条件就可以被包含在结果中。
+		d. filter。与must类似，filter条件也是必须匹配的，但它用于结构化查询，如范围查询、存在查询等，并且对性能有优化。filter查询通常不计算在查询得分中，因此不会影响结果的排序。
+	2. function_score
+	3. hybrid
+        1. queries. An array of one or more query clauses that are used to match documents. A document must match at least one query clause in order to be returned in the results. The documents’ relevance scores from all query clauses are combined into one score by applying a search pipeline. The maximum number of query clauses is 5.
+
+比如 query 里一个match 用的好好的，如果你想加一个过滤，就一下子变成
+
+```json
+{
+  "query": {
+    "match": {
+      "from": "raptor"
+    }
+  }
+}
+```
+```json
+{
+  "query": {
+        "bool":{
+            "must": "match": {"from": "raptor"}
+            "filter": {
+                "range": {
+                    "year": { "gt": 2020}    
+                }
+            }
+        }
+}
+```
 
 ## 其它金句
 

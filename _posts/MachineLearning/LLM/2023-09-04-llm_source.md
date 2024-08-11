@@ -461,7 +461,7 @@ def generate(self,
 
 ### forward实现
 
-[Qwen整体介绍](https://github.com/datawhalechina/tiny-universe/tree/main/content/Qwen-blog) 以代码组织的视角来看下 transformer的设计图。
+[Qwen整体介绍](https://github.com/datawhalechina/tiny-universe/tree/main/content/Qwen-blog) 以代码组织的视角来看下 transformer的设计图。我们看到很多模型的模块图，层次结构跟代码也是一致的。 
 
 ![](/public/upload/machine/qwen_code_view.jpg)
 

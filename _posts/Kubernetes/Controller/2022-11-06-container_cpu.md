@@ -259,11 +259,14 @@ Kubelet 寻求最大资源效率，因此默认没有设置资源限制， Burst
 如果两个条件不能同时满足，就会导致无法抢占。基于这种考虑，开发了针对离线业务的新调度算法[bt](https://github.com/Tencent/TencentOS-kernel)，该算法可以保证在线业务优先运行。
 
 [资源隔离技术之CPU隔离](https://mp.weixin.qq.com/s/q-O2L-6_DMwhjCjGVAvmrg) 建议先复习下linux 的抢占调度机制：每个CPU都有一个运行队列rq，每个rq会有一个cfs_rq运行队列，该结构包含一棵红黑树rb_tree，用来链接调度实体se，每次只能调度一个se到cpu上去运行。**如果想要在任意时刻cfs_rq上的se运行时间都尽可能的接近，那么就需要不停地切换se上cpu运行**，但是频繁的切换会有开销，想要减小这种开销，就需要减少切换的次数。为了可以减小开销还能保证时间上的统一，内核便给cfs_rq的se进行排序，让他们按照时间顺序挂在rb_tree上，这样每次取红黑树最左边的se，就可以得到运行时间的最小的那个。但实际上，se又会有优先级的概念，不同优先级的se所分配到的cpu时间片是不一样的。内核便经过一系列公式的转换，可以得到一样的值，这个转换后的值称作虚拟运行时间vruntime，**CFS实际上只需要保证每个任务运行的虚拟时间是相等的即可**。每次挑选se上cpu运行，当分配的时间片用完，就会将它再放回到cfs_rq中，挂在红黑树的适当位置。
-1. 内核CFS设置有两种最小时间粒度保护：sched_min_granularity_ns 和 sched_wakeup_granularity_ns，实际效果并不那么理想。在离线业务的混跑，当在线和离线任务分别调度到一个核上，相互抢执行时间，意味着**离线一旦抢占，便可以持续运行一个最小粒度的时间sched_min_granularity_ns**，在线任务的唤醒延迟可能达sched_wakeup_granularity_ns，即在线业务的调度延迟可能会很大，导致在线业务的性能下降。另外，如果在离线业务跑到相互对应的一对HT上，还将面临超线程干扰的问题，虽然有core scheduling技术，但是其设计初衷并非为了混部，设计和实现开销较大，这些都将直接影响在线业务的性能。
+1. 内核CFS设置有两种最小时间粒度保护：sched_min_granularity_ns 和 sched_wakeup_granularity_ns，实际效果并不那么理想。在离线业务的混跑，当在线和离线任务分别调度到一个核上，相互抢执行时间，意味着**离线一旦抢占，便可以持续运行一个最小粒度的时间sched_min_granularity_ns，在线任务的唤醒延迟可能达sched_wakeup_granularity_ns，即在线业务的调度延迟可能会很大**，导致在线业务的性能下降。另外，如果在离线业务跑到相互对应的一对HT上，还将面临超线程干扰的问题，虽然有core scheduling技术，但是其设计初衷并非为了混部，设计和实现开销较大，这些都将直接影响在线业务的性能。
 2. 当然也有可能会碰到运行过程中，时间片还未用完，但主动放弃运行的情况，如睡眠（TASK_INTERRUPTIBLE）或等待某种资源（TASK_UNINTERRUPTIBLE），这时就需要出列等待，进到“小黑屋”，直至相应事件发生才会再次放到红黑树中等待调度。等待后重新放入红黑树的se，如果休眠时间比较长，vruntime可能会非常小，便会迅速得到运行。为了避免其疯狂地执行，cfs_rq上会维护min_vruntime，如果新唤醒的vruntime(se) < vruntime (cfs_rq→min_vruntime)，会将se的vruntime修正至接近min_vruntime，这样就可以保证此类se优先执行，但是又不会疯狂执行。
 3. 调度器每次唤醒的是 vruntime 最小的task，task 一定获取cpu 除非主动放弃， 调度器会保证其至少可以执行sched_min_granularity_ns。这些都可能导致 高优任务 ready时因为cpu在执行低优任务而无法被立即执行。 
   1. group identity特性相对于upstream kernel的CFS设计，新增一棵低优先级红黑树，用于存放低优先级任务。能做到 当高优任务ready时，立即抢占低优任务，哪怕此时低优任务 尚未执行够 sched_min_granularity_ns。
 
+[K8s CPU Throttle 优化方案](https://mp.weixin.qq.com/s/KrEcd71gmelL0zC4g5sMsg)受内核调度控制周期（cfs_period）影响，容器的 CPU 利用率往往具有一定的欺骗性，比如在 1s 级别的粒度下容器的 CPU 用量较为稳定，平均在 2.5 核左右。根据经验，管理员会将 CPU Limit设置为 4 核。本以为这已经保留了充足的弹性空间，然而若我们将观察粒度放大到 100ms 级别容器的 CPU 用量呈现出了严重的毛刺现象，峰值达到 4 核以上。毛刺产生的原因通常是由于应用突发性的 CPU 资源需求（如代码逻辑热点、流量突增等），假设每个请求的处理时间均为 60 ms，可以看到，即使容器在最近整体的 CPU 利用率较低，由于在 100 ms～200 ms 区间内连续处理了4 个请求，将该内核调度周期内的时间片预算（Limit=2对应200ms）全部消耗，需要等待下一个周期才能继续将 req 处理完成，该请求的响应时延（RT）就会变长。这种情况在应用负载上升时将更容易发生，导致其 RT 的长尾情况将会变得更为严重。为了避免 CPU Throttle 的问题，我们只能将容器的 CPU Limit 值调大。然而，若想彻底解决 CPU Throttle，通常需要将 CPU Limit 调大两三倍，有时甚至五到十倍，问题才会得到明显缓解。而为了降低 CPU Limit 超卖过多的风险，还需降低容器的部署密度，进而导致整体资源成本上升。
+
+什么是 CPU Burst：CPU Burst（CPU 突发）是指在计算机处理器空闲时，允许进程或线程在一段短时间内使用超过其平均 CPU 使用量的额外 CPU 时间。在 CPU 突发期间，进程可以使用比其在限定时间段内被允许的平均 CPU 使用量更多的 CPU 资源，以提高应用程序的响应速度和性能。
 
 ### k8s CPU Qos 问题与解决
 

@@ -157,7 +157,7 @@ BaseLanguageModel ==> BaseLLM + BaseChatModel
 ![](/public/upload/machine/prompt_structure.jpg)
 
 
-对于文本生成模型服务来说，实际的输入和输出本质上都是字符串，因此直接裸调用LLM服务带来的问题是要在输入格式化和输出结果解析上做大量的重复的文本处理工作，我们不太可能硬编码上下文和用户问题，比如**用 f-strings（如 f"insert some custom text '{custom_text}' etc"）替换**。LangChain当然考虑到这一点，提供了Prompt和OutputParser抽象规范化这个过程，添加多个参数，并**以面向对象的方式构建提示**，用户可以根据自己的需要选择具体的实现类型使用，可以高效的复用（参数化的提示词模版）和组合提示词。PS：本质是f-string 的对象化。多个PromptTemplate 可以组成 ChatPromptTemplate。`ChatPromptTemplate.from_messages([SystemMessagePromptTemplate.from_template(f-string),HumanMessagePromptTemplate.from_template(f-string)])`
+对于文本生成模型服务来说，实际的输入和输出本质上都是字符串，因此直接裸调用LLM服务带来的问题是要在输入格式化和输出结果解析上做大量的重复的文本处理工作，我们不太可能硬编码上下文和用户问题，比如**用 f-strings（如 f"insert some custom text '{custom_text}' etc"）替换**。LangChain当然考虑到这一点，提供了Prompt和OutputParser抽象规范化这个过程，添加多个参数，并**以面向对象的方式构建提示**，用户可以根据自己的需要选择具体的实现类型使用，可以高效的复用（参数化的提示词模版）和组合提示词。PS：本质是f-string 的对象化。如果参数 不是str的话，可以自己实现一个 PromptTemplate。
 
 ![](/public/upload/machine/llm_chain.jpg)
 
@@ -300,7 +300,7 @@ PS： 以编程视角来看，chain的核心是prompt，大部分时间都在在
 
 ![](/public/upload/machine/langchain_memory.jpg)
 
-记忆 ( memory )允许大型语言模型（LLM）记住与用户的先前交互。默认情况下，LLM/Chain 是 无状态 stateless 的，每次交互都是独立的，无法知道之前历史交互的信息。对于无状态代理 (Agents) 来说，唯一存在的是当前输入，没有其他内容。LangChain通过Memory工具类为Agent和Chain提供了记忆功能，让智能应用能够记住前一次的交互，比如在聊天环境中这一点尤为重要。
+记忆 ( memory )允许大型语言模型（LLM）记住与用户的先前交互。默认情况下，LLM/Chain 是 无状态 stateless 的，每次交互都是独立的，无法知道之前历史交互的信息。对于无状态代理 (Agents) 来说，唯一存在的是当前输入，没有其他内容。**memory 需要支持两个基本操作：读取和写入**。LangChain通过Memory工具类为Agent和Chain提供了记忆功能（除了用户输入外地另一个输入，或者说增强用户输入），让智能应用能够记住前一次的交互，比如在聊天环境中这一点尤为重要。在核心逻辑执行完毕并返回答复之前，chain 会将这一轮的输入和输出都保存到memory中，以便在将来使用它们。
 
 LangChain使用Memory组件保存和管理历史消息，这样可以跨多轮进行对话，在当前会话中保留历史会话的上下文。Memory组件支持多种存储介质，可以与Monogo、Redis、SQLite等进行集成，以及简单直接形式就是Buffer Memory。常用的Buffer Memory有
 1. ConversationSummaryMemory ：以摘要的信息保存记录

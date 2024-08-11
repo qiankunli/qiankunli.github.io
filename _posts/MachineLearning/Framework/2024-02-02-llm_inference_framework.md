@@ -38,7 +38,7 @@ print(response)
 1. 统一api，这样切换模型时上游应用无感，最好是 OpenAI-compatible，其api 被主要上游框架（比如langchain）兼容
     1. 支持流式输出和普通输出
 2. 支持多实例，进而支持灰度发布等
-3. 支持通用的加速库比如vllm等
+3. 支持通用的加速库，比如vllm等
 4. prompt拼写：llm本质都是语言模型，因此提供的只有语言模型调用方式，将所有请求简化为输入一个string，输出一个string的模式。然而，从语言模型到chat应用之间仍然有一个gap：输入prompt的拼写。text-in-text-out的设计可以简化引擎开发，但是prompt拼写的难题就被丢给了用户。提供chat能力的核心需求是如何将多轮对话按照模型训练时的格式渲染成模型的input id。[从Language Model到Chat Application：对话接口的设计与实现](https://mp.weixin.qq.com/s/DfMJVZnqFpsubKJ60H8s7g)
 5. function call 的处理。以ReAct模板的prompt为例，在模型吐字时留上一小块buffer不返回，如果没有`\nAction:` 那就继续返回；如果遇到这个string，则说明模型可能要输出function call，在此收集输出直到遇到eos或者作为stop word 的`\nObservation:`，然后再把buffer一次性parse成函数并返回。
 
@@ -48,6 +48,8 @@ print(response)
 3. 不同的llm 还有很多差别的（比如加载 load_model、运行chat/generate、模型配置转换），也有很多共性，所以模型设计的分层抽象很重要，Fastchat 的思路是 提供了一个ModelAdapter（主要差异化了加载） 和一个 generate_stream_gate 函数成员（差异化text生成），inference的思路是一个模型（比如chatglm、llama等）一个XXLLM
   1. 这里的模型配置转换说的是，比如一个chat message 包含role 和content 两个部分，role=system/user/assistant 各家各有差异，但因为对外提供的接口一般是openai 风格，所以有一个转换的过程。
 4. 除了文本生成模型，还经常需要部署embedding模型、rerank模型、图生图、文生图等（入参出参与LLM 肯定不一样了），Fastchat 的方式是 让ModelWorker支持除了generate_stream_xx 外的get_embeddings、get_rerank方法，inference的思路除了LLM之外还定义了 EmbeddingModel、RerankModel等。
+
+由于像GPU 这样的加速器具有大量的并行计算单元，推理服务系统通常会对作业进行批处理，以提高硬件利用率和系统吞吐量。启用批处后，来自多个作业的输入会被合并在一起，并作为整体输入模型。但是此前推理服务系统主要针对确定性模型进行推理（LLM输出长度未知，使得一个推理任务总执行时间未知），它依赖于准确的执行时间分析来进行调度决策，而这对LLM并不适用。此外，批处理与单个作业执行相比，内存开销更高，因此LLM的尺寸限制了其推理的最大批处理数量。传统的作业调度将作业按照批次运行，直到一个批次中的所有作业完成，才进行下一次调度，这会造成提前完成的作业无法返回给客户端，而新到达的作业则必须等当前批次完成。因此提出 iteration-level 调度策略，在每次批次上只运行单个迭代，即每个作业仅生成一个token。每次迭代完成后，完成的作业可以离开批次，新到达的作业可以加入批次。 
 
 ## 简单封装
 

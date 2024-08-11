@@ -27,6 +27,7 @@ keywords: langchain langgraph lcel
 1. 简单的rewrite ==> retrieve ==> generate
 2. [rag的尽头是agent](https://mp.weixin.qq.com/s/iZjfHEe2TXCJYPAGQ6beUQ) `rewrite ==> retrieve ==> generate` 可以解决的问题终归有限， 这里涉及到很多花活，比如拆分子问题、联网、ircot等，需要agent 根据当前的已知信息，判断下一步 ==> 行动 ==> 根据观察判断下一步
 3. [rag的尽头是multi-agent](https://mp.weixin.qq.com/s/uSHGFKpPzdrJjDL3BZVDWw)  单个agent 可以解决的问题也终归有限，用户的“知识”不只在文档里，也在数据库表里，也是知识图谱里，都编排在一个agent里，对路由器/plan 组件的要求很高，很多时候即便人也无法判断，这时候就要“三个臭皮匠，顶一个诸葛亮”了。
+如果LLM能力足够，一个agent 选择tools 就能解决所有问题。**实质上还是LLM 能力有限**（无法较好的拆解问题，制定plan，也无法较好的判断问题结束），针对某一链路、某一场景进行特化，复查场景采取多角色协作方式。
 
 从架构的角度，与 single agent 相比，multi-agent 架构更易于维护扩展。即使是基于 single agent 的接口，使用 multi-agent 的实施架构也可能使系统更加模块化，开发人员更容易添加或删除功能组件。**目前的技术条件下，无法构建出一个满足所有功能的 single agent**，但可以将不同的 Agent 和 LLM 进行组合，构建出一个满足使用要求的 multi-agent。
 

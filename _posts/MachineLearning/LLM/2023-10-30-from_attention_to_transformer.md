@@ -31,7 +31,7 @@ Transformer模型采用的也是编码器-解码器架构，但是在该模型�
 1. 在 Transformer 的 Decoder 结构中，Q 来自于 Decoder 的输入，K 与 V 来自于 Encoder 的输出， 从而拟合了编码信息与历史信息之间的关系，便于综合这两种信息实现未来的预测。
 1. 在 Transformer 的 Encoder 结构中，使用的是 Attention 机制的变种 —— self-attention （自注意力）机制。 所谓自注意力，即是计算本身序列中每个元素都其他元素的注意力分布， 即在计算过程中，Q、K、V 都由同一个输入通过不同的参数矩阵计算得到。 从而拟合输入语句中每一个 token 对其他所有 token 的关系，从而建模文本之间的依赖关系。​
 
-Transformer 模型本来是为了翻译任务而设计的。在训练过程中，Encoder 接受源语言的句子作为输入，而 Decoder 则接受目标语言的翻译作为输入。在 Encoder 中，由于翻译一个词语需要依赖于上下文，因此注意力层可以访问句子中的所有词语；而 Decoder 是顺序地进行解码，在生成每个词语时，注意力层只能访问前面已经生成的单词。例如，假设翻译模型当前已经预测出了三个词语，我们会把这三个词语作为输入送入 Decoder，然后 Decoder 结合 Encoder 所有的源语言输入来预测第四个词语。每一个部分都有公式对应。
+Transformer 模型本来是为了翻译任务而设计的。在训练过程中，Encoder 接受源语言的句子作为输入，而 Decoder 则接受目标语言的翻译作为输入。在 Encoder 中，由于翻译一个词语需要依赖于上下文，因此注意力层可以访问句子中的所有词语；而 Decoder 是顺序地进行解码，在生成每个词语时，注意力层只能访问前面已经生成的单词。例如，假设翻译模型当前已经预测出了三个词语，我们会把这三个词语作为输入送入 Decoder，然后 Decoder 结合 Encoder 端的输出 和 当前block mask attention layer的输出作为输入（多头交叉注意力）来预测第四个词语。每一个部分都有公式对应。
 
 想要进一步了解 Transformer 这一架构的原理，强烈推荐阅读 Jay Alammar 的博客。从为了解决翻译问题时 Seq2Seq 模型的提出的 Attention 的基本概念 https://jalammar.github.io/visualizing-neural-machine-translation-mechanics-of-seq2seq-models-with-attention，到 Transformer 架构中完全抛弃 RNN https://www.youtube.com/watch?v=UNmqTiOnRfg 提出的 Attention is All You Need http://jalammar.github.io/illustrated-transformer，到 GPT-2 和 GPT-3 的架构解读http://jalammar.github.io/illustrated-gpt2 http://jalammar.github.io/how-gpt3-works-visualizations-animations，Jay Alammar 的博客都提供了精彩的可视化配图便于理解模型结构。
 
@@ -68,6 +68,7 @@ transformer中，模型输入encoder的每个token向量由两部分加和而成
 3. 可以借助正余弦函数的特性，对于某个偏移量k ，可以基于$PE_{pos}$通过线性变换快速计算出相对位置的 $PE_{pos+k}$
 
 ## attention层
+[大模型结构基础（五）：注意力机制的升级](https://zhuanlan.zhihu.com/p/702890483) 未读
 
 ### self-attention 机制
 
@@ -219,7 +220,8 @@ class MLP(nn.Module):
 1. 大语言模型中的参数都用在哪了？可以看到在百亿参数量以上，差不多三分之二的参数实际上是 FFN 参数，剩下的基本都是 attention 参数。所以虽然论文名叫 attention is all you need，但实际上 FFN 仍然起到了很重要的作用。
 2. transformer 中最重要的是self-attention，self-attention 由三个线性矩阵Q、K、V 决定，如果我们把Q、K矩阵设置为零，那么self-attention 就变成了FFN，$Z_0 =V_0*X$，也就是说，FFN是self-attention 的一个特例，FFN能表达的逻辑，self-attention 也可以，但反过来却不成立。至于transformer 中的FFN部分，当初设计是为了输入输出维度的对齐，毕竟多注意力的输出 $W_0$的维度比输入X维度高很多。但如果一定要用FFN去表达self-attention的逻辑，也是可以的，但需要的参数量却要大很多，感兴趣的可以去试验一下，用FFN去拟合self-attention 的逻辑。就好像乘法能计算的东西，单纯用加法依然可以做到，但效率要低很多，self-attention就是乘法，FFN就是加法。
 
-###  Layer Normalization
+[大模型结构基础（四）：前馈网络层的升级](https://zhuanlan.zhihu.com/p/702190813) 未读。
+###  Layer Normalization/对应Norm
 
 归一化核心是为了让不同层输入的取值范围或者分布能够比较一致。由于深度神经网络中每一层的输入都是上一层的输出，因此多层传递下，对网络中较高的层，之前的所有神经层的参数变化会导致其输入的分布发生较大的改变。也就是说，随着神经网络参数的更新，各层的输出分布是不相同的，且差异会随着网络深度的增大而增大。但是，需要预测的条件分布始终是相同的，从而也就造成了预测的误差。因此，在深度神经网络中，往往需要归一化操作，将每一层的输入都归一化成标准正态分布。
 
@@ -229,7 +231,9 @@ Normalization有两种方法，Batch Normalization和Layer Normalization。关�
 
 **在 Transformer 里面，或者说正常的 RNN 里面，它的输入是一个三维的矩阵**。因为 输入的是一个序列的样本，即每一个样本里面有很多个元素。一个序列，如：一个句子里面有 n 个词，所以每个词表示为一个向量的话，还有一个 batch 维度，那么就是个 3D 的输入。列不再是特征，而是序列的长度，对每一个 sequence 就是 每个词，每个词有自己对应的向量。如果是 layernorm 的话，那么就是对每个样本切一下（横着切一下）。为什么 layer norm 用的多一点？一个原因是：在 时序的序列模型 里面，每个样本的长度可能会发生变化。那些不够 sequence 的长度 n 的样本 ，一般是补 0。 layernorm 是对 每个样本来做，所以不管样本是长还是短，反正算均值是在样本自己算的，这样的话相对来说它稳定一些。
 
-### Residual Network 残差网络
+[大模型结构基础（三）：归一化技术的升级](https://zhuanlan.zhihu.com/p/701779323) 未读。
+
+### Residual Network 残差网络/对应Add
 
 由于 Transformer 模型结构较复杂、层数较深，​为了避免模型退化，Transformer 采用了残差连接的思想来连接每一个子层。残差连接，即下一层的输入不仅是上一层的输出，还包括上一层的输入。残差连接允许最底层信息直接传到最高层，让高层专注于残差的学习。​例如，在 Encoder 中，在第一个子层，输入进入多头自注意力层的同时会直接传递到该层的输出，然后该层的输出会与原输入相加，再进行标准化。在第二个子层也是一样。
 
