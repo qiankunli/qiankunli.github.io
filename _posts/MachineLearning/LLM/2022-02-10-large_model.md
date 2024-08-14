@@ -54,6 +54,8 @@ keywords: large model
 
 [大模型训练为什么用A100不用4090](https://mp.weixin.qq.com/s/nHCznUDOpXk3G4zfhisf9w) 重点，非常经典，讲清楚了Tensor、Pipeline、Data Parallelism三大并行的算力、算力和内存耗费，优缺点，是一次大模型理论知识与工程知识的完美结合。
 
+[预训练一个72b模型需要多久？](https://mp.weixin.qq.com/s/E0OIgufVW8dm-fRhlRoA6A) 未细读
+
 [万字长文解析：大模型需要怎样的硬件算力](https://mp.weixin.qq.com/s/NoREsyLXNVk1aABtSkhBDA)
 
 [为什么说大模型训练很难？ - ZOMI酱的回答 - 知乎](https://www.zhihu.com/question/498271491/answer/2218933677)

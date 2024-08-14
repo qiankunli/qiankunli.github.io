@@ -13,13 +13,19 @@ keywords: elasticsearch
 * TOC
 {:toc}
 
-面向对象编程语言流行的原因之一，是我们可以用对象来表示和处理现实生活中那些有着潜在关系和复杂结构的实体。但当我们想存储这些实体的时候问题便来了，传统上，我们以行和列的形式把数据存储在关系型数据库中，相当于使用电子表格。这种固定的存储方式导致对象的灵活性不复存在了。PS：或许是ddd存在的动因之一 [ddd(一)——领域驱动理念入门](http://qiankunli.github.io/2017/12/25/ddd.html)
+面向对象编程语言流行的原因之一，是我们可以用对象来表示和处理现实生活中那些有着潜在关系和复杂结构的实体。但当我们想存储这些实体的时候问题便来了，传统上，我们以行和列的形式把数据存储在关系型数据库中，相当于使用电子表格。这种固定的存储方式导致对象的灵活性不复存在了。
 
 如何能以对象的形式存储对象呢？相对于围绕表格去为我们的程序建模，我们可以专注使用数据，把对象本来的灵活性找回来。对象是一种语言相关，记录在内存的数据结构。为了在网络间发送或者存储它，我们需要一些标准的格式来表示它。JSON 是一种可读的以文本来表示对象的方式，已经成为NoSQL领域的事实标准格式。
 
 Elasticsearch所涉及到的每一项技术都不是创新或革命性的，全文搜索、分析系统以及分布式数据库早已存在了，它的革命性在于将这些独立且有用的技术整合成一个一体化的、实时的应用。
 
-## 直接存储对象
+## 核心概念
+
+es核心概念
+1. 分布式存储相关概念，集群、节点、分片、副本。
+2. 数据模型相关概念，索引、类别（在Elasticsearch 7.0以后，类别逐渐被弃用）、文档
+    1. 文档是一个JSON格式的数据对象。对应关系型数据库中的数据行。优势在于提供了更高的自由度，文档中可以方便地新增减字段，多个文档间也不要求字段完全一致。同时，文档也保留了一部分结构化存储的特性，对存储的数据进行了一定的结构化封装，而没有像K-V非关系型数据库那样完全抛弃数据的结构化。
+3. 分析检索能力相关概念：倒排索引，分析器。
 
 应用中的对象很少只是简单的键值列表，更多时候它拥有复杂的数据结构，比如包含日期、地理位置、另一个对象或数组。总有一天你会想到把这些对象存储在数据库中。将这些数据保存到由行和列组成的关系数据库中，就好比是把一个丰富、信息表现力强的对象拆散了放入一个非常大的表格中：你不得不拆散对象以适应表模式（通常一列表示一个字段），然后又不得不在查询的时候重建它们。
 
@@ -36,7 +42,15 @@ elasticsearch 是面向文档的，**使用JSON作为文档序列化格式**，�
 |更新某个字段|`update xx set xx=xx`|`update /$index/$type/$id`|es是整体更新|
 |并发控制|隔离级别|乐观锁|
 
-es 不适合/不善于频繁更新、复杂关联查询、事务等操作
+es 不适合/不善于频繁更新、复杂关联查询、事务等操作。
+
+Term Query的文档相关度得分计算方式：利用倒排索引，对于输入的单词，考虑每个文档的以下指标：
+1. TFIDF 目的：用文档中的一个单词，在一堆文档中区分出该文档；
+    1. TFIDF = TF * IDF；
+    2. TF（term frequency）：词频。表示单词在该文本中出现的频率（单词在该文本中出现的多不多）；
+    3. IDF（inverse document frequency）：反向文档频率。 表示单词在整个文本集合中出现的频率（有多少文本包含了这个词）的倒数，IDF越大表示该词的重要性越高，反映了单词是否具有distinguish其所在文本的能力。
+2. 字段的长度。字段越短相关度越高；
+综合这两个指标得出每个文档的相关度评分_score。
 
 ## 安装和配置
 
@@ -171,6 +185,15 @@ database(es叫索引)只是一个用来指向多个shard（默认一个index被�
 
 ## 查询dsl
 
+[浅谈Elasticsearch的入门与实践](https://mp.weixin.qq.com/s/wlh2AHpNLrz9dHxPw9UrkQ)基于以上的index+document+倒排索引+分析器等概念，Elasticsearch通过分布式存储结构和分析检索能力，支持并提供了多种不同类型的查询能力，用于满足各种检索需求。
+1. 单词级别查询，
+    1. Term Query（精确）；把输入字符串全部看作一个完整的单词，然后去倒排索引表里面找。
+    2. Fuzzy Query（模糊）；带编辑距离的term查询。具体实现：给定一个模糊度（编辑距离），ES会根据这个编辑距离，对原始的单词进行拓展，生成一系列候选的新单词。对每一个编辑距离内的新单词，做term查询。
+2. 全文级别查询，全文级别查询是对多个/多种单词级别查询的封装。
+    1. match，查询的主要步骤：检查字段类型，查看字段是analyzed（对输入进行分词）还是not_analyzed；分析查询字符串，将输入字符串进行分词，对分出来的每个单词，根据是否设置了模糊度参数fuzziness，选择走term query或者fuzzy query；文档评分计算。
+    2. match_phrase，在match查询的基础上，保证输入的单词之间的顺序不变才会命中，性能相比match会差一些。
+3. Bool查询。用于实现复杂的组合查询逻辑，具体有四种：should（或）must（且）非（must _not）filter（类似must），逻辑完备性：足够数量的或且非，可以实现任何逻辑。
+
 [Query DSL](https://opensearch.org/docs/latest/query-dsl/)
 
 1. leaf queries:   Leaf queries search for a specified value in a certain field or fields. PS：可以看做是基本的筛选语句/表达式，后续都是最这些表达式的组合。
@@ -182,7 +205,7 @@ database(es叫索引)只是一个用来指向多个shard（默认一个index被�
 		a. must，对应 and 。表示查询条件必须匹配。如果有多个must条件，文档必须同时满足所有这些条件。
 		b. must_not，对应not。表示查询条件必须不匹配。
 		c. should，对应or，匹配的条数越多分越高.表示查询条件是首选的，但不是必需的。should查询可以有多个条件，文档至少满足其中一个条件就可以被包含在结果中。
-		d. filter。与must类似，filter条件也是必须匹配的，但它用于结构化查询，如范围查询、存在查询等，并且对性能有优化。filter查询通常不计算在查询得分中，因此不会影响结果的排序。
+		d. filter。与must类似，filter条件也是必须匹配的，但它用于结构化查询，如范围查询、存在查询等，并且对性能有优化。可以用于作为查询中的前置过滤条件，must类似，好处是它不会参与计算相关性分数。
 	2. function_score
 	3. hybrid
         1. queries. An array of one or more query clauses that are used to match documents. A document must match at least one query clause in order to be returned in the results. The documents’ relevance scores from all query clauses are combined into one score by applying a search pipeline. The maximum number of query clauses is 5.

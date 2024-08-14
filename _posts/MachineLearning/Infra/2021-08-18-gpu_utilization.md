@@ -214,3 +214,25 @@ dcgm-exporter采集指标项以及含义:
 从k8s 1.13开始，kubelet通过`/var/lib/kubelet/pod-resources`下的Unix套接字来提供pod资源查询服务，dcgm-exporter可以访问`/var/lib/kubelet/pod-resources/`下的套接字服务查询为每个pod分配的GPU设备，然后将GPU的pod信息附加到收集的度量中。
 
 [监控Kubernetes集群的GPU资源](https://mp.weixin.qq.com/s/f8kKzcZqsbSmD2lArfCZpw)
+
+## 其它
+
+[如何把 PyTorch 的 GPU 利用率提升到 100% ?](https://mp.weixin.qq.com/s/9HSZppiFjypwu-TttbxqMQ)造成 GPU 利用率低的表象虽然五花八门，但其深层次的原因却是 CPU 与 GPU 不协调: CPU 负载太多，或者 GPU 负载太少。GPU 负载好理解，主要指的是 CUDA kernel 以及 CPU 和 GPU 之间必要的内存拷贝。这里的 CPU 负载有两层含义:
+1. 指 CPU 参与的数据运算和逻辑控制: 数据运算如 dataloader 中的数据增强，或者把输入的文本划分为 token 并转为 tensor，逻辑控制如判定要不要梯度裁剪。它们的共同特征是 GPU 需要等来自 CPU 的数据或者决策完全就绪才能继续执行，一旦 GPU 需要这些数据或者决策，而 CPU 没有及时处理完，那么 GPU 就处在空闲状态，降低了 GPU 利用率。
+2. 指 CPU 为调用 CUDA API 所做的准备和清理工作: 比如一个 nn.Linear，它最终调用了 cuBLAS 中的 GEMM，但 PyTorch 需要从 Python 前端执行到 C++ 后端，需要为输出 tensor 和必要的 workspace 分配内存，需要根据 device、合适的精度、正向传播/反向传播等一些列信息决定执行哪个算子，cuBLAS 需要根据输入参数的信息查询 heuristics 决定调用哪一个 CUDA kernel，PyTorch 还需要在调用 kernel 后维护计算图信息、执行必要的清理工作。调用一个 CUDA kernel 需要准备一系列复杂的运行时环境，这些都由 CPU 负责完成。**当模型中存在大量的小 CUDA kernel 时，CPU 准备运行时环境的时间就会超过 CUDA kernel 在 GPU 上的执行时间，造成 GPU 需要等待 CPU 完成运行时环境的准备，从而降低了GPU 利用率**。
+
+从增加 GPU 负载的角度，以下手段可以提升 GPU 利用率:
+
+1. 增加每个 GPU 上的 batch size: 不是所有的场景都适用，GPU 数目不多且模型本身的 global batch size 较大时可以一试。除了直接增加单 GPU 上的 batch size，一些通过削减 GPU 内存使用量从而间接提升 batch size 的手段也可以考虑，包括但不限于 gradient/activation checkpointing，ZeRO，model parallelism，等等;
+2. 共享 GPU: 当一个应用无法充分利用 GPU 时，也可以考虑通过多进程、Multi-Process Service (MPS)、Multi-Instance GPU(MIG) 等手段让多个应用共享同一个GPU，量化投资领域的机器学习模型就有此类案例;
+
+从减小 CPU 负载的角度，以下手段可以提升 GPU 利用率:
+
+1. 预处理/缓存: 针对需要 CPU 重复处理的数据，可以在 training 开始前通过预处理把它保存到文件系统中，例如把 training 数据集中的文本转为 token，在预处理阶段把 token 保存在文件系统中，避免在 training 中实时处理数据;
+多线程: 现如今的 CPU 基本上都是多核处理器，把主线程上的重负载任务分配给其他 CPU 核，从而降低主线程的工作量，避免主线程因任务繁重而无法及时调用 CUDA kernel;
+2. CPU 与 GPU 流水线: 把 CPU 和 GPU 组成软件流水线，确保 GPU 需要的数据及时就绪，例如在 GPU 执行当前 iteration 时，CPU 上的 dataloader 预取并处理下一个 iteration 的数据，从而避免由于 CPU 数据没有及时就绪而造成的 GPU 等待;
+3. 迁移到 GPU 上: 针对 CPU 负责的数据处理和逻辑控制部分，可以把他们迁移到 GPU 上，例如使用 DALI 在 GPU 上进行图像数据预处理，又比如梯度裁剪，原本是否进行梯度裁剪的 if/else 是在 CPU 上执行的，现在把整个梯度裁剪用 GPU 实现，包含其中的 if/else;
+4. 减少 CUDA kernel 数目: 通过算子融合，可以把多个小 CUDA kernel 合并成一个大 CUDA kernel，原来 CPU 需要为每一个 CUDA kernel 准备运行时环境，融合后则只需要准备一次，这会显著降低 CPU 的运行时开销。能够有效减少 CUDA kernel 数目的手段包括但不限于 vertical fusion，horizontal fusion，multi tensor apply 等等;
+5. 消除 CPU 与 GPU 之间的同步: CPU 与 GPU 之间的每一次同步，GPU 都会因为 CPU 在准备下一个 CUDA kernel 的运行时环境而进入空闲状态，甚至可能引起后续 CUDA kernel 的连锁反应，使得 CPU 没有足够的时间依次调用 CUDA kernel。移除 CPU 与 GPU 之间的所有同步点，可以把 PyTorch 程序变为 异步(asynchronous, sync-free) 程序，GPU 被 CPU 阻塞的概率大大降低。现阶段，不是所有 PyTorch 中的同步都可以被移除，个别同步点也比较难移除，好在绝大多数同步点都可以避免，例如 .cuda() 会导致一次同步，而 .cuda(non_blocking=True) 则不会有同步;
+6. CUDA Graph: CUDA Graph 是解决运行时开销的终极武器，它可以基本消除 PyTorch 的所有运行时开销，威力十分强大，但在 PyTorch 中有一定的使用难度，目前也仅限于 static shape 的模型，需要有一定的经验，可以参考 CUDA Graphs。在 PyTorch 中，CUDA Graph 又分为 Partial-network capture 和 Whole-network capture，前者要容易很多，但效果不如后者，Torch 2.0 中的 TorchInductor 也可以自动给一些子图自动应用 CUDA Graph;
+异步和 CUDA Graph 提升 GPU 利用率的终极手段;

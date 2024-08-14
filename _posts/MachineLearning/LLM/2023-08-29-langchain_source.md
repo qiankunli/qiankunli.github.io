@@ -23,6 +23,38 @@ LangChain 0.1 几个包
 2. langchain-community 包含第三方集成，其易变特性与 langchain-core 形成对比。主要集成将被进一步拆分为独立软件包，以更好地组织依赖、测试和维护。
 3. langchain 负责流程的编排与组装，包含了实际运用的 Chain、Agent 和算法，为构建完整的 LLM 应用提供了支撑。。它相对开放，介于 langchain-core 和 langchain-community 之间。 
 
+## LangChain
+
+LangChain is a framework for developing applications powered by language models. We believe that the most powerful and differentiated applications will not only call out to a language model, but will also be:
+1. Data-aware: connect a language model to other sources of data
+2. Agentic: allow a language model to interact with its environment
+
+如果是一个简单的应用，比如写诗机器人，或者有 token 数量限制的总结器，开发者完全可以只依赖 Prompt。当一个应用稍微复杂点，单纯依赖 Prompting 已经不够了，这时候需要**将 LLM 与其他信息源或者 LLM 给连接起来**（PS：重点不是模型服务本身），比如调用搜索 API 或者是外部的数据库等。LangChain 的主要价值在于：
+1. 组件：**用于处理语言模型的抽象，以及每个抽象的一系列实现**。无论您是否使用 LangChain 框架的其他部分，组件都是模块化且易于使用的。PS： 既可以单独用，也可以组合用。
+2. 现成的链式组装：用于完成特定高级任务的结构化组件组装。一些例子包括：
+    1. 将 LLM 与提示模板结合。
+    2. 通过将第一个 LLM 的输出作为第二个 LLM 的输入，按顺序组合多个 LLM。
+    3. 将 LLM 与外部数据结合，例如用于问答系统。
+    4. 将 LLM 与长期记忆结合，例如用于聊天历史记录。
+
+[LangChain 中文入门教程](https://github.com/liaokongVFX/LangChain-Chinese-Getting-Started-Guide)基础功能：
+1. Model，主要涵盖大语言模型（LLM），为各种不同基础模型**提供统一接口**，然后我们可以自由的切换不同的模型。相关代码较少，大部分主要是调用外部资源，如 OPENAI 或者 Huggingface 等模型/API。
+    1. 普通LLM：接收文本字符串作为输入，并返回文本字符串作为输出
+    2. 聊天模型：将聊天消息列表作为输入，并返回一个聊天消息。支持流模式（就是一个字一个字的返回，类似打字效果）。
+2. Prompt，支持各种自定义模板
+3. 拥有大量的文档加载器，从指定源进行加载数据的，比如 Email、Markdown、PDF、Youtube ...当使用loader加载器读取到数据源后，数据源需要转换成 Document 对象后，后续才能进行使用。
+4. 对索引的支持。对用户私域文本、图片、PDF等各类文档进行存储和检索。为了索引，便不得不牵涉以下这些能力
+    1. 在LangChain中，所有的数据源都可以认为是Document，任何的数据库、网络、内存等等都可以看成是一个Docstore。
+    1. 文档分割器/Text Splitters，为什么需要分割文本？因为我们每次不管是做把文本当作 prompt 发给 openai api ，还是还是使用 openai api embedding 功能都是有字符限制的。比如我们将一份300页的 pdf 发给 openai api，让它进行总结，它肯定会报超过最大 Token 错。所以这里就需要使用文本分割器去分割我们 loader 进来的 Document。
+    2. 向量化，数据相关性搜索其实是向量运算。以，不管我们是使用 openai api embedding 功能还是直接通过向量数据库直接查询，都需要将我们的加载进来的数据 Document 进行向量化，才能进行向量运算搜索。
+    3. 对接向量存储与搜索，向量化存储接口VectorStore， 比如 Chroma、Pinecone、Qdrand
+5. Chains，相当于 pipeline，包括一系列对各种组件的调用，**每一个从Prompt到Answer的过程，都被标准化为不同类型的LLMChain**。Chain可以相互嵌套并串行执行，通过这一层，让LLM的能力链接到各行各业。 内嵌了memory、cache、callback等组件。
+    1. LLMChain
+    2. 各种工具Chain
+    3. LangChainHub
+
+![](/public/upload/machine/langchain_chains.jpg)
+
 ## 干活的基础：OPENAI接口
 
 **LangChain 本身不提供LLM，本质上就是对各种大模型提供的 API 的套壳**，是为了方便我们使用这些 API，搭建起来的一些框架、模块和接口。因此，要了解 LangChain 的底层逻辑，需要了解大模型的 API 的基本设计思路。重点有两类模型：Chat Model 和 Text Model（当然，OpenAI 还提供 Image、Audio 和其它类型的模型），Chat 模型和 Text 模型的调用是完全一样的，**只是输入（input/prompt）和输出（response）的数据格式有所不同**
@@ -114,6 +146,8 @@ assistant：炒米粉在广东是蛮常见的早餐，但是油太多，可以�
 这里除了区分user和 assistant加的special token 以外，必须要添加的是eos_token，必须要让模型知道什么时候next token生成结束，如果没有终止符，模型会陷入推理的无限循环。
 
 不幸的是，目前还没有一个标准来确定使用哪些标记，因此不同的模型使用的格式和控制标记都可能大相径庭。聊天对话通常表示为字典列表，每个字典包含角色和内容键，表示一条单独的聊天消息。聊天模板是包含Jinja模板的字符串，用于指定如何将给定模型的对话格式化为一个可分词的序列。通过将这些信息存储在分词器中，我们可以确保模型以其期望的格式获取输入数据。对于一个模型来说，chat template 存储在tokenizer.chat_template 属性上（这个属性将保存在tokenizer_config.json文件中），如果chat template没有被设置，对那个模型来说，默认模版会被使用。
+
+
 
 ## LLM模型层
 

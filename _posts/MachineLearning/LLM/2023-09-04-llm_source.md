@@ -23,7 +23,62 @@ keywords: llm Transformers
 
 ![](/public/upload/machine/transformers_overview.png)
 
-## 使用
+## HuggingFace 使用
+
+Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供了以下几个产品和服务：
+1. Hub：这是一个机器学习的中心，让你可以创建、发现和协作ML项目。可以从排行榜开始，了解社区中表现较好的模型。如果你没有 GPU，你必须使用小的模型。转到文件目录并查看 .bin 文件的大小。有的项目在型号卡中也会提到所需的最低规格。PS：就像github 包含代码文件一样，这里包含代码的模型文件，git clone 时要安装Git LFS（Git Large File Storage）
+2. Transformers：这是一个自然语言处理的库，支持多种编程语言（如Python、JavaScript、Swift等）和框架（如PyTorch、TensorFlow等），并提供了简单易用的API，让你可以快速地加载、训练和部署模型。帮我们跟踪流行的新模型，并且**提供统一的代码风格来使用BERT、XLNet和GPT等等各种不同的模型**。只有configuration，models和tokenizer三个主要类，基于上面的三个类，提供更上层的pipeline和Trainer/TFTrainer，从而用更少的代码实现模型的预测和微调。
+    1. pipeline 在底层是由 AutoModel 和 AutoTokenizer 类来实现的。AutoClass（即像 AutoModel 和 AutoTokenizer 这样的通用类）是加载模型的快捷方式，它可以从其名称或路径中自动检索预训练模型。
+    2.  
+    ```python
+    from transformers import MODEL_NAME # 导入模型
+    model = MODEL_NAME.from_pretrained('MODEL_NAME') # 实例化模型，其中 MODEL_NAME 是模型的名称或路径。
+    inputs = xx             # 准备输入数据，转换为模型支持的格式。（如 tokenizer 后的文本、图像等）
+    outputs = model(inputs) # 调用模型并获得输出
+
+    model.save_pretrained('PATH')   # 将模型保存到指定路径
+    ```
+    3. 在Linux下，模型默认会缓存到`~/.cache/huggingface/transformers/`。所有的模型都可以通过统一的from_pretrained()函数来实现加载，transformers会处理下载、缓存和其它所有加载模型相关的细节。而所有这些模型都统一在Hugging Face Models管理。
+    4. 最初我认为您需要为每个模型系列使用特定的Transformers和Tokenizer（例如，如果您使用T5模型系列，则对应T5Tokenizer和 T5ForConditionalGeneration），对于所有预训练模型，您可以声明一个简单的语句：
+        ```python
+        from transformers import AutoTokenizer, AutoModelForCausalLM
+        tokenizer = AutoTokenizer.from_pretrained("databricks/dolly-v2-3b")
+        model = AutoModelForCausalLM.from_pretrained("databricks/dolly-v2-3b")
+        ```
+3. Inference API：这是一个服务，让你可以直接从Hugging Face的基础设施上运行大规模的NLP模型，并在毫秒级别得到响应。
+4. Datasets：这是一个数据集的库，让你可以获取、加载和处理超过1400个公开可用的数据集。Datasets支持多种数据类型（如文本、图像、音频等）和格式（如JSON、CSV等），并提供了高效且统一的API，让你可以快速地加载、缓存和转换数据。PS： 一开始看代码的时候，总以为是pytorch dataset
+
+下载模型文件（一般有几个G）有多种方式
+1. 到huggingface 官网手动通过文件链接下载
+    1. 可以使用 `export HF_ENDPOINT=https://hf-mirror.com` 国内加速一下
+2. Git LFS 下载。`git clone https://huggingface.co/THUDM/chatglm-6b` PS：注意不是github 地址
+3. Hugging Face Hub 下载。
+    ```python
+    from huggingface_hub import snapshot_download
+    snapshot_download(repo_id="bert-base-chinese")
+    ```
+4. `huggingface-cli  download  --resume-download --cache-dir ./cache/ --local-dir ./starcoder  bigcode/starcoder`
+4. 使用transformers 库，但这种方式速度慢，且经常中断。
+    ```
+    from transformers import AutoTokenizer, AutoModel
+    tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm2-6b", trust_remote_code=True,mirror="tuna")
+    model = AutoModel.from_pretrained("THUDM/chatglm2-6b",trust_remote_code=True, mirror="tuna")
+    ```
+    下载后文件会出现在 `~/.cache`目录下
+    ```
+    ~/.cache
+        /torch/sentence_transformers
+            /moka-ai_m3e-base
+                /config.json
+                /pytorch_model.bin
+        /huggingface/hub
+            /models--THUDM--chatglm2-6b
+                /blobs
+                /snapshots
+                    /b1502f4f75c71499a3d566b14463edd62620ce9f   # 某个版本的文件内容
+                        /config.json
+                        /pytorch_model.xx.bin
+    ```
 
 ### pipelines
 
@@ -49,7 +104,7 @@ results = generator("In this course, we will teach you how to")
 print(results)
 ```
 
-### 基础组件
+### transformers基础组件
 
 transformers开源库的核心组件包括3个：Conﬁguration、Tokenizer、Model
 1. 「Conﬁguration」：配置类，通常继承自「PretrainedConﬁg」，保存model或tokenizer的超参数，例如词典大小，隐层维度数，dropout rate等。配置类主要可用于复现模型。
