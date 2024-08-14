@@ -188,14 +188,13 @@ BaseLanguageModel ==> BaseLLM + BaseChatModel
 3. 用户 In 或 查询 ：通常（但不总是）是由人类用户（即提示者）In 到系统中的查询。
 4. Out 指示器 ：标记要生成的文本的 开头。如果生成 Python 代码，我们可以使用 import 来指示模型必须开始编写 Python 代码（因为大多数 Python 脚本以 import 开头）。
 
-![](/public/upload/machine/prompt_structure.jpg)
-
-
-对于文本生成模型服务来说，实际的输入和输出本质上都是字符串，因此直接裸调用LLM服务带来的问题是要在输入格式化和输出结果解析上做大量的重复的文本处理工作，我们不太可能硬编码上下文和用户问题，比如**用 f-strings（如 f"insert some custom text '{custom_text}' etc"）替换**。LangChain当然考虑到这一点，提供了Prompt和OutputParser抽象规范化这个过程，添加多个参数，并**以面向对象的方式构建提示**，用户可以根据自己的需要选择具体的实现类型使用，可以高效的复用（参数化的提示词模版）和组合提示词。PS：本质是f-string 的对象化。如果参数 不是str的话，可以自己实现一个 PromptTemplate。
+对于文本生成模型服务来说，实际的输入和输出本质上都是字符串，因此直接裸调用LLM服务带来的问题是要在输入格式化和输出结果解析上做大量的重复的文本处理工作，我们不太可能硬编码上下文和用户问题，比如**用 f-strings（如 f"insert some custom text '{custom_text}' etc"）替换**。LangChain当然考虑到这一点，提供了Prompt和OutputParser抽象规范化这个过程，添加多个参数，并**以面向对象的方式构建提示**，用户可以根据自己的需要选择具体的实现类型使用，可以高效的复用（参数化的提示词模版）和组合提示词。PS：本质是f-string 的对象化。
 
 ![](/public/upload/machine/llm_chain.jpg)
 
-BasePromptTemplate ==> StringPromptTemplate + BaseChatPromptTemplate 
+### prompt
+
+BasePromptTemplate ==> StringPromptTemplate + BaseChatPromptTemplate 所有的 PromptTemplate 父类都是BasePromptTemplate，它也是一个Runnable，它将Runnable.invoke 转为了PromptTemplate.format_xx，Runnable.invoke 输入转为PromptTemplate.format_xx输入，PromptTemplate.format_xx输出转为invoke 输出。
 
 ||PromptTemplate|ChatPromptTemplate|
 |---|---|---|
@@ -203,25 +202,74 @@ BasePromptTemplate ==> StringPromptTemplate + BaseChatPromptTemplate
 |构造/入口|from_template|from_messages|
 |出口/invoke|format_prompt|format_messages|
 
-OutputParser 可以生成特定格式的提示词，并将提示词插入到prompt，指导模型按照相应的格式输出内容。
+PromptTemplate 核心成员是template，核心方法是format_prompt 返回PromptValue，之所以PromptValue而不是str，是因为现在llm的输入已经不只是text了，还有message list和image。
 
-few-shot learning 适用于将这些示例在提示中提供给模型，通过示例来强化我们在提示中传递的指令，我们可以使用 Langchain 的 FewShotPromptTemplate 规范化这个过程，**比如根据查询长度来可变地包含不同数量的示例**，因为我们的提示和补全 (completion) Out 的最大长度是有限的，这个限制通过 最大上下文窗口 maximum context window 进行衡量，上下文窗口 (ontext window) = In 标记 (input_tokens) + Out 标记 (output tokens)。如果我们传递一个较短或较长的查询，我们应该会看到所包含的示例数量会有所变化。
-
+```python
+class BasePromptTemplate(RunnableSerializable[Dict, PromptValue], Generic[FormatOutputType], ABC):
+    input_variables: List[str]
+    def invoke(self, input: Dict, config: Optional[RunnableConfig] = None) -> PromptValue:
+        return self._call_with_config(self._format_prompt_with_error_handling,input,config,run_type="prompt",) 
+    def _format_prompt_with_error_handling(self, inner_input: Dict) -> PromptValue:
+        _inner_input = self._validate_input(inner_input)
+        return self.format_prompt(**_inner_input)
+    @abstractmethod
+    def format_prompt(self, **kwargs: Any) -> PromptValue:
+        """Create Prompt Value."""
+class PromptTemplate(StringPromptTemplate):
+    input_variables: List[str]
+    template: str
+    def from_template(cls, template: str,*,template_format: str = "f-string",partial_variables: Optional[Dict[str, Any]] = None,**kwargs: Any,) -> PromptTemplate:
+        input_variables = get_template_variables(template, template_format)
+        ...
+        return cls(
+            input_variables=input_variables,
+            template=template,
+            template_format=template_format,  # type: ignore[arg-type]
+            partial_variables=_partial_variables,
+            **kwargs,
+        )
 ```
-prompt = "" " The following are exerpts from conversations with an AI
-assistant. The assistant is typically sarcastic and witty, producing
-creative  and funny responses to the users questions. Here are some
-examples: 
-
-User: How are you?
-AI: I can't complain but sometimes I still do.
-
-User: What time is it?
-AI: It's time to get a watch.
-
-User: What is the meaning of life?
-AI: "" "
+ChatPromptTemplate 核心成员是messages，核心方法是format_messages返回`List[BaseMessage]`。PS：上层定义方法，下层负责实现，所谓实现，一般会带有对应的成员变量。
+```python
+class BaseChatPromptTemplate(BasePromptTemplate, ABC):
+    def format_prompt(self, **kwargs: Any) -> PromptValue:
+        messages = self.format_messages(**kwargs)
+        return ChatPromptValue(messages=messages)
+    @abstractmethod
+    def format_messages(self, **kwargs: Any) -> List[BaseMessage]:
+        """Format kwargs into a list of messages."""
+class ChatPromptTemplate(BaseChatPromptTemplate):
+    input_variables: List[str]
+    messages: List[MessageLike]
+    def format_messages(self, **kwargs: Any) -> List[BaseMessage]:
+        ...
+        result = []
+        for message_template in self.messages:
+            if isinstance(message_template, BaseMessage):
+                result.extend([message_template])
+            elif isinstance(
+                message_template, (BaseMessagePromptTemplate, BaseChatPromptTemplate)
+            ):
+                message = message_template.format_messages(**kwargs)
+                result.extend(message)
+            else:
+                raise ValueError(f"Unexpected input: {message_template}")
+        return result
+    @classmethod
+    def from_messages(cls,messages: Sequence[MessageLikeRepresentation],template_format: Literal["f-string", "mustache"] = "f-string",) -> ChatPromptTemplate:
+         _messages = [_convert_to_message(message, template_format) for message in messages]
+        # Automatically infer input variables from messages
+        input_vars: Set[str] = set()
+        for _message in _messages:
+            ...
+            input_vars.update(_message.input_variables)
+        return cls(input_variables=sorted(input_vars),messages=_messages,...)
 ```
+
+### OutputParser
+
+Output parsers help structure language model responses. OutputParser 还可以生成特定格式的提示词，并将提示词插入到prompt，指导模型按照相应的格式输出内容。
+
 
 ## Chain
 
