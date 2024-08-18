@@ -113,15 +113,19 @@ TypedDict 仅为类型检查工具而生，在运行时没有作用。
 
 ### 泛型编程
 
-在 Python 中，T 通常用作一个占位符，表示一个类型变量，这是泛型编程的一部分。T 通常与 typing.Generic 类一起使用来定义泛型类型，`typing.Generic[T]` 来定义一个可以接收任何类型参数 T 的泛型类或函数。继承自Generic的类在编写需要处理多种数据类型的代码时非常有用，它们提供了一种类型安全的方式来编写灵活和可重用的组件。
+动态类型天然就是泛型。只不过太泛了。
+
+比如对于`List[int]`，其中List就是泛型（Generic Type）。`List[int]`合一块儿叫具体类型（Concrete Type）。用List这个泛型，生成`List[int]`这个具体类型的过程叫做参数化 （Parameterization）。
+
+在 Python 中，T 通常用作一个占位符（3.12之前得用typeVar），表示一个类型变量，这是泛型编程的一部分。T 通常与 typing.Generic 类一起使用来定义泛型类型，`typing.Generic[T]` 来定义一个可以接收任何类型参数 T 的泛型类或函数。继承自Generic的类在编写需要处理多种数据类型的代码时非常有用，它们提供了一种类型安全的方式来编写灵活和可重用的组件。如果A类中使用了泛型T，其子类B 可以在继承A时进一步将 T 指定为具体的类型。PS：typing.Generic 是一个类，定义了一些约束和检查，所以一般泛型基类 习惯上会继承typing.Generic，但不是定义泛型类必须。
 
 ```python
 from typing import Generic, TypeVar, List
 
-# 定义一个类型变量 T
+# 定义一个类型变量 T。 这里不像java 一样，可以直接在类名后写T
 T = TypeVar('T')
 
-# 定义一个泛型类，它可以持有任何类型的数据
+# 定义一个泛型类，它可以持有任何类型的数据。或者说用Generic[T] 实现了Stack的泛型化。
 class Stack(Generic[T]):
     def __init__(self):
         self.items: List[T] = []
@@ -145,6 +149,8 @@ str_stack.push("hello")
 str_stack.push("world")
 print(str_stack.pop())  # 输出 "world"
 ```
+
+Callable[[int, str], float]，接受一个整数和一个字符串作为参数，并返回一个浮点数。中括号 [] 用于创建一个类型元组 (int, str)，表示函数的参数类型。如果没有中括号，Python 解释器将无法正确解析参数类型列表（分不清哪些是入参，哪些是返回值）。
 
 ## pydantic(py+pedantic=Pydantic)
 

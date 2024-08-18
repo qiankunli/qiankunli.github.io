@@ -57,6 +57,8 @@ keywords: dynamic
 
 ### 泛型编程
 
+对于`List[int]`，其中List就是泛型（Generic Type）。`List[int]`合一块儿叫具体类型（Concrete Type）。用List这个泛型，生成`List[int]`这个具体类型的过程叫做参数化 （Parameterization）
+
 来自陈皓《左耳听风》笔记
 
 编程语言的本质是帮助程序猿屏蔽底层机器代码，使得我们可以更为关注业务逻辑代码。

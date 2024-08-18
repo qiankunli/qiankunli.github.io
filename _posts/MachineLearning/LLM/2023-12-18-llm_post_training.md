@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 大模型RHLF
+title: 大模型Post-Training
 category: 架构
 tags: MachineLearning
 keywords: llm rhlf
@@ -26,7 +26,7 @@ keywords: llm rhlf
 
 [RLHF 的故事：起源、动机、技术和现代应用](https://mp.weixin.qq.com/s/cRixcz6VeZ-C4D-IpXsNmw) 未细读。
 
-## 流程
+## RLHF流程
 
 [图解大模型RLHF系列之：人人都能看懂的PPO原理与源码解读](https://mp.weixin.qq.com/s/mhPJzhQvPJlAWsO2nW9BHg)
 
