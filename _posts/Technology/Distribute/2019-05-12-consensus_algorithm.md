@@ -150,7 +150,7 @@ Paxos 算法的出发点，是为了达成分布式共识。状态机复制，�
 
 ### Raft 和 Paxos
 
-Raft 算法属于 Multi-Paxos 算法，它是在兰伯特 Multi-Paxos 思想的基础上，做了一些简化和限制，比如增加了日志必须是连续的，只支持领导者、跟随者和候选人三种状态，在理解和算法实现上都相对容易许多。Raft 算法是现在分布式系统开发首选的共识算法。绝大多数选用 Paxos 算法的系统（比如 Cubby、Spanner）都是在 Raft 算法发布前开发的，当时没得选；而全新的系统大多选择了 Raft 算法（比如 Etcd、Consul、CockroachDB）。
+Raft 算法属于 Multi-Paxos 算法，它是在兰伯特 Multi-Paxos 思想的基础上，做了一些简化和限制，比如增加了日志必须是连续的，只支持领导者、跟随者和候选人三种状态，在理解和算法实现上都相对容易许多。Raft 算法是现在分布式系统开发首选的共识算法。绝大多数选用 Paxos 算法的系统（比如 Cubby、Spanner）都是在 Raft 算法发布前开发的，当时没得选；而全新的系统大多选择了 Raft 算法（比如 Etcd、Consul、CockroachDB）。Raft将整个共识过程分解为几个子问题：领导者选举、日志复制和安全性。整个 Raft 算法因此变得易理解、易论证、易实现，从而让分布式一致性协议可以较为简单地实现。
 
 [《In Search of an Understandable Consensus Algorithm》](https://raft.github.io/raft.pdf)： In order to enhance understandability, Raft separates the key elements of consensus, such as leader election, log replication, and safety, and it enforces a stronger degree of coherency to reduce the number of states that must be considered.
 
@@ -221,11 +221,16 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 1. 跟随者等待领导者心跳信息超时的时间间隔，是随机的；
 2. 如果候选人在一个随机时间间隔内，没有赢得过半票数，那么选举无效了，然后候选人发起新一轮的选举，也就是说，等待选举超时的时间间隔，是随机的。
 
+小结：Raft 算法通过任期的概念来分隔时间，每个任期开始都会进行一次领导者选举。任期是一个递增的数字，每次选举都会增加。如果跟随者在“选举超时”之内没有收到领导者的心跳，它会将自己的任期号加一，并转变为候选者状态来发起一次领导者选举。候选者首先给自己投票，并向其他节点发送请求投票的 RPC。如果接收节点在当前任期内还没有投票，它会同意投票给请求者。如果候选者在一次选举中从集群的大多数节点获得了选票，它就会成为领导者。在此过程中生成的任期号用于节点之间的通信，以防止过时的信息导致错误。例如，如果节点收到任期号比自己小的请求，它会拒绝该请求。极端情况下集群可能会出现脑裂或网络问题，此时集群可能会被分割成几个互不通信的子集。不过由于Raft算法要求一个领导者必须拥有集群大多数节点的支持，这保证了即使在脑裂的情况下，最多只有一个子集能够选出一个有效的领导者。
+
 ### 日志复制
 
-Leader，本质上是通过一个两阶段提交，来做到同步复制的。一方面，它会先把日志写在本地，同时也发送给 Follower，这个时候，日志还没有提交，也就没有实际生效。Follower 会返回 Leader，是否可以提交日志。当 Leader 接收到超过一半的 Follower 可以提交日志的响应之后，它会再次发送一个提交的请求给到 Follower，完成实际的日志提交，并把写入结果返回给客户端。
+Leader，本质上是通过一个两阶段提交，来做到同步复制的。一方面，它会先把日志写在本地，同时也发送给 Follower，这个时候，日志还没有提交，也就没有实际生效。Follower 会返回 Leader，是否可以提交日志。当 Leader 接收到超过一半的 Follower 可以提交日志的响应之后，它会再次发送一个提交的请求给到 Follower，完成实际的日志提交，并把写入结果返回给客户端。**因此，Raft 确保了即使在领导者崩溃或网络分区的情况下，也不会有数据丢失。任何被提交的日志条目都保证在后续的任期中也存在于任意新的领导者的日志中**。PS：作为应用层的kafka可以削弱一致性（ISR协议，BookKeeper的Quorum协议），比如client发消息到主分区即可认为消息发送成功，但是infra层的raft leader+follower 全部写入ok再返回给client的。
 
-一旦被leader创建的条目已经复制到了大多数的服务器上，这个条目就称为可被提交的（commited）
+简单来说，Raft 算法的特点就是 Strong Leader：
+a. 系统中必须存在且同一时刻只能有一个 Leader，只有 Leader 可以接受 Clients 发过来的请求；
+b. Leader 负责主动与所有 Followers 通信，负责将“提案”发送给所有 Followers，同时收集多数派的 Followers 应答；
+c. Leader 还需向所有 Followers 主动发送心跳维持领导地位（保持存在感）。
 
 **副本数据是以日志的形式存在的**，日志是由日志项组成，日志项是一种数据格式，它主要包含用户指定的数据，也就是指令（Command），还包含一些附加信息，比如索引值（Log index）、任期编号（Term）。
 

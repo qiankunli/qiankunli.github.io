@@ -154,6 +154,8 @@ Callable[[int, str], float]，接受一个整数和一个字符串作为参数�
 
 ## pydantic(py+pedantic=Pydantic)
 
+Pydantic 的核心是 pydantic.BaseModel 类。通过继承 BaseModel，可以轻松创建具有类型提示和校验功能的数据模型。Pydantic 在模型实例化时自动进行数据校验。如果数据类型不匹配或缺失，它会抛出错误。还提供了从各种数据格式（例如 JSON、字典）到模型实例的转换功能。**如果要对BaseModel中的某一基本型进行统一的格式要求**，我们还可以使用Config类来实现。有了BaseModel，类似对于配置类的增强可以使用 BaseSettings。
+
 对象的属性，我们都是通过把变量值赋值给对象本身来实现的。直接赋值会存在一个问题，就是无法对属性值进行合法性较验，比如我给 age 赋值的是负数，在业务上这种数据是不合法的。
 
 ```

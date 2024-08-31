@@ -17,7 +17,7 @@ LLM 不管是 GPT 还是 BERT，有且只有一个核心功能，就是预测你
 
 ![](/public/upload/machine/langchain_overview.jpg)
 
-在 LangChain 0.1 之前，LangChain 总结提炼了LLM 开发必须的几个基础组件，比如Prompt/LLM等，对它们的功能范围、输入输出进行了界定，此时还相对碎一些，抽象粒度低，后来将Prompt/LLM 等都统一到Runnable 协议（就像Java里的一切皆Object），原子组件标准化，进而以此为基础提出了编排组件LCEL和LangGraph。
+在 LangChain 0.1 之前，LangChain 总结提炼了LLM 开发必须的几个基础组件，比如Prompt/LLM等，对它们的功能范围、输入输出进行了界定，找到构造复杂系统的统一规律和可达路径，此时还相对碎一些，抽象粒度低，后来将Prompt/LLM 等都统一到Runnable 协议（就像Java里的一切皆Object），原子组件标准化，进而以此为基础提出了编排组件LCEL和LangGraph。
 LangChain 0.1 几个包
 1. langchain-core 包含了核心抽象（如消息类型定义，输入输出管理等）和 LangChain 表达语言（LCEL）
 2. langchain-community 包含第三方集成，其易变特性与 langchain-core 形成对比。主要集成将被进一步拆分为独立软件包，以更好地组织依赖、测试和维护。
@@ -193,7 +193,7 @@ BaseLanguageModel ==> BaseLLM + BaseChatModel
 ![](/public/upload/machine/llm_chain.jpg)
 
 ### prompt
-
+prompt template 是一个模板化的字符串，可以用来生成特定的提示（prompts）。可以将变量插入到模板中，从而创建出不同的提示。这对于重复生成相似格式的提示非常有用。
 BasePromptTemplate ==> StringPromptTemplate + BaseChatPromptTemplate 所有的 PromptTemplate 父类都是BasePromptTemplate，它也是一个Runnable，它将Runnable.invoke 转为了PromptTemplate.format_xx，Runnable.invoke 输入转为PromptTemplate.format_xx输入，PromptTemplate.format_xx输出转为invoke 输出。
 
 ||PromptTemplate|ChatPromptTemplate|
@@ -378,7 +378,14 @@ PS： 以编程视角来看，chain的核心是prompt，大部分时间都在在
 
 ## Memory
 
-通过Chain，LangChain相当于以“工作流”的形式，将LLM与IO组件进行了有秩序的连接，从而具备构建复杂AI工程流程的能力。而我们都知道LLM提供的文本生成服务本身不提供记忆功能，需要用户自己管理对话历史。因此引入Memory组件，可以很好地扩展AI工程的能力边界。
+
+通过Chain，LangChain相当于以“工作流”的形式，将LLM与IO组件进行了有秩序的连接，从而具备构建复杂AI工程流程的能力。而我们都知道LLM提供的文本生成服务本身不提供记忆功能，需要用户自己管理对话历史。
+
+消息历史主要通过不同类型的Message类：
+1. 如HumanMessage, AIMessage, SystemMessage等来表示对话中的各种消息。
+2. 这些消息可以被添加到 ChatMessageHistory 中,形成一个完整的对话记录。
+
+Memory 记忆的内存管理则更为复杂和多样化。
 
 ![](/public/upload/machine/langchain_memory.jpg)
 
@@ -444,7 +451,7 @@ New summary:
 在llm 生成之前，首要工作就是填充PromptTemplate 中的变量。 Memory 有几个key
 1. input_key，save_context 用到
 2. output_key，save_context 用到
-2. memory_key，load_memory_variables 用到
+2. memory_key，load_memory_variables（从内存加载变量） 用到
 
 
 ### 底层实现

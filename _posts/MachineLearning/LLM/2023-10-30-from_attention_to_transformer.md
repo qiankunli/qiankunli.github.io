@@ -548,6 +548,11 @@ Sequence Mask， 上述训练过程是挨个单词串行进行的，那么能不
 
 鲁提辖：要理解Transformer就是搞懂Attention，再就是Positional Encoding。Attention主要负责对长程依赖内容依赖建模，Positional Encoding负责对短程依赖和位置依赖建模，两者合力就有了Transformer强大的拟合能力。
 
+大模型的Embedding层和独立的Embedding模型有什么区别？Embedding层是神经网络中的一层，用于将离散的符号（如单词）映射到连续的向量空间。
+1. 独立Embedding模型的特点，独立的Embedding模型通常以特定的损失函数（如Skip-gram或CBOW）单独训练，如最小化上下文中词汇的预测误差，目标是学习到通用的词向量表示。训练完成后，可以在多个任务中复用，适用于各种下游任务，如文本分类、情感分析等。
+2. 在大模型中，Embedding层作为模型的第一层，用于将输入的词汇序列映射到向量空间。通常与Transformer Blocks等其他层一起训练。由于Embedding层与整个模型的训练目标（如提高下一个token的预测准确率）一致，与模型的其他部分共享一个统一的损失函数（通常是提高下一个token预测的准确率），这意味着Embedding层并非为通用目的设计，而是为优化特定任务（如语言模型任务）而定制。这种联合训练方式使得Embedding层不仅仅是词汇表示的工具，更是为整个模型的任务优化服务的组件。
+
+
 [五年时间被引用3.8万次，Transformer宇宙发展成了这样](https://mp.weixin.qq.com/s/cVuBfrrtGBpNlZUekxgnmg) 未读。 
 
 

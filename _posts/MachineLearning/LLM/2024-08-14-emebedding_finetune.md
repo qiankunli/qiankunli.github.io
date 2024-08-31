@@ -82,6 +82,19 @@ torchrun --nproc_per_node ${N_NODES} \
 ...
 ```
 
+另外，如果你使用的是开源嵌入模型，对其进行微调是提高检索准确性的有效方法。LlamaIndex 提供了 一份详尽的指南，指导如何一步步微调开源嵌入模型，并证明了微调可以在各项评估指标上持续改进性能。（https://docs.llamaindex.ai/en/stable/examples/finetuning/embeddings/finetune_embedding.html ） 下面是一个示例代码片段，展示了如何创建微调引擎、执行微调以及获取微调后的模型：
+
+```
+finetune_engine = SentenceTransformersFinetuneEngine(
+ train_dataset,
+ model_id="BAAI/bge-small-en",
+ model_output_path="test_model",
+ val_dataset=val_dataset,
+)
+finetune_engine.finetune()
+embed_model = finetune_engine.get_finetuned_model()
+```
+
 ### 模型使用
 
 模型的使用方式，与使用RAG技术构建企业级文档问答系统之基础流程中介绍的完全一致，只是替换模型路径model_path即可

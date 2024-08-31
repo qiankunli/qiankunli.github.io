@@ -212,6 +212,7 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
 
 ### 对LLM的要求
+
 对于 RAG 来说，LLM 最基础也是最重要的能力其实包含：
 1. 摘要能力；
 2. 可控性：既 LLM 是否听话，是否会不按照提示要求的内容自由发挥产生幻觉；
@@ -280,7 +281,11 @@ Self-RAG 的一个重要创新是 Reflection tokens (反思字符)：通过生�
 
 ![](/public/upload/machine/modular_rag.jpg)
 
-文档处理工作流 datashaper/ray 
+文档处理工作流 PS：datashaper/ray 
+1. 首先文档处理包含多个步骤，所以是一个典型的workflow/step，workflow 对应一个文档处理流程，step对应一个class/func，按配置拼为workflow。再丰富一点，workflow 和step 的状态支持持久化（对应db表），持久化之后 bind 一些字段/数据就可以支持重试/缓存，也具备一定的容错能力。至此，创建一个workflow 即可触发step 依次执行直到workflow 完成。 
+2. 接着是workflow/文档 创建和消费，比如server 负责创建workflow，worker 负责消费workflow，并执行step。server 可以通过mq 将workflow id发给worker来驱动worker 执行workflow，也可以worker 监听workflow 表自己轮询来消费workflow。考虑到文档隶属于不同的知识库，要考虑不要让某个知识库的workflow独占了所有worker，这需要mq 分topic消费，从这个视角来说，worker 主动扫db消费workflow 更有利于各个知识库文档获取同等的处理机会。 
+
+问答工作流这块，llm的推理能力仍然不够，国内的llm更不够，llm的能力甚至影响了问答代码的实现方案。理想状态下，如果llm能力足够的话，基于llm的agentic chat （由llm决定是否拆分子问题，以及用户问题是否已充分回答，未充分回答则提取新问题）即可满足大部分需求。这里的一个大的难点是，各种技术论文每周都有新的方法出来，但每个方法都有特定的场景，无法直接纳入到现有的问答流程里。 比如hyde，也不可能一个问题进来都执行一次hyde再去检索。如果没有通用的处理工作流，则RAG平台型、专用型产品的鸿沟就一直在。想进一步，有时候觉得有必要微调下llm，但又不知道从哪里搞数据集，尤其是诱导llm拆解L2 L3 类问题。团队里缺个算法工程师的话，下个决心就比较难，是不是微调好llm + agentic chat 就一统天下了？尤其是开源llm一般一个季度发一版（内厂快的一个月发一版），刚微调完base llm能力提升了不白忙活了。
 
 ## 其它
 

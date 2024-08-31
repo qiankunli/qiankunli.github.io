@@ -242,3 +242,28 @@ func ParseCIDR(c string) (*IP, *IPNet, error) {...}
 ```
 
 [探究 Go database/sql 包的设计模式](https://mp.weixin.qq.com/s/CtKjgQ2C459Ns1ZNGwWXFw)
+
+## 优雅退出
+
+[Go 程序如何实现优雅退出？](https://mp.weixin.qq.com/s/2A2MqqI7jJmdYCebjzG-hQ)如果要停止正在运行的程序，通常可以这样做：
+1. 在正在运行程序的终端执行 Ctrl + C。发送的是 SIGINT 信号，这个信号表示中断，默认行为就是终止程序。
+2. 在正在运行程序的终端执行 Ctrl + \。发送的是 SIGQUIT 信号，这个信号其实跟 SIGINT 信号差不多，不过它会生成 core 文件，并在终端会打印很多日志内容，不如 Ctrl + C 常用。
+3. 在终端执行 kill 命令，如 kill pid 或 kill -9 pid。 发送的是 SIGTERM 信号，而 kill -9 pid 则发送 SIGKILL 信号。
+这几种操作本身没什么问题，不过它们的默认行为都比较“暴力”。它们会直接强制关闭进程，这就有可能导致出现数据不一致的问题。比如，一个 HTTP Server 程序正在处理用户下单请求，用户付款操作已经完成，但订单状态还没来得及从「待支付」变更为「已支付」，进程就被杀死退出了。这种情况肯定是要避免的，于是就有了优雅退出的概念。所谓的优雅退出，其实就是在关闭进程的时候，不能“暴力”关闭，而是要等待进程中的逻辑（比如一次完整的 HTTP 请求）处理完成后，才关闭进程。
+
+以上几种方式中我们见到了 4 种终止进程的信号：SIGINT、SIGQUIT、SIGTERM 和 SIGKILL。这其中，前 3 种信号是可以被 Go 进程内部捕获并处理的，而 SIGKILL 信号则无法捕获，它会强制杀死进程，没有回旋余地。在写 Go 代码时，默认情况下，我们没有关注任何信号，Go 程序会自行处理接收到的信号。对于 SIGINT、SIGTERM、SIGQUIT 这几个信号，Go 的处理方式是直接强制终止进程。如果我们在 Go 代码中自行处理收到的 Ctrl + C 传来的信号 SIGINT，我们就能够控制程序的退出行为，这也是实现优雅退出的机会所在。Go 为我们提供了 os/singal 内置包用来处理信号，os/singal 包提供了如下 6 个函数 供我们使用：
+
+```
+// 忽略一个或多个指定的信号
+func Ignore(sig ...os.Signal)
+// 判断指定的信号是否被忽略了
+func Ignored(sig os.Signal) bool
+// 注册需要关注的某些信号，信号会被传递给函数的第一个参数（channel 类型的参数 c）
+func Notify(c chan<- os.Signal, sig ...os.Signal)
+// 带有 Context 版本的 Notify
+func NotifyContext(parent context.Context, signals ...os.Signal) (ctx context.Context, stop context.CancelFunc)
+// 取消关注指定的信号（之前通过调用 Notify 所关注的信号）
+func Reset(sig ...os.Signal)
+// 停止向 channel 发送所有关注的信号
+func Stop(c chan<- os.Signal)
+```
