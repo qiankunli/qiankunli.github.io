@@ -146,6 +146,8 @@ result = joe.initiate_chat(cathy, message="Cathy, tell me a joke.", max_turns=2)
 
 AutoGen允许在一个群聊中，调用另外一个Agent群聊来执行对话(嵌套对话Nested Chats)。这样做可以把一个群聊封装成单一的Agent，从而实现更加复杂的工作流。
 
+## Qwen-Agent（未细读）
+
 ## AutoGPT
 
 Andrej Karpathy 在 2017 年提出的 Software 2.0：基于神经网络的软件设计。真的很有前瞻性了。这进一步引出了当前正在迅速发展的 Agent Ecosystem。AutoGPT ，BabyAGI 和 HuggingGPT 这些项目形象生动地为我们展示了 LLM 的潜力除了在生成内容、故事、论文等方面，它还具有强大的通用问题解决能力。如果说 ChatGPT 本身的突破体现在人们意识到**语言可以成为一种服务**，成为人和机器之间最自然的沟通接口，这一轮新发展的关键在于人们意识到语言（不一定是自然语言，也包括命令、代码、错误信息）也是模型和自身、模型和模型以及模型和外部世界之间最自然的接口，让 AI agent 在思考和表达之外增加了调度、结果反馈和自我修正这些新的功能模块。于是**在人类用自然语言给 AI 定义任务目标（只有这一步在实质上需要人类参与）之后可以形成一个自动运行的循环**：

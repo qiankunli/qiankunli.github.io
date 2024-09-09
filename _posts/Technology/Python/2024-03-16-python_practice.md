@@ -363,6 +363,32 @@ java里面增强已有代码，几乎只有动态代理一个手段。注解加�
 
 ### 动态属性
 
+PS：在java 里得用reflect包，在python里好家伙
+```python
+# 动态调用方法
+class MyClass:
+    def greet(self, message):
+        print(message)
+my_instance = MyClass()
+method_name = "greet"
+getattr(my_instance, method_name)("Hello, World!")
+# 使用装饰器修改类定义
+def add_attribute(attr_name, attr_value):
+    def decorator(cls):
+        setattr(cls, attr_name, attr_value)
+        return cls
+    return decorator
+@add_attribute('my_attr', 'My Value')
+class MyClass:
+    pass
+print(MyClass.my_attr)
+# 使用sys模块获取模块信息
+import sys
+module_info = sys.modules[__name__]
+print(f"Module Name: {module_info.__name__}")
+print(f"Module Docstring: {module_info.__doc__}")
+```
+
 在python 中，数据属性和方法统称属性 attribute，方法是可调用的attribute，动态属性的接口与数据属性一样（obj.attr），不过按需计算。 在python 中实现动态属性有以下几种
 1. @property
 2. `__getattr__`。对于my_obj.x 表达式，python会检查my_obj 实例有没有名为x的属性，如果没有，就到类（`my_obj.__class__`）中查找，如果还没有，就会沿着继承图继续向上查找，如果依旧找不到，则调用my_obj所属的类中定义的 `__getattr__` 方法，传入self 和属性名称的字符串形式（例如'x'）。大多数时候，定义了`__getattr__`  也要定义 `__setattr__`
@@ -576,6 +602,8 @@ class Test(metaclass=AddInfo):
 ```
 
 其实在开头引用TimPeters的话（元类就是深度的魔法，99%的⽤户应该根本不必为此操⼼。如果你想搞清楚 究竟是否需要⽤到元类，那么你就不需要它。那些实际⽤到元类的⼈都⾮常 清楚地知道他们需要做什么，⽽且根本不需要解释为什么要⽤元类。）就说明，不要随意在生产代码中使用元类，而且现有的编码规范也极不推荐使用。代码可读性不高，不易维护。
+
+PS：改变已有代码类的行为，java一般是创建代理类（直接干活儿的类已经被换掉了），python更绝一点，直接改类的字段、方法成员。在哪里改呢？python是通过继承某个父类即可，而java 则只能通过spring ioc在初始化bean的时候玩花活儿。 
 
 ### 以ORM为例
 

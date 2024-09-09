@@ -177,6 +177,24 @@ async def get_items(page: int = 1, page_size: int = 10):
     return Page(items=items, page=page, page_size=page_size, total=items.total)
 ```
 
+### 后台任务
+
+在 FastAPI 中使用后台任务，利用其依赖注入系统进行异步处理。
+
+```python
+from fastapi import BackgroundTasks, FastAPI
+
+app = FastAPI()
+def write_log(message: str):
+    with open("log.txt", "a") as log_file:
+        log_file.write(f"{message}\n")
+
+@app.post("/log")
+def log_message(message: str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(write_log, message)
+    return {"message": "Log will be written in the background"}
+```
+
 ## SQLAlchemy
 
 SQLAlchemy 不具备连接数据库的能力，它连接数据库还是使用了驱动，同步驱动用 pymysql 异步驱动为 asyncmy。

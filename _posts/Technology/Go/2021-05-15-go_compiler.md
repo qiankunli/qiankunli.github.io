@@ -24,6 +24,7 @@ SSA-IR（Single Static Assignment）是一种介于高级语言和汇编语言�
 1. Static：每个变量只能赋值一次（因此应该叫常量更合适）；
 2. Single：每个表达式只能做一个简单运算，对于复杂的表达式a*b+c*d要拆分成："t0=a*b; t1=c*d; t2=t0+t1;"三个简单表达式；
 
+golang 的 runtime 是与用户代码一起打包在一个可执行文件中，是程序的一部分，在 golang 语言中的关键字编译时会变成 runtime 中的函数调用，例如 go 关键字对应 runtime 中的 newproc 函数。
 
 ## go编译器
 

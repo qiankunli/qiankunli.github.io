@@ -113,7 +113,11 @@ Self-Instruct是一种微调数据扩充的方法。如果已经一些种子微�
 
 ### PEFT/LoRA原理
 
-LoRA，LoRA背后有一个假设：我们现在看到的这些大语言模型，它们都是被过度参数化的。而过度参数化的大模型背后，都有一个低维的本质模型。通俗讲人话：大模型参数很多，但并不是所有的参数都是发挥同样作用的；大模型中有其中一部分参数，是非常重要的，是影响大模型生成结果的关键参数，这部分关键参数就是上面提到的低维的本质模型。LoRA的基本思路，在原始预训练模型旁边增加一个旁路，先用一个 Linear 层 A，将数据从 d 维降到 r 维，在用第二个 Linear 层 B，将数据从 r 维变回 d 维。LoRA 训练的时候固定预训练模型的参数，只训练降维矩阵 A 和升维矩阵 B。包括以下几步：
+LoRA，LoRA背后有一个假设：**我们现在看到的这些大语言模型，它们都是被过度参数化的**。
+1. 一旦我们找到了足够解决问题的参数空间，再增加这个参数空间的大小并不会显著提升模型的性能。
+2. 一个过参数的模型的参数空间是有压缩的空间的，这也就是LoRA的提出动机。
+
+通俗讲人话：大模型参数很多，但并不是所有的参数都是发挥同样作用的；大模型中有其中一部分参数，是非常重要的，是影响大模型生成结果的关键参数。LoRA的基本思路，在原始预训练模型旁边增加一个旁路，先用一个 Linear 层 A，将数据从 d 维降到 r 维，在用第二个 Linear 层 B，将数据从 r 维变回 d 维。LoRA 训练的时候固定预训练模型的参数，只训练降维矩阵 A 和升维矩阵 B。包括以下几步：
 1. 要适配特定的下游任务，要训练一个特定的模型，将Y=WX变成$Y=(W+∆W)X$，这里面$∆W$主是我们要微调得到的结果；
 2. 将∆W进行低维分解`∆W=AB` (`∆W`为m * n维，A为m * r维，B为r * n维，r就是上述假设中的低维)；
 3. 接下来，用特定的训练数据，训练出A和B即可得到∆W，在推理的过程中直接将∆W加到W上去，再没有额外的成本。另外，如果要用LoRA适配不同的场景，切换也非常方便，做简单的矩阵加法即可：$(W + ∆W) - ∆W + ∆W`$。
@@ -133,6 +137,40 @@ LoRA微调方法为啥能加速训练？
 1. 只更新了部分参数：比如LoRA原论文就选择只更新Self Attention的参数，实际使用时我们还可以选择只更新部分层的参数；
 2. 减少了通信时间：由于更新的参数量变少了，所以（尤其是多卡训练时）要传输的数据量也变少了，从而减少了传输时间；
 3. 采用了各种低精度加速技术，如FP16、FP8或者INT8量化等。PS：不是LoRA所独有的
+
+代码示例
+
+```python
+import torch
+import torch.nn as nn
+
+class LoRALayer(nn.Module):
+    def __init__(self, original_layer, rank=4):
+        super(LoRALayer, self).__init__()
+        self.original_layer = original_layer
+        self.rank = rank
+        self.A = nn.Parameter(torch.randn(original_layer.weight.size(0), rank))
+        self.B = nn.Parameter(torch.randn(rank, original_layer.weight.size(1)))
+
+    def forward(self, x):
+        delta_w = torch.matmul(self.A, self.B)
+        return self.original_layer(x) + torch.matmul(x, delta_w.t())
+
+# 示例：在Transformer模型中使用LoRA层
+class TransformerWithLoRA(nn.Module):
+    def __init__(self, transformer, rank=4):
+        super(TransformerWithLoRA, self).__init__()
+        self.transformer = transformer
+        for name, module in transformer.named_modules():
+            if isinstance(module, nn.Linear):
+                setattr(self, name, LoRALayer(module, rank))
+
+    def forward(self, x):
+        return self.transformer(x)
+```
+
+[大模型微调经验和认知](https://mp.weixin.qq.com/s/lYJcnUW9qtTsAF7_G8bKhA)lora_rank是一个很重要的参数，它影响旁路矩阵的大小。如果你的数据量比较小，那推荐用比较小的rank就可以了，我记得原论文里8和32区别不大，如果你数据量较大，那建议用更大的rank，来得到一个更大的旁路矩阵，它显然可以记住更多的东西。与此同时，除了q_proj,v_proj，强烈建议再试一下把所有的线性层都上lora，如k_proj, up_proj, down_proj这些。此外lora_alpha也很重要，它通常和lora_rank是正比关系，表示一个缩放系数。alpha越大，表示新建的旁路矩阵影响力越大、新数据学得越“猛”；alpha越小，表示原始模型参数对结果的影响力越大。很多人喜欢设置alpha是rank的2倍，其实可以二者1: 1跑个baseline看看效果。
+    1. lora的秩的值设置在1-16上还是存在不小的区别，从16到128上经常只是一些收敛上的差异，例如128可能n个epoch收敛到x，16可能要2n，但并不绝对，而且r大时间久，一般16-32是比较推荐的
 
 ### HuggingFace Peft 实现
 
@@ -241,7 +279,7 @@ class LoraModel(torch.nn.Module):
         )
 ```
 可以看到
-1. Freeze 预训练模型权重/参数的本质：requires_grad = False ，不接受梯度更新，只微调参数A和B。，此时该步骤模型微调的参数量由$d×k$变成$d×r+r×k$，而$r≪min(d,k)$，因此微调参数量大量减少了。
+1. Freeze 预训练模型权重/参数的本质：requires_grad = False ，不接受梯度更新，只微调参数A和B。，此时该步骤模型微调的参数量由$d×k$变成$d×r+r×k$，而$r≪min(d,k)$，因此微调参数量大量减少了。降低大量优化器状态带来的显存占用问题，反向传播计算量减少，训练速度也提升了。 
 
 [图解大模型微调系列之：大模型低秩适配器LoRA（源码解读与实操篇）](https://mp.weixin.qq.com/s/RuV_4lCQentq4kBr3fv08A) 未读。
 

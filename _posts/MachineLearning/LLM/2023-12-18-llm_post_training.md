@@ -28,6 +28,8 @@ keywords: llm rhlf
 
 ## RLHF流程
 
+![](/public/upload/machine/rlhf_workflow.jpg)
+
 [图解大模型RLHF系列之：人人都能看懂的PPO原理与源码解读](https://mp.weixin.qq.com/s/mhPJzhQvPJlAWsO2nW9BHg)
 
 [RLHF——让大模型对齐人类偏好](https://mp.weixin.qq.com/s/UGLifcfq9SmjARYk9D3kDQ)预训练主要针对补全能力，但不一定是“有用”的补全。RLHF优化模型所涉及的三个步骤
@@ -49,6 +51,8 @@ keywords: llm rhlf
 
 
 总结一下：我们通过比较容易获得的公开无标签数据，来训练一个大语言模型/预训练模型，然后，通过人工编写的问答对，来生成高质量的监督对话数据，来优化大语言模型的对话能力。在得到了这个优化后模型（sft model）之后，标注者便在给定问题上可以基于模型生成的答案，对回答进行排序，并用排序数据训练一个reward model对回答的结果排序打分，用来评估回答的质量。最后，也是强化学习中最重要的一步，就是用你的“奖励模型”来提升 SFT model的效果。PS：在得到一个sft model之后，如何进一步优化sft model？一种办法是准备更多的“问题回答对“，但这个成本很高，再一个准备的多了，也可能会有价值观等问题，所以干脆训练一个专门的reward model来做这个事儿，用它来对sft model 生成的内容打分，进而继续“微调”sft model。这个很像家长、老师会告诉我们做事的正确答案，但是教的不多，到社会上，没人告诉你对错，只能通过别人的脸色、反应来判断自己做的对错。
+
+[RLHF 为什么不直接对 loss 进行梯度下降来求解？](https://mp.weixin.qq.com/s/Qxue1q9n9q06HLg_ijjqRw)
 
 ## PPO
 
@@ -158,7 +162,7 @@ def update_model(args, experience_list, actor_model, actor_optimizer, critic_mod
     # critic模型梯度回传，梯度更新          
 ```
 
-
+[阿里PAI-ChatLearn：大规模 Alignment高效训练框架正式开源](https://zhuanlan.zhihu.com/p/717112741) 未细读
 
 ## 小结 
 

@@ -722,5 +722,61 @@ class Qwen2RMSNorm(nn.Module):  # 标准化层
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         return self.weight * hidden_states.to(input_dtype)
 ```
+## 模型加载
 
+在模型的加载过程中，通常包含两个核心部分：模型的权重和配置文件。
 
+每个模型的配置文件的变量的名字都不尽相同，比如表示transformer模型多头注意力机制的head num的变量名，有的模型可能叫num_attention_heads(opt)，有的模型可能叫n_head(starcoder)，所以需要对应到框架统一的变量体系下。
+
+```python
+class Opt(GPT):
+    """Opt"""
+    @classmethod
+    def _create_config(cls, ckpt_path: str):
+        offset = 2
+        config_dict = get_config_from_path(ckpt_path)
+        config = GptInitModelParameters(
+            head_num=config_dict['num_attention_heads'],
+            size_per_head=config_dict['hidden_size'] // config_dict['num_attention_heads'], # 每个注意力头的维度大小
+            layer_num=config_dict.get('num_hidden_layers', 12),
+            vocab_size=config_dict['vocab_size'],   # 词表的大小
+            max_seq_len=config_dict['max_position_embeddings'] + offset # 模型能够处理的最长序列长度
+        )
+        config.layernorm_type = 'pre_layernorm'
+        config.norm_type = "layernorm"
+        config.has_post_decoder_layernorm = True
+        config.hidden_size = config_dict['hidden_size']
+        config.inter_size = config_dict["ffn_dim"]
+        config.has_positional_encoding = True
+        config.activation_type = 'relu'
+        config.add_special_tokens = True
+        config.special_tokens.eos_token_id = config_dict.get('eos_token_id', 2)
+        config.special_tokens.pad_token_id = config_dict.get('pad_token_id', 1)
+        config.special_tokens.bos_token_id = config_dict.get('bos_token_id', 2)
+        config.head_num_kv = config.head_num
+        return config
+```
+
+在加载配置文件后，框架会根据这些参数去加载权重等。例如，如果has_positional_encoding为True，框架会初始化nn.embedding(config.max_seq_len, config.hidden_dim)。
+
+模型权重加载就是将模型的权重参数名对应到框架的权重参数名上, 因为每个模型的权重参数名定义每个都不一样，所以需要对应到框架统一的变量体系下；
+
+```python
+class OptWeightInfo(ModelDeployWeightInfo):
+    def _get_weight_info(self):
+        layer_weights = [
+            # * Attention之前 layer_norm部分
+            WeightInfo(W.pre_ln_gamma, [CkptWeightInfo('model.decoder.layers.{i}.self_attn_layer_norm.weight', identity)], identity),
+            WeightInfo(W.pre_ln_beta, [CkptWeightInfo('model.decoder.layers.{i}.self_attn_layer_norm.bias', identity)], identity),
+
+            # *  Attention
+            WeightInfo(W.attn_qkv_w, [
+                CkptWeightInfo('model.decoder.layers.{i}.self_attn.q_proj.weight', identity),
+                CkptWeightInfo('model.decoder.layers.{i}.self_attn.k_proj.weight', identity),
+                CkptWeightInfo('model.decoder.layers.{i}.self_attn.v_proj.weight', identity),
+                ], functools.partial(merge_qkv_hf)),
+            ...
+
+```
+
+![](/public/upload/machine/model_load_weight.jpg)

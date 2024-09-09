@@ -298,6 +298,12 @@ Linux Core Scheduling支持在用户态定义可以共享物理核的任务分�
 1. BE 容器启用 CGroup Idle 特性，最小化调度权重和优先级。
 2. LSR/LS 容器启用 Core Scheduling 特性，支持驱逐物理核上同分组的 BE 任务。
 
+[K8s 1.31 版本上新超酷新功能： 跨核分发CPU](https://mp.weixin.qq.com/s/pVmuanw7jrqWMWz16hqejg) PS：两个配图的意思是，先把pod尽量调度到不同的socket上，同一个socket内 尽量调度到不同的core上？
+
+![](/public/upload/kubernetes/k8s_cpu_manager.jpg)
+
+![](/public/upload/kubernetes/k8s_cpu_order.jpg)
+
 ## 其它
 
 [如何正确获取容器的CPU利用率？](https://mp.weixin.qq.com/s/nKedQRFxmIgPBxtlIJasZw)

@@ -21,7 +21,7 @@ keywords: jvm concurrency
     2. 明确Java内存模型。 Happens-before。不能保证任意时刻的数据一致性，但是通过对synchronized、volatile和final这几个语义被增强的关键字的使用，可以做到数据一致性。
 4. JDK 6.0 synchronized优化。自此再也不允许别人说它的性能比ReentrantLock差了。synchronized吃亏在了它只是个关键字，JVM负责它底层的动作，到底应用程序加锁的时候什么样的姿势舒服，得靠JVM“猜”。ReentrantLock就不同了，它将这件事直接交给程序员去处理了，你希望公平那就用公平锁，你希望你的不公平，那你就用非公平锁。设计层面算是一种偷懒，但同时也是一种灵活。
 5. JDK 15 禁用和废弃偏向锁
-6. JDK 19 虚拟线程
+6. JDK 19 虚拟线程 [Java虚拟线程探究与性能解析](https://mp.weixin.qq.com/s/G1-qLXqHva193LBJ6pSbgg)
 
 ### C语言下的线程使用
 

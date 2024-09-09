@@ -79,6 +79,8 @@ Python是一门动态语言，很多时候我们可能不清楚函数参数类�
 
 ### TypedDict
 
+TypedDict 是 Python 中一个数据类型，用于表示具有固定类型和值的字典。可以让 Python 的字典具有更强的类型约束和检查，从而提高代码的安全性和可维护性。
+
 ```python
 class Point2D(TypedDict):
     x: int

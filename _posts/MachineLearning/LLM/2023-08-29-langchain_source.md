@@ -727,3 +727,8 @@ class AsyncCallbackHandler(BaseCallbackHandler):
     async def on_retriever_error(self,error: BaseException,...):
         """Run on retriever error."""
 ```
+
+1. callback 可以在构建runnable 时传入，也可在invoke 时传入，一个runnable 有多个callbacks，因此要有一个对象统一管理这些callback，叫callbackmanager。在runnable 等执行时，只需执行 callbackmanager.on_xx 即可执行管理的所有 callback.on_xx。 **一个runnable runManager**。
+3. **callbackmanager.on_xx_start 会判断如果有传入的run_id 就使用传入的，没有则自己new一个，on_xx_start 返回一个runManager**，on_xx_start 一般会返回一个callbackManagerForXX（就是一个runManager） 封装父runable的所有callback。这也保证了，如果多个llm共用一个callback实例，在callback on_xx 里可以区分不同的调用链路。这些信息 也是callbackmanager 负责构建并传给callback的，这也是为何要有callbackmanager存在，光在runable 之间传递callback list是不够的。
+2. runnable 有父子关系，执行child_runnable.invoke 时也要执行parent_runnable.callbacks，实际上在父子runnable.invoke 传递的不是callback list 而是runmanager（callback list=runmanager.get_child）。**连带着runManager 也有父子关系**，子runnable on_xx_start 在此基础上再添加自己的callback 构成新的callbackManagerForXX（parent_run_id 为父callbackManagerForXX.run_id），这样在on_xx_end 时可以反向遍历callbackManagerForXX，执行所有callback.on_xx_end。
+4. langchain 提了一个handle_event 方法（由callbackmanager 调用）负责真正出发callback.on_xx，这样不管callback 是同步还是异步的，都可以被触发执行。

@@ -72,3 +72,5 @@ Kubernetes和Mesos调度的最大区别在于资源调度请求的方式
 [服务调用延迟降低 10%-70%，字节跳动做了什么？](https://mp.weixin.qq.com/s/AR-HOtRKUpsQJCshn_CHjA)与直接将微服务合并为更大的服务相比，亲和性部署方案仍保留了微服务架构中服务的独立性、敏捷性和易扩展性等优势。
 1. 通过策略性地重新部署服务的 Pod，尽量将频繁通信的服务 Pod 部署在同一台机器上（Collocation）；
 2. 通过调整网络通信协议，采用本地通信方式（IPC）替代网络通信，显著降低网络开销，减少请求延迟，增强系统的稳定性。
+
+[ResLake: 字节跳动多机房资源统一管理系统解析](https://mp.weixin.qq.com/s/mJP2tNE5p8Rg5WjU9p9qtQ) 未细读

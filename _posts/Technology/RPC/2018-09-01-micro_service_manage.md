@@ -375,6 +375,8 @@ class GenericService {
     1. 其中拉取(pull)模式则是比较通用且重要的一种，即任务的驱动是由消费者发起的，而不是生产者。例如 Reactive Stream 里的 API 规定是由订阅者（消费者）调用 request(n) 方法向生产者请求 n 个消息，生产者再调用 onNext() 将 n 个消息提供给消费者。消费者可以按需要获取，生产者也可以按需生产，从而实现背压。
     2. TCP 是最经典的示例了，协议本身提供背压，内核会保存一个有限(bounded)大小的发送缓冲，当缓冲满的时候，会阻塞 send 方法，即 callstack blocking 实现背压。这样接收方的压力就可以传导到发送方的 send 方法了。消息队列(如 Kafka)相当于提供了一个巨大（接近无限）的缓冲，这样它的上下游之间就不需要有压力的传导了，多余的流量全在队列上。
 
+[软件系统限流的底层原理解析](https://mp.weixin.qq.com/s/EJ68f40ebapdqKTgGOG8tw) 未读
+
 ## 微服务治理标准OpenSergo 
 
 [跨不同开发语言和技术框架，微服务治理规范OpenSergo项目正式开源](https://mp.weixin.qq.com/s/_WQcfyH3H2p7vuT3Keik3Q)

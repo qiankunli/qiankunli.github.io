@@ -29,6 +29,10 @@ Asyncio 和其他 Python 程序一样，是单线程的，它只有一个主线�
 - python3.5:asyncio+async/await(比较熟悉)       
 - python3.7:引入了asyncio.create_task和asyncio.run两个高级接口
 
+几个理解
+1. 在go里没有同步方法异步方法一说，同步里调“异步方法” 只是go 启动了一个同步方法。但在python 里从语法上区分了同步方法和异步方法，**异步方法只能在EventLoop里执行**，可以认为同步方法和异步方法 runtime 不同。
+2. 所以在python里，同步方法里调用异步方法，要把异步方法封为task 交给loop执行，比如loop.run_until_complete(task)。异步方法可以直接执行同步方法，但如果不想让同步方法阻塞EventLoop，则需要loop.run_in_executor(sync_func)，将sync_func交给专门的线程executor。
+
 ## Task
 
 调用异步函数并不能执行函数，**异步函数就不能由我们自己直接执行**（这也是函数与协程的区别），异步代码是以 Task 的形式去运行，被 Event Loop 管理和调度的。`result = async_function()` 协程对象 result 虽然生成了，但是还没有运行，要使代码块实际运行，需要使用 asyncio 提供的其他工具。
