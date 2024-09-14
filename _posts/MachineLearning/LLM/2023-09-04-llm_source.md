@@ -780,3 +780,8 @@ class OptWeightInfo(ModelDeployWeightInfo):
 ```
 
 ![](/public/upload/machine/model_load_weight.jpg)
+
+```
+model = AutoModel.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True)
+``` 
+ AutoModel.from_pretrained 到最后实际是 pytorch.nn.module.load_state_dict。

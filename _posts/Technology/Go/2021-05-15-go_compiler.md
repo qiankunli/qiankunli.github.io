@@ -259,13 +259,17 @@ $ go run main.go
 
 ## panic /recover
 
-panic 指的是 Go 程序在运行时出现的一个异常情况。如果异常出现了，但没有被捕获并恢复，Go 程序的执行就会被终止，即便出现异常的位置不在主 Goroutine 中也会这样。在 Go 中，panic 主要有两类来源，一类是来自 Go 运行时，另一类则是 Go 开发人员通过 panic 函数主动触发的。无论是哪种，一旦 panic 被触发，后续 Go 程序的执行过程都是一样的，这个过程被 Go 语言称为 panicking。
+Go 与其他主流编程语言在错误处理上有一个很大的分歧，**Go 区分了「错误」和「异常」**。与 error 错误不同，panic 指的是 Go 程序在运行时出现的一个异常情况。如果异常出现了，但没有被捕获并恢复，Go 程序的执行就会被终止，即便出现异常的位置不在主 Goroutine 中也会这样。在 Go 中，panic 主要有两类来源，一类是来自 Go 运行时，另一类则是 Go 开发人员通过 panic 函数主动触发的。无论是哪种，一旦 panic 被触发，后续 Go 程序的执行过程都是一样的，这个过程被 Go 语言称为 panicking。
+
+**panic/recover 机制控制流作用在整个goroutine的调用栈**，当goroutine执行到panic时，控制流开始在当前goroutine调用栈向上回溯并执行每个函数的defer，如果defer中遇到recover 则回溯停止。如果执行到goroutine 最顶层的defer还没有recover，runtime就输出调用栈信息然后退出。所以如果要使用recover 避免panic 导致进程挂掉，recover 必须要放到defer里。
 
 recover 是 Go 内置的专门用于恢复 panic 的函数，**它必须被放在一个 defer 函数中才能生效**。如果 recover 捕捉到 panic，它就会返回以 panic 的具体内容为错误上下文信息的error值。如果没有 panic 发生，那么 recover 将返回 nil。而且，如果 panic 被 recover 捕捉到，panic 引发的 panicking 过程就会停止。
 
 Java 中对checked exception处理的本质是错误处理，虽然它的名字用了带有“异常”的字样。Go 中的 panic 呢，更接近于 Java 的RuntimeException+Error。不同于java 的 try...catch，在 Golang 中并不是所有异常都能够被 recover 捕获到：
 1. 当异常是通过 runtime.panic() 抛出时，能够被 recover 方法捕获；
 2. 当异常是通过 runtime.throw() 或者 runtime.fatal() 抛出时，不能够被 recover 方法捕获。
+
+不过绝大多数情况下并不建议使用 panic + recover 机制，panic 表示意外的异常，而我们在编写代码阶段，更多需要处理的情况是可以预见的错误 error。对于真正意外的情况，比如数组索引越界，我们才会使用 panic，对于一般性错误，我们应该是使用 error 来进行处理。
 
 [Go 的 panic 的秘密都在这](https://mp.weixin.qq.com/s/pxWf762ODDkcYO-xCGMm2g)
 ```go

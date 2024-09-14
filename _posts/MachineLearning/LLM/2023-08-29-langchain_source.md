@@ -17,12 +17,6 @@ LLM 不管是 GPT 还是 BERT，有且只有一个核心功能，就是预测你
 
 ![](/public/upload/machine/langchain_overview.jpg)
 
-在 LangChain 0.1 之前，LangChain 总结提炼了LLM 开发必须的几个基础组件，比如Prompt/LLM等，对它们的功能范围、输入输出进行了界定，找到构造复杂系统的统一规律和可达路径，此时还相对碎一些，抽象粒度低，后来将Prompt/LLM 等都统一到Runnable 协议（就像Java里的一切皆Object），原子组件标准化，进而以此为基础提出了编排组件LCEL和LangGraph。
-LangChain 0.1 几个包
-1. langchain-core 包含了核心抽象（如消息类型定义，输入输出管理等）和 LangChain 表达语言（LCEL）
-2. langchain-community 包含第三方集成，其易变特性与 langchain-core 形成对比。主要集成将被进一步拆分为独立软件包，以更好地组织依赖、测试和维护。
-3. langchain 负责流程的编排与组装，包含了实际运用的 Chain、Agent 和算法，为构建完整的 LLM 应用提供了支撑。。它相对开放，介于 langchain-core 和 langchain-community 之间。 
-
 ## LangChain
 
 LangChain is a framework for developing applications powered by language models. We believe that the most powerful and differentiated applications will not only call out to a language model, but will also be:
@@ -147,11 +141,9 @@ assistant：炒米粉在广东是蛮常见的早餐，但是油太多，可以�
 
 不幸的是，目前还没有一个标准来确定使用哪些标记，因此不同的模型使用的格式和控制标记都可能大相径庭。聊天对话通常表示为字典列表，每个字典包含角色和内容键，表示一条单独的聊天消息。聊天模板是包含Jinja模板的字符串，用于指定如何将给定模型的对话格式化为一个可分词的序列。通过将这些信息存储在分词器中，我们可以确保模型以其期望的格式获取输入数据。对于一个模型来说，chat template 存储在tokenizer.chat_template 属性上（这个属性将保存在tokenizer_config.json文件中），如果chat template没有被设置，对那个模型来说，默认模版会被使用。
 
-
-
 ## LLM模型层
 
-一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析（**output_parsers 在 prompt 中尤其是system prompt中插入了需要返回的格式说明**）等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。PS：底层Transformer比如 chatglm原输出不是直接str，langchain中要求模型返回必须是str的结果，因此 Transformers.Model 与 langchain.llm 要有一个适配。
+LangChain的一个核心价值就是它提供了标准的模型接口；然后我们可以自由的切换不同的模型。一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析（**output_parsers 在 prompt 中尤其是system prompt中插入了需要返回的格式说明**）等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。PS：底层Transformer比如 chatglm原输出不是直接str，langchain中要求模型返回必须是str的结果，因此 Transformers.Model 与 langchain.llm 要有一个适配。
 
 ```python
 # BaseLanguageModel 是一个抽象基类，是所有语言模型的基类
@@ -193,6 +185,7 @@ BaseLanguageModel ==> BaseLLM + BaseChatModel
 ![](/public/upload/machine/llm_chain.jpg)
 
 ### prompt
+
 prompt template 是一个模板化的字符串，可以用来生成特定的提示（prompts）。可以将变量插入到模板中，从而创建出不同的提示。这对于重复生成相似格式的提示非常有用。
 BasePromptTemplate ==> StringPromptTemplate + BaseChatPromptTemplate 所有的 PromptTemplate 父类都是BasePromptTemplate，它也是一个Runnable，它将Runnable.invoke 转为了PromptTemplate.format_xx，Runnable.invoke 输入转为PromptTemplate.format_xx输入，PromptTemplate.format_xx输出转为invoke 输出。
 
@@ -692,6 +685,7 @@ LangChain 的 Callback 机制允许你在应用程序的不同阶段进行自定
 3. 在 LangChain 的各个组件，如 Chains、Models、Tools、Agents 等，都提供了两种类型的回调设置方法：构造函数回调和请求回调。你可以在初始化 LangChain 时将回调处理器传入，或者在单独的请求中使用回调。例如，当你想要在整个链的所有请求中进行日志记录时，可以在初始化时传入处理器；而当你只想在某个特定请求中使用回调时，可以在请求时传入。
     1. verbose = True等同于将一个输出到控制台的回调处理器添加到你的对象中。
 
+![](/public/upload/machine/langchain_010.png)
 
 看 AsyncCallbackHandler 各个回调方法的参数，再结合langhcain 各个抽象的作用，很对口。
 ```python

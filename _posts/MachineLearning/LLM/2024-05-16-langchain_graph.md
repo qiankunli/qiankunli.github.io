@@ -71,9 +71,19 @@ p.add_link("reranker", "evaluator", dest_key="nodes")
 p.add_link("output", "evaluator", dest_key="answer")
 ```
 
-## LCEL 
+## Runnable protocol
+
+在 LangChain 0.1 之前，LangChain 总结提炼了LLM 开发必须的几个基础组件，比如Prompt/LLM等，对它们的功能范围、输入输出进行了界定，找到构造复杂系统的统一规律和可达路径，此时还相对碎一些，抽象粒度低，后来将Prompt/LLM 等都统一到Runnable 协议（就像Java里的一切皆Object），原子组件标准化，进而以此为基础提出了编排组件LCEL和LangGraph。
+LangChain 0.1 几个包
+1. langchain-core 包含了核心抽象（如消息类型定义，输入输出管理等）和 LangChain 表达语言（LCEL）
+2. langchain-community 包含第三方集成，其易变特性与 langchain-core 形成对比。主要集成将被进一步拆分为独立软件包，以更好地组织依赖、测试和维护。
+3. langchain 负责流程的编排与组装，包含了实际运用的 Chain、Agent 和算法，为构建完整的 LLM 应用提供了支撑。。它相对开放，介于 langchain-core 和 langchain-community 之间。 
+
+![](/public/upload/machine/langchain_010.png)
 
 在 LangChain 里只要实现了Runnable接口，并且有invoke方法，都可以成为链。实现了Runnable接口的类，可以拿上一个链的输出作为自己的输入。
+
+## LCEL 
 
 [langchain入门3-LCEL核心源码速通](https://juejin.cn/post/7328204968636252198)LCEL实际上是langchain定义的一种DSL，可以方便的将一系列的节点按声明的顺序连接起来，实现固定流程的workflow编排。LCEL语法的核心思想是：一切皆为对象，一切皆为链。这意味着，LCEL语法中的每一个对象都实现了一个统一的接口：Runnable，它定义了一系列的调用方法（invoke, batch, stream, ainvoke, …）。这样，你可以用同样的方式调用不同类型的对象，无论它们是模型、函数、数据、配置、条件、逻辑等等。而且，你可以将多个对象链接起来，形成一个链式结构，这个结构本身也是一个对象，也可以被调用。这样，你可以将复杂的功能分解成简单的组件，然后用LCEL语法将它们组合起来，形成一个完整的应用。
 
@@ -127,7 +137,7 @@ Runnable所有接口都接收可选的配置参数，可用于配置执行、添
         chunks.append(chunk)
         print(chunk.content, end="|", flush=True)
     ```
-4. stream_events:从输入流流式获取结果与中间步骤。 PS： 有点替换 callbackhandler 的味道。
+4. stream_events:从输入流流式获取结果与中间步骤。 PS：尤其是对agent来讲，等final answer 太久了，但流式获取一个个token太细节了（哪怕这些token 都附带了它们属于哪些step的元信息），流式获取中间一个个event 更舒服些。[langchain streaming](https://python.langchain.com/v0.1/docs/modules/agents/how_to/streaming/)
 
     ```
     async for event in model.astream_events("hello", version="v1"):

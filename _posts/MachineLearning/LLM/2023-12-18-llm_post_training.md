@@ -28,6 +28,8 @@ keywords: llm rhlf
 
 ## RLHF流程
 
+强化学习（Reinforcement Learning, RL）是一种机器学习方法，模型通过与环境的交互来学习决策策略。模型在每一步的选择中会得到奖励或惩罚，目标是最大化长期的累积奖励。在自然语言处理（NLP）中，强化学习可以用于优化模型的输出，使其更符合期望的目标。
+
 ![](/public/upload/machine/rlhf_workflow.jpg)
 
 [图解大模型RLHF系列之：人人都能看懂的PPO原理与源码解读](https://mp.weixin.qq.com/s/mhPJzhQvPJlAWsO2nW9BHg)

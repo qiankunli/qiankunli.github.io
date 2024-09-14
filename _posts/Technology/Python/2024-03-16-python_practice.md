@@ -363,7 +363,7 @@ java里面增强已有代码，几乎只有动态代理一个手段。注解加�
 
 ### 动态属性
 
-PS：在java 里得用reflect包，在python里好家伙
+PS：在java 里得用reflect包，在python里好家伙直接 setattr/getattr，都懒得用反射
 ```python
 # 动态调用方法
 class MyClass:

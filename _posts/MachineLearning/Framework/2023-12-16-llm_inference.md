@@ -240,6 +240,12 @@ System Prompt Caching，也称为 Prefix Sharing，其基本思想是对System P
 
 ### 调度优化/动态批处理
 
+[大模型推理服务调度优化技术-Continuous batching](https://mp.weixin.qq.com/s/Se4lzaTLNZF29BXLRjw0xw)
+1. 单处理，也就是单个提示（Prompt）传过来直接送入到LLM进行推理。因为每次只能处理一条数据，对GPU资源的利用率较低。
+2. 静态批处理（static batching），静态批处理指将多个Prompt打包进行一个批处理请求，并在批处理请求中所有Prompt完成后返回响应，批处理的大小在推理完成之前保持不变。一个批次中不同序列的生成长度不同。有的Prompt在批处理中较早“完成”，但需等待这一批次中Prompt最长的生成结束，因此，GPU 未得到充分利用。
+3. 动态批处理（Dynamic batching），动态批处理是指允许将一个或多个推理请求组合成单个批次（必须动态创建）以最大化吞吐量的功能。PS： 没懂，不过无所畏了。
+4. 连续批处理（Continuous Batching），无论是动态批处理还是静态批处理，通常在相同形状的输入和输出请求的场景，提高GPU的利用率。但对于自回归大模型推理场景而言，都不太适用（同一批次中的数据输入和输出长度都不一样）。Continuing Batching（有的地方也叫做 Inflight batching 或者 Iteration batching）指请求在到达时一起批量处理，但它不是等待批次中所有序列都完成，而是当一个输入提示生成结束之后，就会在其位置将新的输入Prompt插入进来，从而比静态批处理具备更高的 GPU 利用率。由于**每次迭代的批处理大小是动态的**，因此，有些地方也叫动态Batching。
+
 提升模型服务吞吐最重要的手段是 Batching 策略，Batching主要包含以下三个步骤：
 
 1. 模型服务调度层将多个不同的请求组成一个 batch 的模型输入；
@@ -248,7 +254,7 @@ System Prompt Caching，也称为 Prefix Sharing，其基本思想是对System P
 
 一般来说，合并越多的请求作为单次推理的输入，服务吞吐越高。所以从请求 Batching 的角度去提升模型服务吞吐的本质是提升单次推理的最大合并请求数，即 batch size。对于模型服务来说，单次推理最大合并请求数主要受显存制约。合并越多的请求，batch size 越大，KVCache 的显存占用则越大。KVCache 的显存占用上限可简单的通过显卡的最大显存减去模型权重显存计算得到。
 
-Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的（Request-Level），将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。
+Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的（Request-Level），将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。对于新到达的请求，有机会在当前的迭代执行后进行处理，从而减少等待时间。**通过迭代级调度，调度器可以完全控制每次迭代处理的请求数量和哪些请求**。PS： batch的粒度不同。
 
 ![](/public/upload/machine/iteration_level_batching.jpg)
 
