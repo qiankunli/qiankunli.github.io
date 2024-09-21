@@ -65,10 +65,31 @@ k8s
              └── kustomization.yaml
 ```
 
-一个由 kustomize 管理的应用结构，它主要由 base 和 overlays 组成。Kustomize 使用 Base、Overlay 和 Patch 生成最终配置文件的思路，与 Docker 中分层镜像的思路有些相似（PS：所以叫overlays，指定 Kubernetes 将使用哪些策略修补资源），这样的方式既规避了以“字符替换”对资源元数据文件的入侵，也不需要用户学习额外的 DSL 语法（比如 Lua）。但是，毕竟 Kustomize 只是一个“小工具”性质的辅助功能，**要做的事、要写的配置，最终都没有减少，只是不用反复去写罢了**。
+一个由 kustomize 管理的应用结构，它主要由 base 和 overlays 组成。Kustomize 使用 Base、Overlay 和 Patch 生成最终配置文件的思路，与 Docker 中分层镜像的思路有些相似（PS：所以叫overlays，指定 Kubernetes 将使用哪些策略修补资源），这样的方式既规避了以“字符替换”对资源元数据文件的入侵，也不需要用户学习额外的 DSL 语法（比如 Lua）。但是，毕竟 Kustomize 只是一个“小工具”性质的辅助功能，**要做的事、要写的配置，最终都没有减少，只是不用反复去写罢了**。PS：`kubectl apply -k 带有 kustomization.yaml的目录` 就可以看做 `kubectl apply -f  kustomization.yaml 引用的所有resource manifest`
+
+Kustomize 提供的两个核心功能 —— 聚合资源和修补字段。 
+
+```yaml
+# let's modify the contents of kustomization.yaml thus:
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: frontend
+commonLabels:
+  app: frontend
+resources:        # 聚合资源
+- service.yaml
+- deployment.yaml
+patches:          # 修补字段
+- target:
+    kind: Deployment
+    name: frontend
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 15
+```
 
 ### 使用
-
 
 ```sh
 $ cd k8s/

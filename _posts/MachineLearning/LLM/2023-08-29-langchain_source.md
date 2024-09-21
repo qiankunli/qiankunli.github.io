@@ -682,8 +682,7 @@ class RetrievalQA(BaseRetrievalQA):
 LangChain 的 Callback 机制允许你在应用程序的不同阶段进行自定义操作，如日志记录、监控和数据流处理，这个机制通过 CallbackHandler（回调处理器）来实现。回调处理器是 LangChain 中实现 CallbackHandler 接口的对象，为每类可监控的事件提供一个方法。当该事件被触发时，CallbackManager 会在这些处理器上调用适当的方法。
 1. BaseCallbackHandler 是最基本的回调处理器，你可以继承它来创建自己的回调处理器。它包含了多种方法，如 on_llm_start/on_chat（当 LLM 开始运行时调用）和 on_llm_error（当 LLM 出现错误时调用）等。
 2. LangChain 也提供了一些内置的处理器，例如 StdOutCallbackHandler，它会将所有事件记录到标准输出。还有 FileCallbackHandler，会将所有的日志记录到一个指定的文件中。
-3. 在 LangChain 的各个组件，如 Chains、Models、Tools、Agents 等，都提供了两种类型的回调设置方法：构造函数回调和请求回调。你可以在初始化 LangChain 时将回调处理器传入，或者在单独的请求中使用回调。例如，当你想要在整个链的所有请求中进行日志记录时，可以在初始化时传入处理器；而当你只想在某个特定请求中使用回调时，可以在请求时传入。
-    1. verbose = True等同于将一个输出到控制台的回调处理器添加到你的对象中。
+
 
 ![](/public/upload/machine/langchain_010.png)
 
@@ -722,7 +721,24 @@ class AsyncCallbackHandler(BaseCallbackHandler):
         """Run on retriever error."""
 ```
 
-1. callback 可以在构建runnable 时传入，也可在invoke 时传入，一个runnable 有多个callbacks，因此要有一个对象统一管理这些callback，叫callbackmanager。在runnable 等执行时，只需执行 callbackmanager.on_xx 即可执行管理的所有 callback.on_xx。 **一个runnable runManager**。
-3. **callbackmanager.on_xx_start 会判断如果有传入的run_id 就使用传入的，没有则自己new一个，on_xx_start 返回一个runManager**，on_xx_start 一般会返回一个callbackManagerForXX（就是一个runManager） 封装父runable的所有callback。这也保证了，如果多个llm共用一个callback实例，在callback on_xx 里可以区分不同的调用链路。这些信息 也是callbackmanager 负责构建并传给callback的，这也是为何要有callbackmanager存在，光在runable 之间传递callback list是不够的。
-2. runnable 有父子关系，执行child_runnable.invoke 时也要执行parent_runnable.callbacks，实际上在父子runnable.invoke 传递的不是callback list 而是runmanager（callback list=runmanager.get_child）。**连带着runManager 也有父子关系**，子runnable on_xx_start 在此基础上再添加自己的callback 构成新的callbackManagerForXX（parent_run_id 为父callbackManagerForXX.run_id），这样在on_xx_end 时可以反向遍历callbackManagerForXX，执行所有callback.on_xx_end。
-4. langchain 提了一个handle_event 方法（由callbackmanager 调用）负责真正出发callback.on_xx，这样不管callback 是同步还是异步的，都可以被触发执行。
+1. callback 可以在构建runnable 时传入，也可在invoke 时传入，一个runnable 有多个callbacks，因此要有一个对象统一管理这些callback，叫callbackmanager。callbackmanager 只负责触发on_xx_start，**on_xx_start 返回一个runManager**，on_xx_start 一般会返回一个callbackManagerForXX（就是一个runManager） 封装父runable的所有callback，runManager 主要触发on_xx_end 和 on_xx_error。
+2. on_xx_start 会判断如果有传入的run_id 就使用传入的，没有则自己new一个。run_id保证了，如果多个llm共用一个callback实例，在callback on_xx 执行时的run_id可以区分不同的调用链路。这些信息 也是callbackmanager/runManager 负责构建并传给callback的，这也是为何要有callbackmanager/runManager存在，光在runable 之间传递callback list是不够的。PS：**至于为何区分callbackManager/runManager还有待观察**。
+2. runnable 有父子关系，执行child_runnable.invoke 时也要执行parent_runnable.callbacks，实际上在父子runnable.invoke 传递的不是callback list 而是callbackManager（runManager.get_child 又可以返回一个 CallbackManager）。连带着callbackManager/runManager 通过parent_run_id 关联也有了父子关系。`runManager = cm.on_xx_start();child_cm = runManager.get_child()`
+    1. child_cm.parent_run_id = cm/runManager.run_id
+    1. callbackhandler 分为是否inheritable。child_cm 只保留了cm.inheritable_callbacks。 Runnable 自身是不包含callbacks的，只有invoke时可以传递RunnableConfig.callbacks。Runnable 子类 比如Chain 包含callbacks 成员。 也就是有两种类型的回调设置方法：构造函数回调和invoke 等方法。一种是可以透传到子Runnable，一种只应用于本次执行。 
+4. langchain 提了一个handle_event 方法（由callbackmanager/runManager 调用）负责真正触发callback.on_xx，这样不管callback 是同步还是异步的，都可以被触发执行。
+
+LLM 可观测性组件都是基于callbackhandler 实现的，分为服务端、客户端、与langchain集成套件，会预先定义好类似trace/span的概念。
+1. langfuse 
+    1. 概念：user ==> session/conversation ==> trace ==> span，run/span包含input、output、tags、metadata的等
+1. LangSmith提供了一套完整的SDK用于您在自己的LLM应用中对每一次的AI应用的“Run”进行灵活管理。
+    1. LangSmith 有一套概念 trace和run（一对多关系），什么是一次Run？这通常代表你的LLM应用中一次完整任务的执行过程。通常以用户输入（或系统输入）开始，以最终输出结束。一次Run的过程中会包含一次或者多次的LLM调用与交互，并最终完成整个思维链获得输出。
+    2. 提供了langsmith-sdk（python） 来向LangSmith录入数据，且实际上也是通过callbackhandler（在langchain trace包下） 来调用langsmith-sdk client上传run数据（tracehandler）
+    3. 因为LangSmith是内置的，所以callmanager 内部会根据开关决定是否加入tracehanlder，不用显式在够着Runnable或invoke时注入callbackhandler。
+
+为了落实 LLM 可观测性，我们具体应该关注哪些方面？
+1. Prompt 输入输出交互信息
+2. Token 消耗
+3. 模型响应时间
+4. Agent workflow
+5. 用户反馈

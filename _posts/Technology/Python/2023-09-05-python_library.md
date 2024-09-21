@@ -31,7 +31,7 @@ sys.path 是一个 Python 列表，用于指定解释器在导入模块时搜索
 可以在 Python 解释器中执行 `print(sys.path)`，查看当前 Python 解释器的 sys.path。
 
 1. requirements.txt。requirements.txt 是一个纯文本文件，它列出了项目所需的所有Python包及其版本。适合小型到中型项目，或者是那些不需要复杂依赖管理的项目。它的缺点是不支持条件依赖（例如，某些依赖只在特定操作系统上需要），也不支持包的替代。这个文件通常与pip工具一起使用
-2. pyproject.toml 是一个TOML格式的配置文件，它是Python包管理工具pipenv使用的配置文件。 支持更复杂的依赖管理，例如条件依赖、开发依赖和包的替代。
+2. pyproject.toml 是一个TOML格式的配置文件，它是Python包管理工具pipenv使用的配置文件。 支持更复杂的依赖管理，例如条件依赖、开发依赖和包的替代。通过 `poetry install` 或`pip install .` 安装
 
 ## streamlit
 

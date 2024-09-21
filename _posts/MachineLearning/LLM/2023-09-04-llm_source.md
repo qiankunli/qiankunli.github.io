@@ -512,7 +512,7 @@ def generate(self,
 1. generate只用于推理场景，forward既用于推理场景，也用于训练场景。
 2. generate是基于forward实现的。
 3. generate利用各种解码策略，生成文本；而forward最主要的作用就是提供logits（未归一化的分布）。
-4. 解码策略对于文本的生成是非常重要的。我们可以不使用generate，而直接根据forward的logits进行解码，只要自己实现各类解码策略即可。这在自定义解码策略时非常有用。
+4. 解码策略对于文本的生成是非常重要的。我们可以不使用generate，而直接根据forward的logits进行解码，只要自己实现各类解码策略即可。这在自定义解码策略时非常有用，比如生成结构化的数据 [一文弄懂 LLM 结构化数据生成原理](https://mp.weixin.qq.com/s/M5b-e1eLZyy1SBRiUw1z4Q)，结构化数据生成的原理用一句话概括就是：每个 step 拿到当前 model 给出的 logits 之后，在采样下一个 token 之前，通过人工设定的规则可以得到当前 step 只允许采样的 token 集合，接着通过加 bias 的方式压制其他不允许采样的 token，从而实现指定的结构化数据生成。
 
 ### forward实现
 

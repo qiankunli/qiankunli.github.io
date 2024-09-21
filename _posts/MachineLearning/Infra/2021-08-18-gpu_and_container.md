@@ -68,10 +68,11 @@ service DevicePlugin {
     rpc Allocate(AllocateRequest) returns (AllocateResponse) {}
 }
 ```
-目前 Kubernetes 本身的 Device Plugin 的设计，实际上能覆盖的场景是非常单一的，属于“可用”但是“不好用”的状态。一旦你的设备是异构的、不能简单地用“数目”去描述具体使用需求的时候，比如，“我的 Pod 想要运行在计算能力最强的那个 GPU 上”，Device Plugin 就完全不能处理了。在很多场景下，我们其实希望在调度器进行调度的时候，就可以根据整个集群里的某种硬件设备的全局分布，做出一个最佳的调度选择。
+目前 Kubernetes 本身的 Device Plugin 的设计，实际上能覆盖的场景是非常单一的，属于“可用”但是“不好用”的状态。一旦你的设备是异构的、**不能简单地用“数目”去描述具体使用需求的时候**，比如，“我的 Pod 想要运行在计算能力最强的那个 GPU 上”，Device Plugin 就完全不能处理了。在很多场景下，我们其实希望在调度器进行调度的时候，就可以根据整个集群里的某种硬件设备的全局分布，做出一个最佳的调度选择。
 1. 调度器扮演的角色，仅仅是为 Pod 寻找到可用的、支持这种硬件设备的节点
-2. GPU 等硬件设备的调度工作，实际上是由 kubelet 完成的。即，kubelet 会负责从它所持有的硬件设备列表中，为容器挑选一个硬件设备，然后调用 Device Plugin 的 Allocate API 来完成这个分配操作。
+2. GPU 等硬件设备的调度工作，实际上是由 kubelet 完成的。即kubelet 会负责从它所持有的硬件设备列表中，为容器挑选一个硬件设备，然后调用 Device Plugin 的 Allocate API 来完成这个分配操作。
 3. 不支持多个pod共享一个gpu 
+[GPU拓扑感知调度概述](https://help.aliyun.com/zh/ack/ack-managed-and-ack-dedicated/user-guide/overview-of-topology-aware-gpu-scheduling)
 
 ## 上报细节
 

@@ -16,6 +16,8 @@ keywords: llm inference
 
 ## 简介
 
+在大模型之前的时代，模型结构不断发散，但推理功能的形态是稳定的，因此推理框架演化的结果是重Builder，轻Runtime。但大模型时代恰恰相反，模型结构相对稳定，推理功能却花样迭出，因此需要一个灵活的，预留足够空间的Runtime模块，Builder的各种优化反而变得简单。综合几点来看，大模型对于推理框架的设计哲学的改变是革命性的，已有的成熟的推理框架显得过于陈旧，难以完成这些变化，而新的推理框架又过于简单(以vllm为代表)，24年的博弈会非常精彩。
+
 1. vLLM是一个开源的大模型推理加速框架，通过PagedAttention高效地管理attention中缓存的张量，实现了比HuggingFace Transformers高14-24倍的吞吐量，就像在操作系统中管理CPU虚拟内存一样
 2. NVIDIA FasterTransformer (FT) 是一个用于实现基于Transformer的神经网络推理的加速引擎。它包含Transformer块的高度优化版本的实现，其中包含编码器和解码器部分。使用此模块，您可以运行编码器-解码器架构模型（如：T5）、仅编码器架构模型（如：BERT）和仅解码器架构模型（如：GPT）的推理。FT框架是用C++/CUDA编写的，依赖于高度优化的 cuBLAS、cuBLASLt 和 cuSPARSELt 库，这使您可以在 GPU 上进行快速的 Transformer 推理。与 NVIDIA TensorRT 等其他编译器相比，FT 的最大特点是它支持以分布式方式进行 Transformer 大模型推理。在底层，节点间或节点内通信依赖于 MPI 、 NVIDIA NCCL、Gloo等。因此，使用FasterTransformer，您可以在多个 GPU 上以张量并行运行大型Transformer，以减少计算延迟。同时，TP 和 PP 可以结合在一起，在多 GPU 节点环境中运行具有数十亿、数万亿个参数的大型 Transformer 模型。
 3. DeepSpeed-MII 是 DeepSpeed 的一个新的开源 Python 库，旨在使模型不仅低延迟和低成本推理，而且还易于访问。
