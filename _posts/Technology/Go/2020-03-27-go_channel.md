@@ -71,9 +71,10 @@ type waitq struct { // 等待队列 sudog 双向队列
 
 ```go
 func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
+	// 异常检查，如GC检查等
 	...
-    lock(&c.lock)
-    // 如果 Channel 已经关闭
+    lock(&c.lock)	// 为当前 Channel 加锁，保证线程安全
+    // 如果 Channel 已经关闭，那么向该 Channel 发送数据时会抛出panic
 	if c.closed != 0 {
 		unlock(&c.lock)
 		panic(plainError("send on closed channel"))
@@ -83,7 +84,7 @@ func chansend(c *hchan, ep unsafe.Pointer, block bool, callerpc uintptr) bool {
 		send(c, sg, ep, func() { unlock(&c.lock) }, 3)
 		return true
     }
-    // 如果创建的 Channel 包含缓冲区并且 Channel 中的数据没有装满
+    // 如果创建的 Channel 包含缓冲区并且 Channel 中的数据没有装满，将发送的数据写入 Channel 的缓冲区；
     if c.qcount < c.dataqsiz {
 		qp := chanbuf(c, c.sendx)
 		typedmemmove(c.elemtype, qp, ep)
@@ -194,6 +195,15 @@ func chanrecv(c *hchan, ep unsafe.Pointer, block bool) (selected, received bool)
 ```
 
 ### 关闭
+
+- 关闭未初始化的channel(nil channel)会panic
+- 重复关闭同一channel会panic
+- 向已关闭channel发送消息会panic
+- 从已关闭channel读取数据，不会panic
+  - 若还存在数据，会读出未被读取的消息
+  - 若无数据，会读出对应数据类型的零值
+- 关闭channel时，所有阻塞在此channel上的接收者，都会立刻从阻塞等待中返回，**可以利用此特性，实现广播机制**。
+- channel也可以使用for-range取值，并且会一直从channel中读取数据，因此不主动break/goto/return的情况下，for循环结束的唯一条件是channel被关闭
 
 编译器会将用于关闭管道的 close 关键字转换成 OCLOSE 节点以及 runtime.closechan 的函数调用。该函数在最后会为所有被阻塞的 Goroutine 调用 runtime.goready 触发调度。PS：所以close 也成了一种 通知的方式。
 

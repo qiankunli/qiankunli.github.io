@@ -31,6 +31,8 @@ keywords: llm multimodal
 4. 音频模态：指声音数据，如音乐、语音等。
 5. 其他模态：如传感器数据、生物特征数据等其他形式的信息。
 
+[多模态大模型技术点总结](https://mp.weixin.qq.com/s/P2lMI6TkHo7SjamjMO3G3A) 未读。
+
 ## Transformer与多模态
 
 ![](/public/upload/machine/mllm.jpg)

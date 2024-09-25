@@ -261,7 +261,7 @@ func printiface(i iface) {
 2. 反射出变量的类型需要额外的开销，降低了代码的运行效率
 3. 反射的概念和语法比较抽象，过多的使用反射，使得代码难以被其他人读懂，不利于合作与交流
 
-[Golang 中反射的应用与理解](https://mp.weixin.qq.com/s/TmzV2VTfkE8of2_zuKa0gA)反射，就是能够在运行时更新变量和检查变量的值、调用变量的方法和变量支持的内在操作，而不需要在编译时就知道这些变量的具体类型。这种机制被称为反射。Golang 的基础类型是静态的（也就是指定 int、string 这些的变量，它的 type 是 static type），在创建变量的时候就已经确定，反射主要与 Golang 的 interface 类型相关（它的 type 是 concrete type），只有运行时 interface 类型才有反射一说。当程序运行时， 我们获取到一个 interface 变量， 程序应该如何知道当前变量的类型，和当前变量的值呢？当然我们可以有预先定义好的指定类型， 但是如果有一个场景是我们需要编写一个函数，能够处理一类共性逻辑的场景，但是输入类型很多，或者根本不知道接收参数的类型是什么，或者可能是没约定好；也可能是传入的类型很多，这些类型并不能统一表示。这时反射就会用的上了，**典型的例子如：json.Marshal**。在 Golang 中为我们提供了两个方法，分别是 reflect.ValueOf  和 reflect.TypeOf，见名知意这两个方法分别能帮我们获取到对象的值和类型。Valueof 返回的是 Reflect.Value 对象，是一个 struct,而 typeof 返回的是 Reflect.Type 是一个接口。我们只需要简单的使用这两个进行组合就可以完成多种功能。
+[Golang 中反射的应用与理解](https://mp.weixin.qq.com/s/TmzV2VTfkE8of2_zuKa0gA)反射，就是能够在运行时更新变量和检查变量的值、调用变量的方法和变量支持的内在操作，而不需要在编译时就知道这些变量的具体类型。这种机制被称为反射。Golang 的基础类型是静态的（也就是指定 int、string 这些的变量，它的 type 是 static type），在创建变量的时候就已经确定，反射主要与 Golang 的 interface 类型相关（它的 type 是 concrete type），只有运行时 interface 类型才有反射一说。**当程序运行时， 我们获取到一个 interface 变量， 程序应该如何知道当前变量的类型，和当前变量的值呢？**当然我们可以有预先定义好的指定类型， 但是如果有一个场景是我们需要编写一个函数，能够处理一类共性逻辑的场景，但是输入类型很多，或者根本不知道接收参数的类型是什么，或者可能是没约定好；也可能是传入的类型很多，这些类型并不能统一表示。这时反射就会用的上了，**典型的例子如：json.Marshal**。在 Golang 中为我们提供了两个方法，分别是 reflect.ValueOf  和 reflect.TypeOf，见名知意这两个方法分别能帮我们获取到对象的值和类型。Valueof 返回的是 Reflect.Value 对象，是一个 struct,而 typeof 返回的是 Reflect.Type 是一个接口。我们只需要简单的使用这两个进行组合就可以完成多种功能。
 
 [深度解密GO语言之反射](https://juejin.im/post/5cd0d6ed6fb9a0321556f618)反射的本质是程序在运行期探知对象的类型信息和内存结构（泛化一点说，就是我想知道某个指针对应的内存里有点什么），不用反射能行吗？可以的！使用汇编语言，直接和内层打交道，什么信息不能获取？但是，当编程迁移到高级语言上来之后，就不行了！就只能通过反射来达到此项技能。
 
@@ -273,14 +273,30 @@ reflect 包里定义了一个接口`reflect.Type`和一个结构体`reflect.Valu
 ![](/public/upload/go/reflect_object.png)
 
 
-
 ### TypeOf
 
-TypeOf 函数用来提取一个接口中值的类型信息。由于它的输入参数是一个空的 `interface{}`，调用此函数时，实参会先被转化为 `interface{}` 类型。这样，实参的类型信息、方法集、值信息都存储到 `interface{}` 变量里了。
+TypeOf 函数用来提取一个接口中值的类型信息（**比如有哪些字段**）。由于它的输入参数是一个空的 `interface{}`，调用此函数时，实参会先被转化为 `interface{}` 类型。这样，实参的类型信息、方法集、值信息都存储到 `interface{}` 变量里了。
 
+Type是什么
+```go
+type rtype struct {
+    size       uintptr // 类型占用内存大小
+    ptrdata    uintptr // 包含所有指针的内存前缀大小
+    hash       uint32  // 类型 hash
+    tflag      tflag   // 标记位，主要用于反射
+    align      uint8   // 对齐字节信息
+    fieldAlign uint8   // 当前结构字段的对齐字节数
+    kind       uint8   // 基础类型枚举值
+    equal func(unsafe.Pointer, unsafe.Pointer) bool //比较两个形参对应对象的类型是否相等
+    gcdata    *byte    // GC 类型的数据
+    str       nameOff  // 类型名称字符串在二进制文件段中的偏移量
+    ptrToThis typeOff  // 类型元信息指针在二进制文件段中的偏移量
+}
+```
 
 ```go
 func TypeOf(i interface{}) Type{
+    // 任意类型的变量都可以被强转为emptyInterface
     eface := *(*emptyInterface)(unsafe.Pointer(&i))
     return toType(eface.typ)
 }
@@ -295,6 +311,18 @@ func toType(t *rtype) Type {
 ### ValueOf
 
 reflect.Value 表示 interface{} 里存储的实际变量，它能提供实际变量的各种信息。相关的方法常常是需要结合类型信息和值信息。例如，如果要提取一个结构体的字段信息，那就需要用到 _type (具体到这里是指 structType) 类型持有的关于结构体的字段信息、偏移信息，以及 `*data` 所指向的内容 —— 结构体的实际值。
+
+Value是什么
+```go
+type Value struct {
+    // typ 包含由值表示的值的类型。
+    typ *rtype
+    // 指向值的指针
+    ptr unsafe.Pointer
+    // flag 保存有关该值的元数据
+    flag
+}
+```
 
 ```go
 func ValueOf(i interface{}) Value {

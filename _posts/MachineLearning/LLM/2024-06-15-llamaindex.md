@@ -186,11 +186,59 @@ chat 方法由一个while true 循环组成，循环内执行 _run_step， Agent
 5. 指定响应模式 `query_engine = index.as_query_engine(response_mode='tree_summarize')`
 6. 指定流式响应 `query_engine = index.as_query_engine(streaming=True)`
 
+## workflow
+
+LlamaIndex Workflows是LlamaIndex近期推出的用来替代之前Query Pipeline（查询管道）的新特性。与LangGraph不同的是，其没有采用类似LangCraph基于图结构的流程编排模式，而是采用了一种事件驱动的工作流编排方式：工作流中的每个环节被作为step（步骤，代表一个处理动作），每个step可以选择接收（类似订阅）一种或多种event（事件）做处理，并同样可以发送一种或多种event给其他step。通过这种方式，把多个step自然的连接起来形成完整的Workflow。在这种架构中，工作流的运行不是由框架来根据预先的定义（比如Graph）来调度任务组件执行，而是由组件自身决定：你想接收什么event，做什么处理，并发出什么event。如果组件B接受了A发出的某种event，那么B就会在A发出event后触发执行。
+
+![](/public/upload/machine/llamaindex_workflow.jpg)
+
+图中涉及到LlamaIndex Workflows中的一些关键概念：
+1. Workflow（工作流）工作流代表一个复杂的RAG、Agent或者任意复合形式的LLM应用的端到端流程。创建完工作流后，调用run方法，并输入任务即可启动。Workflow类似LangGraph中的Graph。
+2. Step（步骤）步骤代表工作流中的单个任务，你可以自由的定义步骤内容。每个步骤接收输入事件（订阅），并返回输出事件。当输入事件发生时，这个步骤就会自动执行。步骤使用Python函数定义。Step类似LangGraph中的Node。
+3. Event（事件）事件是一个步骤的输入输出，也是工作流各个步骤之间的数据载体。当事件发生时，“订阅”该事件的步骤就会执行，同时从事件中取出必要数据。事件是一个Pydantic类型对象，可以自由定义结构。注意两个特殊事件：StartEvent与StopEvent是两个系统事件，代表工作流开始与结束。StartEvent由框架派发，代表工作流的开始。StopEvent由框架接收，发送StopEvent的步骤代表没有后续步骤。
+4. Context（上下文），Context是一个用来在整个工作流内自动流转的上下文状态对象，放入Context中的数据可以被所有步骤接收和读取到，可以理解为全局变量。
+PS：一个workflow 引擎，两个关键字是workflow/step(task)，三个关键字是workflow/step/context（全局的和step间的信息传递）。四个关键词就再带一个驱动机制：顺序驱动（按序执行，就没法循环了）、图驱动、事件驱动。
+
+```python
+#定义两个事件
+class RetrieverEvent(Event):
+    nodes: list[NodeWithScore]
+
+class RerankEvent(Event):
+    nodes: list[NodeWithScore]
+#workflow定义
+class RAGWorkflow(Workflow):
+    @step
+    async def retrieve(self, ctx: Context, ev: StartEvent) -> RetrieverEvent | None:
+        query = ev.get("query")
+        index = ev.get("index")
+        return RetrieverEvent(nodes=nodes)
+    @step
+    async def rerank(self, ctx: Context, ev: RetrieverEvent) -> RerankEvent:
+        ranker = LLMRerank(
+            choice_batch_size=5, top_n=3, llm=OpenAI(model="gpt-4o-mini")
+        )
+        new_nodes = ranker.postprocess_nodes(
+            ev.nodes, query_str=await ctx.get("query", default=None)
+        )
+        return RerankEvent(nodes=new_nodes)
+    @step
+    async def generate(self, ctx: Context, ev: RerankEvent) -> StopEvent: 
+        llm = OpenAI(model="gpt-4o-mini")
+        summarizer = CompactAndRefine(llm=llm, streaming=True, verbose=True)
+        query = await ctx.get("query", default=None)
+
+        response = await summarizer.asynthesize(query, nodes=ev.nodes)
+        return StopEvent(result=response)
+w = RAGWorkflow()
+result = await w.run(query="你的问题", index=index)
+async for chunk in result.async_response_gen():
+    print(chunk, end="", flush=True
+```
+
+
 ## 与LangChain 对比
 
 人工智能和LLM正在快速变化的领域，每周都会出现新的概念和想法，设计经得起时间考验的抽象是非常困难的。更安全的选择是仅对较低级别的构建块使用抽象。
 
 LlamaIndex的重点放在了Index上，也就是通过各种方式为文本建立索引，有通过LLM的，也有很多并非和LLM相关的。LangChain的重点在 Agent 和 Chain 上，也就是流程组合上。可以根据你的应用组合两个，如果你觉得问答效果不好，可以多研究一下LlamaIndex。如果你希望有更多外部工具或者复杂流程可以用，可以多研究一下LangChain。
-
-
-

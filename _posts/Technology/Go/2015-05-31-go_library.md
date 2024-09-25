@@ -127,6 +127,27 @@ unsafe 包提供了 2 点重要的能力：
 |数学运算|不能|可以|
 |指针的语义|有|无<br>uintptr 所指向的对象会被 gc 无情地回收|
 
+
+```go
+func testPtr() {
+    s := &Student{
+        name: "xiaoming",
+        age:  10,
+    }
+
+    pName := (*string)(unsafe.Pointer(s))
+    *pName = "lihua"
+
+    pAge := (*int)(unsafe.Pointer(uintptr(unsafe.Pointer(s)) + unsafe.Offsetof(s.age)))
+    *pAge = 20
+
+    fmt.Printf("student(name=%v, age=%v)\n", s.name, s.age)
+}
+
+//OUTPUT: student(name=lihua, age=20)
+```
+
+
 在java 中经常有一种场景
 
 ```java

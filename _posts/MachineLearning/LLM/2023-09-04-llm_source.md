@@ -724,6 +724,51 @@ class Qwen2RMSNorm(nn.Module):  # 标准化层
 ```
 ## 模型加载
 
+通常情况下，使用Pytorch来加载模型步骤如下：
+1. 创建模型
+2. 将权重加载到内存（一个叫做state_dict的字典对象）
+3. 在已创建模型基础上加载权重值
+4. 将模型加载到相应设备上（如：GPU）进行模型推理
+
+```python
+import torch
+
+my_model = ModelClass(...)
+state_dict = torch.load(checkpoint_file)
+my_model.load_state_dict(state_dict)
+```
+
+对于超大模型进行推理，这种常规的加载方式存在一些明显的局限性。第一步，在 RAM 中加载模型的完整版本，并花一些时间随机初始化权重，第二步将模型的另一个完整预训练权重加载到 RAM 中。因此，对于一个6B的模型，使用FP16半精度加载，也需要24G内存。因此，这种常规的加载方式已经无法满足要求。在 Transformers 库中利用Accelerate库来完成这些超大模型的加载。那么 Accelerate 如何利用 PyTorch 来加载和运行大模型进行推理呢？具体步骤如下：
+1. 创建一个空模型（没有权重）
+2. 当有多个计算设备可用时，决定每一层权重的去向。Accelerate库提供了一个函数用来自动检测一个空模型使用的设备类型。它会最大化利用所有的GPU资源，然后再使用CPU资源，并且给不能容纳的权重打上标记，并 offload 到硬盘。
+3. 加载部分权重到内存
+4. 将内存中的这些权重加载到空模型中
+5. 将权重移动到计算设备上完成推理
+6. 对剩下的权重，重复步骤 3，直到加载完所有权重，并完成最终推理。
+
+```python
+import torch
+from accelerate import init_empty_weights, load_checkpoint_and_dispatch
+
+with init_empty_weights():
+    model = MyModel(...)
+
+model = load_checkpoint_and_dispatch(
+    model, checkpoint=checkpoint_file, device_map="auto" # device_map=auto会根据可用资源自动确定模型每一层的放置位置
+)
+
+input = torch.randn(2,3)
+input = input.to("cuda")
+output = model(input)
+```
+
+在 Transformers 库中，也是通过在from_pretrained()或者pipeline()函数中设置device_map=auto完成同样的操作。此外，device_map有如下选项可供设置：
+1. "auto" 或 "balanced": Accelerate将会根据所有GPU均衡切分权重，尽量均匀的切分到各个GPU上；
+2. "balanced_low_0": Accelerate均匀分割权重到各个GPU上，除了第一个GPU（序号为0）。在第一个GPU上会尽量节省显存（这种模式可以有效节省第一个GPU的显存，以便使用generate函数用于模型生成）；
+3. "sequential": Accelerate按照GPU的顺序占用显存（后面的GPU可能根本不会使用）。
+当然也可以根据需求设置device_map参数，以决定各个部分权重应该放置的设备。`device_map = {"block1": 0, "block2.linear1": 0, "block2.linear2": 1, "block2.linear3": 1}`
+此外，还可以通过max_memory来控制各个设备使用的内存的大小。`max_memory={0: "10GiB", 1: "20GiB", 2: "20GiB", "cpu": "60GiB"}`
+
 在模型的加载过程中，通常包含两个核心部分：模型的权重和配置文件。
 
 每个模型的配置文件的变量的名字都不尽相同，比如表示transformer模型多头注意力机制的head num的变量名，有的模型可能叫num_attention_heads(opt)，有的模型可能叫n_head(starcoder)，所以需要对应到框架统一的变量体系下。
@@ -784,4 +829,6 @@ class OptWeightInfo(ModelDeployWeightInfo):
 ```
 model = AutoModel.from_pretrained("THUDM/chatglm-6b", trust_remote_code=True)
 ``` 
- AutoModel.from_pretrained 到最后实际是 pytorch.nn.module.load_state_dict。
+AutoModel.from_pretrained 到最后实际是 pytorch.nn.module.load_state_dict。
+
+此外，Transformers 为了减少 GPU VRAM 使用，实现了Offload KV Cache的功能，通过将大多数层的 KV 缓存移至 CPU 来实现这一点。当模型的forward()方法迭代各层时，该策略会在GPU上维护当前层的缓存。同时，它异步预取下一层缓存，并将上一层缓存发送回 CPU。与 KV 缓存量化（可能损失模型精度）不同，此策略始终与默认 KV Cache 实现产生相同的结果。

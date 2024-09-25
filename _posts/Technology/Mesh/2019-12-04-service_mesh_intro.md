@@ -81,6 +81,11 @@ SideCar的一种实现[MOSN](https://www.sofastack.tech/projects/sofa-mosn/overv
 
 ![](/public/upload/architecture/service_mesh_sidecar_direct.png)
 
+[介绍 Kmesh：用内核原生技术革新服务网格数据平面](https://mp.weixin.qq.com/s/ZF1scdI2BHlmYF3sWqjx8Q)传统 Sidecar 架构的局限性
+1. 延迟开销：增加 Sidecar 代理会导致网络跳数和上下文切换增加，每次服务调用引入额外 2 至 3 毫秒 的延迟。对于对延迟敏感的应用，这种延迟是不可接受的。
+2. 资源消耗：每个 Sidecar 都会消耗 CPU 和内存资源。在拥有数千个服务的大规模部署中，累积的资源开销巨大，虽然可以通过一定的技术手段进行优化，但依然降低了部署密度并增加了运营成本。
+行业内一直在尝试引入无 Sidecar 的架构。Kmesh 通过将流量治理直接集成到操作系统内核，定义了一种新的服务网格数据平面。利用 eBPF（扩展伯克利数据包过滤器）和内核增强，Kmesh 提供高性能、低延迟和资源高效的服务网格能力。
+
 ### Control Plane 
 
 ![](/public/upload/architecture/service_mesh_control_plan.png)
