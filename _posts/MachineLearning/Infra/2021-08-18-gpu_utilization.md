@@ -127,9 +127,44 @@ GPU计算单元类似于CPU中的核，用来进行数值计算。衡量计算�
 [教你如何继续压榨GPU的算力——MPS](https://zhuanlan.zhihu.com/p/346389176) 
 
 ### 显存
+对于如下图所示的一个全连接网络(不考虑偏置项b)
+![](/public/upload/machine/mlp_memory.jpg)
+
+模型的显存占用包括：
+1. 参数：二维数组 W
+2. 模型的输出：二维数组 Y
+输入X可以看成是上一层的输出，因此把它的显存占用归于上一层。
+
+**参数的显存占用**。只有有参数的层，才会有显存占用。这部份的显存占用和输入无关，模型加载完成之后就会占用。
+1. 有参数的层主要包括：
+    1. 卷积 ，Conv2d(Cin, Cout, K): 参数数目：Cin × Cout × K × K。
+    2. 全连接，Linear(M->N) 参数数目：M×N。计算量：BxMxN
+    3. BatchNorm，BatchNorm(N) 参数数目：2N。计算量：BHWC*{4,5,6}
+    4. Embedding层，Embedding(N,W) 参数数目：N × W
+    5. ...
+2. 无参数的层：
+    1. 多数的激活层(Sigmoid/ReLU)。 计算量：BHWC
+    2. 池化层。计算量：BHWCK^2
+    3. Dropout
+    4. ...
+
+参数占用显存 = 参数数目×n（n = 4 ：float32；）。在PyTorch中，当你执行完model=MyGreatModel().cuda()之后就会占用相应的显存，占用的显存大小基本与上述分析的显存差不多。
+
+**梯度与动量的显存占用**：优化器如果是SGD，需要保存动量， 因此显存x3，如果是Adam优化器，动量占用的显存更多，显存x4。
+
+总结一下，模型中与输入无关的显存占用包括：
+1. 参数 W
+2. 梯度 dW（一般与参数一样）
+3. 优化器的动量（普通SGD没有动量，momentum-SGD动量与梯度一样，Adam优化器动量的数量是梯度的两倍）
+
+**输入输出的显存占用** ：需要计算每一层的feature map的形状（多维数组的形状）；模型输出的显存占用与 batch size 成正比；需要保存输出对应的梯度用以反向传播（链式法则）；模型输出不需要存储相应的动量信息（因为不需要执行优化）。
 
 [科普帖：深度学习中GPU和显存分析](https://mp.weixin.qq.com/s/K_Yl-MD0SN4ltlG3Gx_Tiw) 
+
 显存占用 = 模型显存占用（参数 + 梯度与动量 + 模型输出） + batch_size × 每个样本的显存占用
+
+AlexNet的分析如下图，左边是每一层的参数数目（不是显存占用），右边是消耗的计算资源
+![](/public/upload/machine/AlexNet_gpu.jpg)
 
 ### 单机
 
@@ -179,7 +214,7 @@ GPU计算单元类似于CPU中的核，用来进行数值计算。衡量计算�
 
 其它技巧：调用 watch -n 1 nvidia-smi  可以每一秒进行自动的刷新。nvidia-smi 也可以通过添加 --format=csv 以 CSV 格式输。在 CSV 格式中，可以通过添加 `--gpu-query=...` 参数来选择显示的指标。为了实时显示 CSV 格式并同时写入文件，我们可以将 nvidia-smi 的输出传输到 tee 命令中，`nvidia-smi --query-gpu=timestamp,pstate,temperature.gpu,utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv | tee gpu-log.csv`。这将写入我们选择的文件路径。
 
-gpustat,直接pip install gpustat即可安装，gpustat基于nvidia-smi，可以提供更美观简洁的展示，结合watch命令，可以动态实时监控GPU的使用情况。`watch --color -n1 gpustat -cpu`
+这里推荐一个好用的小工具：**gpustat**,直接pip install gpustat即可安装，gpustat基于nvidia-smi，可以提供更美观简洁的展示，结合watch命令，可以动态实时监控GPU的使用情况。`watch --color -n1 gpustat -cpu`
 
 
 ### exporter

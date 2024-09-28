@@ -54,6 +54,7 @@ PS： 也就是稀疏向量 可以用一个词表长度的[]来表示，也有�
 
 ## 微调emebedding
 
+通常，**Embedding模型是通过对比学习来训练的**，而负样本的质量对模型性能至关重要。Language Embedding模型训练通常采用多阶段方案，分为弱监督的预训练以及有监督的精调训练。
 1. 微调样本构建
 2. 微调脚本
 3. 训练过程监控：W&B监控
@@ -65,6 +66,27 @@ PS： 也就是稀疏向量 可以用一个词表长度的[]来表示，也有�
 1. Q-Q（question-question）：这种方式适合已经积累了比较多FAQ的企业，希望对用户问题检索FAQ库中的Q，这种情况下，使用Q-Q方式构建的样本，优化的模型检索效果会比较好
 2. Q-A（question-answer）：这种方式比较有误导性，看起来感觉最应该用这种方式构建，但实际上线后，要检索的，是一堆documents，而不是answer，如果你真的用这个方式构建过样本，看一些case就会发现，answer跟实际的文档相差非常远，导致模型微调后，性能反而出现下降
 3. Q-D（question-document）：这种方式，在几个项目中实践下来，基本上是最适合的构建方式，因为**实际检索时，就是拿问题去检索文档，确保训练、推理时任务的一致性，也是减少模型性能损失最主要的一个方法**。
+
+### 训练过程
+
+[探索更强中文Embedding模型：Conan-Embedding](https://mp.weixin.qq.com/s/5upU8Yf-6Bcn0kfxk7-V2Q) 不是特别直白。
+
+预训练
+1. 通过文档提取和语言识别进行格式化处理；
+2. 在基于规则的阶段，文本会经过规范化和启发式过滤；
+    1. 在安全过滤阶段，执行域名阻止、毒性分类和色情内容分类；
+    2. 在质量过滤阶段，文本会经过广告分类和流畅度分类，以确保输出文本的高质量。
+3. 通过MinHash方法进行去重
+
+在预训练阶段，为了高效且充分地利用数据，我们使用InfoNCE Loss with In-Batch Negative：
+
+![](/public/upload/machine/InfoNCE_Loss+with_In-Batch_Negative.jpg)
+
+其中是title，input，question，prompt等，$y_i^{+}$是对应的 content，output，answer，response等，认为是正样本；$y_i$是同 batch 其他样本的content，output，answer，response，认为是负样本。In-Batch Negative InfoNCE Loss 是一种用于对比学习的损失函数，它利用了 mini-batch 中的其他样本作为负样本来优化模型。具体来说，在每个 mini-batch 中，除了目标样本的正样本对外，其余样本都被视为负样本。通过最大化正样本对的相似度并最小化负样本对的相似度，In-Batch Negative InfoNCE Loss 能够有效地提高模型的判别能力和表征学习效果。这种方法通过充分利用 mini-batch 中的样本，提升了训练效率并减少了对额外负样本生成的需求。
+
+有监督精调，我们针对不同的下游任务进行特定任务的微调。
+1. 检索（Retrieval）。检索任务包括查询、正样本和负样本，经典的损失函数是InfoNCE Loss。
+2. 语义文本相似性（STS）。STS任务涉及区分两段文本之间的相似性，经典的损失函数是交叉熵损失。
 
 ### 微调脚本
 

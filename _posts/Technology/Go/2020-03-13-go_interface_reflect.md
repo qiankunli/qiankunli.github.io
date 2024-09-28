@@ -17,7 +17,6 @@ interface，接口，restful接口，SQL 也是一种接口
 
 从编码的角度看：**Interfaces give programs structure**. Interfaces encourage design by composition. You must do your best to understand what could change and use interfaces to decouple.
 
-
 [如何让 Go 反射变快](https://mp.weixin.qq.com/s/8aFSgJeDKgMD2r125c_UWg) 未读
 
 ## Go 自定义类型系统
@@ -61,27 +60,41 @@ type S struct {
 
 ## interface 底层实现
 
+接口（interface）本质上是一种结构体，go 中的接口变量其实是用 iface 和 eface 这两个结构体来表示的：iface 表示某一个具体的接口（含有方法的接口），eface 表示一个空接口（interface{}，不包含任何方法）
+
+```go
+type Flyable interface {
+    Fly()
+}
+func main(){
+    var f1 interface{}  // 在底层实际上是 eface 类型
+    println(f1) // CALL    runtime.printeface(SB)
+
+    var f2 Flyable      // 在底层实际上是 iface 类型
+    println(f2) // CALL    runtime.printiface(SB)
+}
+```
+
 ### eface 和 iface
 
 [Go Data Structures: Interfaces](https://research.swtch.com/interfaces)Languages with methods typically fall into one of two camps: prepare tables for all the method calls statically (as in C++ and Java), or do a method lookup at each call (as in Smalltalk and its many imitators, JavaScript and Python included) and add fancy caching to make that call efficient. Go sits halfway between the two: it has method tables but computes them at runtime. I don't know whether Go is the first language to use this technique, but it's certainly not a common one.
 
-接口类型变量在运行时表示为 eface 和 iface：Go 使用 iface 结构体表示包含方法的接口；使用 eface（empty iface?） 结构体表示不包含任何方法的 interface{} 类型。
-
 ```go
 // $GOROOT/src/runtime/runtime2.go
 type iface struct {
-    tab  *itab			// iface 除了要存储动态类型信息之外，还要存储接口本身的信息（接口的类型信息、方法列表信息等）以及动态类型所实现的方法的信息，因此 iface 的第一个字段指向一个itab类型结构。
-    data unsafe.Pointer	// 指向当前赋值给该接口类型变量的动态类型变量的值。
+    // 方法表
+    tab  *itab			// iface 除了要存储结构体类型信息之外，还要存储接口本身的信息（接口的类型信息、方法列表信息等）以及结构体类型所实现的方法的信息，因此 iface 的第一个字段指向一个itab类型结构。
+    data unsafe.Pointer	// 指向变量本身的指针
 }
 // $GOROOT/src/runtime/runtime2.go
 type itab struct {
     inter *interfacetype	// 这个接口类型自身的信息
-    _type *_type			// 接口类型变量的动态类型的信息
+    _type *_type			// 接口类型变量的结构体类型的信息
     hash  uint32 // copy of _type.hash. Used for type switches.
     _     [4]byte
-    fun   [1]uintptr 		// 动态类型已实现的接口方法的调用地址数组
+    fun   [1]uintptr 		// 结构体类型已实现的接口方法的调用地址数组
 }
-// $GOROOT/src/runtime/type.go
+// $GOROOT/src/runtime/type.go 根据 interfacetype 我们可以得到关于接口所有方法的信息
 type interfacetype struct {
     typ     _type		// 接口类型自身的信息
     pkgpath name		// 包路径名
@@ -89,15 +102,15 @@ type interfacetype struct {
 }
 
 ```
-
+iface 里面保存的 itab 中保存了具体类型的方法指针列表，data 保存了具体类型值的内存地址。
 ```go
 type eface struct {
-    _type *_type		// eface 表示的空接口类型并没有方法列表，因此它的第一个指针字段指向一个_type类型结构，这个结构为该接口类型变量的动态类型的信息
-    data  unsafe.Pointer	// 指向当前赋值给该接口类型变量的动态类型变量的值。
-}
+    // 接口变量的类型
+    _type *_type		// eface 表示的空接口类型并没有方法列表，因此它的第一个指针字段指向一个_type类型结构，这个结构为该接口类型变量的结构体类型的信息
+    data  unsafe.Pointer	// 指向变量本身的指针
 ```
 
-虽然 eface 和 iface 的第一个字段有所差别，但 tab 和 _type 可以统一看作是动态类型的类型信息。Go 语言中每种类型都会有唯一的 _type 信息，无论是内置原生类型，还是自定义类型都有。**Go 运行时会为程序内的全部类型建立只读的共享 _type 信息表**（类似于java的 kclass？），因此拥有相同动态类型的同类接口类型变量的 _type/tab 信息是相同的。
+虽然 eface 和 iface 的第一个字段有所差别，但 tab 和 _type 可以统一看作是结构体类型的类型信息。Go 语言中每种类型都会有唯一的 _type 信息，无论是内置原生类型，还是自定义类型都有。**Go 运行时会为程序内的全部类型建立只读的共享 _type 信息表**（类似于java的 kclass？），因此拥有相同结构体类型的同类接口类型变量的 _type/tab 信息是相同的。过 _type 我们可以得到结构体里面所包含的方法这些信息。
 
 运行时类型结构（类似于jvm的kclass？）
 
@@ -155,8 +168,6 @@ func main() {
 
 Interface values are represented as a two-word pair giving a pointer to information about the type stored in the interface and a pointer to the associated data. Assigning b to an interface value of type Stringer sets both words of the interface value.一个结构体实现了一个接口，把这个结构体变量赋值给这个接口变量，就是赋值这个接口变量里的俩指针，就完成了数据和实现的绑定。
 
-
-
 Note that the itable corresponds to the interface type, not the dynamic type. In terms of our example, the itable for Stringer holding type Binary lists the methods used to satisfy Stringer, which is just String: Binary's other methods (Get) make no appearance in the itable.`itable(Stringer,Binary)` 的方法表只包含 String 方法不包含 Get 方法。
 
 `any := Stringer(b)` 用伪代码表示 就是
@@ -172,7 +183,7 @@ tab.fun[0] = getSymAddr(`main.(*Binary).String`).(uintptr)
 
 `any.String()` 相当于 `any.tab->fun[0]`
 
-**接口类型变量赋值是一个“装箱”的过程，实际就是创建一个 eface 或 iface 的过程**（PS：any 赋值就是给iface赋值，只不过我们没有显式定义 iface 而已，被隐藏掉了）。在将动态类型变量赋值给接口类型变量语句对应的汇编代码中，我们看到了convT2E和convT2I两个 runtime 包的函数。convT2E 用于将任意类型转换为一个 eface，convT2I 用于将任意类型转换为一个 iface。两个函数的实现逻辑相似，主要思路就是根据传入的类型信息（convT2E 的 _type 和 convT2I 的 tab._type）分配一块内存空间，并将 elem 指向的数据拷贝到这块内存空间中，最后传入的类型信息作为返回值结构中的类型信息，返回值结构中的数据指针（data）指向新分配的那块内存空间。
+**接口类型变量赋值是一个“装箱”的过程，实际就是创建一个 eface 或 iface 的过程**（PS：any 赋值就是给iface赋值，只不过我们没有显式定义 iface 而已，被隐藏掉了）。在**将结构体类型变量赋值给接口类型变量**语句对应的汇编代码中，我们看到了convT2E和convT2I两个 runtime 包的函数。convT2E 用于将任意类型转换为一个 eface，convT2I 用于将任意类型转换为一个 iface。两个函数的实现逻辑相似，主要思路就是根据传入的类型信息（convT2E 的 _type 和 convT2I 的 tab._type）分配一块内存空间，并将 elem 指向的数据拷贝到这块内存空间中，最后传入的类型信息作为返回值结构中的类型信息，返回值结构中的数据指针（data）指向新分配的那块内存空间。
 
 ```go
 // $GOROOT/src/runtime/iface.go
@@ -205,7 +216,7 @@ func convT2I(tab *itab, elem unsafe.Pointer) (i iface) {
 }
 ```
 
-不过，装箱操作是由 Go 编译器和运行时共同完成的，有一定的性能开销，因此 Go 也在不断对装箱操作进行优化，包括对常见类型如整型、字符串、切片等提供系列快速转换函数。这些函数去除了 typedmemmove 操作，增加了零值快速返回等特性。同时 Go 建立了 staticuint64s 区域，对 255 以内的小整数值进行装箱操作时不再分配新内存，而是利用 staticuint64s 区域的内存空间。PS： 有点Java的意思了。
+不过，装箱操作是由 Go 编译器和运行时共同完成的，有一定的性能开销，因此 Go 也在不断对装箱操作进行优化，包括对常见类型如整型、字符串、切片等提供系列快速转换函数。这些函数去除了 typedmemmove 操作，增加了零值快速返回等特性。同时 Go 建立了 staticuint64s 区域，对 255 以内的小整数值进行装箱操作时不再分配新内存，而是利用 staticuint64s 区域的内存空间。PS： 有点Java的意思了，Java是对 -128~127 范围内的整数做了享元模式的处理
 
 C++ 和 Go 在定义接口方式上的不同，也导致了底层实现上的不同。C++ 通过虚函数表来实现基类调用派生类的函数；而 Go 通过 itab 中的 fun 字段来**实现接口**变量调用实体类型的函数。C++ 中的虚函数表是在编译期生成的；而 Go 的 itab 中的 fun 字段是在运行期间动态生成的。
 
@@ -239,7 +250,7 @@ func main() {
 
 ### 等值比较操作
 
-而接口类型变量的 data 部分则是指向一个动态分配的内存空间，这个内存空间存储的是赋值给接口类型变量的动态类型变量的值。也就是说，我们判断两个接口类型变量是否相同，只需要判断 _type/tab 是否相同，以及 data 指针指向的内存空间所存储的数据值是否相同就可以了。这里要注意不是 data 指针的值相同噢。在创建 eface 时一般会为 data 重新分配新内存空间，将动态类型变量的值复制到这块内存空间，并将 data 指针指向这块内存空间。因此我们多数情况下看到的 data 指针值都是不同的。
+而接口类型变量的 data 部分则是指向一个动态分配的内存空间，这个内存空间存储的是赋值给接口类型变量的结构体类型变量的值。也就是说，我们判断两个接口类型变量是否相同，只需要判断 _type/tab 是否相同，以及 data 指针指向的内存空间所存储的数据值是否相同就可以了。这里要注意不是 data 指针的值相同噢。在创建 eface 时一般会为 data 重新分配新内存空间，将结构体类型变量的值复制到这块内存空间，并将 data 指针指向这块内存空间。因此我们多数情况下看到的 data 指针值都是不同的。
 
 由于 eface 和 iface 是 runtime 包中的非导出结构体定义，我们不能直接在包外使用，所以也就无法直接访问到两个结构体中的数据。不过，Go 语言提供了 println 预定义函数，可以用来输出 eface 或 iface 的两个指针字段的值。在编译阶段，编译器会根据要输出的参数的类型将 println 替换为特定的函数，这些函数都定义在$GOROOT/src/runtime/print.go文件中，而针对 eface 和 iface 类型的打印函数实现如下：
 
@@ -261,9 +272,9 @@ func printiface(i iface) {
 2. 反射出变量的类型需要额外的开销，降低了代码的运行效率
 3. 反射的概念和语法比较抽象，过多的使用反射，使得代码难以被其他人读懂，不利于合作与交流
 
-[Golang 中反射的应用与理解](https://mp.weixin.qq.com/s/TmzV2VTfkE8of2_zuKa0gA)反射，就是能够在运行时更新变量和检查变量的值、调用变量的方法和变量支持的内在操作，而不需要在编译时就知道这些变量的具体类型。这种机制被称为反射。Golang 的基础类型是静态的（也就是指定 int、string 这些的变量，它的 type 是 static type），在创建变量的时候就已经确定，反射主要与 Golang 的 interface 类型相关（它的 type 是 concrete type），只有运行时 interface 类型才有反射一说。**当程序运行时， 我们获取到一个 interface 变量， 程序应该如何知道当前变量的类型，和当前变量的值呢？**当然我们可以有预先定义好的指定类型， 但是如果有一个场景是我们需要编写一个函数，能够处理一类共性逻辑的场景，但是输入类型很多，或者根本不知道接收参数的类型是什么，或者可能是没约定好；也可能是传入的类型很多，这些类型并不能统一表示。这时反射就会用的上了，**典型的例子如：json.Marshal**。在 Golang 中为我们提供了两个方法，分别是 reflect.ValueOf  和 reflect.TypeOf，见名知意这两个方法分别能帮我们获取到对象的值和类型。Valueof 返回的是 Reflect.Value 对象，是一个 struct,而 typeof 返回的是 Reflect.Type 是一个接口。我们只需要简单的使用这两个进行组合就可以完成多种功能。
+[Golang 中反射的应用与理解](https://mp.weixin.qq.com/s/TmzV2VTfkE8of2_zuKa0gA)反射，就是能够在运行时更新变量和检查变量的值、调用变量的方法和变量支持的内在操作，而不需要在编译时就知道这些变量的具体类型。这种机制被称为反射。Golang 的基础类型是静态的（也就是指定 int、string 这些的变量，它的 type 是 static type），在创建变量的时候就已经确定，反射主要与 Golang 的 interface 类型相关（它的 type 是 concrete type），只有运行时 interface 类型才有反射一说。**当程序运行时， 我们获取到一个 interface 变量， 程序应该如何知道当前变量的类型，和当前变量的值呢？**当然我们可以有预先定义好的指定类型， 但是如果有一个场景是我们需要编写一个函数，能够处理一类共性逻辑的场景，但是输入类型很多，或者根本不知道接收参数的类型是什么，或者可能是没约定好；也可能是传入的类型很多，这些类型并不能统一表示。这时反射就会用的上了，**典型的例子如：json.Marshal**。在 Golang 中为我们提供了两个方法，分别是 reflect.ValueOf  和 reflect.TypeOf，见名知意这两个方法分别能帮我们获取到对象的值和类型。Valueof 返回的是 Reflect.Value 对象，是一个 struct，而 typeof 返回的是 Reflect.Type 是一个接口。我们只需要简单的使用这两个进行组合就可以完成多种功能。
 
-[深度解密GO语言之反射](https://juejin.im/post/5cd0d6ed6fb9a0321556f618)反射的本质是程序在运行期探知对象的类型信息和内存结构（泛化一点说，就是我想知道某个指针对应的内存里有点什么），不用反射能行吗？可以的！使用汇编语言，直接和内层打交道，什么信息不能获取？但是，当编程迁移到高级语言上来之后，就不行了！就只能通过反射来达到此项技能。
+[深度解密GO语言之反射](https://juejin.im/post/5cd0d6ed6fb9a0321556f618)反射的本质是程序在运行期探知对象的类型信息和内存结构（泛化一点说，就是我想知道某个指针对应的内存里有点什么），不用反射能行吗？可以的！使用汇编语言，直接和内存打交道，**首地址指针+偏移什么信息不能获取？**但是，当编程迁移到高级语言上来之后，就不行了！就只能通过反射来达到此项技能。
 
 ![](/public/upload/go/go_reflect.jpeg)
 ![](/public/upload/go/reflect_transfer.jpg)
@@ -312,18 +323,18 @@ func toType(t *rtype) Type {
 
 reflect.Value 表示 interface{} 里存储的实际变量，它能提供实际变量的各种信息。相关的方法常常是需要结合类型信息和值信息。例如，如果要提取一个结构体的字段信息，那就需要用到 _type (具体到这里是指 structType) 类型持有的关于结构体的字段信息、偏移信息，以及 `*data` 所指向的内容 —— 结构体的实际值。
 
-Value是什么
+Value是什么？ PS: 对值内存区域指针的封装
 ```go
 type Value struct {
     // typ 包含由值表示的值的类型。
     typ *rtype
-    // 指向值的指针
+    // 指向值的指针。
     ptr unsafe.Pointer
     // flag 保存有关该值的元数据
     flag
 }
 ```
-
+PS：持有首地址，再持有类型信息，也就知道了某个字段在偏移量，进而就可以获取某个字段的值。
 ```go
 func ValueOf(i interface{}) Value {
 	if i == nil {

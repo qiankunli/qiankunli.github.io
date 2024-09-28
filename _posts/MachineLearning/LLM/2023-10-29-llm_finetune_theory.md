@@ -155,7 +155,7 @@ class LoRALayer(nn.Module):
         self.B = nn.Parameter(torch.randn(rank, original_layer.weight.size(1)))
 
     def forward(self, x):
-        delta_w = torch.matmul(self.A, self.B)
+        delta_w = torch.matmul(self.A, self.B)  # 多维矩阵乘法
         return self.original_layer(x) + torch.matmul(x, delta_w.t())
 
 # 示例：在Transformer模型中使用LoRA层

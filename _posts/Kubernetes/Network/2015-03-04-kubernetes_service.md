@@ -214,7 +214,7 @@ spec:
 
 Ingress和Pod、Servce等等类似，被定义为kubernetes的一种资源。本质上说Ingress只是存储在etcd上面一些数据，我们可以通过kubernetes的apiserver添加删除和修改ingress资源。
 
-有了 Ingress 这样一个统一的抽象，Kubernetes 的用户就无需关心 Ingress 的具体细节了。在实际的使用中，你只需要从社区里选择一个具体的 Ingress Controller，把它部署在 Kubernetes 集群里即可。这个 Ingress Controller 会根据你定义的 Ingress 对象，提供对应的代理能力。目前，业界常用的各种反向代理项目，比如 Nginx、HAProxy、Envoy、Traefik 等，都已经为 Kubernetes 专门维护了对应的 Ingress Controller。
+有了 Ingress 这样一个统一的抽象，Kubernetes 的用户就无需关心 Ingress 的具体细节了。在实际的使用中，你只需要从社区里选择一个具体的 Ingress Controller，把它部署在 Kubernetes 集群里即可。这个 Ingress Controller 会根据你定义的 Ingress 对象，提供对应的代理能力。目前，业界常用的各种反向代理项目，比如 Nginx、HAProxy、Envoy、Traefik 等，都已经为 Kubernetes 专门维护了对应的 Ingress Controller。PS： **把nginx 搬到k8s上，把路由规则 k8s object化**，service作为backend。
 
 ### Ingress Controller 部署和实现
 
@@ -315,6 +315,10 @@ server {
 	}
 }
 ```
+
+### 进化
+
+[超越 Gateway API：深入探索 Envoy Gateway 的扩展功能](https://mp.weixin.qq.com/s/n258ul1Tqe27NJ0WAHK4MA)Ingress 是 Kubernetes 中定义集群入口流量规则的 API 资源。Ingress API 为用户提供了基本的定义 HTTP 路由规则的能力，但是 Ingress API 的功能非常有限，只提供了按照 Host、Path 进行路由和 TLS 卸载的基本功能。在实际应用中， Ingress API 的基本功能往往无法满足应用程序复杂的流量管理需求。这导致各个 Ingress Controller 实现需要通过 Annotations 或者自定义 API 资源等非标准的方式来扩展 Ingress API 的功能。这些非标准的扩展方式都导致 Ingress API 的可移植性变差，用户在不同的 Ingress Controller 之间切换时，需要重新学习和配置不同的 API 资源。分裂的 Ingress API 也不利于社区的统一和发展。为了解决 Ingress API 的问题，Kubernetes 社区提出了 Gateway API，Gateway API 是一个新的 API 规范，旨在提供一个统一的、可扩展的、功能丰富的 API 来定义集群入口流量规则。Gateway API 定义了多种资源，包括 Gateway、HTTPRoute、GRPCRoute、TLSRoute、TCPRoute、UDPRoute 等。原来很多需要通过 Annotations 或者自定义 API 资源来扩展的功能，现在都可以直接通过 Gateway API 来实现。但是任何一个标准，不管定义得多么完善，理论上都只能是其所有实现的最小公约数。Gateway API 作为一个通用的 API 规范，为了保持通用性，无法对一些和具体实现细节相关的功能提供直接的支持。例如，虽然请求限流、权限控制等功能在实际应用中非常重要，但是不同的数据平面如 Envoy，Nginx 等的实现方式各有不同，因此 Gateway API 无法提供一个通用的规范来支持这些功能。Gateway API 提供了 Policy Attachment 扩展机制，允许各个 Controller 实现在不修改 Gateway API 的情况下，通过关联自定义的 Policy 到 Gateway 和 HTTPRoute 等资源上，以实现对流量的自定义处理。此外，Gateway API 还支持将自定义的 Backend 资源关联到 HTTPRoute 和 GRPCRoute 等资源上，以支持将流量路由到自定义的后端服务。支持在 HTTPRoute 和 GRPCRoute 的规则中关联自定义的 Filter 资源，以支持对请求和响应进行自定义处理。
 
 ## Services without selectors
 

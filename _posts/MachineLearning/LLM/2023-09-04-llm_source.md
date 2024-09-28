@@ -667,7 +667,7 @@ class Qwen2Attention(nn.Module):
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
         # 使用dot attn实现q*kT/hd_d^0.5
-        attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
+        attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim) # # 多维矩阵乘法
         # 然后 attn_weights 加上 attention_mask，实现读取顺序
         attn_weights = attn_weights + attention_mask
         # softmax + dropout + values_states相乘
