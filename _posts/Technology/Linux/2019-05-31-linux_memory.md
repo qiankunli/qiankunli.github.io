@@ -47,18 +47,38 @@ Linux 系统中用来管理物理内存页面的**伙伴系统**，以及负责�
 |free_area|表示内存页的空闲链表，所有的空闲页面都挂载在这个链表中|
 |page|一个物理内存页面，有多少个物理内存页面就有多少个page|
 
-[说出来你可能不信，内核这家伙在内存的使用上给自己开了个小灶](https://zhuanlan.zhihu.com/p/347562875)
-基于伙伴系统管理连续空闲页面：伙伴指的是两个内存块大小相同、地址连续，同属于一个大块区域。free_area 是一个包含11个元素的数组，每一个元素分别代表的是 空闲可分配连续4kb/8kb/16kb...4Mb内存链表。
+```c++
+// 每一个页都由一个struct page 来表示，struct page 大小不一样，一般是64字节，平均每4kb（一页）就要额外消耗64B内存来存储struct page，管理16GB内存大约需要256M
+struct page(
+    unsigned long flags;
+    ...
+)
+```
+
+在linux 系统刚启动的时候，linux 通过e820（固件/firmware中断号）读取到内存的布局，接着内核会根据NUMA信息创建node、zone等相关的对象，在每个zone 中都使用一个伙伴系统来管理所有的空闲物理页面，对外提供alloc_pages 作为申请内存的接口。 
 ```c
+// 每一个NUMA node 下会有多个 zone，每个zone下一个数组free_area 管理了绝大部分可用的空闲页面。
+struct pglist_data *node_data[MAX_NUMNODES];
+typedef struct pglist_data {
+    struct zone node_zones[MAX_NR_ZONES];
+    int node_id;
+}
+// 内核其实不只有一个伙伴系统，在每个zone 下都有一个struct free_area 定义的伙伴系统
 struct zone{
     free_area free_area[MAX_ORDER];
     ...
 }
+struct free_area {
+	struct list_head	free_list[MIGRATE_TYPES];
+	unsigned long		nr_free;
+};
 // alloc_pages到 上述多个链表中寻找可用连续页面
 struct page * alloc_pages(gfp_t gfp_mask,unsigned int order)
 ```
-内核初始化完成后，物理内存管理的管理基本是由伙伴系统承担。Linux 的物理内存分配过程是这样的：通过 pglist_data 结构，先找到自己节点的 zone 结构的指针，如果不能满足要求，则查找其它节点的 zone 结构；然后，找到 zone 结构中的 free_area 结构数组；最后，要找到其中的 page 结构，并返回。释放过程则是分配过程的相反过程。
 
+基于伙伴系统管理连续空闲页面：伙伴指的是两个内存块大小相同、地址连续，同属于一个大块区域。free_area 是一个包含11个元素的数组，每一个元素分别代表的是 空闲可分配连续4kb/8kb/16kb...4Mb内存链表。
+
+内核初始化完成后，物理内存管理的管理基本是由伙伴系统承担。Linux 的物理内存分配过程是这样的：通过 pglist_data 结构，先找到自己节点的 zone 结构的指针，如果不能满足要求，则查找其它节点的 zone 结构；然后，找到 zone 结构中的 free_area 结构数组；最后，要找到其中的 page 结构，并返回。释放过程则是分配过程的相反过程。PS： 所以申请内存的时候，可以根据自己在哪个node尽量申请临近的内存。 
 
 ### 内核如何使用内存
 
@@ -82,6 +102,59 @@ struct kmem_cache_node{
 ![](/public/upload/linux/kmem_cache.png)
 
 ### 进程如何使用内存
+
+Linux使用mm_struct来表示进程的地址空间，该描述符表示着进程所有地址空间的信息。进程在运行的时候，在用户态其所需要的代码，全局变量数据，以及 mmap 内存映射等全部都是通过 mm_struct 来进行内存查找和寻址的。在mm这个虚拟地址空间中，每一段已经分配出去的地址范围都是用一个个虚拟内存区域VMA/vm_area_struct来表示的，**无论是代码段、数据段、还有堆内存、栈内存都对应着一个个的vm_area_struct对象**，vm_area_struct 汇总起来就是整个虚拟地址空间的占用情况。进程运行过程中不断地分配和释放vm_area_struct，运行一段时间后会有很多vm_area_struct对象，而且在内存访问的过程中，也需要经常查找虚拟地址和某个vm_area_struct 的对应关系。所以所有的vm_area_struct 对象都需要使用合适的数据结构高效的管理起来，这样才能做到高性能的遍历和查询。在linux 6.1 之前，一直使用红黑树管理vm_area_struct，但红黑树遍历性能比较低，所以还额外使用了双向链表，专门用来加速遍历过程。
+
+```c 
+// 持有task_struct 便可以访问进程在内存中的所有数据
+struct task_struct {
+    ...
+    struct mm_struct                *mm;    // 代表进程的虚拟地址空间
+    struct mm_struct                *active_mm;
+    ...
+    void  *stack;                   // 指向内核栈的指针
+}
+//file:include/linux/mm_types.h
+struct mm_struct {
+    struct vm_area_struct * mmap;  /* list of VMAs */
+    struct rb_root mm_rb;
+
+    unsigned long mmap_base;  /* base of mmap area */
+    unsigned long task_size;  /* size of task vm space */
+    unsigned long start_code, end_code, start_data, end_data;   // start_code、end_code 分别指向代码段的开始与结尾，start_data 和 end_data 共同决定数据段的区域
+    unsigned long start_brk, brk, start_stack;  // start_brk 和 brk 中间是堆内存的位置、start_stack 是用户态堆栈的起始地址。
+    unsigned long arg_start, arg_end, env_start, env_end;
+}
+struct vm_area_struct{ 
+    unsigned long vm_start;    // 虚拟地址范围的开始
+    unsigned long vm_end;      // 虚拟地址范围的结束
+    ...
+}
+```
+
+![](/public/upload/linux/mm_struct.png)
+
+**内核提供了mmap、brk等系统调用，允许进程在运行的时候动态的向虚拟地址空间申请内存**。无论是mmap还是brk，其工作原理都非常简单，就是申请或修改一个vm_area_struct 对象。也就是说当用户进程申请内存的时候，其实申请到的只是一个vm_area_struct，仅仅是一段地址范围，并不会立即分配物理内存，具体的分配要等到实际访问的时候。如果物理页还没有分配，会触发缺页中断，在缺页中断中来真正的分配物理内存。
+
+在用户态，进程觉着整个空间是它独占的，没有其他进程存在。但是到了内核里面，无论是从哪个进程进来的，看到的都是同一个内核空间，看到的都是同一个进程列表（虽然内核栈是各用个的）。在内核内存区域，可以通过直接计算得出物理内存地址，并不需要复杂的页表计算。而且最重要的是所有内核进程、以及用户进程的内核态，这部分内存都是共享的。所以，**如果要访问一些公共的数据结构，需要进行锁保护**。
+
+![](/public/upload/linux/linux_task_vm.jpg)
+
+
+[你真的理解内存分配吗？](https://mp.weixin.qq.com/s/H9W3tL_Jxxg3LAV6Y3rFyw)对于内存的访问，用户态的进程使用虚拟地址，内核的也基本都是使用虚拟地址
+
+![](/public/upload/linux/process_virtual_space.png)
+
+通过 malloc 函数申请的内存地址是由 堆空间 分配的(其实还有可能从 mmap 区分配)，在内核中，使用一个名为 brk 的指针来表示进程的 堆空间 的顶部。malloc 函数就是通过移动 brk 指针来实现申请和释放内存的，Linux 提供了一个名为 brk() 的系统调用来移动 brk 指针。
+
+使用 sbrk 和 mmap 这两个系统调用，向操作系统申请堆内存，不过，sbrk 和 mmap 这两个系统调用分配内存效率比较低。为了解决这个问题，人们倾向于使用系统调用来分配大块内存，然后再把这块内存分割成更小的块。在 C 语言的运行时库里，这个工作是由 malloc 函数负责的。在 glibc 的实现里，malloc 函数在向操作系统申请堆内存时，会使用 mmap，以 4K 的整数倍一次申请多个页。之后，对小块内存进行精细化管理
+1. 空闲链表，分配内存通过遍历 free list 来查找可用的空闲内存区域，在找到合适的空闲区域以后，就将这一块区域从链表中摘下来。比如要请求的大小是 m，就将这个结点从链表中取下，把起始位置向后移动 m，大小也相应的减小 m。将修改后的结点重新挂到链表上。在释放的时候，将这块区域按照起始起址的排序放回到链表里，并且检查它的前后是否有空闲区域，如果有就合并成一个更大的空闲区。
+2. 分桶式内存管理。分桶式内存管理采用了多个链表，对于单个链表，它内部的所有结点所对应的内存区域的大小是相同的。换句话说，相同大小的区域会挂载到同一个链表上。
+3. 伙伴系统。当系统中还有很多 8 字节的空闲块，而 4 字节的空闲块却已经耗尽，这时再有一个 4 字节的请求，伙伴系统不会直接把 8 的空闲区域分配出去，因为这样做的话，会带来巨大的浪费。它会先把 8 字节分成两个 4 字节，一个用于本次 malloc 分配，另一个则挂入到 4 字节的 free list。这种不断地把一块内存分割成更小的两块内存的做法，就是伙伴系统，这两块更小的内存就是伙伴。当释放内存时，如果系统发现与被释放的内存相邻的那个伙伴也是空闲的，就会把它们合并成一个更大的连续内存。
+
+![](/public/upload/linux/linux_virtual_address.png)
+
+### 进程虚拟空间划分 
 
 CPU 运行一个程序，实质就是在顺序执行该程序的机器码。一个程序的机器码会被组织到同一个地方，这个地方就是**代码段**。另外，程序在运行过程中必然要操作数据。这其中，对于有初值的变量，它的初始值会存放在程序的二进制文件中，而且，这些数据部分也会被装载到内存中，即程序的**数据段**。数据段存放的是程序中已经初始化且不为 0 的全局变量和静态变量。对于未初始化的全局变量和静态变量，因为编译器知道它们的初始值都是 0，因此便不需要再在程序的二进制映像中存放这么多 0 了，只需要记录他们的大小即可，这便是 **BSS 段**。数据段和 BSS 段里存放的数据也只能是部分数据，主要是全局变量和静态变量，但程序在运行过程中，仍然需要记录大量的临时变量，以及运行时生成的变量，这里就需要新的内存区域了，即程序的**堆空间**跟**栈空间**。与代码段以及数据段不同的是，堆和栈并不是从磁盘中加载，它们都是由程序在运行的过程中申请，在程序运行结束后释放。**CPU 访问内存有三种途径——访问代码的 cs:ip，访问数据的 ds:XXX，以及访问栈的 ss:sp**。PS：本质是代码 + 数据两个部分，只是数据部分按用途细分了一下
 
@@ -107,49 +180,6 @@ CPU 运行一个程序，实质就是在顺序执行该程序的机器码。一�
 
 在内核里面也会有内核的代码，同样有 Text Segment、Data Segment 和 BSS Segment，别忘了内核代码也是 ELF 格式的。
 
-[你真的理解内存分配吗？](https://mp.weixin.qq.com/s/H9W3tL_Jxxg3LAV6Y3rFyw)对于内存的访问，用户态的进程使用虚拟地址，内核的也基本都是使用虚拟地址
-
-![](/public/upload/linux/process_virtual_space.png)
-
-通过 malloc 函数申请的内存地址是由 堆空间 分配的(其实还有可能从 mmap 区分配)，在内核中，使用一个名为 brk 的指针来表示进程的 堆空间 的顶部。malloc 函数就是通过移动 brk 指针来实现申请和释放内存的，Linux 提供了一个名为 brk() 的系统调用来移动 brk 指针。
-
-使用 sbrk 和 mmap 这两个系统调用，向操作系统申请堆内存，不过，sbrk 和 mmap 这两个系统调用分配内存效率比较低。为了解决这个问题，人们倾向于使用系统调用来分配大块内存，然后再把这块内存分割成更小的块。在 C 语言的运行时库里，这个工作是由 malloc 函数负责的。在 glibc 的实现里，malloc 函数在向操作系统申请堆内存时，会使用 mmap，以 4K 的整数倍一次申请多个页。之后，对小块内存进行精细化管理
-1. 空闲链表，分配内存通过遍历 free list 来查找可用的空闲内存区域，在找到合适的空闲区域以后，就将这一块区域从链表中摘下来。比如要请求的大小是 m，就将这个结点从链表中取下，把起始位置向后移动 m，大小也相应的减小 m。将修改后的结点重新挂到链表上。在释放的时候，将这块区域按照起始起址的排序放回到链表里，并且检查它的前后是否有空闲区域，如果有就合并成一个更大的空闲区。
-2. 分桶式内存管理。分桶式内存管理采用了多个链表，对于单个链表，它内部的所有结点所对应的内存区域的大小是相同的。换句话说，相同大小的区域会挂载到同一个链表上。
-3. 伙伴系统。当系统中还有很多 8 字节的空闲块，而 4 字节的空闲块却已经耗尽，这时再有一个 4 字节的请求，伙伴系统不会直接把 8 的空闲区域分配出去，因为这样做的话，会带来巨大的浪费。它会先把 8 字节分成两个 4 字节，一个用于本次 malloc 分配，另一个则挂入到 4 字节的 free list。这种不断地把一块内存分割成更小的两块内存的做法，就是伙伴系统，这两块更小的内存就是伙伴。当释放内存时，如果系统发现与被释放的内存相邻的那个伙伴也是空闲的，就会把它们合并成一个更大的连续内存。
-
-![](/public/upload/linux/linux_virtual_address.png)
-
-```c 
-// 持有task_struct 便可以访问进程在内存中的所有数据
-struct task_struct {
-    ...
-    struct mm_struct                *mm;
-    struct mm_struct                *active_mm;
-    ...
-    void  *stack;                   // 指向内核栈的指针
-}
-//file:include/linux/mm_types.h
-struct mm_struct {
-    struct vm_area_struct * mmap;  /* list of VMAs */
-    struct rb_root mm_rb;
-
-    unsigned long mmap_base;  /* base of mmap area */
-    unsigned long task_size;  /* size of task vm space */
-    unsigned long start_code, end_code, start_data, end_data;   // start_code、end_code 分别指向代码段的开始与结尾，start_data 和 end_data 共同决定数据段的区域
-    unsigned long start_brk, brk, start_stack;  // start_brk 和 brk 中间是堆内存的位置、start_stack 是用户态堆栈的起始地址。
-    unsigned long arg_start, arg_end, env_start, env_end;
-}
-```
-Linux使用mm_struct来表示进程的地址空间，该描述符表示着进程所有地址空间的信息。进程在运行的时候，在用户态其所需要的代码，全局变量数据，以及 mmap 内存映射等全部都是通过 mm_struct 来进行内存查找和寻址的。
-
-![](/public/upload/linux/mm_struct.png)
-
-
-在用户态，进程觉着整个空间是它独占的，没有其他进程存在。但是到了内核里面，无论是从哪个进程进来的，看到的都是同一个内核空间，看到的都是同一个进程列表（虽然内核栈是各用个的）。在内核内存区域，可以通过直接计算得出物理内存地址，并不需要复杂的页表计算。而且最重要的是所有内核进程、以及用户进程的内核态，这部分内存都是共享的。所以，**如果要访问一些公共的数据结构，需要进行锁保护**。
-
-![](/public/upload/linux/linux_task_vm.jpg)
-
 ## 进程的页表
 
 虚拟内存跟物理内存要如何对应起来？最简单的方案是让虚拟地址能够索引到物理内存单元，但是虚拟地址和物理地址显然不能一一对应，因此，我们需要在虚拟地址空间与物理地址空间之间加一个机构，这个机构相当于一个函数：p=f(v) 。对这函数传入一个虚拟地址，它就能返回一个物理地址。该函数有自己的计算方法，对于没法计算的地址或者没有权限的地址，还能返回一个禁止访问。这个函数用硬件实现出来，就是 CPU 中的 MMU，即内存管理单元。把一个数据转换成另一个数据，最简单的方案是什么？当然是建立一个对应表格，对照表格进行查询就行了。MMU 也是使用一个地址转换表，但是它做很多优化和折中处理。
@@ -165,41 +195,46 @@ Linux使用mm_struct来表示进程的地址空间，该描述符表示着进程
 
 在一个进程新创建的时候，会调用 fork，对于内存的部分会调用 copy_mm，里面调用 dup_mm。
 
-    // Allocate a new mm structure and copy contents from the mm structure of the passed in task structure.
-    static struct mm_struct *dup_mm(struct task_struct *tsk){
-        struct mm_struct *mm, *oldmm = current->mm;
-        mm = allocate_mm();
-        memcpy(mm, oldmm, sizeof(*mm));
-        if (!mm_init(mm, tsk, mm->user_ns))
-            goto fail_nomem;
-        err = dup_mmap(mm, oldmm);
-        return mm;
-    }
+```c++
+// Allocate a new mm structure and copy contents from the mm structure of the passed in task structure.
+static struct mm_struct *dup_mm(struct task_struct *tsk){
+    struct mm_struct *mm, *oldmm = current->mm;
+    mm = allocate_mm();
+    memcpy(mm, oldmm, sizeof(*mm));
+    if (!mm_init(mm, tsk, mm->user_ns))
+        goto fail_nomem;
+    err = dup_mmap(mm, oldmm);
+    return mm;
+}
+```
 
 除了创建一个新的 mm_struct，并且通过memcpy将它和父进程的弄成一模一样之外，我们还需要调用 mm_init 进行初始化。接下来，mm_init 调用 mm_alloc_pgd，分配全局页目录项，赋值给mm_struct 的 pdg 成员变量。
 
-    static inline int mm_alloc_pgd(struct mm_struct *mm){
-        mm->pgd = pgd_alloc(mm);
-        return 0;
-    }
+```c++
+static inline int mm_alloc_pgd(struct mm_struct *mm){
+    mm->pgd = pgd_alloc(mm);
+    return 0;
+}
+```
 
 一个进程的虚拟地址空间包含用户态和内核态两部分。为了从虚拟地址空间映射到物理页面，页表也分为用户地址空间的页表和内核页表。在内核里面，映射靠内核页表，这里内核页表会拷贝一份到进程的页表
 
 如果是用户态进程页表，会有 mm_struct 指向进程顶级目录 pgd，对于内核来讲，也定义了一个 mm_struct，指向 swapper_pg_dir（指向内核最顶级的目录 pgd）。
 
-    struct mm_struct init_mm = {
-        .mm_rb		= RB_ROOT,
-        // pgd 页表最顶级目录
-        .pgd		= swapper_pg_dir,
-        .mm_users	= ATOMIC_INIT(2),
-        .mm_count	= ATOMIC_INIT(1),
-        .mmap_sem	= __RWSEM_INITIALIZER(init_mm.mmap_sem),
-        .page_table_lock =  __SPIN_LOCK_UNLOCKED(init_mm.page_table_lock),
-        .mmlist		= LIST_HEAD_INIT(init_mm.mmlist),
-        .user_ns	= &init_user_ns,
-        INIT_MM_CONTEXT(init_mm)
-    };
-
+```c++
+struct mm_struct init_mm = {
+    .mm_rb		= RB_ROOT,
+    // pgd 页表最顶级目录
+    .pgd		= swapper_pg_dir,
+    .mm_users	= ATOMIC_INIT(2),
+    .mm_count	= ATOMIC_INIT(1),
+    .mmap_sem	= __RWSEM_INITIALIZER(init_mm.mmap_sem),
+    .page_table_lock =  __SPIN_LOCK_UNLOCKED(init_mm.page_table_lock),
+    .mmlist		= LIST_HEAD_INIT(init_mm.mmlist),
+    .user_ns	= &init_user_ns,
+    INIT_MM_CONTEXT(init_mm)
+};
+```
 ### 页表的应用
 
 **一个进程 fork 完毕之后，有了内核页表（内核初始化时即弄好了内核页表， 所有进程共享），有了自己顶级的 pgd，但是对于用户地址空间来讲，还完全没有映射过（用户空间页表一开始是不完整的，只有最顶级目录pgd这个“光杆司令”）**。这需要等到这个进程在某个 CPU 上运行，并且对内存访问的那一刻了
@@ -218,81 +253,169 @@ cr3 是 CPU 的一个寄存器，它会指向当前进程的顶级 pgd。如果 
 
 ### 虚实结合处：通过缺页中断来“填充”页表
 
-[虚实结合：虚拟内存和物理内存](https://time.geekbang.org/column/article/571870)CPU 拿着一个虚拟地址访问内存，首先会经过 MMU，对于调用 malloc 函数的情况是该虚拟地址没有映射到物理内存，所以会通知 CPU 该地址禁止访问。上图中 1 到 4 个步骤为硬件自动完成的，然后 CPU 中断到 Linux 内核地址错误处理程序，软件开始工作，也就是说 Linux 内核会对照着当前进程的虚拟地址空间，去查找对应的 vm_area_struct 数据结构，找不到就证明虚拟地址未分配，直接结束，进程会发出段错误；若是找到了，则证明虚拟地址已经分配，接着会分配物理内存，建立虚拟地址到物理地址的映射关系，接着程序就可以继续运行了。
+[虚实结合：虚拟内存和物理内存](https://time.geekbang.org/column/article/571870)CPU 拿着一个虚拟地址访问内存，首先会经过 MMU，对于调用 malloc 函数的情况是该虚拟地址没有映射到物理内存，所以会通知 CPU 该地址禁止访问。上图中 1 到 4 个步骤为硬件自动完成的，然后 CPU 中断到 Linux 内核地址错误处理程序，软件开始工作，也就是说 Linux 内核会对照着当前进程的虚拟地址空间，根据变量地址address去查找对应的 vm_area_struct 数据结构，找不到就证明虚拟地址未分配，直接结束，进程会发出段错误；若是找到了，则证明虚拟地址已经分配，接着会分配物理内存，建立虚拟地址到物理地址的映射关系，接着程序就可以继续运行了。
 
 ![](/public/upload/linux/linux_page_interupt.jpg)
 
 如果对没有进行映射的虚拟内存地址进行读写操作，那么将会发生 缺页异常。Linux 内核会对 缺页异常 进行修复，修复过程如下：获取触发 缺页异常 的虚拟内存地址（读写哪个虚拟内存地址导致的）。查看此虚拟内存地址是否被申请（是否在 brk 指针内），如果不在 brk 指针内，将会导致 Segmention Fault 错误（也就是常见的coredump），进程将会异常退出。如果虚拟内存地址在 brk 指针内，那么将此虚拟内存地址映射到物理内存地址上，完成 缺页异常 修复过程，并且返回到触发异常的地方进行运行。
 
-内存管理并不直接分配物理内存，只有等你真正用的那一刻才会开始分配。只有访问虚拟内存的时候，发现没有映射多物理内存，页表也没有创建过，才触发缺页异常。进入内核调用 do_page_fault，一直调用到 __handle_mm_fault，__handle_mm_fault 调用 pud_alloc 和 pmd_alloc，来创建相应的页目录项，最后调用 handle_pte_fault 来创建页表项。
+内存管理并不直接分配物理内存，只有等你真正用的那一刻才会开始分配。只有访问虚拟内存的时候，发现没有映射多物理内存，页表也没有创建过，才触发缺页异常。**Linux 是用4级页表来管理虚拟地址空间到物理内存之间的映射的，所以在实际申请物理页面之前，需要先检查一遍需要遍历的各级页表是否存在，不存在的话需要申请**。进入内核调用 do_page_fault（缺页中断处理入口），根据变量地址address去查找对应的 vm_area_struct，一直调用到 __handle_mm_fault，__handle_mm_fault 调用 pud_alloc 和 pmd_alloc，来创建相应的页目录项，最后调用 handle_pte_fault 来创建页表项。
 
-    static noinline void
-    __do_page_fault(struct pt_regs *regs, unsigned long error_code,
-            unsigned long address){
-        struct vm_area_struct *vma;
-        struct task_struct *tsk;
-        struct mm_struct *mm;
-        tsk = current;
-        mm = tsk->mm;
-        // 判断缺页是否发生在内核
-        if (unlikely(fault_in_kernel_space(address))) {
-            if (vmalloc_fault(address) >= 0)
-                return;
-        }
-        ......
-        // 找到待访问地址所在的区域 vm_area_struct
-        vma = find_vma(mm, address);
-        ......
-        fault = handle_mm_fault(vma, address, flags);
-        ......
-
-    static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
-            unsigned int flags){
-        struct vm_fault vmf = {
-            .vma = vma,
-            .address = address & PAGE_MASK,
-            .flags = flags,
-            .pgoff = linear_page_index(vma, address),
-            .gfp_mask = __get_fault_gfp_mask(vma),
-        };
-        struct mm_struct *mm = vma->vm_mm;
-        pgd_t *pgd;
-        p4d_t *p4d;
-        int ret;
-        pgd = pgd_offset(mm, address);
-        p4d = p4d_alloc(mm, pgd, address);
-        ......
-        vmf.pud = pud_alloc(mm, p4d, address);
-        ......
-        vmf.pmd = pmd_alloc(mm, vmf.pud, address);
-        ......
-        return handle_pte_fault(&vmf);
+```c
+static noinline void __do_page_fault(struct pt_regs *regs, unsigned long error_code,unsigned long address){
+    struct vm_area_struct *vma;
+    struct task_struct *tsk;
+    struct mm_struct *mm;
+    tsk = current;
+    mm = tsk->mm;
+    // 判断缺页是否发生在内核
+    if (unlikely(fault_in_kernel_space(address))) {
+        if (vmalloc_fault(address) >= 0)
+            return;
     }
+    ......
+    // 找到待访问地址所在的区域 vm_area_struct
+    vma = find_vma(mm, address);
+    ......
+    fault = handle_mm_fault(vma, address, flags);
+    ......
 
-以handle_pte_fault 的一种场景 do_anonymous_page为例：先通过 pte_alloc 分配一个页表项，然后通过 alloc_zeroed_user_highpage_movable 分配一个页，接下来要调用 mk_pte，**将页表项指向新分配的物理页**，set_pte_at 会将页表项塞到页表里面。
+static int __handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
+        unsigned int flags){
+    struct vm_fault vmf = {
+        .vma = vma,
+        .address = address & PAGE_MASK,
+        .flags = flags,
+        .pgoff = linear_page_index(vma, address),
+        .gfp_mask = __get_fault_gfp_mask(vma),
+    };
+    struct mm_struct *mm = vma->vm_mm;
+    pgd_t *pgd;
+    p4d_t *p4d;
+    int ret;
+    // 依次查看或申请每一级页表
+    pgd = pgd_offset(mm, address);
+    p4d = p4d_alloc(mm, pgd, address);
+    ......
+    vmf.pud = pud_alloc(mm, p4d, address);
+    ......
+    vmf.pmd = pmd_alloc(mm, vmf.pud, address);
+    ......
+    return handle_pte_fault(&vmf);
+}
+```
+在handle_pte_fault 函数中会进行很多种内存缺页处理，比如文件映射缺页处理、swap缺页处理、写时复制缺页处理、匿名映射页缺页处理等，开发者申请的变量内存对应的是匿名映射页缺页处理，会进入do_anonymous_page 函数。先通过 pte_alloc 分配一个页表项，然后通过 alloc_zeroed_user_highpage_movable 分配一个页，在底层会调用伙伴系统的alloc_page 进行实际的物理页面的分配。接下来要调用 mk_pte，**将页表项指向新分配的物理页**，set_pte_at 会将页表项塞到页表里面。
 
-    static int do_anonymous_page(struct vm_fault *vmf){
-        struct vm_area_struct *vma = vmf->vma;
-        struct mem_cgroup *memcg;
-        struct page *page;
-        int ret = 0;
-        pte_t entry;
-        ......
-        if (pte_alloc(vma->vm_mm, vmf->pmd, vmf->address))
-            return VM_FAULT_OOM;
-        ......
-        page = alloc_zeroed_user_highpage_movable(vma, vmf->address);
-        ......
-        entry = mk_pte(page, vma->vm_page_prot);
-        if (vma->vm_flags & VM_WRITE)
-            entry = pte_mkwrite(pte_mkdirty(entry));
-        vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
-                &vmf->ptl);
-        ......
-        set_pte_at(vma->vm_mm, vmf->address, vmf->pte, entry);
-        ......
-    }
+```c
+static int do_anonymous_page(struct vm_fault *vmf){
+    struct vm_area_struct *vma = vmf->vma;
+    struct mem_cgroup *memcg;
+    struct page *page;
+    int ret = 0;
+    pte_t entry;
+    ......
+    if (pte_alloc(vma->vm_mm, vmf->pmd, vmf->address))
+        return VM_FAULT_OOM;
+    ......
+    page = alloc_zeroed_user_highpage_movable(vma, vmf->address);
+    ......
+    entry = mk_pte(page, vma->vm_page_prot);
+    if (vma->vm_flags & VM_WRITE)
+        entry = pte_mkwrite(pte_mkdirty(entry));
+    vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
+            &vmf->ptl);
+    ......
+    set_pte_at(vma->vm_mm, vmf->address, vmf->pte, entry);
+    ......
+}
+```
 
+## 虚拟地址空间内的堆
+
+内核只提供mmap、brk这种基础的内存分配方式，但开发者可能需要频繁的申请各种尺寸的小对象，如果直接使用mmap、brk，会导致严重的碎片问题，频繁的系统调用也会拉低进程的运行性能。在应用开发者和内核之间还需要一个内存分配器，glibc 中的内存分配器通过链表的方式管理各种大小的chunk，每一个链表中都是相同大小的chunk。当进程需要对象时，分配器根据其大小找到链表，从链表头摘一个直接用。 当释放的时候，还会放到相应大小的chunk中，等下次再分配，并不会立即还给内核。
+
+```c
+struct mm_struct {
+    ...
+    unsigned long start_brk // heap段
+}
+```
+
+## 虚拟地址空间内的栈
+
+[Linux虚拟地址空间布局以及进程栈和线程栈总结](https://www.cnblogs.com/sky-heaven/p/7112006.html)
+
+栈是主要用途就是支持函数调用。大多数的处理器架构，都有实现**硬件栈**。有专门的栈指针寄存器，以及特定的硬件指令来完成 入栈/出栈 的操作。
+
+```c
+struct mm_struct {
+    ...
+    unsigned long start_stack;  // 用户态堆栈的起始地址。
+}
+```
+栈内存的申请（默认给了4kb，一页）其实只是申请一个表示一段地址范围的vm_area_struct，并没有真正的申请物理内存。加载elf程序时（load_elf_binary），会将准备的栈地址空间指针赋值给mm_struct->start_stack。当进程运行的过程中在栈上开始分配和访问变量的时候，如果物理页还没有分配，会触发缺页中断，在缺页中断中调用内核的伙伴系统真正的分配物理内存。随着进程的运行，当栈中保存的调用链、局部变量越来越多的时候，必然会超过4kb，此时如果要访问的address 大于vma，在缺页处理函数中，会调用expand_stack 进行扩充，如果允许扩充，则简单修改下vma->vm_start 就可以了。
+
+### 用户栈和内核栈的切换
+
+删改自[进程内核栈、用户栈](http://www.cnblogs.com/shengge/articles/2158748.html)
+
+内核在创建进程的时候，在创建task_struct的同时，会为进程创建相应的堆栈。每个进程会有两个栈，一个用户栈，存在于用户空间，一个内核栈，存在于内核空间。**当进程在用户空间运行时，cpu堆栈指针寄存器里面的内容是用户堆栈地址，使用用户栈；当进程在内核空间时，cpu堆栈指针寄存器里面的内容是内核栈空间地址，使用内核栈**。当进程因为中断或者系统调用而陷入内核态之行时，进程所使用的堆栈也要从用户栈转到内核栈。
+
+如何相互切换呢？进程陷入内核态后，先把用户态堆栈的地址保存在内核栈之中，然后设置堆栈指针寄存器的内容为内核栈的地址，这样就完成了用户栈向内核栈的转换；当进程从内核态恢复到用户态执行时，在内核态执行的最后，将保存在内核栈里面的用户栈的地址恢复到堆栈指针寄存器即可。这样就实现了内核栈和用户栈的互转。
+
+那么，我们知道从内核转到用户态时用户栈的地址是在陷入内核的时候保存在内核栈里面的，但是在陷入内核的时候，我们是如何知道内核栈的地址的呢？**关键在进程从用户态转到内核态的时候，进程的内核栈总是空的**。这是因为，一旦进程从内核态返回到用户态后，内核栈中保存的信息无效，会全部恢复。因此，每次进程从用户态陷入内核的时候得到的内核栈都是空的，直接把内核栈的栈顶地址给堆栈指针寄存器就可以了。
+
+### 为什么需要单独的进程内核栈？
+
+内核地址空间所有进程空闲，但内核栈却不共享。为什么需要单独的进程内核栈？**因为同时可能会有多个进程在内核运行**。
+
+所有进程运行的时候，都可能通过系统调用陷入内核态继续执行。假设第一个进程 A 陷入内核态执行的时候，需要等待读取网卡的数据，主动调用 `schedule()` 让出 CPU；此时调度器唤醒了另一个进程 B，碰巧进程 B 也需要系统调用进入内核态。那问题就来了，如果内核栈只有一个，那进程 B 进入内核态的时候产生的压栈操作，必然会破坏掉进程 A 已有的内核栈数据；一但进程 A 的内核栈数据被破坏，很可能导致进程 A 的内核态无法正确返回到对应的用户态了。
+
+进程内核栈在**进程创建的时候**，通过 slab 分配器从 thread_info_cache 缓存池中分配出来，其大小为 THREAD_SIZE，一般来说是一个页大小 4K；
+
+### 进程切换带来的用户栈切换和内核栈切换
+
+```c
+// 持有task_struct 便可以访问进程在内存中的所有数据
+struct task_struct {
+    ...
+    struct mm_struct                *mm;
+    struct mm_struct                *active_mm;
+    ...
+    void  *stack;   // 指向内核栈的指针
+}
+```
+
+从进程 A 切换到进程 B，用户栈要不要切换呢？当然要，在切换内存空间的时候就切换了，每个进程的用户栈都是独立的，都在内存空间里面。
+
+那内核栈呢？已经在 __switch_to 里面切换了，也就是将 current_task 指向当前的 task_struct。里面的 void *stack 指针，指向的就是当前的内核栈。内核栈的栈顶指针呢？在 __switch_to_asm 里面已经切换了栈顶指针，并且将栈顶指针在 __switch_to加载到了 TSS 里面。
+
+用户栈的栈顶指针呢？如果当前在内核里面的话，它当然是在内核栈顶部的 pt_regs 结构里面呀。当从内核返回用户态运行的时候，pt_regs 里面有所有当时在用户态的时候运行的上下文信息，就可以开始运行了。
+
+### 主线程的用户栈和一般现成的线程栈
+
+|用户栈|进程主线程|一般线程|
+|---|---|---|
+|栈地址|进程用户栈|在进程的堆里面创建的|
+|指令指针初始位置|main函数|为线程指定的函数|
+
+对应着jvm 一个线程一个栈
+
+## 中断栈
+
+中断存在的意义是CPU控制外部设备的同时，外部设备也可以高效的“控制CPU”。发展至今，这种设计思想扩展到了外部硬件控制CPU、软件控制CPU、CPU运行管理等三个方面。
+
+[Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)中断有点类似于我们经常说的事件驱动编程，而这个事件通知机制是怎么实现的呢，硬件中断的实现通过一个导线和 CPU 相连来传输中断信号，软件上会有特定的指令，例如执行系统调用创建线程的指令，而 CPU 每执行完一个指令，就会检查中断寄存器中是否有中断，如果有就取出然后执行该中断对应的处理程序。
+
+当系统收到中断事件后，进行中断处理的时候，也需要中断栈来支持函数调用。由于系统中断的时候，系统当然是处于内核态的，所以中断栈是可以和内核栈共享的。但是具体是否共享，这和具体处理架构密切相关。ARM 架构就没有独立的中断栈。
+
+
+## 活学活用
+
+1. OOM Killer 在 Linux 系统里如果内存不足时，会杀死一个正在运行的进程来释放一些内存。
+2. Linux 里的程序都是调用 malloc() 来申请内存，如果内存不足，直接 malloc() 返回失败就可以，为什么还要去杀死正在运行的进程呢？Linux允许进程申请超过实际物理内存上限的内存。因为 malloc() 申请的是内存的虚拟地址，系统只是给了程序一个地址范围，由于没有写入数据，所以程序并没有得到真正的物理内存。物理内存只有程序真的往这个地址写入数据的时候，才会分配给程序。
+
+![](/public/upload/linux/linux_memory_management.png)
 
 ## 彭东《操作系统实战》案例操作系统
 
@@ -579,69 +702,3 @@ typedef struct s_THREAD
 每个进程拥有 x86 CPU 的整个虚拟地址空间，这个虚拟地址空间被分成了两个部分，上半部分是所有进程都共享的内核部分 ，里面放着一份内核代码和数据，下半部分是应用程序，分别独立，互不干扰。从**进程的**虚拟地址空间开始，而进程的虚拟地址是由 kmvarsdsc_t 结构表示的，一个 kmvarsdsc_t 结构就表示一个已经分配出去的虚拟地址空间。一个进程所有的 kmvarsdsc_t 结构，要交给进程的 mmadrsdsc_t 结构中的 virmemadrs_t 结构管理。为了管理虚拟地址空间对应的物理内存页面，我们建立了 kvmembox_t 结构，它由 kvmemcboxmgr_t 结构统一管理。在 kvmembox_t 结构中，挂载了物理内存页面对应的 msadsc_t 结构。
 
 整个虚拟地址空间就是由一个个虚拟地址区间组成的。那么不难猜到，分配一个虚拟地址空间就是在整个虚拟地址空间分割出一个区域，而释放一块虚拟地址空间，就是把这个区域合并到整个虚拟地址空间中去。我们分配一段虚拟地址空间，并没有分配对应的物理内存页面，而是等到真正访问虚拟地址空间时，才触发了缺页异常。查找缺页地址对应的 kmvarsdsc_t 结构，没找到说明没有分配该虚拟地址空间，那属于非法访问不予处理；然后，查找 kmvarsdsc_t 结构下面的对应 kvmemcbox_t 结构，它是用来挂载物理内存页面的；最后，分配物理内存页面并建立 MMU 页表映射关系，即调用物理页分配接口分配一个物理内存页面并把对应的 msadsc_t 结构挂载到 kvmemcbox_t 结构上，接着获取 msadsc_t 结构对应内存页面的物理地址，最后是调用 hal_mmu_transform 函数完成虚拟地址到物理地址的映射工作，它主要是建立 MMU 页表。
-
-## 地址空间内的栈
-
-[Linux虚拟地址空间布局以及进程栈和线程栈总结](https://www.cnblogs.com/sky-heaven/p/7112006.html)
-
-栈是主要用途就是支持函数调用。大多数的处理器架构，都有实现**硬件栈**。有专门的栈指针寄存器，以及特定的硬件指令来完成 入栈/出栈 的操作。
-
-### 用户栈和内核栈的切换
-
-删改自[进程内核栈、用户栈](http://www.cnblogs.com/shengge/articles/2158748.html)
-
-内核在创建进程的时候，在创建task_struct的同时，会为进程创建相应的堆栈。每个进程会有两个栈，一个用户栈，存在于用户空间，一个内核栈，存在于内核空间。**当进程在用户空间运行时，cpu堆栈指针寄存器里面的内容是用户堆栈地址，使用用户栈；当进程在内核空间时，cpu堆栈指针寄存器里面的内容是内核栈空间地址，使用内核栈**。当进程因为中断或者系统调用而陷入内核态之行时，进程所使用的堆栈也要从用户栈转到内核栈。
-
-如何相互切换呢？进程陷入内核态后，先把用户态堆栈的地址保存在内核栈之中，然后设置堆栈指针寄存器的内容为内核栈的地址，这样就完成了用户栈向内核栈的转换；当进程从内核态恢复到用户态执行时，在内核态执行的最后，将保存在内核栈里面的用户栈的地址恢复到堆栈指针寄存器即可。这样就实现了内核栈和用户栈的互转。
-
-那么，我们知道从内核转到用户态时用户栈的地址是在陷入内核的时候保存在内核栈里面的，但是在陷入内核的时候，我们是如何知道内核栈的地址的呢？**关键在进程从用户态转到内核态的时候，进程的内核栈总是空的**。这是因为，一旦进程从内核态返回到用户态后，内核栈中保存的信息无效，会全部恢复。因此，每次进程从用户态陷入内核的时候得到的内核栈都是空的，直接把内核栈的栈顶地址给堆栈指针寄存器就可以了。
-
-### 为什么需要单独的进程内核栈？
-
-内核地址空间所有进程空闲，但内核栈却不共享。为什么需要单独的进程内核栈？**因为同时可能会有多个进程在内核运行**。
-
-所有进程运行的时候，都可能通过系统调用陷入内核态继续执行。假设第一个进程 A 陷入内核态执行的时候，需要等待读取网卡的数据，主动调用 `schedule()` 让出 CPU；此时调度器唤醒了另一个进程 B，碰巧进程 B 也需要系统调用进入内核态。那问题就来了，如果内核栈只有一个，那进程 B 进入内核态的时候产生的压栈操作，必然会破坏掉进程 A 已有的内核栈数据；一但进程 A 的内核栈数据被破坏，很可能导致进程 A 的内核态无法正确返回到对应的用户态了。
-
-进程内核栈在**进程创建的时候**，通过 slab 分配器从 thread_info_cache 缓存池中分配出来，其大小为 THREAD_SIZE，一般来说是一个页大小 4K；
-
-### 进程切换带来的用户栈切换和内核栈切换
-
-    // 持有task_struct 便可以访问进程在内存中的所有数据
-    struct task_struct {
-        ...
-        struct mm_struct                *mm;
-        struct mm_struct                *active_mm;
-        ...
-        void  *stack;   // 指向内核栈的指针
-    }
-
-从进程 A 切换到进程 B，用户栈要不要切换呢？当然要，在切换内存空间的时候就切换了，每个进程的用户栈都是独立的，都在内存空间里面。
-
-那内核栈呢？已经在 __switch_to 里面切换了，也就是将 current_task 指向当前的 task_struct。里面的 void *stack 指针，指向的就是当前的内核栈。内核栈的栈顶指针呢？在 __switch_to_asm 里面已经切换了栈顶指针，并且将栈顶指针在 __switch_to加载到了 TSS 里面。
-
-用户栈的栈顶指针呢？如果当前在内核里面的话，它当然是在内核栈顶部的 pt_regs 结构里面呀。当从内核返回用户态运行的时候，pt_regs 里面有所有当时在用户态的时候运行的上下文信息，就可以开始运行了。
-
-### 主线程的用户栈和一般现成的线程栈
-
-|用户栈|进程主线程|一般线程|
-|---|---|---|
-|栈地址|进程用户栈|在进程的堆里面创建的|
-|指令指针初始位置|main函数|为线程指定的函数|
-
-对应着jvm 一个线程一个栈
-
-## 中断栈
-
-中断存在的意义是CPU控制外部设备的同时，外部设备也可以高效的“控制CPU”。发展至今，这种设计思想扩展到了外部硬件控制CPU、软件控制CPU、CPU运行管理等三个方面。
-
-[Java和操作系统交互细节](https://mp.weixin.qq.com/s/fmS7FtVyd7KReebKzxzKvQ)中断有点类似于我们经常说的事件驱动编程，而这个事件通知机制是怎么实现的呢，硬件中断的实现通过一个导线和 CPU 相连来传输中断信号，软件上会有特定的指令，例如执行系统调用创建线程的指令，而 CPU 每执行完一个指令，就会检查中断寄存器中是否有中断，如果有就取出然后执行该中断对应的处理程序。
-
-当系统收到中断事件后，进行中断处理的时候，也需要中断栈来支持函数调用。由于系统中断的时候，系统当然是处于内核态的，所以中断栈是可以和内核栈共享的。但是具体是否共享，这和具体处理架构密切相关。ARM 架构就没有独立的中断栈。
-
-
-## 活学活用
-
-1. OOM Killer 在 Linux 系统里如果内存不足时，会杀死一个正在运行的进程来释放一些内存。
-2. Linux 里的程序都是调用 malloc() 来申请内存，如果内存不足，直接 malloc() 返回失败就可以，为什么还要去杀死正在运行的进程呢？Linux允许进程申请超过实际物理内存上限的内存。因为 malloc() 申请的是内存的虚拟地址，系统只是给了程序一个地址范围，由于没有写入数据，所以程序并没有得到真正的物理内存。物理内存只有程序真的往这个地址写入数据的时候，才会分配给程序。
-
-![](/public/upload/linux/linux_memory_management.png)

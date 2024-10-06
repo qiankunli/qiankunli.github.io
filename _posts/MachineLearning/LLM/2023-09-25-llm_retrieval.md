@@ -134,6 +134,16 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
 **优化召回的输入**/如何使检索对用户输入的变异性稳健/优化发送给检索器的搜索查询？
 1. 查询转换
     1. 将用户问题采用多个不同的视角去提问，借助子问题检索，然后 LLM 会得出最终结果。大多数人在问问题的过程中，如果不懂 prompt 工程，往往不专业，要么问题过于简单化，要么有歧义，意图不明显。那么向量搜索也是不准确的，导致LLM回答的效果不好。所以需要 LLM 进行问题的修正和多方位解读。MultiQueryRetriever 。[使用RAG-Fusion和RRF让RAG在意图搜索方面更进一步](https://mp.weixin.qq.com/s/N7HgjsqgCVf2i-xy05qZtA)
+    2. Decomposition（问题分解）在最终回答子问题的时候有两种方式。第一种是递归回答，即先接收一个子问题，先回答这个子问题并接受这个答案，并用它来帮助提出第二个子问题。第二种方式是独立回答，然后再把所有的这些答案串联起来，得出最终答案。这更适合于一组有几个独立的问题，问题之间的答案不互相依赖的情况。
+        ```
+        from langchain.prompts import ChatPromptTemplate
+        # Decomposition
+        template = """You are a helpful assistant that generates multiple sub-questions related to an input question. \n
+        The goal is to break down the input into a set of sub-problems / sub-questions that can be answers in isolation. \n
+        Generate multiple search queries related to: {question} \n
+        Output (3 queries):"""
+        prompt_decomposition = ChatPromptTemplate.from_template(template)
+        ```
     3. BPO 通过优化提问和提供思路使得大模型更好的理解问题和回答问题。
         1. 天猫超市供应商如何入驻？ ==> 通过对话增强优化后的提问：你是物流部的机器人，针对天猫超市供应商入驻物流及供应链产品的流程，进行详细且有条理的解答，包括但不限于入驻申请、签署协议、品牌授权、创建二级供应商、签署商务合同和确定入仓方案等步骤。请确保你的回答准确、有深度且连贯，能够帮助用户理解和使用产品。
         2. 下班后帮我推荐个附近好吃的店？==> 通过对话增强优化后的提问：今天是周五，路上比较拥挤。想吃点辣的，给我推荐下周围车程不超过10分钟有什么好吃的店？

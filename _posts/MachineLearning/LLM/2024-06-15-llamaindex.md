@@ -242,3 +242,5 @@ async for chunk in result.async_response_gen():
 人工智能和LLM正在快速变化的领域，每周都会出现新的概念和想法，设计经得起时间考验的抽象是非常困难的。更安全的选择是仅对较低级别的构建块使用抽象。
 
 LlamaIndex的重点放在了Index上，也就是通过各种方式为文本建立索引，有通过LLM的，也有很多并非和LLM相关的。LangChain的重点在 Agent 和 Chain 上，也就是流程组合上。可以根据你的应用组合两个，如果你觉得问答效果不好，可以多研究一下LlamaIndex。如果你希望有更多外部工具或者复杂流程可以用，可以多研究一下LangChain。
+
+[Build and Scale a Powerful Query Engine with LlamaIndex and Ray](https://www.anyscale.com/blog/build-and-scale-a-powerful-query-engine-with-llamaindex-ray) 未读

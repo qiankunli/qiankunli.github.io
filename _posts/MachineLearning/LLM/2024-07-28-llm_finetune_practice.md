@@ -352,6 +352,8 @@ PS: 深度学习都得指定features/labels。在llm 场景下，features 和lab
 
 [基于LLaMA-Factory框架对Qwen2-7B模型进行微调实践](https://mp.weixin.qq.com/s/EIwmK5tHw3n7EGXkKhg4YQ)
 
+[使用医患对话数据训练新冠诊疗模型的例子](https://github.com/hiyouga/ChatGLM-Efficient-Tuning/blob/main/examples/covid_doctor.md)
+
 ## 微调实践
 
 [LLM is not all you need（大模型领域知识微调实践）](https://zhuanlan.zhihu.com/p/689800667)

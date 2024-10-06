@@ -93,6 +93,8 @@ static void scheduler(void) {
 
 ### GPM模型
 
+GMP模型和linux内核中cpu、runq有着非常高的相似度。 
+
 ![](/public/upload/go/gpm.jpg)
 
 ```go

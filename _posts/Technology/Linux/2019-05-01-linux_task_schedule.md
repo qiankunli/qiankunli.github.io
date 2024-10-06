@@ -39,6 +39,7 @@ struct task_struct {
     void            *stack;      //进程内核栈地址 
     refcount_t      usage;       //进程使用计数
     int             on_rq;       //进程是否在运行队列上
+    // 进程调度优先级
     int             prio;        //动态优先级
     int             static_prio; //静态优先级
     int             normal_prio; //取决于静态优先级和调度策略
@@ -49,9 +50,11 @@ struct task_struct {
     struct sched_dl_entity      dl;//采用EDF算法调度实时进程的调度实体
     struct sched_info       sched_info;//用于调度器统计进程的运行信息 
     struct list_head        tasks;//所有进程的链表
+    // 进程地址空间，在用户态所需要的内存数据，如代码、全局变量数据以及mmap 内存映射等都是通过mm_struct 进行内存查找和寻址的
     struct mm_struct        *mm;  //指向进程内存结构
     struct mm_struct        *active_mm;
     pid_t               pid;            //进程id
+    // 进程树关系
     struct task_struct __rcu    *parent;//指向其父进程
     struct list_head        children; //链表中的所有元素都是它的子进程
     struct list_head        sibling;  //用于把当前进程插入到兄弟链表中
@@ -73,7 +76,7 @@ struct task_struct {
 
 ![](/public/upload/linux/linux_task_struct_data.png)
 
-一个进程的运行竟然要保存这么多信息，这些信息都可以通过命令行取出来。fork 进程时， 创建一个空的task_struct 结构之后，这些信息也将被一一复制。
+一个进程的运行竟然要保存这么多信息，这些信息都可以通过命令行取出来。fork 进程时，核心是一个copy_process函数，它以复制父进程的方式来生成一个新的task_struct，然后调用wake_up_new_task 将新进程添加到就绪队列中，等待调度器调度执行。 
 
 ```c
 long _do_fork(unsigned long clone_flags,unsigned long stack_start,unsigned long stack_size,int __user *parent_tidptr,int __user *child_tidptr,unsigned long tls){
@@ -95,37 +98,32 @@ long _do_fork(unsigned long clone_flags,unsigned long stack_start,unsigned long 
         wake_up_new_task(p);
         ......
         put_pid(pid);
-    } 
+    }
+    ...
+} 
+static struct task_struct *copy_process(...){
+    // 复制进程task_struct结构体
+    struct task_struct *p;
+    p = dup_task_struct(current, ...);
+    // 复制files_struct
+    retval = copy_files(clone_flags,p)
+    // 复制fs_struct
+    retval = copy_fs(clone_flags,p)
+    // 复制mm_struct
+    retval = copy_mm(clone_flags,p)
+    // 复制进程的命名空间 nsproxy
+    retval = copy_namespace(clone_flags,p)
+    // 申请pid并设置进程号
+    pid = alloc_pid(p->nsproxy->pid_ns_for_children,...);
+    p->pid = pid_nr(pid);
+    if (clone_flags & CLONE_THREAD) {
+        p->tgid = current->tgid;
+    }else{
+        p->tgid = p->pid;
+    }
+    ...
+}
 ```
-
-
-### cpu 如何访问task_struct
-
-**进程及调度数据结构的组织**：在 task_struct 结构中，会包含至少一个 sched_entity 结构的变量。它其实是 Linux 进程调度系统的一部分，被嵌入到了 Linux 进程数据结构中，与调度器进行关联，能间接地访问进程。我们只要通过 sched_entity 结构变量的地址，减去它在 task_struct 结构中的偏移（由编译器自动计算），就能获取到 task_struct 结构的地址。这样就能达到通过 sched_entity 结构，访问 task_struct 结构的目的了。sched_entity 结构是通过红黑树组织起来的，红黑树的根在 cfs_rq 结构中，cfs_rq 结构又被包含在 rq 结构，每个 CPU 对应一个 rq 结构。
-
-![](/public/upload/linux/thread_sturct_relation.png)
-
-从CPU的视角，是如何访问task_struct结构的？进程的地址空间分为用户态和内核态，无论从哪个进程进入的内核态，进来后访问的是同一份，对应的也是物理内存中同一块空间。内核态 有一个数据结构 struct list_head tasks 维护了task_struct 列表。在处理器内部，有一个控制寄存器叫 CR3，存放着页目录的物理地址，故 CR3 又叫做页目录基址寄存器。
-1. 每个进程都有自己的用户态虚拟地址空间，因而每个进程都有自己的页表，每个进程的页表的根，放在task_struct结构中。进程运行在用户态，则从task_struct里面找到页表顶级目录，加载到CR3里面去，则程序里面访问的虚拟地址就通过CPU指向的页表转换成物理地址进行访问。
-2. 内核有统一的一个内核虚拟地址空间，因而内核也应该有个页表，内核页表的根是内存初始化的时候预设在一个虚拟地址和物理地址。进程进入内核后，CR3要变成指向内核页表的顶级目录。
-
-### Per CPU的struct
-
-SMP 系统的出现，对应用软件没有任何影响，因为应用软件始终看到是一颗 CPU，然而这却给操作系统带来了麻烦，操作系统必须使每个 CPU 都正确地执行进程。
-1. 操作系统要开发更先进的同步机制，解决数据竞争问题。比如原子变量、自旋锁、信号量等高级的同步机制。
-2. 进程调度问题，需要使得多个 CPU 尽量忙起来，否则多核还是等同于单核。为此，操作系统需要对进程调度模块进行改造。
-    1. 单核 CPU 一般使用全局进程队列，系统所有进程都挂载到这个队列上，进程调度器每次从该队列中获取进程让 CPU 执行。**多核心系统下，每个 CPU 一个进程队列**，虽然提升了进程调度的性能，但同时又引发了另一个问题——每个 CPU 的压力各不相同。这是因为进程暂停或者退出，会导致各队列上进程数量不均衡，有的队列上很少或者没有进程，有的队列上进程数量则很多，间接地出现一部分 CPU 太忙吃不消，而其他 CPU 太闲（处于饥饿空闲状态）的情况。
-    2. 怎么解决呢？这就需要操作系统时时查看各 CPU 进程队列上的进程数量，做出动态调整，把进程多的队列上的进程迁移到较少进程的队列上，使各大进程队列上的进程数量尽量相等，使 CPU 之间能为彼此分担压力。这就叫负载均衡，这种机制能提升系统的整体性能。
-
-linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
-
-1. 结构体 tss， 所有寄存器切换 ==> 内存拷贝/拷贝到特定tss_struct
-2. struct rq，为每一个CPU都创建一个队列来保存可以在这个CPU上运行的任务，这样调度的时候，只需要看当前的 CPU 上的资源就行，把（竞争全局线程队列）锁的开销就砍掉了。这里面包括一个实时进程队列rt_rq和一个CFS运行队列cfs_rq ，task_struct就是用sched_entity这个成员变量将自己挂载到某个CPU的队列上的。PS： Go中GMP 模型中的P抄的也是这个。
-
-    ![](/public/upload/linux/cpu_runqueue.jpg)
-
-进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，**将这个进程放进某个CPU的队列上来**。选择CPU，CPU 调度是在缓存性能和空闲核心两个点之间做权衡，同等条件下会尽量优先考虑缓存命中率，选择同 L1/L2 的核，其次会选择同一个物理 CPU 上的（共享 L3），最坏情况下去选择另外一个物理 CPU 上的核心。
-
 
 ### 进程切换
 
@@ -161,6 +159,18 @@ shell 实现的功能有别于其它应用，它的功能是接受用户输入�
 |copy_process逻辑|会将五大结构 files_struct、fs_struct、sighand_struct、signal_struct、mm_struct 都复制一遍<br>从此父进程和子进程各用各的数据结构|五大结构仅仅是引用计数加一<br>也即线程共享进程的数据结构|
 ||完全由内核实现|由内核态和用户态合作完成<br>相当一部分逻辑由glibc库函数pthread_create来做|
 |数据结构||内核态struct task_struct <br>用户态 struct pthread|
+
+
+[聊聊Linux中线程和进程的联系与区别](https://mp.weixin.qq.com/s/--S94B3RswMdBKBh6uxt0w)**Linux进程和线程的相同点要远远大于不同点，本质上是同一个东西**，都是一个 task_struct。每一个 task_struct 都需要被唯一的标识，它的 pid 就是唯一标识号。对于进程来说，这个 pid 就是我们平时常说的进程 pid。对于线程来说，我们假如一个进程下创建了多个线程出来。那么每个线程的 pid 都是不同的。但是我们一般又需要记录线程是属于哪个进程的，通过 tgid 字段来表示自己所归属的进程 ID。
+1. 进程创建 fork ==> fork ==> do_fork ==> copy_process
+2. 线程创建 pthread_create ==> do_clone ==> clone ==> do_fork ==> copy_process
+可见和创建进程时使用的 fork 系统调用相比，创建线程的 clone 系统调用几乎和 fork 差不多，也一样使用的是内核里的 do_fork 函数，最后走到 copy_process 来完整创建。不过创建过程的区别是二者在调用 do_fork 时传入的 clone_flags 里的标记不一样！。
+1. 创建进程时的 flag：仅有一个 SIGCHLD
+2. 创建线程时的 flag：包括 CLONE_VM(新 task 和父进程共享地址空间)、CLONE_FS(新 task 和父进程共享文件系统信息)、CLONE_FILES(新 task 和父进程共享文件描述符表)、CLONE_SIGNAL、CLONE_SETTLS、CLONE_PARENT_SETTID、CLONE_CHILD_CLEARTID、CLONE_SYSVSEM。PS：带了就会复用、共享对应xx_struct。代码段、数据段、堆内存共享，各个线程的栈区独立。
+
+![](/public/upload/linux/process_vs_thread.png)
+
+对于线程来讲，其地址空间 mm_struct、目录信息 fs_struct、打开文件列表 files_struct 都是和创建它的任务共享的。但是对于进程来讲，地址空间 mm_struct、挂载点 fs_struct、打开文件列表 files_struct 都要是独立拥有的，都需要去申请内存并初始化它们。
 
 ## 进程调度
 
@@ -438,22 +448,36 @@ static __always_inline struct rq *context_switch(struct rq *rq, struct task_stru
 
 ## 其它
 
-### 进程和线程的区别
+cpu 就是不断从pc 找活儿（指令）干，加上scheduler + task list之后就是不断从task list找个活儿（task_struct）干，跟java executor 不断从队列找活儿（runnable）干是一样的。又比如go中，用户逻辑包在goroutine中，goroutine 放在P中，M 不断从P 中取出G 来干活儿。 就好像网络包，一层套一层，符合一定的格式才可以收发和识别。
 
-[聊聊Linux中线程和进程的联系与区别](https://mp.weixin.qq.com/s/--S94B3RswMdBKBh6uxt0w)Linux进程和线程的相同点要远远大于不同点，本质上是同一个东西，都是一个 task_struct。每一个 task_struct 都需要被唯一的标识，它的 pid 就是唯一标识号。对于进程来说，这个 pid 就是我们平时常说的进程 pid。对于线程来说，我们假如一个进程下创建了多个线程出来。那么每个线程的 pid 都是不同的。但是我们一般又需要记录线程是属于哪个进程的，通过 tgid 字段来表示自己所归属的进程 ID。
-1. 进程创建 fork ==> fork ==> do_fork ==> copy_process
-2. 线程创建 pthread_create ==> do_clone ==> clone ==> do_fork ==> copy_process
-可见和创建进程时使用的 fork 系统调用相比，创建线程的 clone 系统调用几乎和 fork 差不多，也一样使用的是内核里的 do_fork 函数，最后走到 copy_process 来完整创建。不过创建过程的区别是二者在调用 do_fork 时传入的 clone_flags 里的标记不一样！。
-1. 创建进程时的 flag：仅有一个 SIGCHLD
-2. 创建线程时的 flag：包括 CLONE_VM(新 task 和父进程共享地址空间)、CLONE_FS(新 task 和父进程共享文件系统信息)、CLONE_FILES(新 task 和父进程共享文件描述符表)、CLONE_SIGNAL、CLONE_SETTLS、CLONE_PARENT_SETTID、CLONE_CHILD_CLEARTID、CLONE_SYSVSEM。
 
-![](/public/upload/linux/process_vs_thread.png)
+### cpu 如何访问task_struct
 
-对于线程来讲，其地址空间 mm_struct、目录信息 fs_struct、打开文件列表 files_struct 都是和创建它的任务共享的。但是对于进程来讲，地址空间 mm_struct、挂载点 fs_struct、打开文件列表 files_struct 都要是独立拥有的，都需要去申请内存并初始化它们。
+**进程及调度数据结构的组织**：在 task_struct 结构中，会包含至少一个 sched_entity 结构的变量。它其实是 Linux 进程调度系统的一部分，被嵌入到了 Linux 进程数据结构中，与调度器进行关联，能间接地访问进程。我们只要通过 sched_entity 结构变量的地址，减去它在 task_struct 结构中的偏移（由编译器自动计算），就能获取到 task_struct 结构的地址。这样就能达到通过 sched_entity 结构，访问 task_struct 结构的目的了。sched_entity 结构是通过红黑树组织起来的，红黑树的根在 cfs_rq 结构中，cfs_rq 结构又被包含在 rq 结构，每个 CPU 对应一个 rq 结构。
 
-### 其它它
+![](/public/upload/linux/thread_sturct_relation.png)
 
-cpu 就是不端从pc 找活儿（指令）干，加上scheduler + task list之后就是不断从task list找个活儿（task_struct）干，跟java executor 不断从队列找活儿（runnable）干是一样的。又比如go中，用户逻辑包在goroutine中，goroutine 放在P中，M 不断从P 中取出G 来干活儿。 就好像网络包，一层套一层，符合一定的格式才可以收发和识别。
+从CPU的视角，是如何访问task_struct结构的？进程的地址空间分为用户态和内核态，无论从哪个进程进入的内核态，进来后访问的是同一份，对应的也是物理内存中同一块空间。内核态 有一个数据结构 struct list_head tasks 维护了task_struct 列表。在处理器内部，有一个控制寄存器叫 CR3，存放着页目录的物理地址，故 CR3 又叫做页目录基址寄存器。
+1. 每个进程都有自己的用户态虚拟地址空间，因而每个进程都有自己的页表，每个进程的页表的根，放在task_struct结构中。进程运行在用户态，则从task_struct里面找到页表顶级目录，加载到CR3里面去，则程序里面访问的虚拟地址就通过CPU指向的页表转换成物理地址进行访问。
+2. 内核有统一的一个内核虚拟地址空间，因而内核也应该有个页表，内核页表的根是内存初始化的时候预设在一个虚拟地址和物理地址。进程进入内核后，CR3要变成指向内核页表的顶级目录。
+
+### Per CPU的struct
+
+SMP 系统的出现，对应用软件没有任何影响，因为应用软件始终看到是一颗 CPU，然而这却给操作系统带来了麻烦，操作系统必须使每个 CPU 都正确地执行进程。
+1. 操作系统要开发更先进的同步机制，解决数据竞争问题。比如原子变量、自旋锁、信号量等高级的同步机制。
+2. 进程调度问题，需要使得多个 CPU 尽量忙起来，否则多核还是等同于单核。为此，操作系统需要对进程调度模块进行改造。
+    1. 单核 CPU 一般使用全局进程队列，系统所有进程都挂载到这个队列上，进程调度器每次从该队列中获取进程让 CPU 执行。**多核心系统下，每个 CPU 一个进程队列**，虽然提升了进程调度的性能，但同时又引发了另一个问题——每个 CPU 的压力各不相同。这是因为进程暂停或者退出，会导致各队列上进程数量不均衡，有的队列上很少或者没有进程，有的队列上进程数量则很多，间接地出现一部分 CPU 太忙吃不消，而其他 CPU 太闲（处于饥饿空闲状态）的情况。
+    2. 怎么解决呢？这就需要操作系统时时查看各 CPU 进程队列上的进程数量，做出动态调整，把进程多的队列上的进程迁移到较少进程的队列上，使各大进程队列上的进程数量尽量相等，使 CPU 之间能为彼此分担压力。这就叫负载均衡，这种机制能提升系统的整体性能。
+
+linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
+
+1. 结构体 tss， 所有寄存器切换 ==> 内存拷贝/拷贝到特定tss_struct
+2. struct rq，为每一个CPU都创建一个队列来保存可以在这个CPU上运行的任务，这样调度的时候，只需要看当前的 CPU 上的资源就行，把（竞争全局线程队列）锁的开销就砍掉了。这里面包括一个实时进程队列rt_rq和一个CFS运行队列cfs_rq ，task_struct就是用sched_entity这个成员变量将自己挂载到某个CPU的队列上的。PS： Go中GMP 模型中的P抄的也是这个。
+
+    ![](/public/upload/linux/cpu_runqueue.jpg)
+
+进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，**将这个进程放进某个CPU的队列上来**。选择CPU，CPU 调度是在缓存性能和空闲核心两个点之间做权衡，同等条件下会尽量优先考虑缓存命中率，选择同 L1/L2 的核，其次会选择同一个物理 CPU 上的（共享 L3），最坏情况下去选择另外一个物理 CPU 上的核心。
+
 
 
 

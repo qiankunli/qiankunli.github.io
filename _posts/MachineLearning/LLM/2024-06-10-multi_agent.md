@@ -146,6 +146,8 @@ result = joe.initiate_chat(cathy, message="Cathy, tell me a joke.", max_turns=2)
 
 AutoGen允许在一个群聊中，调用另外一个Agent群聊来执行对话(嵌套对话Nested Chats)。这样做可以把一个群聊封装成单一的Agent，从而实现更加复杂的工作流。
 
+[AutoGen多代理对话项目示例和工作流程分析](https://developer.aliyun.com/article/1394332) 未细读。
+
 ## Qwen-Agent（未细读）
 
 ## AutoGPT

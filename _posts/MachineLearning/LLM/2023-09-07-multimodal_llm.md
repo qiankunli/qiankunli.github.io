@@ -66,6 +66,7 @@ keywords: llm multimodal
 [VLMs多模态大模型当下进展与思考](https://mp.weixin.qq.com/s/BkV3v3_NdXZ0jKt1DTj5Xw)
 
 ## 图片理解
+
 1. 如何将图片数据转为模型输入
 1. 高分辨率问题
 
@@ -173,3 +174,9 @@ curl  https://api.openai-hk.com/v1/images/generations \
 [Sora 的基石：Diffusion Transformer 原理与源码解析](https://zhuanlan.zhihu.com/p/684125968) 未读
 
 [技术神秘化的去魅：Sora关键技术逆向工程图解](https://mp.weixin.qq.com/s/5mxoYXY6vKsyqBzxNRnurQ) 未读
+
+## 多模态RAG
+
+多模态RAG的想法是允许RAG系统以某种方式将多种形式的信息注入到多模态模型中。因此，多模态RAG系统可能检索基于用户提示的文本、图像、视频和其他不同模态的数据，而不仅仅是检索文本片段。 有三种流行的方法可以实现多模态RAG。
+1. 使用一个嵌入空间，检索出所有模态中与用户查询最相似的数据。
+2. 将所有数据模态转换为单一模态，通常是文本。

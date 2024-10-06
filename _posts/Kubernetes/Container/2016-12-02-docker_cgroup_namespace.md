@@ -66,12 +66,12 @@ struct task_struct {
     …….
 }
 struct nsproxy {
-        atomic_t count;	// nsproxy可以共享使用，count字段是该结构的引用计数
-        struct uts_namespace *uts_ns;
-        struct ipc_namespace *ipc_ns;
-        struct mnt_namespace *mnt_ns;
-        struct pid_namespace *pid_ns_for_children;
-        struct net             *net_ns;
+    atomic_t count;	// nsproxy可以共享使用，count字段是该结构的引用计数
+    struct uts_namespace *uts_ns;
+    struct ipc_namespace *ipc_ns;
+    struct mnt_namespace *mnt_ns;
+    struct pid_namespace *pid_ns_for_children;
+    struct net             *net_ns;
 };
 ```
 

@@ -55,11 +55,11 @@ struct files_struct {
     struct fdtable __rcu *fdt;     //fdtable
 }
 struct fdtable {
-    struct file __rcu **fd;     //当前的文件数组，
+    struct file __rcu **fd;     //当前的文件数组
     ......
 };
 ```
-fdtable.fd数组的下标就是文件描述符，其中 0、1、2 三个描述符总是默认分配给标准输入、标准输出和标准错误。在数组元素中记录了当前进程打开的每一个文件的指针。这个文件是 Linux 中抽象的文件，可能是真的磁盘上的文件，也可能是一个 socket。
+fdtable.fd数组的下标就是文件描述符，其中 0、1、2 三个描述符总是默认分配给标准输入、标准输出和标准错误。这就是你在shell 命令中经常看到的 2>&1的由来，在数组元素中记录了当前进程打开的每一个文件的指针。这个文件是 Linux 中抽象的文件，可能是真的磁盘上的文件，也可能是一个 socket。
 
 ## vfs 
 

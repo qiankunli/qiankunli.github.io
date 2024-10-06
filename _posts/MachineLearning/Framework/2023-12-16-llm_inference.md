@@ -65,6 +65,15 @@ KV Cache/PagedAttention/FlashAttention 本质是基于GPU计算和内存架构�
 $$
 Attention(Q,K,V) = softmax(\frac{QK^T}{\sqrt{d_k}})V
 $$
+$$
+Q = W^Q * X
+$$
+$$
+K = W^K * X
+$$
+$$
+V = W^V * X
+$$
 自注意力机制的时间和存储复杂度与序列的长度呈平方关系，因此占用了大量的计算设备内存并消耗的大量的计算资源，如果优化自注意力机制的时空复杂度、增强计算效率是大语言模型面临的重要问题。一些研究从近似注意力出发，旨在减少注意力计算和内存需求，提出了稀疏近似、低秩近似等方法。此外，有一些研究从计算加速设备本身的特性出发，研究如何更好的利用硬件特性对Transformer中的注意力层进行高效计算。
 
 
@@ -154,23 +163,25 @@ LLM推理需要的芯片形态，最重要的是内存带宽和互联带宽，�
 
 ### KV Cache
 
-有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。 KVCache 主要用于加速生成 token 时的 attention 计算。
+有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。 KVCache 顾名思义**缓存一部分K矩阵和V矩阵**（省的是$input*W_k$和$input*W_v$的计算），主要用于加速生成 token 时的 attention 计算。
 
 ![](/public/upload/machine/kv_cache.jpg)
 
 比如，当预测 今天天气真 ==> 好 时，使用kv cache后流程如下：
 1. 输入“真”的向量
-2. 提取“真”对应的 $Q_i$,$K_i$,$V_i$
-3. 拼接历史K、V的值，得到完整的K、V。
+2. 计算“真”向量 乘以$W_q$,$W_k$,$W_v$ 得到 $Q_i$,$K_i$,$V_i$。
+3. 拼接历史K、V的值，得到完整的K、V。PS：注意，每一步step迭代中，K矩阵列数加1，V矩阵行数加1，**“今天天气”4个token的key矩阵列和value矩阵行就不用再算了**，K矩阵前面n-1列都是保存在cache中，只有k矩阵的最后一列是通过新增加的输入input token和$W_k$进行矩阵相乘得到的（后续也会加入到kvcache中），之后进行拼接即可。
 4. 然后经过Attention计算，获得 $O_i$ 输出。
 5. 根据$O_i$ 计算得到“好”
 
+![](/public/upload/machine/kvcache.png)
 
 ![](/public/upload/machine/attention_kvcache.png)
 
-在推理的时候transformer本质上只需要计算出$O_i$ ，即一个字一个字地蹦。
+在推理的时候transformer本质上只需要计算出$O_i$ ，即一个字一个字地蹦。PS：也回答了为何不缓存Q
 1. Attention的第i个输出只和第 i 个query有关，和其他query无关，所以query完全没有必要缓存，每次预测 $O_i$时只要计算最新的$O_i$，其他的丢弃即可。
 2. Attention的输出$O_i$的计算和完整的K和V有关，而K、V的历史值只和历史的O有关，和当前的O无关。那么就可以通过缓存历史的K、V，而避免重复计算历史K、V
+![](/public/upload/machine/kvcache_no_query.png)
 
 ```
 K = X * W_k
@@ -192,7 +203,7 @@ for x in X:  # 对每一个新的输入x
     output = Attention(Q, K_cache, V_cache)
 ```
 
-但是有一个问题就是KV Cache非常的大，比如说拿LLaMA-13B举例子，假设每个token在一层的大小有20KB，LLaMA-13B有40层，这样这个token大小就会达到800KB，而一个sequence一般来说会有几千的token，也就是说一个sequence就会达到几个G。[Transformers KV Caching Explained](https://medium.com/@joaolages/kv-caching-explained-276520203249) 动图实在太贴切了。
+但是有一个问题就是KV Cache非常的大，比如说拿LLaMA-13B举例子，假设每个token在一层的大小有20KB，LLaMA-13B有40层，这样这个token大小就会达到800KB，而一个sequence一般来说会有几千的token，也就是说一个sequence就会达到几个G。[Transformers KV Caching Explained](https://medium.com/@joaolages/kv-caching-explained-276520203249) 动图实在太贴切了。PS：**KV-Cache的总空间大小为max_seqlen×layer_num×dim×sizeof(float)**。因此，在第token_pos步时，我们可以通过索引位置(token_pos, layer_idx)来获取第layer_idx层的KV-Cache。
 
 Memory waste in KV Cache
 1. 内部碎片：推理过程具有非常大的动态性，输出的长度不能预先知道，传统的serving system为了保险起见，就会预留非常大的空间，比如模型支持的最大输出2048个token，它就会预留这么大的空间，那么如果我产生的输出仅有10个token，剩下的2038的slots就会作为内部碎片被浪费。

@@ -84,6 +84,8 @@ keywords: memory management
 
 内存的延迟分配，只有在真正访问一个地址的时候才建立这个地址的物理映射，这是 Linux 内存管理的基本思想之一。Linux 内核在用户申请内存的时候，只是给它分配了一个线性区（也就是虚拟内存），并没有分配实际物理内存；只有当用户使用这块内存的时候，内核才会分配具体的物理页面给用户，这时候才占用宝贵的物理内存。内核释放物理页面是通过释放线性区，找到其所对应的物理页面，将其全部释放的过程。
 
+在用户态所需要的内存数据，如代码、全局变量数据以及mmap 内存映射等都是通过mm_struct 进行内存查找和寻址的。mm_struct 中所有成员共同表示一个虚拟地址空间，当虚拟地址空间中的内存区域被访问的时候，会由cpu中的mmu 配合tlb缓存来将虚拟地址转换成物理地址进行访问。对于内核线程来说，由于它只固定工作在地址空间较高的那部分，所以并没有涉及对虚拟内存部分的使用，内核线程的mm_struct都是null。在内核内存区域，可以直接通过计算得出物理内存地址，并不需要复杂的页表计算。而且最重要的是所有内核进程及用户进程的内核态内存都是共享的。
+
 ```c
 struct mm_struct {
     ...
@@ -119,16 +121,16 @@ C语言的动态内存分配基本函数是 malloc()，在 Linux 上的实现是
 在 ptmalloc 中，使用分配区 arena 管理从操作系统中批量申请来的内存。之所以要有多个分配区，原因是多线程在操作一个分配区的时候需要加锁。在线程比较多的时候，在锁上浪费的开销会比较多。为了降低锁开销，ptmalloc 支持多个分配区。这样在单个分配区上锁的竞争开销就会小很多（但但是有，毕竟不是一个线程一个分配区）。
 
 ```c
-//file:malloc/malloc.c
+//file:malloc/malloc.c  ptmalloc存在一个全局的主分配区，是用静态变量的方式定义的。
 static struct malloc_state main_arena;
 //file:malloc/malloc.c
 struct malloc_state {
- // 锁，用来解决在多线程分配时的竞争问题
- mutex_t mutex;
- // 分配区下管理内存的各种数据结构
- ...
- /* Linked list 通过这个指针，ptmalloc 把所有的分配区都以一个链表组织了起来，方便后面的遍历。*/ 
- struct malloc_state *next;
+    // 锁，用来解决在多线程分配时的竞争问题
+    mutex_t mutex;
+    // 分配区下管理内存的各种数据结构
+    ...
+    /* Linked list 通过这个指针，ptmalloc 把所有的分配区都以一个链表组织了起来，方便后面的遍历。*/ 
+    struct malloc_state *next;
 }
 ```
 ![](/public/upload/basic/ptmalloc_arena.jpg)
@@ -137,15 +139,15 @@ struct malloc_state {
 ```c
 // file:malloc/malloc.c
 struct malloc_chunk {
- INTERNAL_SIZE_T      prev_size;  /* Size of previous chunk (if free).  */
- INTERNAL_SIZE_T      size;       /* Size in bytes, including overhead. */
+    INTERNAL_SIZE_T      prev_size;  /* Size of previous chunk (if free).  */
+    INTERNAL_SIZE_T      size;       /* Size in bytes, including overhead. */
 
- struct malloc_chunk* fd;         /* double links -- used only if free. */
- struct malloc_chunk* bk;
+    struct malloc_chunk* fd;         /* double links -- used only if free. */
+    struct malloc_chunk* bk;
 
- /* Only used for large blocks: pointer to next larger size.  */
- struct malloc_chunk* fd_nextsize; /* double links -- used only if free. */
- struct malloc_chunk* bk_nextsize;
+    /* Only used for large blocks: pointer to next larger size.  */
+    struct malloc_chunk* fd_nextsize; /* double links -- used only if free. */
+    struct malloc_chunk* bk_nextsize;
 };
 ```
 ![](/public/upload/basic/ptmalloc_chunk.jpg)
@@ -226,6 +228,8 @@ JVM运行时数据区域
 ### go runtime
 
 [Visualizing memory management in Golang](https://deepu.tech/memory-management-in-golang/#:~:text=collection%20comes%20in.-,Go%20Memory%20management,is%20well%20optimized%20and%20efficient.) 有动图建议细读
+
+各个语言的分配器的实现原理基本上和linux内核使用的slab分配器差不太多。
 
 
 ## 中间件
