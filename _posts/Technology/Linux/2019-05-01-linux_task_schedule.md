@@ -29,48 +29,7 @@ keywords: linux 进程调度
 
 ![](/public/upload/linux/task_struct_part.png)
 
-结合上图我们发现，进程可以看作操作系统用来管理应用程序资源的容器，通过进程就能控制和保护应用程序。
-
-彭东《操作系统实战》
-```c
-struct task_struct {
-    struct thread_info thread_info;//处理器特有数据 
-    volatile long   state;       //进程状态 
-    void            *stack;      //进程内核栈地址 
-    refcount_t      usage;       //进程使用计数
-    int             on_rq;       //进程是否在运行队列上
-    // 进程调度优先级
-    int             prio;        //动态优先级
-    int             static_prio; //静态优先级
-    int             normal_prio; //取决于静态优先级和调度策略
-    unsigned int    rt_priority; //实时优先级
-    const struct sched_class    *sched_class;//指向其所在的调度类
-    struct sched_entity         se;//普通进程的调度实体
-    struct sched_rt_entity      rt;//实时进程的调度实体
-    struct sched_dl_entity      dl;//采用EDF算法调度实时进程的调度实体
-    struct sched_info       sched_info;//用于调度器统计进程的运行信息 
-    struct list_head        tasks;//所有进程的链表
-    // 进程地址空间，在用户态所需要的内存数据，如代码、全局变量数据以及mmap 内存映射等都是通过mm_struct 进行内存查找和寻址的
-    struct mm_struct        *mm;  //指向进程内存结构
-    struct mm_struct        *active_mm;
-    pid_t               pid;            //进程id
-    // 进程树关系
-    struct task_struct __rcu    *parent;//指向其父进程
-    struct list_head        children; //链表中的所有元素都是它的子进程
-    struct list_head        sibling;  //用于把当前进程插入到兄弟链表中
-    struct task_struct      *group_leader;//指向其所在进程组的领头进程
-    u64             utime;   //用于记录进程在用户态下所经过的节拍数
-    u64             stime;   //用于记录进程在内核态下所经过的节拍数
-    u64             gtime;   //用于记录作为虚拟机进程所经过的节拍数
-    unsigned long           min_flt;//缺页统计 
-    unsigned long           maj_flt;
-    struct fs_struct        *fs;    //进程相关的文件系统信息
-    struct files_struct     *files;//进程打开的所有文件
-    struct vm_struct        *stack_vm_area;//内核栈的内存区
-  };
-```
-
-操作系统各个模块的运作原理，就是不断和这些数据结构打交道而已。
+结合上图我们发现，进程可以看作操作系统用来管理应用程序资源的容器，通过进程就能控制和保护应用程序。操作系统各个模块的运作原理，就是不断和这些数据结构打交道而已。
 
 ### 进程部分
 
@@ -166,7 +125,7 @@ shell 实现的功能有别于其它应用，它的功能是接受用户输入�
 2. 线程创建 pthread_create ==> do_clone ==> clone ==> do_fork ==> copy_process
 可见和创建进程时使用的 fork 系统调用相比，创建线程的 clone 系统调用几乎和 fork 差不多，也一样使用的是内核里的 do_fork 函数，最后走到 copy_process 来完整创建。不过创建过程的区别是二者在调用 do_fork 时传入的 clone_flags 里的标记不一样！。
 1. 创建进程时的 flag：仅有一个 SIGCHLD
-2. 创建线程时的 flag：包括 CLONE_VM(新 task 和父进程共享地址空间)、CLONE_FS(新 task 和父进程共享文件系统信息)、CLONE_FILES(新 task 和父进程共享文件描述符表)、CLONE_SIGNAL、CLONE_SETTLS、CLONE_PARENT_SETTID、CLONE_CHILD_CLEARTID、CLONE_SYSVSEM。PS：带了就会复用、共享对应xx_struct。代码段、数据段、堆内存共享，各个线程的栈区独立。
+2. 创建线程时的 flag：包括 CLONE_VM(新 task 和父进程共享地址空间)、CLONE_FS(新 task 和父进程共享文件系统信息)、CLONE_FILES(新 task 和父进程共享文件描述符表)、CLONE_SIGNAL、CLONE_SETTLS、CLONE_PARENT_SETTID、CLONE_CHILD_CLEARTID、CLONE_SYSVSEM。PS：带了就会复用、共享对应xx_struct。代码段、数据段、堆内存共享，各个线程的栈区独立（不复用）。
 
 ![](/public/upload/linux/process_vs_thread.png)
 
@@ -174,13 +133,30 @@ shell 实现的功能有别于其它应用，它的功能是接受用户输入�
 
 ## 进程调度
 
+两个核心问题
+1. cpu如何选择下面让哪一个任务运行
+2. 允许选中的进程运行多长时间
+
 **进程调度第一定律**：所有进程的调度最终是通过正在运行的进程调用`__schedule` 函数实现
 
 ![](/public/upload/linux/process_schedule.png)
 
 ### 基于虚拟运行时间的调度
 
+到linux2.4（2001年），整个系统有一个调度队列，当有新任务到达时，先设置一个静态优先级，调度器选择进程执行的时候，选择的办法是遍历整个任务队列，从中挑选优先级最高的。但是优先级是在静态优先级的基础上动态变化的，如果获得了cpu，那动态优先级就会变低。如果一直未获得cpu，动态优先级就会变高。这样既照顾了对实时性要求高的高优先级进程，也避免了把低优先级的进程饿死。随后cpu开始朝多核发展了，所有cpu 访问一个任务队列，锁竞争的开销越来越高，随着服务器上跑的进程越来越多，O(n)遍历也显得有一点低效。在linux2.5中，为每个cpu 逻辑核都准备一个runqueue，减少了锁的开销。采用多优先级队列，每一个优先级都有一个链表，在查找的时候引入bitmap（通过一个bit 来表示相对应的优先级上是否有任务存在，顺带定位指定优先级上对应的任务链表） 辅助结构实现O(1)查找（PS：跟go gmp的演进一致）。但linux2.5 存在一点瑕疵，就是按优先级固定计算时间片，优先级高的进程被分配了更多的时间片，优先级低的进程被分配的时间片较少，一个进程的运行时间片长度是10~200ms之间，最大的问题是调度延迟不可控。背景是一个**调度周期**（volcano 也有调度周期的概念）就是当前周期内需要执行的所有任务时间片之和，新来一个任务或本轮时间片用完的话，在下一个周期才能调度到。linux 2.6.23 采用cfs 作为用户进程的调度算法，在一个调度周期内所有进程的运行时间片大小相等（时间周期T/进程数量N），通过引入一个虚拟运行时间vruntime 的概念来极大维护了调度算法的简洁性。如果等待运行的进程数量不多，那就使用一个固定的调度周期（sysctl_sched_latency默认24ms），如果等待运行的进程数量过多，有N进程等待，那就N*sysctl_sched_min_granularity(默认3ms)为一个调度周期。保证所有进程都能快速得到一小段处理时间，进程的调度延迟最大不会超过一个调度周期。
+
+||linux2.5|linux 2.6.23|
+|---|---|---|
+|cpu如何选择下面让哪一个任务运行|动态优先级|vruntime 最小|
+|允许选中的进程运行多长时间|跟静态优先级挂钩，10~200ms|在一个调度周期内，时间周期T/进程数量N|
+
 ```c
+// file: kernel/sched/sched.h
+struct rq {
+    struct rt_rq rt;
+    struct cfs_rq cfs;
+    struct dl_rq dl;
+}
 struct task_struct{
     ...
     unsigned int policy;    // 调度策略
@@ -192,7 +168,7 @@ struct task_struct{
 }
 ```
 
-CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，task_struct.sched_entity里面有一个重要的变量vruntime，来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的。PS：vruntime 正是理解 docker --cpu-shares 的钥匙。
+CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，task_struct.sched_entity里面有一个重要的变量vruntime，来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变，**最后尽量保证所有进程的vruntime相等**。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的。PS：vruntime 正是理解 docker `--cpu-shares` 的钥匙。
 
 ```c
 /*
@@ -225,19 +201,67 @@ static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se){
 }
 ```
 
-调度需要一个数据结构来对 vruntime 进行排序，因为任何一个策略做调度的时候，都是要区分谁先运行谁后运行。这个能够排序的数据结构不但需要查询的时候，能够快速找到最小的，更新的时候也需要能够快速的调整排序，毕竟每一个tick vruntime都会增长。能够平衡查询和更新速度的是树，在这里使用的是红黑树。sched_entity 表示红黑树的一个node（数据结构中很少有一个Tree 存在，都是根节点`Node* root`就表示tree了）。
+调度需要一个数据结构来对 vruntime 进行排序，因为任何一个策略做调度的时候，都是要区分谁先运行谁后运行。这个能够排序的数据结构不但需要查询的时候，能够快速找到最小的，更新的时候也需要能够快速的调整排序，毕竟每一个tick vruntime都会增长。能够平衡查询和更新速度的是树，在这里使用的是红黑树，key=vruntime。红黑树的一个node由sched_entity 表示（数据结构中很少有一个Tree 存在，都是根节点`Node* root`就表示tree了），可能是一个真正的进程，也可能是一个进程组。
 
 ```c
+// file: kernel/sched/sched.h
+struct cfs_rq {
+    u64 min_vruntime;   // 当前队列中所有进程vruntime中的最小值
+    struct rb_root_cached tasks_timeline;   // 保存就绪任务的红黑树（根节点）
+}
 struct task_struct{
     ...
+    const struct sched_class *sched_class; // 调度策略的执行逻辑
     struct sched_entity se;     // 对应完全公平算法调度
     struct sched_rt_entity rt;  // 对应实时调度
     struct sched_dl_entity dl;  // 对应deadline 调度
     ...
 }
+struct sched_entity {
+    struct load_weight load; // 当前进程权重
+    struct rb_node run_node; // 指向自己在红黑树上的节点位置
+    u64 exec_start;         // 进程开始运行的时间
+    u64 sum_exec_runtime;   // 总的运行时间
+    u64 vruntime;           // 进程虚拟运行时间
+}
 ```
+fork 创建进程时，copy_process对新进程的task_struct 进行各种初始化，其中会调用sched_fork 来完成调度相关的初始化。
+```c
+static struct task_struct *copy_process(...){
+    ...
+    retval = sched_fork(clone_flags, p);
+}
+// file:kernel/sched/core.c
+int sched_fork(unsigned long clone_flags, struct task_struct *p){
+    __schedd_fork(clone_flags, p);
+    p->__state = TASK_NEW;
+    if (rt_prio(p->prio))
+        p->sched_class = &rt_sched_class;
+    else
+        p->sched_class = &fair_sched_class; // fair_sched_class 是一个全局对象
+}
+// file:kernel/sched/core.c
+static void __sched_fork(struct task_struct *p){
+    p ->on_rq = 0;
+    ...
+    p->se.nr_migrations = 0;
+    p->se.vruntime = 0; // 新进程是0对老进程不公平，在新进程真正被加入运行队列时，会将其值设置为cfs_rq->min_vruntime
+}
+// file:kernel/sched/core.c
+void wake_up_new_task(struct task_struct *p){
+    // 为进程选择一个合适的cpu
+    cpu = select_task_rq(p, task_cpu(p)
+    // 为进程指定运行队列
+    __set_task_cpu(p,cpu, WF_FORK));
+    // 将进程添加到运行队列红黑树
+    rq = __task_rq_lock(p);
+    activate_task(rq, p, 0);
+}
+```
+select_task_rq ==> task_struct->sched_class->select_task_rq在缓存性能和空闲核两个点做权衡，同等条件会尽量优先考虑缓存命中率，选择同L1/L2的核，其次会选择同一个物理cpu上的（共享L3），最坏情况下去选择另一个（负载最小的）物理cpu上的核，称之为漂移。现在互联网公司都流行在离线混部，宿主机的cpu利用率被打到很高的水平，比如70%，进程在不同的核上运行概率增加，缓存中的数据都是“凉的”，穿透到内存的访问次数增加，进程的运行性能就会下降很多。
 
 每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。**这样保证了实时任务的优先级永远大于普通任务**。PS： [离线调度算法(BT)](https://github.com/Tencent/TencentOS-kernel) 为了支持在混部，支持了bt_rq。
+
 
 ```c
 // Pick up the highest-prio task:
@@ -269,16 +293,21 @@ CFS 的队列是一棵红黑树（所以叫“队列”很误导人），树的�
 如果将task_struct 视为一个对象，在很多场景下 主动调用`schedule()` 让出cpu，那么如何选取下一个task 就是其应该具备的能力，sched_class 作为其成员就顺理成章了。
 
 ```c
-struct task_struct{
-    const struct sched_class *sched_class; // 调度策略的执行逻辑
+DEFINE_SCHED_CLASS(fair) = {
+    ...
+    .select_task_rq = cfs_select_task_rq, // 选择运行队列
 }
 ```
 
 ![](/public/upload/linux/schedule_class.png)
 
-sched_class结构体类似面向对象中的基类啊，通过函数指针类型的成员指向不同的函数，实现了多态。
+sched_class结构体类似面向对象中的基类，通过函数指针类型的成员指向不同的函数，实现了多态。
 
-### 主动调度
+### 调度时机
+
+调度时机包括：定时调度节拍和其它进程阻塞时主动让出两种。
+
+调度节拍 的入口是scheduler_tick ==> curr->sched_class->task_tick：时钟节拍最终会调用调度类task_tick方法完成调度相关的工作，会在这里判断是否需要调度下一个任务来抢占当前cpu核。也会触发多核之间任务队列的负载均衡，保证不让忙的核忙死，闲的核闲死。在调度节拍中会定时将每个进程所执行过的时间都换算成vruntime，并累计起来，也会定时判断当前进程是否已经执行了足够长的时间，如果是的话，需要再选择另一个vruntime较小的任务来运行。
 
 主动调度，就是进程运行到一半，因为等待 I/O 等操作而主动调用 schedule() 函数让出 CPU。在 Linux 内核中有数百处**调用点**，它们会把进程设置为 D 状态（TASK_UNINTERRUPTIBLE），主要集中在 disk I/O 的访问和信号量（Semaphore）锁的访问上，因此 D 状态的进程在 Linux 里是很常见的。
 
@@ -325,6 +354,7 @@ vruntime就是一个数据，如果没有任何机制对它进行更新，就会
 
 ```c
 void scheduler_tick(void){
+    // 取出当前的cpu及其任务队列
     int cpu = smp_processor_id();
     struct rq *rq = cpu_rq(cpu);
     struct task_struct *curr = rq->curr;
@@ -406,21 +436,15 @@ static void __sched notrace __schedule(bool preempt){
     cpu = smp_processor_id();
     rq = cpu_rq(cpu);   
     prev = rq->curr;
-    // 获取下一个任务
+    // 获取下一个待执行任务，其实就是从当前rq 的红黑树节点中选择vruntime最小的节点
     next = pick_next_task(rq, prev, &rf);
     clear_tsk_need_resched(prev);
     clear_preempt_need_resched();
     // 当选出的继任者和前任不同，就要进行上下文切换，继任者进程正式进入运行
-    if (likely(prev != next)) {
-    rq->nr_switches++;
-    rq->curr = next;
-    ++*switch_count;
-    ......
     rq = context_switch(rq, prev, next, &rf);
-}
 ```
 
-上下文切换主要干两件事情，一是切换进程空间，也即虚拟内存；二是切换寄存器和 CPU 上下文。
+上下文切换主要干两件事情，一是切换进程空间，也即虚拟内存；二是切换寄存器和栈等。
 
 ```c
 // context_switch - switch to the new MM and the new thread's register state.
@@ -434,7 +458,7 @@ static __always_inline struct rq *context_switch(struct rq *rq, struct task_stru
     switch_mm_irqs_off(oldmm, mm, next);
     ......
     /* Here we just switch the register state and the stack. */
-    // 切换寄存器
+    // 切换栈和寄存器
     switch_to(prev, next, prev);
     barrier();
     return finish_task_switch(prev);
@@ -444,12 +468,11 @@ static __always_inline struct rq *context_switch(struct rq *rq, struct task_stru
 
 虽然指令指针寄存器IP还是一行一行代码的执行下去，但由于所有的调度都会走schedule函数，IP没变，但是SP变了，进程切换就完成了。
 
-什么是调度延迟？其实就是保证每一个可运行的进程，都至少运行一次的时间间隔。假设系统中有 3 个可运行进程，每个进程都运行 10ms，那么调度延迟就是 30ms；随着进程的增加，每个进程分配的时间在减少，进程调度次数会增加，调度器占用的时间就会增加。因此，CFS 调度器的调度延迟时间的设定并不是固定的。当运行进程少于 8 个的时候，调度延迟是固定的 6ms 不变。当运行进程个数超过 8 个时，就要保证每个进程至少运行一段时间，才被调度。这个“至少一段时间”叫作最小调度粒度时间。在 CFS 默认设置中，最小调度粒度时间是 0.75ms
-
 ## 其它
 
 cpu 就是不断从pc 找活儿（指令）干，加上scheduler + task list之后就是不断从task list找个活儿（task_struct）干，跟java executor 不断从队列找活儿（runnable）干是一样的。又比如go中，用户逻辑包在goroutine中，goroutine 放在P中，M 不断从P 中取出G 来干活儿。 就好像网络包，一层套一层，符合一定的格式才可以收发和识别。
 
+调度周期的另一块素材：什么是调度延迟？其实就是保证每一个可运行的进程，都至少运行一次的时间间隔。假设系统中有 3 个可运行进程，每个进程都运行 10ms，那么调度延迟就是 30ms；随着进程的增加，每个进程分配的时间在减少，进程调度次数会增加，调度器占用的时间就会增加。因此，CFS 调度器的调度延迟时间的设定并不是固定的。当运行进程少于 8 个的时候，调度延迟是固定的 6ms 不变。当运行进程个数超过 8 个时，就要保证每个进程至少运行一段时间，才被调度。这个“至少一段时间”叫作最小调度粒度时间。在 CFS 默认设置中，最小调度粒度时间是 0.75ms
 
 ### cpu 如何访问task_struct
 
@@ -467,7 +490,7 @@ SMP 系统的出现，对应用软件没有任何影响，因为应用软件始�
 1. 操作系统要开发更先进的同步机制，解决数据竞争问题。比如原子变量、自旋锁、信号量等高级的同步机制。
 2. 进程调度问题，需要使得多个 CPU 尽量忙起来，否则多核还是等同于单核。为此，操作系统需要对进程调度模块进行改造。
     1. 单核 CPU 一般使用全局进程队列，系统所有进程都挂载到这个队列上，进程调度器每次从该队列中获取进程让 CPU 执行。**多核心系统下，每个 CPU 一个进程队列**，虽然提升了进程调度的性能，但同时又引发了另一个问题——每个 CPU 的压力各不相同。这是因为进程暂停或者退出，会导致各队列上进程数量不均衡，有的队列上很少或者没有进程，有的队列上进程数量则很多，间接地出现一部分 CPU 太忙吃不消，而其他 CPU 太闲（处于饥饿空闲状态）的情况。
-    2. 怎么解决呢？这就需要操作系统时时查看各 CPU 进程队列上的进程数量，做出动态调整，把进程多的队列上的进程迁移到较少进程的队列上，使各大进程队列上的进程数量尽量相等，使 CPU 之间能为彼此分担压力。这就叫负载均衡，这种机制能提升系统的整体性能。
+    2. 怎么解决呢？这就需要操作系统时时查看各 CPU 进程队列上的进程数量，做出动态调整，把进程多的队列上的进程迁移到较少进程的队列上，使各大进程队列上的进程数量尽量相等，使 CPU 之间能为彼此分担压力。这就叫负载均衡，这种机制能提升系统的整体性能。这里有一个调度域的概念，从根级调度域、二级、三级到基本单位逻辑核构成一棵树，load_balance 的时候从下到上，先判断当前cpu是否有余力多处理一些任务，如果有则看下兄弟cpu谁最忙，**从其rq 拉一些任务放到自己的rq上就可以了**，当然也不是随便一个任务都可以拉出来，比如绑核或涉及到调度亲和性的就不可以。PS：这不就是go work steal嘛。
 
 linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的部分。**有点线程本地变量的意思**
 
@@ -477,6 +500,48 @@ linux 内有很多 struct 是Per CPU的，估计是都在内核空间特定的�
     ![](/public/upload/linux/cpu_runqueue.jpg)
 
 进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，**将这个进程放进某个CPU的队列上来**。选择CPU，CPU 调度是在缓存性能和空闲核心两个点之间做权衡，同等条件下会尽量优先考虑缓存命中率，选择同 L1/L2 的核，其次会选择同一个物理 CPU 上的（共享 L3），最坏情况下去选择另外一个物理 CPU 上的核心。
+
+### 彭东《操作系统实战》
+
+```c
+struct task_struct {
+    struct thread_info thread_info;//处理器特有数据 
+    volatile long   state;       //进程状态 
+    void            *stack;      //进程内核栈地址 
+    refcount_t      usage;       //进程使用计数
+    int             on_rq;       //进程是否在运行队列上
+    // 进程调度优先级
+    int             prio;        //动态优先级
+    int             static_prio; //静态优先级
+    int             normal_prio; //取决于静态优先级和调度策略
+    unsigned int    rt_priority; //实时优先级
+    const struct sched_class    *sched_class;//指向其所在的调度类
+    struct sched_entity         se;//普通进程的调度实体
+    struct sched_rt_entity      rt;//实时进程的调度实体
+    struct sched_dl_entity      dl;//采用EDF算法调度实时进程的调度实体
+    struct sched_info       sched_info;//用于调度器统计进程的运行信息 
+    struct list_head        tasks;//所有进程的链表
+    // 进程地址空间，在用户态所需要的内存数据，如代码、全局变量数据以及mmap 内存映射等都是通过mm_struct 进行内存查找和寻址的
+    struct mm_struct        *mm;  //指向进程内存结构
+    struct mm_struct        *active_mm;
+    pid_t               pid;            //进程id
+    // 进程树关系
+    struct task_struct __rcu    *parent;//指向其父进程
+    struct list_head        children; //链表中的所有元素都是它的子进程
+    struct list_head        sibling;  //用于把当前进程插入到兄弟链表中
+    struct task_struct      *group_leader;//指向其所在进程组的领头进程
+    u64             utime;   //用于记录进程在用户态下所经过的节拍数
+    u64             stime;   //用于记录进程在内核态下所经过的节拍数
+    u64             gtime;   //用于记录作为虚拟机进程所经过的节拍数
+    unsigned long           min_flt;//缺页统计 
+    unsigned long           maj_flt;
+    struct fs_struct        *fs;    //进程相关的文件系统信息
+    struct files_struct     *files;//进程打开的所有文件
+    struct vm_struct        *stack_vm_area;//内核栈的内存区
+  };
+```
+
+
 
 
 
