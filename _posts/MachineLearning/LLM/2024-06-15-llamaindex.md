@@ -236,6 +236,7 @@ async for chunk in result.async_response_gen():
     print(chunk, end="", flush=True
 ```
 
+[深入解析LlamaIndex Workflows【下篇】：实现ReAct模式AI智能体的新方法](https://mp.weixin.qq.com/s/QTYlW3K5x5_b501Mcx_8bA) 未细读
 
 ## 与LangChain 对比
 
