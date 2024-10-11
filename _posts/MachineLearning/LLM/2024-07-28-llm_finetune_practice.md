@@ -432,7 +432,7 @@ LLaMA-Factory
 ```
 
 workflow.py 的逻辑言简意赅，就是拼凑运行 Trainer的dataset、model、tokenizer、data_collator等参数
-1. 对于dataset 有一个load_dataset 和preprocess_dataset 的过程，preprocess_dataset 会根据任务目标不同，处理逻辑不同，也就是将数据转为input_ids 的方式不同。 最终转为trainer 也就是transformer model 可以接受的dataset，包含列 input_ids/attention_task/labels（或其它model.forward 可以支持的参数）。 
+1. 对于dataset 有一个load_dataset 和preprocess_dataset 的过程，preprocess_dataset 会根据任务目标不同，处理逻辑不同，也就是将数据转为input_ids 的方式不同。 最终转为trainer 也就是transformer model 可以接受的dataset，包含列 input_ids/attention_task/labels（或其它model.forward 可以支持的参数）。 PS: 对于有监督任务，比如包含name=labels 列，至于input 列则名字随意，毕竟input text 总有一个通过tokenizer 转为input_ids 的过程。传入trainer的 dataset 有input_ids 和labels等列即可。
 2. Trainer 对训练逻辑已经封的很好了，内部也支持了accelerate 和 deepspeed，只要合适的配置 training_args 即可。
 
 以pt对应的workflow.py 为例
