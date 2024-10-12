@@ -32,7 +32,6 @@ Ti表示Titanium钛
 3. 一来一回异步又低效的问题诊断是很大的痛苦的来源，以及 oncall 没办法 scale 的核心原因之一。对于用户来说，只需要在集群内执行
 一个简单的命令，就会生成上面这样的一个链接，把重要的诊断信息与 PingCAP 的专业服务支持人员共享。 TiDB Clinic 是对于基础软件的维护性的一个新尝试：诊断能力的 SaaS 化，通过一个在云端不断强化的规则引擎，将故障的诊断和修复建议和本地的运维部署结耦。
 
-
 ## 基本理念
 
 [势高，则围广：TiDB 的架构演进哲学](https://zhuanlan.zhihu.com/p/67552966)适合没事读一读
@@ -81,7 +80,26 @@ Ti表示Titanium钛
 2. SQL 解释层，将SQL 转换为对应底层系统的逻辑计算
 3. 系统本身的逻辑 + 存储层
 
+
+
 ## 整体设计
+
+###  HTAP
+
+![](/public/upload/storage/tidb_htap.jpg)
+
+计算引擎层
+1. TiDB：作为 OLTP 计算引擎，负责处理事务性工作负载，对外提供 MySQL 协议接口，实现 SQL 解析、优化并生成分布式执行计划。TiDB 服务器无状态，易于横向扩展，通过负载均衡器均衡客户端连接，但本身不存储数据，而是将数据操作请求转发给 TiKV。
+2. TiSpark：集成 Apache Spark，专为复杂的 OLAP 查询设计，直接在 TiKV 数据上运行 Spark SQL 作业，实现大数据分析能力，与大数据生态无缝对接。TiSpark 与 TiFlash 结合，增强了 TiDB 在数据分析领域的表现。
+存储引擎层
+1. TiKV：负责存储行格式数据，支撑 OLTP 业务，是一个分布式、事务性的键值存储系统。数据被切分为多个 Region，每个 Region由多个 TiKV 节点复制存储，确保高可用性和数据一致性。TiKV 支持事务隔离级别，是 TiDB 处理 SQL 查询的底层存储。
+2. TiFlash：针对 OLAP 场景设计，采用列式存储优化分析查询性能。TiFlash 能够近乎实时地复制 TiKV 中的数据，保持数据一致性的同时，提供高效分析查询能力。它兼容 TiDB 和 TiSpark，分别适用于不同规模的分析需求，与 ClickHouse 的高效分析技术相融合，提升了 TiDB 的分析处理能力。
+分布式协调层
+1. PD（Placement Driver）：作为整个集群的元数据管理和调度中心，存储集群拓扑信息及数据分布状态，控制数据的自动均衡与故障恢复，分配事务ID，是集群的控制大脑。PD 集群通常由三个或以上节点构成，确保高可用性。
+
+### OLTP
+
+![](/public/upload/storage/tidb_htap.jpg)
 
 [畅想TiDB应用场景和HTAP演进之路](https://blog.bcmeng.com/post/tidb-application-htap.html#5-tidb-htap-%E6%BC%94%E8%BF%9B%E4%B9%8B%E8%B7%AF)
 
@@ -111,38 +129,44 @@ TiDB 对每个表分配一个 TableID，每一个索引都会分配一个 IndexI
 
 以下标为例
 
-    CREATE TABLE User {
-        ID int,
-        Name varchar(20),
-        Role varchar(20),
-        Age int,
-        PRIMARY KEY (ID)，
-        Key idxAge (age)
-    };
+```
+CREATE TABLE User {
+    ID int,
+    Name varchar(20),
+    Role varchar(20),
+    Age int,
+    PRIMARY KEY (ID)，
+    Key idxAge (age)
+};
+```
 
 假设有3条记录
-
-    1, "TiDB", "SQL Layer", 10
-    2, "TiKV", "KV Engine", 20
-    3, "PD", "Manager", 30
-
+```
+1, "TiDB", "SQL Layer", 10
+2, "TiKV", "KV Engine", 20
+3, "PD", "Manager", 30
+```
 假设这个表的 Table ID 为 10，因为有一个 Int 类型的 Primary Key，所以 RowID 的值即为这个 Primary Key 的值，row的数据为
 
-    t_r_10_1  --> ["TiDB", "SQL Layer", 10]
-    t_r_10_2 --> ["TiKV", "KV Engine", 20]
-    t_r_10_3 --> ["PD", "Manager", 30]
+```
+t_r_10_1  --> ["TiDB", "SQL Layer", 10]
+t_r_10_2 --> ["TiKV", "KV Engine", 20]
+t_r_10_3 --> ["PD", "Manager", 30]
+```
 
 假设这个 Index 的 ID 为 1，则其数据为：
 
-    t_i_10_1_10_1 —> null
-    t_i_10_1_20_2 --> null
-    t_i_10_1_30_3 --> null
+```
+t_i_10_1_10_1 —> null
+t_i_10_1_20_2 --> null
+t_i_10_1_30_3 --> null
+```
 
 ### SQL 运算，分布式 SQL 运算
 
 将 SQL 查询映射为对 KV 的查询，再通过 KV 接口获取对应的数据，最后执行各种计算。比如`select count(*) from user where name = "TIDB"`（没有对name建索引）
 
-1. 构造出 Key Range：一个表中所有的 RowID 都在 [0, MaxInt64) 这个范围内，那么我们用 0 和 MaxInt64 根据 Row 的 Key 编码规则，就能构造出一个 [StartKey, EndKey) 的左闭右开区间
+1. 构造出 Key Range：一个表中所有的 RowID 都在 `[0, MaxInt64)` 这个范围内，那么我们用 0 和 MaxInt64 根据 Row 的 Key 编码规则，就能构造出一个 `[StartKey, EndKey)` 的左闭右开区间
 2. 扫描 Key Range：根据上面构造出的 Key Range，读取 TiKV 中的数据
 3. 过滤数据：对于读到的每一行数据，计算 name="TiDB" 这个表达式，如果为真，则向上返回这一行，否则丢弃这一行数据
 4. 计算 Count：对符合要求的每一行，累计到 Count 值上面
@@ -160,3 +184,4 @@ TiDB 对每个表分配一个 TableID，每一个索引都会分配一个 IndexI
 [三篇文章了解 TiDB 技术内幕 —— 谈调度](https://zhuanlan.zhihu.com/p/27275483) 文章适宜精读，仔细品味一个复杂的需求如何抽丝剥茧、条缕清晰的
 
 ![](/public/upload/data/tidb_pd_xmind.png)
+

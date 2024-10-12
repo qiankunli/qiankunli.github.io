@@ -13,8 +13,7 @@ keywords: tsdb
 * TOC
 {:toc}
 
-建议看下前文 [OpenTSDB 入门](http://qiankunli.github.io/2017/08/02/opentsdb.html) [influxdb 入门](http://qiankunli.github.io/2019/02/26/influxdb_intro.html)
-
+时序模型是专门设计用于高效存储、索引和查询时间序列数据的系统。时间序列数据是指按时间顺序排列的数据序列，每个数据点通常包含一个时间戳和一个或多个与该时间相关的值，广泛应用于监控系统、金融分析、物联网（IoT）、传感器网络、气象预报等领域。
 
 [下一代监控系统大阅兵-基于TSDB的监控系统定制开发需求调研](https://zhuanlan.zhihu.com/p/35978607)
 
