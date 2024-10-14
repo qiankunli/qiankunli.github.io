@@ -50,9 +50,8 @@ linux内核对命名空间的支持完全隔离了工作环境中应用程序的
 
 [Namespaces in operation, part 1: namespaces overview](https://lwn.net/Articles/531114/) 是一个介绍 namespace 的系列文章，要点如下：
 
-1.  The purpose of each namespace is to wrap a particular global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource. 对global system resource的封装
-2. there will probably be further extensions to existing namespaces, such as the addition of namespace isolation for the kernel log. 将会有越来越多的namespace
-
+1.  The purpose of each namespace is to wrap a particular global system resource in an abstraction that makes it appear to the processes within the namespace that they have their own isolated instance of the global resource. 对global system resource的封装，每一个namespace 解决的是一种或几种特定资源的隔离性。
+2. there will probably be further extensions to existing namespaces, such as the addition of namespace isolation for the kernel log. 将会有越来越多的namespace。 
 
 namespace 简单说，就是进程的task_struct 以前都直接 引用资源id（各种资源或者是index，或者 是一个地址），现在是进程  task struct   ==> nsproxy ==> 资源表(操作系统就是提供抽象，并将各种抽象封装为数据结构，外界可以引用)
 
@@ -70,8 +69,8 @@ struct nsproxy {
     struct uts_namespace *uts_ns;
     struct ipc_namespace *ipc_ns;
     struct mnt_namespace *mnt_ns;
-    struct pid_namespace *pid_ns_for_children;
-    struct net             *net_ns;
+    struct pid_namespace *pid_ns_for_children; // 解决进程号隔离性
+    struct net             *net_ns;            // 解决网络相关设备、路由表、socket等资源的隔离性
 };
 ```
 
@@ -100,6 +99,7 @@ struct pid_namespace{
 
 
 ```c
+// fork的核心是 copy_process
 static struct task_struct *copy_process(...){
     ...
     //2.1 拷贝进程的命名空间 nsproxy
@@ -115,6 +115,7 @@ static struct task_struct *copy_process(...){
 ```
 1. 支持namespace 之前，很多数据结构比如pidmap，都是进程全局共享的（或者说就是 全局变量），支持了namespace之后，都变成了 per-namespace的，每个task_struct 都有个ns_proxy 去引用它们。pidmap（或者说包裹它的pid_namespace）自己也组成了树状结构。
 2. 创建进程的核心是在于 copy_process 函数。是先 copy_namespaces，把新的namespace struct 都创建好之后，再从这些数据结构里 走申请 资源（pid号等）逻辑
+3. 申请pid 编号时并不是只申请一个，而是使用了一个for循环申请了多个，都存到了struct pid 对象中。容器中的进程不仅仅在容器中需要被看到，在它的宿主机中也是需要被看到，也就是在每一层都需要一个独立的pid的（当前ns申请一个，其所有的父ns 也申请一个），那申请出来的多个pid 编号也就需要一个结构体来存储。
 
 ### mount namespace
 
@@ -182,7 +183,9 @@ runtime 有两种 cgroup 驱动：一种是 systemd，另外一种是 cgroupfs�
 
 ![](/public/upload/container/cgroup_v1.jpeg)
 
-Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的限制只能在子系统中发生。比如pid可以分别属于 memory Cgroup 和 blkio Cgroup。但是在 blkio Cgroup 对进程 pid 做磁盘 I/O 做限制的时候，blkio 子系统是不会去关心 pid 用了哪些内存，这些内存是不是属于 Page Cache，而这些 Page Cache 的页面在刷入磁盘的时候，产生的 I/O 也不会被计算到进程 pid 上面。**Cgroup v2 相比 Cgroup v1 做的最大的变动就是一个进程属于一个控制组，而每个控制组里可以定义自己需要的多个子系统**。Cgroup v2 对进程 pid 的磁盘 I/O 做限制的时候，就可以考虑到进程 pid 写入到 Page Cache 内存的页面了，这样 buffered I/O 的磁盘限速就实现了。
+Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的限制只能在子系统中发生，每种资源对应的层级/hierarchy上都有一个根节点，代表的是该种资源的全部分配。在其下面的子节点是对这种资源进行的限制和划分，子节点下还可以再继续派生孙节点。**对于某一个特定的用户进程，如果想对其所使用的cpu、内存、网络进行限制，那就把进程和指定资源下的某个cgroup建立起关联关系**。比如pid可以分别属于 memory Cgroup 和 blkio Cgroup。但是在 blkio Cgroup 对进程 pid 做磁盘 I/O 做限制的时候，blkio 子系统是不会去关心 pid 用了哪些内存，这些内存是不是属于 Page Cache，而这些 Page Cache 的页面在刷入磁盘的时候，产生的 I/O 也不会被计算到进程 pid 上面。
+
+**Cgroup v2 相比 Cgroup v1 做的最大的变动，整个cgroup 只有一个层级/hierarchy上，**每个节点上都可以拥有对cpu、内存、网络等多种资源的限制，一个进程只需要和一个控制组建立关联关系。Cgroup v2 对进程 pid 的磁盘 I/O 做限制的时候，就可以考虑到进程 pid 写入到 Page Cache 内存的页面了，这样 buffered I/O 的磁盘限速就实现了。
 
 ![](/public/upload/container/cgroup_v2.jpeg)
 
@@ -192,6 +195,14 @@ Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的�
 
 ![](/public/upload/linux/cgroup_struct.jpg)
 
+```c
+struct cgroup {
+    ...
+    struct cgroup_subsys_state __rcu *subsys[CGROUP_SUBSYS_COUNT];
+    ...
+}
+```
+
 1. 包含哪些数据结构/内核对象
     1. 一个 cgroup 对象中可以指定对 cpu、cpuset、memory 等一种或多种资源的限制。每个 cgroup 都有一个 cgroup_subsys_state 类型的数组 subsys，其中的每一个元素代表的是一种资源控制，如 cpu、cpuset、memory 等等。
     2. 其实 cgroup_subsys_state 并不是真实的资源控制统计信息结构，对于 CPU 子系统真正的资源控制结构是 task_group，对于内存子系统控制统计信息结构是 mem_cgroup，其它子系统也类似。它是 cgroup_subsys_state 结构的扩展，类似父类和子类的概念，当 task_group 需要被当成cgroup_subsys_state 类型使用的时候，只需要强制类型转换就可以。
@@ -199,32 +210,47 @@ Cgroup v1 的一个整体结构，每一个子系统都是独立的，资源的�
     4. 无论是进程、还是 cgroup 对象，最后都能找到和其关联的具体的 cpu、内存等资源控制子系统的对象。
 2. 通过创建目录来创建 cgroup 对象。在 `/sys/fs/cgroup/cpu,cpuacct` 创建一个目录 test，实际上内核是创建了 cgroup、task_group 等内核对象。
 3. 在目录中设置 cpu 的限制情况。在 task_group 下有个核心的 cfs_bandwidth 对象，用户所设置的 cfs_quota_us 和 cfs_period_us 的值最后都存到它下面了。
-4. 将进程添加到 cgroup 中进行资源管控。当在 cgroup 的 cgroup.proc 下添加进程 pid 时，实际上是将该进程加入到了这个新的 task_group 调度组了。
+4. 将进程添加到 cgroup 中进行资源管控。当在 cgroup 的 cgroup.proc 下添加进程 pid 时，实际上是将该进程加入到了这个新的 task_group 调度组了，后面进程将使用task_group的rq及它的时间配额。内核定义了修改cgroup.procs 文件的处理函数 cgroup_procs_write
+    1. 根据用户输入的pid 来查找task_struct 内核对象
+    2. 从旧的调度组中退出，加入新的调度组task_group
+    3. 修改进程的cgroup 相关的指针，让其指向新的task_group
 
 ### cpu cgroups生效
+
+每个容器都有一个独立的task_group内核对象，每一个task_group内部都有一组自己的调度队列/rq，其数量和逻辑核数一致。PS：调度选下一个进程变成了选下一个task_group 然后再选进程。改cgroup到最后就是改了 内核某个struct 的成员值。
 
 ```c
 //file:kernel/sched/core.c
 struct task_group root_task_group;  // 所有的 task_group 都是以 root_task_group 为根节点组成了一棵树。
 //file:kernel/sched/sched.h
 struct task_group {
- struct cgroup_subsys_state css;
- ...
+    struct cgroup_subsys_state css;
+    ...
 
- // task_group 树结构
- struct task_group   *parent;
- struct list_head    siblings;
- struct list_head    children;
+    // task_group 树结构
+    struct task_group   *parent;
+    struct list_head    siblings;
+    struct list_head    children;
 
- //task_group 持有的 N 个调度实体(N = CPU 核数)
- struct sched_entity **se;
- //task_group 自己的 N 个公平调度队列(N = CPU 核数)
- struct cfs_rq       **cfs_rq;
-
- //公平调度带宽限制
- struct cfs_bandwidth    cfs_bandwidth;
- ...
+    // task_group 持有的 N 个调度实体(N = CPU 核数)
+    struct sched_entity **se;
+    // task_group 自己的 N 个公平调度队列(N = CPU 核数)
+    struct cfs_rq       **cfs_rq;
+    // 公平调度带宽限制
+    struct cfs_bandwidth    cfs_bandwidth;      
+    ...
 }
+struct cfs_bandwidth {
+    // 带宽控制配置
+    ktime_t period;                // 周期，指定时间长度（微秒），对应cfs_period_us
+    u64 quota                      // 配额，对应cfs_quota_us
+    // 当前周期剩余的运行时间，peroid_timer 会定时给其“充值”
+    u64 runtime;                   
+    ...
+    // 定时分配
+    strcut hrtimer period_timer;       // 定时器，定时给runtime“充值”
+    strcut hrtimer slack_timer;       
+};
 ```
 
 假如当前系统有两个逻辑核，那么一个 task_group 树和 cfs_rq 的简单示意图大概是下面这个样子。
@@ -233,39 +259,87 @@ struct task_group {
 
 Linux 中的进程调度是一个层级的结构，进程创建后的一件重要的事情，就是调用sched_class的enqueue_task方法，将这个进程放进某个CPU的队列上来。默认有一个根group，也就是，创建普通进程后（没有配置cgroup）加入percpu.rq 实质是加入到了一个默认的task_group中。对于容器来讲，**宿主机中进行进程调度的时候，先调度到的实际上不是容器中的具体某个进程，而是一个 task_group**。然后接下来再进入容器 task_group 的调度队列 cfs_rq 中进行调度，才能最终确定具体的进程 pid。
 
-系统会定期在每个 cpu 核上发起 timer interrupt，在时钟中断中处理的事情包括 cpu 利用率的统计，以及周期性的进程调度等。当cgroup cpu 子系统创建完成后，内核的 period_timer 会根据 task_group->cfs_bandwidth 下用户设置的 period 定时给可执行时间 runtime 上加上 quota 这么多的时间（相当于按月发工资），以供 task_group 下的进程执行（消费）的时候使用。
+系统会定期在每个 cpu 核上发起 timer interrupt，在时钟中断中处理的事情包括 cpu 利用率的统计，以及周期性的进程调度等。当cgroup cpu 子系统创建完成后，**内核的 period_timer 会根据 task_group->cfs_bandwidth 下用户设置的 period 定时给可执行时间 runtime 上加上 quota 这么多的时间**（相当于按月发工资），以供 task_group 下的进程执行（消费）的时候使用。
 
 在完全公平器调度的时候，每次 pick_next_task_fair 时会做两件事情
 1. 将从 cpu 上拿下来的进程所在的运行队列进行执行时间的更新与申请。会将 cfs_rq 的 runtime_remaining 减去已经执行了的时间。如果减为了负数，则从 cfs_rq 所在的 task_group 下的 cfs_bandwidth 去申请一些。
-2. 判断 cfs_rq 上是否申请到了可执行时间，如果没有申请到，需要将这个队列上的所有进程都从完全公平调度器的红黑树上取下。这样再次调度的时候，这些进程就不会被调度了。
-当 period_timer 再次给 task_group 分配时间的时候，或者是自己有申请时间没用完回收后触发 slack_timer 的时候，被限制调度的进程会被解除调度限制，重新正常参与运行。这里要注意的是，一般 period_timer 分配时间的周期都是 100 ms 左右。假如说你的进程前 50 ms 就把 cpu 给用光了，那你收到的请求可能在后面的 50 ms 都没有办法处理，对请求处理耗时会有影响。这也是为啥在关注 CPU 性能的时候要关注对容器 throttle 次数和时间的原因了。
+2. 判断 cfs_rq 上是否申请到了可执行时间，如果没有申请到，**需要将这个队列上的所有进程都从完全公平调度器的红黑树上取下**。这样再次调度的时候，这些进程就不会被调度了。当 period_timer 再次给 task_group 分配时间/“发工资”的时候，或者是自己有申请时间没用完回收后触发 slack_timer 的时候，被限制调度的进程会被解除调度限制，重新正常参与运行。
+    1. 这里要注意的是，一般 period_timer 分配时间的周期都是 100 ms 左右。假如说你的进程（cfs_peroid_us=100ms，cfs_quota_us=200ms）前 50 ms 就把 cpu 给用光了（因为容器会有多个进程运行，进程也会有多个线程运行，所有线程的总运行时长可能是超过了200ms），那你收到的请求可能在后面的 50 ms 都没有办法处理，对请求处理耗时会有影响。这也是为啥在关注 CPU 性能的时候要关注对容器 throttle 次数和时间的原因了。
+
+```c
+static struct task_struct *pick_next_task_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf) {
+    struct cfs_rq *cfs_rq = &rq->cfs;
+    ...
+    // 选择下一个调度的进程
+    do{
+        ...
+        se = pick_next_entity(cfs_rq, curr);
+        cfs_rq = get_cfs_rq(se);
+    }while(cfs_rq)
+    p = task_of(se);
+    // 如果选出的进程和上一个进程不同
+    if (prev != p){
+        struct sched_entity *pse = &prev->se;
+        ...
+        // 对要放弃cpu 的进程执行一些处理
+        put_prev_entity(cfs_rq, pse);
+    }
+}
+static void put_prev_entity(struct cfs_rq *cfs_rq, struct sched_entity *prev){
+    // 运行队列带宽的更新与申请
+    if (prev->on_rq){
+        update_curr(cfs_rq);
+    }
+    // 判断是否需要将容器挂起
+    check_cfs_rq_runtime(cfs_rq);
+    // 更新负载数据
+    update_load_avg(cfs_rq, prev, 0);
+```
 
 ### 内存 cgroups生效
 
-我们知道， 任何内存申请都是从缺页中断开始的，`handle_pte_fault ==> do_anonymous_page ==> mem_cgroup_newpage_charge（不同linux版本方法名不同） ==> mem_cgroup_charge_common ==> __mem_cgroup_try_charge`
+一个进程是通过task_struct 结构体下的*cgroups 指向自己所关联的 task_cgroup、mem_cgroup的，对容器下所有进程的cpu资源限制是通过task_cgroup实现的，而对于内存资源的限制是通过mem_cgroup实现的。**linux 提供了cgroupfs 作为接口，让用户来访问和控制mem_cgroup**。PS：task_cgroup大概也是如此。
 
 ```c
-static int __mem_cgroup_try_charge(struct mm_struct *mm,
-    gfp_t gfp_mask,
-    unsigned int nr_pages,
-    struct mem_cgroup **ptr,
-    bool oom){
+struct mem_cgroup {
+    struct cgroup_subsys_state css;
+    struct mem_cgroup_id id;
     ...
-    struct mem_cgroup *memcg = NULL;
-    ...
-    memcg = mem_cgroup_from_task(p);
-    ...
-}
+    // cgroup 内存计数
+    struct page_counter memory; // 统计内存消耗，判断是否需要oom kill掉某个进程来释放内存
+    struct memcg_vmstats_percpu __percpu *vmstats_percpu;  // 用来记录更详细的rss、pagecache内存开销
 ```
 
-`mem_cgroup_from_task ==> mem_cgroup_from_css` 
+我们知道， 任何内存申请都是从缺页中断开始的，`handle_pte_fault ==> do_anonymous_page ==> mem_cgroup_newpage_charge（不同linux版本方法名不同） ==> ... ==> try_charge_memcg`
 
 ```c
-struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p){
+static int try_charge_memcg(struct mem_cgroup *memcg, gfp_t gfp_mask, unsigned int nr_pages){
+    struct mem_cgroup *mem_over_limit;
     ...
-    return mem_cgroup_from_css(task_subsys_state(p, mem_cgroup_subsys_id));
+    // 对使用的内存记账，如果记账后没有超出限制就跳到记账成功后返回
+    if (page_counter_try_charge(&memcg->memory, batch, &counter)){
+        goto done_restock;
+    }
+    // 如果记账超过限制
+    // 记录内存使用量超过限制的内存控制组
+    mem_over_limit = mem_cgroup_from_counter(counter, memory);
+    // 尝试对超出限制的内存控制组进行内存回收
+    nr_reclaimed = try_to_free_mem_cgroup_pages(mem_over_limit, nr_pages, gfp_mask, reclaim_options);
+
+    if(mem_cgroup_oom(mem_over_limit, gfp_mask, get_order(nr_pages * PAGE_SIZE))) {
+        ...
+        goto retry
+    }
 }
+done_restock:
+    // 记账成功
+    do{
+        ...
+    }while((memcg = parent_mem_cgroup(memcg)))
+    ...
+    return 0
 ```
+
 ### 查看配置
 
 从右向左 ==> 和docker run放在一起看 
@@ -287,6 +361,8 @@ struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p){
 ![]()(/public/upload/linux/linux_task_cgroup.png)
 
 为什么要使用cg_cgroup_link结构体呢？因为 task 与 cgroup 之间是多对多的关系。熟悉数据库的读者很容易理解，在数据库中，如果两张表是多对多的关系，那么如果不加入第三张关系表，就必须为一个字段的不同添加许多行记录，导致大量冗余。通过从主表和副表各拿一个主键新建一张关系表，可以提高数据查询的灵活性和效率。
+
+cgroup 目录有当前cgroup 所消耗的cpu资源的统计信息，根据这个信息可以准确的计算出容器的利用率。kubelet 中集成的cAdvisor 就是利用上述方案来上报容器cpu利用率的打点信息的。每隔一段定长的时间都进行采样，将数据上传给Prometheus。cAdvisor 访问cgroup 目录信息又是通过调用libcontainer获取的。
 
 
 

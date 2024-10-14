@@ -125,7 +125,7 @@ shell 实现的功能有别于其它应用，它的功能是接受用户输入�
 2. 线程创建 pthread_create ==> do_clone ==> clone ==> do_fork ==> copy_process
 可见和创建进程时使用的 fork 系统调用相比，创建线程的 clone 系统调用几乎和 fork 差不多，也一样使用的是内核里的 do_fork 函数，最后走到 copy_process 来完整创建。不过创建过程的区别是二者在调用 do_fork 时传入的 clone_flags 里的标记不一样！。
 1. 创建进程时的 flag：仅有一个 SIGCHLD
-2. 创建线程时的 flag：包括 CLONE_VM(新 task 和父进程共享地址空间)、CLONE_FS(新 task 和父进程共享文件系统信息)、CLONE_FILES(新 task 和父进程共享文件描述符表)、CLONE_SIGNAL、CLONE_SETTLS、CLONE_PARENT_SETTID、CLONE_CHILD_CLEARTID、CLONE_SYSVSEM。PS：带了就会复用、共享对应xx_struct。代码段、数据段、堆内存共享，各个线程的栈区独立（不复用）。
+2. 创建线程时的 flag：包括 CLONE_VM(新 task 和父进程共享地址空间)、CLONE_FS(新 task 和父进程共享文件系统信息)、CLONE_FILES(新 task 和父进程共享文件描述符表)、CLONE_SIGNAL、CLONE_SETTLS、CLONE_PARENT_SETTID、CLONE_CHILD_CLEARTID、CLONE_SYSVSEM。PS：带了就会复用、共享对应xx_struct。代码段、数据段、堆内存共享，各个线程的栈区独立（不复用）。进程在创建的时候，启动调用exec加载可执行文件的过程中，os 会为其分配一个栈内存供进程运行使用。**线程没有办法使用os 默认给进程分配的栈内存**，linux中glibc库的做法是自己(用户态)申请内存来当线程栈用。
 
 ![](/public/upload/linux/process_vs_thread.png)
 
@@ -168,38 +168,40 @@ struct task_struct{
 }
 ```
 
-CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，task_struct.sched_entity里面有一个重要的变量vruntime，来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变，**最后尽量保证所有进程的vruntime相等**。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的。PS：vruntime 正是理解 docker `--cpu-shares` 的钥匙。
+CPU 会提供一个时钟，过一段时间就触发一个时钟中断Tick，task_struct.sched_entity里面有一个重要的变量vruntime，来记录一个进程的虚拟运行时间。如果一个进程在运行，随着时间的增长，也就是一个个 tick 的到来，进程的 vruntime 将不断增大。没有得到执行的进程 vruntime 不变，**最后尽量保证所有进程的vruntime相等**。为什么是 虚拟运行时间呢？`虚拟运行时间 vruntime += 实际运行时间 delta_exec * NICE_0_LOAD/ 权重`。就好比可以把你安排进“尖子班”变相走后门，但高考都是按分数（vruntime）统一考核的。完全公平调度器维持的是所有sched_entity 的vruntime的公平，但是vruntime会根据weight 来进行缩放。vruntime的计算是在calc_delta_fair函数中实现的。
 
 ```c
 /*
  * Update the current task's runtime statistics.
  */
 static void update_curr(struct cfs_rq *cfs_rq){
-  struct sched_entity *curr = cfs_rq->curr;
-  u64 now = rq_clock_task(rq_of(cfs_rq));
-  u64 delta_exec;
-  ......
-  delta_exec = now - curr->exec_start;
-  ......
-  curr->exec_start = now;
-  ......
-  curr->sum_exec_runtime += delta_exec;
-  ......
-  curr->vruntime += calc_delta_fair(delta_exec, curr);
-  update_min_vruntime(cfs_rq);
-  ......
+    struct sched_entity *curr = cfs_rq->curr;
+    u64 now = rq_clock_task(rq_of(cfs_rq));
+    u64 delta_exec;
+    ......
+    delta_exec = now - curr->exec_start;
+    ......
+    curr->exec_start = now;
+    ......
+    curr->sum_exec_runtime += delta_exec;
+    ......
+    curr->vruntime += calc_delta_fair(delta_exec, curr);
+    update_min_vruntime(cfs_rq);
+    ......
 }
 
 /*
  * delta /= w
  */
 static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se){
-  if (unlikely(se->load.weight != NICE_0_LOAD))
+    if (unlikely(se->load.weight != NICE_0_LOAD))
         /* delta_exec * weight / lw.weight */
-    delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
-  return delta;
+        delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
+    return delta;
 }
 ```
+
+NICE_0_LOAD宏对应的是1024，如果权重是1024，那么vruntime 就正好等于实际运行时间，否则会进入__calc_delta 来根据权重和实际运行时间折算一个vruntime增量。如果weight 较高，则同样实际运行时间算出来的vruntime 就会偏小，就会在调度中获取更多的cpu，cfs 就是这样实现了cpu资源按权重分配。
 
 调度需要一个数据结构来对 vruntime 进行排序，因为任何一个策略做调度的时候，都是要区分谁先运行谁后运行。这个能够排序的数据结构不但需要查询的时候，能够快速找到最小的，更新的时候也需要能够快速的调整排序，毕竟每一个tick vruntime都会增长。能够平衡查询和更新速度的是树，在这里使用的是红黑树，key=vruntime。红黑树的一个node由sched_entity 表示（数据结构中很少有一个Tree 存在，都是根节点`Node* root`就表示tree了），可能是一个真正的进程，也可能是一个进程组。
 
@@ -218,7 +220,7 @@ struct task_struct{
     ...
 }
 struct sched_entity {
-    struct load_weight load; // 当前进程权重
+    struct load_weight load; // 当前进程权重，对应cgroup cpu.shares
     struct rb_node run_node; // 指向自己在红黑树上的节点位置
     u64 exec_start;         // 进程开始运行的时间
     u64 sum_exec_runtime;   // 总的运行时间
@@ -260,7 +262,7 @@ void wake_up_new_task(struct task_struct *p){
 ```
 select_task_rq ==> task_struct->sched_class->select_task_rq在缓存性能和空闲核两个点做权衡，同等条件会尽量优先考虑缓存命中率，选择同L1/L2的核，其次会选择同一个物理cpu上的（共享L3），最坏情况下去选择另一个（负载最小的）物理cpu上的核，称之为漂移。现在互联网公司都流行在离线混部，宿主机的cpu利用率被打到很高的水平，比如70%，进程在不同的核上运行概率增加，缓存中的数据都是“凉的”，穿透到内存的访问次数增加，进程的运行性能就会下降很多。
 
-每个 CPU 都有自己的 struct rq 结构，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。**这样保证了实时任务的优先级永远大于普通任务**。PS： [离线调度算法(BT)](https://github.com/Tencent/TencentOS-kernel) 为了支持在混部，支持了bt_rq。
+**每个逻辑核都有自己的 struct rq 结构**，其用于描述在此 CPU 上所运行的所有进程，其包括一个实时进程队列rt_rq 和一个 CFS 运行队列 cfs_rq。在调度时，调度器首先会先去实时进程队列找是否有实时进程需要运行，如果没有才会去 CFS 运行队列找是否有进行需要运行。**这样保证了实时任务的优先级永远大于普通任务**。PS： [离线调度算法(BT)](https://github.com/Tencent/TencentOS-kernel) 为了支持在混部，支持了bt_rq。
 
 
 ```c
