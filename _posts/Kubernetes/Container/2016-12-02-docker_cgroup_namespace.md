@@ -305,9 +305,10 @@ struct mem_cgroup {
     struct cgroup_subsys_state css;
     struct mem_cgroup_id id;
     ...
-    // cgroup 内存计数
+    // cgroup 内存计数 page_counter->usage，其中 page_counter->max 是用户设置的上限 memory.limit_in_bytes
     struct page_counter memory; // 统计内存消耗，判断是否需要oom kill掉某个进程来释放内存
-    struct memcg_vmstats_percpu __percpu *vmstats_percpu;  // 用来记录更详细的rss、pagecache内存开销
+    // 用来记录更详细的rss、pagecache内存开销
+    struct memcg_vmstats_percpu __percpu *vmstats_percpu;  // 访问memory.stat 文件实际输出的就是这个数组的数据
 ```
 
 我们知道， 任何内存申请都是从缺页中断开始的，`handle_pte_fault ==> do_anonymous_page ==> mem_cgroup_newpage_charge（不同linux版本方法名不同） ==> ... ==> try_charge_memcg`
@@ -320,12 +321,12 @@ static int try_charge_memcg(struct mem_cgroup *memcg, gfp_t gfp_mask, unsigned i
     if (page_counter_try_charge(&memcg->memory, batch, &counter)){
         goto done_restock;
     }
-    // 如果记账超过限制
+    // 如果记账超过限制 memory->max
     // 记录内存使用量超过限制的内存控制组
     mem_over_limit = mem_cgroup_from_counter(counter, memory);
     // 尝试对超出限制的内存控制组进行内存回收
     nr_reclaimed = try_to_free_mem_cgroup_pages(mem_over_limit, nr_pages, gfp_mask, reclaim_options);
-
+    // 无法回收足够的内存，触发oom killer
     if(mem_cgroup_oom(mem_over_limit, gfp_mask, get_order(nr_pages * PAGE_SIZE))) {
         ...
         goto retry

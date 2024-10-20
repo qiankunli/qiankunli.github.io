@@ -16,7 +16,7 @@ keywords: 可观测性
 如何通过监控找到性能瓶颈？
 
 1. 宏观上，找出整个分布式系统中的瓶颈组件。全链路监控
-2. 微观上，快速地找出进程内的瓶颈函数，就是从代码层面直接寻找调用次数最频繁、耗时最长的函数，通常它就是性能瓶颈。[火焰图](http://www.brendangregg.com/flamegraphs.html)
+2. 微观上，快速地找出进程内的瓶颈函数，就是从代码层面直接寻找调用次数最频繁、耗时最长的函数，通常它就是性能瓶颈。[火焰图](http://www.brendangregg.com/flamegraphs.html) 
 
 ![](/public/upload/linux/linux_profile.png)
 
@@ -169,13 +169,35 @@ root     32901 32794  0 00:01 pts/0    00:00:00 ps -ef
 2. pid=2 内核线程kthreadd，用户态不带中括号， 内核态带中括号。在 linux 内核中有一些执行定时任务的线程, 比如定时写回脏页的 pdflush, 定期回收内存的 kswapd0, 以及每个 cpu 上都有一个负责负载均衡的 migration 线程等.
 3. tty 带问号的，说明不是前台启动的，一般都是后台启动的服务
 
-## perf
+## 观测的事件源
+
+linux 性能观测技术主要分为指标观测和跟踪观测
+1. 指标观测，从系统中获取一个数字化的值，单纯某一个时间点的指标说服力不够，所以一般按照某个时间定时采集要观测的指标，将每个时间点的指标值存储到一起。然后再用一些高级观测工具展示出来。只能用于发现问题，无法用于更精细的定位问题。
+    ![](/public/upload/container/linux_metric.png)
+2. 跟踪观测，可以理解为在一个正常工作的系统上活动的信息收集过程，可以用于分析和查找真正的性能瓶颈。
+    ![](/public/upload/container/linux_trace.png)
+    tracepoints是内核在源码中插了很多桩，当没有跟踪需求的时候，这些桩都处于关闭状态。当某个跟踪点被打开的时候，桩代码就会得以运行。通过这些桩代码可以跟踪到内核的执行过程。这些桩都是静态的，都是在源码里提前放置好了的，桩的优势是比较稳定。但内核不可能在所有函数中都插个桩，所以还有另外一类补充性的技术就是kprobes。kprobes提供了对内核的动态插桩，这个动态表现在可以对任意的内核函数插桩代码，它的缺点是不够稳定，而且要求内核编译时要开启CONFIG_KPROBE_EVENT选项才能工作。
+
+静态跟踪点的入口是在每个要跟踪的位置埋下trace_xx函数，例如在__schedule 路径下执行了trace_sched_switch 这个静态跟踪点
+```c
+static void __schedule notrace __schedule(bool preempt){
+    ...
+    trace_sched_switch(preempt, prev, next);
+}
+```
+源码中可以多处搜到register_trace_sched_switch在这个静态跟踪点上注册了一些钩子函数，每当内核执行到__schedule中的trace_sched_switch时，就会调用所注册的xx_probe_xx 等函数来完成整个静态跟踪过程。
+
+动态跟踪kprobes 则不用提前预埋，它找到要跟踪的指令，直接用INT3_INSN_OPCODE 指令将其替换掉（每个cpu架构都有自己的实现），并将原来的指令保存起来。等内核运行到被替换的指令位置时就会进入INT3_INSN_OPCODE，触发INT3中断，进而调用到cpu架构相关的kprobe_int3_handler，在这里将会获取到kprobe 跟踪点，发现它有pre_handler 就执行（跟踪函数），之后再将处理流程还原为原来的指令继续执行。
+
+![](/public/upload/container/linux_kprobe.png)
+
+**CPU的硬件开发者们也想到了软件同学们会有统计观察硬件指标的需求。所以在硬件设计的时候，加了一类专用的寄存器**，专门用于系统性能监视。这类寄存器的名字叫硬件性能计数器（PMC: Performance Monitoring Counter）。每个PMC寄存器都包含一个计数器和一个事件选择器，计数器用于存储事件发生的次数，事件选择器用于确定所要计数的事件类型。例如，可以使用PMC寄存器来统计 L1 缓存命中率或指令执行周期数等。当CPU执行到 PMC 寄存器所指定的事件时，硬件会自动对计数器加1，而不会对程序的正常执行造成任何干扰。PS：硬件事件。
+
+![](/public/upload/linux/pmu.jpg)
 
 [盘点内核中常见的CPU性能卡点](https://mp.weixin.qq.com/s/moZjYijy2WcnGSTfv-nr9Q)CPU硬件影响程序运行性能的关键指标，分别是平均每条指令的时钟周期个数 CPI 和缓存命中率。其实，内核开发者们也都知道内核运行的过程中，哪些开销会比较高。所以老早就给我们提供了一种名为软件性能事件的支持（`perf list sw`可以看到alignment-faults,context-switches OR cs,cpu-migrations OR migrations,emulation-faults,major-faults,minor-faults,page-faults OR faults,task-clock）。以方便我们应用的开发者来观测这些事件发生的次数，以及发生时所触发的函数调用链。
 
-CPU的硬件开发者们也想到了软件同学们会有统计观察硬件指标的需求。所以在硬件设计的时候，加了一类专用的寄存器，专门用于系统性能监视。这类寄存器的名字叫硬件性能计数器（PMC: Performance Monitoring Counter）。每个PMC寄存器都包含一个计数器和一个事件选择器，计数器用于存储事件发生的次数，事件选择器用于确定所要计数的事件类型。例如，可以使用PMC寄存器来统计 L1 缓存命中率或指令执行周期数等。当CPU执行到 PMC 寄存器所指定的事件时，硬件会自动对计数器加1，而不会对程序的正常执行造成任何干扰。
-
-![](/public/upload/linux/pmu.jpg)
+## perf
 
 [perf](https://perf.wiki.kernel.org/index.php/Main_Page) began as a tool for using the performance counters subsystem in Linux, and has had various enhancements to add tracing capabilities. linux 有一个performance counters，perf 是这个子系统的外化。perf是性能分析的必备工具, 它最核心的能力是能访问硬件上的Performance Monitor Unit (PMU)。
 
@@ -201,10 +223,10 @@ perf record 在不加 -e 指定 event 的时候，它缺省的 event 就是 Hard
 perf的原理是这样的：每隔一个固定的时间，就在CPU上（每个核上都有）产生一个中断，在中断上看看，当前是哪个pid，哪个函数，然后给对应的pid和函数加一个统计值，这样，我们就知道CPU有百分几的时间在某个pid，或者某个函数上了。这是一种采样的模式，我们预期，运行时间越多的函数，被时钟中断击中的机会越大，从而推测，那个函数（或者pid等）的CPU占用率就越高。perf最大的好处是它可以直接跟踪到整个系统的所有程序（而不仅仅是内核），所以perf通常是我们分析的第一步，我们先看到整个系统的outline，然后才会进去看具体的调度，时延等问题。
 
 三类event，event 是 perf 工作的基础，主要有两种：有使用硬件的 PMU 里的 event，也有在内核代码中注册的 event。
-1. Hardware event，Hardware event 来自处理器中的一个 PMU（Performance Monitoring Unit），这些 event 数目不多，都是底层处理器相关的行为，perf 中会命名几个通用的事件，比如 cpu-cycles，执行完成的 instructions，Cache 相关的 cache-misses。不同的处理器有自己不同的 PMU 事件
+1. Hardware event，Hardware event 来自处理器中的一个 PMU（Performance Monitoring Unit），这些 event 数目不多，比如cpu相关的执行指令数和时钟周期数、与cpu缓存相关的L1、TLB等缓存相关事件等，可以帮我们观测到硬件的底层运行情况。perf 中会命名几个通用的事件，比如 cpu-cycles，执行完成的 instructions，Cache 相关的 cache-misses。不同的处理器有自己不同的 PMU 事件
     1. Performance counters are CPU hardware registers that count hardware events such as instructions executed, cache-misses suffered, or branches mispredicted. They form a basis for **profiling applications** to trace dynamic control flow and identify hotspots. perf provides rich generalized abstractions over hardware specific capabilities. Among others, it provides per task, per CPU and per-workload counters, sampling on top of these and source code event annotation. 
-2. Software event，Software event 是定义在 Linux 内核代码中的几个特定的事件，比较典型的有进程上下文切换（内核态到用户态的转换）事件 context-switches、发生缺页中断的事件 page-faults 等。
-3. Tracepoints event，实现方式和 Software event 类似，都是在内核函数中注册了 event。不仅是用在 perf 中，它已经是 Linux 内核 tracing 的标准接口了，ftrace，ebpf 等工具都会用到它。
+2. Software event，Software event 是定义在 Linux 内核代码中的几个特定的事件，比较典型的有进程上下文切换（内核态到用户态的转换）事件 context-switches、发生缺页中断的事件 page-faults 等。会将执行次数累计到某一个内核计数器中。
+3. Tracepoints event，是内核中预定义的静态探测点，每个tracepoint 其实就是一个钩子函数，可以打开或关闭。当内核源码执行到这个位置，其上注册的probe函数就会被调用。不仅是用在 perf 中，它已经是 Linux 内核 tracing 的标准接口了，ftrace，ebpf 等工具都会用到它。
     1. Tracepoints are instrumentation points placed at logical locations in code, such as for system calls, TCP/IP events, file system operations, etc. These have negligible(微不足道的) overhead when not in use, and can be enabled by the perf command to collect information including timestamps and stack traces. perf can also dynamically create tracepoints using the kprobes and uprobes frameworks, for kernel and userspace dynamic tracing. The possibilities with these are endless.
 
 在这些 event 都准备好了之后，perf 又是怎么去使用这些 event 呢？有计数和采样两种方式
@@ -225,7 +247,7 @@ perf的原理是这样的：每隔一个固定的时间，就在CPU上（每个�
 2. 创建各种event文件句柄
 3. 指定采样处理回调
 
-当 perf_event_open 创建事件对象，并打开后，硬件上发生的事件就可以出发执行了。内核注册相应的硬件中断处理函数是 perf_event_nmi_handler。这样 CPU 硬件会根据 perf_event_open 调用时指定的周期发起中断，调用 perf_event_nmi_handler 通知内核进行采样处理。内核和硬件一起协同合作，定时将当前正在执行的函数，以及函数完整的调用链路都给记录下来。
+当 perf_event_open systemcall 创建事件对象，并打开后，硬件上发生的事件就可以触发执行了。（perf_event_open给cpu指定了中断处理函数）内核注册相应的硬件中断处理函数是 perf_event_nmi_handler。这样 CPU 硬件会根据 perf_event_open 调用时指定的周期发起中断，调用 perf_event_nmi_handler 通知内核进行采样处理。具体过程是访问该进程的IP寄存器的值（也就是下一条指令的地址），通过分析该进程的可执行文件，可以得知每次采样的IP值处于哪个函数的内部。最后内核和硬件一起协同合作，定时将当前正在执行的函数，以及函数完整的调用链路都给记录下来。
 
 ![](/public/upload/linux/perf_work.jpg)
 
