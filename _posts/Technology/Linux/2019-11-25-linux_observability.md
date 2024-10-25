@@ -126,16 +126,13 @@ CPU 使用率是单位时间内 CPU 繁忙程度的统计。而平均负载不�
 
 IPC 全称 Instruction Per Cycle，指每个时钟周期内执行的指令数，CPI 全称 Cycle Per Instruction，指执行每条指令所需的时钟周期数，这一对指标互为倒数。一个编译好的程序在底层是由一个个机器指令组成的，每条指令处理起来复杂度不同，所以指令之间需要的cpu周期差别是比较大的。程序编译生成可执行文件后，执行哪些二进制指令基本上也就固定了。对指令耗时影响比较大的是数据访问位置在哪里，寄存器、L1、L2、L3、内存（顺序io、随机io、跨numa node访问）会越来越慢，假如程序局部性原理把握的不好，CPI指标就会偏高。此外，内核的调度配置也有影响，比如绑核vs 进程经常漂移。可以通过perf 来查看程序运行耗费的cycles和instructions。
 
+在追求高性能的场景下，一般会选择C和Rust 这两种语言，在C语言的函数调用传参使用的是寄存器，在Go中使用的是栈内存，寄存器的性能还是栈内存给高的，即使命中了CPU的L1缓存，效率也不如寄存器，C语言相比Go的CPI指标就会低一些。
+
 ### 如何限制cpu的使用
 
 [CFS Bandwidth Control](https://www.kernel.org/doc/Documentation/scheduler/sched-bwc.txt)
 
-The bandwidth allowed for a group（进程所属的组） is specified using a quota and period. Within
-each given "period" (microseconds), a group is allowed to consume only up to
-"quota" microseconds of CPU time.  When the CPU bandwidth consumption of a
-group exceeds this limit (for that period), the tasks belonging to its
-hierarchy will be throttled and are not allowed to run again until the next
-period. 有几个点
+The bandwidth allowed for a group（进程所属的组） is specified using a quota and period. Within each given "period" (microseconds), a group is allowed to consume only up to "quota" microseconds of CPU time.  When the CPU bandwidth consumption of a group exceeds this limit (for that period), the tasks belonging to its hierarchy will be throttled and are not allowed to run again until the next period. 有几个点
 
 1. cpu 不像内存 一样有明确的大小单位，单个cpu 是独占的，只能以cpu 时间片来衡量。
 2. 进程耗费的限制方式：在period（毫秒/微秒） 内该进程只能占用 quota （毫秒/微秒）。`quota /period = %CPU` 。PS：内存隔离是 申请内存的时候判断 判断已申请内存有没有超过阈值。cpu 隔离则是 判断period周期内，已耗费时间有没有超过 quota。PS： 频控、限流等很多系统也是类似思想

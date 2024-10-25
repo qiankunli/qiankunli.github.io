@@ -23,6 +23,8 @@ keywords: llm agent
 
 [智源推出下一代检索增强大模型框架MemoRAG](https://mp.weixin.qq.com/s/4YBRNRnC831u8PpP5IhgMQ)
 
+[当LangGraph遇上Mem0：如何让你的AI Agent具有更智能的记忆与个性化的体验？](https://mp.weixin.qq.com/s/R4PEimhcOMQ3nGRZe2GZOQ)
+
 ## 融合LLM和RL来生成Hidden COT（后续移到专门一文）
 
 ### RL从未走远
@@ -131,6 +133,7 @@ o1这条技术方向不仅增强了模型的复杂逻辑能力，由此可能引
 5. 强化学习、self-play（自我博弈）与MCTS（使用蒙特卡洛搜索树寻找最佳答案）
 
 ### 什么是Test/Inference-time Scaling Law
+
 [OpenAI o1模型的本质优势是什么？ - 猛猿的回答 - 知乎](https://www.zhihu.com/question/667055619/answer/3864887300)设想一下，当我们手里有一个基础模型（我们称其为generator），但是这个模型的逻辑推理能力（比如解数学题的能力）较差时，我们该怎么改进它？再说的具体点，不考虑数据集相关的成本，假设我手头的gpu算力（FLOPs）是有限的，我该怎么利用它，能让我的模型最终能推理出更好的结果？一个比较直接的想法是：把算力花在它的pretain阶段，给模型注入更多数理逻辑的预训练知识。例如用更好、更多的代码数学等数据，或者扩展模型的参数规模。这个做法启发自大家都很熟悉的scaling law（更具体地说是pretrain-time scaling law）。但是，当我们研读openai o1的技术报告时，我们会发现，它把这个算力更多地用在了2个地方：
 
 1. 用在了rlhf的训练上（post training）
@@ -159,5 +162,11 @@ o1这条技术方向不仅增强了模型的复杂逻辑能力，由此可能引
 1. 使用PRM指导搜索过程。
 2. 直接改变模型的输出分布
 
+## MCTS
 
+[逻辑推理与决策规划：LLM+MCTS](https://zhuanlan.zhihu.com/p/968362756)
+1. 为什么要将 LLM 与 MCTS 结合起来？
+2. 为什么 LLM 可以与 MCTS 结合起来？
+3. LLM 要如何与 MCTS 有效结合起来？
+4. LLM + MCTS 是终极方案么，有何局限性？
 

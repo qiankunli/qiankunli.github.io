@@ -51,14 +51,13 @@ Scale-up 和 Scale-out 实现了算力的弹性，弹性算力又是 Serverless 
 
 [零拷贝及一些引申内容](https://mp.weixin.qq.com/s/l_MRLyRW8lxvjtsKapT6HA)
 
-
-DMA 是一种外设**绕开CPU**独立直接访问内存的机制，零拷贝是一种绕开CPU 进行用户态和内核态之间数据拷贝的技术，包括mmap+write、sendfile、sendfile+DMA收集、splice等。kafka 的零拷贝即为磁盘通过sendfile实现DMA 拷贝Socket buffer，减少内核态到用户态的拷贝。
+DMA 是一种外设**绕开CPU**独立直接访问内存的机制，零拷贝是一种绕开CPU 进行用户态和内核态之间数据拷贝的技术，包括mmap+write、sendfile、sendfile+DMA收集、splice等。kafka 的零拷贝即为磁盘通过sendfile实现DMA 拷贝Socket buffer，减少内核态到用户态的拷贝。PS：所谓零拷贝，活儿没有少，只是由DMA在干活儿，省了CPU
 
 ## 用户态与内核态切换有什么代价呢？
 
 用户态的程序只能通过调用系统提供的API/系统调用来申请并使用资源，比如有个read 系统调用 用户态程序不能直接调用read，而是要`systemcall read系统调用号`。为了避免用户态程序绕过操作系统，直接执行对于硬件的控制和操作，**操作系统利用CPU所提供的特权机制**，封锁一些指令，并且将内存地址进行虚拟化（Ring 3无法执行一些指令，访问一些地址），使得存储有关键数据（比如IO映射）的部分物理内存无法从用户态进程进行访问。PS: 就好像看日志，你可以上物理机直接看，干其它事儿就只能给运维提交工单，而不能直接操作一样。
 
-我们的应用程序运行在 Ring 3（我们通常叫用户态，cpu的状态），而操作系统内核运行在 Ring 0（我们通常叫内核态）。所以一次中断调用，不只是“函数调用”，更重要的是改变了执行权限，从用户态跃迁到了内核态。
+我们的应用程序运行在 Ring 3（我们通常叫用户态，cpu的状态），而操作系统内核运行在 Ring 0（我们通常叫内核态）。所以一次中断调用，不只是“函数调用”，更重要的是改变了执行权限，从用户态跃迁到了内核态。栈切换，内核态用的是内核栈，SS/ESP/EFLAGS/CS/EIP寄存器全部需要切换，L1/L2/L3缓存命中率出现下降。
 
 [Understanding User and Kernel Mode](https://blog.codinghorror.com/understanding-user-and-kernel-mode/)
 
