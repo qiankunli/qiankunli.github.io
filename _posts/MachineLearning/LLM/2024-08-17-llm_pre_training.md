@@ -129,6 +129,8 @@ pretrain 最重要的几个东西：数据，学习率，优化器！
 4. 词表的中、英覆盖率要足够大，至于其他小语种是否要加，则看业务需求；
 5. tokenizer 的 vocab_len 和模型的 embdding_size 之间，要有一千个左右的 buffer，后续的 alignment 环节，需要大量在 pretrain 阶段没见过的全新 token 来做训练。
 
+[LLM实践系列-详谈Tokenizer训练细节](https://mp.weixin.qq.com/s/oMpikx1J0XhjQbIJsF9CFQ)
+
 ### 模型结构
 
 一个原则：能抄 llama 的结构就不要随便创新，就 rope + gqa + rms_norm + swiglu，少创新 = 少踩坑，创新的前提是大量鲁棒的实验。如果是 1B 左右很小的模型，那么 embedding 和 lm_head 还需要共享参数，目的是让 layer 的参数占全局参数的比例大一些，大一点的模型则没有这个必要。

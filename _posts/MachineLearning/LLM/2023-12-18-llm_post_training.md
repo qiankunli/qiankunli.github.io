@@ -76,9 +76,16 @@ RL包含行动、 环境、观察、奖励机制等模块，奖励机制是RL �
 
 RLHF 是一个完整技术框架，PPO 仅仅是其中强化学习算法模块的一种实现方式。人类反馈构造出偏好对齐数据集以便训练RM，正因为有了RM，才能让强化学习有了发挥的空间，让sft后的模型有了进一步的提升。但偏好对齐一定需要RL嘛？偏好对齐一定需要人类反馈吗？偏好对齐一定需要训练RM嘛？偏好对齐一定需要大量偏好样本么？
 
+[系统梳理LLM+RLHF发展脉络](https://mp.weixin.qq.com/s/rsPAF-ohUNJf6IW7LMIvZg) 非常经典，建议细读。 
+chatgpt所用的RLHF流程，首先BT模型的假设来训练Reward model。BT模型假设可以对每个query-response对（x，y）单独打分，即可以采用point-wise形式的reward来表述一个（x，y）的好坏。然后我们就可以基于该假设，训练出为每个query-response对（x，y）打分的reward model了。在获得reward model后，为了避免RL算法过度优化reward model所学习的偏好，从而使LLM出现“胡言乱语”的表现，通常会在优化目标中加入对原有策略的KL惩罚，这样我们就得到了最初的优化目标（Optimization Gaol）了。对于response层级的reward，最终，我们会将其转成token-level的累积reward。
+
+[如何用一个统一的视角，分析RLHF下的各种算法？](https://mp.weixin.qq.com/s/2txfqHpyiW-ipKuQSWAsLA) PS：大佬们一直在试图寻找统一脉络。思路一般不是突变的。
+
 ### PPO
 
 利用PPO算法，根据RW模型的奖励反馈进一步微调 sft model。经过强化学习后，LLM 给出的回答会越来越逼近那些在奖励模型中得分比较高的回答。包含actor model、reference模型/ref_model、reward model和critic model。actor model是我们想通过强化学习微调的大模型，但是强化学习过程很容易把模型训练“坏”，因此需要另外一个不会参数更新的 ref_model来当作标的，别让actor model跑偏太远。**为什么PPO不直接使用reward model?**虽然reward model可以提供每个状态或状态动作对的即时奖励信号，但它并不能直接提供对应的价值估计。奖励信号只反映了当前动作的即时反馈，critic model的作用是估计状态或状态动作对的长期价值，也称为状态值函数或动作值函数。critic model能够学习和预测在当前状态下采取不同动作所获得的累积奖励，它提供了对策略改进的指导。PPO算法使用critic model的估计值来计算优势函数，从而调整策略的更新幅度，使得更有利于产生更高长期回报的动作被选择。PS： actor model 和 ref_model是同一个模型的两个副本，reward model和critic model也是同一个模型的两个副本，且起源都是base model。[拆解大语言模型RLHF中的PPO算法](https://mp.weixin.qq.com/s/y7o9F9vz8dv609ee6xqYtw) 原理与代码并重，值得细读。
+
+使用PPO优化pipeline，有几个明显挑战，比如需要在学习过程中启动4个模型：actor model，reference model，reward model，critic model。如果为了提升训练效率，还可额外部署infer model。在游戏、机器人等领域，这几个模型通常size都比较小，为了效果多部署几个模型可以接受。但在LLM领域中，为了效果导致模型size剧增，同时也需要更为复杂的调度方式，总体来说，PPO优化pipeline对资源使用和调度带来了不小挑战。
 
 ### DPO（Direct Preference Optimization）
 
@@ -90,6 +97,8 @@ RLHF 是一个完整技术框架，PPO 仅仅是其中强化学习算法模块�
 2. DPO算法不包含奖励模型和强化学习过程，直接通过偏好数据进行微调，将强化学习过程直接转换为类似SFT过程，因此整个训练过程简单、高效，**主要的改进之处体现在于损失函数**。DPO算法仅包含RLHF中的两个模型，即演员模型(actor model)以及参考(reference model)，且训练过程中不需要进行数据采样。DPO算法的目的是最大化奖励模型(此处的奖励模型即为训练的策略)，使得奖励模型对chosen和rejected数据的差值最大，进而学到人类偏好。
 
 偏好数据，可以表示为三元组(提示语prompt, 良好回答chosen, 一般回答rejected)。
+
+[DPO的局限性讨论：理论和实践](https://mp.weixin.qq.com/s/-b2HCeizDeltKYQAimY7Kw) 未读
 
 ## Self-Play RL（细节移步其它文章）
 
