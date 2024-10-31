@@ -34,7 +34,13 @@ Naive RAG上述痛点的原因
     2. 对于复杂问题，复杂问题的处理链路仍需单独训练。
 2. agentic chat，有一个很牛逼的 agent llm（难点也在这），未来新的链路是一个tool。实际上揉和了规划、调用、总结到一个llm。
     1. 从分层的角度将，最下层/基础的能力是一系列的tool，所以要有caller，上层是对问题的拆分（也就是规划）和汇总（summary）。
-    2. 对于单步骤问题，tool的回答已经可以作为答案了，所以规划器除了输出final Answer也可以ignoresummary 来决定是否调用summary。
+    2. 对于单步骤问题，tool的回答已经可以作为答案了，所以规划器除了输出final Answer也可以ignore_summary 来决定是否调用summary。
+        ```
+        {
+            action: "ignore_summary"
+            action_input: "tool1_name"  # 表示只用tool1的输出作为answer就行了，不必再summary了。
+        } 
+        ```
 
 ## agentic chat 优化
 

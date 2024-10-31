@@ -162,6 +162,8 @@ AI分布式集群中**计算节点之间**通常使用InfiniBand或Myrinet等高
 
 ### 硬件和协议层
 
+[360智算中心：万卡GPU集群落地实践](https://mp.weixin.qq.com/s/JauX1xNyPy5PEwkkttW55w) 对网络这块有一些直观描述和图。
+
 #### TCP vs RDMA
 
 [海思专家如何看待RDMA技术？](https://mp.weixin.qq.com/s/UqSydz8hJCFcX5CF30gXSw) 比较好的一篇文章

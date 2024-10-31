@@ -229,7 +229,7 @@ class MLP(nn.Module):
 [大模型结构基础（四）：前馈网络层的升级](https://zhuanlan.zhihu.com/p/702190813) 未读。FFN组件的一个显著进步是混合专家（MoE）架构，它采用稀疏激活的FFN。在MoE中，每个输入只有一部分FFN层（或专家）被激活，显著减少了计算负载，同时保持了高模型容量。
 
 ###  Layer Normalization/对应Norm
-
+[Batch Normalization原理与实战](https://mp.weixin.qq.com/s/7B-gSLQm0PAKMefKHMb8nw) 是一种常规的模型“构件”，非transformer独有。 
 归一化核心是为了让不同层输入的取值范围或者分布能够比较一致。由于深度神经网络中每一层的输入都是上一层的输出，因此多层传递下，对网络中较高的层，之前的所有神经层的参数变化会导致其输入的分布发生较大的改变。也就是说，随着神经网络参数的更新，各层的输出分布是不相同的，且差异会随着网络深度的增大而增大。但是，需要预测的条件分布始终是相同的，从而也就造成了预测的误差。因此，在深度神经网络中，往往需要归一化操作，将每一层的输入都归一化成标准正态分布。
 
 Normalization有两种方法，Batch Normalization和Layer Normalization。关于两者区别不再详述。

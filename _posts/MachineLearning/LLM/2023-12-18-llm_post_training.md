@@ -102,6 +102,8 @@ chatgpt所用的RLHF流程，首先BT模型的假设来训练Reward model。BT�
 
 ## Self-Play RL（细节移步其它文章）
 
+[OpenAI-O1之下，我们技术该何去何从](https://mp.weixin.qq.com/s/yIM1j6XFz_Hc67bW3FaNgg)o1 则再次证明了强化学习的重要性。dpo 是我这种没有强化基础的老 nlp 从业者的一块遮羞布，o1 则完全撕下了这张遮羞布。不学强化，不训 reward_model 是吧，那就抱着 sft / dpo 这些老古董一辈子技术落后别人吧。
+
 ## 技术
 
 RLHF开源框架主要有DeepspeedChat、Trlx、ColossalAI-Chat，同时在这些框架中会包括一些常用的节省GPU资源，加快训练速度的框架例如Accelerate、PEFT等。在整个RLHF的优化训练中，少则涉及2个模型，多则涉及4个模型（**base-model,sft-model,reward-model,ppo-model**），超参数较多，训练优化存在较多不确定性。还有一个需要关注的问题，就是RLHF的优化训练耗时较多，少则半月，多则数月才会训练完成，训练资源成本较多。

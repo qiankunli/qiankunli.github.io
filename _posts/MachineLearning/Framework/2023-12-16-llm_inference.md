@@ -104,6 +104,8 @@ First Token Latency 和 Latency 这两个指标会因为用户输入的长度不
 
 在 prefill 阶段，至少要做四件事情：第一件事情是把用户的输入进行向量化，tokenize 的过程指的是将用户输入的文本转换为向量，相对于 prefill 整个阶段来说，大概要占掉 10% 的时间，这是有代价的。之后就会进行真正的 prefill 计算，这一过程会占掉大概 80% 的时间。计算之后会进行 sampling，这个过程在 Pytorch 里面一般会用sample、top p。在大语言模型推理当中会用 argmax。总而言之，是根据模型的结果，生成最后词的一个过程。这个过程会占掉 10% 的时间。最后将 refill 的结果返回给客户，这需要的时间会比较短，大概占 2% 到 5% 的时间。
 
+![](/public/upload/machine/llm_inference_cost.jpg)
+
 **Decoding 阶段不需要 tokenize**，每一次做 decoding 都会直接从计算开始，整个decoding 过程会占掉 80% 的时间，而后面的 sampling，也就是采样生成词的过程，也要占掉 10% 的时间。但它会有一个 detokenize 的时间，detokenize 是指生成了一个词之后，这个生成的词是个向量，需要把它解码回文本，这一操作大概会占掉 5% 的时间，最后将这个生成的词返回给用户。
 
 新的请求进来，在进行完 prefill 之后，会不断迭代进行 decoding，每一个 decoding 阶段结束之后，都会将结果当场返回给客户。这样的生成过程在大语言模型里面是很常见的，我们称这样的方式为流式传输。
@@ -142,7 +144,7 @@ LLM推理需要的芯片形态，最重要的是内存带宽和互联带宽，�
 
 不同场景的访存量
 
-1. prefill（用户输入）和decode（模型输出）的token量在不同场景下也是不一样的。LLM的prefill和decode分别用来处理用户输入的token和产生模型输出的token。prefill阶段是一次性输入全部token进行一次模型推理即可，期间生成用户输入对应的KV补充到整个KV-cache中供decode阶段使用，同时也生成输出的第一个token供decode启动自回归。这是个计算密集的阶段，且计算量随着用户输入token长度增加成正比增加。而decode阶段因为每个token都需要对模型进行一次inference，并对权重和KV进行一次访问，总的访存量和用户输入token数成正比，计算量也是一样成正比。所以相同token长度下，prefill和decode计算量一致，decode阶段访存量远远大于prefill阶段的，正比于token长度。一次用户请求实际上是既包含prefill，也包含decode。一个是计算密集型，一个是访存密集型，对硬件的要求更夸张了。如果是简单对话场景，通常模型的decode输出会更多一些，而如果是超长上下文场景，用户先上传一本几十万字的书再进行问答，这本书的prefill会直接起飞。在Agent场景下，大量预设的prompt也会占据非常多的prefill，不过prompt的prefill有不少机会可以提前算好KV而无需每个用户请求单独重复计算。
+1. prefill（用户输入）和decode（模型输出）的token量在不同场景下也是不一样的。LLM的prefill和decode分别用来处理用户输入的token和产生模型输出的token。prefill阶段是一次性输入全部token进行一次模型推理即可，期间生成用户输入对应的KV补充到整个KV-cache中供decode阶段使用，同时也生成输出的第一个token供decode启动自回归。**这是个计算密集的阶段**，且计算量随着用户输入token长度增加成正比增加。而decode阶段因为每个token都需要对模型进行一次inference，并对权重和KV进行一次访问，总的访存量和用户输入token数成正比，计算量也是一样成正比。所以相同token长度下，prefill和decode计算量一致，**decode阶段访存量远远大于prefill阶段的**，正比于token长度。一次用户请求实际上是既包含prefill，也包含decode。一个是计算密集型，一个是访存密集型，对硬件的要求更夸张了。如果是简单对话场景，通常模型的decode输出会更多一些，而如果是超长上下文场景，用户先上传一本几十万字的书再进行问答，这本书的prefill会直接起飞。在Agent场景下，大量预设的prompt也会占据非常多的prefill，不过prompt的prefill有不少机会可以提前算好KV而无需每个用户请求单独重复计算。
 2. 同一个batch的prefill和decode长度也不一样。考虑到我们搭建这样一个庞大的大模型推理系统需要服务大量用户，每个用户的prefill和decode长度很难保持一致。考虑到prefill和decode截然相反的计算访存特性，再考虑到芯片系统里面的内存资源异常宝贵，其实此时对Infra层面的调度设计已经开始爆炸了，而芯片设计同样需要考虑给Infra层面提供什么样的设计空间。用户请求之间相互等待prefill和decode阶段的同步完成会产生很强的QoS问题，但如果同时进行prefill和decode硬件算力资源、内存资源、带宽资源的分配以及每一阶段的性能优化策略产生很强的扰动和不确定性，甚至产生内存不足等一系列问题。此外，面对不等长输入输出的更加复杂和精细的资源调度，也进一步产生大量更精细的算子编写和优化的工作量，对于芯片的可编程性进一步提出了变态要求。
 
 海量用户的KV-cache需要频繁从高速内存中切入切出。当整个推理系统服务几千万用户时，一个batch的几十个用户请求支持开胃菜。每个用户会不间断地和大模型进行交互，发出大量请求，但这些请求的间隔时间短则几秒，长则几分钟几小时。因此我们上一章讲的占用内存空间巨大的KV-cache实际上只考虑了当前系统正在处理的用户请求总量，还有大量用户正在阅读大模型返还的文字，正在打字输入更多的请求。考虑人机交互的频率，一个用户请求结束后，对应的KV-cache继续常驻在高速内存中实际意义不大，需要赶紧把宝贵的高速内存资源释放出来。而其他已经发送到系统的新用户请求也需要把对应的KV-cache赶紧加载到高速内存中来开启对该用户请求的处理。每个用户聊天的KV-cache都是100MB~100GB量级的IO量（取决于模型和上下文长度，跨度比较大）。这个IO带宽要求也不小，因为要匹配系统内部的吞吐率，每个请求要进行一次完整的KV导入和导出，而系统内部的内存带宽需要读取的次数正比于token数，所以两者带宽差距取决于请求输出的文本长度，通常在100~1000左右，注意这里的带宽是芯片系统的总内存带宽，例如groq的是80TB/s * 500+ = 40PB/s，那么这个IO的总带宽需要飙升到40TB/s~400TB/s才能满足sram的吞吐要求。当然也可以考虑重计算，但这个重计算的代价一定是超过prefill的，因为聊天历史记录一定比当前这一次的输入长度要长的多，尤其对于超长上下文，用户上传一个文件后进行多轮对话，对文件的prefill进行一次即可，后续的交互中仅仅对用户提问进行prefill而无需对文件重复prefill，但需要将前面prefill的结果从外部IO倒腾进来，并在回答后将增量部分及时倒腾出去。虽然倒腾到高速内存系统外部了，但面对几千万用户时，每个用户的每个聊天对应的KV-cache量也是天文数字一样的存储，实际上也不需要都存，但确实需要综合考虑效率的问题。一个用户在看到大模型回复之后，可能在几秒钟内回复，也可能几分钟后回复，也有可能就离开电脑永远不回复了。此时已经是一个大规模集群层面的调度和存储资源、计算资源、带宽资源的综合管理了。多模态进一步加剧复杂程度。不同模态的流量潮汐、计算特点以及计算、内存、带宽资源占用情况，都会进一步加剧整个系统对于弹性的需求。
@@ -215,7 +217,7 @@ KV Cache的优化方法
 3. 量化和稀疏
 4. PageAttention
 
-[如何解决LLM大语言模型的并发问题？](https://www.zhihu.com/question/613263140/answer/3271554389)vLLM：Efficient memory management for LLM inference 受到操作系统中的分页和虚拟内存的启发，将KV Block当做页，将Request当做进程，允许在非连续的内存空间中存储连续的KV。PagedAttention机制：传统要求将keys和values存到连续的内存空间，因为我们知道传统大家都是用TensorFlow、pytorch之类的，它是一个个tensor，所以很自然的就假设给它们一段连续的内存空间，但是对于LLM来说，这个假设就不是一个好的假设，因此PagedAttention允许在非连续内存空间中存储连续的keys和values，vLLM维护一个Block table，存放逻辑空间到物理空间的映射。现在有一个Prompt：Alan Turing is a computer scientist，当产生一个新的token时，会查看Block table中的Physical block no.,然后找到对应物理内存的地方存储进去，并更新Block table中的Filled slots内容。当产生“renowned”的时候，是新开了一个Block，所以也要更新Block table，新开一个物理内存（每个kv block中有固定的token数目）。
+[如何解决LLM大语言模型的并发问题？](https://www.zhihu.com/question/613263140/answer/3271554389)vLLM：Efficient memory management for LLM inference 受到操作系统中的分页和虚拟内存的启发，**通过额外的元数据即page table管理KV cache**。将KV Block当做页，将Request当做进程，允许在非连续的内存空间中存储连续的KV。PagedAttention机制：传统要求将keys和values存到连续的内存空间，因为我们知道传统大家都是用TensorFlow、pytorch之类的，它是一个个tensor，所以很自然的就假设给它们一段连续的内存空间，但是对于LLM来说，这个假设就不是一个好的假设，因此PagedAttention允许在非连续内存空间中存储连续的keys和values，vLLM维护一个Block table，存放逻辑空间到物理空间的映射。现在有一个Prompt：Alan Turing is a computer scientist，当产生一个新的token时，会查看Block table中的Physical block no.,然后找到对应物理内存的地方存储进去，并更新Block table中的Filled slots内容。当产生“renowned”的时候，是新开了一个Block，所以也要更新Block table，新开一个物理内存（每个kv block中有固定的token数目）。
 
 ![](/public/upload/machine/paged_attention.gif)
 
