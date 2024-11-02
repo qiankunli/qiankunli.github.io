@@ -345,6 +345,31 @@ $$
 
 既然不能用矩阵乘法，那用加法，直接把所有的 $x_i$ 加一遍也不是个事儿。从另一个角度，两个向量内积表示表示两个向量的相似度，把$x_1$ 跟其它所有$x_i$ 乘一下，让$y_1=x_1*x_1*x_1 + x_1*x_2*x_2 + x_1*x_{inputlen}*x_{inputlen}$。看样子也挺不错，但这么算，就没啥可学习的W了，这不是$y_i$ 每个加法单元是3个向量相乘嘛，那干脆把$x_i$ 跟一个矩阵wi 变换一下再计算吧，于是有了$W_k$/$W_q$/$W_v$和QKV。 $y_1=Q_1*K_1*V_1 + Q_1*K_2*V_2 + Q_1*K_{inputlen}*V_{inputlen}$。
 
+
+[面试时被问到“Scaling Law”，怎么答？](https://mp.weixin.qq.com/s/Q0fThU-4YP5OwFmfJM_q-Q)对于 Decoder-only 的模型，计算量C(Flops)，模型参数量 N(除去 Embedding 部分)，数据大小 D(token 数)，三者的关系为: C≈6ND。推导如下，记模型的结构为：decoder 层数l，attention隐层维度d，attention feedforward层维度 $d_{ff}$，一般来说 $d_{ff} = 4 * d$。
+模型的参数量N（忽略emebedding、norm和bias） 计算如下，transformer 每层包含 self-attention 和mlp 两个部分
+1. self-attention 的参数为$W_q$、$W_k$、$W_v$、$W_o$，每个矩阵的维度为$R^{d*d}$，整体参数量：$4 * d^2$
+2. mlp 的参数为 $W_1$（维度为$R^{d*d_{ff}}$）和$W_2$（维度为$R^{d_{ff}*d}$），整体参数量：$2 * d * d_ff = 2 * d * 4d = 8d^2$
+3. 所以每层参数是$4d^2 + 8d^2 = 12d^2$，全部l 层的参数量为 $12*ld^2$，即$N=12*ld^2$
+
+计算量的单位是FLOPS，float point operations 对于矩阵A (m*n)和B（n*p） AB 相乘的计算量为2mnp，一次加法一次乘法。假设decoder 层的输入X（b*s*d），b为batch size，s为序列长度，d为模型维度。
+
+1. 前向推理的计算量：
+    1. self-attention 部分的计算：
+        1. 输入线性层，$XW_q$、$XW_k$、$XW_v$，计算量为 $3 * b * s * d * d * 2 = 6bsd^2$
+        2. attention 计算 $QK^T$，计算量为 $2 * b * s* s * d = 2bs^2d$
+        3. score 与V 的计算，$S_{attention}V$，计算量为 $b*2 * s * s * d = 2bs^2d$
+        4. 输出线性层 $X^{\prime} W_O$，计算量为 $b * 2 * s * d * d = 2bsd^2$
+    2. MLP 部分的计算：
+        1. 升维 $XW_1$，计算量为 $b * 2 * s * d * 4d = 8bsd^2$
+        2. 降维 $XW_2$，计算量为 $b * 2 * s * 4d * d = 8bsd^2$
+    3. 所以整个decoder层的计算量为 $24bsd^2 + 4bs^2d$，全部l层为 $C_{forward}=24bsd^2 + 4bs^2d$。
+2. 反向传播计算量是正向的2倍，所以全部计算量为 $C=3*C_{forward} = 72bsd^2 + 12bs^2d$。
+3. 平均每个token的计算量为 $C_{token}=\frac{C}{b s} = 72ld^2 + 12lsd = 6N (1+\frac{s}{6 d}) \approx 6N(s \le 6d)$
+4. 所以对于包含全部D个token的数据集 $C = C_{token}D \approx 6ND$
+
+PS：mlp参数量和计算量都不输attention。 $C_{token} \approx 6N$ 可以认为是正反向3倍*加法乘法2倍=6倍。
+
 ### 代码
 
 

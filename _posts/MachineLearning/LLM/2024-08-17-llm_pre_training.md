@@ -8,6 +8,8 @@ keywords: llm pretrain
 
 ---
 
+<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
+
 * TOC
 {:toc}
 
@@ -35,11 +37,36 @@ keywords: llm pretrain
 3. 老板准备 1 个月后开发布会，给的资源是 100 张 A100，应该用多少数据训多大的模型效果最好？
 4. 老板对现在 10B 的模型不满意，想知道扩大到 100B 模型的效果能提升到多少？
 大模型的 Scaling Law 是 OpenAI 在 2020 年提出的概念，具体如下：
-1. 对于 Decoder-only 的模型，计算量 C(Flops), 模型参数量 N，数据大小 D(token 数)，三者满足：C≈6ND。
+1. 对于 Decoder-only 的模型，计算量 C(Flops), 模型参数量 N，数据大小 D(token 数)，三者满足：$C \approx 6ND$
 2. 模型的最终性能主要与计算量 C，模型参数量 N 和数据大小 D 三者相关，而与模型的具体结构(层数/深度/宽度)基本无关。固定模型的总参数量，调整层数/深度/宽度，不同模型的性能差距很小，大部分在 2% 以内。
 3. 对于计算量 𝐶，模型参数量 𝑁 和数据大小 𝐷，当不受其他两个因素制约时，模型性能与每个因素都呈现幂律关系。根据幂律定律，模型的参数固定，无限堆数据并不能无限提升模型的性能，模型最终性能会慢慢趋向一个固定的值。
 4. 为了提升模型性能，模型参数量 N 和数据大小 D 需要同步放大，但模型和数据分别放大的比例还存在争议。
 5. Scaling Law 不仅适用于语言模型，还适用于其他模态以及跨模态的任务：
+
+对于 Decoder-only 的模型，计算量C(Flops)，模型参数量 N(除去 Embedding 部分)，数据大小 D(token 数)，三者的关系为: C≈6ND。推导如下，记模型的结构为：decoder 层数l，attention隐层维度d，attention feedforward层维度 $d_{ff}$，一般来说 $d_{ff} = 4 * d$。
+模型的参数量N（忽略emebedding、norm和bias） 计算如下，transformer 每层包含 self-attention 和mlp 两个部分
+1. self-attention 的参数为$W_q$、$W_k$、$W_v$、$W_o$，每个矩阵的维度为$R^{d*d}$，整体参数量：$4 * d^2$
+2. mlp 的参数为 $W_1$（维度为$R^{d*d_{ff}}$）和$W_2$（维度为$R^{d_{ff}*d}$），整体参数量：$2 * d * d_ff = 2 * d * 4d = 8d^2$
+3. 所以每层参数是$4d^2 + 8d^2 = 12d^2$，全部l 层的参数量为 $12*ld^2$，即$N=12*ld^2$
+
+计算量的单位是FLOPS，float point operations 对于矩阵A (m*n)和B（n*p） AB 相乘的计算量为2mnp，一次加法一次乘法。假设decoder 层的输入X（b*s*d），b为batch size，s为序列长度，d为模型维度。
+
+1. 前向推理的计算量：
+    1. self-attention 部分的计算：
+        1. 输入线性层，$XW_q$、$XW_k$、$XW_v$，计算量为 $3 * b * s * d * d * 2 = 6bsd^2$
+        2. attention 计算 $QK^T$，计算量为 $2 * b * s* s * d = 2bs^2d$
+        3. score 与V 的计算，$S_{attention}V$，计算量为 $b*2 * s * s * d = 2bs^2d$
+        4. 输出线性层 $X^{\prime} W_O$，计算量为 $b * 2 * s * d * d = 2bsd^2$
+    2. MLP 部分的计算：
+        1. 升维 $XW_1$，计算量为 $b * 2 * s * d * 4d = 8bsd^2$
+        2. 降维 $XW_2$，计算量为 $b * 2 * s * 4d * d = 8bsd^2$
+    3. 所以整个decoder层的计算量为 $24bsd^2 + 4bs^2d$，全部l层为 $C_{forward}=24bsd^2 + 4bs^2d$。
+2. 反向传播计算量是正向的2倍，所以全部计算量为 $C=3*C_{forward} = 72bsd^2 + 12bs^2d$。
+3. 平均每个token的计算量为 $C_{token}=\frac{C}{b s} = 72ld^2 + 12lsd = 6N (1+\frac{s}{6 d}) \approx 6N(s \le 6d)$
+4. 所以对于包含全部D个token的数据集 $C = C_{token}D \approx 6ND$
+
+PS：mlp参数量和计算量都不输attention。 $C_{token} \approx 6N$ 可以认为是正反向3倍*加法乘法2倍=6倍。再拿到GPU的算力 * GPU 个数，就可以根据
+$C \approx 6ND$ 计算训练的耗时了。
 
 ## 数据准备
 
