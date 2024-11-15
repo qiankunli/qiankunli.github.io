@@ -180,7 +180,7 @@ LLM推理需要的芯片形态，最重要的是内存带宽和互联带宽，�
 
 ![](/public/upload/machine/attention_kvcache.png)
 
-在推理的时候transformer本质上只需要计算出$O_i$ ，即一个字一个字地蹦。PS：也回答了为何不缓存Q
+在推理的时候transformer本质上只需要计算出$O_i$ ，即一个字一个字地蹦。PS：也回答了为何不缓存Q？每一轮的q都是新的。
 1. Attention的第i个输出只和第 i 个query有关，和其他query无关，所以query完全没有必要缓存，每次预测 $O_i$时只要计算最新的$O_i$，其他的丢弃即可。
 2. Attention的输出$O_i$的计算和完整的K和V有关，而K、V的历史值只和历史的O有关，和当前的O无关。那么就可以通过缓存历史的K、V，而避免重复计算历史K、V
 ![](/public/upload/machine/kvcache_no_query.png)
@@ -236,6 +236,13 @@ System Prompt Caching，也称为 Prefix Sharing，其基本思想是对System P
 
 ### Flash Attention
 
+
+[Flash Attention 的数学原理](https://mp.weixin.qq.com/s/Nv9iS96J7pVZRvH7U8fWsA)**Flash Attention 并没有减少 Attention 的计算量**，也不影响精度，但是却比标准的Attention运算快 2~4 倍的运行速度，减少了 5~20 倍的内存使用量。究竟是怎么实现的呢？简单来说，Flash Attention 让 Attention 的所有计算都符合结合律，这样就可以充分利用 GPU 的并行优势。从Attention 计算公式可以看出，Attention 的并行计算主要解决两个问题：
+1. 矩阵的并行计算。$X=QK^T$
+2. Softmax 的并行计算。$A=softmax(\frac{X}{\sqrt{d}})$。
+矩阵的并行算法已经比较成熟，GPU 上也有 TensorCore 来加速计算。 Softmax 操作让并行计算有些棘手。Softmax 的并行无法将计算放到一个 Kernel 中。后面的建议细读文章。
+传统方法计算时，需要引入两个中间矩阵X和A并存在全局内存中。需要先从全局内存中读取矩阵 QK，并将计算好的X写入全局内存。然后从全局内存中读取X，计算Softmax得到矩阵A，再将其写入全局内存，最后读取矩阵A和矩阵V，计算$O=AV$ 计算得到矩阵O，这个过程会极大的占用显存的带宽。Flash Attention 的目标是尽可能使用 SRAM来加快计算速度，避免从全局内存中读取或写入注意力矩阵（H100 全局内存80G，访问速度3.35TB/s，但当全部线程同时访问全局内存时，其平均带宽仍然很低）。达成该目标需要做到在不访问整个输入的情况下计算softmax函数，并且后向传播中不能存储中间注意力矩阵（存部分信息，反向传播时重新计算）。PS：通过数学变换，换个算法，减少内存占用，pytorch2.0 已支持Flash Attention。PS：FA的本质是融合算子的一种新的实现方式。
+
 [图解大模型计算加速系列：Flash Attention V1，从硬件到计算逻辑](https://mp.weixin.qq.com/s/J2i2MDv4us_GMwCyku0tnw)在矩阵分块的时候设计好一个能够充分利用高速访存HBM的分块方法，让一次搬运进HBM中的参数可以全部和该做乘加操作的算子都计算完再丢弃，达到数量单次访存利用率最大化。
 1. Fast（with IO-Awareness），计算快。它发现：计算慢的卡点不在运算能力，而是在读写速度上。所以它通过**降低对显存（HBM）的访问次数**来加快整体运算速度（通过分块计算（tiling）和核函数融合（kernel fusion）来降低对显存的访问），这种方法又被称为IO-Awareness。
 2. Memory Efficicent，节省显存。在标准attention场景中，forward时我们会计算并保存N*N大小的注意力矩阵；在backward时我们又会读取它做梯度计算，这就给硬件造成了的存储压力。在Flash Attention中，则巧妙避开了这点，使得存储压力降至。在后文中我们会详细看这个trick。
@@ -245,11 +252,7 @@ System Prompt Caching，也称为 Prefix Sharing，其基本思想是对System P
 
 [图解大模型计算加速系列：Flash Attention V2，从原理到并行计算](https://mp.weixin.qq.com/s/gMRZV-ZCrFccKPKSkOpxsQ) 未读。
 
-[Flash Attention 的数学原理](https://mp.weixin.qq.com/s/Nv9iS96J7pVZRvH7U8fWsA)Flash Attention 并没有减少 Attention 的计算量，也不影响精度，但是却比标准的Attention运算快 2~4 倍的运行速度，减少了 5~20 倍的内存使用量。究竟是怎么实现的呢？简单来说，Flash Attention 让 Attention 的所有计算都符合结合律，这样就可以充分利用 GPU 的并行优势。从Attention 计算公式可以看出，Attention 的并行计算主要解决两个问题：
-1. 矩阵的并行计算。$X=QK^T$
-2. Softmax 的并行计算。$A=softmax(\frac{X}{\sqrt{d}})$。
-矩阵的并行算法已经比较成熟，GPU 上也有 TensorCore 来加速计算。 Softmax 操作让并行计算有些棘手。Softmax 的并行无法将计算放到一个 Kernel 中。后面的建议细读文章。
-传统方法计算时，需要引入两个中间矩阵X和A并存在全局内存中。需要先从全局内存中读取矩阵 QK，并将计算好的X写入全局内存。然后从全局内存中读取X，计算Softmax得到矩阵A，再将其写入全局内存，最后读取矩阵A和矩阵V，计算$O=AV$ 计算得到矩阵O，这个过程会极大的占用显存的带宽。Flash Attention 的目标是尽可能使用 SRAM来加快计算速度，避免从全局内存中读取或写入注意力矩阵（H100 全局内存80G，访问速度3.35TB/s，但当全部线程同时访问全局内存时，其平均带宽仍然很低）。达成该目标需要做到在不访问整个输入的情况下计算softmax函数，并且后向传播中不能存储中间注意力矩阵（存部分信息，反向传播时重新计算）。PS：通过数学变换，换个算法，减少内存占用，pytorch2.0 已支持Flash Attention。PS：FA的本质是融合算子的一种新的实现方式。
+[FlashAttention算法之美：极简推导版](https://mp.weixin.qq.com/s/hu5D1dmCFkeStxbXBE-czA) 未读。
 
 ### 调度优化/动态批处理
 
@@ -362,6 +365,7 @@ FasterTransformer 是真对于 Transofrmer 类型模型（也包括 encoder-only
     2. 量化对于文本生成特别有效，因为我们关心的是选择 最可能的下一个词元的分布 ，而不真正关心下一个词元的确切 logit 值。所以，只要下一个词元 logit 大小顺序保持相同， argmax 或 topk 操作的结果就会相同。
     3. 常用量化方法：GPTQ、AWQ和GGUF
 3. 模型稀疏化。模型稀疏化是一种重要的优化方法。它的主要目的是减少模型参数的数量，从而降低模型的复杂度，提高模型的泛化能力和计算效率。模型稀疏化的主要方法有剪枝、量化、低秩近似等。剪枝是一种直接删除模型中部分参数的方法，它可以有效地减少模型的规模，但需要注意不能过度剪枝，以免影响模型的性能。低秩近似则是通过将模型转换为低秩矩阵，来减少模型的参数数量。
+4. 推理引擎都是做成多卡TP而不是PP，主要是因为从服务器视角看PP的吞吐上限更高，但是从单个请求视角看TP的延迟会更低，在线服务往往不需要那么高的吞吐，延迟更加重要。后来vLLM还增加了流水线并行（Pipeline Parallelism）的支持，从vLLM版本 0.5.1 开始支持跨多节点的流水线并行，对于那些跨多个节点的超大模型和低带宽连接，流水线并行是一种更优的选择。
 
 ## 硬件
 

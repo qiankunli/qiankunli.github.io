@@ -195,11 +195,12 @@ PS: head的概念类似卷积中的通道，只不过每个通道的输入都是
 
 Attention模块的作用就是确定上下文中哪些词之间有语义关系，以及如何准确地理解这些含义（更新相应的向量）。这里说的“含义”meaning指的是编码在向量中的信息。Attention模块让输入向量们彼此充分交换了信息（例如machine learning model和fashion model，单词“model”指的应该是“模特”还是“模型”）， 然后，这些向量会进入第三个处理阶段：Feed-forward / MLPs。针对所有向量做一次性变换。这个阶段，向量不再互相"交流"，而是并行地经历同一处理。**Transformer基本不断重复Attention和Feed-forward这两个基本结构，这两个模块的组合成为神经网络的一层**。输入向量通过attention更新彼此；feed-forward 模块将这些更新之后的向量做统一变换，得到这一层的输出向量；在Attention模块和多层感知机（MLP）模块之间不断切换。
 
+FFN 设计的初衷，其实就是为模型引入非线性变换。
 1. FFN的作用就是空间变换。FFN包含了2层linear transformation层，中间的激活函数是ReLu。
-2. attention层的output最后会和相乘，为什么这里又要增加一个2层的FFN网络？**Attention内部就是对特征向量V加权平均的过程。只用self-Attention搭建的网络结构就只有线性表达能力**。FFN的加入引入了非线性(ReLu激活函数)，**变换了attention output的空间**, 从而增加了模型的表现能力。把FFN去掉模型也是可以用的，但是效果差了很多。
-$$
-FFN(x) = max(0,xW_1+b1)W_2+b_2
-$$
+2. attention层的output最后会和相乘，为什么这里又要增加一个2层的FFN网络？仔细看一下 Attention 的计算公式，其中确实有一个针对 q 和 k 的 softmax 的非线性运算。但是对于 value 来说，并没有任何的非线性变换。所以每一次 Attention 的计算相当于是对 value 代表的向量进行了加权平均，虽然权重是非线性的权重。**Attention内部就是对特征向量V加权平均的过程。只用self-Attention搭建的网络结构就只有线性表达能力**。FFN的加入引入了非线性(ReLu激活函数)，**变换了attention output的空间**, 从而增加了模型的表现能力。把FFN去掉模型也是可以用的，但是效果差了很多。
+  $$
+  FFN(x) = max(0,xW_1+b1)W_2+b_2
+  $$
 2. 前馈神经网络的输入是self-attention的输出，是一个矩阵（即上图Z），矩阵的维度是（序列长度×D词向量），**之后前馈神经网络的输出也是同样的维度**。self-attention + 前馈神经网络 就是一个小编码器的内部构造了，一个大的编码部分就是将这个过程重复了6次，最终得到整个编码部分的输出。为了解决梯度消失的问题，在Encoders和Decoder中都是用了残差神经网络的结构，即每一个前馈神经网络的输入不光包含上述self-attention的输出Z，还包含最原始的输入。
 
 ```python
@@ -223,14 +224,15 @@ class MLP(nn.Module):
 
 其它
 
-1. 大语言模型中的参数都用在哪了？可以看到在百亿参数量以上，差不多三分之二的参数实际上是 FFN 参数，剩下的基本都是 attention 参数。所以虽然论文名叫 attention is all you need，但实际上 FFN 仍然起到了很重要的作用。
+1. 大语言模型中的参数都用在哪了？可以看到在百亿参数量以上，**差不多三分之二的参数实际上是 FFN 参数**，剩下的基本都是 attention 参数。所以虽然论文名叫 attention is all you need，但实际上 FFN 仍然起到了很重要的作用。
 2. transformer 中最重要的是self-attention，self-attention 由三个线性矩阵Q、K、V 决定，如果我们把Q、K矩阵设置为零，那么self-attention 就变成了FFN，$Z_0 =V_0*X$，也就是说，FFN是self-attention 的一个特例，FFN能表达的逻辑，self-attention 也可以，但反过来却不成立。至于transformer 中的FFN部分，当初设计是为了输入输出维度的对齐，毕竟多注意力的输出 $W_0$的维度比输入X维度高很多。但如果一定要用FFN去表达self-attention的逻辑，也是可以的，但需要的参数量却要大很多，感兴趣的可以去试验一下，用FFN去拟合self-attention 的逻辑。就好像乘法能计算的东西，单纯用加法依然可以做到，但效率要低很多，self-attention就是乘法，FFN就是加法。
 
 [大模型结构基础（四）：前馈网络层的升级](https://zhuanlan.zhihu.com/p/702190813) 未读。FFN组件的一个显著进步是混合专家（MoE）架构，它采用稀疏激活的FFN。在MoE中，每个输入只有一部分FFN层（或专家）被激活，显著减少了计算负载，同时保持了高模型容量。
 
 ###  Layer Normalization/对应Norm
+
 [Batch Normalization原理与实战](https://mp.weixin.qq.com/s/7B-gSLQm0PAKMefKHMb8nw) 是一种常规的模型“构件”，非transformer独有。 
-归一化核心是为了让不同层输入的取值范围或者分布能够比较一致。由于深度神经网络中每一层的输入都是上一层的输出，因此多层传递下，对网络中较高的层，之前的所有神经层的参数变化会导致其输入的分布发生较大的改变。也就是说，随着神经网络参数的更新，各层的输出分布是不相同的，且差异会随着网络深度的增大而增大。但是，需要预测的条件分布始终是相同的，从而也就造成了预测的误差。因此，在深度神经网络中，往往需要归一化操作，将每一层的输入都归一化成标准正态分布。
+归一化核心是为了让不同层输入的取值范围或者分布能够比较一致。由于深度神经网络中每一层的输入都是上一层的输出，**因此多层传递下，对网络中较高的层，之前的所有神经层的参数变化会导致其输入的分布发生较大的改变**。也就是说，随着神经网络参数的更新，各层的输出分布是不相同的，且差异会随着网络深度的增大而增大。**但是，需要预测的条件分布始终是相同的**，从而也就造成了预测的误差。因此，在深度神经网络中，往往需要归一化操作，将每一层的输入都归一化成标准正态分布。
 
 Normalization有两种方法，Batch Normalization和Layer Normalization。关于两者区别不再详述。
 
@@ -368,7 +370,7 @@ $$
 3. 平均每个token的计算量为 $C_{token}=\frac{C}{b s} = 72ld^2 + 12lsd = 6N (1+\frac{s}{6 d}) \approx 6N(s \le 6d)$
 4. 所以对于包含全部D个token的数据集 $C = C_{token}D \approx 6ND$
 
-PS：mlp参数量和计算量都不输attention。 $C_{token} \approx 6N$ 可以认为是正反向3倍*加法乘法2倍=6倍。
+PS：mlp参数量和计算量都不输attention。 $C_{token} \approx 6N$ 可以认为是正反向3倍*加法乘法2倍=6倍。 一般推演的时候，可以先只考虑一个句子的 输入10个token 输出10个token的变换，实际计算时，还要再考虑batch 维度。
 
 ### 代码
 

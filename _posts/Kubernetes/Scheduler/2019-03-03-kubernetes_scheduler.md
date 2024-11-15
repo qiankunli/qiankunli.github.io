@@ -347,3 +347,11 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 	return nil
 }
 ```
+
+## 其它
+[6 张图带你深入了解 kube-scheduler](https://mp.weixin.qq.com/s/2elOZD0yaBf-WvMCSD5zHQ)Scheduler 的作用是 负责将 Pod 调度到 Node 上。如果让你设计这个组件，你会如何设计，保证它稳定高效的运行。
+1. 需要能够实时监听到 有新的 Pod 待调度
+2. 同一时间如果有大量待调度的 Pod，如果处理，如何保证不能漏掉，应该先处理哪个 Pod，调度过程中，如果失败，如何处理。所以得加个队列，有重试机制等
+3. 调度过程中依赖 Node、Pod 的实时信息，根据 Node、Pod 信息，决策 Pod 调度到哪个Node上合适，每次调度 调 Apiserver ，显然低效， 得在本地缓存一份数据，加个缓存
+4. 调度选择过程中，考虑因素太多，很难周全，可扩展性一定要设计好
+5. Pod 绑定过程中 可能依赖 pvc 绑定等，耗时较长， 所以绑定得是异步的， 但是匹配哪个Node合适的算法 需要同步执行，所以要有两个周期， 调度周期和绑定周期，调度周期串行，绑定周期并行

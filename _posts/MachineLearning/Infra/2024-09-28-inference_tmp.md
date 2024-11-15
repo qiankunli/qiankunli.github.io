@@ -23,6 +23,8 @@ Mooncake 采用了以 KVCache 为中心的分离式推理架构，主要由三�
 2. Decoding 池：这个部分集中处理所有解码阶段的任务。
 3. KVCache 池：这个部分负责存储所有中间过程中应用到的 KVCache，并决定何时使用这些缓存，何时释放它们。
 
+prefill-decode 分离架构核心是解决Continous Batching在decode中会被插入prefill从而导致decode卡顿以及decode阶段MFU低下这两个问题。
+
 Context Caching 
 
 ![](/public/upload/machine/context_caching.jpg)
