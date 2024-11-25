@@ -520,6 +520,8 @@ def generate(self,
 
 [Qwen整体介绍](https://github.com/datawhalechina/tiny-universe/tree/main/content/Qwen-blog) 以代码组织的视角来看下 transformer的设计图。我们看到很多模型的模块图，层次结构跟代码也是一致的。 
 
+[Qwen2源码阅读——核心代码跟读](https://mp.weixin.qq.com/s/PVSPNfv0I8_cxgPTmOes5w) 建议细读。
+
 ![](/public/upload/machine/qwen_code_view.jpg)
 
 ```python

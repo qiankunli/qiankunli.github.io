@@ -49,6 +49,8 @@ Go 语言的编译器完全用 Go 语言本身来实现，它完全实现了从�
 
 另外推荐一个不错的库，这是 Golang 布道师 Dave Cheney 搞的用来做性能调优的库，使用起来非常方便：https://github.com/pkg/profile，可以看 pprof和 trace 信息。有兴趣读者可以了解一下。
 
+[为Go应用无侵入地添加任意代码](https://mp.weixin.qq.com/s/Eb8Rx6lN9HhyCmg6x9Wo9g)
+
 ## Go 程序启动引导
 
 [深入剖析 Golang 程序启动原理 - 从 ELF 入口点到GMP初始化到执行 main！](https://mp.weixin.qq.com/s/0EZCmABsMEV3TFVmDZmzZA)一般编程语言的入口点都不会是我们在代码中写的那个 main。c 语言中如此，golang 中更是这样。这是因为各个语言都需要在进程启动过程中做一些启动逻辑的。在 golang 中，其底层运行的 GMP、垃圾回收等机制都需要在进入用户的 main 函数之前启动起来。
