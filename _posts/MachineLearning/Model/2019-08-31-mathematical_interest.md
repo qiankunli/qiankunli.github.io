@@ -335,7 +335,7 @@ parameters: $W^{[1]},b^{[1]},W^{[2]},b^{[2]},...$
 
 超参数hyperparameters: 每一个参数都能够控制w 和 b
 
-1. learning rate。随着batch_size变大Learning_rate也需要变大，按照大模型经验公式为根号下同比，例如batch从8变为16扩大2倍，则LR扩大根号二倍。
+1. learning rate。随着batch_size变大Learning_rate也需要变大，按照大模型经验公式为根号下同比，例如batch从8变为16扩大2倍，则LR扩大根号二倍。[当Batch Size增大时，学习率该如何随之变化？](https://mp.weixin.qq.com/s/fSsOzZwQAuyQFhr7PY5kcg)
 2. 梯度下降算法循环的数量  epoch
 3. 隐层数
 4. 每个隐层的单元数

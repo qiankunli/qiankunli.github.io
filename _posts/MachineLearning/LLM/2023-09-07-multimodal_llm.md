@@ -65,6 +65,8 @@ keywords: llm multimodal
 
 [VLMs多模态大模型当下进展与思考](https://mp.weixin.qq.com/s/BkV3v3_NdXZ0jKt1DTj5Xw)
 
+[多模态大模型MLLM的架构发展及思考](https://mp.weixin.qq.com/s/zVii5TZlf0iM16THHmINrg) mllm的综述。
+
 ## 图片理解
 
 1. 如何将图片数据转为模型输入

@@ -355,7 +355,7 @@ case PlayScriptParser.ADD:
 
 ### 闭包的实现
 
-a closure is a record storing a function together with an environment.闭包是由函数和与其相关的引用环境组合而成的实体。闭包就是把函数在静态作用域中所访问的变量的生存期拉长，形成一份可以由这个函数单独访问的数据。正因为这些数据只能被闭包函数访问，所以也就具备了对信息进行封装、隐藏内部细节的特性。
+a closure is a record storing a function together with an environment.闭包是由函数和与其相关的引用环境组合而成的实体。闭包就是把函数在静态作用域中所访问的变量的生存期拉长，形成一份可以由这个函数单独访问的数据。正因为这些数据只能被闭包函数访问，所以也就具备了对信息进行封装、隐藏内部细节的特性。闭包=外部作用域+内层函数。
 
 ```c
 function int() fun1(){        //函数的返回值是一个函数    
@@ -369,6 +369,8 @@ function int() fun1(){        //函数的返回值是一个函数
 }
 function int() fun2 = fun1(); 
 ```
+尽管函数 inner 里面没有 b  这个局部变量，但是不妨碍我们使用它，因为外层函数 fun1 里面有。
+
 原理是：给 fun2 赋值时，先执行 fun1() 函数，创建一个 FunctionObject 对象(包含变量b)，作为 fun1() 的返回值，给到调用者。
 
 《小议Java语言》讲Java Lambda实现：**仅仅的一个匿名函数（ Anonymous Function）， 或者函数指针，是不足以正确地实现 Lambda 的**（以上文为例就是 b 在inner 中没有定义，不能直接编译运行）；而正确实现 Lambda，或者说允许把 Lambda 表示的函数作为一个像其他类型的值一样作为参数来传递，语言必须要有对 Lambda 的函数表达，以及一个用来在各层中传递参数值的“参数定义环境”两者同时的实现。

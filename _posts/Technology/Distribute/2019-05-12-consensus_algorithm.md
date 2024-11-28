@@ -225,6 +225,8 @@ Raft协议比paxos的优点是 容易理解，容易实现。它强化了leader�
 
 ### 日志复制
 
+相较于基于异步复制的分布式系统（如 mysql，redis），基于 Paxos/Raft/ZAB 等共识协议的分布式协调系统可以更严格地保证数据安全。
+
 Leader，本质上是通过一个两阶段提交，来做到同步复制的。一方面，它会先把日志写在本地，同时也发送给 Follower，这个时候，日志还没有提交，也就没有实际生效。Follower 会返回 Leader，是否可以提交日志。当 Leader 接收到超过一半的 Follower 可以提交日志的响应之后，它会再次发送一个提交的请求给到 Follower，完成实际的日志提交，并把写入结果返回给客户端。**因此，Raft 确保了即使在领导者崩溃或网络分区的情况下，也不会有数据丢失。任何被提交的日志条目都保证在后续的任期中也存在于任意新的领导者的日志中**。PS：作为应用层的kafka可以削弱一致性（ISR协议，BookKeeper的Quorum协议），比如client发消息到主分区即可认为消息发送成功，但是infra层的raft leader+follower 全部写入ok再返回给client的。
 
 简单来说，Raft 算法的特点就是 Strong Leader：

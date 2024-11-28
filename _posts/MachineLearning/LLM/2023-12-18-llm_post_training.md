@@ -81,17 +81,21 @@ chatgpt所用的RLHF流程，首先BT模型的假设来训练Reward model。BT�
 
 [如何用一个统一的视角，分析RLHF下的各种算法？](https://mp.weixin.qq.com/s/2txfqHpyiW-ipKuQSWAsLA) PS：大佬们一直在试图寻找统一脉络。思路一般不是突变的。
 
-### PPO
+### PPO（Proximal Policy Optimization）
+
+PPO即近端策略优化算法，是一种强化学习算法。
 
 利用PPO算法，根据RW模型的奖励反馈进一步微调 sft model。经过强化学习后，LLM 给出的回答会越来越逼近那些在奖励模型中得分比较高的回答。包含actor model、reference模型/ref_model、reward model和critic model。actor model是我们想通过强化学习微调的大模型，但是强化学习过程很容易把模型训练“坏”，因此需要另外一个不会参数更新的 ref_model来当作标的，别让actor model跑偏太远。**为什么PPO不直接使用reward model?**虽然reward model可以提供每个状态或状态动作对的即时奖励信号，但它并不能直接提供对应的价值估计。奖励信号只反映了当前动作的即时反馈，critic model的作用是估计状态或状态动作对的长期价值，也称为状态值函数或动作值函数。critic model能够学习和预测在当前状态下采取不同动作所获得的累积奖励，它提供了对策略改进的指导。PPO算法使用critic model的估计值来计算优势函数，从而调整策略的更新幅度，使得更有利于产生更高长期回报的动作被选择。PS： actor model 和 ref_model是同一个模型的两个副本，reward model和critic model也是同一个模型的两个副本，且起源都是base model。[拆解大语言模型RLHF中的PPO算法](https://mp.weixin.qq.com/s/y7o9F9vz8dv609ee6xqYtw) 原理与代码并重，值得细读。
 
 使用PPO优化pipeline，有几个明显挑战，比如需要在学习过程中启动4个模型：actor model，reference model，reward model，critic model。如果为了提升训练效率，还可额外部署infer model。在游戏、机器人等领域，这几个模型通常size都比较小，为了效果多部署几个模型可以接受。但在LLM领域中，为了效果导致模型size剧增，同时也需要更为复杂的调度方式，总体来说，PPO优化pipeline对资源使用和调度带来了不小挑战。
 
+[人人都能看懂的RL-PPO理论知识](https://mp.weixin.qq.com/s/XU9MznCUFYkoHCrdQmV68w) 未读，建议细读。
+
 ### DPO（Direct Preference Optimization）
 
 [人人都能看懂的DPO数学原理](https://mp.weixin.qq.com/s/aG-5xTwSzvHXN4B73mfKMA)
 
-在训练奖励模型的过程中，我们就已经在考虑“什么回答是好的，什么回答是不好的”这个问题了。而对齐模型依然是在考虑这个问题。所以，我们能不能避开奖励模型的训练，直接一步到位训练对齐模型呢？
+在训练奖励模型RM的过程中，我们就已经在考虑“什么回答是好的，什么回答是不好的”这个问题了。而对齐模型依然是在考虑这个问题。所以，我们能不能避开奖励模型的训练，直接一步到位训练对齐模型呢？
 1. RLHF算法包含奖励模型(reward model)和策略模型(policy model，也称为演员模型，actor model)，基于偏好数据以及强化学习不断迭代优化策略模型的过程。RLHF常使用PPO作为基础算法，整体流程包含了4个模型，且通常训练过程中需要针对训练的actor model进行采样，因此训练起来，稳定性、效率、效果不易控制。
 2. 在实际rlhf-ppo的训练中，存在【显存占据大】、【超参多】、【模型训练不稳定】等一系列问题。所以，在考虑“一步到位训练对齐模型”的过程中，我们是不是也能顺手做到绕过强化学习，采用一个更简单的方式（比如类似于sft）来使用偏好数据训练对齐模型呢？
 2. DPO算法不包含奖励模型和强化学习过程，直接通过偏好数据进行微调，将强化学习过程直接转换为类似SFT过程，因此整个训练过程简单、高效，**主要的改进之处体现在于损失函数**。DPO算法仅包含RLHF中的两个模型，即演员模型(actor model)以及参考(reference model)，且训练过程中不需要进行数据采样。DPO算法的目的是最大化奖励模型(此处的奖励模型即为训练的策略)，使得奖励模型对chosen和rejected数据的差值最大，进而学到人类偏好。

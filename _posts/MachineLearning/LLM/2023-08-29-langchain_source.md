@@ -180,7 +180,7 @@ BaseLanguageModel ==> BaseLLM + BaseChatModel
 3. 用户 In 或 查询 ：通常（但不总是）是由人类用户（即提示者）In 到系统中的查询。
 4. Out 指示器 ：标记要生成的文本的 开头。如果生成 Python 代码，我们可以使用 import 来指示模型必须开始编写 Python 代码（因为大多数 Python 脚本以 import 开头）。
 
-对于文本生成模型服务来说，实际的输入和输出本质上都是字符串，因此直接裸调用LLM服务带来的问题是要在输入格式化和输出结果解析上做大量的重复的文本处理工作，我们不太可能硬编码上下文和用户问题，比如**用 f-strings（如 f"insert some custom text '{custom_text}' etc"）替换**。LangChain当然考虑到这一点，提供了Prompt和OutputParser抽象规范化这个过程，添加多个参数，并**以面向对象的方式构建提示**，用户可以根据自己的需要选择具体的实现类型使用，可以高效的复用（参数化的提示词模版）和组合提示词。PS：本质是f-string 的对象化。
+对于文本生成模型服务来说，实际的输入和输出本质上都是字符串，因此直接裸调用LLM服务带来的问题是要在输入格式化和输出结果解析上做大量的重复的文本处理工作，我们不太可能硬编码上下文和用户问题，比如**用 f-strings（如 f"insert some custom text '{custom_text}' etc"）替换**。LangChain当然考虑到这一点，提供了Prompt和OutputParser抽象规范化这个过程，添加多个参数，并**以面向对象的方式构建提示**，用户可以根据自己的需要选择具体的实现类型使用，可以高效的复用（参数化的提示词模版）和组合提示词。PS：本质是f-string 的对象化，**但是太薄了**，国内一般一个prompt要准备中英文双份，这个抽象没cover住，再进一步，输入输出应该封在一起，比如从一段话中提取一个graph的三元组，则最好是有一个`triplet:list[str] = extractor.extract(text)` 的抽象出来。
 
 ![](/public/upload/machine/llm_chain.jpg)
 

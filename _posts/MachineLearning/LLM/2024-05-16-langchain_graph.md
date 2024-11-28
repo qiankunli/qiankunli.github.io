@@ -99,6 +99,19 @@ LangChain 0.1 几个包
 
 在 LangChain 里只要实现了Runnable接口，并且有invoke方法，都可以成为链。实现了Runnable接口的类，可以拿上一个链的输出作为自己的输入。
 
+类似runnable 协议的思路在业界有很多应用，比如KAG中文档入库的pipeline，其也是上层提了一个Runnable抽象，override了`__rshift__`方法
+
+```python
+class DiseaseBuilderChain(BuilderChainABC):
+    def build(self, **kwargs):
+        source = PdfReader(output_type="Chunk", file_path=xx)
+        splitter = LengthSplitter(split_length=2000)
+        extractor = KAGExtractor()
+        vectorizer = BatchVectorizer()
+        sink = KGWriter()
+        return source >> splitter >> extractor >> vectorizer >> sink
+```
+
 ## LCEL 
 
 [langchain入门3-LCEL核心源码速通](https://juejin.cn/post/7328204968636252198)LCEL实际上是langchain定义的一种DSL，可以方便的将一系列的节点按声明的顺序连接起来，实现固定流程的workflow编排。LCEL语法的核心思想是：一切皆为对象，一切皆为链。这意味着，LCEL语法中的每一个对象都实现了一个统一的接口：Runnable，它定义了一系列的调用方法（invoke, batch, stream, ainvoke, …）。这样，你可以用同样的方式调用不同类型的对象，无论它们是模型、函数、数据、配置、条件、逻辑等等。而且，你可以将多个对象链接起来，形成一个链式结构，这个结构本身也是一个对象，也可以被调用。这样，你可以将复杂的功能分解成简单的组件，然后用LCEL语法将它们组合起来，形成一个完整的应用。
@@ -321,6 +334,29 @@ chain_with_history = RunnableWithMessageHistory(
 LCEL提供了多种优势，例如一流的流支持、异步支持、优化的并行执行、支持重试和回退、访问中间结果、输入和输出模式以及无缝 LangSmith 跟踪集成。但因为语法上的问题，要实现 loop 和 condition 的情况就比较困难。于是LangChain社区推出了一个新的项目——LangGraph，期望基于LangChain构建支持循环和跨多链的计算图结构，以描述更复杂的，甚至具备自动化属性的AI工程应用逻辑，比如智能体应用。
 
 ## LangGraph
+langchain早期其实都内置有开箱即用的更简单的Agent开发组件。比如在先前LangChain中，创建一个会使用工具（Tools）的ReAct范式的Agent并不复杂：把定义好的tools交给大模型，然后让大模型自行规划与选择工具的使用，以完成输入任务。如下：
+
+```python
+#准备tools，model，prompt
+search = TavilySearchResults(max_results=2)
+@tool
+def email(topic: str) -> str:
+  return 'Email completed.'
+
+tools = [search, email]
+model = ChatOpenAI(model="gpt-4o")
+prompt = hub.pull("hwchase17/openai-functions-agent")
+
+#创建agent
+agent = create_tool_calling_agent(model, tools, prompt)
+
+#调用agent
+agent_executor = AgentExecutor(agent=agent, tools=tools)
+agent_executor.invoke({"input": "搜索明天的天气发送到mm@aa.com"})
+```
+那为什么还需要LangGraph？两个核心的原因是：
+1. 为了支持更复杂的LLM应用，特别是需要循环迭代的工作流，以及需要多智能体协作与交互的应用。比如Self-RAG
+2. 为了让AI智能体更加可控与可预测。尽管LLM已经足够强大，但完全依赖于其自行规划与决策行动的“黑盒”智能体仍然存在较大的不确定性，这会极大的限制其在生产环境，特别是企业环境中的应用。
 
 [彻底搞懂LangGraph：构建强大的Multi-Agent多智能体应用的LangChain新利器 ](https://mp.weixin.qq.com/s/MzLz4lJF0WMsWrThiOWPog)相对于Chain.invoke()直接运行，Agent_executor的作用就是为了能够实现多次循环ReAct的动作，以最终完成任务。为什么需要将循环引入运行时呢？考虑一个增强的RAG应用：我们可以对语义检索出来的关联文档（上下文）进行评估：如果评估的文档质量很差，可以对检索的问题进行重写（Rewrite，比如把输入的问题结合对话历史用更精确的方式来表达），并把重写结果重新交给检索器，检索出新的关联文档，这样有助于获得更精确的结果。这里把Rewrite的问题重新交给检索器，就是一个典型的“循环”动作。而在目前LangChain的简单链中是无法支持的。其他一些典型的依赖“循环”的场景包括：代码生成时的自我纠正：当借助LLM自动生成软件代码时，根据代码执行的结果进行自我反省，并要求LLM重新生成代码；Web访问自动导航：每当进入下一界面时，需要借助多模态模型来决定下一步的动作（点击、滚动、输入等），直至完成导航。
 
@@ -337,7 +373,6 @@ LCEL提供了多种优势，例如一流的流支持、异步支持、优化的�
 LangGraph的实现方式是把之前基于AgentExecutor的黑盒调用过程用一种新的形式来构建：状态图（StateGraph）。把基于LLM的任务（比如RAG、代码生成等）细节用Graph进行精确的定义（定义图的节点与边），最后基于这个图来编译生成应用；在任务运行过程中，维持一个中央状态对象(state)，会根据节点的跳转不断更新，状态包含的属性可自行定义。
 
 ![](/public/upload/machine/lang_graph_agent.jpg)
-
 
 
 ## 构建Agent
@@ -415,6 +450,11 @@ for s in app.stream(inputs):
 ```
 
 ## LangGraph原理
+
+LangGraph的核心方法是：通过定义一个Graph图结构的流程来代表你需要创建的LLM应用工作流。Graph的特点决定了你的应用具备了极大的灵活性：
+1. 支持并行、条件分支、循环等各种细粒度工作流控制
+2. 灵活定义每个节点任务，简单函数、LLM调用，或一次Agent交互
+3. 可持久的全局状态控制，工作流可随时暂停、启动或介入人工交互
 
 LangGraph 三个核心要素
 1. StateGraph，LangGraph 在图的基础上增添了全局状态变量，是一组键值对的组合，可以被整个图中的各个节点访问与更新，从而实现有效的跨节点共享及透明的状态维护。它将该对象传递给每个节点。然后，节点会以键值对的形式，返回对状态属性的操作。这些操作可以是在状态上设置特定属性（例如，覆盖现有值）或者添加到现有属性。
