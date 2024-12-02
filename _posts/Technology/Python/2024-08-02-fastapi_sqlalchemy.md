@@ -100,7 +100,7 @@ class PlainTextResponse(Response):
 
 ### 依赖注入
 
-依赖注入用于把一些可复用的逻辑抽离出来，减少代码重复。Depends参数/依赖的定义是一个 callable, 也就是说函数或者类都可以。依赖可以在三个地方添加：handler 函数参数，路径装饰器，全局 app 实例。如果在 handler 函数的 参数中添加，那么依赖的返回值会作为参数传递进去，就像其他参数一样。其他两种方式返回值都会被丢弃。
+依赖注入用于把一些可复用的逻辑抽离出来，减少代码重复。Depends参数/依赖的定义是一个 callable, 也就是说函数或者类都可以。依赖可以在三个地方添加：handler 函数参数，路径装饰器，全局 app 实例。如果在 handler 函数的 参数中添加，那么依赖的返回值会作为参数传递进去，就像其他参数一样。其他两种方式返回值都会被丢弃。PS： fastapi 在分析api handler（比如下面get_users）函数参数的时候，有一个专门处理Depends 参数的环节，如果Depends 管理的对象实现了`__enter__`和 `__exit__`（上下文管理器），那么在api handler干完活儿，fastapi 会触发 `__exit__`的执行。从这个视角 说Depends 是搞依赖管理的，就有点那位了。
 
 ```python
 # 使用函数作为依赖
@@ -126,6 +126,7 @@ def get_users(pagination: dict=Depends(pagination)):
 ### fastapi_sqlalchemy
 
 常规使用 sqlalchemy 就是构建engine，获取session，之后就可以session.crud了。 session 的创建与销毁都在dao层做，sesion的获取和销毁用一个装饰器包一下。
+
 ```python
 engine = create_engine(
     settings.SQLALCHEMY_DATABASE_URI,
@@ -158,6 +159,10 @@ def create_user(username: str):
     db.session.commit()
     return {"message": "User created successfully"}
 ```
+总结一下，操作db_client 要注意哪些事情
+1. 有一个全局唯一入口对象db_client，可以直接在controller、service、dao  import 引用的方式获取db_client 操作po。
+2. 操作db 有一个事务的问题，我们希望db操作完，自动执行db_client.commit()。 db_client 获取的位置越靠上层，这个事务的范围越大，毕竟api handler 直接对应业务的上的用户操作。所以一般将获取db_client 放在controller/api handler 那里，api handler 执行完成后自动commit。controller 将db_client 通过传参下传到service 和dao层。
+3. 如果嫌弃2传参麻烦，老办法使用线程局部变量（实质是ContextVar），dao从ContextVar 取下db_client 干活。
 
 ### fastapi_pagination
 

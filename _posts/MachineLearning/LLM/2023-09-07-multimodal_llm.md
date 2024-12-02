@@ -12,6 +12,7 @@ keywords: llm multimodal
 {:toc}
 
 ## 前言
+
 为什么我们需要能够处理多种数据类型的AI模型呢？原因很简单：我们的世界是多模态的。我们交流和感知世界不仅仅通过语言，还包括视觉、听觉等多种方式。多模态模型能够更全面地理解和模拟人类的交流和感知方式，使得AI能够更自然地与人类互动。
 多模态模型就像是我们的大脑，能够同时处理和理解来自眼睛（视觉信息）、耳朵（听觉信息）和其他感官的数据。作用主要体现在以下几个方面：
 1. 信息整合：能够将不同类型的信息整合在一起，提高理解和分析的准确性。
@@ -33,41 +34,9 @@ keywords: llm multimodal
 
 [多模态大模型技术点总结](https://mp.weixin.qq.com/s/P2lMI6TkHo7SjamjMO3G3A) 未读。
 
-## Transformer与多模态
+## 应用场景
 
-![](/public/upload/machine/mllm.jpg)
-
-[为什么Transformer适合做多模态任务？](https://mp.weixin.qq.com/s/zGUwdaS5qlET_PZ6O2amxg)
-1. 其实不是“Transformer适合做多模态任务”，而是Transformer中的Attention适合做多模态任务，准确的说，应该是“Transformer中的Dot-product Attention适合做多模态任务”。PS： Transformer提出了深度学习领域既MLP、CNN、RNN后的第4大特征提取器。
-2. 之前的多模态任务是怎么做的? 在Transformer，特别是Vision Transformer出来打破CV和NLP的模型壁垒之前，CV的主要模型是CNN，NLP的主要模型是RNN，那个时代的多模态任务，主要就是通过CNN拿到图像的特征，RNN拿到文本的特征，然后做各种各样的Attention与concat过分类器。
-3. 为什么Transformer可以做图像也可以做文本，为什么它适合做一个跨模态的任务？说的直白一点，因为Transformer中的Self-Attetion机制很强大，使得Transformer是一个天然强力的一维长序列特征提取器，而所有模态的信息都可以合在一起变成一维长序列被Transformer处理。当你输入纯句子时，模型能学到这个it主要指animal，那么比如当你输入图片猫+这个句子的时候，模型可能就能学到你前面那张猫指的就是这个animal。
-4. attention本身就是很强大的，已经热了很多年了，而self-attention更是使得Transformer的大规模pretrain成为可能的重要原因self-attention的序列特征提取功能其实是非常强大的，如果你用CNN，那么一次提取的特征只有一个限定大小的矩阵，如果在句子里做TextCNN，那就是提取一小段文字的特征，最后汇聚到一起；如果做RNN，那么会产生长程依赖问题，当句子 太长最后RNN会把前面的东西都忘掉。**self-attention的本质就是对每个token，计算这个token相对于这个句子其他所有token的特征再concat到一起**，无视长度，输入有多长，特征就提多远。**Transformer也可以认为是一个全连接图**， 缓解了序列数据普遍存在的长距离依赖和梯度消失等缺陷 。
-5. 那么如果传入的不是句子，而是普通一维序列(也就是一个数组)呢？那就是对序列的每个点(数组的每个值)，计算这个点与序列里其他点的所有特征，这也是Vision Transformer成功的原因，既然是对序列建模，我就把一张图片做成序列不就完了？一整张图片的像素矩阵直接平铺变成序列复杂度太大，那就切大块一点呗(反正CNN也是这种思想，卷积核获得的是局部特征，换个角度来说也是特定patch的特征)，ViT就把一张图片做成了16个patch然后加上对应的position embedding(就是割成小方块变成token向量塞进去加上patch对应图片原始位置的标号)
-    ![](/public/upload/machine/vit.jpg)
-6. 所以如果你用Transformer来当backbone的时候，**你需要做的就只是把图片，文本，甚至表格信息等其他的所有模态信息全部flatten再concat或者相加成一维数组送进Transformer**，然后期待强大的Self-Attention开始work就可以了。
-
-[面向统一的AI神经网络架构和预训练方法](https://mp.weixin.qq.com/s/3KWbxBf1hEcgSnt2XBCgkg)近几年，自然语言处理（NLP）和图形图像领域（CV）在神经网络架构和预训练上正在经历一个趋向统一的融合趋势。Transformer 的神经网络架构率先在自然语言处理（NLP）领域取得了很好的效果，并成为该领域的主流神经架构。从 2020 年下半年开始，计算机视觉领域也开始将 Transformer 应用到各种视觉问题中，并取代此前的卷积神经网络，成为新的主流神经架构。关于统一的好处，这里列举三点：
-1. 技术和知识共享：技术和知识共享能让不同领域都有更快的进步，对于 NLP 和 CV 领域来说，深度学习革命的早期主要是 CV 技术在影响 NLP 领域，而最近两年 NLP 领域进展迅速，很多很好的技术被 CV 领域所借鉴。
-2. 促进多模态应用：技术的统一也在催生全新的多模态研究和应用，例如实现零样本物体识别能力的 CLIP 模型、能给定任意文本生成图片的 DALL-E 模型等等。
-3. 实现降本增效：我们举芯片的例子，以前设计芯片时需要优化不同的算子，例如卷积、Transformer 等，而现在芯片设计只需要优化 Transformer 就可以解决 90% 以上问题。Nvidia 最新的 H100 GPU 的一个主要宣传点，就是可以将 Transformer 的训练性能提升 6 倍。
-
-谷歌的 ViT 模型就是把图像切块切成不重叠的块，将每个块当作一个 token，于是就可以将 NLP 里的 Transformer 直接应用于图像分类。这种建模相比 CNN 有两个明显的好处：
-1. 相比 CNN 这种基于静态模板的网络，Transformer 的滤波模板是随位置动态的，可以更高效地建模关系。
-2. 可以建模长程关系（Long-term relationship），可以建模远距离的 token 之间的关联。
-
-![](/public/upload/machine/multimodal_network.jpg)
-
-多模态的三条路：
-1. 用多模态数据端到端预训练的模型：Fuyu-8B,Gemini,LVM
-2. 使用“胶水层”粘接已经训练好的文本模型和各模态编码/解码器，使用多模态数据训练胶水层（projection layer） GPT-4V, MiniGPT-4/v2, LLaVA
-3. 使用文本粘接文本模型和多模态识别/生成模型，无需训练，例如语音：whisper语音识别+LLM文本模型+VITS语音合成
-
-
-[VLMs多模态大模型当下进展与思考](https://mp.weixin.qq.com/s/BkV3v3_NdXZ0jKt1DTj5Xw)
-
-[多模态大模型MLLM的架构发展及思考](https://mp.weixin.qq.com/s/zVii5TZlf0iM16THHmINrg) mllm的综述。
-
-## 图片理解
+### 图片理解
 
 1. 如何将图片数据转为模型输入
 1. 高分辨率问题
@@ -133,7 +102,7 @@ curl  https://api.openai-hk.com/v1/chat/completions \
 }'
 ```
 
-## 文生图
+### 文生图
 
 [文生图模型发展简史与原理：DALL·E, Imagen, Stable Diffusion](https://mp.weixin.qq.com/s/u4t23yzx0Qli_NIlnvNNEA) 未读。 
 
@@ -165,7 +134,7 @@ curl  https://api.openai-hk.com/v1/images/generations \
 }
 ```
 
-## 文生视频
+### 文生视频
 
 [领先99%小白的Sora关键信息](https://mp.weixin.qq.com/s/MsaCUnTsJYxJFgnNGT6DTA)
 
@@ -177,7 +146,7 @@ curl  https://api.openai-hk.com/v1/images/generations \
 
 [技术神秘化的去魅：Sora关键技术逆向工程图解](https://mp.weixin.qq.com/s/5mxoYXY6vKsyqBzxNRnurQ) 未读
 
-## 多模态RAG
+### 多模态RAG
 
 多模态RAG的想法是允许RAG系统以某种方式将多种形式的信息注入到多模态模型中。因此，多模态RAG系统可能检索基于用户提示的文本、图像、视频和其他不同模态的数据，而不仅仅是检索文本片段。 有三种流行的方法可以实现多模态RAG。
 1. 对图像和文本直接做Embedding，使用多模态嵌入模型来嵌入图像和文本，然后使用相似性搜索检索两者，最后将原始图像和文本块传递多模态模型以进行答案合成
@@ -186,3 +155,91 @@ curl  https://api.openai-hk.com/v1/images/generations \
     2. 图片 ==> vemb ==> embedding。 生成时 一般也是将 query + topk emb 图片 + 其它文本 传给vlm 生成答案。
 
 [训练VLM(视觉语言模型)的经验](https://zhuanlan.zhihu.com/p/890327005) 未读。
+
+
+## Transformer与多模态
+
+常见的文本 LLM 架构，这里简单分为两个部分:
+- 分词部分: 负责将 Prompt 拆分为 Input Ids
+- LLM 主干部分: 基于 Input Ids 生成的 Embedding 进行后续的推理，得到最终的 Hidden States 并取 argmax 
+
+![](/public/upload/machine/llm_to_vlm.png)
+
+对于多模态场景，我们除了需要转换文本外，还需要将图像信息也转换为 Embedding，通过将文本 Embedding + 图像 Embedding concat 连接，再继续后面的部分。
+
+![](/public/upload/machine/mllm.jpg)
+
+[为什么Transformer适合做多模态任务？](https://mp.weixin.qq.com/s/zGUwdaS5qlET_PZ6O2amxg)
+1. 其实不是“Transformer适合做多模态任务”，而是Transformer中的Attention适合做多模态任务，准确的说，应该是“Transformer中的Dot-product Attention适合做多模态任务”。PS： Transformer提出了深度学习领域既MLP、CNN、RNN后的第4大特征提取器。
+2. 之前的多模态任务是怎么做的? 在Transformer，特别是Vision Transformer出来打破CV和NLP的模型壁垒之前，CV的主要模型是CNN，NLP的主要模型是RNN，那个时代的多模态任务，主要就是通过CNN拿到图像的特征，RNN拿到文本的特征，然后做各种各样的Attention与concat过分类器。
+3. 为什么Transformer可以做图像也可以做文本，为什么它适合做一个跨模态的任务？说的直白一点，因为Transformer中的Self-Attetion机制很强大，使得Transformer是一个天然强力的一维长序列特征提取器，而所有模态的信息都可以合在一起变成一维长序列被Transformer处理。当你输入纯句子时，模型能学到这个it主要指animal，那么比如当你输入图片猫+这个句子的时候，模型可能就能学到你前面那张猫指的就是这个animal。
+4. attention本身就是很强大的，已经热了很多年了，而self-attention更是使得Transformer的大规模pretrain成为可能的重要原因self-attention的序列特征提取功能其实是非常强大的，如果你用CNN，那么一次提取的特征只有一个限定大小的矩阵，如果在句子里做TextCNN，那就是提取一小段文字的特征，最后汇聚到一起；如果做RNN，那么会产生长程依赖问题，当句子 太长最后RNN会把前面的东西都忘掉。**self-attention的本质就是对每个token，计算这个token相对于这个句子其他所有token的特征再concat到一起**，无视长度，输入有多长，特征就提多远。**Transformer也可以认为是一个全连接图**， 缓解了序列数据普遍存在的长距离依赖和梯度消失等缺陷 。
+5. 那么如果传入的不是句子，而是普通一维序列(也就是一个数组)呢？那就是对序列的每个点(数组的每个值)，计算这个点与序列里其他点的所有特征，这也是Vision Transformer成功的原因，既然是对序列建模，我就把一张图片做成序列不就完了？一整张图片的像素矩阵直接平铺变成序列复杂度太大，那就切大块一点呗(反正CNN也是这种思想，卷积核获得的是局部特征，换个角度来说也是特定patch的特征)，ViT就把一张图片做成了16个patch然后加上对应的position embedding(就是割成小方块变成token向量塞进去加上patch对应图片原始位置的标号)
+    ![](/public/upload/machine/vit.jpg)
+6. 所以如果你用Transformer来当backbone的时候，**你需要做的就只是把图片，文本，甚至表格信息等其他的所有模态信息全部flatten再concat或者相加成一维数组送进Transformer**，然后期待强大的Self-Attention开始work就可以了。
+
+[面向统一的AI神经网络架构和预训练方法](https://mp.weixin.qq.com/s/3KWbxBf1hEcgSnt2XBCgkg)近几年，自然语言处理（NLP）和图形图像领域（CV）在神经网络架构和预训练上正在经历一个趋向统一的融合趋势。Transformer 的神经网络架构率先在自然语言处理（NLP）领域取得了很好的效果，并成为该领域的主流神经架构。从 2020 年下半年开始，计算机视觉领域也开始将 Transformer 应用到各种视觉问题中，并取代此前的卷积神经网络，成为新的主流神经架构。关于统一的好处，这里列举三点：
+1. 技术和知识共享：技术和知识共享能让不同领域都有更快的进步，对于 NLP 和 CV 领域来说，深度学习革命的早期主要是 CV 技术在影响 NLP 领域，而最近两年 NLP 领域进展迅速，很多很好的技术被 CV 领域所借鉴。
+2. 促进多模态应用：技术的统一也在催生全新的多模态研究和应用，例如实现零样本物体识别能力的 CLIP 模型、能给定任意文本生成图片的 DALL-E 模型等等。
+3. 实现降本增效：我们举芯片的例子，以前设计芯片时需要优化不同的算子，例如卷积、Transformer 等，而现在芯片设计只需要优化 Transformer 就可以解决 90% 以上问题。Nvidia 最新的 H100 GPU 的一个主要宣传点，就是可以将 Transformer 的训练性能提升 6 倍。
+
+谷歌的 ViT 模型就是把图像切块切成不重叠的块，将每个块当作一个 token，于是就可以将 NLP 里的 Transformer 直接应用于图像分类。这种建模相比 CNN 有两个明显的好处：
+1. 相比 CNN 这种基于静态模板的网络，Transformer 的滤波模板是随位置动态的，可以更高效地建模关系。
+2. 可以建模长程关系（Long-term relationship），可以建模远距离的 token 之间的关联。
+
+![](/public/upload/machine/multimodal_network.jpg)
+
+多模态的三条路：
+1. 用多模态数据端到端预训练的模型：Fuyu-8B,Gemini,LVM
+2. 使用“胶水层”粘接已经训练好的文本模型和各模态编码/解码器，使用多模态数据训练胶水层（projection layer） GPT-4V, MiniGPT-4/v2, LLaVA
+3. 使用文本粘接文本模型和多模态识别/生成模型，无需训练，例如语音：whisper语音识别+LLM文本模型+VITS语音合成
+
+
+[VLMs多模态大模型当下进展与思考](https://mp.weixin.qq.com/s/BkV3v3_NdXZ0jKt1DTj5Xw)
+
+[多模态大模型MLLM的架构发展及思考](https://mp.weixin.qq.com/s/zVii5TZlf0iM16THHmINrg) mllm的综述。
+
+### 代码
+
+```python
+import requests
+from PIL import Image
+
+import torch
+from transformers import AutoProcessor, LlavaForConditionalGeneration
+
+model_id = "./model/llava-1.5-7b-hf"
+model = LlavaForConditionalGeneration.from_pretrained(
+    model_id, 
+    torch_dtype=torch.float16, 
+    low_cpu_mem_usage=True, 
+).to(0)
+
+# 与 Text LLM 加载 tokenizer 处理文本不同，这里 Vision LLM 需要加载生成 processor 处理相关数据。
+processor = AutoProcessor.from_pretrained(model_id)
+
+
+conversation = [
+    {
+
+      "role": "user",
+      "content": [
+          {"type": "text", "text": "What are these?"},
+          {"type": "image"},
+        ],
+    },
+]
+prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
+print(prompt)
+# USER: <image>
+# What are these? ASSISTANT:
+
+image_file = "http://images.cocodataset.org/val2017/000000039769.jpg"
+raw_image = Image.open(requests.get(image_file, stream=True).raw)
+inputs = processor(images=raw_image, text=prompt, return_tensors='pt').to(0, torch.float16)
+# <image> 的 token_id = 32000(根据配置文件)，事实上这里的 <iamge> 是图像的占位符，因此 32000 也是一个特殊的 token，其目的是标识图像 Embedding 的位置并占位
+for key in inputs:
+    print(key, inputs[key].shape)
+```
+
+![](/public/upload/machine/cat_image_emb.png)

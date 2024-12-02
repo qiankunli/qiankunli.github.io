@@ -31,6 +31,10 @@ keywords: llm pretrain
 
 [从零手搓中文大模型](https://mp.weixin.qq.com/s/kbmkdkukkvnGMCzRD2Z1mQ) 比较通俗易懂，推荐看下。
 
+目前比较成熟，一般采用 gpt架构，Llama/Llama2，在模型结构不改变的情况下，模型的优化主要在于 分词、参数选择、训练数据，同时也包括对attention方法的选择。
+
+## 计算量
+
 [面试时被问到“Scaling Law”，怎么答？](https://mp.weixin.qq.com/s/Q0fThU-4YP5OwFmfJM_q-Q)在大模型的研发中，通常会有下面一些需求：
 1. 计划训练一个 10B 的模型，想知道至少需要多大的数据？
 2. 收集到了 1T 的数据，想知道能训练一个多大的模型？
@@ -69,6 +73,12 @@ PS：mlp参数量和计算量都不输attention。 $C_{token} \approx 6N$ 可以
 $C \approx 6ND$ 计算训练的耗时了。
 
 ## 数据准备
+
+|训练阶段|	说明|	常见数据集|
+|---|---|---|
+|pre-train（continual-train)|	收集、整理清洗，分类筛选，多语言无需特别加工，主要是数据分布合理，质量保障	|C4(T5)，RedPajama，Pile，Wudao，ROOTS(BLOOM)|
+|sft|	指令微调，数据需要人工加工，已经有一些公开数据集了主要目的是让机器学会一些思考、回答问题的方法	|
+|RLHF|	需要单独组织，人工整理数据主要目的是在回答的helpful、safety等方面符合人类标准|	https://github.com/anthropics/hh-rlhf/blob/master/README.md|
 
 [关于大模型语料的迷思](https://mp.weixin.qq.com/s/A8O5omTFd4egVIuH--ZNWg) 未读。
 [聊一聊做Pretrain的经验](https://mp.weixin.qq.com/s/pUJsZVBN_Gh2yBF3g5XhKA)pretrain 大模型的第一件事：先找个 10T 左右的训练数据吧。至于怎么获取数据，爬网页、逛淘宝、联系数据贩子，等等等等。算法同学往往搞不定这个事情，你敢爬他就敢封你 IP，你爬得起劲他甚至还可以起诉你，所以这个工作最好还是让专业的数据团队同学来做。好在，世上还是好人多！今年再做 pretrain 工作，网上的开源数据集已经很多了。FineWeb、pile、Skypile、RedPajama，凑合着差不多能当启动资金来用。但从另一个角度讲，世界上没有免费的午餐，所有开源出来的中文大模型数据集，我不认为是他们最干净的数据，质量多少都有点问题。准备数据还要懂得一个基础概念：数据的知识密度是有差异的。“唐诗三百首”的知识量要远远大于“中国新闻网的三百篇新闻”。而这种高知识密度的训练数据，往往都是需要花钱的。最近，一种新的数据趋势是“合成高知识密度数据”，把几千字的新闻概括成几百字喂给模型，四舍五入也等于训练速度提高了十倍。
@@ -152,7 +162,7 @@ pretrain 最重要的几个东西：数据，学习率，优化器！
 
 ### Tokenizer
 
-大模型无法直接处理文本，需要转换为数字。转换过程可以简化为以下几步：输入文本序列，对序列进行切分成为Token序列，再构建词典将每个Token映射为整数型的index。
+大模型无法直接处理文本，需要转换为数字。转换过程可以简化为以下几步：输入文本序列，对序列进行切分成为Token序列，再构建词典将每个Token映射为整数型的index。**通常情况下，Tokenizer有三种粒度：word/char/subword**。llm使用的 Tokenizer 一般为subword。
 
 扩词表容易把词表扩错，这和字典树的逻辑有关。简单来说，就是你加入“中华人民”这个新 token，并且引入相对应的 merge token 的逻辑，就可能导致“中华人民共和国”这个旧 token 永远不会被 encode 出来，那“中华人民共和国”这个 token 对应的知识也就丢失了。因此，提前准备好自己的 tokenizer 真的非常重要，这就是一个打地基的工作。你如果想着后期可以扩词表解决，那和房子歪了你再加一根柱子撑着有啥区别呢？llama + 扩中文词表 + conitnue pretrain 训出来过效果惊艳的中文模型吗？至于怎么训 tokenizer：找一个内存空间很大的 cpu 机器，再找一份很大的 common 数据集，然后利用 BPE / BBPE 算法去跑（ChatGPT会写），这里只提醒一些细节。
 

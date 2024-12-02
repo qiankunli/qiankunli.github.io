@@ -35,7 +35,7 @@ keywords: Go goroutine scheduler
 
 程序=数据结构 + 算法。调度器就是 基于 g/p/m/sched 等struct，提供初始化方法 schedinit ==> mcommoninit –> procresize –> newproc。**代码go 生产g，在每个m 执行执行 mstart => mstart1 ==>  schedule 来消费g**。PS： 不一定对，这个表述手法很重要。
 
-### go main 函数执行
+### 从main函数启动开始分析
 
 各个语言都会提供自己的入口函数，这个入口函数并不是我们开发者所熟知的main函数，而是语言开发者实现的入口函数。在glibc 中，这个入口函数是_start，在_start 中会进行很多进入main 函数之前的初始化操作，例如全局对象的构造，建立打开文件表，初始化标准输入输出流等，也会注册好程序退出时的逻辑，接着才会进入到我们应用开发者所熟知的main 函数中来执行。go也是如此，在go中，其底层运行的GMP、gc等机制都需要在进入用户的main函数之前启动。
 
@@ -108,7 +108,7 @@ func startm(_p_ *p, spinning bool) {    // 调度一些M 来运行P（如有必�
 }
 ```
 
-### 启动调度系统
+### 调度循环的启动（mstart）
 
 ```go
 // 汇编 mstart ==> mstart0
@@ -246,10 +246,6 @@ func goexit0(gp *g) {
     schedule()
 }
 ```
-
-
-
-
 
 ### goroutine 创建
 
@@ -399,7 +395,7 @@ m 拿到 goroutine 并运行它的过程就是一个消费者消费队列的过�
 schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexit0()->schedule()
 ```
 
-一轮调度是从调用schedule函数开始的，然后经过一系列代码的执行到最后又再次通过调用schedule函数来进行新一轮的调度，从一轮调度到新一轮调度的这一过程我们称之为一个调度循环，这里说的调度循环是指某一个工作线程的调度循环，而同一个Go程序中可能存在多个工作线程，每个工作线程都有自己的调度循环，也就是说每个工作线程都在进行着自己的调度循环。
+**一轮调度是从调用schedule函数开始的，然后经过一系列代码的执行到最后又再次通过调用schedule函数来进行新一轮的调度**，从一轮调度到新一轮调度的这一过程我们称之为一个调度循环，这里说的调度循环是指某一个工作线程的调度循环，而同一个Go程序中可能存在多个工作线程，每个工作线程都有自己的调度循环，也就是说每个工作线程都在进行着自己的调度循环。
 
 ![](/public/upload/go/go_scheduler_cycle.jpg)
 

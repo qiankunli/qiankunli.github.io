@@ -123,8 +123,8 @@ static void schedule(void) {
 
 ![](/public/upload/linux/cpu_runqueue.jpg)
 
-[从Golang调度器的作者视角探究其设计之道](https://mp.weixin.qq.com/s/mH23ola6B_n8N9PRc1kpPw)**为什么引入Processor 的概念？**计算（M）存储(P)分离。把Local Run Queue及相关存储资源都挪到P 上去。
-1. 存在 一个 Local Run Queue ，且 Local Run Queue 不能挂在 M 上。 如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行。将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行。对runq 及相关信息进行抽象 得到P，我们通过P把任务队列挂载到其它线程中。**M 并不保留 G 状态，这是 G 可以跨 M 调度的基础**。
+[从Golang调度器的作者视角探究其设计之道](https://mp.weixin.qq.com/s/mH23ola6B_n8N9PRc1kpPw)如果是想实现本地队列、Work Stealing 算法，那为什么不直接在 M 上加runq呢，M 也照样可以实现类似的功能。**为什么引入Processor 的概念？**计算（M）存储(P)分离。把Local Run Queue及相关存储资源都挪到P 上去。
+1. 一般来讲，M 的数量都会多于 P。像在 Go 中，M 的数量最大限制是 10000，P 的默认数量的 CPU 核数。如果G 包含同步调用，会导致执行G 的M阻塞，进而导致 与M 绑定的所有runq 上的 G 无法执行。将M 和 runq 拆分，M 可以阻塞，M 阻塞后，runq 交由新的M 执行，**M 数量会不断增加，如果本地队列挂载在 M 上，那就意味着本地队列也会随之增加**，这显然是不合理的。对runq 及相关信息进行抽象 得到P，我们通过P把任务队列挂载到其它线程中。**M 并不保留 G 状态，这是 G 可以跨 M 调度的基础**。
 2. GM 模型 一些内存资源（比如malloc cache等）是绑定在线程上面的，会导致线程数量和资源占用规模紧耦合。当线程数量多的时候，资源消耗也会比较大。
 
 ## goroutine调度模型的四个抽象及其数据结构
@@ -230,15 +230,15 @@ type m struct {
 	...
      // 没有 goroutine 需要运行时，工作线程睡眠在这个 park 上
     park          note
-    
     // tls作为线程的本地存储
-    // 其中可以在任意时刻获取绑定到当前线程上的协程g、结构体m、逻辑处理器p、特殊协程g0等信息
     tls           [tlsSlots]uintptr
     // 用于存储创建当前线程的堆栈信息
     createstack   [32]uintptr 
     mstartfn      func() // 启动 m 的函数
 }
 ```
+在 Linux 系统中，fs 段可以用于存储线程的 TLS 数据，通常通过 fs 段寄存器来访问。m 结构体的 tls 字段通常会被设置为当前线程的 fs 段，Go 可以高效地管理和访问每个 goroutine 的特定数据。每个工作线程在刚刚被创建出来进入调度循环之前就利用线程本地存储机制为该工作线程实现了一个指向m结构体实例对象的私有全局变量，**这样在之后的代码中就使用该全局变量来访问自己的m结构体对象以及与m相关联的p和g对象**。
+
 除了对线程的定义， 还需要实现创建线程的函数newm
 ```go
 // file: src/runtime/proc.go
@@ -272,7 +272,7 @@ func newosproc(mp *m){
 
 ### P
 
-P全称是Processor，处理器，表示调度的上下文，它可以被看做一个运行于线程 M 上的本地调度器，所以它维护了一个goroutine队列（环形链表），里面存储了所有需要它来执行的goroutine。通过处理器 P 的调度，每一个内核线程都能够执行多个 Goroutine，它能在 Goroutine 进行一些 I/O 操作时及时切换，提高线程的利用率。PS：linux内核为每个cpu 准备了一个rq
+P全称是Processor，处理器，表示调度的上下文，它可以被看做一个运行于线程 M 上的本地调度器，所以它维护了一个goroutine队列（环形链表），里面存储了所有需要它来执行的goroutine。**M想要运行G，就得先获取P，然后从 P 的本地队列获取 G**。通过处理器 P 的调度，每一个内核线程都能够执行多个 Goroutine，它能在 Goroutine 进行一些 I/O 操作时及时切换，提高线程的利用率。PS：linux内核为每个cpu 准备了一个rq
 1. 对 G 来说，P 相当于 CPU 核，G 只有绑定到 P （在 P 的 local runq 中）才能被调度。
 2. 对 M 来说，P 提供了相关的执行环境（Context），如内存分配状态（mcache），任务队列（G）等。
 
@@ -340,7 +340,7 @@ type schedt struct {
 }
 ```
 
-重要的全局变量，**尤其是allgs/allm/allp**
+重要的全局变量，**尤其是allgs/allm/allp**。在程序初始化时，这些全变量都会被初始化为0值，指针会被初始化为nil指针，切片初始化为nil切片，int被初始化为数字0，结构体的所有成员变量按其本类型初始化为其类型的0值。所以程序刚启动时allgs，allm和allp都不包含任何g,m和p。
 
 ```go
 allgs    []*g           // 保存所有的g

@@ -27,41 +27,47 @@ keywords: ThreadLocal 线程安全
 
 ## 线程原生的局部变量 
 
-
-
 以上是从线程安全的角度出发，那么从线程本身角度看，线程操作时，往往需要一些对象（或变量），这些对象只有这个线程才可以使用。Java在语法层面没有提供线程的“局部变量（成员变量）” 这个支持，当然，我们可以变通一下：
    
-    class MyThread extends Thread{
-        int abc;	//	我们自定义的局部变量
-        public void run(){xxx}
-    }
+```java
+class MyThread extends Thread{
+    int abc;	//	我们自定义的局部变量
+    public void run(){xxx}
+}
+```
 
 
 其实为实现这个特性，除了我们自己继承Thread类以外，观察Java Thread类源码，可以发现其有一个ThreadLocalMap成员。我们可以揣测，开发Java的那些大咖们估计我们会有这样的需求，但不知道我们会需要什么样的成员变量，所以预留这样一个“容器”，留给我们来存储自定义成员变量。
 
-	//	Thread类部分源码
-	public class Thread implements Runnable {  
-	    ThreadLocal.ThreadLocalMap threadLocals= null ;  
-		xxx;
-	}  
+```java
+//	Thread类部分源码
+public class Thread implements Runnable {  
+    ThreadLocal.ThreadLocalMap threadLocals= null ;  
+    xxx;
+}  
+```
 
 threadLocals是Thread的default类型的成员，ThreadLocal跟Thread类在一个包下，所以在ThreadLocal类中可以`Thread.currentThread().threadLocals`来操作threadLocals成员。
 
-    threadLocals(是一个map) ==> <ThreadLocal1,value1>
-	                           <ThreadLocal2,value2>
-	                           <ThreadLocal3,value3>
+```
+threadLocals(是一个map) ==> <ThreadLocal1,value1>
+                            <ThreadLocal2,value2>
+                            <ThreadLocal3,value3>
+```
 
 ThreadLocal有以下方法：
 
-    set(v){
-        当前线程.threadlocals.put(this,v);
-    }
-    get(v){
-        当前线程.threadlocals.get(this);
-    }
-    remove(v){
-        当前线程.threadlocals.remove(this);
-    }
+```
+set(v){
+    当前线程.threadlocals.put(this,v);
+}
+get(v){
+    当前线程.threadlocals.get(this);
+}
+remove(v){
+    当前线程.threadlocals.remove(this);
+}
+```
 
 这里，有一个跟寻常开发习惯不同的地方，一般，一个类的成员变量由这个类自己负责初始化，而在Thread类中，由ThreadLocal类负责对其ThreadLocalMap成员初始化。由于一个ThreadLocal包装一个value，所以ThreadLocal对象也可以和value形成一对一映射。
 
@@ -78,6 +84,9 @@ __thread int g = 0;  // 1，这里增加了__thread关键字，把g定义成私�
 
 [全局视角看技术-Java多线程演进史](https://mp.weixin.qq.com/s/XwI_09N0BdrRqjS45REx0w)想像一下如果让你设计，一般的简单思路是：在ThreadLocal里维护一个全局线程安全的Map，key为线程，value为共享对象。这样设计有个弊端就是内存泄露问题，因为该Map会随着越来越多的线程加入而无限膨胀，如果要解决内容泄露，必须在线程结束时清理该Map，这又得强化GC能力了，显然投入产出比不合适。于是，**ThreadLocal就被设计成Map不由ThreadLocal持有，而是由Thread本身持有**。key为ThreadLocal变量，value为值。每个Thread将所用到的ThreadLoacl都放于其中。
 
+## 硬件基础
+
+在 Linux 系统中，fs 段可以用于存储线程的 TLS 数据，通常通过 fs 段寄存器来访问。
 
 ## 使用模式 ##
 

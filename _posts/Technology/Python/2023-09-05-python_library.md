@@ -31,7 +31,28 @@ sys.path 是一个 Python 列表，用于指定解释器在导入模块时搜索
 可以在 Python 解释器中执行 `print(sys.path)`，查看当前 Python 解释器的 sys.path。
 
 1. requirements.txt。requirements.txt 是一个纯文本文件，它列出了项目所需的所有Python包及其版本。适合小型到中型项目，或者是那些不需要复杂依赖管理的项目。它的缺点是不支持条件依赖（例如，某些依赖只在特定操作系统上需要），也不支持包的替代。这个文件通常与pip工具一起使用
-2. pyproject.toml 是一个TOML格式的配置文件，它是Python包管理工具pipenv使用的配置文件。 支持更复杂的依赖管理，例如条件依赖、开发依赖和包的替代。通过 `poetry install` 或`pip install .` 安装
+2. pyproject.toml 是一个TOML格式的配置文件，它是Python包管理工具pipenv/Poetry使用的配置文件。 支持更复杂的依赖管理，例如条件依赖、开发依赖和包的替代。通过 `poetry install` 或`pip install .` 安装
+
+Poetry是一个Python依赖管理和打包工具。有点类似 go build/go mod/go run 等
+
+```sh
+# 创建一个 pyproject.toml 文件
+poetry init
+
+poetry add requests  # 安装最新版requests
+poetry add “requests>=2.25.0”  # 安装指定版本
+
+# 更新依赖
+poetry update 
+poetry update requests
+
+# 打包发布
+poetry build  # 打包项目
+poetry publish  # 发布到PyPI
+
+# 想在当前目录对应的虚拟环境中执行命令
+poetry run <你的命令> # 例如： poetry run python flask.py
+```
 
 ## streamlit
 
@@ -49,17 +70,42 @@ st.text_input('请输入最喜欢的编程语言', key="name")
 
 ## 类型注解 typing
 
-Python 3.5前，为弱类型语言，类型不显式声明，运行时可根据上下文推断变量或参数类型；Python 3.5后，引入的typing模块支持Python的静态类型注解，可显式注明变量、函数参数和返回值的类型；
+Python 3.5前，为弱类型语言，类型不显式声明，运行时可根据上下文推断变量或参数类型；Python 3.5后，引入的typing模块支持Python的静态**类型注解**，可显式注明变量、函数参数和返回值的类型；PS：对应静态语言里的类型。
 
-Python是一门动态语言，很多时候我们可能不清楚函数参数类型或者返回值类型，很有可能导致一些类型没有指定方法，在写完代码一段时间后回过头看代码，很可能忘记了自己写的函数需要传什么参数，返回什么类型的结果。typing提供了类型提示和类型注解的功能，用于对代码进行静态类型检查和类型推断。
+Python是一门动态语言，很多时候我们可能不清楚函数参数类型或者返回值类型，很有可能导致一些类型没有指定方法，在写完代码一段时间后回过头看代码，很可能忘记了自己写的函数需要传什么参数，返回什么类型的结果。typing提供了类型提示和类型注解的功能，**用于对代码进行静态类型检查和类型推断**。
 1. 类型注解：typing包提供了多种用于类型注解的工具，包括基本类型（如int、str）、容器类型（如List、Dict）、函数类型（如Callable、Tuple）、泛型（如Generic、TypeVar）等。通过类型注解，可以在函数声明、变量声明和类声明中指定参数的类型、返回值的类型等，以增加代码的可读性和可靠性。
     1. 数据容器：typing模块提供了多种数据容器类型，如List、Tuple、Dict和Set。
 2. 泛型支持：typing模块提供了对泛型的支持，使得可以编写更通用和灵活的代码。通过泛型，可以在函数和类中引入类型参数，以处理各种类型的数据。
 3. 类、函数和变量装饰器：typing模块提供了一些装饰器，如@overload、@abstractmethod、@final等，用于修饰类、函数和变量，以增加代码的可读性和可靠性。
 
+
+typing.Annotated是用于增强类型注解语义的工具。它允许你在类型提示中附加额外的元数据，用于描述一些特殊规则，如参数取值范围、参数单位、或是与其他系统约定的格式，使得你可以在代码注释中表达更多的业务逻辑需求。Annotated本质上是一个泛型，它的第一个参数是原本的类型，后续参数则是附加的元数据信息。虽然 **Python 本身不会解析这些元数据**，但它可以用于静态分析工具、文档生成工具或其他依赖注解的第三方库来做进一步处理。PS：类似于go里除了类型之外，加tag
+
+```python
+def process_data(value： int)：
+    pass
+
+# 约定整数必须在 1 到 100 之间
+from typing import Annotated
+@ensure_range
+def process_data(value： Annotated[int， “Range： 1-100”])：
+    pass
+
+def ensure_range(func)：
+	def wrapper(value)：
+		annotations = func.__annotations__.get('value')
+		if isinstance(annotations， list) and len(annotations) > 1：
+			range_info = annotations[1]
+			if “Range” in range_info：
+				min_val， max_val = map(int， range_info.split(“：”)[1].split(“-”))
+				if not (min_val <= value <= max_val)：
+					raise ValueError(f“Value {value} is out of the range {min_val}-{max_val}”)
+				return func(value)
+	return wrapper
+```
+
 泛型:
-1. Generic: 泛型基类，用于创建泛型类或泛型函数。
-2. TypeVar: 类型变量，用于创建表示不确定类型的占位符
+2. TypeVar: 类型变量，用于创建表示不确定类型的**占位符**。TypeVar的名称通常使用单个大写字母，比如T、K、V等，这是约定俗成的写法。PS：类似java里的T
 
     ```python
     # 定义一个泛型类型T
@@ -68,8 +114,24 @@ Python是一门动态语言，很多时候我们可能不清楚函数参数类�
     def reverse_list(items: List[T]) -> List[T]:
         """反转列表"""
         return items[::-1]
+    
+    # 有时我们需要限制类型变量可以接受的类型范围
+    # 只接受int或float的类型变量
+    Number = TypeVar('Number'， int， float)
     ```
-
+1. Generic: **是用来创建泛型类的基类**，它能让我们定义可以处理多种类型的类或函数。
+    ```python
+    T = TypeVar('T')
+    class Box(Generic[T])：
+    def __init__(self， content：T)：
+        self.content = content
+    def get_content(self) -> T：
+        return self.content
+    def set_content(self， value：T) -> None：
+        self.content = value
+    # 使用Generic创建的类在实例化时需明确指定类型参数，这样可以获得更好的类型检查支持。
+    int_box = Box[int](42)
+    ```
 3. Callable: 可调用对象类型，用于表示函数类型
 4. Optional: 可选类型，表示一个值可以为指定类型或None
 5. Iterable: 可迭代对象类型
@@ -274,6 +336,12 @@ BaseModel模型具有以下方法和属性：
 11. `__fields_set__` 初始化模型实例时设置的字段名称集
 12. `__fields__` 模型字段的字典
 13. `__config__` 模型的配置类，cf。模型配置
+
+## 日志
+
+日志记录模块具有四个主要组件：记录器（loggers），处理程序（handlers），过滤器（filters）和格式化程序（formatters）。记录器公开了应用程序代码直接使用的接口。处理程序将日志记录（由记录器创建）发送到适当的目的地。筛选器提供了更细粒度的功能，用于确定要输出的日志记录。格式化程序在最终输出中指定日志记录的布局。
+
+所有记录器都是根记录器的后代。每个记录器将日志消息传递到其父级。使用该getLogger(name) 方法创建新的记录器。调用不带名称的函数（getLogger()）将返回root记录器。
 
 ## 其它
 
