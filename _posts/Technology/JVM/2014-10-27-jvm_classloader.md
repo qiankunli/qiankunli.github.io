@@ -53,15 +53,66 @@ Spring 采用的代理技术有两个：一个是 Java 的动态代理（dynamic
 
 ## 类加载——按类名加载
 
+Java类何时会被加载？《深入理解Java虚拟机》给出的答案是：
+1. 遇到new、getstatic、putstatic 等指令时。
+2. 对类进行反射调用的时候。
+3. 初始化某个类的子类的时候。
+4. 虚拟机启动时会先加载设置的程序主类。
+5. 使用JDK 1.7 的动态语言支持的时候。
+一句话总结就是：当运行过程中需要这个类的时候。
+
 最初的jdk 根本没有类加载的概念，jdk的核心类库直接调用 `ClassFileParser::parseClassFile`接口完成加载。加载的本质，从磁盘上加载，得到的是一个字节数组，然后按照自己的内存模型，把字节数组中对应的数据放到进程内存对应的地方。并对数据进行校验，转化解析和初始化，最终形成可以被虚拟机直接使用的java类型，这就是虚拟机的类加载机制。
 
-[JVM类加载器与ClassNotFoundException和NoClassDefFoundError](http://arganzheng.life/jvm-classloader-ClassNotFoundException-NoClassDefFoundError.html)在”加载“阶段，虚拟机需要完成以下三件事：
-
-1. 通过一个类的全限定名来获取此类的二进制字节流。类似的 [maven的基本概念](http://qiankunli.github.io/2019/02/14/maven_concept.html) 中提到`URL construction scheme` 概念，根据一个jar 的groupId + artifactId + version 即可构造一个http url ，从maven remote Repository 下载jar 文件。
-2. 将字节流代表的静态存储结构转换为方法区的运行时数据结构 
-3. 在内存中创建一个代表此类的java.lang.Class对象，作为方法区此类的各种数据的访问入口。
-
 ![](/public/upload/java/class_load_process.png)
+
+[你知道Java类是如何被加载的吗？](https://mp.weixin.qq.com/s/q1ecT-4lprVzwQRrSqlU7g)JVM 默认用于加载用户程序的ClassLoader为AppClassLoader。不过无论是什么ClassLoader，它的根父类都是java.lang.ClassLoader。利用ClassLoader加载类很简单，直接调用ClassLoder的loadClass（）方法即可，loadClass（）方法最终会调用到ClassLoader.definClass1（）中，这是一个 Native 方法。definClass1对应的 JNI 方法为：Java_java_lang_ClassLoader_defineClass1，主要是调用了JVM_DefineClassWithSource（）加载类，跟着源码往下走，会发现最终调用的是 jvm.cpp 中的 jvm_define_class_common（）方法。
+
+```c++
+static jclass jvm_define_class_common(JNIEnv *env, const char *name,
+                                      jobject loader, const jbyte *buf,
+                                      jsize len, jobject pd, const char *source,
+                                      TRAPS) {
+  ......
+  ClassFileStream st((u1*)buf, len, source, ClassFileStream::verify);
+  Handle class_loader (THREAD, JNIHandles::resolve(loader));
+  if (UsePerfData) {
+    is_lock_held_by_thread(class_loader,
+                           ClassLoader::sync_JVMDefineClassLockFreeCounter(),
+                           THREAD);
+  }
+  Handle protection_domain (THREAD, JNIHandles::resolve(pd));
+  //将 Class 文件加载成内存中的 Klass
+  Klass* k = SystemDictionary::resolve_from_stream(class_name,
+                                                   class_loader,
+                                                   protection_domain,
+                                                   &st,
+                                                   CHECK_NULL);
+  ......
+
+  return (jclass) JNIHandles::make_local(env, k->java_mirror());
+}
+```
+上面这段逻辑主要就是利用 ClassFileStream 将要加载的class文件转成文件流，然后调用SystemDictionary::resolve_from_stream（），**生成 Class 在 JVM 中的代表：Klass**。不过Klass只是一个基类，Java Class 真正的数据结构定义在 InstanceKlass 中。
+
+```c++
+class InstanceKlass: public Klass {
+ 
+ protected:
+ 
+  Annotations*    _annotations;
+  ......
+  ConstantPool* _constants;
+  ......
+  Array<jushort>* _inner_classes;
+  ......
+  Array<Method*>* _methods;
+  Array<Method*>* _default_methods;
+  ......
+  Array<u2>*      _fields;
+}
+```
+
+可见 InstanceKlass 中记录了一个 Java 类的所有属性，包括注解、方法、字段、内部类、常量池等信息。这些信息本来被记录在Class文件中，所以说，**InstanceKlass就是一个Java Class 文件被加载到内存后的形式**。（InstanceKlass 是分配在 ClassLoader的 Metaspace（元空间） 的方法区中。从 JDK8 开始，HotSpot 就没有了永久代，类都分配在 Metaspace 中。Metaspace 和永久代不一样，采用的是 Native Memory。）到这儿，Class文件已经完成了华丽的转身，由冷冰冰的二进制文件，变成了内存中充满生命力的InstanceKlass。PS：二进程程序加载到内存，可以理解为加载到进程地址空间的各个段里，**InstanceKlass类似于linux中的task_struct**。InstanceKlass 的各个字段类似于task_struct 的各个区域。
 
 [ClassLoader提速](https://mp.weixin.qq.com/s/CTFcwer2htssKszjhnOXtQ)
 
@@ -71,10 +122,12 @@ ClassLoader源码注释：The ClassLoader class uses a delegation model to searc
 
 ![](/public/upload/java/classloader_object.png)
 
+
+每个ClassLoader都有一个 Dictionary 用来保存它所加载的InstanceKlass信息。并且，每个 ClassLoader 通过锁，保证了对于同一个Class，它只会注册一份 InstanceKlass 到自己的 Dictionary 。正是由于上面这些原因，如果所有的 ClassLoader 都由自己去加载 Class 文件，就会导致对于同一个Class文件，存在多份InstanceKlass，所以即使是同一个Class文件，不同InstanceKlasss 衍生出来的实例类型也是不一样的。双亲委派的好处是尽量保证了同一个Class文件只会生成一个InstanceKlass。
+
 双亲委派模型要求除了顶层的启动类加载器外，其余的类加载器都必须有自己的父类加载器，类加载器间的父子关系不会以继承关系实现，而是以组合的方式来复用父类加载的代码。通过这种**层次模型**，规定了类加载器优先级，可以避免类的重复加载，也可以避免核心类被不同的类加载器加载到内存中造成冲突和混乱，从而保证了Java核心库的安全。
 
 双亲委派模型的工作过程：当一个类加载器收到类加载请求的时候，它会首先把这个请求委托给父类加载器去执行，因此所有的类加载请求最终都会传送到顶层的启动类加载器中，只有当父类加载器也无法找到时才会交给自己去加载。
-
 
 [Java类加载器 — classloader 的原理及应用](https://mp.weixin.qq.com/s/YzIlIx4t0uqb-fm9rA9EvQ)使用场景：
 
@@ -89,15 +142,19 @@ ClassLoader源码注释：The ClassLoader class uses a delegation model to searc
 
 ### 延迟加载
 
-    class X{
-        static{   System.out.println("init class X..."); }
-        int foo(){ return 1; }
-        Y bar(){ return new Y(); }
-    }
+```java
+class X{
+    static{   System.out.println("init class X..."); }
+    int foo(){ return 1; }
+    Y bar(){ return new Y(); }
+}
+```
 
 The most basic API is ClassLoader.loadClass(String name, boolean resolve)
 
-    Class classX = classLoader.loadClass("X", resolve);
+```
+Class classX = classLoader.loadClass("X", resolve);
+```
 
 If resolve is true, it will also try to load all classes referenced by X. In this case, Y will also be loaded. If resolve is false, Y will not be loaded at this point.
 

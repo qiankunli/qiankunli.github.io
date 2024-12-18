@@ -21,6 +21,8 @@ keywords: container cpu
 
 ## 内存（待补充）
 
+[K8s里我的容器到底用了多少内存？](https://mp.weixin.qq.com/s/iN3tMmJ2y_nUa6ATInyP1A)
+
 隔离性一般没啥问题，但为了提高资源利用率，一般会对节点进行超卖，此时任务之间就可能相互影响。 
 
 [Koordinator 1.0 正式发布：业界首个生产可用、面向规模场景的开源混部系统](https://mp.weixin.qq.com/s/wox_TMvB4caziOVU5xSTKg)Koordinator 基于 Resource Director Technology (RDT, 资源导向技术) ，控制由不同优先级的工作负载可以使用的末级缓存（服务器上通常为 L3 缓存）。RDT 还使用内存带宽分配 (MBA) 功能来控制工作负载可以使用的内存带宽。这样可以隔离工作负载使用的 L3 缓存和内存带宽，确保高优先级工作负载的服务质量，并提高整体资源利用率。

@@ -33,7 +33,7 @@ keywords: Go goroutine scheduler
 
 协程和线程的最大区别是协程完全是用户态的，包括对象定义，创建、调度和上下文切换。
 
-程序=数据结构 + 算法。调度器就是 基于 g/p/m/sched 等struct，提供初始化方法 schedinit ==> mcommoninit –> procresize –> newproc。**代码go 生产g，在每个m 执行执行 mstart => mstart1 ==>  schedule 来消费g**。PS： 不一定对，这个表述手法很重要。
+程序=数据结构 + 算法。调度器就是 基于 g/p/m/sched 等struct，提供初始化方法 schedinit ==> mcommoninit –> procresize –> newproc。**代码go 生产g，在每个m 执行执行 mstart => mstart1 ==>  schedule 来消费g**。PS： 启动时创建gmp数据结构，创建第一个g（也就是main函数那个g）并切换到这个g执行。
 
 ### 从main函数启动开始分析
 
@@ -105,6 +105,21 @@ func startm(_p_ *p, spinning bool) {    // 调度一些M 来运行P（如有必�
         return
     }
     ...
+}
+```
+编译器在编译下面的go语句时，就会把其替换为对newproc函数的调用，编译后的代码逻辑上等同于下面的伪代码。
+```go
+func start(a, b, c int64) {
+    ......
+}
+func main() {
+    go start(1, 2, 3)
+}
+func main() {
+    push 0x3
+    push 0x2
+    push 0x1
+    runtime.newproc(24, start)
 }
 ```
 
@@ -219,7 +234,7 @@ TEXT runtime·gogo(SB), NOSPLIT, $8-4
     JMP	BX
 ```
 
-runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器和待执行函数的程序计数器，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**(所以goroutine 没有返回值)。runtime.goexit ==> runtime·goexit1 ==> mcall(goexit0) ==> goexit0，goexit0 会对 G 进行复位操作，解绑 M 和 G 的关联关系，将其 放入 gfree 链表中等待其他的 go 语句创建新的 g。在最后，goexit0 会重新调用 schedule触发新一轮的调度。PS：就切换几个寄存器（PC和SP），所以协程的切换成本更低
+runtime.gogo 中会从 runtime.gobuf 中取出 runtime.goexit 的程序计数器和待执行函数的程序计数器，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**(所以goroutine 函数没有返回值)。runtime.goexit ==> runtime·goexit1 ==> mcall(goexit0) ==> goexit0，goexit0 会对 G 进行复位操作，解绑 M 和 G 的关联关系，将其 放入 gfree 链表中等待其他的 go 语句创建新的 g。在最后，goexit0 会重新调用 schedule触发新一轮的调度。PS：就切换几个寄存器（PC和SP），所以协程的切换成本更低
 
 ![](/public/upload/go/routine_switch_after.jpg)
 
@@ -309,66 +324,36 @@ func newproc1(fn *funcval, argp *uint8, narg int32, callergp *g, callerpc uintpt
     }
 }
 ```
+总结下newproc做了什么事情:
 
-## 图解
-
-### 初始化
-
-在主线程第一次被调度起来执行第一条指令之前，主线程的函数栈如下图所示：
-
-![](/public/upload/go/go_scheduler_thread_init.jpg)
-
-初始化全局变量g0，g0的主要作用是提供一个栈供runtime代码执行。 PS：代码执行就得有一个栈结构存在？
-
-![](/public/upload/go/go_scheduler_g0.jpg)
-
-把m0和g0绑定在一起，这样，之后在主线程中通过get_tls可以获取到g0，通过g0的m成员又可以找到m0，于是这里就实现了**m0和g0与主线程之间的关联**。
-
-![](/public/upload/go/go_scheduler_m0.jpg)
-
-初始化p和allp
-
-![](/public/upload/go/go_scheduler_p.jpg)
-
-创建 main goroutine。多了一个我们称之为newg的g结构体对象，该对象也已经获得了从堆上分配而来的2k大小的栈空间，newg的stack.hi和stack.lo分别指向了其栈空间的起止位置。
-
-![](/public/upload/go/go_scheduler_newg.jpg)
-
-调整newg的栈空间，把goexit函数的第二条指令的地址入栈，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**；重新设置newg.buf.pc 为需要执行的函数的地址，即fn，我们这个场景为runtime.main函数的地址。修改newg的状态为_Grunnable并把其放入了运行队列
-
-![](/public/upload/go/go_scheduler_newg_runnable.jpg)
-
-gogo函数也是通过汇编语言编写的，这里之所以需要使用汇编，是因为goroutine的调度涉及不同执行流之间的切换，前面我们在讨论操作系统切换线程时已经看到过，执行流的切换从本质上来说就是**CPU寄存器以及函数调用栈的切换**（PS：栈的切换没有在之前的意识里），然而不管是go还是c这种高级语言都无法精确控制CPU寄存器的修改，因而高级语言在这里也就无能为力了，只能依靠汇编指令来达成目的。
-
-1. 保存g0的调度信息，主要是保存CPU栈顶寄存器SP到g0.sched.sp成员之中；
-2. 调用schedule函数寻找需要运行的goroutine，我们这个场景找到的是main goroutine;
-3. 调用gogo函数首先从g0栈切换到main goroutine的栈，然后从main goroutine的g结构体对象之中取出sched.pc的值并使用JMP指令跳转到该地址去执行；
-4. main goroutine执行完毕直接调用exit系统调用退出进程。
+1. 在堆上给新goroutine分配一段内存作为栈空间，设置堆栈信息到新goroutine对应的g结构体上，核心是设置gobuf.pc指向要执行的代码段，待调度到该g时，会将保存的pc值设置到cpu的RIP寄存器上从而去执行该goroutine对应的代码。
+2. 把传递给goroutine的参数从当前栈拷贝到新goroutine所在的栈上。
+3. 把g加入到p的本地队列等待调度，如果本地队列满了会加入到全局队列（程序刚启动时只会加入到p的本地队列）。
 
 
-入口函数是runtime.main，runtime.main函数主要工作流程如下：
+### “M的”调度循环
 
-1. 启动一个sysmon系统监控线程，该线程负责整个程序的gc、抢占调度以及netpoll等功能的监控
-2. 执行runtime包的初始化；
-3. 执行main包以及main包import的所有包的初始化；
-4. 执行main.main函数；
-5. 从main.main函数返回后调用exit系统调用退出进程；
-
-非main goroutine执行完成后就会返回到goexit继续执行，而main goroutine执行完成后整个进程就结束了，这是main goroutine与其它goroutine的一个区别。
-
+启动流程已经创建好第一个goroutine并放入了当前工作线程的本地运行队列（即runtime.main对应的goroutine）。获取到g后，会调用execute去切换到g，具体的切换逻辑继续看下execute函数。
 
 ```go
-func g2(n int, ch chan int) {
-    ch <- n*n
-}
-func main() {
-    ch := make(chan int)
-    go g2(100, ch)
-    fmt.Println(<-ch)
+func execute(gp *g, inheritTime bool) {
+    _g_ := getg() //g0
+    //设置待运行g的状态为_Grunning
+    casgstatus(gp, _Grunnable, _Grunning)
+  
+    //......
+    
+    //把g和m关联起来
+    _g_.m.curg = gp 
+    gp.m = _g_.m
+    //......
+    //gogo完成从g0到gp真正的切换
+    gogo(&gp.sched)
 }
 ```
 
-### “M的”调度循环
+这里的重点是gogo函数，真正完成了g0到g的切换，切换的实质就是CPU寄存器以及函数调用栈的切换。启动场景找到的是main goroutine;
+调用gogo函数首先从g0栈切换到main goroutine的栈，然后从main goroutine的g结构体对象之中取出sched.pc的值并使用JMP指令跳转到该地址去执行；
 
 从 `go func(){...}` 创建goroutine 到调度循环。
 
@@ -399,19 +384,19 @@ schedule()->execute()->gogo()->用户协程->goexit()->goexit1()->mcall()->goexi
 
 ![](/public/upload/go/go_scheduler_cycle.jpg)
 
+
+
 ## 调度策略
 
 GMP模型结合了协同式调度与抢占式调度的特点，其中主动调度和被动调度体现了协程间的协作，而 sysmon 协程执行的抢占式调度确保了即使协程长时间运行或阻塞也能被及时中断，从而公平高效地分配 CPU 资源。
 1. 主动调度：协程通过 runtime.Goshed 方法主动让渡自己的执行权利，之后这个协程会被放到全局队列中，等待后续被执行。
+    1. 类似的，linux 进程会主动调用schedule() 触发调度让出cpu 控制权。
 2. 被动调度：协程在休眠、channel 通道阻塞、网络 I/O 堵塞、执行垃圾回收时被暂停，被动式让渡自己的执行权利。大部分场景都是被动调度，这是 Go 高性能的一个原因，让 M 永远不停歇，不处于等待的协程让出 CPU 资源执行其他任务。
     1. Go 语言通过 Syscall 和 Rawsyscall 等使用汇编语言编写的方法封装了操作系统提供的所有系统调用
-3. 抢占式调度：sysmon 协程上的调度，当发现 G 处于系统调用（如调用网络 io ）超过 20 微秒或者 G 运行时间过长（超过10ms），会抢占 G 的执行 CPU 资源，让渡给其他协程，防止其他协程没有执行的机会。
+3. 抢占式调度：sysmon 协程上的调度，当发现 G 处于系统调用（如调用网络 io ）超过 20 微秒或者 G 运行时间过长（超过10ms），会抢占 G 的执行 CPU 资源，让渡给其他协程，防止其他协程没有执行的机会。PS：linux 可以依靠硬件提供的中断机制
     1. 函数调用时执行栈分段检查自身的抢占标记， 决定是否继续执行
 
 ![](/public/upload/go/goroutine_schedule.png)
-
-
-类似的，linux 进程会主动调用schedule() 触发调度让出cpu 控制权。
 
 ### 协作式的抢占
 
@@ -474,6 +459,65 @@ func park_m(gp *g) {
     schedule()
 }
 ```
+
+## 图解
+
+### 初始化
+
+在主线程第一次被调度起来执行第一条指令之前，主线程的函数栈如下图所示：
+
+![](/public/upload/go/go_scheduler_thread_init.jpg)
+
+初始化全局变量g0，g0的主要作用是提供一个栈供runtime代码执行。 PS：代码执行就得有一个栈结构存在？
+
+![](/public/upload/go/go_scheduler_g0.jpg)
+
+把m0和g0绑定在一起，这样，之后在主线程中通过get_tls可以获取到g0，通过g0的m成员又可以找到m0，于是这里就实现了**m0和g0与主线程之间的关联**。
+
+![](/public/upload/go/go_scheduler_m0.jpg)
+
+初始化p和allp
+
+![](/public/upload/go/go_scheduler_p.jpg)
+
+创建 main goroutine。多了一个我们称之为newg的g结构体对象，该对象也已经获得了从堆上分配而来的2k大小的栈空间，newg的stack.hi和stack.lo分别指向了其栈空间的起止位置。
+
+![](/public/upload/go/go_scheduler_newg.jpg)
+
+调整newg的栈空间，把goexit函数的第二条指令的地址入栈，**伪造成goexit函数调用了fn，从而使fn执行完成后执行ret指令时返回到goexit继续执行完成最后的清理工作**；重新设置newg.buf.pc 为需要执行的函数的地址，即fn，我们这个场景为runtime.main函数的地址。修改newg的状态为_Grunnable并把其放入了运行队列
+
+![](/public/upload/go/go_scheduler_newg_runnable.jpg)
+
+gogo函数也是通过汇编语言编写的，这里之所以需要使用汇编，是因为goroutine的调度涉及不同执行流之间的切换，前面我们在讨论操作系统切换线程时已经看到过，执行流的切换从本质上来说就是**CPU寄存器以及函数调用栈的切换**（PS：栈的切换没有在之前的意识里），然而不管是go还是c这种高级语言都无法精确控制CPU寄存器的修改，因而高级语言在这里也就无能为力了，只能依靠汇编指令来达成目的。
+
+1. 保存g0的调度信息，主要是保存CPU栈顶寄存器SP到g0.sched.sp成员之中；
+2. 调用schedule函数寻找需要运行的goroutine，我们这个场景找到的是main goroutine;
+3. 调用gogo函数首先从g0栈切换到main goroutine的栈，然后从main goroutine的g结构体对象之中取出sched.pc的值并使用JMP指令跳转到该地址去执行；
+4. main goroutine执行完毕直接调用exit系统调用退出进程。
+
+
+入口函数是runtime.main，runtime.main函数主要工作流程如下：
+
+1. 启动一个sysmon系统监控线程，该线程负责整个程序的gc、抢占调度以及netpoll等功能的监控
+2. 执行runtime包的初始化；
+3. 执行main包以及main包import的所有包的初始化；
+4. 执行main.main函数；
+5. 从main.main函数返回后调用exit系统调用退出进程；
+
+非main goroutine执行完成后就会返回到goexit继续执行，而main goroutine执行完成后整个进程就结束了，这是main goroutine与其它goroutine的一个区别。
+
+
+```go
+func g2(n int, ch chan int) {
+    ch <- n*n
+}
+func main() {
+    ch := make(chan int)
+    go g2(100, ch)
+    fmt.Println(<-ch)
+}
+```
+
 
 ## Go的栈
 

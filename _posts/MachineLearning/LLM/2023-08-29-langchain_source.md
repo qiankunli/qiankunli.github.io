@@ -742,3 +742,33 @@ LLM 可观测性组件都是基于callbackhandler 实现的，分为服务端、
 3. 模型响应时间
 4. Agent workflow
 5. 用户反馈
+
+## 一些理解
+
+1. 一次llm的调用的基本组成是llm（llm client） 和prompt
+    1. llm client 负责text in text output 抽象
+    2. prompt 负责variables 到text 抽象。text 到output 因为output 领域特定，但json是一个相对普及和通用的格式。prompt 抽象也该负责起来，langchain 将这两个活儿分拆到PromptTemplate 和 OutputParser。
+    3. chain = prompt | llm | output_parser 组成一次调用。
+2. 一次干活儿，光有chain 不够，还有为 chain 准备数据，以及将chain的输出 进一步格式化和使用的过程。
+    1. 提供一个XXChain。
+       ```python
+        input_struct = get_xx()
+        xx_chain = XXChain(llm, ...)
+        output_struct = xx_chain(input_struct)
+        ```
+    2. 自己提供一个 XXComponent，干一个活儿定义一个XXComponent，可以抽一个BaseComponent出来，明显的共性就是都需要持有llm_client
+        ```python
+        class BaseComponent(ABC):
+            def __init__(config):
+                self.llm_client = OpenAIClient(config)
+        class XXComponent(BaseComponent):
+            def __init__(**kwargs):
+                xx
+            def run(input_struct) -> output_struct:
+                xx
+        ```
+    3. 如果没有这样一个封装，再对prompt 和 output_parser 没有合理的管理，你的代码将经常在 业务代码langchain 概念之间跳跃。
+3. 在看了一些框架之后，个人发现将prompt 和 output_parser 分开是不对的，因为prompt 一般定义了输出格式，改prompt 也得改output_parser实现，以及output_parser解析失败的默认值等，为此应有一个统一抽象比如叫Prompt
+    1. llm 负责 text in text output
+    2. Prompt 负责input_struct to text,  text to output_struct
+    3. Component 负责config + input_struct in， output_struct output，根据需要聚合其它逻辑或Component

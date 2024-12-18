@@ -140,8 +140,10 @@ struct vm_area_struct{
 
 ![](/public/upload/linux/linux_task_vm.jpg)
 
+linux进程地址空间是由一个个vm_area_struct(vma)组成，每个vma都有自己地址区间。如果你的代码panic或者Segmentation Fault崩溃，最直接的原因就是你引用的指针值不在进程的任意一个vma区间内。你可以通过 /proc/<pid>/maps 来观察进程的vma分布。
 
-[你真的理解内存分配吗？](https://mp.weixin.qq.com/s/H9W3tL_Jxxg3LAV6Y3rFyw)对于内存的访问，用户态的进程使用虚拟地址，内核的也基本都是使用虚拟地址
+
+[你真的理解内存分配吗？](https://mp.weixin.qq.com/s/H9W3tL_Jxxg3LAV6Y3rFyw)对于内存的访问，用户态的进程使用虚拟地址，内核的也基本都是使用虚拟地址。
 
 ![](/public/upload/linux/process_virtual_space.png)
 
@@ -153,6 +155,7 @@ struct vm_area_struct{
 3. 伙伴系统。当系统中还有很多 8 字节的空闲块，而 4 字节的空闲块却已经耗尽，这时再有一个 4 字节的请求，伙伴系统不会直接把 8 的空闲区域分配出去，因为这样做的话，会带来巨大的浪费。它会先把 8 字节分成两个 4 字节，一个用于本次 malloc 分配，另一个则挂入到 4 字节的 free list。这种不断地把一块内存分割成更小的两块内存的做法，就是伙伴系统，这两块更小的内存就是伙伴。当释放内存时，如果系统发现与被释放的内存相邻的那个伙伴也是空闲的，就会把它们合并成一个更大的连续内存。
 
 ![](/public/upload/linux/linux_virtual_address.png)
+malloc函数增大了进程虚拟地址空间的heap容量，扩大了mm描述符中vma的start和end长度，或者插入了新的vma；但是它刚完成调用后，并没有增大进程的实际内存使用量。malloc申请到的地址，在得到真实的使用之前，必须经历缺页中断，完成建立虚拟地址到物理地址的映射。
 
 ### 进程虚拟空间划分 
 
@@ -354,6 +357,8 @@ struct mm_struct {
 }
 ```
 栈内存的申请（默认给了4kb，一页）其实只是申请一个表示一段地址范围的vm_area_struct，并没有真正的申请物理内存。加载elf程序时（load_elf_binary），会将准备的栈地址空间指针赋值给mm_struct->start_stack。当进程运行的过程中在栈上开始分配和访问变量的时候，如果物理页还没有分配，会触发缺页中断，在缺页中断中调用内核的伙伴系统真正的分配物理内存。随着进程的运行，当栈中保存的调用链、局部变量越来越多的时候，必然会超过4kb，此时如果要访问的address 大于vma，在缺页处理函数中，会调用expand_stack 进行扩充，如果允许扩充，则简单修改下vma->vm_start 就可以了。
+
+进程的RSS(Resident Set Size)是当前使用的实际物理内存大小，包括代码段、堆、栈和共享库等所使用的内存, 实际上就是页表中物理页部分的全部大小。
 
 ### 用户栈和内核栈的切换
 

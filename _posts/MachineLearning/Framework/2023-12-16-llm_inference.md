@@ -165,7 +165,7 @@ LLM推理需要的芯片形态，最重要的是内存带宽和互联带宽，�
 
 ### KV Cache
 
-有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。 KVCache 顾名思义**缓存一部分K矩阵和V矩阵**（省的是$input*W_k$和$input*W_v$的计算），主要用于加速生成 token 时的 attention 计算。
+有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。 KVCache 顾名思义**缓存一部分K矩阵和V矩阵**（省的是$input*W_k$和$input*W_v$的计算），主要用于加速生成 token 时的 attention 计算。PS：缓存的就是kv矩阵。
 
 ![](/public/upload/machine/kv_cache.jpg)
 
