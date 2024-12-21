@@ -29,6 +29,283 @@ keywords:  pytorch distributed
 
 [[源码解析] PyTorch 分布式(8) -------- DistributedDataParallel 之 论文篇](https://mp.weixin.qq.com/s/5EL3yb_-8t02GLdZ6qsclw)应用程序开发通常从本地模型开始，然后在必要时扩展。所以需要有一个从本地模型开始，修改代码以适应分布式的过程。为了避免这个从本地模型到分布式模型的过渡期间太过麻烦，API在应用程序代码中是非侵入性的。
 
+## 用torchrun实现分布式开发
+
+先不说模型训练，单说分布式开发，来一个Hello World
+
+```python
+import torch
+import os
+
+if __name__ == '__main__':
+    rank = int(os.getenv('RANK','0'))
+    world_size = int(os.getenv('WORLD_SIZE','1'))
+    torch.distributed.init_process_group(rank=rank, world_size=world_size, backend='nccl')
+    print(f'Hello World from rank:{torch.distributed.get_rank()} out of {torch.distributed.get_world_size()} worlds.')
+```
+
+可以用`torchrun --nproc-per-node 2 hello.py`来启动。
+1. --nproc-per-node表示每台服务器上启动多少个进程
+2. --master_addr和--master_port：当启动的是多机环境时，需要用这两个参数指定主机的IP地址和端口号。这两个参数在所有master和slaver机器上都是一样的，不需要修改。
+3. --nnodes： 当多机启动分布式时，使用这个参数，表明总共有多少台机器。master会根据这个参数配置来等待slaver链接，直到slaver数量凑够nnodes才会启动。这个参数在每台机器上都是一样的，不需要修改。
+4. --node_rank：表示当前node是全部node中的第几个，这个参数需要根据启动的机器进行更改，master的rank必须是0。
+上述启动参数要放在torchrun之后，脚本路径之前。写在脚本路径之前的参数不会被传递给脚本运行的环境，所以脚本中不要处理这些参数。
+
+### 原生多进程
+
+使用torchrun启动脚本，就是以多进程方式启动脚本。首先来看看python原生的多进程启动方式：
+
+```python
+import multiprocessing as mp
+
+def main(rank, world):
+    print(rank, world)
+
+if __name__ == '__main__':
+    world_size = 4
+    ps = [mp.Process(None, main, args=(rank, world_size)) for rank in range(world_size)]
+
+    for p in ps:
+        p.start()
+    for p in ps:
+        p.join()
+```
+
+这种多进程能不能拿来作为torch的分布式训练环境呢？当然是可以的，只需要这样操作：
+
+```python
+import multiprocessing as mp
+import torch
+import torch.distributed
+
+def main(rank, world_size, master_addr='127.0.0.1', master_port=29500):
+    init_method = f'tcp://{master_addr}:{master_port}'
+
+    torch.distributed.init_process_group(rank=rank,world_size=world_size,init_method=init_method,backend='nccl')
+    print(f'rank:{torch.distributed.get_rank()} world_size:{torch.distributed.get_world_size()}')
+
+if __name__ == '__main__':
+    world_size = 4
+    ps = [mp.Process(None, main, args=(rank, world_size)) for rank in range(world_size)]
+
+    for p in ps:
+        p.start()
+    for p in ps:
+        p.join()
+```
+
+这里init_method就是用来在初始化阶段，实现进程发现的方法，除了tcp，还可以用本地文件发现或者环境变量。除了multiprocessing 的多进程，用subprocess 的多进程也是一样可以的。当然torch也提供了一种启动多进程的方法：
+
+```python
+import torch
+
+def main(rank, world_size, master_addr='127.0.0.1', master_port=29500):
+    init_method = f'tcp://{master_addr}:{master_port}'
+
+    torch.distributed.init_process_group(rank=rank,world_size=world_size,init_method=init_method,backend='nccl')
+    print(f'rank:{torch.distributed.get_rank()} world_size:{torch.distributed.get_world_size()}')
+
+if __name__ == '__main__':
+    world_size = 4
+    torch.multiprocessing.spawn(main, args=(world_size,), nprocs=world_size)
+```
+
+### 初始化分布式环境
+
+在启动的训练脚本中，需要先**初始化分布式环境**，也就是下面这几行：
+
+```python
+rank = int(os.getenv('RANK','0'))
+world_size = int(os.getenv('WORLD_SIZE','1'))
+torch.distributed.init_process_group(rank=rank, world_size=world_size, backend='nccl')
+```
+
+如果是使用torchrun启动的脚本，torch会帮你在环境变量中写入RANK和WORLD_SIZE这两个变量，在脚本中可以读出来。它们分别表示当前进程的序号和总进程数。这个进程序号是全局的进程序号，也就是说如果每台服务器启动8个进程，总共10台服务器参与训练，那么第十台机器的8个进程rank分别是72、73、74、75、76、77、78、79。world_size也是全局的进程数，而不是单台服务器上的进程数。获得rank和world_size后，就可以用torch.distributed.init_process_group初始化分布式环境。需要提的一点是，torch并没有local_rank 这个概念。这是一些训练框架自己定义的，通常用来表示当前进程是这台服务器上的第几个进程。
+
+在初始化命令中，我们还指定了backend参数，这个参数表示的是分布式环境默认使用的通信后端是什么，一般可以选择 nccl、gloo和mpi后端。gpu to gpu的通信选择nccl后端。cpu to cpu的通信选择gloo后端，一般不太会用到mpi后端。nccl通信会比gloo通信快，所以应该尽量使用nccl进行通信。但是在有些时候，比如读取数据的阶段，如果多个进程之间需要通信，一般使用用gloo通信。因为这时，我们并不希望这些还没有开始正向传播的张量过早出现在gpu上，避免过多占用显存。
+### set device
+分布式训练中，在我们创建gpu张量时，经常使用torch.cuda.current_device()获取当前rank使用的cuda设备，然后直接在这个设备上创建。 但是使用这个函数的前提是之前通过set_device显示的设定过默认设备。
+
+所以一个好习惯是，在执行主要的训练逻辑之前，尽早设置默认的cuda设备：
+
+```python
+devices = torch.cuda.device_count()
+torch.cuda.set_device(rank % devices)
+```
+如果不手动设置，current_device默认会返回cuda:0。
+
+
+### 通信算子
+通信算子指的是在分布式训练中，能够在不同rank之间进行数据交换的算子。torch提供了很多通信相关的算子，最常用可以划分为5类：规约、聚集、广播、点对点通信和其他。
+
+规约。规约最典型的就是torch.distributed.all_reduce，这个算子能够对不同rank之间的数据进行求和、求均值、最大值等操作，特点是不论有多少个rank，**最终结果只有一个tensor**。例如下面这段代码，作用是对所有rank之间的"tensor"求和：
+
+```python
+import torch
+import os
+
+if __name__ == '__main__':
+    rank = int(os.getenv('RANK','0'))
+    world_size = int(os.getenv('WORLD_SIZE','1'))
+
+    torch.distributed.init_process_group(rank=rank, world_size=world_size, backend='nccl')
+    devices = torch.cuda.device_count()
+    torch.cuda.set_device(rank % devices)
+    # rank0的tensor=1，rank1的tensor=2
+    tensor = torch.tensor([rank + 1], dtype=torch.long, device='cuda')
+    torch.distributed.all_reduce(tensor)  # 求和结果为3
+    print(f'rank:{rank} {tensor}')
+```
+规约操作基本可以算是最常用的通信算子。例如rank之间通过规约操作同步梯度、计算平均loss，再比如分布式softmax利用规约计算最大值、归一化分母等等。
+
+聚集操作中最典型的是torch.distributed.all_gather()，能够把不同rank的数据收集到一起，**特点是参与通信的rank有多少，就会得到多少个tensor**。例如下面这段代码，作用是将所有rank的tensor收集到一起：
+
+```python
+import torch
+import os
+
+if __name__ == '__main__':
+    rank = int(os.getenv('RANK','0'))
+    world_size = int(os.getenv('WORLD_SIZE','1'))
+
+    torch.distributed.init_process_group(rank=rank, world_size=world_size, backend='nccl')
+    devices = torch.cuda.device_count()
+    torch.cuda.set_device(rank % devices)
+
+    tensor = torch.tensor([rank+1], dtype=torch.long, device='cuda')
+    tensors = [torch.empty_like(tensor) for _ in range(world_size)]
+    torch.distributed.all_gather(tensors,tensor)
+    print(f'rank:{rank} {tensors}')
+```
+all_gather可以模拟all_reduce，比如sum(tensors)就等于all_reduce sum，max(tensors) 就是all_reduce max。聚集相比规约更加灵活，但是规约的效率和显存占用通常会更好。
+
+广播的典型操作是 torch.distributed.broadcast()，作用是将指定rank的tensor发送给其他所有rank，比如下面这段代码，是将rank0的tensor发送给其他所有rank，这样最终所有rank的tensor都是一样的
+```python
+import torch
+import os
+
+if __name__ == '__main__':
+    rank = int(os.getenv('RANK','0'))
+    world_size = int(os.getenv('WORLD_SIZE','1'))
+
+    torch.distributed.init_process_group(rank=rank, world_size=world_size, backend='nccl')
+    devices = torch.cuda.device_count()
+    torch.cuda.set_device(rank % devices)
+
+    tensor = torch.tensor([rank+1], dtype=torch.long, device='cuda')
+    torch.distributed.broadcast(tensor,0)
+    print(f'rank:{rank} {tensor}')
+```
+广播的特点是数据由一个节点到所有节点，通常用于将只会出现在某一个rank的信号发送到全部rank。
+
+除了上述几个所有rank之间的通信，有时我们也需要两个rank之间的两两通信，这时就会用到p2p通信。p2p通信的发送方使用torch.distributed.send()，接收方使用torch.distributed.recv()。比如下面这段代码，功能是所有偶数rank将tensor发送到下一个奇数rank：
+
+```python
+import torch
+import os
+
+if __name__ == '__main__':
+    rank = int(os.getenv('RANK','0'))
+    world_size = int(os.getenv('WORLD_SIZE','1'))
+
+    torch.distributed.init_process_group(rank=rank, world_size=world_size, backend='nccl')
+    devices = torch.cuda.device_count()
+    torch.cuda.set_device(rank % devices)
+
+    if rank % 2 == 0:
+        tensor = torch.tensor([999], dtype=torch.long, device='cuda')
+        torch.distributed.send(tensor, rank+1)
+    else:
+        tensor = torch.empty(1, dtype=torch.long, device='cuda')
+        torch.distributed.recv(tensor,rank-1)
+    print(f'rank:{rank} {tensor}')
+```
+
+上面大多数算子都是原地操作，这就带来一个问题，**原地操作要求先创建一个空张量，等待通信算子把数据放进来**。但是一个rank怎么知道被通信过来的张量shape是什么样的，怎么提前创建这个空张量？尤其是在广播和p2p通信时经常会碰到这个问题。一个常用的方案是在通信以前，先通信一个固定ndim的张量用来表示接下来要通信的张量的shape，然后再通信真正的数据。这种方法有点像定义一种通信协议，第一次握手通信shape，第二次通信数据。点对点通信主要的应用场景一个是pipeline并行，由上一个pipe发送数据到下一个pipe，一个是蒸馏的teacher 模型发送 probabilities 给 student，以及类似的reference-policy model。
+
+还有一个经常使用的是同步屏障 torch.distributed.barrier()，这个操作不通信任何数据，作用是确保所有进程都运行到此处后再开始之后的动作。比如当存储checkpoint时，我们通常只会让第一个数据并行的rank进行保存，其他rank此时就应该使用同步屏障等待第一个rank保存结束。这样可以避免其他rank提前开始新的计算或提前结束导致保存失败，例如：
+
+```python
+import torch
+import os
+import time
+
+if __name__ == '__main__':
+    rank = int(os.getenv('RANK','0'))
+    world_size = int(os.getenv('WORLD_SIZE','1'))
+
+    torch.distributed.init_process_group(rank=rank, world_size=world_size, backend='nccl')
+    devices = torch.cuda.device_count()
+    torch.cuda.set_device(rank % devices)
+
+    if rank == 0:
+        time.sleep(20) # 用sleep20秒模拟rank0在做一些高耗时行为，比如存储checkpoint
+    else:
+        a = 1 + 2
+
+    torch.distributed.barrier()
+```
+除了上面这几种，还有all-to-all算子和scatter算子。在LLM场景中经这两个算子经常出现在序列并行的正、反向传播中。在使用通信算子时，需要确保所有相关rank都要执行到这一段代码，不然已经执行到这一步的rank会hang住一直等待，导致程序无法继续。
+
+### 通信组
+
+上面的提到的算子，除了p2p通信，基本都是所有rank参与的通信，如果只能这样未免有些太死板了。想要前5个rank all_reduce，后5个 rank all_gather应该怎么做？广播只广播给奇数rank怎么做？一部分操作在gpu上用nccl通信，一部分在cpu上用gloo通信怎么实现？如果2个rank同时用p2p通信不同张量，怎么做区分？这里就轮到通信组登场了。
+
+通信组是通过下面这种形式创建的：
+```
+ranks = [0,1]
+group = torch.distributed.new_group(ranks,backend='nccl')
+```
+上面这段代码的意思是创建1个通信组，包含 rank0和rank1，以nccl作为后端。 在使用通信算子时，我们可以通过group参数指定通信组，这样数据交换就只会发生在组内。比如当你这样使用barrier时，可以指定通信组，这样只要组内的rank都到达barrier，就可以继续，而不是等待所有rank都到达barrier才能继续：
+
+```python
+import torch
+import os
+
+if __name__ == '__main__':
+    rank = int(os.getenv('RANK','0'))
+    world_size = int(os.getenv('WORLD_SIZE','1'))
+
+    torch.distributed.init_process_group(rank=rank, world_size=world_size, backend='nccl')
+    devices = torch.cuda.device_count()
+    torch.cuda.set_device(rank % devices)
+
+    ranks = [0,1]
+    group = torch.distributed.new_group(ranks)
+
+    if rank in ranks:
+        torch.distributed.barrier(group=group)
+        print(f'rank:{rank} finish')
+    else:
+        torch.distributed.barrier()
+        print(f'rank:{rank} finish')
+```
+
+通信组可以创建多个，并且每个可以指定使用不同的后端，方便进行cuda或cpu张量的混合通信：
+```
+group1 = torch.distributed.new_group([0,1])
+group2 = torch.distributed.new_group([2,3])
+group3 = torch.distributed.new_group([1,2,3])
+group4 = torch.distributed.new_group([0,3], backend='gloo')
+```
+在使用通信组时，rank自身必须是这个通信组的成员，比如rank3不能使用group1。那么既然rank3不能使用group1，那rank3能不能干脆就不创建group1，只创建group2、3、4呢？答案是不行。torch对创建通信组有两个要求：
+1. 通信组中涉及到的所有rank必须全都执行创建通信组的代码
+2. 通信组在所有rank上的创建顺序必须是一样的
+
+比如在rank0创建的第一个通信组是[0, 1]，那么rank1创建的第一个也必须这个，rank2、3也一样，即使他们不能用这个通信组。所以多通信组的创建代码一般是长这样的：
+
+```python
+group = None
+rank = torch.distributed.get_rank()
+for ranks in [[0,1],[2,3]]:
+    _group = torch.distributed.new_group(ranks)
+    if rank in ranks:
+        group = _group
+```
+这样保证group的创建顺序是一致的，并且只保留自己这个rank能用的组。
+
+PS：分布式程序（再具体就是多进程程序）从代码看，大部分逻辑相同，但是rank不同，个别步骤基于rank 做一些本rank的操作，此外还有一些多个步骤间同步数据、步调的工作。gpu cuda编程也非常类似，可以通过参数和全局函数知道自己处于第几个block（threadIdx）和thread（blockIdx）。且一般都是预先建好 参数和结果变量（申请好内存空间），等着跟其他worker发送和接收它们。
+
 ## 单机单卡
 
 [Pytorch分布式训练](https://mp.weixin.qq.com/s/G-uLl3HXzFJOW03nA7etig)

@@ -112,13 +112,16 @@ shell 实现的功能有别于其它应用，它的功能是接受用户输入�
 
 ![](/public/upload/linux/task_fork.jpeg)
 
+应用：在torch的多进程中，再次启动子进程有一点需要注意的地方。那就是如果在启动子进程之前触发了任何与cuda相关的操作，比如使用了set_device，或者在cuda上创建了一个张量，那么子进程中就不能再使用cuda。因为cuda环境只能初始化一次，并且与进程绑定。Linux上创建的子进程默认使用的是fork的方式。fork创建的子进程会继承父进程的内存空间，因此已经绑定了父进程的cuda环境被继承给了子进程，子进程使用cuda就会报错。可以要求子进程以spawn方式启动，因为spawn方式启动的子进程使用的是全新的解释器，cuda还处于未初始化的状态。
+
+### 与线程区别
+
 ||创建进程|创建线程|
 |---|---|---|
 |系统调用|fork|clone|
 |copy_process逻辑|会将五大结构 files_struct、fs_struct、sighand_struct、signal_struct、mm_struct 都复制一遍<br>从此父进程和子进程各用各的数据结构|五大结构仅仅是引用计数加一<br>也即线程共享进程的数据结构|
 ||完全由内核实现|由内核态和用户态合作完成<br>相当一部分逻辑由glibc库函数pthread_create来做|
 |数据结构||内核态struct task_struct <br>用户态 struct pthread|
-
 
 [聊聊Linux中线程和进程的联系与区别](https://mp.weixin.qq.com/s/--S94B3RswMdBKBh6uxt0w)**Linux进程和线程的相同点要远远大于不同点，本质上是同一个东西**，都是一个 task_struct。每一个 task_struct 都需要被唯一的标识，它的 pid 就是唯一标识号。对于进程来说，这个 pid 就是我们平时常说的进程 pid。对于线程来说，我们假如一个进程下创建了多个线程出来。那么每个线程的 pid 都是不同的。但是我们一般又需要记录线程是属于哪个进程的，通过 tgid 字段来表示自己所归属的进程 ID。
 1. 进程创建 fork ==> fork ==> do_fork ==> copy_process

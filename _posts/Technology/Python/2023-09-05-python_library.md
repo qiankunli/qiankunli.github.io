@@ -78,7 +78,6 @@ Python是一门动态语言，很多时候我们可能不清楚函数参数类�
 2. 泛型支持：typing模块提供了对泛型的支持，使得可以编写更通用和灵活的代码。通过泛型，可以在函数和类中引入类型参数，以处理各种类型的数据。
 3. 类、函数和变量装饰器：typing模块提供了一些装饰器，如@overload、@abstractmethod、@final等，用于修饰类、函数和变量，以增加代码的可读性和可靠性。
 
-
 typing.Annotated是用于增强类型注解语义的工具。它允许你在类型提示中附加额外的元数据，用于描述一些特殊规则，如参数取值范围、参数单位、或是与其他系统约定的格式，使得你可以在代码注释中表达更多的业务逻辑需求。Annotated本质上是一个泛型，它的第一个参数是原本的类型，后续参数则是附加的元数据信息。虽然 **Python 本身不会解析这些元数据**，但它可以用于静态分析工具、文档生成工具或其他依赖注解的第三方库来做进一步处理。PS：类似于go里除了类型之外，加tag
 
 ```python
@@ -177,7 +176,7 @@ TypedDict 仅为类型检查工具而生，在运行时没有作用。
 
 ### 泛型编程
 
-动态类型天然就是泛型。只不过太泛了。
+泛型的核心优势：一次编写，多种类型通用。动态类型天然就是泛型。只不过太泛了。
 
 比如对于`List[int]`，其中List就是泛型（Generic Type）。`List[int]`合一块儿叫具体类型（Concrete Type）。用List这个泛型，生成`List[int]`这个具体类型的过程叫做参数化 （Parameterization）。
 
@@ -215,6 +214,35 @@ print(str_stack.pop())  # 输出 "world"
 ```
 
 Callable[[int, str], float]，接受一个整数和一个字符串作为参数，并返回一个浮点数。中括号 [] 用于创建一个类型元组 (int, str)，表示函数的参数类型。如果没有中括号，Python 解释器将无法正确解析参数类型列表（分不清哪些是入参，哪些是返回值）。
+
+如果两个类型有继承关系呢？
+1. 协变指的是：如果 A 是 B 的子类，那么 Container[A] 也可以被视为 Container[B] 的子类。通常用于"只读"操作的场景。
+    ```python
+    class Animal: pass
+    class Dog(Animal): pass
+
+    # 协变的例子
+    T_co = TypeVar('T_co', covariant=True)
+    class ReadOnlyList(Generic[T_co]):
+        ...
+    dogs_list: ReadOnlyList[Dog] = ReadOnlyList([Dog()])
+    animals_list: ReadOnlyList[Animal] = dogs_list  # 协变允许这种赋值
+    ```
+2. 逆变与协变相反：如果 A 是 B 的子类，那么 Container[B] 反而可以被视为 Container[A] 的子类。逆变通常用于"只写"操作（如接收参数）的场景。
+    ```python
+    class Animal: pass
+    class Dog(Animal): pass
+    # 逆变的例子
+    T_contra = TypeVar('T_contra', contravariant=True)
+    class AnimalShelter(Generic[T_contra]):
+        def handle_animal(self, animal: T_contra) -> None:
+            pass
+    # 这是合法的，因为Animal是Dog的父类
+    dog_shelter: AnimalShelter[Dog] = AnimalShelter()
+    animal_shelter: AnimalShelter[Animal] = AnimalShelter()
+    dog_shelter = animal_shelter  # 逆变允许这种赋值
+    ```
+3. 不变是泛型类型系统中最严格的变体关系。当类型参数被声明为不变时，即使两个类型之间存在继承关系，它们的泛型容器之间也不存在子类型关系。这是 Python 类型系统的默认行为。
 
 ## pydantic(py+pedantic=Pydantic)
 

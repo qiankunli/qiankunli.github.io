@@ -23,6 +23,25 @@ EventLoop是用于在单个线程中执行协程的环境。EventLoop是异步�
 
 Asyncio 和其他 Python 程序一样，是单线程的，它只有一个主线程，Future 是一个可以被等待的对象，Task 在 Future 的基础上加入了一个 coroutine。他们都是 asyncio 的核心，但是他们都需要一个 EventLoop 来运行。任务只有两个状态：一是预备状态；二是等待状态。event loop 会维护两个任务列表，分别对应这两种状态；并且选取预备状态的一个任务（具体选取哪个任务，和其等待的时间长短、占用的资源等等相关），使其运行，一直到这个任务把控制权交还给 event loop 为止。当任务把控制权交还给 event loop 时，event loop 会根据其是否完成，把任务放到预备或等待状态的列表，然后遍历等待状态列表的任务，查看他们是否完成。如果完成，则将其放到预备状态的列表；这样，当所有任务被重新放置在合适的列表后，新一轮的循环又开始了：event loop 继续从预备状态的列表中选取一个任务使其执行…如此周而复始，直到所有任务完成。
 
+```python
+# 简化的事件循环实现示意
+class EventLoop:
+    def __init__(self):
+        self._ready = deque()  # 就绪任务队列
+        self._scheduled = []   # 计划任务队列
+        self._stopping = False
+    async def run_forever(self):
+        while not self._stopping:
+            # 执行就绪任务
+            while self._ready:
+                current_task = self._ready.popleft()
+                await self._run_task(current_task)
+            # 检查计划任务
+            self._check_scheduled()
+            # 等待新的事件
+            await self._poll_for_events()
+```
+
 协程实现的几种方式?     
 - python2.X:利用生成器通过yield+send实现协程     
 - python3.4:利用asyncio+yield from实现协程      
