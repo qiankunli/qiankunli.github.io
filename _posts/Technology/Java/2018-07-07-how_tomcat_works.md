@@ -18,6 +18,10 @@ keywords: tomcat
 
 《how tomcat works》的书写方式类似于 从0到1 写tomcat，从一个入门级程序猿的demo 代码开始，逐渐演化 出一个web 容器。
 
+## servlet规范
+
+比Servlet定义了服务端对于处理来自网络请求的一套规范，规范了生命周期，比如init，service，destroy的生命周期，还规定应用容器中WEB-INF/classes目录或WEB-INF/lib目录下的jar包才会被Web容器处理。然后我们通过实行这套规范来实现与客户端的交互，在调用init初始化完Servlet对象后通过多线程模式使用service响应网络请求。
+
 ## 代码的演化
         
 新手的直观感觉

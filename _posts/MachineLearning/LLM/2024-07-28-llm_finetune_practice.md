@@ -493,6 +493,69 @@ PS: 深度学习都得指定features/labels。在llm 场景下，features 和lab
 
 [使用医患对话数据训练新冠诊疗模型的例子](https://github.com/hiyouga/ChatGLM-Efficient-Tuning/blob/main/examples/covid_doctor.md)
 
+## 工程
+
+如果你有10个任务，训练了10个Lora模型，并且将每个Lora参数都Merge回了原来基模的参数中，构成了一个新的模型，那么你在后期模型部署的时候，你想当与需要10份部署资源。假如部署一个7B模型需要一个24G的3090显卡，那么你现在就需要10张3090显卡。同时如果模型很大，部署过程中，模型Copy、上传的时间也会非常久，会带来很多不必要的等待时间。但是你如果利用多Lora加载模型的话，那么10个Lora模型+一个7B基座模型，一张3090显卡就能加载。
+
+vLLM多Lora模式加载
+
+```
+from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
+from transformers import AutoTokenizer
+
+# 样例
+prompts = ["你是谁？", "你是谁训练的？"]
+
+# 设置生成所需参数
+sampling_params = SamplingParams(temperature=0.7, top_p=0.8, top_k=50, max_tokens=2048)
+
+lora_request1 = LoRARequest("self_adapter_v1", 1, lora_local_path="output_dir_qwen2.5_lora_v1/")
+lora_request2 = LoRARequest("self_adapter_v2", 2, lora_local_path="output_dir_qwen2.5_lora_v2/")
+
+# 创建模型
+llm = LLM(model="Qwen2.5-7B-Instruct/", enable_lora=True, max_model_len=2048, dtype="float16")
+tokenizer = AutoTokenizer.from_pretrained("Qwen2.5-7B-Instruct/")
+
+# 通过prompts构造prompt_token_ids
+temp_prompts = [tokenizer.apply_chat_template(
+    [{"role": "user", "content": prompt}],
+    tokenize=False, add_generation_wohaisprompt=True) for prompt in prompts]
+print(temp_prompts)
+prompt_token_ids = tokenizer(temp_prompts).input_ids
+
+# 注意，generate可以直接使用prompts，但直接使用prompts时，默认直接使用tokenizer.encode，没有拼接chat_template
+
+print("加载自我认知Lora1进行模型推理：")
+# 调用generate时，请求调用lora参数
+outputs = llm.generate(sampling_params=sampling_params, prompt_token_ids=prompt_token_ids,
+                       lora_request=lora_request1)
+print(outputs)
+# 输出结果
+for i, (prompt, output) in enumerate(zip(prompts, outputs)):
+    generated_text = output.outputs[0].text
+    print("prompt: {}, output: {}".format(prompt, generated_text))
+
+print("加载自我认知Lora2进行模型推理：")
+# 调用generate时，请求调用lora参数
+outputs = llm.generate(sampling_params=sampling_params, prompt_token_ids=prompt_token_ids,
+                       lora_request=lora_request2)
+print(outputs)
+# 输出结果
+for i, (prompt, output) in enumerate(zip(prompts, outputs)):
+    generated_text = output.outputs[0].text
+    print("prompt: {}, output: {}".format(prompt, generated_text))
+
+print("不加载自我认知Lora进行模型推理：")
+# 调用generate时，请求调用lora参数
+outputs = llm.generate(sampling_params=sampling_params, prompt_token_ids=prompt_token_ids)
+print(outputs)
+# 输出结果
+for i, (prompt, output) in enumerate(zip(prompts, outputs)):
+    generated_text = output.outputs[0].text
+    print("prompt: {}, output: {}".format(prompt, generated_text))
+```
+
 ## 其它
 
 [sft 的局限性](https://zhuanlan.zhihu.com/p/717275921) 非常经典

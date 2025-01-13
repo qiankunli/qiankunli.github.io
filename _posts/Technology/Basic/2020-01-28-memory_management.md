@@ -109,7 +109,7 @@ struct mm_struct {
     // mmap_base表示memory mapping段的起始地址
 }
 ```
-C语言的动态内存分配基本函数是 malloc()，在 Linux 上的实现是通过内核的 brk 系统调用。brk()是一个非常简单的系统调用， 只是简单地改变mm_struct结构的成员变量 brk 的值。
+C语言的动态内存分配基本函数是 malloc()，在 Linux 上的实现是通过内核的 brk 系统调用。brk()是一个非常简单的系统调用， 只是简单地改变mm_struct结构的成员变量 brk 的值。PS：系统级分配内存还是很简单的，就是入门的线性分配或链表分配。
 
 ## 语言/运行时
 

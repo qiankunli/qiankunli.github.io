@@ -165,7 +165,7 @@ LLM推理需要的芯片形态，最重要的是内存带宽和互联带宽，�
 
 ### KV Cache
 
-有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。 KVCache 顾名思义**缓存一部分K矩阵和V矩阵**（省的是$input*W_k$和$input*W_v$的计算），主要用于加速生成 token 时的 attention 计算。PS：缓存的就是kv矩阵。
+有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。 KVCache 顾名思义**缓存一部分K矩阵和V矩阵**（省的是$input*W_k$和$input*W_v$的计算），主要用于加速生成 token 时的 attention 计算。PS：缓存的就是kv矩阵。计算的时候，q是左乘矩阵，q矩阵不缓存不是因为需要每次重新算，而是之前的行不需要了。 
 
 ![](/public/upload/machine/kv_cache.jpg)
 
@@ -268,9 +268,9 @@ Flash Attention 的目标是尽可能使用 SRAM来加快计算速度，避免�
 
 [大模型推理服务调度优化技术-Continuous batching](https://mp.weixin.qq.com/s/Se4lzaTLNZF29BXLRjw0xw)
 1. 单处理，也就是单个提示（Prompt）传过来直接送入到LLM进行推理。因为每次只能处理一条数据，对GPU资源的利用率较低。
-2. 静态批处理（static batching），静态批处理指将多个Prompt打包进行一个批处理请求，并在批处理请求中所有Prompt完成后返回响应，批处理的大小在推理完成之前保持不变。一个批次中不同序列的生成长度不同。有的Prompt在批处理中较早“完成”，但需等待这一批次中Prompt最长的生成结束，因此，GPU 未得到充分利用。
+2. 静态批处理（static batching），静态批处理指将多个Prompt打包进行一个批处理请求，不同的request组成batch后，要等最长的一个request执行完毕，才能整体退出，批处理的大小在推理完成之前保持不变。因此，GPU 未得到充分利用。
 3. 动态批处理（Dynamic batching），动态批处理是指允许将一个或多个推理请求组合成单个批次（必须动态创建）以最大化吞吐量的功能。PS： 没懂，不过无所畏了。
-4. 连续批处理（Continuous Batching），无论是动态批处理还是静态批处理，通常在相同形状的输入和输出请求的场景，提高GPU的利用率。但对于自回归大模型推理场景而言，都不太适用（同一批次中的数据输入和输出长度都不一样）。Continuing Batching（有的地方也叫做 Inflight batching 或者 Iteration batching）指请求在到达时一起批量处理，但它不是等待批次中所有序列都完成，而是当一个输入提示生成结束之后，就会在其位置将新的输入Prompt插入进来，从而比静态批处理具备更高的 GPU 利用率。由于**每次迭代的批处理大小是动态的**，因此，有些地方也叫动态Batching。
+4. 连续批处理（Continuous Batching），无论是动态批处理还是静态批处理，通常在相同形状的输入和输出请求的场景，提高GPU的利用率。但对于自回归大模型推理场景而言，都不太适用（同一批次中的数据输入和输出长度都不一样）。Continuing Batching（有的地方也叫做 Inflight batching 或者 Iteration batching）指请求在到达时一起批量处理，但它不是等待批次中所有序列都完成，而是当一个输入提示生成结束之后，**就会在其位置将新的输入Prompt插入进来**，从而比静态批处理具备更高的 GPU 利用率。由于**每次迭代的批处理大小是动态的**，因此，有些地方也叫动态Batching。PS：当一个request执行完毕之后，可以继续插入新的request
 
 提升模型服务吞吐最重要的手段是 Batching 策略，Batching主要包含以下三个步骤：
 
@@ -309,9 +309,10 @@ Batching就是将一段时间内到达的用户请求合并到一起，提交到
 
 [大模型推理加速技术的学习路线是什么? ](https://www.zhihu.com/question/591646269/answer/3333428921)
 
-推理加速，**标准的推理优化技术**对于LLM很重要（例如，算子融合、权重量化），但探索更深层次的系统优化也很重要，特别是那些能改善内存利用率的优化。一个例子是KV缓存量化。
+推理加速，**标准的推理优化技术**对于LLM很重要（例如，算子融合、权重量化），但探索更深层次的系统优化也很重要，特别是那些能改善内存利用率的优化。
 1. 模型优化技术（重点Kernel 优化）。MHA(Multi-Head Attention) ==> MQA/GQA；FlashAttention；PagedAttention
-2. 模型压缩技术。权重量化、KV Cache 量化
+2. 模型压缩技术。量化的粒度从per tensor，per channel到per group，涉及到weight、activation以及kv cache的量化。
+3. prompt压缩，在prompt进入到LLM推理之前，压缩掉一些不必要的prompt信息，prompt长度变短之后，整体计算量减少，推理性能提升。
 3. Offload技术。[大模型低显存推理优化-Offload技术](https://mp.weixin.qq.com/s/gNvWB07YFpxU8PNsVpZ7Kg)对于推理场景下，Offload的对象有以下两种：权重、KV Cache。PS：由于涉及使用速度较慢的存储介质，卸载操作会带来严重的时延，因此不适用于对时延比较敏感的用例。卸载系统通常用于面向吞吐量的用例（因为batch 可以很大），如离线批处理。
 3. 硬件加速
 4. GPU加速

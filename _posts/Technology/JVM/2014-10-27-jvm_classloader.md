@@ -11,13 +11,15 @@ keywords: JAVA JVM
 * TOC
 {:toc}
 
+进入到JVM领域后，其实就跟JAVA没什么关系了，JVM只认得class文件。
+
 ## 字节码结构
 
 字节码的本质是一个虚拟指令集，它里面的每条指令代表一种操作。字节码的设计非常类似于 CPU 指令，它有自己定义的数值计算、位操作、比较操作、跳转操作等。人们把这种专门为某一类编程语言所开发的字节码以及其解释器合并称为编程语言虚拟机。对字节码文件进行加载、分析、执行的逻辑都在 Java 语言虚拟机里封装了。在不同的硬件平台和不同的操作系统上，Java 语言虚拟机的实现各不相同，但是它提供的字节码执行器的功能是完全相同的。
 
 C在开发层面的平台相关性：C语言实现系统兼容性的思路很简单，那就是通过在不同的硬件平台和操作系统上开发各自特定的编译器，从而将相同的C语言源代码翻译为底层平台相关的硬件指令。虽然这种思路很棒，但是仍然有明显的缺点，当涉及系统调用时，开发者仍然要关注具体底层系统的API。在Linux平台上，开发者需要知道Linux平台所提供的创建线程的接口是`pthread_create()`；而在Windows平台上，开发者需要知道Windows平台所提供的创建线程的接口是`CreateThread()`。另外，在Linux和Windows平台上，C程序需要引用不同的头文件，并且所调用的创建线程的两种API的入参和返回值也不相同。所以在开发层面上屏蔽底层差异的关键就是**中间语言**，C可以run anywhere，但不能write once。
 
-以类似C struct 的方式来表达java 字节码文件的结构。
+以类似C struct 的方式来表达java 字节码文件的结构。类的数据结构类似一个数据库，里面多张不同类型的“表”紧凑的挨在一起，最大的节省类占用的空间。多数表都会应用到常量池表里面的字面量。
 
 ![](/public/upload/jvm/class_code.jpg)
 
@@ -55,9 +57,9 @@ Spring 采用的代理技术有两个：一个是 Java 的动态代理（dynamic
 
 Java类何时会被加载？《深入理解Java虚拟机》给出的答案是：
 1. 遇到new、getstatic、putstatic 等指令时。
-2. 对类进行反射调用的时候。
-3. 初始化某个类的子类的时候。
-4. 虚拟机启动时会先加载设置的程序主类。
+2. 反射：对类进行反射调用的时候。
+3. 继承：初始化某个类的子类的时候。
+4. 入口：虚拟机启动时会先加载设置的程序主类。包含main方法的类首先被加载
 5. 使用JDK 1.7 的动态语言支持的时候。
 一句话总结就是：当运行过程中需要这个类的时候。
 
@@ -135,6 +137,7 @@ ClassLoader源码注释：The ClassLoader class uses a delegation model to searc
 2. 热加载 spring boot devtools。
 2. 代码加密。基于java开发编译产生的jar包是由.class字节码组成，由于字节码的文件格式是有明确规范的。因此对于字节码进行反编译，就很容易知道其源码实现了。jar包加密的本质，还是对字节码文件进行加密操作。但是JVM虚拟机加载class的规范是统一的，因此在加载class文件之前通过自定义classloader先进行反向的解密操作，然后再按照标准的class文件标准进行加载
 4. 依赖冲突。阿里 pandora(潘多拉）通过自定义类加载器，为每个中间件自定义一个加载器来 解决依赖冲突
+通过自定义类加载器可以干出很多黑科技，但是有个基本的雷区就是，不能随便替代JAVA的核心基础类，或者说即是你写了一个跟核心类一模一样的类，JVM也不会使用。**JVM实例由类加载器+类的全限定包名和类名组成类的唯一标志**。加载类的时候，JVM 判断类是否来自相同的加载器，如果相同而且全限定名则直接返回内存已有的类。PS： 要先父后子
 
 [为什么 Tomcat 会破坏双亲委派机制？](https://mp.weixin.qq.com/s/8Yk0R1iHtaPBL6sa_MDgig)
 1. 只要自定义个ClassLoader，重写loadClass方法（不依照往上开始寻找类加载器），那就算是打破双亲委派机制了。
@@ -167,14 +170,23 @@ If resolve is true, it will also try to load all classes referenced by X. In thi
 
 ### ClassLoader 隔离
 
-在 Java 虚拟机中，类的唯一性是由类加载器实例以及类的全名一同确定的（即便是同一串字节流，经由不同的类加载器加载，也会得到两个不同的类。猜测一下，如果是一致的，ClassLoader 该如何实现呢？
-
+在 Java 虚拟机中，类的唯一性是由类加载器实例以及类的全名一同确定的（即便是同一串字节流，经由不同的类加载器加载，也会得到两个不同的类）。猜测一下，如果是一致的，ClassLoader 该如何实现呢？
 1. ClassLoader `Class<?> defineClass(String name, byte[] b, int off, int len)` 时，如果发现name 相同， 可以直接返回。但ClassLoader 是可以自定义实现的，很难约束开发必须遵守这个规则。
 2. defineClass 时直接覆盖，那问题就更严重了，开发就有机会恶意覆盖 一些已有的java 库中的类的实现。
 
 在大型应用中，**往往借助这一特性，来运行同一个类的不同版本**。tomcat 在类加载方面就有很好的实践 [Tomcat源码分析](http://qiankunli.github.io/2019/11/26/tomcat_source.html)
 
+### 字节增强
+
+任何合法的源码编译成class后被类加载器加载进JVM的方法区，也就是以字节码的形态存活在JVM的内存空间。
+
+可能很多同学都已经习惯在IDE上对某句代码打上断点，然后逐步往下追踪代码执行的步骤。我们进一步想想，这个是怎么实现的，是一股什么样的力量能把已经跑起来的线程踩下刹车，一步一步往前挪？我们知道线程运行其实就是在JVM的栈空间上不断的把代码对应的JVM指令集不断的送到CPU执行。那能阻止这个流程的力量也肯定是发生在JVM范围内，所以我们可以很轻松的预测到这肯定是JVM提供的机制，而不是IDE真的有这样的能力，只不过是JVM把这种能力封装成接口暴露出去，然后提供给IDE调用，而IDE只不过是通过界面交互来调用这些接口而已。JVM提供的一个工具箱JVMTI(JVM TOOL Interface)提供的接口，而这个工具箱是一套叫做JPDA的架构定义的。 [JVM核心知识体系](https://mp.weixin.qq.com/s/DSqk4enXer1-RzGvNr6_GQ)
+
+
+
 ## Java对象在内存中的表示
+
+抛开细节从操作系统层面观察，那么就是JVM实例在运行过程中通过IO从硬盘或者网络读取CLASS二进制文件，然后在JVM管辖的内存区域存放对应的文件。从功能上判断无非就是读取文件到内存。但是乱糟糟的把一堆毫无秩序的类文件往内存里面扔，没有良好的管理也没法用，所以需要我们需要设计一套规则来管理存放内存里面的CLASS文件。
 
 [jvm中类和对象定义存储基础知识](https://mp.weixin.qq.com/s/1ffuusC21mJvAKl-v-OAOg) 未细读。
 
@@ -334,7 +346,10 @@ class oopDesc {
 
 InstanceKlass结构比较复杂，包含了类的所有方法、field等等，方法又包含了字节码等信息。这个数据结构是通过运行时解析class文件获得的，为了保证安全性，解析class时还需要校验字节码的合法性(非通过javac产生的方法字节码很容易引起jvm crash)。CDS可以将这个解析、校验产生的数据结构存储(dump)到文件，在下一次运行时重复使用。这个dump产物叫做Shared Archive，以jsa后缀(java shared archive)。为了减少CDS读取jsa dump的开销，避免将数据反序列化到InstanceKlass的开销，jsa文件中的存储layout和InstanceKlass对象完全一样，这样在使用jsa数据时，只需要将jsa文件映射到内存，并且让对象头中的类型指针指向这块内存地址即可，十分高效。 [Alibaba Dragonwell对AppCDS的优化](https://mp.weixin.qq.com/s/CTFcwer2htssKszjhnOXtQ)
 
+
 ## 其它
+
+通常情况下类加载器会持有该加载器加载过的所有类的引用，所有如果类是经过系统默认类加载器加载的话，那就很难被垃圾收集器回收，除非符合根节点不可达原则才会被回收。
 
 [探究 Java 应用的启动速度优化](https://mp.weixin.qq.com/s/E05eJ8keZo-ZYL6HzUyLRw)InstanceKlass结构比较复杂，包含了类的所有方法、field等等，方法又包含了字节码等信息。这个数据结构是通过运行时解析class文件获得的，为了保证安全性，解析class时还需要校验字节码的合法性。CDS 可以将这个解析、校验产生的数据结构存储(dump)到文件，在下一次运行时重复使用。这个dump产物叫做Shared Archive，以jsa后缀(Java shared archive)。为了减少 CDS 读取 jsa dump 的开销，避免将数据反序列化到InstanceKlass的开销，jsa 文件中的存储layout和InstanceKlass对象完全一样，这样在使用 jsa 数据时，只需要将 jsa 文件映射到内存，并且让对象头中的类型指针指向这块内存地址即可，十分高效。
 

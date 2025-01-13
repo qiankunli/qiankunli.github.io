@@ -110,6 +110,8 @@ Tor 架构感知：对于一些超大模型，可能会需要用到上千卡来�
 
 ## gpu 监控
 
+[聊聊 GPU 监控那些事：利用率 & 故障等](https://mp.weixin.qq.com/s/geSijcXTAA8zoEM60F968w)建议细读。
+
 GPU计算单元类似于CPU中的核，用来进行数值计算。衡量计算量的单位是flop：the number of floating-point multiplication-adds，浮点数先乘后加算一个flop。计算能力越强大，速度越快。衡量计算能力的单位是flops：每秒能执行的flop数量
 
 ```

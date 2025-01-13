@@ -378,6 +378,55 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
         ![](/public/upload/machine/sequence_mask.jpg)
     3. 为什么Attention Mask不是0和1构成的矩阵，而是0和负无穷构成的？在 Transformer 模型中通常用于指示模型哪些位置是有效的输入，哪些位置是填充的。它的主要目的是确保模型在计算注意力分数时不会考虑到填充的位置。在大多数实现中，当我们说“mask”时，我们通常是指一个由0和1组成的矩阵，其中1表示“考虑这个位置”而0表示“不考虑这个位置”。但在实际的注意力机制计算中，这种简单的0和1的表示方法并不直接适用。Transformer中的注意力机制涉及到softmax函数，该函数会将输入的原始分数转换为概率分布。为了确保某些位置在softmax之后的概率为0，我们需要在softmax之前为这些位置赋予一个非常小的分数，通常是负无穷。这样，经过softmax转换后，这些位置的概率会接近于0。
 
+
+### 关于chat template（不是langchain 的ChatTemplate）
+
+对于chat api来说，server 收到的是一个message list，但是，不管是Base Model还是Instruct Model，模型最终接受的输入，应该是一段free text（再转成token）。那么问题来了，这个有结构的对话历史列表，是如何转成free text的呢？显然，这里需要一个模板（template），这就是所谓的chat template，表达各种message（包括system message，user message，assistant message以及其它类型的message）的渲染方式。
+
+```python
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+
+llm = ChatOpenAI(
+  openai_api_key="EMPTY",
+  openai_api_base="http://127.0.0.1:8000/v1",
+  model_name="llama3.2-1B-instruct"
+)
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "Your are a helpful assistant."),
+    ("user", "Hello, how are you?"),
+    ("assistant", "I'm doing well, thank you for asking."),
+    ("user", "Can you tell me a joke?")
+  ]
+)
+chain = prompt | llm
+reponse = chain.invoke({})
+```
+以llama3.2为例， 最终输入到LLM时会转化成如下的free text（也就是prompt）：
+
+```
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+Cutting Knowledge Date: December 2023
+Today Date: 28 Dec 2024
+
+Your are a helpful assistant.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Hello, how are you?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+I'm doing well, thank you for asking.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Can you tell me a joke?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+```
+那么，这个chat template是从哪里来的呢？对于vLLM来说，它启动的时候，有两种方式可以获取到chat template：
+1. 一种方式是从模型文件夹中加载。具体地说，chat template的内容存在于tokenizer_config.json文件中。需要注意的是，tokenizer_config.json文件中并不一定包含chat_template字段。
+2. 另一种方式是vLLM通过启动参数--chat-template来指定一个chat template模板文件。
+如果都没有，vLLM会以未指定chat template模板的方式启动起来。会出现意想不到的结果。
+1. 如果Transformers的版本小于4.44，vLLM会自动使用一个默认的chat template。这时候从调用结果上很可能看不出什么大问题，但实际上模型回答的准确度已经大打折扣，这个错误非常不易察觉。
+2. 如果Transformers的版本大于等于4.44，vLLM会抛一个异常，如下：`openai.BadRequestError: Error code: 400 - {'object': 'error', 'message': 'As of transformers v4.44, default chat template is no longer allowed, so you must provide a chat template if the tokenizer does not define one.', 'type': 'BadRequestError', 'param': None, 'code': 400}`
+
+
+
 ### 推理/generate实现
 
 [浅谈LLAMA2核心函数generate源码](https://mp.weixin.qq.com/s/vnke00f7kzlA16Pw_FJFjQ)

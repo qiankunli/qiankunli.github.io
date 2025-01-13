@@ -15,6 +15,7 @@ keywords: llm emebedding
 
 ## 简介（未完成）
 
+对于 Embedding 模型来说，它通常采用 Encoder 架构，它的训练目标是使得语义相似的文本在向量空间距离更近，而 Reranker ，则采用 Cross Encoder 架构，它的训练目标是预测查询和文档之间的分数。
 
 ## 为什么用rerank
 
@@ -31,3 +32,14 @@ HNSW（最小可导航世界）的逻辑解释起来有点麻烦，但是我可�
 微调数据集格式为[query，正样本集合，负样本集合]。微调在Embeding模型与Reranker模型采用同类型数据集，并将语义相关性任务视为二分类任务，采用BCE作为损失函数。
 
 https://zhuanlan.zhihu.com/p/704562748 未细读
+
+## 基于张量的重排序
+
+评测 Embedding 模型和 Reranker 模型，通常可以观察 MTEB 榜单，在 2024 年上半年，Reranker 的榜单基本都是 Cross Encoder ，而到了下半年，榜单更多为基于 LLM 的重排序模型所占据。这类方案已经不是 Encoder 架构，而是标准 LLM 的 Decoder 架构，由于参数量更大，因此推理成本更高。
+
+![](/public/upload/machine/tensor_rerank.jpg)
+
+一种被称作延迟交互模型的重排序方案引起关注，这就是基于张量的重排序。它的具体做法是：在索引阶段，保存 Encoder 为每个 Token 生成的 Embedding，因此对于一个文档来说，就是用一个张量 Tensor （或者多向量）来表示一个文档，在查询的时候，只需要生成查询的每个 Token 的 Embedding，然后计算所有查询和 Text Çhunk 之间所有 Token 两两之间的相似度，然后累加就是最终文档得分。这种重排序，同样捕获了 Token 之间的交互信息，所以理论上可以做到跟 Cross Encoder 接近或者持平的效果。而另一方面，由于在查询时不涉及复杂的模型推理，所以它的成本相比 Cross Encoder，或者基于 LLM 的 Reranker要低得多，这甚至可以把排序做到数据库内部，因此带来的好处就是：即使粗筛的结果并不理想，但采用基于张量的重排序，可以对更多的结果进行重排，因此也有很大的概率弥补之前的召回。
+
+## 评测
+

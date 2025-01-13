@@ -69,6 +69,7 @@ AI界的大佬 --- Andrew NG推出过一个Prompt Engineering的短课程《Chat
 1. 明确、具体是关键。我们发给LLM的批令，越明确、越具体，对于LLM越友好。
     ![](/public/upload/machine/prompt_tips.jpg)
 2. 另一种视角：立角色 + 述问题 + 定目标 + 补要求。 
+3. ICIO： Instruction（指令） + Context（上下文/背景）+ Input Data（输入数据）+ Output Indicator（输出指示器）
 2. 给LLM更多的时间去思考。通过Prompt Engineering 的方式，把LLM的“慢思考”调动起来。
     1. 一个简单的技巧是在你的Prompt后面，加上这样一句话“Let’s think step by step”。这句话会引导LLM，会去分步骤思考，效果会比不加这句话要好。
     2. CoT(Chain-of-Thought) 在Prompt中加入一些例子，让LLM照着例子进行推理、思考。注意，CoT是LLM足够大（参数足够多，通常是在1000亿参数）时才涌现出来的能力。因此，在一些不够大的LLM上，CoT的效果并不明显。此外，在Prompt中加入的示例不是1条，而是多条。具体要考虑解决的问题类型，以及Prompt的长度（因为LLM的Prompt长度通常都是有长度限制的）。

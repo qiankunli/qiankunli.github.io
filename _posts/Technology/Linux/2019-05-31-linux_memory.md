@@ -140,7 +140,7 @@ struct vm_area_struct{
 
 ![](/public/upload/linux/linux_task_vm.jpg)
 
-linux进程地址空间是由一个个vm_area_struct(vma)组成，每个vma都有自己地址区间。如果你的代码panic或者Segmentation Fault崩溃，最直接的原因就是你引用的指针值不在进程的任意一个vma区间内。你可以通过 /proc/<pid>/maps 来观察进程的vma分布。
+linux进程地址空间是由一个个vm_area_struct(vma)组成，每个vma都有自己地址区间。如果你的代码panic或者Segmentation Fault崩溃，最直接的原因就是你引用的指针值不在进程的任意一个vma区间内。你可以通过 `/proc/<pid>/maps` 来观察进程的vma分布。
 
 
 [你真的理解内存分配吗？](https://mp.weixin.qq.com/s/H9W3tL_Jxxg3LAV6Y3rFyw)对于内存的访问，用户态的进程使用虚拟地址，内核的也基本都是使用虚拟地址。

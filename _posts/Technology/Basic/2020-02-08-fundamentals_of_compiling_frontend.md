@@ -376,6 +376,7 @@ function int() fun2 = fun1();
 《小议Java语言》讲Java Lambda实现：**仅仅的一个匿名函数（ Anonymous Function）， 或者函数指针，是不足以正确地实现 Lambda 的**（以上文为例就是 b 在inner 中没有定义，不能直接编译运行）；而正确实现 Lambda，或者说允许把 Lambda 表示的函数作为一个像其他类型的值一样作为参数来传递，语言必须要有对 Lambda 的函数表达，以及一个用来在各层中传递参数值的“参数定义环境”两者同时的实现。
 
 [从栈上理解 Go 语言函数调用](https://mp.weixin.qq.com/s/-xn2i2depcN4uWT3wV63Pw)匿名函数就是闭包的一种，只是没有传递变量信息而已。而在闭包的调用中，会将上下文信息逃逸到堆上，避免因为栈帧调用结束而被回收。
+[编译时插桩，Go应用监控的最佳选择](https://mp.weixin.qq.com/s/9rCggJjdE-kY9mTATdc52w)
 
 ### 从类型体系的角度理解继承和多态
 

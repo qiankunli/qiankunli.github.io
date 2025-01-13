@@ -111,7 +111,7 @@ f()
 
 ## 装饰器
 
-古明地觉：装饰器本质上就是高阶函数加上闭包，只不过给我们提供了一个优雅的语法糖，所以**理解装饰器（decorator）的关键就在于理解闭包（closure）**。装饰器存在的最大意义就是可以在不改动原函数的代码和调用方式的情况下，为函数增加一些新的功能。
+古明地觉：装饰器本质上就是高阶函数加上闭包，只不过给我们提供了一个优雅的语法糖，所以**理解装饰器（decorator）的关键就在于理解闭包（closure）**。装饰器存在的最大意义就是可以在不改动原函数的代码和调用方式的情况下，为函数增加一些新的功能。PS：在java里，用注解方式给一个方法加点功能，有点麻烦，得spring ioc支持，写一个专门的切面类，再配置spring ioc 把这个切面加到特定的方法上。而在python里，切面用一个函数实现就行。此外，不仅是可以给和函数加一点新功能，还可以捕获方法的参数，**在函数的执行前后对这个方法参数干点事情**，比如有一个db参数，则函数func执行完后，wrap_func 触发下db.commit。
 
 fluent python：装饰器是一种可调用对象，其参数是另一个函数（被装饰的函数），本质上就是一个高阶函数。装饰器可能会对被修饰的函数做些处理，然后返回函数，或者把函数替换成另一个函数或可调用对象（也就是类）。**装饰器在加载模块时立即执行，通常是在导入时**，即使这些函数或方法还没有被显式调用。很多python框架会使用这样的装饰器把函数添加到某个中央注册处，比如注册http handler。严格来说，装饰器只是语法糖。
 
@@ -238,6 +238,30 @@ add(3, 4, key='test')
 
 一般情况下我们用不到这样的骚操作，但是能够写出来或者说看懂这样的功能。
 
+### 装饰一个类
+
+```python
+from functools import wraps
+
+def injectable(lifetime: str = "singleton"):
+    """更简洁的服务注册装饰器"""
+    def decorator(cls):
+        @wraps(cls)  # 保留原始类的元数据
+        def wrapped_cls(*args, **kwargs):
+            instance = cls(*args, **kwargs)
+            return instance
+
+        setattr(wrapped_cls, "__injectable__", True)
+        setattr(wrapped_cls, "__lifetime__", lifetime)
+        return wrapped_cls
+    return decorator
+
+@injectable(lifetime="singleton")
+class UserService:
+    def __init__(self, repository: UserRepository):
+        self.repository = repository
+```
+
 ### decorator库
 
 原始的装饰器一般简单写法是两层嵌套，如果使用decorator库，将原始嵌套的写法改造成单层的写法，两层的参数合并了，且使用decorator库实现的装饰器实现了签名不变。
@@ -306,7 +330,7 @@ ready to write to file
 calling __exit__ method
 ```
 
-某些时候，如果只有很少的上下文需要管理，那么定义一个类便会有些麻烦。可以使用装饰器 contextlib.contextmanager将一个生成器函数转换为上下文管理器，来定义自己所需的基于生成器的上下文管理器，用以支持 with 语句。使用@contextmanager 能减少创建上下文管理器的样板代码，不用编写一个完整的类来定义`__enter__()` 和`__exit__()` 方法，而只需实现一个含有yield 语句的生成器，生成想让`__enter__()` 方法返回的值。yield 把函数主体分为两部分：在yield 之前的所有代码在调用`__enter__()` 方法时执行，yield 之后的代码在调用`__exit__()` 方法时执行。
+某些时候，如果只有很少的上下文需要管理，那么定义一个类便会有些麻烦。可以使用装饰器 contextlib.contextmanager将一个**生成器函数**转换为上下文管理器，来定义自己所需的基于生成器的上下文管理器，用以支持 with 语句。使用@contextmanager 能减少创建上下文管理器的样板代码，不用编写一个完整的类来定义`__enter__()` 和`__exit__()` 方法，而只需实现一个含有yield 语句的生成器，生成想让`__enter__()` 方法返回的值。yield 把函数主体分为两部分：在yield 之前的所有代码在调用`__enter__()` 方法时执行，yield 之后的代码在调用`__exit__()` 方法时执行。
 
 ```python
 from contextlib import contextmanager
@@ -488,6 +512,26 @@ class Exp:
 ```
 
 对于 setattr和getattr，我们不禁有一个问题，我们通过`.`操作不香吗，为什么还要搞一个setattr和getattr出来呢？如果我们自己写代码写着玩，当然是用`.`操作更方便，但如果是实际的开发场景。很有可能我们需要添加的属性的名称是个变量，而不是写死的，也就是说是可配置的。这个时候就不能通过`.`了。
+
+### 描述器/Descriptor
+
+Descriptor允许我们自定义对象属性的访问方式。简单来说，描述器就是一个实现了描述器协议的类，让我们能够在获取、设置或删除属性时自动触发这些特殊方法。描述器协议定义了四个关键方法：
+
+`__get__(self, obj, objtype=None)`: 当获取属性时调用
+`__set__(self, obj, value)`: 当设置属性时调用
+`__delete__(self, obj)`: 当删除属性时调用
+`__set_name__(self, owner, name)`: 在类创建时调用，用于获取描述器在类中的名称
+
+使用描述器时需要注意以下几点：
+
+1. 描述器应该是类属性，而不是实例属性。
+2. 注意数据描述器和非数据描述器的优先级差异
+3. 合理使用 __set_name__ 方法来获取描述器的名称
+4. 避免在描述器中保存实例相关的状态
+5. 使用 __dict__ 存储实例特定的数据
+6. 考虑使用 weakref 来避免内存泄漏
+
+未搞懂：比装饰器更适合处理需要维护状态的场景。
 
 ## 元类
 
