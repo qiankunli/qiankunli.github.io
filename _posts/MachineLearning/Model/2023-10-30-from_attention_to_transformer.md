@@ -195,7 +195,7 @@ PS: head的概念类似卷积中的通道，只不过每个通道的输入都是
 
 Attention模块的作用就是确定上下文中哪些词之间有语义关系，以及如何准确地理解这些含义（更新相应的向量）。这里说的“含义”meaning指的是编码在向量中的信息。Attention模块让输入向量们彼此充分交换了信息（例如machine learning model和fashion model，单词“model”指的应该是“模特”还是“模型”）， 然后，这些向量会进入第三个处理阶段：Feed-forward / MLPs。针对所有向量做一次性变换。这个阶段，向量不再互相"交流"，而是并行地经历同一处理。**Transformer基本不断重复Attention和Feed-forward这两个基本结构，这两个模块的组合成为神经网络的一层**。输入向量通过attention更新彼此；feed-forward 模块将这些更新之后的向量做统一变换，得到这一层的输出向量；在Attention模块和多层感知机（MLP）模块之间不断切换。
 
-FFN 设计的初衷，其实就是为模型引入非线性变换。
+FFN 设计的初衷，是为模型引入非线性变换。
 1. FFN的作用就是空间变换。FFN包含了2层linear transformation层，中间的激活函数是ReLu。
 2. attention层的output最后会和相乘，为什么这里又要增加一个2层的FFN网络？仔细看一下 Attention 的计算公式，其中确实有一个针对 q 和 k 的 softmax 的非线性运算。但是对于 value 来说，并没有任何的非线性变换。所以每一次 Attention 的计算相当于是对 value 代表的向量进行了加权平均，虽然权重是非线性的权重。**Attention内部就是对特征向量V加权平均的过程。只用self-Attention搭建的网络结构就只有线性表达能力**。FFN的加入引入了非线性(ReLu激活函数)，**变换了attention output的空间**, 从而增加了模型的表现能力。把FFN去掉模型也是可以用的，但是效果差了很多。
   $$
@@ -283,6 +283,10 @@ Decoder最后是一个线性变换和softmax层。解码组件最后会输出一
 ## 其它视角
 
 [逐步理解Transformers的数学原理](https://mp.weixin.qq.com/s/b9YHoCOp5Pu5kfyeTdoBxw) 可以看看从字符串到输出向量 到各层的变换过程。
+
+输入 token 序列的维度：【batch, seqlen】
+经过 embedding 之后的维度：【batch，seqlen，D】
+后面xx变换，都是在 tensor 之间加权组合，不会改变这个输入的 shape。
 
 ### 李宏毅
 

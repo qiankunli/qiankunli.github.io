@@ -77,9 +77,9 @@ RL包含行动、 环境、观察、奖励机制等模块，奖励机制是RL �
 
 [大模型对齐技术，各种什么O：PPO,DPO, SimPO,KTO,Step-DPO, MCTS-DPO,SPO](https://mp.weixin.qq.com/s/pE_sSlaGUfKNM9EaBLR-cg) 推荐细读。PS：建议捋一下。
 
-## 迭代
+[RLHF通俗理解](https://zhuanlan.zhihu.com/p/685261886) **代码级的理解看这里**。
 
-
+## 演进
 
 RLHF 是一个完整技术框架，PPO 仅仅是其中强化学习算法模块的一种实现方式。人类反馈构造出偏好对齐数据集以便训练RM，正因为有了RM，才能让强化学习有了发挥的空间，让sft后的模型有了进一步的提升。但偏好对齐一定需要RL嘛？偏好对齐一定需要人类反馈吗？偏好对齐一定需要训练RM嘛？偏好对齐一定需要大量偏好样本么？
 
@@ -133,6 +133,24 @@ RFT 的价值：只要能定制好一个任务的 verifier，那么 RFT 便可�
 
 ReFT 这篇论文，好就好在它是在 o1 之前发表的。因为 o1 的出现，“cot 的推理过程，MCTS 采样，PRM，ORM，rule-based reward_model” 等概念，已经在 LLM 圈深入人心了。
 
+## 案例
+
+[大模型Post-Training总结](https://mp.weixin.qq.com/s/FDe4dz6eMC4QZ1aNoE4vnw)
+1. Qwen2.5的后训练路径是SFT + Two-stage Reinforcement Learning，即SFT->DPO->GRPO。
+2. TULU 3的后训练路径是SFT->DPO->RLVR。
+3. DeepSeek-V3的后训练路径是SFT->GRPO。
+4. Llama 3后训练方法是迭代式的，总共做了6轮。每轮的核心操作是：Reward Modeling，Rejection Sampling，SFT，DPO。
+
+[张俊林：MCST树搜索会是复刻OpenAI O1/O3的有效方法吗](https://mp.weixin.qq.com/s/oJFJjk9zbopmLSbh7QbBjg) 讲的很详细。post-trainning 分为几个阶段，每个阶段准备什么样的数据。尤其是有几张图，很有借鉴意义。
+
+## 常见技术
+
+### 拒绝采样
+
+在 LLM 训练中，拒绝采样（Rejection Sampling）通常用于以下场景：
+1. 生成多个候选响应：模型针对给定的提示（prompt）生成多个候选响应。
+2. 使用奖励模型筛选：利用奖励模型（Reward Model, RM）对这些候选响应进行评分，选择得分最高的响应作为高质量样本。
+3. 迭代优化：将筛选出的高质量样本用于进一步训练模型，以逐步提升模型的生成质量。
 
 ## 技术
 
@@ -148,7 +166,6 @@ RLHF开源框架主要有DeepspeedChat、Trlx、ColossalAI-Chat，同时在这�
 TRL 是由大名鼎鼎的Transformer 针对强化学习专门设计的，旨在打造一个针对大语言模型开展强化学习所用到的全栈类库。提供三阶段训练框架，包括微调训练阶段的SFTTrainer、RM模型训练阶段的RewardTrainer、以及强化学习训练阶段使用的PPOTrainer。 PS：对应训练的LLM的Trainer
 
 ### 数据集格式
-
 
 ## 数据准备
 
@@ -289,6 +306,12 @@ def update_model(args, experience_list, actor_model, actor_optimizer, critic_mod
     # 计算critic模型损失值
     # critic模型梯度回传，梯度更新          
 ```
+
+
+
+## 工程框架
+
+OpenRLHF [OpenRLHF源码解读：1.理解PPO单机训练](https://zhuanlan.zhihu.com/p/13043187674)
 
 [阿里PAI-ChatLearn：大规模 Alignment高效训练框架正式开源](https://zhuanlan.zhihu.com/p/717112741) 未细读
 
