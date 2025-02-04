@@ -139,6 +139,8 @@ Don't Repeat Yourself在大部分时候是正确的，但是复用的代价就�
 
 ## 继承 vs 组合
 
+继承应该用于 “属于” 关系。例如，狗属于一种动物，矩形属于一种形状，汽车属于一种交通工具。组合应该用于 “拥有 关系。例如，狗有主人，汽车有发动机，项目组有一名或多成员。反过来，狗并不是主人，汽车并不是发动机，项目组并不是成员。我们不能用继承来表示这些关系，而应该使用组合。
+
 对于继承，子类通过super 可以访问父类的相关方法。对于java8 interface，也是类似。从这个角度看，如果将 this、super 理解为 类成员，继承父类、实现接口，像是组合的一种特殊形态。在c++里面，子类拥有父类的数据拷贝。那么java的内存对象模型和c的内存对象模型，研究一下，做个对比，还是蛮有意思的。以下图为例，UML 在展示PriorityKafkaProducer的继承和聚合关系时，将父类AbstractPriorityKafkaProducer和聚合类/成员KafkaProducer做了平级的处理。
 
 ![](/public/upload/java/priority_kafka_producer_class_diagram.png)

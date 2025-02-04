@@ -40,6 +40,8 @@ keywords: llm rhlf
 
 强化学习（Reinforcement Learning, RL）是一种机器学习方法，模型通过与环境的交互来学习决策策略。模型在每一步的选择中会得到奖励或惩罚，目标是最大化长期的累积奖励。在自然语言处理（NLP）中，强化学习可以用于优化模型的输出，使其更符合期望的目标。
 
+**强化学习算法主要以原来的训练结果为基础**，只是不断调整新的处理结果与目标问题（强化学习算法本身的专业术语叫“环境”）之间的偏差（专业术语叫“奖励”）。
+
 RL包含行动、 环境、观察、奖励机制等模块，奖励机制是RL 具有特色的模块，在奖励机制出现之前，众多机器学习算法是通过损失函数的梯度更新来进行模型学习的，这种损失函数优化效果带来的是模型直接收益反馈，然而不同于传统机器学习任务的单一任务分析，针对复杂环境的分析以及任意动作的带来的奖励反馈极为动态，比如我们在驾驶场景，方向盘多转动5度所带来的奖励收益是极为复杂的，这也让众多传统机器学习算法无法对上述任务进行建模。如何设计良好的奖励机制，是强化学习系统算法建模之前就要想清楚的问题。RLHF的做法是不再像原有RL依赖机器计算奖励反馈，而是利用人工计算奖励反馈，所以该算法框架才被定义为基于人类反馈的强化学习框架。 
 
 强化学习在LLM中的应用：给定prompt，调整policy，生成符合人类喜好（RM偏序信号）的response
@@ -94,11 +96,57 @@ chatgpt所用的RLHF流程，首先BT模型的假设来训练Reward model。BT�
 
 PPO即近端策略优化算法，是一种强化学习算法。
 
-利用PPO算法，根据RW模型的奖励反馈进一步微调 sft model。经过强化学习后，LLM 给出的回答会越来越逼近那些在奖励模型中得分比较高的回答。包含actor model、reference模型/ref_model、reward model和critic model。actor model是我们想通过强化学习微调的大模型，但是强化学习过程很容易把模型训练“坏”，因此需要另外一个不会参数更新的 ref_model来当作标的，别让actor model跑偏太远。**为什么PPO不直接使用reward model?**虽然reward model可以提供每个状态或状态动作对的即时奖励信号，但它并不能直接提供对应的价值估计。奖励信号只反映了当前动作的即时反馈，critic model的作用是估计状态或状态动作对的长期价值，也称为状态值函数或动作值函数。critic model能够学习和预测在当前状态下采取不同动作所获得的累积奖励，它提供了对策略改进的指导。PPO算法使用critic model的估计值来计算优势函数，从而调整策略的更新幅度，使得更有利于产生更高长期回报的动作被选择。PS： actor model 和 ref_model是同一个模型的两个副本，reward model和critic model也是同一个模型的两个副本，且起源都是base model。[拆解大语言模型RLHF中的PPO算法](https://mp.weixin.qq.com/s/y7o9F9vz8dv609ee6xqYtw) 原理与代码并重，值得细读。
+利用PPO算法，根据RW模型的奖励反馈进一步微调 sft model。经过强化学习后，LLM 给出的回答会越来越逼近那些在奖励模型中得分比较高的回答。包含actor model、reference模型/ref_model、reward model和critic model。
+1. actor model是我们想通过强化学习微调的大模型，但是强化学习过程很容易把模型训练“坏”，因此需要另外一个不会参数更新的 ref_model来当作标的，别让actor model跑偏太远。
+2. reward model，计算即时收益。**为什么PPO不直接使用reward model?**虽然reward model可以提供每个状态或状态动作对的即时奖励信号，但它并不能直接提供对应的价值估计。奖励信号只反映了当前动作的即时反馈
+2. critic model的作用是估计状态或状态动作对的长期价值（预估总收益；），也称为状态值函数或动作值函数。critic model能够学习和预测在当前状态下采取不同动作所获得的累积奖励，它提供了对策略改进的指导。PPO算法使用critic model的估计值来计算优势函数，从而调整策略的更新幅度，使得更有利于产生更高长期回报的动作被选择。
+PS： actor model 和 ref_model是同一个模型的两个副本，reward model和critic model也是同一个模型的两个副本，且起源都是base model。[拆解大语言模型RLHF中的PPO算法](https://mp.weixin.qq.com/s/y7o9F9vz8dv609ee6xqYtw) 原理与代码并重，值得细读。[OpenRLHF源码解析一PPO](https://zhuanlan.zhihu.com/p/19673307383)
+
+![](/public/upload/machine/ppo_train.png)
 
 使用PPO优化pipeline，有几个明显挑战，比如需要在学习过程中启动4个模型：actor model，reference model，reward model，critic model。如果为了提升训练效率，还可额外部署infer model。在游戏、机器人等领域，这几个模型通常size都比较小，为了效果多部署几个模型可以接受。但在LLM领域中，为了效果导致模型size剧增，同时也需要更为复杂的调度方式，总体来说，PPO优化pipeline对资源使用和调度带来了不小挑战。
 
 [人人都能看懂的RL-PPO理论知识](https://mp.weixin.qq.com/s/XU9MznCUFYkoHCrdQmV68w) 未读，建议细读。
+
+[拆解大语言模型RLHF中的PPO](https://zhuanlan.zhihu.com/p/645225982) 先用一段伪代码把大语言模型RLHF中的PPO 三部分采样、反馈和学习的关系简要说明一下
+```python
+policy_model = load_model()
+for k in range(20000):
+    # 采样（生成答案）
+    prompts = sample_prompt()
+    data = respond(policy_model, prompts)
+    # 反馈（计算奖励）
+    rewards = reward_func(reward_model, data)
+    # 学习（更新参数）
+    for epoch in range(4):
+        policy_model = train(policy_model, prompts, data, rewards)
+```
+明确一个概念——策略（policy，就是我们想要训练出来的大模型），它就是RLHF中的“学生”。policy由两个模型组成，一个叫做演员模型（Actor），另一个叫做评论家模型（Critic）。它们就像是学生大脑中的两种意识，一个负责决策，一个负责总结得失。评论家/Critic就是将演员/Actor模型的倒数第二层连接到一个新的全连接层上。除了这个全连接层之外，演员和评论家的参数都是共享的
+
+```python
+policy_model = load_model()
+ref_policy_model = policy_model.copy()
+
+for k in range(20000):
+    # 采样
+    prompts = sample_prompt()
+    responses, old_log_probs, old_values = respond(policy_model, prompts)
+
+    # 反馈
+    scores = reward_model(prompts, responses)
+    ref_log_probs, _ = analyze_responses(ref_policy_model, prompts, responses)
+    rewards = reward_func(scores, old_log_probs, ref_log_probs)
+    
+    # 学习
+    advantages = advantage_func(rewards, old_values)
+    for epoch in range(4):
+        log_probs, values = analyze_responses(policy_model, prompts, responses)
+        actor_loss = actor_loss_func(advantages, old_log_probs, log_probs)
+        critic_loss = critic_loss_func(rewards, values)
+        loss = actor_loss + 0.1 * critic_loss
+        train(loss, policy_model.parameters())
+```
+PS：actor model根据prompt 产生response，reward model 根据(prompt, response)得出reward score，简单情况下，我们根据loss=loss_func(score) 得到loss 就可以更新actor model了。但是考虑到，actor model 不合适偏差ref model太远，所以引入actor_loss，loss=loss_func(score，actor_loss)。又是基于啥考虑引入critic_model 和critic_loss 呢？
 
 ### DPO（Direct Preference Optimization）
 
@@ -136,10 +184,16 @@ ReFT 这篇论文，好就好在它是在 o1 之前发表的。因为 o1 的出�
 ## 案例
 
 [大模型Post-Training总结](https://mp.weixin.qq.com/s/FDe4dz6eMC4QZ1aNoE4vnw)
-1. Qwen2.5的后训练路径是SFT + Two-stage Reinforcement Learning，即SFT->DPO->GRPO。
+1. Qwen2.5的后训练路径是SFT + Two-stage Reinforcement Learning，即PPO->DPO->GRPO。
 2. TULU 3的后训练路径是SFT->DPO->RLVR。
-3. DeepSeek-V3的后训练路径是SFT->GRPO。
+3. DeepSeek-V3的后训练路径是DPO->PPO->GRPO。RM的策略也在不断演进，rule-based RM与model-based RM并重，同时最新的DeepSeek-V3中还使用了self-rewarding策略，使得模型能够不断自我改进。
 4. Llama 3后训练方法是迭代式的，总共做了6轮。每轮的核心操作是：Reward Modeling，Rejection Sampling，SFT，DPO。
+
+有几点结论：
+1. GRPO/PPO 与 DPO之争，似乎还没有明确的高下之分。LLaMA偏向DPO，DeepSeek偏向使用GRPO，Qwen则是两者相结合。
+2. 不管使用GRPO/PPO还是使用DPO, RM都是特别关键的（即便采用DPO进行RL，也需要使用RM进行Rejection Sampling），各个模型每次更新几乎都会提及一些RM的优化点和关键。
+3. RL阶段几乎是必须的，尤其是对于代码/数学等强推理场景，RL对于模型能力提升起到关键作用。
+
 
 [张俊林：MCST树搜索会是复刻OpenAI O1/O3的有效方法吗](https://mp.weixin.qq.com/s/oJFJjk9zbopmLSbh7QbBjg) 讲的很详细。post-trainning 分为几个阶段，每个阶段准备什么样的数据。尤其是有几张图，很有借鉴意义。
 
@@ -166,6 +220,12 @@ RLHF开源框架主要有DeepspeedChat、Trlx、ColossalAI-Chat，同时在这�
 TRL 是由大名鼎鼎的Transformer 针对强化学习专门设计的，旨在打造一个针对大语言模型开展强化学习所用到的全栈类库。提供三阶段训练框架，包括微调训练阶段的SFTTrainer、RM模型训练阶段的RewardTrainer、以及强化学习训练阶段使用的PPOTrainer。 PS：对应训练的LLM的Trainer
 
 ### 数据集格式
+
+Karpathy：当我们为 LLM 创建数据集时，本质上与为它们编写教科书并无二致。为了让 LLM 真正“学会”，我们需要像编写教科书一样，提供这三种类型的数据：
+1. 大量的背景知识 (Background information)： 对应预训练，让模型积累广泛的知识。
+2. 示范性的例题 (Worked problems)： 对应监督式微调，让模型学习高质量的输出。
+3. 大量的练习题 (Practice problems)： 对应强化学习，让模型在实践中学习，通过试错和反馈不断改进。
+卡帕西总结道，我们已经让 LLM 经历了大量的“阅读”和“学习例题”，但更重要的是，我们需要引导它们进行大量的“实践练习”。 LLM 需要阅读，更需要实践。 只有通过大量的实践练习，才能真正提升 LLM 的能力，让它们更好地理解世界、解决问题。
 
 ## 数据准备
 

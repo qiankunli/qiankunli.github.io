@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: LLM工作流编排
+title: LangGraph工作流编排
 category: 技术
 tags: MachineLearning
 keywords: langchain langgraph lcel
@@ -458,7 +458,7 @@ LangGraph的核心方法是：通过定义一个Graph图结构的流程来代表
 
 LangGraph 三个核心要素
 1. StateGraph，LangGraph 在图的基础上增添了全局状态变量，是一组键值对的组合，可以被整个图中的各个节点访问与更新，从而实现有效的跨节点共享及透明的状态维护。它将该对象传递给每个节点。然后，节点会以键值对的形式，返回对状态属性的操作。这些操作可以是在状态上设置特定属性（例如，覆盖现有值）或者添加到现有属性。
-2. 在创建了StateGraph之后，我们需要向其中添加Nodes（节点）。添加节点是通过`graph.add_node(name, value)`语法来完成的。其中，`name`参数是一个字符串，用于在添加边时引用这个节点。`value`参数应该可以是函数或runnable 接口，它们将在节点被调用时执行。其输入应为状态图的全局状态变量，在执行完毕之后也会输出一组键值对，字典中的键是State对象中要更新的属性。说白了，Nodes（节点）的责任是“执行”，在执行完毕之后会更新StateGraph的状态。
+2. 在创建了StateGraph之后，我们需要向其中添加Nodes（节点）。添加节点是通过`graph.add_node(name, value)`语法来完成的。其中，`name`参数是一个字符串，用于在添加边时引用这个节点。`value`参数应该可以是函数或runnable 接口，它们将在节点被调用时执行。其输入应为状态图的全局状态变量，在执行完毕之后也会输出一组键值对，字典中的键是State对象中要更新的属性。说白了，Nodes（节点）的责任是“执行”，在执行完毕之后会更新StateGraph的状态。PS： node 输入都是state，输出是对state的更新
 3. 节点通过边相互连接，形成了一个有向无环图（DAG），边有几种类型：
     1. Normal Edges：即确定的状态转移，这些边表示一个节点总是要在另一个节点之后被调用。
     2. Conditional Edges：输入是一个节点，输出是一个mapping，连接到所有可能的输出节点，同时附带一个判断函数（输入是StateGraph，输出是Literal），根据全局状态变量的当前值判断流转到哪一个输出节点上，以充分发挥大语言模型的思考能力。
@@ -534,6 +534,14 @@ def tools_condition(state: Union[list[AnyMessage], dict[str, Any]],) -> Literal[
     return "__end__"
 ```
 
+langgraph 的灵感来自 Pregel 和 Apache Beam。暴露的接口借鉴了 NetworkX。PS: 限定了node 输入输出的dag。
+
+![](/public/upload/machine/langgraph_work.png)
+
+1. CompiledGraph 类没正经干什么活儿，主要将点、边加入到了nodes/channels里，核心是父类Pregel在干活儿。触发 CompiledGraph.astream 实质是触发 Pregel.astream/stream。stream的输出是当前step的state的值。
+2. node 的输入是state，输出是对state的更新。所以langgraph 才提供了prebuilt 将 其它工具转为兼容node的形式。
+3. Pregel.stream 核心工作是按DAG依次提交node/task并执行，拿到某个node 结果后，更新state值，执行下一个node/conditional_edge。此时Pregel 与一个DAGExecutor 没什么两样。
+
 ## 其它
 
 从llamaindex的代码看，问答链路多种多样（比如RouterQueryEngine/MultiStepQueryEngine等），一种链路是一种queryEngine，每种queryEngine有不同的组件，比如RouterQueryEngine提出了 BaseSelector（可以EmbeddingSingleSelector 也可以是LLMSingleSelector） summarizer（BaseSynthesizer子类） 抽象，有分有合。langchain类似，会提各种xxChain，创建chain的时候也会指定一些抽象，比如xxComprossor（实质就是rerank）但不如llamaindex 明显。
@@ -547,7 +555,7 @@ class RouterQueryEngine(BaseQueryEngine):
     ) -> None:
         ...
 ```
-也就是，问答链路复杂了，有多个step， step 如何串成piipeline， spep 之间如何传递数据，此时有几种选择
+也就是，问答链路复杂了，有多个step， step 如何串成pipeline， spep 之间如何传递数据，此时有几种选择
 1. 每个组件都遵守比如Runnable 接口（输入输出是dict 或很宽泛的Input/Oupput，也是一种抽象，但这种抽象几乎意义不大），然后串起来。 此时要解决 控制流（分支、循环）以及组件间的参数传递问题。
 2. 每种链路提出一个抽象
   1. 控制流：一个抽象固化了问答的先后顺序，比如 RouterQueryEngine/MultiStepQueryEngine。langchain的各种xxChain。
@@ -555,4 +563,4 @@ class RouterQueryEngine(BaseQueryEngine):
   3. 参数传递：参数的传递可以通过QueryEngine/XXChain 的成员变量
 3. langgraph 是一种中间态，复用靠把箭头指向原有链路，一条子链路存在的本身就是一种抽象，信息传递靠GraphState。
 
-框架的作用，很多时候也不是没它不行，框架是一个约束和规范，没有它经常会跑偏。
+框架的作用，很多时候也不是没它不行，框架是一个约束和规范，没有它经常会跑偏。比如**使用LangGraph 时大部分需要使用 Langchain 对象才能顺利运行**。

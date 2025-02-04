@@ -188,13 +188,14 @@ chat 方法由一个while true 循环组成，循环内执行 _run_step， Agent
 
 ## workflow
 
-LlamaIndex Workflows是LlamaIndex近期推出的用来替代之前Query Pipeline（查询管道）的新特性。与LangGraph不同的是，其没有采用类似LangCraph基于图结构的流程编排模式，而是采用了一种事件驱动的工作流编排方式：工作流中的每个环节被作为step（步骤，代表一个处理动作），每个step可以选择接收（类似订阅）一种或多种event（事件）做处理，并同样可以发送一种或多种event给其他step。通过这种方式，把多个step自然的连接起来形成完整的Workflow。在这种架构中，工作流的运行不是由框架来根据预先的定义（比如Graph）来调度任务组件执行，而是由组件自身决定：你想接收什么event，做什么处理，并发出什么event。如果组件B接受了A发出的某种event，那么B就会在A发出event后触发执行。
+LlamaIndex Workflows是LlamaIndex近期推出的用来**替代之前Query Pipeline（查询管道）**的新特性。与LangGraph不同的是，其没有采用类似LangCraph基于图结构的流程编排模式，而是采用了一种事件驱动的工作流编排方式：工作流中的每个环节被作为step（步骤，代表一个处理动作），每个step可以选择接收（类似订阅）一种或多种event（事件）做处理，并同样可以发送一种或多种event给其他step。通过这种方式，把多个step自然的连接起来形成完整的Workflow。在这种架构中，**工作流的运行不是由框架来根据预先的定义（比如Graph）来调度任务组件执行，而是由组件自身决定**：你想接收什么event，做什么处理，并发出什么event。如果组件B接受了A发出的某种event，那么B就会在A发出event后触发执行。
 
 ![](/public/upload/machine/llamaindex_workflow.jpg)
 
 图中涉及到LlamaIndex Workflows中的一些关键概念：
 1. Workflow（工作流）工作流代表一个复杂的RAG、Agent或者任意复合形式的LLM应用的端到端流程。创建完工作流后，调用run方法，并输入任务即可启动。Workflow类似LangGraph中的Graph。
 2. Step（步骤）步骤代表工作流中的单个任务，你可以自由的定义步骤内容。每个步骤接收输入事件（订阅），并返回输出事件。当输入事件发生时，这个步骤就会自动执行。步骤使用Python函数定义。Step类似LangGraph中的Node。
+    1. 将条件路由逻辑保留在step中而不是langgraph.conditional_edge中
 3. Event（事件）事件是一个步骤的输入输出，也是工作流各个步骤之间的数据载体。当事件发生时，“订阅”该事件的步骤就会执行，同时从事件中取出必要数据。事件是一个Pydantic类型对象，可以自由定义结构。注意两个特殊事件：StartEvent与StopEvent是两个系统事件，代表工作流开始与结束。StartEvent由框架派发，代表工作流的开始。StopEvent由框架接收，发送StopEvent的步骤代表没有后续步骤。
 4. Context（上下文），Context是一个用来在整个工作流内自动流转的上下文状态对象，放入Context中的数据可以被所有步骤接收和读取到，可以理解为全局变量。
 PS：一个workflow 引擎，两个关键字是workflow/step(task)，三个关键字是workflow/step/context（全局的和step间的信息传递）。四个关键词就再带一个驱动机制：顺序驱动（按序执行，就没法循环了）、图驱动、事件驱动。
@@ -237,6 +238,42 @@ async for chunk in result.async_response_gen():
 ```
 
 [深入解析LlamaIndex Workflows【下篇】：实现ReAct模式AI智能体的新方法](https://mp.weixin.qq.com/s/QTYlW3K5x5_b501Mcx_8bA) 未细读
+
+### 原理
+
+`@step` 可以用于workflow 的方法或独立的方法。PS：实质是一个猴版的消息总线
+1. Workflows make async a first-class citizen
+2. 对于workflow方法，`@step` 将当前func 构造为 StepConfig，并保存到func 对应Callbale.__step_config 里
+  1. Workflow 第一个step的入参是StartEvent，最后一个step的出参是StopEvent
+  2. 每个step 入参除了event，还可以传入ctx，用来传递一些全局信息。比如用户的原始query，多个step都需要。
+3. 将每个step func封装为_task，协程触发启动，所有的_step 都开始监听queue，拿到自己对口的event就开始干活儿。不是传统的通过DAG拓扑排序的方式依次驱动step。
+
+![](/public/upload/machine/llamaindex_workflow.png)
+
+```
+class Workflow(metaclass=WorkflowMeta):
+    @dispatcher.span
+    def run(self, ctx，stepwise: bool = False, checkpoint_callback，        **kwargs: Any,) -> WorkflowHandler:
+        # 触发start 干活
+        ctx, run_id = self._start(
+            ctx=ctx, stepwise=stepwise, checkpoint_callback=checkpoint_callback
+        )
+        result = WorkflowHandler(ctx=ctx, run_id=run_id)
+        asyncio.create_task(_run_workflow())
+        return result     
+```
+
+1. workflow._start 将所有step func都封装为_task 并（作为协程）触发执行，还启动了一个监听workflow取消的协程。
+2. _task 对对step func进行了封装，主要是一个轮询逻辑：从queue（一个step 对应一个queue）里取出event，触发step func，成功最好（得到new_ev 发出去），不成功处理下重试。
+3. _run_workflow 负责触发扳机（发出StartEvent），并等待所有的step执行完成。
+
+还有一个很关键的组件是Context
+1. Context 持有了workflow 对象，所以它获取所有的step情况。
+2. Context 持有了_retval，结果写到这里。
+3. Context 持有了_queues，key=step name，value=asyncio.Queue
+4. Context 持有了_step_flags，key=step name，value=asyncio.Event
+5. Context 提供了一些工具方法，比如等待上游的多个step 都执行完成。
+Emit event 不只是workflow内部（驱动step 执行时），也可以手动在step 内部、workflow.run 外部手动通过ctx.send_event 来发送event。
 
 ## 与LangChain 对比
 

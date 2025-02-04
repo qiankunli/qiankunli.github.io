@@ -58,7 +58,7 @@ if __name__ == '__main__':
     print('主线程')
 ```
 
-在python中，协调线程的信号机制，使用threading.Event类最简单，threading.Event有一个内部bool标志，一开始是False，调用Event.set() 可以将标志设为True。这个标志为False时，在一个线程中调用Event.wait() 该线程将被阻塞，直到另一个线程调用Event.set()，致使Event.wait() 返回True。PS： threading.Event 对应有multiprocessing.Event,asyncio.Event。
+在python中，协调线程的信号机制，使用threading.Event类最简单，threading.Event有一个内部bool标志，一开始是False，调用Event.set() 可以将标志设为True。这个标志为False时，在一个线程中调用Event.wait() 该线程将被阻塞，直到另一个线程调用Event.set()，致使Event.wait() 返回True。PS： threading.Event 对应有multiprocessing.Event,asyncio.Event。PS：感觉类似于barrier
 
 
 ## 进程

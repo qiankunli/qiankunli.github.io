@@ -34,6 +34,8 @@ OpenAI 是以 AGI 为愿景的公司，现在的 Agent 在一定程度上可以�
 2. [rag的尽头是agent](https://mp.weixin.qq.com/s/iZjfHEe2TXCJYPAGQ6beUQ) `rewrite ==> retrieve ==> generate` 可以解决的问题终归有限， 这里涉及到很多花活，比如拆分子问题、联网、ircot等，需要agent 根据当前的已知信息，判断下一步 ==> 行动 ==> 根据观察判断下一步
 3. [rag的尽头是multi-agent](https://mp.weixin.qq.com/s/uSHGFKpPzdrJjDL3BZVDWw)  单个agent 可以解决的问题也终归有限，用户的“知识”不只在文档里，也在数据库表里，也是知识图谱里，都编排在一个agent里，对路由器/plan 组件的要求很高，很多时候即便人也无法判断，这时候就要“三个臭皮匠，顶一个诸葛亮”了。
 如果LLM能力足够，一个agent 选择tools 就能解决所有问题。**实质上还是LLM 能力有限**（无法较好的拆解问题，制定plan，也无法较好的判断问题结束），针对某一链路、某一场景进行特化，复查场景采取多角色协作方式。
+1. MultiAgent: 多个LLM，角色分工明确（角色扮演很重要！），偏向协作解决复杂任务，
+2. Agent-tools: 单个Agent调用工具（通常为API或功能模块）完成特定功能，偏向任务执行和效率。
 
 从架构的角度，与 single agent 相比，multi-agent 架构更易于维护扩展。即使是基于 single agent 的接口，使用 multi-agent 的实施架构也可能使系统更加模块化，开发人员更容易添加或删除功能组件。**目前的技术条件下，无法构建出一个满足所有功能的 single agent**，但可以将不同的 Agent 和 LLM 进行组合，构建出一个满足使用要求的 multi-agent。
 
@@ -63,7 +65,7 @@ PS： 你要是上万个tool的话，llm 上下文塞不下，此时让一个llm
     4. 无反馈（None），无反馈主要出现世界模拟这类应用中，因为这列应用主要侧重结果分析，例如传播模拟的结果分析，而非智能体能力获取，所以无需引入反馈对智能体的策略进行调整。
     而智能体调整策略、增强能力的方式又可以分为三类：记忆（Memory），自我进化（Self-Evolution）和动态生成（Dynamic Generation）。
 
-## AutoGen
+## AutoGen v0.2
 
 AutoGen 代理是可定制的、可对话的，并且无缝地允许人类参与。in AutoGen
 1. 收发消息、生成回复：an agent is an entity that can send messages, receive messages and generate a reply using models, tools, human inputs or a mixture of them. This abstraction not only allows agents to model real-world and abstract entities, such as people and algorithms, but it also simplifies implementation of complex workflows as collaboration among agents.
@@ -166,6 +168,77 @@ result = joe.initiate_chat(cathy, message="Cathy, tell me a joke.", max_turns=2)
 AutoGen允许在一个群聊中，调用另外一个Agent群聊来执行对话(嵌套对话Nested Chats)。这样做可以把一个群聊封装成单一的Agent，从而实现更加复杂的工作流。
 
 [AutoGen多代理对话项目示例和工作流程分析](https://developer.aliyun.com/article/1394332) 未细读。
+
+## AutoGen v0.4
+
+AutoGen0.4与旧版本最大的区别在于：提供了一种更底层的，快速构建消息驱动的、分布式、可扩展的多Agent系统的框架与组件，即AutoGen-core。AutoGen-Core提供了多Agent的基础管理与运行环境。
+
+![](/public/upload/machine/autogen_core.jpg)
+
+### 示例代码
+
+定义两个Agent，ManagerAgent与WorkerAgent。ManagerAgent在收到任务消息（Hello World）后，会转发给Worker完成，并获得反馈。
+
+```python
+from dataclasses import dataclass
+@dataclass
+class MyTextMessage:
+    content: str
+
+from autogen_core import AgentId, MessageContext, RoutedAgent, message_handler
+class MyWorkerAgent(RoutedAgent):
+    def __init__(self) -> None:
+        super().__init__("MyWorkerAgent")
+    @message_handler # 每个message_handler都会收到两个输入参数：消息体与消息上下文
+    async def handle_my_message(self, message: MyTextMessage, ctx: MessageContext) -> MyTextMessage:
+        print(f"{self.id.key} 收到来自 {ctx.sender} 的消息: {message.content}\n")
+        return MyTextMessage(content="OK, Got it!")
+
+class MyManagerAgent(RoutedAgent):
+    def __init__(self) -> None:
+        super().__init__("MyManagerAgent")
+        # 由于其需要将任务消息转发给WorkerAgent，因此在初始化时，会保留指向WorkerAgent的引用
+        # 指定一个AgentId即可，Agent实例由Runtime在必要时自动创建
+        self.worker_agent_id = AgentId('my_worker_agent', 'worker')
+
+    @message_handler
+    async def handle_my_message(self, message: MyTextMessage, ctx: MessageContext) -> None:
+        print(f"{self.id.key} 收到消息: {message.content}\n")
+        print(f"{self.id.key} 发送消息给 {self.worker_agent_id}...\n")
+        response = await self.send_message(message, self.worker_agent_id)
+        print(f"{self.id.key} 收到来自 {self.worker_agent_id} 的消息: {response.content}\n")
+
+from autogen_core import SingleThreadedAgentRuntime
+import asyncio
+async def main():
+
+    #创建runtime，并注册agent类型，并负责启动与停止
+    runtime = SingleThreadedAgentRuntime() 
+    await MyManagerAgent.register(runtime, "my_manager_agent", lambda: MyManagerAgent()) # 注册定义好的Agent类型，并指定工厂函数用于实例化
+    await MyWorkerAgent.register(runtime, "my_worker_agent", lambda: MyWorkerAgent())
+
+    #启动runtime，发送消息，关闭runtime
+    runtime.start()
+
+    #创建agent_id，发送消息
+    agent_id = AgentId("my_manager_agent", "manager")
+    await runtime.send_message(MyTextMessage(content="Hello World!"),agent_id)
+
+    #关闭runtime
+    await runtime.stop_when_idle()
+asyncio.run(main())
+```
+
+langgraph 可以看做是限定了node 输入和输出的dag Executor（step是一个func），llamaindex workflow则是事件驱动（step 限定输入输出是xxevent的func，step依托于workflow 而存在），event可以看做message通信的话，有一点消息总线的样子了。autogen 有点明确了提出了消息总线概念的样子，step是一个独立的类message_handler（意味着可以各方便的复用），只与runtime交互。[Agent框架分析 - AutoGen](https://zhuanlan.zhihu.com/p/10856919764) 则非常直接的将autogen与并发计算的Actor模型做了分析，将Agent类比为Actor。
+
+### 整体设计
+
+1. AutoGen Core
+  1. autogen_core.base：定义了 Agent、Message 和 Runtime 时的核心接口和基础类。这个层次是框架的基础，其他层次会依赖于它。
+  2. autogen_core.application：提供了 Runtime 的具体实现以及 Multi-Agent 应用程序所需的工具，如日志记录等。
+  3. autogen_core.components：提供了构建 Agent 的可重用组件，包括 type-routed agent、model client、tools、代码运行沙箱和 memory。
+2. AgentChat 是一个用于构建多智能体应用的高级 API。它建立在 autogen-core 包之上。
+3. Extensions AutoGen 框架将官方实现和社区实现进行了一些分离，以插件的形式进行。官方维护框架的核心功能，而社区维护生态。
 
 ## Qwen-Agent（未细读）
 

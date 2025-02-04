@@ -28,6 +28,11 @@ MoE架构的主要优势在于其能够通过激活部分专家来降低计算�
 
 ## deepseek
 
+deepseek有很多自己特色性的技术。从这些特色性的技术中可以看到，他们的出发点都是尽最大努力去减少人工智能中的各项成本。例如：
+1. 不依赖于对用于训练的数据进行人工打标签。
+2. 混合专家架构（Mixture of Experts：MoE）。
+3. 多头潜在注意力（Multi-Head Latent Attention，MLA）
+
 ### MTP
 
 MTP的研究并不是大模型时代的新物种，而是在第一代Transformer base的模型上，就有相应的研究了。

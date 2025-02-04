@@ -17,9 +17,24 @@ keywords: Python
 
 创建协程 ==> asyncio.create_task(coroutine)协程转为task并注册到eventloop ==> eventloop 驱动task 执行。
 
+## 铺垫
+
+[协程系列(1) 什么是协程](https://zhuanlan.zhihu.com/p/680552473)协程的协指的是主动协作，每个协程在完成前可以暂停和恢复，在代码块中可以将执行权交给其他协程。**协程的本质是一个状态机**，有多个状态，每个状态都可以暂停，然后再继续往下走。一个语言支持协程，就是指这个语言提供了创建协程的语法。但是这个语法，并不是协程的本质，只是为了方便用户使用协程而已。保存状态可以用状态机，也可以用栈空间。如果把我们的状态机改造成一个栈，那么我们就可以把状态保存在栈里，然后切换协程的时候， 保存和恢复栈空间就可以了。
+1. 有栈协程(Stackful Coroutine)，协程有自己的栈空间，比如像 Go 的话，一个协程就对应了一个程序栈，切换协程的时候，就需要切换程序栈。有点像那个线程切换，不同之处在于可以主动换出。而Go的虚拟机就承担了调度器的角色，有兴趣可以了解一下 Go 的 GMP 抽象.
+2. 无栈协程 (Stackless Coroutine) ，协程对象没有自己的栈空间。用户写起来更加麻烦，因为需要显式写出 await 语句，来让协程切换到其他协程，不然只是创建了协程对象，但是协程对象不会运行。而且 await 需要一个协程 Event Loop，所以只能在 async 函数里面调用。这就是大家所说的**无栈协程染色问题**。Python 协程库asyncio/Rust协程库 tokio/C++20 协程库 asio都是典型的无栈协程。
+
+协程离不开调度器，调度器 (Scheduler) 是协程的运行时的重要组成部分，它负责调度协程的运行。一个调度器管理多个协程，调度器需要有一个队列，用来存放等待运行的协程。调度器的 run 方法， 就是一个事件循环 (Event Loop)。 它会不断地运行协程， 直到所有协程都运行完毕。我们还需要给 Scheduler 提供一个 add_coro 方法，用来向队列中添加协程。大家一般把这个方法叫做 spawn 或者 create_task。
+
+当把这些设计实现出来后，我们会发现，这个调度器的性能很差。现在我们要对它做一些优化
+1. 阻塞系统调用。如果协程里有阻塞的系统调用， 比如 sleep, 那么这个线程就会一直等待， 直到系统调用返回，才可以运行下一个协程。这会大大影响协程的工作效率。所以说, 协程里的阻塞系统调用，不能阻塞整个工作线程。常见的解决方法有两种:
+    1. 把阻塞的系统调用，放到一个单独的线程里运行， 然后让协程等待这个线程的结果。
+    2. 提供一套 async 的替代品，把阻塞系统调用替换掉，比如 asyncio.sleep 等。
+2. 协程的调度。如果我们有 1000 个协程，每次都从队列里随机选一个协程，也会导致每个协程都要等待 1000 次， 才能运行一次。所以我们需要一个更加合理的办法， 来找出哪些协程是可以运行的。上面说过, 协程库需要提供系统调用接口， 比如 sleep, send_request 等。这些系统调用接口可以向操作系统注册事件， 比如 sleep 可以注册一个定时器事件，send_request 可以注册一个网络事件。当这些事件发生时，操作系统会通知协程库，然后协程库再通知相应的协程。这样的话， 协程库就可以知道哪些协程是可以运行的了， 效率被极大地提高了。 比如你有十万个协程，但是只有 100 个协程是可以继续跑的， 那么调度器就只需要运行这 100 个协程， 而不需要处理其他的 99900 个协程。
+有了上面说的这两点想法，我们就可以实现一个高效的协程库了。当然具体做起来还有很多细节需要处理，比如协程的异常处理，协程的返回值等等。
+
 ## 事件循环/EventLoop
 
-EventLoop是用于在单个线程中执行协程的环境。EventLoop是异步程序的核心。事件循环，顾名思义，就是一个循环。它管理一个任务列表（协同程序）并尝试在循环的每次迭代中按顺序推进每个任务，以及执行其他任务，如执行回调和处理 I/O。“asyncio”模块提供了访问事件循环并与之交互的功能，这不是典型应用程序开发所必需的，asyncio 模块提供了一个用于访问当前事件循环对象的低级 API，以及一套可用于与事件循环交互的方法。
+EventLoop是用于在单个线程中执行协程的环境。EventLoop是异步程序的核心，是中央总控。**Eventloop实例提供了注册、取消和执行任务和回调的方法**。事件循环，顾名思义，就是一个循环。它管理一个任务列表（协同程序）并尝试在循环的每次迭代中按顺序推进每个任务，以及执行其他任务，如执行回调和处理 I/O。“asyncio”模块提供了访问事件循环并与之交互的功能，这不是典型应用程序开发所必需的，asyncio 模块提供了一个用于访问当前事件循环对象的低级 API，以及一套可用于与事件循环交互的方法。
 
 Asyncio 和其他 Python 程序一样，是单线程的，它只有一个主线程，Future 是一个可以被等待的对象，Task 在 Future 的基础上加入了一个 coroutine。他们都是 asyncio 的核心，但是他们都需要一个 EventLoop 来运行。任务只有两个状态：一是预备状态；二是等待状态。event loop 会维护两个任务列表，分别对应这两种状态；并且选取预备状态的一个任务（具体选取哪个任务，和其等待的时间长短、占用的资源等等相关），使其运行，一直到这个任务把控制权交还给 event loop 为止。当任务把控制权交还给 event loop 时，event loop 会根据其是否完成，把任务放到预备或等待状态的列表，然后遍历等待状态列表的任务，查看他们是否完成。如果完成，则将其放到预备状态的列表；这样，当所有任务被重新放置在合适的列表后，新一轮的循环又开始了：event loop 继续从预备状态的列表中选取一个任务使其执行…如此周而复始，直到所有任务完成。
 
@@ -52,9 +67,36 @@ class EventLoop:
 1. 在go里没有同步方法异步方法一说，同步里调“异步方法” 只是go 启动了一个同步方法。但在python 里从语法上区分了同步方法和异步方法，**异步方法只能在EventLoop里执行**，可以认为同步方法和异步方法 runtime 不同。
 2. 所以在python里，同步方法里调用异步方法，要把异步方法封为task 交给loop执行，比如loop.run_until_complete(task)。异步方法可以直接执行同步方法，但如果不想让同步方法阻塞EventLoop，则需要loop.run_in_executor(sync_func)，将sync_func交给专门的线程executor。
 
-## Task
+### Future
 
-调用异步函数并不能执行函数，**异步函数就不能由我们自己直接执行**（这也是函数与协程的区别），异步代码是以 Task 的形式去运行，被 Event Loop 管理和调度的。`result = async_function()` 协程对象 result 虽然生成了，但是还没有运行，要使代码块实际运行，需要使用 asyncio 提供的其他工具。
+Future是协程的封装，对于用户而言， Future 是同步代码和异步代码之间的桥梁，表示一个可以被等待的对象。它记录了如下变量： PS：所谓桥梁，说白了就是调用方和执行方都可以持有、 访问它
+1. state: 任务的状态, 分别是 PENDING , CANCELLED , FINISHED .
+2. loop: 事件循环, 用于执行回调函数.
+3. callbacks: 回调函数列表, 用于存储回调函数.
+4. result: 任务的结果.
+5. exception: 任务的异常.
+
+可以想见，Future 记录了任务的状态，并储存了任务的结果或异常。用户可以等它，并获取结果，也可以取消他。**Future并不一定要和协程绑定在一起**，有时候我们只是等待一个 IO 完成， 或者等待一个定时器到期。 这时候我们就可以用 Future 来表示这个等待。
+
+```
+def c():
+    print('Inner C')
+    return 12
+
+future = loop.run_in_executor(None, c)
+
+future.done()
+
+future.add_done_callback(...)
+
+await future
+```
+
+### Task
+
+Task 是 Future 的子类，它的作用是把协程对象包装成 Future，在 Future 的基础上加入了一个 coroutine。PS：类似java的FutureTask，协程离不开调度器，一个调度器管理多个协程，调度器需要有一个队列，用来存放等待运行的协程。现在看，是不是可以认为，调度器队列里的基本单元是Task？单纯一个 coro 则调度器无法设置coro的状态。
+
+调用异步函数并不能执行函数，**异步函数就不能由我们自己直接执行**（这也是函数与协程的区别），异步代码是以 Task 的形式去运行，被 EventLoop 管理和调度的。`result = async_function()` 协程对象 result 虽然生成了，但是还没有运行，要使代码块实际运行，需要使用 asyncio 提供的其他工具。
 1. 最常见的是 await 关键字。当我们await一个Coroutine，这个异步函数就会被提交给asyncio底层，然后asyncio就会开始执行这个函数。
     1. 如果一个对象可以在 await 语句中使用，那么它就是 可等待 对象。许多 asyncio API 都被设计为接受可等待对象。可等待 对象有三种主要类型: 协程, Task  和 Future.
     2. 使用 await 关键字时，当遇到耗时操作时，将暂停当前函数的执行，并等待耗时操作完成，同时它会释放出事件循环来处理其他任务。
@@ -64,7 +106,7 @@ class EventLoop:
     2. 任务组合并了一套用于等待分组中所有任务完成的方便可靠方式的任务创建 API。class asyncio.TaskGroup，持有一个任务分组的 异步上下文管理器。 可以使用 create_task() 将任务添加到分组中。 async with 语句将等待分组中的所有任务结束。 
 。当该上下文管理器退出时所有任务都将被等待。当首次有任何属于分组的任务因 asyncio.CancelledError 以外的异常而失败时，分组中的剩余任务将被取消。一旦所有任务被完成，如果有任何任务因 asyncio.CancelledError 以外的异常而失败，这些异常会被组合在 ExceptionGroup 或 BaseExceptionGroup 中并将随后引发。PS： 有点像go中的waitgroup，启动多个任务，发生异常、等一个任务执行完、等待所有任务都完成、限制某个任务执行过程都提供了接口。
 
-`result = await async_function()` 和普通的同步函数没有任何区别，主要原因是：这里其实没有将协程放到 Event Loop 中，这用到了asyncio.create_task()。
+`result = await async_function()` 和普通的同步函数没有任何区别，主要原因是：这里其实没有将协程放到 EventLoop 中，这用到了asyncio.create_task()。
 
 ```python
 async def main():
@@ -117,7 +159,7 @@ new_loop = asyncio.get_event_loop_policy().new_event_loop()     # 与上一行�
 1. 调用 get_event_loop() 得到的是默认事件循环。如果是 Unix-like 系统，会调用asyncio.SelectorEventLoop()得到基于epoll或kqueue选择机制的事件循环；
 2. 每个线程可以设置不同的事件循环，但是每个进程又只能有一个**事件循环策略**。使用默认策略时，主线程能够 asyncio.get_event_loop() 得到默认事件循环，但是子线程内做此操作却不行。会报RuntimeError，提示当前线程无事件循环。子线程中有异步时，需在子线程内先设置事件循环，或将主线程中获取到的循环对象传递给子线程。
 3. Event Loop 不能中断正在执行的协程
-4. 程序以 Task 的形式放到 Event Loop 中，Event Loop 管理多个 Task，唤醒某个 Task 或者暂停某个 Task 。
+4. 程序以 Task 的形式放到 EventLoop 中，EventLoop 管理多个 Task，唤醒某个 Task 或者暂停某个 Task 。
 
 
 [Python Asyncio调度原理](https://mp.weixin.qq.com/s/GNHYoLF-hMdTeDn3K6O55Q) 未细读。
@@ -225,6 +267,12 @@ class BaseEventLoop(events.AbstractEventLoop):
 ```
 
 像netty eventloop一样，可以为eventloop 设置执行器executor，把包含阻塞调用的任务包装成协程。
+
+## Asyncio 库同步原语
+1. asyncio.Lock
+2. asyncio.Event
+3. asyncio.Condition
+4. asyncio.Semaphore
 
 ## 协程上下文
 [使用 contextvars 管理上下文变量](https://mp.weixin.qq.com/s/e2myTR6wMffuUAcRIGUezg)Python 在 3.7 的时候引入了一个模块：contextvars，从名字上很容易看出它指的是上下文变量（Context Variables）。
@@ -359,6 +407,7 @@ print(async_function())
 # <coroutine object async_function at 0x102ff67d8>
 ```
 
-1. async with  可以处理实现了`__aenter__`和`__aexit__`方法的对象，二者返回可异步调用对象，通常是协程对象。 
+1. async with  可以处理实现了`__aenter__`和`__aexit__`方法的对象，二者返回可异步调用对象，通常是协程对象。  
+    1. `__enter__`和`__exit__`两个方法都是不支持await调用的，为了解决这个问题，Python引入了async with语法。
 2. async for  可以处理实现了`__aiter__`方法的异步可迭代对象，返回异步迭代器。异步迭代器提供`__anext__`协程方法，返回一个可异步调用对象，通常是协程对象。 
 3. 若想实现 异步迭代器，可以编写一个类，实现`__anext__`和`__aiter__`，不过还有更简单的方法：以async def 声明一个函数，在主体使用yield。 

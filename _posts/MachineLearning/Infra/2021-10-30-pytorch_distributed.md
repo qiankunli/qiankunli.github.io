@@ -375,6 +375,11 @@ pytorch ddp论文：During distributed training, each pro- cess has its own loca
 5. 反向传播阶段。运行后向传播来计算梯度，在计算梯度同时也对梯度执行all-reduce操作。每一层的梯度不依赖于前一层，所以梯度的All-Reduce和后向过程同时计算，以进一步缓解网络瓶颈。在后向传播的最后，每个节点都得到了平均梯度，这样模型参数保持同步。[关于AllReduce](https://zhuanlan.zhihu.com/p/100012827)
 6. 更新模型参数阶段。因为每个GPU都从完全相同的模型开始训练，并且梯度被all-reduced，因此每个GPU在反向传播结束时最终得到平均梯度的相同副本，所有GPU上的权重更新都相同，也就**不需要模型同步了**
 
+FullyShardedDataParallel
+1. Sharded ：切分，比如zero1将优化器切分，可以翻译成 Optimizer State Sharded。
+2. FullyShard: 所有都切分，包括optimizer state, grad, param
+3. 所以FullyShardedDataParallel就是zero3。
+
 ### 模板代码
 
 ```python

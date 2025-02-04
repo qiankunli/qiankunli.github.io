@@ -212,9 +212,12 @@ Memory waste in KV Cache
 2. 外部碎片：因为每个request长度不等，就像os中的malloc，长度不等，不停的malloc就会产生外部碎片。
 
 KV Cache的优化方法
-1. MQA、MHA减少KV Cache
+1. MQA、MHA减少KV Cache。KV cache的存在，本来是为了避免在推理阶段对前置序列的重复计算的。但是，随着前置序列的长度变长（我们记为kv_len），需要读取的KV cache也将越来越大，数据的传输成本增加，这就使得attn计算逐渐变成memory bound。我们采取了一些策略来缓解KV cache过大的问题，其中2种就是大家熟知的MQA和GQA。
+    1. 在MQA的情况下，一个token所有的heads都共享同一个k和v。这样在降低param weights大小的同时，还让原本需要保存num_heads份的kv cache降低为只需保存1份。
+    2. 但是，MQA可能造成模型效果上的损失，毕竟原来对于1个token，它的每个head都有各自的k、v信息的，现在却被压缩为一份。所以GQA作为一种折衷的方案出现了，即将1个token的head分成num_group组，每个group内共享同一个k，v信息，使得信息压缩不像GQA那样严重。
+    3. 但是，不管是MQA还是GQA，对于1个token来说，总是存在heads上k、v信息被压缩的情况。那么是否有一种办法，能在尽量不压缩head上k，v信息的情况下，节省kv cache，提高整体推理速度呢？MLA [再读MLA，还有多少细节是你不知道的](https://mp.weixin.qq.com/s/IaIx-3Ok5uW9GgMxlHGw9A)
 2. 窗口约束减少KV Cache
-3. 量化和稀疏
+3. 量化和稀疏。量化原本的意思是**把原来不是“数量的”变化成“数量的”**。这个术语起的名字很不好（在降低精度这个场景）。
 4. PageAttention
 
 [如何解决LLM大语言模型的并发问题？](https://www.zhihu.com/question/613263140/answer/3271554389)vLLM：Efficient memory management for LLM inference 受到操作系统中的分页和虚拟内存的启发，**通过额外的元数据即page table管理KV cache**。将KV Block当做页，将Request当做进程，允许在非连续的内存空间中存储连续的KV。PagedAttention机制：传统要求将keys和values存到连续的内存空间，因为我们知道传统大家都是用TensorFlow、pytorch之类的，它是一个个tensor，所以很自然的就假设给它们一段连续的内存空间，但是对于LLM来说，这个假设就不是一个好的假设，因此PagedAttention允许在非连续内存空间中存储连续的keys和values，vLLM维护一个Block table，存放逻辑空间到物理空间的映射。现在有一个Prompt：Alan Turing is a computer scientist，当产生一个新的token时，会查看Block table中的Physical block no.,然后找到对应物理内存的地方存储进去，并更新Block table中的Filled slots内容。当产生“renowned”的时候，是新开了一个Block，所以也要更新Block table，新开一个物理内存（每个kv block中有固定的token数目）。
