@@ -13,6 +13,8 @@ keywords: infrastructure optimization
 * TOC
 {:toc}
 
+PS：cpu 要是能一直跑，利用率自然就高，**但面临两个问题：io、线程间同步（毕竟总要沟通点信息）**。为此整了很多花活儿。
+
 2018 年 AWS ReInvent 大会上 AWS CTO Werner Volgels 提出的 21 世纪架构中 20 个有趣的事情中最后一个观点：All The Code You Ever Write Will Be Business Logic。开发者只应该关心业务逻辑，不用关心基础设施，不用关心开发工具链。
 
 通用计算我们以云计算最核心的虚拟化为例，KVM 合入 Linux 内核是在 2007 年，OpenStack 第一个版本发布是在 2010 年，Open vSwitch 第一个版本是 2012 年合入 Linux 内核的，LSM 分布式存储的鼻祖 BigTable 论文是 2006 发表的。异构计算是从 2012 年 AlexNet 兴起，再到 2017 年 Transformer 论文发布进入快车道。这些云计算和 AI 领域的核心技术在行业内已经存在了很多年，短期内很难有革命性的创新出来，这意味着计算进入稳态。**在上层的算法和软件进入稳态之后，出于对效率的追求就会催生底层体系结构的创新**，来提升计算性能降低计算成本。通用计算方面 2017 年AWS ReInvent 上发布了 Nitro System，用硬件卸载来降低虚拟化开销提升性能。异构计算方面 NIVIDIA 在 2017 年发布了 Volta 架构 GPU V100 支持第一代 Tensor Core，加速深度学习的矩阵运算。

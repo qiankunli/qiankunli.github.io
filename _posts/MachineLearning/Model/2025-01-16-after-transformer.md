@@ -28,10 +28,38 @@ MoE架构的主要优势在于其能够通过激活部分专家来降低计算�
 
 ## deepseek
 
-deepseek有很多自己特色性的技术。从这些特色性的技术中可以看到，他们的出发点都是尽最大努力去减少人工智能中的各项成本。例如：
-1. 不依赖于对用于训练的数据进行人工打标签。
-2. 混合专家架构（Mixture of Experts：MoE）。
-3. 多头潜在注意力（Multi-Head Latent Attention，MLA）
+[论文](https://github.com/deepseek-ai/DeepSeek-R1/blob/main/DeepSeek_R1.pdf)
+
+边际创新
+1. 无辅助损失的负载均衡策略（Auxiliary-loss-free Load Balancing Strategy）
+2. 多头潜在注意力架构（Multi-head Latent Attention, MLA）
+3. DeepSeekMoE架构
+4. FP8混合精度训练框架
+5. 跨节点混合专家（MoE）训练的通信与计算重叠
+
+首次验证
+1. 多标记预测训练目标（Multi-Token Prediction, MTP）对模型性能的显著提升
+2. FP8训练在超大规模模型上的可行性及有效性
+3. 强化学习可完全激励LLMs的推理能力（无SFT依赖）
+4. 蒸馏后的小型密集模型性能优于直接强化学习的小模型
+
+
+
+### 训练过程
+
+训练路径：  PS： base-> rl -> sft 数据集 -> sft base-> rl -> sft 数据集。论文提到包含2个rl 过程和2个sft过程。
+1. 先收集了一部分高质量冷启动数据（约几千条），使用该数据fine-tune DeepSeek-V3-Base模型，记为模型A。PS： 最开始没有冷启动这个步骤，而是直接对DeepSeek-V3-Base进行了GRPO训练，发现虽然CoT能力提升比较大，但是回复的内容鱼龙混杂，甚至有多个语言同时出现的情况
+2. 使用A模型用GRPO训练（**论文用了一个词 reasoning-oriented RL**），使其涌现推理能力，收敛的模型记为B
+3. 使用B模型产生高质量SFT数据，并混合DeepSeek-V3产生的其他领域的高质量数据，形成一个高质量数据集
+4. 使用该数据集训练原始DeepSeek-V3-Base模型，记为模型C
+5. 使用C模型重新进行步骤2，但是数据集变为所有领域（常规的rl，常规的reward model，提高helpfulness and harmlessness），收敛后的模型记为D，这个模型就是DeepSeek-R1
+6. 训练C模型的数据对小模型做蒸馏，效果也非常好
+
+这个训练过程是不需要任何监督数据的，只需要准确评估最终结果。GRPO的reward并没有采用PRM，而是使用了基于正则的ORM。其中包括了两个点：
+1. 评估最终答案是否正确。包含最终结果比对、代码运行结果等
+2. 格式奖励：模型需要将CoT过程放在`<think></think>`之间
+
+有人说sft不存在了。不可能的，最多是人类标注的sft不存在了。那么取而代之的是什么呢？ai标注的sft。模型rl得到的思维链做sft训练新模型，大模型的思维链训练小模型。
 
 ### MTP
 
@@ -40,3 +68,31 @@ MTP的研究并不是大模型时代的新物种，而是在第一代Transformer
 为什么要做MTP(Multi-Token Prediction)? 当前主流的大模型(LLMs)都是decoder-base的模型结构，也就是无论在模型训练还是在推理阶段，对于一个序列的生成过程，都是token-by-token的。每次在生成一个token的时候，都要频繁跟访存交互，加载KV-Cache，再通过多层网络做完整的前向计算。对于这样的访存密集型的任务，通常会因为访存效率形成训练或推理的瓶颈。
 
 MTP核心思想：通过解码阶段的优化，将1-token的生成，转变成multi-token的生成，从而提升训练和推理的性能。具体来说，在训练阶段，一次生成多个后续token，可以一次学习多个位置的label，进而有效提升样本的利用效率，提升训练速度；在推理阶段通过一次生成多个token，实现成倍的推理加速来提升推理性能。
+
+### 蒸馏/distilled
+
+知识蒸馏本质上是一种模型压缩的方法，其核心思想是利用一个大模型（教师模型）来指导小模型（学生模型）的训练。蒸馏有几种方法，每种方法都有各自的优点：
+1. 一种是数据蒸馏，在数据蒸馏中，教师模型生成合成数据或伪标签，然后用于训练学生模型。这种方法可以应用于广泛的任务，即使是那些 logits 信息量较少的任务（例如开放式推理任务）。
+2. 一种是Logits蒸馏，Logits 是应用 softmax 函数之前神经网络的原始输出分数。在 logits蒸馏中，学生模型经过训练以匹配教师的 logits，而不仅仅是最终预测。这种方法保留了更多关于教师信心水平和决策过程的信息。
+3. 一种是特征蒸馏，特征蒸馏将知识从教师模型的中间层转移到学生。通过对齐两个模型的隐藏表示，学生可以学习更丰富、更抽象的特征。
+
+![](/public/upload/machine/llm_softmax.jpg)
+
+[知识蒸馏技术原理详解：从软标签到模型压缩的实现机制](https://mp.weixin.qq.com/s/lwETI5Fa9t48eOIm5usExQ)
+
+考虑一个输出三类别概率的神经网络模型。假设教师模型输出以下logits值： `[1.1, 0.2, 0.2]`， 经过softmax函数转换后得到： `[0.552, 0.224, 0.224]`。 此时，类别0获得最高概率，成为模型的预测输出。模型同时为类别1和类别2分配了较低的概率值。这种概率分布表明，尽管输入数据最可能属于类别0，但其特征表现出了与类别1和类别2的部分相关性。在传统的模型训练中，仅使用独热编码标签（如[1, 0, 0]）会导致模型仅关注正确类别的预测。这种训练方式通常采用交叉熵损失函数。而知识蒸馏技术通过引入教师模型的软标签信息，为学生模型提供了更丰富的学习目标。
+
+低概率信息的利用价值：在传统分类任务中，由于最高概率（0.552）显著高于其他概率值（均为0.224），次高概率通常会被忽略。而知识蒸馏技术的创新之处在于充分利用这些次要概率信息来指导学生模型的训练过程。以动物识别任务为例，当教师模型处理一张马的图像时，除了对"马"类别赋予最高概率外，还会为"鹿"和"牛"类别分配一定概率。这种概率分配反映了物种间的特征相似性，如四肢结构和尾部特征。虽然马的体型大小和头部轮廓等特征最终导致"马"类别获得最高概率，但模型捕获到的类别间相似性信息同样具有重要价值。
+
+### 其它
+
+让base model 生成推理过程的prompt
+```
+A conversation between User and Assistant. The user asks a question, and the Assistant solves it.
+The assistant first thinks about the reasoning process in the mind and then provides the user
+with the answer. The reasoning process and answer are enclosed within <think> </think> and
+<answer> </answer> tags, respectively, i.e., <think> reasoning process here </think>
+<answer> answer here </answer>. User: {question}. Assistant:
+```
+
+

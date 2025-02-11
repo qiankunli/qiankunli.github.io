@@ -131,11 +131,13 @@ IOC设计模式的两个重要支持：
 2. 面向对象系统中，除了一部分对象是数据对象外，其他很大一部分是用来处理数据的，这些对象并不经常发生变化，在系统中以单件的形式起作用就可以满足应用的需求。
 
 陈皓：控制反转（Inversion of Control，loC ）是一种软件设计的方法，**它的主要思想是把控制逻辑与业务逻辑分开**（程序=控制逻辑+业务逻辑），不要在业务逻辑里写控制逻辑，因为这样会让控制逻辑依赖于业务逻辑，而是反过来，让业务逻辑依赖控制逻辑。
+晓土：控制反转是在**以解耦为目标驱动而产生的一种思想**，终极目标就是通过IOC容器提供中间商/第三方的作用，让对象之间的依赖不靠对象自身控制。引入第三方平台后，对象的主动控制被剥夺，不再自主显式创建所要依赖的对象，而是被动的由第三方平台来控制，当执行到需要其他对象的时候，第三方平台会自动返回所需对象。PS：第三方平台一般直接负责创建所有对象了。在ioc的眼里各个对象之间都是独立的存在，他们之间的依赖关系也只是被写到注册表里面，运行的时候回去检查依赖所需，按需分配，把对象“粘合”到容器里面。
 
+![](/public/upload/spring/ioc_di.jpg)
 
 ## ioc 的接口定义
 
-什么是ioc容器？BeanFactory是最简单的ioc容器，看了BeanFactory接口方法，也许会更直观(主要包括获取bean、查询bean的特性等方法)。
+什么是ioc容器？BeanFactory是最简单的ioc容器，看了BeanFactory接口方法，也许会更直观(主要包括获取bean、查询bean的特性等方法)。**BeanFactory收敛了所以上层的能力**，具体包含核心的BeanDefinitionRegistry和BeanFactory，也就是bean的定义和生产bean的工厂。
 
 ```java
 interface BeanFactory{
@@ -427,6 +429,8 @@ Properties play an important role in almost all applications,and may originate f
 ![](/public/upload/spring/spring_env.png)
 
 ## 其它
+
+Spring容器本质上就是一个存放了一个个描述不同对象属性和方法的定义单元，需要使用的时候就通过反射机制把对象创建好，再将描述的属性初始化。
 
 Spring 元信息
 

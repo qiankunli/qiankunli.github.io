@@ -231,7 +231,7 @@ print('enc =', enc)
 print(tokenizer.batch_decode(enc['input_ids']))
 
 input_ids = enc['input_ids']
-attention_mask = torch.ones(input_ids.shape, dtype=torch.int64)
+attention_mask = torch.ones(input_ids.shape, dtype=torch.int64) # 训练时不是自递归的，所以用到了mask
 # predicts the next token at each position. 也就是 input_ids = [v1,v2,v3] 输出为 [v20,v30,v4]]。 v20 是根据v1 生成的下一个token，大概率跟v2 不一样，v4 是根据v1,v2,v3 生成的。
 out = model(input_ids=input_ids, attention_mask=attention_mask)
 logits = out['logits']

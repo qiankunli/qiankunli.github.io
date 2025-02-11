@@ -189,7 +189,7 @@ spi 是与 api 相对应的一个词，代码上会有一个接口类与其对�
 
 ## 重新理解工厂模式
 
-A factory class decouples the client and implementing class. 工厂模式解决的是bean的生产问题，简单工厂模式根据入参生产不同的bean，普通工厂模式针对每个bean都构建一个工厂，此两者各有优劣，看需要。如果每个bean主要的功能都在方法中，不涉及类变量的使用，可以利用spring容器生成的bean（bean作为factory的成员由spring注入）。
+A factory class decouples the client and implementing class. 工厂模式解决的是bean的生产问题，简单工厂模式根据入参生产不同的bean，普通工厂模式针对每个bean都构建一个工厂，此两者各有优劣，看需要。如果每个bean主要的功能都在方法中，不涉及类变量的使用，可以利用spring容器生成的bean（bean作为factory的成员由spring注入）。PS：我们明确地计划不同条件下创建不同实例时。
 
 The factory pattern is a design pattern that is used to encapsulate complex logic in functions that creates the wanted instance, **without the caller knowing anything about the implementation details**.
 
@@ -197,25 +197,29 @@ The factory pattern is a design pattern that is used to encapsulate complex logi
 
 ## 重新来看观察者模式
 
+观察者模式定义对象间的一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的对象都得到通知并被自动更新。
+
 对于我这个入门程序猿来说，尽管知道观察者模式什么意思，但在实际应用用还是很少用，因为这个违背了了我的直觉。
 
-
-	Objector{
-		List<Listener> listeners;
-		function notify(){
-			for(){
-				...
-			}
-		}
-		business1(){	// 我的直觉
-			business code
-			listener.listen();
-		}
-		business2(){	// 实际
-			business code
-			notify();
+```
+Objector{
+	# 关键代码：在抽象类里有一个 ArrayList 存放观察者们。
+	List<Listener> listeners;
+	function notify(){
+		for(){
+			...
 		}
 	}
+	business1(){	// 我的直觉
+		business code
+		listener.listen();
+	}
+	business2(){	// 实际
+		business code
+		notify();
+	}
+}
+```
 	
 所谓的直觉是，类与类既然相互依赖，那么它们的调用就应该是直接的，就像business1那样，哪怕是business2稍微婉转了一下，都感觉别扭，反射弧就这么大，囧！
 

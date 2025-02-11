@@ -14,7 +14,7 @@ keywords: langchain langgraph lcel
 
 ##  Single-Agent  面临的困境 
 
-OpenAI 是以 AGI 为愿景的公司，现在的 Agent 在一定程度上可以看作 AGI 的代偿 —— 除工具使用外，规划和记忆本是 LLM 所应覆盖的范畴。如果 LLM 自身能力增强，一切还可能重新洗牌。不过在那之前，Retrieve 和 Task Decomposition 应该会长期把持 LLM 显学的位置。Agent 是角色和目标的承载，LLMs、Plans、Memory 和 Tools 服务于角色扮演和目标实现。那么，自然的，服务于相同或相关目标时，多个 Agent 之间可以共享 thread context，但需要保持自身权限的独立，即 Multi-Agent。
+OpenAI 是以 AGI（Artificial General Intelligence） 为愿景的公司，现在的 Agent 在一定程度上可以看作 AGI 的代偿 —— 除工具使用外，规划和记忆本是 LLM 所应覆盖的范畴。如果 LLM 自身能力增强，一切还可能重新洗牌。不过在那之前，Retrieve 和 Task Decomposition 应该会长期把持 LLM 显学的位置。Agent 是角色和目标的承载，LLMs、Plans、Memory 和 Tools 服务于角色扮演和目标实现。那么，自然的，服务于相同或相关目标时，多个 Agent 之间可以共享 thread context，但需要保持自身权限的独立，即 Multi-Agent。
 
 [Multi-Agent ，知多少？](https://mp.weixin.qq.com/s/Z970vS3mGA20YOoqIQMOdw)
 1.  Single-Agent 系统的知识获取和认知范畴高度依赖于其训练数据集和模型算法，这使得它难以全面把握多元异构的信息要素，以及复杂环境中瞬息万变的细微变化。 Single-Agent 很容易产生知识盲区和认知偏差，从而在面临新的情景时无法作出前瞻性的正确决策，导致决策失误。

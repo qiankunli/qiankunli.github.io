@@ -277,6 +277,18 @@ print(squad_it_dataset) # 包括 train 和 test 的 DatasetDict 对象
 
 ## 源码分析
 
+[Deepseek大模型推理算法其实很简单](https://mp.weixin.qq.com/s/kVkw73XhcOE6t4HZyKRUAA)我们听说Deepseek是开源的，这具体是什么意思？训练代码没有开源，但是在论文与技术报告中介绍了关键的Deepseek V3和R1大模型训练的的一些细节，开源的是两个东西，一个是权重，一个是推理代码。这两者是什么关系？可以理解为：权重是人类知识的加密压缩，推理是解码检索知识的工具。**推理过程也不需要太多矩阵知识，就是矩阵乘法/gemm和加法**。
+
+![](/public/upload/machine/transformer_run.jpg)
+
+大模型的矩阵计算，是分层进行的，一个layer接一个layer。每个layer的“结构”都是一样的，所以代码里就是循环。但是，每个layer都有自己固定的参数矩阵（训练出来的），这是不一样的。大模型的威力，就在这些参数矩阵中，但是推理代码里看不出，直接从权重文件中读取。
+
+![](/public/upload/machine/transformer_layer.jpg)
+
+几十层的layer结构中，KQV矩阵不断被计算出来，又传输到FF网络，再到下一个layer，中间隔着一些Norm和Add操作。在最后一个Transformer Layer输出后，要计算logits（概率向量）。最后一层输出是`seq_len*hidden_size`的矩阵，将它乘以一个固定的output矩阵（`hidden_size*vocab_size`的），得到一个`seq_len*vocab_size`的矩阵。
+
+虽然最终得到了一个大矩阵，但我们只关心它最后一行的那个32000维的向量。它就代表最终需要的logits概率向量，说明下一个token可以是什么。
+
 ```python
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
 model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
@@ -372,7 +384,7 @@ class GPT2LMHeadModel(GPT2PreTrainedModel):
     print(outputs.logits)
     ```
 2. attention_mask ，self-attention使用，shape和input_ids一致。
-    1. Encoder中的Mask。模型训练和预测基本都是批量化处理的，处理多个序列时，在attention的时候，不去attend被mask掉的部分。 作用是告诉模型一个batch的数据里哪些是padding的，从而可以忽略掉那些padding的部分，也叫padding mask ，比如下图的例子：
+    1. Encoder中的Mask。模型训练和预测基本都是批量化处理的（**训练时不是自递归的**），处理多个序列时，在attention的时候，不去attend被mask掉的部分。 作用是告诉模型一个batch的数据里哪些是padding的，从而可以忽略掉那些padding的部分，也叫padding mask ，比如下图的例子：
         ![](/public/upload/machine/attention_mask.jpg)
     2. decoder中的mask。用于在训练过程中解码的时候掩盖掉当前时刻之后的信息；也叫sequence mask
         ![](/public/upload/machine/sequence_mask.jpg)
@@ -424,7 +436,6 @@ Can you tell me a joke?<|eot_id|><|start_header_id|>assistant<|end_header_id|>
 如果都没有，vLLM会以未指定chat template模板的方式启动起来。会出现意想不到的结果。
 1. 如果Transformers的版本小于4.44，vLLM会自动使用一个默认的chat template。这时候从调用结果上很可能看不出什么大问题，但实际上模型回答的准确度已经大打折扣，这个错误非常不易察觉。
 2. 如果Transformers的版本大于等于4.44，vLLM会抛一个异常，如下：`openai.BadRequestError: Error code: 400 - {'object': 'error', 'message': 'As of transformers v4.44, default chat template is no longer allowed, so you must provide a chat template if the tokenizer does not define one.', 'type': 'BadRequestError', 'param': None, 'code': 400}`
-
 
 
 ### 推理/generate实现
@@ -530,7 +541,7 @@ def generate(self,
 
 ### 解码策略
 
-可以把解码器文本Transformer模型理解为一个函数，它以词元作为输入并生成一个概率数组，用于表示词汇表中所有词元的概率，然后，程序根据这些概率从所有词元中进行采样，以指导采样过程，并生成下一个词元，这一过程会重复进行。在GPT模型最后一层之前，推理的对象是以向量形式表征的语义，输出的是代表语义的一个“模糊”的向量。此处“模糊”指的是，**这一向量或许并不对应任何一个已知的词**。因此，整个模型最后需要再做一个推测，基于这个“模糊”的向量所包含的语义信息，在词表中寻找最符合这些特征的词，来作为真正的输出。在 transformer 中，最后的输出是一个概率分布，表示每一个词匹配这一“模糊”向量的概率。
+大模型在运算之后，不是只给一个输出选择，而是会给多种都说得过去的词。可以把解码器文本Transformer模型理解为一个函数，它以词元作为输入并生成一个概率数组，用于表示词汇表中所有词元的概率，然后，程序根据这些概率从所有词元中进行采样，以指导采样过程，并生成下一个词元，这一过程会重复进行。在GPT模型最后一层之前，推理的对象是以向量形式表征的语义，输出的是代表语义的一个“模糊”的向量。此处“模糊”指的是，**这一向量或许并不对应任何一个已知的词**。因此，整个模型最后需要再做一个推测，基于这个“模糊”的向量所包含的语义信息，在词表中寻找最符合这些特征的词，来作为真正的输出。在 transformer 中，最后的输出是一个概率分布，表示每一个词匹配这一“模糊”向量的概率。
 
 [一网打尽文本生成策略（beam search/top-k/top-p/温度系数）](https://zhuanlan.zhihu.com/p/676398366)假设我们输入 “I am a”，GPT会对这个序列进行编码得到embedding，并预测下一个单词的概率。“I am a”作为输入，编码后也会得到三个token对应的embedding。GPT会使用输入序列最后一个token对应的embedding做预测，也就是说，”a”经过编码后的embedding会被映射到整个词表上，得到下一个单词的概率。因为GPT是使用masked attention的，每个token在编码时都只会和他前面的token交互。**那么最后一个token自然就包括了当前序列的所有信息，因此用于预测下一个token是最合理的**。
 
@@ -553,7 +564,7 @@ def generate(self,
     Softmax(x_i) = \frac{e^{x_i}/T}{\sum_j e^{x_j}/T}
     $$
 
-    T越大归一化后的概率分布越均匀，而T越小概率分布越陡峭。因此大的T会增加模型输出的随机性，而小的T则会让模型的输出更加固定。这也是“温度系数影响模型创造性”说法的原因。
+    T越大归一化后的概率分布越均匀，而T越小概率分布越陡峭。因此大的T会增加模型输出的随机性，而小的T则会让模型的输出更加固定。**低温输出序列稳定，高温输出序列灵活、变化大**（PS：这有点熵/热力学的感觉了）。这也是“温度系数影响模型创造性”说法的原因。
 
 以上策略体现在代码上 就是：经过多个AttentionLayer  hidden_states，Normalization之后得到 outputs.logits，将 logits 传递给 logits_processor 和 logits_warper（包含TopKLogitsWarper/TopPLogitsWarper等），最后，使用 softmax 函数将经过预处理的 logits 转换为概率分布，并利用 multinomial 方法从中采样得到下一个 token。
 

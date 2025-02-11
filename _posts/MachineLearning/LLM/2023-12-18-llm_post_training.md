@@ -83,6 +83,13 @@ RL包含行动、 环境、观察、奖励机制等模块，奖励机制是RL �
 
 ## 演进
 
+[如何理解 LLM 中的 RL 算法？](https://zhuanlan.zhihu.com/p/22331625359) 非常经典，值得细读。好的文章越读越清晰、收敛。
+ybq：我不在乎算法是 sft 或 rlhf，也不纠结监督学习和强化学习在理论上有何本质区别。**我只关心，哪种 loss 能让模型达到更好的效果**。因此，“直接对模型上 ppo 算法就能起效果”这一结论对算法从业者来说完全不吃惊。sft 本就不是训 LLM 的必备环节，但如果说 sft 完全无用也属实是过激了，毕竟只看 loss 函数的话完全可以这么理解：sft 就是在每个 token 粒度都有一个 reward_model 的 ppo 算法。deepseek在技术报告里指出过，sft 和 rlhf 算法在 loss 函数的设计上没有本质区别。具体来说，deepseek 认为 post training 算法包括三要素：启动数据，reward function，token 粒度的 gradient coefficient。sft 的 Gradient Coefficient 是 1，ppo 的 Gradient Coefficient 是 Advantage。既然两种算法在 loss 函数上没有本质区别，他们的区别又体现在哪里呢？我个人的观点是：explore。rl鼓励模型去explore。
+1. sft是数据质量不足（或者不可判别任务）下的一种妥协。如果有质量很高的rule reward数据，那其实做rlhf更好一点。
+1. sft 的训练过程，是每个 token 都有一个明确的 target 存在的，其优化目标很纯粹，增大这个 target 的概率。但 rl 不同，每个 token 的 reward 是由整个句子的 reward 回传回来的（带上 value function 的预测），试想一个句子“中国的首都不是南京，是北京”，因为太过啰嗦被打上了一个较低的 reward，那问题是“是南京”这三个 token 做错了什么，在上个 token 的回答是“不”的情况下，这三个 token 已经是当下最优的 token 了。此时，如果 value function 能救回来还好，但显然不太容易。这里注意，传统的 rl，每一个 action 是能有一个及时回报的，但 rlhf 算法中是没有的，它只有折扣累积回报（rlhf 中，每个 action 的及时回报，要么被设置成 0，要么被设置成 kl_penalty），这也进一步导致了 token 级别 reward 的不准确。就这，还都是建立在整个 response 的 reward 打分准确的基础上，打不准就更头大了。如何给每个 token 一个正确的打分，那就是 ppo / grpo / rloo 等算法各自的努力方向了，它们的出发点和实现方式各不相同，甚至对 KL_penalty 施加的位置都不同，有的放进 reward 中，有的放进 advantage 中。熟优熟劣，就要靠各位的实验结论和理论推导了，我暂时没有结论。其实就是想说因为 label 不准， rl 天生比 sft 不太好训练，因此才需要那么多的调参工作。再次提醒，不管什么算法，你只要把 reference_model 的 KL_penalty 开得足够大，都会稳如泰山。
+1. reward hacking 其实就是模型以训练者不期望的方式找到了提高 reward 的方法。我们想要的是模型按照某种方法提高 reward，但我们设计的 reward 函数却只在乎 reward，而不在乎“按照某种方法”，那么自然而然的就会不符合预期。万变不离其宗，有多少人工就有多少智能。sft 要时刻留意数据质量，rlhf 则是要时刻留意 reward 的打分是否准确或者说是 reward 的设计是否合理，后者一点都不比洗数据轻松。
+
+
 RLHF 是一个完整技术框架，PPO 仅仅是其中强化学习算法模块的一种实现方式。人类反馈构造出偏好对齐数据集以便训练RM，正因为有了RM，才能让强化学习有了发挥的空间，让sft后的模型有了进一步的提升。但偏好对齐一定需要RL嘛？偏好对齐一定需要人类反馈吗？偏好对齐一定需要训练RM嘛？偏好对齐一定需要大量偏好样本么？
 
 [系统梳理LLM+RLHF发展脉络](https://mp.weixin.qq.com/s/rsPAF-ohUNJf6IW7LMIvZg) 非常经典，建议细读。 
@@ -121,7 +128,7 @@ for k in range(20000):
     for epoch in range(4):
         policy_model = train(policy_model, prompts, data, rewards)
 ```
-明确一个概念——策略（policy，就是我们想要训练出来的大模型），它就是RLHF中的“学生”。policy由两个模型组成，一个叫做演员模型（Actor），另一个叫做评论家模型（Critic）。它们就像是学生大脑中的两种意识，一个负责决策，一个负责总结得失。评论家/Critic就是将演员/Actor模型的倒数第二层连接到一个新的全连接层上。除了这个全连接层之外，演员和评论家的参数都是共享的
+明确一个概念——策略（policy，有点地方叫actor，就是我们想要训练出来的大模型），它就是RLHF中的“学生”。policy由两个模型组成，一个叫做演员模型（Actor），另一个叫做评论家模型（Critic）。它们就像是学生大脑中的两种意识，一个负责决策，一个负责总结得失。评论家/Critic就是将演员/Actor模型的倒数第二层连接到一个新的全连接层上。除了这个全连接层之外，演员和评论家的参数都是共享的
 
 ```python
 policy_model = load_model()
@@ -147,6 +154,11 @@ for k in range(20000):
         train(loss, policy_model.parameters())
 ```
 PS：actor model根据prompt 产生response，reward model 根据(prompt, response)得出reward score，简单情况下，我们根据loss=loss_func(score) 得到loss 就可以更新actor model了。但是考虑到，actor model 不合适偏差ref model太远，所以引入actor_loss，loss=loss_func(score，actor_loss)。又是基于啥考虑引入critic_model 和critic_loss 呢？
+
+算法的一些缺点也越来越被注意到：
+1. PPO需要四个模型协同训练（policy、critic、ref、reward），显存耗费比较大。PS：GRPO 移除了critic，找了一个新的策略替代critic
+2. PPO在训练过程是policy-critic的交叉更新，容易导致训练过程的不稳定
+
 
 ### DPO（Direct Preference Optimization）
 
@@ -181,6 +193,24 @@ RFT 的价值：只要能定制好一个任务的 verifier，那么 RFT 便可�
 
 ReFT 这篇论文，好就好在它是在 o1 之前发表的。因为 o1 的出现，“cot 的推理过程，MCTS 采样，PRM，ORM，rule-based reward_model” 等概念，已经在 LLM 圈深入人心了。
 
+### GRPO（Group Relative Policy Optimization）
+
+[DeepSeek-R1 核心强化学习算法 GRPO 详解](https://mp.weixin.qq.com/s/7Gi37XX2cOvHAdApFYuBJA)
+
+1. 没有critic model。通过组内相对奖励来优化策略模型
+2. DPO会整体计算并优化某个response，无法发现具体错误并针对单个step进行独立优化
+
+||PPO|GRPO|
+|---|---|---|
+|价值网络的使用|依赖于一个与策略模型大小相当的价值网络（critic model）来估计优势函数（advantage function）。这个价值网络需要在每个时间步对状态进行评估，计算复杂度高，内存占用大。|完全摒弃了价值网络，通过组内相对奖励来估计优势函数。|
+|奖励计算方式|使用广义优势估计（GAE）来计算优势函数，需要对每个动作的即时奖励和未来奖励的折扣总和进行估计。|通过采样一组动作并计算它们的奖励值，然后对这些奖励值进行归一化处理，得到相对优势。这种方法更直接，减少了对复杂奖励模型的依赖。|
+|策略更新机制|通过裁剪概率比（clip operation）来限制策略更新的幅度，确保策略分布的变化在可控范围内。|引入了KL散度约束，直接在损失函数中加入KL散度项，从而更精细地控制策略更新的幅度。|
+|计算效率|由于需要维护和更新价值网络，计算效率较低，尤其是在大规模语言模型中，训练过程可能变得非常缓慢。|通过避免价值网络的使用，显著提高了计算效率，降低了内存占用，更适合大规模语言模型的微调。|
+|优势|PPO通过裁剪概率比，能够有效防止策略更新过于剧烈，从而保持训练过程的稳定性。PPO在多种强化学习任务中表现出色，适用于多种类型的环境和任务。|GRPO通过避免价值网络的使用，显著降低了计算和存储需求，提高了训练效率。通过组内相对奖励的计算，GRPO减少了策略更新的方差，确保了更稳定的学习过程。GRPO引入了KL散度约束，能够更精细地控制策略更新的幅度，保持策略分布的稳定性。|
+|局限|在大规模语言模型中，PPO需要维护一个与策略模型大小相当的价值网络，导致显著的内存占用和计算代价。PPO的策略更新依赖于单个动作的奖励值，可能导致较高的方差，影响训练的稳定性。|GRPO需要对每个状态采样一组动作，这在某些情况下可能会增加采样成本。GRPO在某些任务中可能不如PPO表现稳定，尤其是在奖励信号稀疏的情况下。|
+
+![](/public/upload/machine/ppo_grpo.jpg)
+
 ## 案例
 
 [大模型Post-Training总结](https://mp.weixin.qq.com/s/FDe4dz6eMC4QZ1aNoE4vnw)
@@ -201,7 +231,7 @@ ReFT 这篇论文，好就好在它是在 o1 之前发表的。因为 o1 的出�
 
 ### 拒绝采样
 
-在 LLM 训练中，拒绝采样（Rejection Sampling）通常用于以下场景：
+在 LLM 训练中，拒绝采样（Rejection Sampling）是一种“生成候选样本→筛选有效样本”的过程。通常用于以下场景：
 1. 生成多个候选响应：模型针对给定的提示（prompt）生成多个候选响应。
 2. 使用奖励模型筛选：利用奖励模型（Reward Model, RM）对这些候选响应进行评分，选择得分最高的响应作为高质量样本。
 3. 迭代优化：将筛选出的高质量样本用于进一步训练模型，以逐步提升模型的生成质量。

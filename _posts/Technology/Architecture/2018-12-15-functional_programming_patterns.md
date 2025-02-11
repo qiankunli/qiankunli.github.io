@@ -256,6 +256,7 @@ In object-oriented programming the Visitor pattern is commonly used when it is r
 ## 策略模式
 
 ```java
+// 将这些算法封装成一个一个的类，实现同一个接口，任意地替换。
 interface Strategy {
     void doSomething();
 }
