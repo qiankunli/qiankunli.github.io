@@ -285,9 +285,7 @@ print(squad_it_dataset) # 包括 train 和 test 的 DatasetDict 对象
 
 ![](/public/upload/machine/transformer_layer.jpg)
 
-几十层的layer结构中，KQV矩阵不断被计算出来，又传输到FF网络，再到下一个layer，中间隔着一些Norm和Add操作。在最后一个Transformer Layer输出后，要计算logits（概率向量）。最后一层输出是`seq_len*hidden_size`的矩阵，将它乘以一个固定的output矩阵（`hidden_size*vocab_size`的），得到一个`seq_len*vocab_size`的矩阵。
-
-虽然最终得到了一个大矩阵，但我们只关心它最后一行的那个32000维的向量。它就代表最终需要的logits概率向量，说明下一个token可以是什么。
+几十层的layer结构中，KQV矩阵不断被计算出来，又传输到FF网络，再到下一个layer，中间隔着一些Norm和Add操作。在最后一个Transformer Layer输出后，要计算logits（概率向量）。最后一层输出是`seq_len*hidden_size`的矩阵，将它乘以一个固定的output矩阵（`hidden_size*vocab_size`的），得到一个`seq_len*vocab_size`的矩阵。虽然最终得到了一个大矩阵，但我们只关心它最后一行的那个32000维的向量。它就代表最终需要的logits概率向量，说明下一个token可以是什么。PS：通过一个线性层把特征向量升维到词表维度（Linear层），并且通过softmax进行归一化（Softmax层），最终输出一个概率分布。该分布表示对词表中每个词匹配这个特征向量的概率，依据这些概率，按照一定的采样规则来采样下一个token，不断重复上述过程。直到LLM输出结束流（EOS）标记表示解码结束或者已经生成所需数量的token。
 
 ```python
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)

@@ -26,6 +26,12 @@ Naive RAG上述痛点的原因
 3. 缺乏工具使用能力：Naive RAG无法调用外部工具或API来辅助完成任务。
 4. 缺乏反思和错误纠正：Naive RAG无法根据反馈进行自我改进。
 
+[终于让Agentic RAG工作流正常运行了](https://mp.weixin.qq.com/s/dfHQ3Z6ym6pblVWTtuN7SA)Agentic RAG（代理型 RAG） 是**与 AI 智能体架构一起使用的 RAG**（检索增强生成）。
+1. 首先，它需要具有一定的自主决策能力，如果你编写了一个执行一系列步骤的程序，其中一步是调用 LLM——恭喜你！你已经构建了一个调用 LLM 的程序工作流，只是不要称它为 AI 智能体。
+2. AI 智能体还需要有某种与环境交互的方式。对于软件来说，这意味着进行 API 调用、检索数据、向 LLM 发送提示等。大多数 LLM 仅支持一种类型的工具：函数。
+
+![](/public/upload/machine/agentic_chat_loop.jpg)
+
 ## multistep
 
 一般过程：通过多个模型，或者本模型自己的回归方式来实现多步分解问题进而拆解，进而逐步解决。

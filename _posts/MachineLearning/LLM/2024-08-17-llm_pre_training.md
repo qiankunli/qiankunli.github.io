@@ -74,6 +74,8 @@ $C \approx 6ND$ 计算训练的耗时了。
 
 ## 数据准备
 
+[多语言大模型数据研发在大模型时代的实战全解](https://mp.weixin.qq.com/s/eku_BWzvN_H7TPhr6xq7KQ) 未细读。
+
 |训练阶段|	说明|	常见数据集|
 |---|---|---|
 |pre-train（continual-train)|	收集、整理清洗，分类筛选，多语言无需特别加工，主要是数据分布合理，质量保障	|C4(T5)，RedPajama，Pile，Wudao，ROOTS(BLOOM)|

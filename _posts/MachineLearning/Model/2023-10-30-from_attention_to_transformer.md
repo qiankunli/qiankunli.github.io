@@ -31,7 +31,7 @@ Transformer模型采用的也是编码器-解码器架构，但是在该模型�
 1. 在 Transformer 的 Decoder 结构中，Q 来自于 Decoder 的输入，K 与 V 来自于 Encoder 的输出， 从而拟合了编码信息与历史信息之间的关系，便于综合这两种信息实现未来的预测。
 1. 在 Transformer 的 Encoder 结构中，使用的是 Attention 机制的变种 —— self-attention （自注意力）机制。 所谓自注意力，即是计算本身序列中每个元素都其他元素的注意力分布， 即在计算过程中，Q、K、V 都由同一个输入通过不同的参数矩阵计算得到。 从而拟合输入语句中每一个 token 对其他所有 token 的关系，从而建模文本之间的依赖关系。​
 
-Transformer 模型本来是为了翻译任务而设计的。在训练过程中，Encoder 接受源语言的句子作为输入，主要负责理解，而 Decoder 则接受目标语言的翻译作为输入。在 Encoder 中，由于翻译一个词语需要依赖于上下文，因此注意力层可以访问句子中的所有词语；而 Decoder 是顺序地进行解码，在生成每个词语时，注意力层只能访问前面已经生成的单词。例如，假设翻译模型当前已经预测出了三个词语，我们会把这三个词语作为输入送入 Decoder，然后 Decoder 结合 Encoder 端的输出 和 当前block mask attention layer的输出作为输入（多头交叉注意力）来预测第四个词语。每一个部分都有公式对应。
+Transformer 模型本来是为了翻译任务而设计的。在训练过程中，Encoder 接受源语言的句子作为输入，主要负责理解，而 Decoder 则接受目标语言的翻译作为输入。在 Encoder 中，由于翻译一个词语需要依赖于上下文，因此注意力层可以访问句子中的所有词语；而 Decoder 是顺序地进行解码，在生成每个词语时，注意力层只能访问前面已经生成的单词。例如，假设翻译模型当前已经预测出了三个词语，我们会把这三个词语作为输入送入 Decoder，然后 Decoder 结合 Encoder 端的输出 和 当前block mask attention layer的输出作为输入（多头交叉注意力，Q来自前一个解码器层输出向量，K和V来自编码器输出的注意力向量，编码器并非只传递最后一步的隐状态，而是把所有时刻（对应每个位置）产生的所有隐状态都传给解码器，这就解决了中间语义编码上下文的长度是固定的问题）来预测第四个词语。每一个部分都有公式对应。
 
 想要进一步了解 Transformer 这一架构的原理，强烈推荐阅读 Jay Alammar 的博客。从为了解决翻译问题时 Seq2Seq 模型的提出的 Attention 的基本概念 https://jalammar.github.io/visualizing-neural-machine-translation-mechanics-of-seq2seq-models-with-attention，到 Transformer 架构中完全抛弃 RNN https://www.youtube.com/watch?v=UNmqTiOnRfg 提出的 Attention is All You Need http://jalammar.github.io/illustrated-transformer，到 GPT-2 和 GPT-3 的架构解读http://jalammar.github.io/illustrated-gpt2 http://jalammar.github.io/how-gpt3-works-visualizations-animations，Jay Alammar 的博客都提供了精彩的可视化配图便于理解模型结构。
 
@@ -68,6 +68,7 @@ transformer中，模型输入encoder的每个token向量由两部分加和而成
 3. 可以借助正余弦函数的特性，对于某个偏移量k ，可以基于$PE_{pos}$通过线性变换快速计算出相对位置的 $PE_{pos+k}$
 
 ## attention层
+
 [大模型结构基础（五）：注意力机制的升级](https://zhuanlan.zhihu.com/p/702890483) 未读
 
 每个attention层包含2个子层，分别为多头注意力（MSA）和前馈网络（FFN），并采用相加（add）和层归一化（LayerNorm）操作连接两个子层。目前公认的说法是，
@@ -152,7 +153,7 @@ Attention机制的目标是输入$x_n$，输出$z_n$。这个过程可以简单�
 
 ### MultiHeadAttention
 
-​Attention 机制可以实现并行化与长期依赖关系拟合，但一次注意力计算只能拟合一种相关关系，单一的 Attention 机制很难全面拟合语句序列里的相关关系。因此 Transformer 使用了 Multi-Head attention 机制，即同时对一个语料进行多次注意力计算，每次注意力计算都能拟合不同的关系，将最后的多次结果拼接起来作为最后的输出，即可更全面深入地拟合语言信息。（这些集合中的每一个W都是随机初始化的，在训练之后，每个集合都被用来将输入词嵌入(或来自较低编码器/解码器的向量)投影到不同的表示子空间中）。
+​Attention 机制可以实现并行化与长期依赖关系拟合，但一次注意力计算只能拟合一种相关关系，单一的 Attention 机制很难全面拟合语句序列里的相关关系。因此 Transformer 使用了 Multi-Head attention 机制，即同时对一个语料进行多次注意力计算，每次注意力计算都能拟合不同的关系，将最后的多次结果拼接起来作为最后的输出，即可更全面深入地拟合语言信息。（这些集合中的每一个W都是随机初始化的，在训练之后，每个集合都被用来将输入词嵌入(或来自较低编码器/解码器的向量)投影到不同的表示子空间中）。PS：多头注意力机制借鉴了CNN中multi-kernel 的思想，对不同头使用不同的线性变换。
 
 $$
 head_i = Attention(QW{_i}{^Q},KW{_i}{^K},VW{_i}{^V})
@@ -191,12 +192,13 @@ PS: head的概念类似卷积中的通道，只不过每个通道的输入都是
 
 多头注意力（MHA），由于对键-值缓存的二次计算复杂度和高内存消耗而受到限制。为了解决这些问题，提出了几种变体，如多查询注意力（MQA）、组查询注意力（GQA）和多潜在注意力（MLA）。
 
-### Position-wise Feed Forward（对输出进行非线性变换）
+## Position-wise Feed Forward（对输出进行非线性变换）
 
 Attention模块的作用就是确定上下文中哪些词之间有语义关系，以及如何准确地理解这些含义（更新相应的向量）。这里说的“含义”meaning指的是编码在向量中的信息。Attention模块让输入向量们彼此充分交换了信息（例如machine learning model和fashion model，单词“model”指的应该是“模特”还是“模型”）， 然后，这些向量会进入第三个处理阶段：Feed-forward / MLPs。针对所有向量做一次性变换。这个阶段，向量不再互相"交流"，而是并行地经历同一处理。**Transformer基本不断重复Attention和Feed-forward这两个基本结构，这两个模块的组合成为神经网络的一层**。输入向量通过attention更新彼此；feed-forward 模块将这些更新之后的向量做统一变换，得到这一层的输出向量；在Attention模块和多层感知机（MLP）模块之间不断切换。
 
 FFN 设计的初衷，是为模型引入非线性变换，有一个维度为n_ff的隐藏层。主要还是$W_1$和$W_2$，进行了“先把hidden_size的输入向量维度升到n_ff，又降回hidden_size”的操作。
-1. FFN的作用就是空间变换。FFN包含了2层linear transformation层，中间的激活函数是ReLu。
+1. FFN的作用就是空间变换。FFN层由两个线性变换组成，线性变换 中间有一个激活函数。
+  1. FFN包含了2层linear transformation层，中间的激活函数是ReLu。
 2. attention层的output最后会和相乘，为什么这里又要增加一个2层的FFN网络？仔细看一下 Attention 的计算公式，其中确实有一个针对 q 和 k 的 softmax 的非线性运算。但是对于 value 来说，并没有任何的非线性变换。所以每一次 Attention 的计算相当于是对 value 代表的向量进行了加权平均，虽然权重是非线性的权重。**Attention内部就是对特征向量V加权平均的过程。只用self-Attention搭建的网络结构就只有线性表达能力**。FFN的加入引入了非线性(ReLu激活函数)，**变换了attention output的空间**, 从而增加了模型的表现能力。把FFN去掉模型也是可以用的，但是效果差了很多。
   $$
   FFN(x) = max(0,xW_1+b1)W_2+b_2
@@ -228,6 +230,10 @@ class MLP(nn.Module):
 2. transformer 中最重要的是self-attention，self-attention 由三个线性矩阵Q、K、V 决定，如果我们把Q、K矩阵设置为零，那么self-attention 就变成了FFN，$Z_0 =V_0*X$，也就是说，FFN是self-attention 的一个特例，FFN能表达的逻辑，self-attention 也可以，但反过来却不成立。至于transformer 中的FFN部分，当初设计是为了输入输出维度的对齐，毕竟多注意力的输出 $W_0$的维度比输入X维度高很多。但如果一定要用FFN去表达self-attention的逻辑，也是可以的，但需要的参数量却要大很多，感兴趣的可以去试验一下，用FFN去拟合self-attention 的逻辑。就好像乘法能计算的东西，单纯用加法依然可以做到，但效率要低很多，self-attention就是乘法，FFN就是加法。
 
 [大模型结构基础（四）：前馈网络层的升级](https://zhuanlan.zhihu.com/p/702190813) 未读。FFN组件的一个显著进步是混合专家（MoE）架构，它采用稀疏激活的FFN。在MoE中，每个输入只有一部分FFN层（或专家）被激活，显著减少了计算负载，同时保持了高模型容量。
+
+## 辅助架构
+
+除了上述主要模块之外，Transformer模型中还应用了LayerNorm（层归一化）和ResNet（残差连接）等设计方法。对提高模型的整体表示能力非常重要。
 
 ###  Layer Normalization/对应Norm
 
@@ -262,7 +268,7 @@ def forward(self, x):
     return x
 ```
 
-## Linear & Softmax
+## 概率输出/Linear & Softmax
 
 最后一层feed-forward输出中的最后一个向量the very last vector in the sequence的备选列表及其概率， 产生一个覆盖所有可能Token的概率分布，这些Token代表的是可能接下来出现的任何小段文本，包含句子的核心意义essential meaning of the passage。对这个向量进行 unembedding 操作（也是一次性矩阵运算）， 得到的就是下一个单词的备选列表及其概率。
 
@@ -278,7 +284,9 @@ $$
 
 softmax直白来说就是将原来输出是$z_1=3,z_2=1,z_3=-3$通过softmax函数一作用，就映射成为(0,1)的值，而**这些值的累和为1**（满足概率的性质），那么我们就可以将它理解成概率，在最后选取输出结点的时候，我们就可以选取概率最大（也就是值对应最大的$z_1$）结点，作为我们的预测目标！
 
-Decoder最后是一个线性变换和softmax层。解码组件最后会输出一个实数向量。我们如何把浮点数变成一个单词？这便是线性变换层要做的工作，它之后就是Softmax层。线性变换层是一个简单的全连接神经网络，它可以把解码组件产生的向量投射到一个比它大得多的、被称作对数几率（logits）的向量里。不妨假设我们的模型从训练集中学习一万个不同的英语单词（我们模型的“输出词表”）。因此对数几率向量为一万个单元格长度的向量——每个单元格对应某一个单词的分数（相当于做vocaburary_size大小的分类）。接下来的Softmax 层便会把那些分数变成概率（都为正数、上限1.0）。概率最高的单元格被选中，并且它对应的单词被作为这个时间步的输出。
+另：Decoder最后是一个线性变换和softmax层。解码组件最后会输出一个实数向量（在推理时使用的并不是decoder的所有输出，而是最后一个token对应的向量即只使用输出序列中最后一个单词的猜测结果，训练时则使用全部输出）。我们如何**把hidden_size长度的浮点数向量变成一个单词**？这便是线性变换层要做的工作，它之后就是Softmax层。词表中每个单词都有可能成为下一个单词， 所以模型需要对所有它知道的单词均按可能性打分，最终选出其中最合适的单词推荐给用户。
+1. 线性变换层是一个简单的全连接神经网络，它可以把解码组件产生的向量投射到一个比它大得多的、被称作对数几率（logits）的向量里。PS：hidden_size向量 ==> vocab_size向量，其中词汇表中的每个token都有一个对应的值，称为 logit。该过程类似CNN中，卷积层之后再接一个线性层做分类。
+2. Softmax 层。因为是要预测，所以需要根据模型的输出 logits 为词汇表中的每个token分配一个概率。这些概率决定了每个token成为序列中下一个单词的可能性。具体操作是应用 softmax 函数将 logits 转换为总和为 1 的概率分布。
 
 ## 其它视角
 
@@ -350,6 +358,10 @@ $$
 
 
 既然不能用矩阵乘法，那用加法，直接把所有的 $x_i$ 加一遍也不是个事儿。从另一个角度，两个向量内积表示表示两个向量的相似度，把$x_1$ 跟其它所有$x_i$ 乘一下，让$y_1=x_1*x_1*x_1 + x_1*x_2*x_2 + x_1*x_{inputlen}*x_{inputlen}$。看样子也挺不错，但这么算，就没啥可学习的W了，这不是$y_i$ 每个加法单元是3个向量相乘嘛，那干脆把$x_i$ 跟一个矩阵wi 变换一下再计算吧，于是有了$W_k$/$W_q$/$W_v$和QKV。 $y_1=Q_1*K_1*V_1 + Q_1*K_2*V_2 + Q_1*K_{inputlen}*V_{inputlen}$。
+
+论文“MetaFormer is Actually What You Need for Vision”则描述了一种**通用架构**，在该结构中，输入首先经过embedding，得到 𝑋。然后embedding送入重复的blocks中，第一个block主要包含了token mixer，使得不同的token能够相互信息通信（Y = TokenMixer(Norm(X)) + X,）；第二个block包含两层MLP。该架构通过指定token mixer的具体设计，可以获得不同的模型。如果将token mixer指定为注意力或spatial MLP，则MetaFormer将分别成为一个transformer或类似MLP的模型。PS：transformer 与mlp的不同可以理解为 token mixer的选择不同。
+
+![](/public/upload/machine/meta_former.jpg)
 
 
 [面试时被问到“Scaling Law”，怎么答？](https://mp.weixin.qq.com/s/Q0fThU-4YP5OwFmfJM_q-Q)对于 Decoder-only 的模型，计算量C(Flops)，模型参数量 N(除去 Embedding 部分)，数据大小 D(token 数)，三者的关系为: C≈6ND。推导如下，记模型的结构为：decoder 层数l，attention隐层维度d，attention feedforward层维度 $d_{ff}$，一般来说 $d_{ff} = 4 * d$。

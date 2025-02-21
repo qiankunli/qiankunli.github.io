@@ -85,9 +85,9 @@ RL包含行动、 环境、观察、奖励机制等模块，奖励机制是RL �
 
 [如何理解 LLM 中的 RL 算法？](https://zhuanlan.zhihu.com/p/22331625359) 非常经典，值得细读。好的文章越读越清晰、收敛。
 ybq：我不在乎算法是 sft 或 rlhf，也不纠结监督学习和强化学习在理论上有何本质区别。**我只关心，哪种 loss 能让模型达到更好的效果**。因此，“直接对模型上 ppo 算法就能起效果”这一结论对算法从业者来说完全不吃惊。sft 本就不是训 LLM 的必备环节，但如果说 sft 完全无用也属实是过激了，毕竟只看 loss 函数的话完全可以这么理解：sft 就是在每个 token 粒度都有一个 reward_model 的 ppo 算法。deepseek在技术报告里指出过，sft 和 rlhf 算法在 loss 函数的设计上没有本质区别。具体来说，deepseek 认为 post training 算法包括三要素：启动数据，reward function，token 粒度的 gradient coefficient。sft 的 Gradient Coefficient 是 1，ppo 的 Gradient Coefficient 是 Advantage。既然两种算法在 loss 函数上没有本质区别，他们的区别又体现在哪里呢？我个人的观点是：explore。rl鼓励模型去explore。
-1. sft是数据质量不足（或者不可判别任务）下的一种妥协。如果有质量很高的rule reward数据，那其实做rlhf更好一点。
+1. sft是数据质量不足（或者不可判别任务）下的一种妥协。如果有质量很高的rule reward数据，那其实做rlhf更好一点。 PS： SFT有类似ground truth，而rl 只是给出多个采样结果的好坏，但都是转为loss。
 1. sft 的训练过程，是每个 token 都有一个明确的 target 存在的，其优化目标很纯粹，增大这个 target 的概率。但 rl 不同，每个 token 的 reward 是由整个句子的 reward 回传回来的（带上 value function 的预测），试想一个句子“中国的首都不是南京，是北京”，因为太过啰嗦被打上了一个较低的 reward，那问题是“是南京”这三个 token 做错了什么，在上个 token 的回答是“不”的情况下，这三个 token 已经是当下最优的 token 了。此时，如果 value function 能救回来还好，但显然不太容易。这里注意，传统的 rl，每一个 action 是能有一个及时回报的，但 rlhf 算法中是没有的，它只有折扣累积回报（rlhf 中，每个 action 的及时回报，要么被设置成 0，要么被设置成 kl_penalty），这也进一步导致了 token 级别 reward 的不准确。就这，还都是建立在整个 response 的 reward 打分准确的基础上，打不准就更头大了。如何给每个 token 一个正确的打分，那就是 ppo / grpo / rloo 等算法各自的努力方向了，它们的出发点和实现方式各不相同，甚至对 KL_penalty 施加的位置都不同，有的放进 reward 中，有的放进 advantage 中。熟优熟劣，就要靠各位的实验结论和理论推导了，我暂时没有结论。其实就是想说因为 label 不准， rl 天生比 sft 不太好训练，因此才需要那么多的调参工作。再次提醒，不管什么算法，你只要把 reference_model 的 KL_penalty 开得足够大，都会稳如泰山。
-1. reward hacking 其实就是模型以训练者不期望的方式找到了提高 reward 的方法。我们想要的是模型按照某种方法提高 reward，但我们设计的 reward 函数却只在乎 reward，而不在乎“按照某种方法”，那么自然而然的就会不符合预期。万变不离其宗，有多少人工就有多少智能。sft 要时刻留意数据质量，rlhf 则是要时刻留意 reward 的打分是否准确或者说是 reward 的设计是否合理，后者一点都不比洗数据轻松。
+1. **reward hacking 其实就是模型以训练者不期望的方式找到了提高 reward 的方法**。我们想要的是模型按照某种方法提高 reward，但我们设计的 reward 函数却只在乎 reward，而不在乎“按照某种方法”，那么自然而然的就会不符合预期。万变不离其宗，有多少人工就有多少智能。sft 要时刻留意数据质量，rlhf 则是要时刻留意 reward 的打分是否准确或者说是 reward 的设计是否合理，后者一点都不比洗数据轻松。
 
 
 RLHF 是一个完整技术框架，PPO 仅仅是其中强化学习算法模块的一种实现方式。人类反馈构造出偏好对齐数据集以便训练RM，正因为有了RM，才能让强化学习有了发挥的空间，让sft后的模型有了进一步的提升。但偏好对齐一定需要RL嘛？偏好对齐一定需要人类反馈吗？偏好对齐一定需要训练RM嘛？偏好对齐一定需要大量偏好样本么？
@@ -196,9 +196,10 @@ ReFT 这篇论文，好就好在它是在 o1 之前发表的。因为 o1 的出�
 ### GRPO（Group Relative Policy Optimization）
 
 [DeepSeek-R1 核心强化学习算法 GRPO 详解](https://mp.weixin.qq.com/s/7Gi37XX2cOvHAdApFYuBJA)
-
+PS：base llm对一个prompt 生成batch 个结果，基于规则（而不是reward）打分，之后计算loss优化llm。
 1. 没有critic model。通过组内相对奖励来优化策略模型
 2. DPO会整体计算并优化某个response，无法发现具体错误并针对单个step进行独立优化
+3. 基于相对优势：GRPO 算法关注的是组内样本之间的相对优势，而非绝对的奖励值。在一个批次的样本中，它通过比较不同样本的奖励来确定每个样本的相对优劣，以此作为优化策略的依据。这种相对优势的计算可以减少奖励函数的偏差和方差，使训练更加稳定。
 
 ||PPO|GRPO|
 |---|---|---|
@@ -210,6 +211,21 @@ ReFT 这篇论文，好就好在它是在 o1 之前发表的。因为 o1 的出�
 |局限|在大规模语言模型中，PPO需要维护一个与策略模型大小相当的价值网络，导致显著的内存占用和计算代价。PPO的策略更新依赖于单个动作的奖励值，可能导致较高的方差，影响训练的稳定性。|GRPO需要对每个状态采样一组动作，这在某些情况下可能会增加采样成本。GRPO在某些任务中可能不如PPO表现稳定，尤其是在奖励信号稀疏的情况下。|
 
 ![](/public/upload/machine/ppo_grpo.jpg)
+
+HuggingFace GRPOTrainer继承自Trainer类，在Trainer类中封装了很多的训练逻辑
+
+```python
+from datasets import load_dataset
+from trl import GRPOTrainer
+dataset = load_dataset("trl-lib/tldr", split="train")
+
+trainer = GRPOTrainer(
+    model="Qwen/Qwen2-0.5B-Instruct",
+    reward_funcs="weqweasdas/RM-Gemma-2B",
+    train_dataset=dataset,
+)
+trainer.train()
+```
 
 ## 案例
 

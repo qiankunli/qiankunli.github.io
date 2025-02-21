@@ -251,15 +251,19 @@ RDMA 和传统的内核协议栈是完全独立的，因此其软件架构也与
 
 ### GPU 卡间通信
 
-[AI大模型时代的RDMA网络杂谈](https://zhuanlan.zhihu.com/p/618357812)GPU机内通讯技术：PCIe是机内通讯最重要的组件之一，它采用的是树状拓扑结构，在这个体系结构中，CPU和内存是核心，GPU、NIC、NVMe等都是外设 ，作为辅助，如下图所示。
+[AI大模型时代的RDMA网络杂谈](https://zhuanlan.zhihu.com/p/618357812)GPU机内通讯技术：PCIe是机内通讯最重要的组件之一，它采用的是树状拓扑结构，在这个体系结构中，CPU和内存是核心，GPU、NIC、NVMe等都是外设，NIC、NVME、GPU是共享一个PCIE的总带宽的。如下图所示。
 
-![](/public/upload/machine/pcie.jpg)
+![](/public/upload/machine/gpu_pcie.jpg)
 
 然而，在深度学习时代，这一范式改变了，**GPU成为了计算的核心**，CPU反而只扮演的控制的角色，如下图所示。
 
 ![](/public/upload/machine/nvlink.jpg)
 
-在机器内部的GPU-GPU之间，如果通讯仍然走PCIe/QPI/UPI等时，那往往会成为瓶颈；因此，NVIDIA专门提出了NVLink、NVSwitch等**新的机内通讯元件**，可以为同一机器的GPU之间提供几百Gbps甚至上Tbps的互联带宽。在机器之间，GPU间的通讯需要经过NIC，在没有PCIe Switch的情况下，GPU-NIC之间的通讯需要经过RC，并且会使用CPU做一次拷贝和中转，往往会成为瓶颈；为此，NVIDIA又搞出了GPU Direct RDMA（GDR）技术，让GPU的数据可以直接DMA到网卡上，而不需要经过CPU的拷贝和中转。
+在机器内部的GPU-GPU之间，如果通讯仍然走PCIe/QPI/UPI等时，那往往会成为瓶颈；因此，NVIDIA专门提出了NVLink、NVSwitch等**新的机内通讯元件**，可以为同一机器的GPU之间提供几百Gbps甚至上Tbps的互联带宽。但是虽然GPU之间绕过了PCIE网卡的限制，但是GPU之间的通信能力，取决于NVLink的数量。如图所示GPU0-GPU6只有1条NVLink，GPU3-GPU5之间有2条。在Ampere架构之后，Nvidia引入了NVSwitch，使单个机器内任何GPU卡之间的带宽链路获得了一致性。可以看到，如果GPU需要使用PCIE方式去读区其他GPU上的数据，必然数据传输速度收到了PCIE的影响。从物理架构层面受到PCIE链接带宽限制，AI任务调度方面要尽可能让任务调度到NVLink的关联GPU上。**这也是为什么客户AI任务需要了解底层GPU拓扑架构**，不同的架构也需要适配不同的算力调度分配。
+
+![](/public/upload/machine/gpu_rdma.jpg)
+
+在机器之间，GPU间的通讯需要经过NIC，在没有PCIe Switch的情况下，GPU-NIC之间的通讯需要经过RC，并且会使用CPU做一次拷贝和中转，往往会成为瓶颈；为此，NVIDIA又搞出了GPU Direct RDMA（GDR）技术，它使一台计算机能够直接访问另一台计算机的内存，而无需操作系统内核或CPU的干预。
 
 那么，一个自然的问题就是，如何判断GPU之间是的连接方式呢？NVIDIA当然想得非常周到了，提供了`nvidia-smi topo -m`的命令，可以查看机内的连接方式。然而，值得注意的是，并非所有机器都会组装NVLink、NVSwitch、PCIe Switch等，毕竟这都是成本。所以，在给定机型下的GPU通讯性能最优、到底开不开GDR、PCIe参数到底怎么设置都需要根据具体机型和具体通信模式而具体分析了。最好的方式还是在购买GPU服务器和搭建物理网络时，就结合模型特点和实现方式，设计好GPU服务器的GPU-GPU、GPU-NIC等机内互联和NIC-交换机-NIC的网络互联，这样才能不至于在任何一个地方过早出现瓶颈，导致昂贵GPU算力资源的浪费。
 

@@ -12,6 +12,8 @@ keywords:  gpu
 * TOC
 {:toc}
 
+在GPU卡越来越贵情景下，如何实现AI任务的调度对GPU等异构资源充分利用，实现GPU利用趋于饱和，**尽可能减少idle的GPU core**，实现效益最大化是至关重要的。
+
 ## 等数据
 
 ![](/public/upload/machine/gpu_run.jpg)
@@ -84,6 +86,8 @@ GPU 任务会交替的使用 CPU 和 GPU 进行计算，当 CPU 计算成为瓶�
 
 
 ## gpu 调度
+
+![](/public/upload/machine/gpu_scheduler.jpg)
 
 [云原生 AI 的资源调度和 AI 工作流引擎设计分享](https://mp.weixin.qq.com/s/uje27_MHBh8fMzWATusVwQ)**GPU 在离线混部调度**，，这个功能分两部分调度逻辑：
 1. 一是在 K8s 层， AI 调度器将按照亲和性，尽量让在线与离线业务混部 ，同时在线与在线业务反亲和调度；

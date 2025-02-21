@@ -109,7 +109,7 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
 
 利用 LLM 对知识语料进行增强和扩充。对一篇文档/chunk生成知识点、问题、短摘要，当根据query 进行匹配时，可能先匹配到知识点、问题、短摘要，再找到原始chunk。MultiVectorRetriever/ParentDocumentRetriever  。
 
-分块方法
+分块方法。PS： 后续出了一个开源项目 [Chonkie](https://github.com/chonkie-ai)
 1. 按字符/标记分块
 2. 按段落分块
 3. 语义分块，它根据含义而不是结构元素对文本进行分组，对于需要理解数据上下文的任务至关重要。

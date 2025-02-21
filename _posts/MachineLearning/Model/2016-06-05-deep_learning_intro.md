@@ -76,7 +76,7 @@ Let's talk RNN. Recurrent networks are basically neural networks that evolve thr
 
 ## 分类
 
-1. 强化学习
+1. 强化学习。**强化学习与监督学习的区别，就是没有现成的标签**。如果要训练网络，只能通过环境的反馈值构造出标签，即从历史经验中学习。
 2. 深度学习
     1. 监督学习
     2. 无监督学习

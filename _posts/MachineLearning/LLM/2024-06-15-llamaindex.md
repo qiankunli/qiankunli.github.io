@@ -24,8 +24,30 @@ LlamaIndex 提供了5大核心工具：
 
 ![](/public/upload/machine/llamaindex.jpg)
 
+## 基本概念/llama-index-core
 
-## 索引阶段
+与langchain类似，一般都分为 基础组件 + 组织组件（来llamaindex 对应pipeline/agent/workflow）
+
+### 模型
+
+langchain BaseLLM和BaseChatModel 是分开的，llamaindex 的complete 和 chat 接口都在BaseLLM下。
+1. 对于输入，待进一步对比
+2. 对于输出， langchain 的stream 输出是笼统的 `Iterator[Output]`，BaseLLM 则做了专门定义。
+
+```python
+class BaseLLM(ChainableMixin, BaseComponent, DispatcherSpanMixin):
+    def chat(self, messages: Sequence[ChatMessage], **kwargs: Any) -> ChatResponse:
+    def complete(self, prompt: str, formatted: bool = False, **kwargs: Any) -> CompletionResponse:
+    def stream_chat(self, messages: Sequence[ChatMessage], **kwargs: Any) -> ChatResponseGen:
+    def stream_complete(self, prompt: str, formatted: bool = False, **kwargs: Any) -> CompletionResponseGen:    
+    # 上面4个方法还分别对应一个异步方法
+```
+
+### 数据（未完成）
+
+## RAG
+
+### 索引阶段
 
 ![](/public/upload/machine/llamaindex_index.jpg)
 
@@ -51,8 +73,7 @@ LlamaIndex 提供了5大核心工具：
 3. **Tree Index**：树形Node，从树根向叶子查询，可单边查询，或者双边查询合并。
 4. Keyword Table Index：每个Node有很多个Keywords链接，通过查Keyword能查询对应Node。
 
-
-## 查询阶段
+### 查询阶段
 
 有了索引，就必须提供查询索引的接口。通过这些接口用户可以与不同的 大模型进行对话，也能自定义需要的Prompt组合方式。
 
@@ -244,9 +265,11 @@ async for chunk in result.async_response_gen():
 `@step` 可以用于workflow 的方法或独立的方法。PS：实质是一个猴版的消息总线
 1. Workflows make async a first-class citizen
 2. 对于workflow方法，`@step` 将当前func 构造为 StepConfig，并保存到func 对应Callbale.__step_config 里
-  1. Workflow 第一个step的入参是StartEvent，最后一个step的出参是StopEvent
+  1. Workflow 第一个step的入参是StartEvent，`handler = workflow.run(kwargs)` 中的kwargs 会传给StartEvent。最后一个step的出参是StopEvent。StopEvent.result 作为整个workflow 的返回值（handler 实质一个是future子类）。
   2. 每个step 入参除了event，还可以传入ctx，用来传递一些全局信息。比如用户的原始query，多个step都需要。
-3. 将每个step func封装为_task，协程触发启动，所有的_step 都开始监听queue，拿到自己对口的event就开始干活儿。不是传统的通过DAG拓扑排序的方式依次驱动step。
+3. 将每个step func封装为_task，协程触发启动，所有的_step 都开始监听queue（这样才可以有广播给所有step_task效果），拿到自己对口的event就开始干活儿。不是传统的通过DAG拓扑排序的方式依次驱动step（langgraph 疑似是这样）。
+    1. _task 可以返回event 触发下一步step。实际是ctx.send_event 广播给所有_step
+    2. _task 可以使用ctx.write_event_to_stream 发送event，这样可以被 `handler = workflow.run(kwargs); handler.stream_events` 捕获到。
 
 ![](/public/upload/machine/llamaindex_workflow.png)
 
@@ -282,3 +305,22 @@ Emit event 不只是workflow内部（驱动step 执行时），也可以手动�
 LlamaIndex的重点放在了Index上，也就是通过各种方式为文本建立索引，有通过LLM的，也有很多并非和LLM相关的。LangChain的重点在 Agent 和 Chain 上，也就是流程组合上。可以根据你的应用组合两个，如果你觉得问答效果不好，可以多研究一下LlamaIndex。如果你希望有更多外部工具或者复杂流程可以用，可以多研究一下LangChain。
 
 [Build and Scale a Powerful Query Engine with LlamaIndex and Ray](https://www.anyscale.com/blog/build-and-scale-a-powerful-query-engine-with-llamaindex-ray) 未读
+
+在trace 方面，双方的共同点通过callbackhandler（本质就是观察者模式）来暴漏内部执行数据，但差别很大，主要体现在使用event 还是handler 表达差异
+1. langchain 没有明确提出event 概念，按照领域的不同，整了几个xxcallbackhandler
+    ```
+    class _TracerCore(ABC):
+        ...
+        def _on_retriever_start(self, run: Run) -> Union[None, Coroutine[Any, Any, None]]:
+        def _on_retriever_end(self, run: Run) -> Union[None, Coroutine[Any, Any, None]]:
+        def _on_retriever_error(self, run: Run) -> Union[None, Coroutine[Any, Any, None]]:
+    ```
+2. llamaindex 的思路是定义各种event（类似ReRankStartEvent/ReRankEndEvent 定义了几十个），callbackhandler 很纯粹（就一个）
+    ```
+    class BaseEventHandler(BaseModel):
+        def class_name(cls) -> str:
+            return "BaseEventHandler"
+        @abstractmethod
+        def handle(self, event: BaseEvent, **kwargs: Any) -> Any:
+            ...
+    ```

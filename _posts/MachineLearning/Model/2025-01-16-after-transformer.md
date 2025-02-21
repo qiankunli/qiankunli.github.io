@@ -8,10 +8,14 @@ keywords:  gcn
 
 ---
 
+<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
+
 ## 简介
 
 * TOC
 {:toc}
+
+从最早的Transformer架构来看, Attention Block的计算量为$N^2d$， MLP Block的计算量为$Nd^2$。 针对模型规模扩大下的算法优化自然就盯着这两个block来做了。例如针对Attention Block的MHA，DeepSeek MLA以及Stepfun MFA等。 很多的优化主要是前期针对长文本的优化。而针对MoE的优化, 开源的生态上主要是以Mistral的Mixtral 8x7B开始的，但是很遗憾几个大厂一开始的阶段都选择了Dense的MLP. 
 
 ## moe
 
@@ -25,6 +29,8 @@ keywords:  gcn
 MoE架构的主要优势在于其能够通过激活部分专家来降低计算成本，从而在扩展模型参数的同时保持计算效率。然而，现有的MoE架构在专家专业化方面面临挑战，具体表现为知识混杂和知识冗余。这些问题限制了MoE模型的性能，使其无法达到理论上的性能上限。
 1. 知识混杂（Knowledge Hybridity）：现有的MoE实践通常使用较少的专家（例如8或16个），因此分配给特定专家的token可能涵盖多种知识。这导致每个专家需要在其参数中学习多种不同类型的知识，而这些知识难以同时被有效利用。
 2. 知识冗余（Knowledge Redundancy）：分配给不同专家的token可能需要一些共同的知识，导致多个专家在其参数中收敛于共享知识，从而造成专家参数的冗余。
+
+[分析一下DeepSeek每一代MoE的演进](https://mp.weixin.qq.com/s/L8BAFuT5tevRzX9mu0yR-g) 建议细读。
 
 ## deepseek
 
@@ -43,9 +49,15 @@ MoE架构的主要优势在于其能够通过激活部分专家来降低计算�
 3. 强化学习可完全激励LLMs的推理能力（无SFT依赖）
 4. 蒸馏后的小型密集模型性能优于直接强化学习的小模型
 
+### DeepSeek-V3 
 
+[DeepSeek-V3 高效训练关键技术分析](https://mp.weixin.qq.com/s/fUumK29XohD7Wm5bTlyokg)
+1. 模型架构设计：MLA、DeepSeekMoE；创新的负载均衡策略（优化MoE训练）；MTP
+2. 并行策略：大量专家并行（EP）、不使用TP；Dualpipe流水线并行；ZeRO-1（DP）并行策略
+3. 通信优化：MoE All2All优化
+4. 显存优化：FP8低精度训练；选择重计算；EMA显存优化；头尾参数共享（emebedding & lm_head）。
 
-### 训练过程
+### R1训练过程
 
 训练路径：  PS： base-> rl -> sft 数据集 -> sft base-> rl -> sft 数据集。论文提到包含2个rl 过程和2个sft过程。
 1. 先收集了一部分高质量冷启动数据（约几千条），使用该数据fine-tune DeepSeek-V3-Base模型，记为模型A。PS： 最开始没有冷启动这个步骤，而是直接对DeepSeek-V3-Base进行了GRPO训练，发现虽然CoT能力提升比较大，但是回复的内容鱼龙混杂，甚至有多个语言同时出现的情况
@@ -61,13 +73,13 @@ MoE架构的主要优势在于其能够通过激活部分专家来降低计算�
 
 有人说sft不存在了。不可能的，最多是人类标注的sft不存在了。那么取而代之的是什么呢？ai标注的sft。模型rl得到的思维链做sft训练新模型，大模型的思维链训练小模型。
 
-### MTP
+### MTP(Multi-Token Prediction)
 
-MTP的研究并不是大模型时代的新物种，而是在第一代Transformer base的模型上，就有相应的研究了。
-
-为什么要做MTP(Multi-Token Prediction)? 当前主流的大模型(LLMs)都是decoder-base的模型结构，也就是无论在模型训练还是在推理阶段，对于一个序列的生成过程，都是token-by-token的。每次在生成一个token的时候，都要频繁跟访存交互，加载KV-Cache，再通过多层网络做完整的前向计算。对于这样的访存密集型的任务，通常会因为访存效率形成训练或推理的瓶颈。
+与之对应的是DeepSeek-V3 发布之前业界普遍使用的单令牌预测（Single - Token Prediction，STP），STP 一次仅预测一个Token，而 MTP 可同时预测多个 Token。为什么要做MTP? 当前主流的大模型(LLMs)都是decoder-base的模型结构，也就是无论在模型训练还是在推理阶段，对于一个序列的生成过程，都是token-by-token的。每次在生成一个token的时候，都要频繁跟访存交互，加载KV-Cache，再通过多层网络做完整的前向计算。对于这样的访存密集型的任务，通常会因为访存效率形成训练或推理的瓶颈。
 
 MTP核心思想：通过解码阶段的优化，将1-token的生成，转变成multi-token的生成，从而提升训练和推理的性能。具体来说，在训练阶段，一次生成多个后续token，可以一次学习多个位置的label，进而有效提升样本的利用效率，提升训练速度；在推理阶段通过一次生成多个token，实现成倍的推理加速来提升推理性能。
+
+![](/public/upload/machine/deepseek_mtp.jpg)
 
 ### 蒸馏/distilled
 
