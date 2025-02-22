@@ -65,11 +65,11 @@ PS： 你要是上万个tool的话，llm 上下文塞不下，此时让一个llm
     4. 无反馈（None），无反馈主要出现世界模拟这类应用中，因为这列应用主要侧重结果分析，例如传播模拟的结果分析，而非智能体能力获取，所以无需引入反馈对智能体的策略进行调整。
     而智能体调整策略、增强能力的方式又可以分为三类：记忆（Memory），自我进化（Self-Evolution）和动态生成（Dynamic Generation）。
 
-## Qwen-Agent（未细读）
+### Qwen-Agent（未细读）
 
 [Qwen-Agent 使用篇](https://mp.weixin.qq.com/s/eGUCtkWgGIpNAoY2qygKkg) 未细读
 
-## OpenAI-Swarm Multi-Agent
+### OpenAI-Swarm Multi-Agent
 
 [OpenAI终于open了，Swarm开源来袭~](https://mp.weixin.qq.com/s/PUsQHrDfgiwuhTiolag0tA) 未细读
 
@@ -77,11 +77,15 @@ PS： 你要是上万个tool的话，llm 上下文塞不下，此时让一个llm
 
 [初识 OpenAI 的 Swarm：轻量级、多智能体系统的探索利器](https://mp.weixin.qq.com/s/XMMD_19g1CzDUzfeSm2qPQ) 未细读。
 
-## autogen-magentic-one
+### autogen-magentic-one
 
 https://github.com/microsoft/autogen/tree/main/python/packages/autogen-magentic-one
 
-## XAgent - Agent 并行计算, LLM 汇总
+### multi-agent-orchestrator
+
+[multi-agent-orchestrator](https://github.com/awslabs/multi-agent-orchestrator) 未读
+
+### XAgent - Agent 并行计算, LLM 汇总
 
 XAgent采用双环机制，外循环用于高层任务管理，起到规划（Planning）的作用，内循环用于底层任务执行，起到执行（Execution）的作用。
 1. PlanAgent首先生成一个初始计划，为任务执行制定基本策略。该部分会将给定的复杂任务分解为更小、更易管理的子任务，其表现为一个任务队列，可以直接地执行。

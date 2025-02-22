@@ -138,7 +138,7 @@ CPU 和内存来来回回传数据，靠的都是总线。其实总线上主要�
 
 ### 为什么不直接加载操作系统？
 
-Linux 启动过程：BIOS ==> MBR ==> BootLoader(grub) ==> kernel ==> systemd(centos7) ==> 系统初始化 ==> shell 
+Linux 启动过程：BIOS ==> MBR ==> BootLoader(grub) ==> kernel ==> systemd(centos7) ==> 系统初始化 ==> shell。
 
 ||存储|加载到内存|功能|
 |---|---|---|---|
@@ -159,6 +159,8 @@ Linux 启动过程：BIOS ==> MBR ==> BootLoader(grub) ==> kernel ==> systemd(ce
 2. GNU GRUB（GRand Unified Bootloader简称“GRUB”）是一个来自GNU项目的多操作系统启动程序。GRUB是多启动规范的实现，它允许用户可以在计算机内同时拥有多个操作系统，并在计算机启动时选择希望运行的操作系统。**还记得当年装的U盘启动盘么？**<br>开机F12可以启动硬盘上的os，也可以启动U盘上的小系统
 
 2019.5.22 最近在看教父系列，可以将bios、bootloader等接力看成是“交班接班”，一代有一代的任务和问题，一代创业，二代守成和洗白。
+
+[Linux 内核是如何检测可用物理内存地址范围的？](https://mp.weixin.qq.com/s/jZm9CbPayhAlKaptbkppnQ) 未细读。
 
 ### 操作系统是一个main函数/中断处理程序的集合
 

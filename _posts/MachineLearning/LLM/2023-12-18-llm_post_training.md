@@ -195,8 +195,11 @@ ReFT 这篇论文，好就好在它是在 o1 之前发表的。因为 o1 的出�
 
 ### GRPO（Group Relative Policy Optimization）
 
+
+![](/public/upload/machine/grpo.jpg)
+
 [DeepSeek-R1 核心强化学习算法 GRPO 详解](https://mp.weixin.qq.com/s/7Gi37XX2cOvHAdApFYuBJA)
-PS：base llm对一个prompt 生成batch 个结果，基于规则（而不是reward）打分，之后计算loss优化llm。
+PS：base llm对一个prompt 生成batch 个结果（O1,O2,...），基于规则（而不是reward）打分，如果某个Ox 比batch平均分高，则增加其输出概率，否则降低其输出概率。
 1. 没有critic model。通过组内相对奖励来优化策略模型
 2. DPO会整体计算并优化某个response，无法发现具体错误并针对单个step进行独立优化
 3. 基于相对优势：GRPO 算法关注的是组内样本之间的相对优势，而非绝对的奖励值。在一个批次的样本中，它通过比较不同样本的奖励来确定每个样本的相对优劣，以此作为优化策略的依据。这种相对优势的计算可以减少奖励函数的偏差和方差，使训练更加稳定。
@@ -245,7 +248,9 @@ trainer.train()
 
 ## 常见技术
 
-### 拒绝采样
+### 拒绝采样（Rejection Sampling）
+
+核心思想是通过一个已知的、易于采样的提议分布（proposal distribution）来近似目标分布，并通过接受或拒绝样本的机制，最终得到符合目标分布的样本集。
 
 在 LLM 训练中，拒绝采样（Rejection Sampling）是一种“生成候选样本→筛选有效样本”的过程。通常用于以下场景：
 1. 生成多个候选响应：模型针对给定的提示（prompt）生成多个候选响应。

@@ -324,7 +324,7 @@ OpenAI明确表明 o1的训练借鉴了AlphaGo的强化学习思路，而AlphaGo
 
 简单通俗地讲，AlphaGo包括两部分：一个CNN卷积神经网络和MCTS算法，CNN相当于人类的”棋感“系统，它负责根据当前棋盘上的形式给出下一步可能的落点的集合；MCTS相当于理性思考，可以在CNN给出的候选落点集合里找到胜率最高的位置。提升的CNN可以找到更好的落点，MCTS的性能也会提升，MCTS性能的提升的结果反馈给CNN，则CNN的性能会再次提升，整个过程形成正反馈循环。AlphaGo首先在人类棋手的棋谱上进行监督学习，然后自我博弈（Self-Play），即在每一局自我对弈中，**AlphaGo 的不同版本与自己对战**，并根据对局结果更新模型的策略网络和价值网络，通过自我对弈，AlphaGo不再依赖人类棋谱，能够探索新的战术和策略，超越人类棋手的水平。
 
-[OpenAI o1模型的前世今生](https://mp.weixin.qq.com/s/OCgbffOPrZ5kzFKisSUC9Q)MCTS多在Action为闭集的场景下使用。笔者认为o1没有使用MCTS，甚至没有使用搜索算法，而是使用类似STaR方法中的。其实MCTS在除了下棋以外的场景上基本没有成功的案例，尤其是在自然语言组成的几乎无限空间的场景上。PS： MCTS主要解决局部最优问题（llm推理时的token选择是固定规则，比如sampling，Best-of-N），从作用看，mcts与sampling和Best-of-N是并列的
+[OpenAI o1模型的前世今生](https://mp.weixin.qq.com/s/OCgbffOPrZ5kzFKisSUC9Q)MCTS多在Action为闭集的场景下使用。笔者认为o1没有使用MCTS，甚至没有使用搜索算法，而是使用类似STaR方法中的。其实MCTS在除了下棋以外的场景上基本没有成功的案例，尤其是在自然语言组成的几乎无限空间的场景上。PS： MCTS主要解决局部最优问题（llm推理时的token选择是固定规则，比如sampling，Best-of-N），从作用看，mcts与sampling和Best-of-N是并列的，认为MCTS是Tree Search的一种。 
 
 [阿里Marco-o1推理大模型技术报告解读](https://mp.weixin.qq.com/s/lqB1elzslAYvlN03bOv7qw)由论文内容推理MTCS和LLM的算法流程，具体来说：
 1. 在选择阶段，从根节点开始，算法根据特定的策略（如UCT策略）导航到最有潜力的子节点，直到到达叶节点。

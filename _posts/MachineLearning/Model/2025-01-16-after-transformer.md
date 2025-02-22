@@ -29,8 +29,17 @@ keywords:  gcn
 MoE架构的主要优势在于其能够通过激活部分专家来降低计算成本，从而在扩展模型参数的同时保持计算效率。然而，现有的MoE架构在专家专业化方面面临挑战，具体表现为知识混杂和知识冗余。这些问题限制了MoE模型的性能，使其无法达到理论上的性能上限。
 1. 知识混杂（Knowledge Hybridity）：现有的MoE实践通常使用较少的专家（例如8或16个），因此分配给特定专家的token可能涵盖多种知识。这导致每个专家需要在其参数中学习多种不同类型的知识，而这些知识难以同时被有效利用。
 2. 知识冗余（Knowledge Redundancy）：分配给不同专家的token可能需要一些共同的知识，导致多个专家在其参数中收敛于共享知识，从而造成专家参数的冗余。
+PS：训练不稳定、负载不均衡
 
 [分析一下DeepSeek每一代MoE的演进](https://mp.weixin.qq.com/s/L8BAFuT5tevRzX9mu0yR-g) 建议细读。
+
+苏剑林 [MoE环游记：1、从几何意义出发](https://zhuanlan.zhihu.com/p/25344691488)
+1. 一个常规的Dense模型FFN，可以等价改写为n个Expert向量$v_1,v_2,...,v_n$之和；
+2. 为了节省计算量，我们试图挑出k个向量求和来逼近原本的n个向量之和；
+3. 转化为数学问题求解后，我们发现挑选规则是模长最大的k个向量；
+4. 直接去算n个Expert的模长然后选k个实际上是不省计算量的，所以要重新设计Expert；
+5. 将$v_i$归一化得到$e_i$，然后用另外的小模型（Router）预测模长$p_i$，最终的Expert为$p_ie_i$；
+6. 此时，我们就可以先算全体$p_i$，挑出k个后才去计算$e_i$，达到节省计算量的目的。
 
 ## deepseek
 
@@ -59,7 +68,9 @@ MoE架构的主要优势在于其能够通过激活部分专家来降低计算�
 
 ### R1训练过程
 
-训练路径：  PS： base-> rl -> sft 数据集 -> sft base-> rl -> sft 数据集。论文提到包含2个rl 过程和2个sft过程。
+先前的大型语言模型（LLMs）相关的很多工作里都依赖大量的人工标注的数据去提升模型性能。但在Deep Seek R1这篇论文中指出：模型的推理能力（reasoning capabilities）可以通过大规模的强化学习（Reinforcement learning）来提升，甚至不需要用SFT（supervised fine-tune）来完成冷启部分的工作。PS. 通过少量的SFT完成模型的冷启（cold-start）可以进一步提升模型表现。
+
+迭代式训练：  PS： base-> rl -> sft 数据集 -> sft base-> rl -> sft 数据集。论文提到包含2个rl 过程和2个sft过程。
 1. 先收集了一部分高质量冷启动数据（约几千条），使用该数据fine-tune DeepSeek-V3-Base模型，记为模型A。PS： 最开始没有冷启动这个步骤，而是直接对DeepSeek-V3-Base进行了GRPO训练，发现虽然CoT能力提升比较大，但是回复的内容鱼龙混杂，甚至有多个语言同时出现的情况
 2. 使用A模型用GRPO训练（**论文用了一个词 reasoning-oriented RL**），使其涌现推理能力，收敛的模型记为B
 3. 使用B模型产生高质量SFT数据，并混合DeepSeek-V3产生的其他领域的高质量数据，形成一个高质量数据集
