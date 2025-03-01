@@ -30,7 +30,7 @@ LlamaIndex 提供了5大核心工具：
 
 ### 模型
 
-langchain BaseLLM和BaseChatModel 是分开的，llamaindex 的complete 和 chat 接口都在BaseLLM下。
+对于llm api来说，一般分为/completion和 /chat/completion 两个api，langchain BaseLLM和BaseChatModel 是分开的，llamaindex 的complete 和 chat 接口都在BaseLLM下。
 1. 对于输入，待进一步对比
 2. 对于输出， langchain 的stream 输出是笼统的 `Iterator[Output]`，BaseLLM 则做了专门定义。
 
@@ -42,6 +42,33 @@ class BaseLLM(ChainableMixin, BaseComponent, DispatcherSpanMixin):
     def stream_complete(self, prompt: str, formatted: bool = False, **kwargs: Any) -> CompletionResponseGen:    
     # 上面4个方法还分别对应一个异步方法
 ```
+从LLM 的抽象看，与langchain 相比，llm 将很多能力内置了，比如结构化输入输出（对应langchain `prompt | llm | output_parser`），agent 调用等。
+```python
+class LLM(BaseLLM):
+    def structured_predict(self, output_cls: Type[BaseModel],prompt: PromptTemplate,llm_kwargs, **prompt_args: Any,) -> BaseModel:
+    def stream_structured_predict(...)-> Generator[Union[Model, List[Model]], None, None]:
+    def predict( self,prompt: BasePromptTemplate,**prompt_args: Any,    ) -> str:
+    def predict_and_call(self,tools: List["BaseTool"], tools: List["BaseTool"], chat_history: Optional[List[ChatMessage]] = None,...) -> "AgentChatResponse":
+```
+
+结构化输出，实质是对 LLM.structured_predict 的封装。
+
+```python
+class StructuredLLM(LLM):
+    llm: SerializeAsAny[LLM]
+    output_cls: Type[BaseModel]
+    def chat(self, messages: Sequence[ChatMessage], **kwargs: Any) -> ChatResponse:
+        chat_prompt = ChatPromptTemplate(message_templates=messages)
+        output = self.llm.structured_predict(output_cls=self.output_cls, prompt=chat_prompt, llm_kwargs=kwargs))
+        return ChatResponse(
+            message=ChatMessage(
+                role=MessageRole.ASSISTANT, content=output.model_dump_json()
+            ),
+            raw=output,
+        )
+```
+
+llm 底层是text in text out。但是结构化输出也是越来月重要的特性，所以框架封装上则是 struct in struct out，对应到llamaindex 则进一步封装为messages in ChatResponse out。 
 
 ### 数据（未完成）
 
@@ -306,16 +333,16 @@ LlamaIndex的重点放在了Index上，也就是通过各种方式为文本建�
 
 [Build and Scale a Powerful Query Engine with LlamaIndex and Ray](https://www.anyscale.com/blog/build-and-scale-a-powerful-query-engine-with-llamaindex-ray) 未读
 
-在trace 方面，双方的共同点通过callbackhandler（本质就是观察者模式）来暴漏内部执行数据，但差别很大，主要体现在使用event 还是handler 表达差异
+在trace 方面，双方的共同点通过callbackhandler（本质就是观察者模式）来暴漏内部执行数据，但差别很大，主要体现在使用event 还是handler 表达差异 [llamaindex Instrumentation](https://docs.llamaindex.ai/en/stable/module_guides/observability/instrumentation/)
 1. langchain 没有明确提出event 概念，按照领域的不同，整了几个xxcallbackhandler
     ```
-    class _TracerCore(ABC):
+    class _TracerCore(ABC): # CallbackHandler的公共父类
         ...
         def _on_retriever_start(self, run: Run) -> Union[None, Coroutine[Any, Any, None]]:
         def _on_retriever_end(self, run: Run) -> Union[None, Coroutine[Any, Any, None]]:
         def _on_retriever_error(self, run: Run) -> Union[None, Coroutine[Any, Any, None]]:
     ```
-2. llamaindex 的思路是定义各种event（类似ReRankStartEvent/ReRankEndEvent 定义了几十个），callbackhandler 很纯粹（就一个）
+2. llamaindex 的思路是定义各种event（类似ReRankStartEvent/ReRankEndEvent 定义了几十个），callbackhandler 则很纯粹（就一个）
     ```
     class BaseEventHandler(BaseModel):
         def class_name(cls) -> str:
@@ -324,3 +351,31 @@ LlamaIndex的重点放在了Index上，也就是通过各种方式为文本建�
         def handle(self, event: BaseEvent, **kwargs: Any) -> Any:
             ...
     ```
+4. hierarchy 体系。一般一个trace系统都会有hierarchy，组件之间的迁移都会有一个新的run_id/span_id
+    1. langchain, 当从组件a 进入组件b时，会生成一个新的run_id, a_run_id 则作为parent_run_id。
+    2. llamaindex，event 和span 发出依靠Dispatcher （通过 `dispatcher = instrument.get_dispatcher(__name__)` 创建）
+        1. 全局有一个root_manager 持有了 `Dict[str, Dispatcher]`，所有被创建的Dispatcher 都会注册到里面。根据 `__name__` 可以依据python module的层级关系构建父子关系。logger 也是这么玩的。
+        2. Dispatcher 持有event_handlers  和 span_handlers
+        2. Dispatcher.event/span_xx 会触发 自己的event_handlers 以及所有父Dispatcher 的event_handlers执行。PS：也就意味着，我们监听llamaindex的时候，主要监听root Dispatcher即可得到所有event？
+3. span的跟踪，有时候我们需要 跟踪一段逻辑的开始与结束
+    1. langchain 采用on_xx_start, on_xx_end方式，通过run_id 来标记是同一个逻辑。
+    2. llamaindex 采用预定义span方式（其实用XXEventStart和XXEventEnt也可以）。你可以预定义XXSpan，触发测
+        ```python
+        import llama_index.core.instrumentation as instrument
+        dispatcher = instrument.get_dispatcher(__name__)
+        def func():
+            dispatcher.span_enter(...)
+            try:
+                val = ...
+            except:
+                ...
+                dispatcher.span_drop(...)
+            else:
+                dispatcher.span_exit(...)
+                return val
+
+        class MyCustomSpanHandler(BaseSpanHandler[MyCustomSpan]):
+            def new_span(self,id_: str,)-> Optional[T]: ...
+            def prepare_to_exit_span(self,id_: str,) -> Optional[T]:...
+            def prepare_to_drop_span(self,id_: str,) -> Optional[T]:...
+        ```

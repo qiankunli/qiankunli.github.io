@@ -33,6 +33,8 @@ PS：训练不稳定、负载不均衡
 
 [分析一下DeepSeek每一代MoE的演进](https://mp.weixin.qq.com/s/L8BAFuT5tevRzX9mu0yR-g) 建议细读。
 
+[详细谈谈DeepSeek MoE相关的技术发展](https://mp.weixin.qq.com/s/iVzbABkvuetaWnM2sRyQTQ) 未读。
+
 苏剑林 [MoE环游记：1、从几何意义出发](https://zhuanlan.zhihu.com/p/25344691488)
 1. 一个常规的Dense模型FFN，可以等价改写为n个Expert向量$v_1,v_2,...,v_n$之和；
 2. 为了节省计算量，我们试图挑出k个向量求和来逼近原本的n个向量之和；
@@ -43,7 +45,7 @@ PS：训练不稳定、负载不均衡
 
 ## deepseek
 
-[论文](https://github.com/deepseek-ai/DeepSeek-R1/blob/main/DeepSeek_R1.pdf)
+[论文](https://github.com/deepseek-ai/DeepSeek-R1/blob/main/DeepSeek_R1.pdf) 模型架构；优化方法；基础设施。
 
 边际创新
 1. 无辅助损失的负载均衡策略（Auxiliary-loss-free Load Balancing Strategy）
@@ -65,10 +67,15 @@ PS：训练不稳定、负载不均衡
 2. 并行策略：大量专家并行（EP）、不使用TP；Dualpipe流水线并行；ZeRO-1（DP）并行策略
 3. 通信优化：MoE All2All优化
 4. 显存优化：FP8低精度训练；选择重计算；EMA显存优化；头尾参数共享（emebedding & lm_head）。
+ DeepSeek 的优化策略分为两大类。第一类是底层优化，即在已知算法模型和底层硬件的情况下，通过软件优化来提升硬件效率，比如通信优化或内存优化。这些优化不会改变程序执行的正确性，但能显著提升性能。第二类是协同优化，包括混合精度、量化和 MLA 等技术，这些优化不仅涉及原有算法模型的修改，还可能需要调整底层硬件，从而扩展硬件优化的空间。
+
+[漫谈DeepSeek及其背后的核心技术](https://mp.weixin.qq.com/s/W4LzpMb3cIn0zVlW2oVung) 对上面技术有细节介绍，未细读。
 
 ### R1训练过程
 
 先前的大型语言模型（LLMs）相关的很多工作里都依赖大量的人工标注的数据去提升模型性能。但在Deep Seek R1这篇论文中指出：模型的推理能力（reasoning capabilities）可以通过大规模的强化学习（Reinforcement learning）来提升，甚至不需要用SFT（supervised fine-tune）来完成冷启部分的工作。PS. 通过少量的SFT完成模型的冷启（cold-start）可以进一步提升模型表现。
+
+![](/public/upload/machine/deepseek_train.jpg)
 
 迭代式训练：  PS： base-> rl -> sft 数据集 -> sft base-> rl -> sft 数据集。论文提到包含2个rl 过程和2个sft过程。
 1. 先收集了一部分高质量冷启动数据（约几千条），使用该数据fine-tune DeepSeek-V3-Base模型，记为模型A。PS： 最开始没有冷启动这个步骤，而是直接对DeepSeek-V3-Base进行了GRPO训练，发现虽然CoT能力提升比较大，但是回复的内容鱼龙混杂，甚至有多个语言同时出现的情况
@@ -77,6 +84,8 @@ PS：训练不稳定、负载不均衡
 4. 使用该数据集训练原始DeepSeek-V3-Base模型，记为模型C
 5. 使用C模型重新进行步骤2，但是数据集变为所有领域（常规的rl，常规的reward model，提高helpfulness and harmlessness），收敛后的模型记为D，这个模型就是DeepSeek-R1
 6. 训练C模型的数据对小模型做蒸馏，效果也非常好
+
+![](/public/upload/machine/deepseek_train2.jpg)
 
 这个训练过程是不需要任何监督数据的，只需要准确评估最终结果。GRPO的reward并没有采用PRM，而是使用了基于正则的ORM。其中包括了两个点：
 1. 评估最终答案是否正确。包含最终结果比对、代码运行结果等

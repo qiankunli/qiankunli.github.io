@@ -57,7 +57,7 @@ RL包含行动、 环境、观察、奖励机制等模块，奖励机制是RL �
 1. 指令微调（SFT）：模型会模仿其训练数据，使用精选的人类回答数据集来微调预训练的大语言模型以应对各种查询。**这让模型获得了优异的指令理解和意图识别能力**，模型的输出也更符合人类的期待，胜过通用文本生成模型，**弥补了 LLMs预测下一个单词目标与用户遵循指令目标之间的差距**，指令的作用是约束模型的输出，使其符合预期的响应特征或领域知识，为人类干预模型的行为提供一个通道。PS： chat 模型就是SFT 过的模型
     1. 指令微调SFT（Supervised fine-tuning）的数据集是问答对，即（prompt，answer）对，prompt我们可以理解为指令或问题，answer就是针对该指令或问题的高质量答案。SFT就是在预训练模型基础上利用这些人工标注的数据进一步微调
     2. IFT可以算作SFT的一个子集，或者说先驱步骤，IFT的主要目的是让模型适应并听从人类的指令，比如当指令prompt出现"summarize"时，模型就应该知道现在的任务是总结任务。经过IFT之后，模型学会了听从指令，但是其生成的内容却不一定安全可靠。所以为了提升大模型的帮助性、降低有害性，人们会继续做SFT，通过高质量的数据给模型展示无害的、有帮助性的回答，规训模型的生成内容。
-2. 奖励模型训练(RW)：使用一个包含人类对同一查询的多个答案打分的数据集训练一个奖励模型。或者说，就是一个打分模型，标注者对大量的SFT模型输出进行投票，哪个更好，哪个更差，由此创建了一个由比较数据组成的新数据集。相比监督微调，这种方法的优势在于不需要标注者编写回答，只需要为模型生成的几个回答打分，大幅提高了标注效率。
+2. 奖励模型训练(RW)：我们不能让人类对模型的所有输出进行ranking。使用一个包含人类对同一查询的多个答案打分的数据集训练一个奖励模型。或者说，就是一个打分模型，标注者对大量的SFT模型输出进行投票，哪个更好，哪个更差，由此创建了一个由比较数据组成的新数据集。相比监督微调，这种方法的优势在于不需要标注者编写回答，只需要为模型生成的几个回答打分，**大幅提高了标注效率**。
     1. 训练RM的数据集包含同一提示的不同输出，其中query表示提示信息或者说指令信息，chosen为标注后排序分数较高的答案，即针对提示选择的答案；rejected为标注后排序分数较低的答案，即针对提示拒绝的答案。
         ```json
         {
@@ -69,7 +69,7 @@ RL包含行动、 环境、观察、奖励机制等模块，奖励机制是RL �
     2. 训练RM是一个排序任务，不是直接对文本标注分数来训练奖励模型，**因为不同的研究人员对同一个句子可能有不一样的评分，这样会导致大量的噪声出现，如果改成排序，则会大大降低噪声**。不同的排名结果将被归一化为用于训练的标量奖励值。针对query，输入chosen和rejected答案，训练目标尽可能的使得chosen答案和rejected答案的差值更大。
     2. 奖励模型可以利用预训练模型进行初始化，或者也可以进行随机初始化。训练奖励模型的基本目标是获得一个模型，该模型接收一系列的文本，之后返回每个文本对应的标量奖励，该奖励会在数字值的大小上代表人类偏好，越大表示越接近人类偏好，越小表示越脱离人类偏好。
     3. 对于rm模型来说，采用sft模型进行参数初始化，将原来的lm输出层替换成一个线性全连接层，在接受提示和响应作为输入后，输出一个标量奖励值。在训练过程中，采用pair-wise方法进行模型训练，即对于同一个提示内容x来说，比较两个不同的回答$y_w$和$y_l$之间的差异，假设$y_w$在真实情况下好于$y_l$，那么希望$x+y_w$经过模型后的分数比$x+y_l$经过模型后的分数高，反之亦然。
-3. RLHF 训练/rlhf-ppo：人类反馈强化学习/近端策略优化算法（PPO），根据 RW 模型的奖励反馈进一步微调 SFT 模型。
+3. RLHF 训练/rlhf-ppo：人类反馈强化学习/近端策略优化算法（PPO），根据 RW 模型的奖励反馈进一步微调模型**以最大化reward model的score**。
     1. 设计对齐模型的优化目标：这个优化目标不仅考虑到奖励模型的得分，也尽量让对齐模型参数更新后输出的分布不要偏移sft模型太远，防止模型越训越差。
     2. 我们让**对齐模型**根据prompt自生成回答，并采用训练好的奖励模型对回答进行打分，对齐模型会根据评分结果不断调整自己的输出分布。
 
@@ -101,13 +101,30 @@ chatgpt所用的RLHF流程，首先BT模型的假设来训练Reward model。BT�
 
 ### PPO（Proximal Policy Optimization）
 
-PPO即近端策略优化算法，是一种强化学习算法。
+[PPO & GRPO 可视化介绍](https://mp.weixin.qq.com/s/HE5wUIzg5c2u2yqEVVB9fw)PPO（proximal policy optimization），包含三部分：
 
-利用PPO算法，根据RW模型的奖励反馈进一步微调 sft model。经过强化学习后，LLM 给出的回答会越来越逼近那些在奖励模型中得分比较高的回答。包含actor model、reference模型/ref_model、reward model和critic model。
-1. actor model是我们想通过强化学习微调的大模型，但是强化学习过程很容易把模型训练“坏”，因此需要另外一个不会参数更新的 ref_model来当作标的，别让actor model跑偏太远。
-2. reward model，计算即时收益。**为什么PPO不直接使用reward model?**虽然reward model可以提供每个状态或状态动作对的即时奖励信号，但它并不能直接提供对应的价值估计。奖励信号只反映了当前动作的即时反馈
-2. critic model的作用是估计状态或状态动作对的长期价值（预估总收益；），也称为状态值函数或动作值函数。critic model能够学习和预测在当前状态下采取不同动作所获得的累积奖励，它提供了对策略改进的指导。PPO算法使用critic model的估计值来计算优势函数，从而调整策略的更新幅度，使得更有利于产生更高长期回报的动作被选择。
-PS： actor model 和 ref_model是同一个模型的两个副本，reward model和critic model也是同一个模型的两个副本，且起源都是base model。[拆解大语言模型RLHF中的PPO算法](https://mp.weixin.qq.com/s/y7o9F9vz8dv609ee6xqYtw) 原理与代码并重，值得细读。[OpenRLHF源码解析一PPO](https://zhuanlan.zhihu.com/p/19673307383)
+1. Policy: 已预先训练/SFT 的 LLM;
+2. Reward model：一个经过训练和冻结的网络，在对提示做出完全响应的情况下提供标量奖励;
+3. Critic：也称为值函数，它是一个可学习的网络，它接受对提示的部分响应并预测标量奖励。
+具体工作流程：
+
+1. Generate responses: LLM 为给定的prompt生成多个response;
+2. Score responses: reward model 给每个 response 分配 reward;
+3. Compute advantages: 使用 GAE 计算 advantages (it’s used for training the LLM);
+4. Optimise policy: 通过优化总目标来更新 LLM；
+5. Update critic: 训练 value function以更好地预测给定部分响应的奖励。
+
+General Advantage Estimation (GAE)
+Our policy is updated to optimise advantage，直观解释，它定义了一个特定的动作$a_t$与policy 在状态$s_t$决定采取的average action相比 “how much better”。
+$$
+A_t = Q(s_t,a_t)-V(s_t)
+$$
+估计这种Advantage有两种主要方法，每种方法各有优劣：
+
+1. Monte-Carlo (MC)：使用reward of the full trajectory(完整轨迹的奖励)（即完整响应）。由于奖励稀疏，这种方法具有很高的方差——从 LLM 中获取足够的样本来使用 MC 进行优化是昂贵的，但它确实具有低偏差，因为我们可以准确地对奖励进行建模;
+2. Temporal difference (TD)：使用 one-step trajectory reward(一步轨迹奖励)（即根据提示测量刚刚生成的单词有多好）。通过这样做，我们可以在token级别上计算奖励，这大大降低了方差，但与此同时，偏差也会增加，因为我们无法准确地预测部分生成的响应的最终奖励。
+
+如果响应不完整，奖励模型将返回 0（只有对于 LLM 的完整响应，奖励模型才会返回非零标量分数），在不知道奖励在生成单词之前和之后会如何变化的情况下，我们将如何计算 TD？因此，我们引入了一个模型来做到这一点，我们称之为 “the critic”。The critic 受过训练（critic在训练中对奖励模型的分数进行了简单的 L2 损失），可以预期仅给出部分状态的最终奖励，以便我们可以计算 TD。虽然奖励模型R在 PPO 之前进行了训练并被冻结，尽管R的工作只是预测奖励，但 critic 与 LLM 一起进行了训练。这是因为 value 函数必须估计给定当前策略的部分响应的奖励;因此，它必须与 LLM 一起更新，以避免其预测过时和不一致。这就是**actor-critic in RL**。通过critic V，我们现在有办法预测部分状态的奖励。
 
 ![](/public/upload/machine/ppo_train.png)
 
@@ -200,7 +217,7 @@ ReFT 这篇论文，好就好在它是在 o1 之前发表的。因为 o1 的出�
 
 [DeepSeek-R1 核心强化学习算法 GRPO 详解](https://mp.weixin.qq.com/s/7Gi37XX2cOvHAdApFYuBJA)
 PS：base llm对一个prompt 生成batch 个结果（O1,O2,...），基于规则（而不是reward）打分，如果某个Ox 比batch平均分高，则增加其输出概率，否则降低其输出概率。
-1. 没有critic model。通过组内相对奖励来优化策略模型
+1. GRPO 对 PPO 的改进，其动机是 PPO 需要 4 个大模型，即策略、价值函数、奖励模型和参考模型。GRPO 消除了对价值模型的需求。为此，它首先为每个查询生成多个响应。然后，在计算advatage时，它将 value 函数替换为样本的奖励，该奖励由同一查询的所有响应的 mean 和 std 标准化。此外，它还将 KL 惩罚移动到损失函数中（RLHF 通常将 KL 惩罚添加到奖励中），从而简化了优势的计算。
 2. DPO会整体计算并优化某个response，无法发现具体错误并针对单个step进行独立优化
 3. 基于相对优势：GRPO 算法关注的是组内样本之间的相对优势，而非绝对的奖励值。在一个批次的样本中，它通过比较不同样本的奖励来确定每个样本的相对优劣，以此作为优化策略的依据。这种相对优势的计算可以减少奖励函数的偏差和方差，使训练更加稳定。
 
@@ -214,6 +231,37 @@ PS：base llm对一个prompt 生成batch 个结果（O1,O2,...），基于规则
 |局限|在大规模语言模型中，PPO需要维护一个与策略模型大小相当的价值网络，导致显著的内存占用和计算代价。PPO的策略更新依赖于单个动作的奖励值，可能导致较高的方差，影响训练的稳定性。|GRPO需要对每个状态采样一组动作，这在某些情况下可能会增加采样成本。GRPO在某些任务中可能不如PPO表现稳定，尤其是在奖励信号稀疏的情况下。|
 
 ![](/public/upload/machine/ppo_grpo.jpg)
+
+A concrete example of GRPO in action:
+
+```
+Query: “What is 2 + 3?”
+
+Step 1: LLM generates three answers.
+1. “5”
+2. “6”
+3. “2 + 3 = 5”
+
+Step 2: Each answer is scored.
+1. “5” → 1 points (correct, no reasoning)
+2. “6” → 0 points (incorrect)
+3. “2 + 3 = 5” → 2 points (correct, w/ reasoning)
+
+Step 3: Compute avg score for entire group.
+Avg score = (1 + 0 + 2) / 3 = 1
+
+Step 4: Compare each answer score to avg.
+1. “5” → 0  (same as avg)
+2. “6” → -1 (below avg)
+3. “2 + 3 = 5” → 1 (above avg)
+
+Step 5: Reinforce LLM to favor higher scores.
+1. Favor responses like #3 (positive)
+2. Maintain responses like #1 (neutral)
+3. Avoid responses like #2 (negative)
+
+This process is repeated, allowing the model to learn and improve over time.
+```
 
 HuggingFace GRPOTrainer继承自Trainer类，在Trainer类中封装了很多的训练逻辑
 
@@ -250,7 +298,16 @@ trainer.train()
 
 ### 拒绝采样（Rejection Sampling）
 
-核心思想是通过一个已知的、易于采样的提议分布（proposal distribution）来近似目标分布，并通过接受或拒绝样本的机制，最终得到符合目标分布的样本集。
+核心思想是通过一个已知的、易于采样的提议分布（proposal distribution）来近似目标分布，并通过接受或拒绝样本的机制（基于规则或者reward？），最终得到符合目标分布的样本集。
+数学解释：假设我们想从一个复杂的目标分布 p(x)中采样，但直接采样难度很高。我们引入一个辅助分布 q(x)，它满足：
+1. 易采样性，我们可以轻松从 q(x)中生成样本。
+2. 包络条件，存在一个常数 M使得对任意 x，目标分布满足 p(x)≤Mq(x)
+
+步骤：
+1. 从 q(x)中生成一个候选样本 $x^*$。
+2. 计算样本的接受概率：$Paccept(x^∗)=p(x^∗)/Mq(x^∗)$
+3. 生成一个随机数$u∼U(0,1)u$ （从均匀分布中采样）。
+4. 如果 $u≤Paccept(x^∗)u$，接受这个样本；否则拒绝并重新采样。
 
 在 LLM 训练中，拒绝采样（Rejection Sampling）是一种“生成候选样本→筛选有效样本”的过程。通常用于以下场景：
 1. 生成多个候选响应：模型针对给定的提示（prompt）生成多个候选响应。
