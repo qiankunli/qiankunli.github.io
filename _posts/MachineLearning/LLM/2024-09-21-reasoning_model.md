@@ -13,9 +13,7 @@ keywords: llm agent
 
 <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
 
-## 简介（未完成）
-
-[作为开发者，我如何提高任务型大模型应用的响应性能](https://mp.weixin.qq.com/s/_4s8HiRASW59V9S0YMRRww) 减少输出token、选择合适尺寸的模型以及采用流式输出。
+## 简介
 
 张俊林：目前可以提高模型效果的Scaling方法，按照性价比由高到低排序的话: Test time Scaling Law> RL Scaling Law>预训练阶段Scaling Law(数据不够了，只能推大模型尺寸)。如果哪天RL Scaling Law和Test Time Scaling Law到了天花板，又没有找到新的性价比更合算的Scaling law，也不是说模型效果就提不上去了，大家仍然可以回归预训练阶段的Scaling Law，没有新数据也没关系，推大模型尺寸规模就可以，效果仍然会上升。然后RL阶段Scaling 的天花板随之升高，然后可以再去Scale RL和Test Time，就进一步得到智商更高的大模型。如果这成立，那意味着AGI的解决方案已经完整了？
 
@@ -30,6 +28,8 @@ keywords: llm agent
 5. 强化学习、self-play（自我博弈）与MCTS（使用蒙特卡洛搜索树寻找最佳答案）
 
 ### 什么是Test/Inference-time Scaling Law
+
+openai 发现大模型预训练阶段通过增加算力、数据、参数的方式提升模型性能的的scaling law，一般称为pretrain-time scaling law。但是随着人类的知识用完，再增加另外两个数据也带不来模型性能的提升了，预训练的scaling law见顶。o1 证明了如果增加推理阶段的计算量可以提升模型性能。证明了一种趋势，即在预训练时花费更少的计算量，同时增大推理阶段的计算量。
 
 [OpenAI o1模型的本质优势是什么？ - 猛猿的回答 - 知乎](https://www.zhihu.com/question/667055619/answer/3864887300)设想一下，当我们手里有一个基础模型（我们称其为generator），但是这个模型的逻辑推理能力（比如解数学题的能力）较差时，我们该怎么改进它？再说的具体点，不考虑数据集相关的成本，假设我手头的gpu算力（FLOPs）是有限的，我该怎么利用它，能让我的模型最终能推理出更好的结果？一个比较直接的想法是：把算力花在它的pretain阶段，给模型注入更多数理逻辑的预训练知识。例如用更好、更多的代码数学等数据，或者扩展模型的参数规模。这个做法启发自大家都很熟悉的scaling law（更具体地说是pretrain-time scaling law）。但是，当我们研读openai o1的技术报告时，我们会发现，它把这个算力更多地用在了2个地方：
 
@@ -97,6 +97,8 @@ test-time Compute 可以是很多不同的东西，包括思路链、修改答�
     当选择一个新的推理步骤进行探索时，它不一定是迄今为止表现最佳的路径。使用这种类型的公式，首先选择一个节点（推理步骤），然后通过生成新的推理步骤来扩展它。和以前一样，这可以通过合理高且变化的温度值来完成：
     ![](/public/upload/machine/mcts_rm.png)
     选择其中一个扩展推理步骤，并进行多次，直到得出多个答案。这些举措可以根据推理步骤（PRM）、奖励（ORM）或两者的结合来判断。
+
+234 都可以视为搜索算法， 核心是从LLM输出的解空间采样，进而得到最优的解决方法。
 
 ### 修改提议分布Modifying Proposal Distribution
 
@@ -298,4 +300,6 @@ ps： 梳理下，如果要提高llm推理能力，post-trainning时就不能只
 3. 高质量 `<问题，推理轨迹COT，答案>` 不是一步到位的，一般要经过一个多轮迭代的过程。
 
 
+## 其它
 
+[作为开发者，我如何提高任务型大模型应用的响应性能](https://mp.weixin.qq.com/s/_4s8HiRASW59V9S0YMRRww) 减少输出token、选择合适尺寸的模型以及采用流式输出。

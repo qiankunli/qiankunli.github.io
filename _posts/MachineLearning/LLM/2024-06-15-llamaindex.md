@@ -333,6 +333,8 @@ LlamaIndex的重点放在了Index上，也就是通过各种方式为文本建�
 
 [Build and Scale a Powerful Query Engine with LlamaIndex and Ray](https://www.anyscale.com/blog/build-and-scale-a-powerful-query-engine-with-llamaindex-ray) 未读
 
+### trace
+
 在trace 方面，双方的共同点通过callbackhandler（本质就是观察者模式）来暴漏内部执行数据，但差别很大，主要体现在使用event 还是handler 表达差异 [llamaindex Instrumentation](https://docs.llamaindex.ai/en/stable/module_guides/observability/instrumentation/)
 1. langchain 没有明确提出event 概念，按照领域的不同，整了几个xxcallbackhandler
     ```
@@ -379,3 +381,48 @@ LlamaIndex的重点放在了Index上，也就是通过各种方式为文本建�
             def prepare_to_exit_span(self,id_: str,) -> Optional[T]:...
             def prepare_to_drop_span(self,id_: str,) -> Optional[T]:...
         ```
+### human in the loop
+
+langchain 主要是通过checkpoint 机制，遇到人工录入时，先将graph暂存，拿到human input 后再根据thread-id等resume graph运行。
+
+[llamaindex human in the loop](https://docs.llamaindex.ai/en/stable/understanding/agent/human_in_the_loop/) 在llamaindex中
+1. workflow 本身提供了 ctx.write_event_to_stream 和 ctx.wait_for_event 作为workflow 与外部交流的手段
+    ```python
+    async def dangerous_task(ctx: Context) -> str:
+    """A dangerous task that requires human confirmation."""
+
+    # emit an event to the external stream to be captured
+    ctx.write_event_to_stream(
+        InputRequiredEvent(
+            prefix="Are you sure you want to proceed? ",
+            user_name="Laurie",
+        )
+    )
+    # wait until we see a HumanResponseEvent
+    response = await ctx.wait_for_event(
+        HumanResponseEvent, requirements={"user_name": "Laurie"}
+    )
+    # act on the input from the event
+    if response.response.strip().lower() == "yes":
+        return "Dangerous task completed successfully."
+    else:
+        return "Dangerous task aborted."
+    ```
+2. 实现原理上，内置了 InputRequiredEvent and HumanResponseEvent，step 发出的InputRequiredEvent 不被任何step receive，用户的输入可以被封装到 HumanResponseEven 以被某个step 接收。
+    ```python
+    async for event in handler.stream_events():
+    if isinstance(event, InputRequiredEvent):
+        # capture keyboard input
+        response = input(event.prefix)
+        # send our response back
+        handler.ctx.send_event(
+            HumanResponseEvent(
+                response=response,
+                user_name=event.user_name,
+            )
+        )
+    ```
+3. 如果用户输入这个过程耗时很长，llamaindex 不提供手段持久化context，需开发者自行维护。PS： 这也是为何workflow 要有一个context，因为workflow本身的执行必须是无状态的，状态全部保存到context里。 
+
+与fastapi 结合示例  https://github.com/run-llama/human_in_the_loop_workflow_demo
+

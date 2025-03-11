@@ -14,6 +14,8 @@ keywords: virtual network
 * TOC
 {:toc}
 
+网络虚拟化作为 SDN（Software Defined Network，软件定义网络）的一种实现，无非就是虚拟出 vNIC（虚拟网卡）、vSwitch（虚拟交换机）、vRouter（虚拟路由器）等设备，配置相应的数据包流转规则而已。
+
 [Macvlan和IPvlan基础知识](https://mp.weixin.qq.com/s/r_CuqjypaaMRDZfW-RHjxw)运行裸机服务器时，主机网络可以很简单，只需很少的以太网接口和提供外部连接的默认网关。但当我们在一个主机中运行多个虚拟机时，需要在主机内和跨主机之间提供虚拟机之间的连接。一般，单个主机中的VM数量不超过15-20个。但在一台主机上运行Containers时，单个主机上的Containers数量很容易超过100个，需要有成熟的机制来实现Containers之间的网络互联。概括地说，容器或虚拟机之间有两种通信方式。在底层网络方法中，虚拟机或容器直接暴露给主机网络，Bridge、macvlan和ipvlan网络驱动程序都可以做到。在Overlay网络方法中，容器或VM网络和底层网络之间存在额外的封装形式，如VXLAN、NVGRE等。
 
 ![](/public/upload/network/network_device.png)

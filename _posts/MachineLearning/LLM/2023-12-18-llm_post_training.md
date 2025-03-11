@@ -83,6 +83,8 @@ RL包含行动、 环境、观察、奖励机制等模块，奖励机制是RL �
 
 ## 演进
 
+在线学习，离线学习两种微调方法在数学上是等价的，它们理想的训练终点都是达到最大似然拟合。在线强化学习（两阶段训练 RM， RL）， 明显好于离线学习（DPO，SFT，IPO）。在线强化学习更有效的原因是由于，验证模型与生成模型的不对称性。也可以说是对于验证容易问题， 验证模型能提供有效的反馈信号， 让模型更有效的学习。
+
 [如何理解 LLM 中的 RL 算法？](https://zhuanlan.zhihu.com/p/22331625359) 非常经典，值得细读。好的文章越读越清晰、收敛。
 ybq：我不在乎算法是 sft 或 rlhf，也不纠结监督学习和强化学习在理论上有何本质区别。**我只关心，哪种 loss 能让模型达到更好的效果**。因此，“直接对模型上 ppo 算法就能起效果”这一结论对算法从业者来说完全不吃惊。sft 本就不是训 LLM 的必备环节，但如果说 sft 完全无用也属实是过激了，毕竟只看 loss 函数的话完全可以这么理解：sft 就是在每个 token 粒度都有一个 reward_model 的 ppo 算法。deepseek在技术报告里指出过，sft 和 rlhf 算法在 loss 函数的设计上没有本质区别。具体来说，deepseek 认为 post training 算法包括三要素：启动数据，reward function，token 粒度的 gradient coefficient。sft 的 Gradient Coefficient 是 1，ppo 的 Gradient Coefficient 是 Advantage。既然两种算法在 loss 函数上没有本质区别，他们的区别又体现在哪里呢？我个人的观点是：explore。rl鼓励模型去explore。
 1. sft是数据质量不足（或者不可判别任务）下的一种妥协。如果有质量很高的rule reward数据，那其实做rlhf更好一点。 PS： SFT有类似ground truth，而rl 只是给出多个采样结果的好坏，但都是转为loss。
@@ -105,9 +107,9 @@ chatgpt所用的RLHF流程，首先BT模型的假设来训练Reward model。BT�
 
 1. Policy: 已预先训练/SFT 的 LLM;
 2. Reward model：一个经过训练和冻结的网络，在对提示做出完全响应的情况下提供标量奖励;
-3. Critic：也称为值函数，它是一个可学习的网络，它接受对提示的部分响应并预测标量奖励。
-具体工作流程：
+3. Critic：也称为值函数，它是一个可学习的网络，它接受对提示的部分响应并预测标量奖励。比如有些步骤很重要，那么score就很高。对于一些既定好的工作流肯定是适用的，但是LLM如果要思考不定长步骤，那么这个模型并不好定义，更不好训练。
 
+具体工作流程：
 1. Generate responses: LLM 为给定的prompt生成多个response;
 2. Score responses: reward model 给每个 response 分配 reward;
 3. Compute advantages: 使用 GAE 计算 advantages (it’s used for training the LLM);
@@ -184,7 +186,7 @@ PS：actor model根据prompt 产生response，reward model 根据(prompt, respon
 在训练奖励模型RM的过程中，我们就已经在考虑“什么回答是好的，什么回答是不好的”这个问题了。而对齐模型依然是在考虑这个问题。所以，我们能不能避开奖励模型的训练，直接一步到位训练对齐模型呢？
 1. RLHF算法包含奖励模型(reward model)和策略模型(policy model，也称为演员模型，actor model)，基于偏好数据以及强化学习不断迭代优化策略模型的过程。RLHF常使用PPO作为基础算法，整体流程包含了4个模型，且通常训练过程中需要针对训练的actor model进行采样，因此训练起来，稳定性、效率、效果不易控制。
 2. 在实际rlhf-ppo的训练中，存在【显存占据大】、【超参多】、【模型训练不稳定】等一系列问题。所以，在考虑“一步到位训练对齐模型”的过程中，我们是不是也能顺手做到绕过强化学习，采用一个更简单的方式（比如类似于sft）来使用偏好数据训练对齐模型呢？
-2. DPO算法不包含奖励模型和强化学习过程，直接通过偏好数据进行微调，将强化学习过程直接转换为类似SFT过程，因此整个训练过程简单、高效，**主要的改进之处体现在于损失函数**。DPO算法仅包含RLHF中的两个模型，即演员模型(actor model)以及参考(reference model)，且训练过程中不需要进行数据采样。DPO算法的目的是最大化奖励模型(此处的奖励模型即为训练的策略)，使得奖励模型对chosen和rejected数据的差值最大，进而学到人类偏好。
+2. DPO算法不包含奖励模型和强化学习过程，**通过对成对偏好数据直接优化模型**，无需在微调时从模型采样生成数据，因此整个训练过程简单、高效，**主要的改进之处体现在于损失函数**。DPO算法仅包含RLHF中的两个模型，即演员模型(actor model)以及参考(reference model)，且训练过程中不需要进行数据采样。DPO算法的目的是最大化奖励模型(此处的奖励模型即为训练的策略)，使得奖励模型对chosen和rejected数据的差值最大，进而学到人类偏好。
 
 偏好数据，可以表示为三元组(提示语prompt, 良好回答chosen, 一般回答rejected)。
 
@@ -261,6 +263,62 @@ Step 5: Reinforce LLM to favor higher scores.
 3. Avoid responses like #2 (negative)
 
 This process is repeated, allowing the model to learn and improve over time.
+```
+
+[Coding GRPO from Scratch: A Guide to Distributed Implementation with Qwen2.5-1.5B-Instruct](https://github.com/aburkov/theLMbook/blob/main/GRPO_From_Scratch_Multi_GPU_DataParallel_Qwen_2_5_1_5B_Instruct.ipynb)
+```python
+def correctness_reward(prompts, completions, answer, **kwargs):
+   """
+   Assigns a reward based on the correctness of the model's answer.
+   Explanation:
+       1. Extracts the content from each completion.
+       2. Extracts the answer portion from each response using extract_answer_from_model_output.
+       3. Assigns rewards based on matching criteria:
+          - 2.0 points for an exact match
+          - 1.5 points for numeric equivalence (when values match but format differs)
+          - 0.0 points for incorrect answers
+       4. Tracks completion lengths for analysis.
+   """
+   responses = [completion[0]['content'] for completion in completions]
+   extracted = [extract_answer_from_model_output(r) for r in responses]
+   rewards = []
+   for r, a in zip(extracted, answer):
+       if r == a:  # Exact match case
+           rewards.append(2.0)
+       else:
+           # Try numeric equivalence
+           r_num = extract_single_number(str(r))
+           a_num = extract_single_number(str(a))
+           if r_num is not None and a_num is not None and r_num == a_num:
+               rewards.append(1.5)
+           else:
+               rewards.append(0.0)
+   # Log completion lengths
+   completion_lengths = [len(response.split()) for response in responses]
+   return rewards
+
+def format_reward(completions, **kwargs):
+   """
+   Assigns a reward for adhering to the desired XML format.
+   Explanation:
+       1. Extracts the content from each completion.
+       2. Evaluates format compliance by checking for required XML tags:
+          - 0.2 points for each tag present (<reasoning>, </reasoning>, <answer>, </answer>)
+          - Maximum score of 0.8 for perfect format compliance
+       3. Stores and returns the format compliance scores.
+   """
+   responses = [completion[0]['content'] for completion in completions]
+   rewards = []
+   format_scores = []
+   for response in responses:
+       score = 0.0
+       if "<reasoning>" in response: score += 0.2
+       if "</reasoning>" in response: score += 0.2
+       if "<answer>" in response: score += 0.2
+       if "</answer>" in response: score += 0.2
+       rewards.append(score)
+       format_scores.append(score)
+   return rewards
 ```
 
 HuggingFace GRPOTrainer继承自Trainer类，在Trainer类中封装了很多的训练逻辑

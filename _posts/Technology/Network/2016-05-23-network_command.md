@@ -59,11 +59,13 @@ ip link add link DEVICE [ name ] NAME
 
 ## iptables
 
-[从零认识 iptables](https://mp.weixin.qq.com/s/pdX5z5LL-wHGhkqLavMW5w)iptables 并不是也不依赖于守护进程，它只是利用Linux内核提供的功能。iptables 所能做的不仅仅是对包的过滤（Filter Table），还支持对包进行网络地址转换（NAT Table）以及修改包的字段（Mangle Table）。
+[从零认识 iptables](https://mp.weixin.qq.com/s/pdX5z5LL-wHGhkqLavMW5w)iptables 并不是也不依赖于守护进程，它只是利用Linux内核提供的工具，是 Netfilter 的用户态应用程序。iptables 所能做的不仅仅是对包的过滤（Filter Table），还支持对包进行网络地址转换（NAT Table）以及修改包的字段（Mangle Table）。PS: 有一个很重要的用途是k8s service
 
 ### netfilter 
 
-![](/public/upload/network/netfilter_location.png)
+真正实现防火墙功能的是 netfilter，它是 Linux 内核中实现包过滤的内部结构。
+
+![](/public/upload/network/netfilter_location.jpg)
 
 [深入理解 Kubernetes 网络模型 - 自己实现 kube-proxy 的功能](https://mp.weixin.qq.com/s/zWH5gAWpeAGie9hMrGscEg)Netfilter 是 Linux Kernel 的一种 hook 机制，**围绕网络层（IP 协议）的周围**埋下了五个钩子（Hooks），每当有数据包流到网络层，经过这些钩子时，就会自动触发由内核模块注册在这里的回调函数，程序代码就能够通过回调来干预 Linux 的网络通信。 5 个hook分别是 pre-routing、input、forword、output、post-routing。处理数据包的能力主要包括修改、跟踪、打标签、过滤等。一些要点:
 1. 主机上的所有数据包都将通过 netfilter 框架

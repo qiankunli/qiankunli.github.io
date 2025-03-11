@@ -24,7 +24,55 @@ keywords: llm agent
 
 吴恩达：目前，我们使用大语言模型的主要方式是一种non-agentic工作流程，即您输入一个提示,模型就生成一个回答。这有点像让一个人坐下来一次性从头到尾编写一篇文章，而不允许使用退格键,尽管这样做很难，但大语言模型的表现出奇地出色。相比之下，代理工作流程看起来是这样的:首先，让人工智能大语言模型写一个文章大纲，如果需要进行网络研究就先做研究，然后写出第一稿,然后阅读并思考需要修订的部分，再修改这一稿，如此循环往复、迭代多次。很多人没有意识到,这种做法可以带来显著的改进效果。我自己在使用这些代理工作流程时也感到非常惊讶，它们工作得如此之好。研究发现，GPT-3.5使用零样本提示时只有48%的正确率，GPT-4提高到了67%。但如果在GPT-3.5上使用一个代理工作流程，它的表现实际上比GPT-4还要好。如果在GPT-4上使用代理工作流程，它的表现也非常出色。这意味着采用代理工作流程对于构建应用程序至关重要。不过我们需要改变一种习惯，那就是习惯了在提示语言模型后立即获得响应。在代理工作流程中，我们需要学会能够耐心等待几分钟甚至几个小时，才能得到响应，就像我们交代任务给人时需要适当地等待一段时间再进行检查一样。
 
-## langchain使用
+
+
+## 原理
+
+在 Agent 应用的开发和实践中，核心挑战之一是如何优雅地实现一个可控的循环（Loop）机制。这个循环机制不仅需要能够自动化地执行任务，还要能够在执行过程中根据反馈进行自我调整和优化（Loop+Feedback ）。通过这种方式，LLM 能够模仿人类解决问题的基本方法论，如 PDCA（计划-执行-检查-行动）循环，从而更有效地拆解和解决问题。
+
+### 认知框架Cognitive Architecture
+
+**AgentType 对应一个Agent class，对应一个prompt**（又是prompt 起了关键作用），AgentType 有以下几种选择
+1. zero-shot ReAct，完全依靠对所用到的tools 的说明书来理解和使用tools，理论上支持无限多个。
+2. Structured tool chat，跟第一个不同的地方在于接收一个结构化的dict 作为参数且能记住上下文。
+3. OpenAI functions，OpenAI 在大模型层面针对 API的调用做了训练，相当于帮大家做了SFT，可以想象效果必然好。
+4. conversational，类似于第一、二类型，针对对话场景做了优化，比如聊天记录、聊天轮次等meta-data
+5. self-ask，通过自问自答的方式把大问题拆解成小问题之后再组成最终的单子。
+
+ReAct是 Shunyu Yao 等人在 ICLR 2023 会议论文《ReAct: Synergizing Reasoning and Acting in Language Models》中提出的，一个关键启发在于：大语言模型可以通过生成推理痕迹和任务特定行动来实现更大的协同作用。具体来说，就是引导模型生成一个任务解决轨迹：观察环境 - 进行思考 - 采取行动，也就是观察 - 思考 - 行动。那么，再进一步进行简化，就变成了推理 - 行动，**是一种将推理和行动相结合的思考链模式**（PS：知行合一？），以交错的方式产生**与任务相关的语言推理轨迹和行动**。ReAct 框架会提示 LLMs 为任务生成推理轨迹和操作，这使得代理能系统地执行动态推理来创建、维护和调整操作计划，同时还支持与外部环境（例如 Google 搜索、Wikipedia）的交互，以将额外信息合并到推理中。PS：使用LLM来做ifelse，ReAct提示大型语言模型为给定任务生成口头推理历史步骤和操作。这些提示由少量的上下文示例组成，这些示例指导模型的思考和操作生成。
+
+与CoT推理一样，ReAct 也是一种提示工程方法，它使用少量学习来教模型如何解决问题。CoT 被认为是模仿人类如何思考问题，ReAct 也包括了这个推理元素，但它更进一步，允许Agent操作文本，让它与环境互动。人类使用语言推理来帮助我们制定策略并记住事情，但也可以采取行动来获得更多的信息并实现目标。这就是 ReAct 的基础（PS：知行合一？）。ReAct 提示包括行动的例子、通过行动获得的观察结果，以及人类在过程中各个步骤中转录的思想(推理策略)。**LLM 学习模仿这种交叉思考和行动的方法**，使其成为其环境中的Agent。
+
+一定要记住，**观察结果不是由 LLM 生成的，而是由环境生成的**，环境是一个单独的模块，LLM 只能通过特定的文本操作与之交互。因此，为了实现 ReAct，需要:
+1. 一种环境，它采取一个文本操作, 从一组可以根据环境的内部状态改变的潜在操作中返回一个文本观察。
+2. 一个输出解析器框架，一旦Agent编写了一个有效的操作，它就停止生成文本，在环境中执行该操作，并返回观察结果, 一般是将其追加到目前生成的文本中，并用该结果提示 LLM。
+3. 人工产生的示例，混合了思想，行动和观察，在环境中可以使用few-shot，例子的数量和细节取决于目标和开发者的设计
+
+**ReAct Agent 的一般提示词结构**：
+```
+前缀：引入工具的描述
+格式：定义React Agent的输出格式
+
+问题：用户输入的问题
+思考：React Agent推理如何行动
+行动：需要使用的工具
+行动输入：工具所需输入
+观察：行动执行后得到的结果
+（按需重复：思考-行动-观察流程）
+
+终点推理：产生最终结论
+最后回答：问题的答案
+```
+
+### stop token
+
+[How to Get Better Outputs from Your Large Language Model](https://developer.nvidia.com/blog/how-to-get-better-outputs-from-your-large-language-model/)It is especially useful to design a stopping template in a **few-shot** setting so the model can learn to stop appropriately upon completing an intended task. Figure shows separating examples with the string “===” and passing that as the stop word.我们知道一般 LLM 都会长篇大论，说一大堆废话，我们希望 LLM 在返回了我们需要的信息后就停止输出，这里就需要用到stop参数，这个参数是一个列表，列表中的每个元素都是一个字符串，代表了 LLM 输出中的某一句话，当 LLM 输出中包含了这句话时，LLM 就会停止输出，这样我们就可以只获取到我们需要的信息了
+
+![](/public/upload/machine/llm_stop.jpg)
+
+## 框架
+
+### langchain使用
 
 在chain中，操作序列是硬编码的。智能体通过将LLM与动作列表结合，自动选择最佳动作序列，从而实现自动化决策和行动。Agent在LangChain框架中负责决策制定以及工具组的串联，可以根据用户的输入决定调用哪个工具。通过精心制定的提示，我们能够赋予代理特定的身份、专业知识、行为方式和目标。提示策略为 Agent 提供了预设模板，结合关键的指示、情境和参数来得到 Agent 所需的响应。具体的说，Agent就是将大模型进行封装来简化用户使用，根据用户的输入，理解用户的相应意图，通过action字段选用对应的Tool，并将action_input作为Tool的入参，来处理用户的请求。当我们不清楚用户意图的时候，由Agent来决定使用哪些工具实现用户的需求。
 
@@ -209,52 +257,55 @@ Final Answer: I will be 38 in ten years and the weather this week is sunny.
 
 大多数 Agent 主要是在某种循环中运行 LLM。目前，我们使用的唯一方法是 AgentExecutor。我们为 AgentExecutor 添加了许多参数和功能，但它仍然只是运行循环的一种方式。langgraph是一个新的库，旨在创建语言 Agent 的图形表示。这将使用户能够创建更加定制化的循环行为。用户可以定义明确的规划步骤、反思步骤，或者轻松设置优先调用某个特定工具。
 
-## 原理
+### agno
 
-在 Agent 应用的开发和实践中，核心挑战之一是如何优雅地实现一个可控的循环（Loop）机制。这个循环机制不仅需要能够自动化地执行任务，还要能够在执行过程中根据反馈进行自我调整和优化（Loop+Feedback ）。通过这种方式，LLM 能够模仿人类解决问题的基本方法论，如 PDCA（计划-执行-检查-行动）循环，从而更有效地拆解和解决问题。
+[agno](https://github.com/agno-agi/agno)What are Agents? Agents are AI programs that execute tasks autonomously. They solve problems by running tools, accessing knowledge and memory to improve responses. Unlike traditional programs that follow a predefined execution path, agents dynamically adapt their approach based on context, knowledge and tool results.
 
-### 认知框架Cognitive Architecture
+Instead of a rigid binary definition, let's think of Agents in terms of agency and autonomy.
+1. Level 0: Agents with no tools (basic inference tasks).
+2. Level 1: Agents with tools for autonomous task execution.
+3. Level 2: Agents with knowledge, combining memory and reasoning.
+4. Level 3: Teams of specialized agents collaborating on complex workflows.
+PS: llm 根据kb、memory来执行tool（相对传统结构化编程 if else while 明确过程来说）
 
-**AgentType 对应一个Agent class，对应一个prompt**（又是prompt 起了关键作用），AgentType 有以下几种选择
-1. zero-shot ReAct，完全依靠对所用到的tools 的说明书来理解和使用tools，理论上支持无限多个。
-2. Structured tool chat，跟第一个不同的地方在于接收一个结构化的dict 作为参数且能记住上下文。
-3. OpenAI functions，OpenAI 在大模型层面针对 API的调用做了训练，相当于帮大家做了SFT，可以想象效果必然好。
-4. conversational，类似于第一、二类型，针对对话场景做了优化，比如聊天记录、聊天轮次等meta-data
-5. self-ask，通过自问自答的方式把大问题拆解成小问题之后再组成最终的单子。
+从框架设计思想上来说
+1. 几个基本组件都做了抽象，比如Document/Embedder/AgentKnowledge(知识库)/AgentMemory/Model(模型)/Reranker/Toolkit/VectorDb。PS：一般业务开发时，langchain 或llamaindex 的类似抽象也很难完全满足需要，往往要独立的提出这些组件的抽象，此时就是一个很好的参考。 
+2. 只有一个Agent class，持有了几乎所有可能需要的组件，Agent.run 用一个最复杂的流程 来兼容L0到L3。PS：这也导致我们很难对链路做个性化调整，但确实是很多开源框架的思路。具体细节上有很多值得参考的地方，比如流失吐字、多模态、推理模型等。
 
-ReAct是 Shunyu Yao 等人在 ICLR 2023 会议论文《ReAct: Synergizing Reasoning and Acting in Language Models》中提出的，一个关键启发在于：大语言模型可以通过生成推理痕迹和任务特定行动来实现更大的协同作用。具体来说，就是引导模型生成一个任务解决轨迹：观察环境 - 进行思考 - 采取行动，也就是观察 - 思考 - 行动。那么，再进一步进行简化，就变成了推理 - 行动，**是一种将推理和行动相结合的思考链模式**（PS：知行合一？），以交错的方式产生**与任务相关的语言推理轨迹和行动**。ReAct 框架会提示 LLMs 为任务生成推理轨迹和操作，这使得代理能系统地执行动态推理来创建、维护和调整操作计划，同时还支持与外部环境（例如 Google 搜索、Wikipedia）的交互，以将额外信息合并到推理中。PS：使用LLM来做ifelse，ReAct提示大型语言模型为给定任务生成口头推理历史步骤和操作。这些提示由少量的上下文示例组成，这些示例指导模型的思考和操作生成。
+||手写Agent|使用框架|
+|---|---|---|
+|入口|Agent.run|Workflow.run|
+|逻辑串联|代码手撸，父类定义几个抽象方法，做好编排，子类做个性化实现|使用langgraph或llamaindex workflow 来做逻辑串联|
+|步骤定义|类的方法|workflow类的方法|
+|状态共享|类的成员|workflow.context, workflow类成员|
+|推理的上下文|memory|memory，之前笔者不太熟的时候，会用current_reasonngs 来记录|
 
-与CoT推理一样，ReAct 也是一种提示工程方法，它使用少量学习来教模型如何解决问题。CoT 被认为是模仿人类如何思考问题，ReAct 也包括了这个推理元素，但它更进一步，允许Agent操作文本，让它与环境互动。人类使用语言推理来帮助我们制定策略并记住事情，但也可以采取行动来获得更多的信息并实现目标。这就是 ReAct 的基础（PS：知行合一？）。ReAct 提示包括行动的例子、通过行动获得的观察结果，以及人类在过程中各个步骤中转录的思想(推理策略)。**LLM 学习模仿这种交叉思考和行动的方法**，使其成为其环境中的Agent。
-
-一定要记住，**观察结果不是由 LLM 生成的，而是由环境生成的**，环境是一个单独的模块，LLM 只能通过特定的文本操作与之交互。因此，为了实现 ReAct，需要:
-1. 一种环境，它采取一个文本操作, 从一组可以根据环境的内部状态改变的潜在操作中返回一个文本观察。
-2. 一个输出解析器框架，一旦Agent编写了一个有效的操作，它就停止生成文本，在环境中执行该操作，并返回观察结果, 一般是将其追加到目前生成的文本中，并用该结果提示 LLM。
-3. 人工产生的示例，混合了思想，行动和观察，在环境中可以使用few-shot，例子的数量和细节取决于目标和开发者的设计
-
-**ReAct Agent 的一般提示词结构**：
+```python
+agent = Agent(
+    model=OpenAIChat(id="gpt-4o"),
+    description="You are a Thai cuisine expert!",
+    instructions=[
+        "Search your knowledge base for Thai recipes.",
+        "If the question is better suited for the web, search the web to fill in gaps.",
+        "Prefer the information in your knowledge base over the web results."
+    ],
+    knowledge=PDFUrlKnowledgeBase(
+        urls=["https://agno-public.s3.amazonaws.com/recipes/ThaiRecipes.pdf"],
+        vector_db=LanceDb(
+            uri="tmp/lancedb",
+            table_name="recipes",
+            search_type=SearchType.hybrid,
+            embedder=OpenAIEmbedder(id="text-embedding-3-small"),
+        ),
+    ),
+    tools=[DuckDuckGoTools()],
+    show_tool_calls=True,
+    markdown=True
+)
+agent.print_response("How do I make chicken and galangal in coconut milk soup", stream=True)
 ```
-前缀：引入工具的描述
-格式：定义React Agent的输出格式
 
-问题：用户输入的问题
-思考：React Agent推理如何行动
-行动：需要使用的工具
-行动输入：工具所需输入
-观察：行动执行后得到的结果
-（按需重复：思考-行动-观察流程）
-
-终点推理：产生最终结论
-最后回答：问题的答案
-```
-
-### stop token
-
-[How to Get Better Outputs from Your Large Language Model](https://developer.nvidia.com/blog/how-to-get-better-outputs-from-your-large-language-model/)It is especially useful to design a stopping template in a **few-shot** setting so the model can learn to stop appropriately upon completing an intended task. Figure shows separating examples with the string “===” and passing that as the stop word.我们知道一般 LLM 都会长篇大论，说一大堆废话，我们希望 LLM 在返回了我们需要的信息后就停止输出，这里就需要用到stop参数，这个参数是一个列表，列表中的每个元素都是一个字符串，代表了 LLM 输出中的某一句话，当 LLM 输出中包含了这句话时，LLM 就会停止输出，这样我们就可以只获取到我们需要的信息了
-
-![](/public/upload/machine/llm_stop.jpg)
-
-
-## langchain源码
+### langchain源码
 
 Agent 可以看做在Chain的基础上，进一步整合Tool 的高级模块。与Chain 相比，Agent 具有两个新增的能力：思考链和工具箱。**能根据环境变化更新计划，使决策更加健壮**。思考链释放了大模型的规划和调度潜能，是Agent的关键创新，Agent 定义了工具的标准接口，以实现无缝集成。与Chain 直接调用模块/Runnable相比，它只关心tool 输入和输出，tool内部实现对Agent 透明，工具箱大大扩展了Agent的外部知识来源，使其离真正的通用智能更近一步。
 

@@ -27,6 +27,8 @@ TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的�
 
 ## 宏观
 
+![](/public/upload/network/tcp_send_recv.jpg)
+
 ![](/public/upload/network/linux_tcp_function.png)
 
 ### 创建socket
@@ -97,7 +99,7 @@ struct prot{
 
 ## 数据的发送
 
-send 系统调用：在内核中找到 socket（记录着各种协议栈的函数地址），函数调用由系统调用进入协议栈，inet_sendmsg 是AF_INET 协议族提供的通用发送函数，经过协议栈处理后进入RingBuffer，随后网卡驱动真正将数据发送出去，当发送完成的时候，通过硬中断来通知CPU，然后清理RingBuffer。
+send 系统调用：在内核中找到 socket（记录着各种协议栈的函数地址），函数调用由系统调用进入协议栈，inet_sendmsg 是AF_INET 协议族提供的通用发送函数，经过协议栈处理后进入RingBuffer（存储网络数据包的元数据，接收时还未经过协议栈的处理，不能直接用），随后网卡驱动真正将数据发送出去，当发送完成的时候，通过硬中断来通知CPU，然后清理RingBuffer。
 
 ![](/public/upload/linux/tcp_send.png)
 

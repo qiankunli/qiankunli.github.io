@@ -194,6 +194,8 @@ class CustomPreprocessor : public Plugin {
 
 ## 以kvcache为核心的分布式架构
 
+[LLM PD 分离背后的架构问题](https://zhuanlan.zhihu.com/p/27836625742) 未细读。
+
 Mooncake 采用了以 KVCache 为中心的分离式推理架构，主要由三个核心部分组成：
 
 1. Prefill 池：这个部分负责集中管理所有的预填充阶段的计算任务。

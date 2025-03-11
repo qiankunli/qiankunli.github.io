@@ -101,11 +101,15 @@ PS：文搜图时，CLIP模型的核心思想是通过对比学习（contrastive
 2. Q-A（question-answer）：这种方式比较有误导性，看起来感觉最应该用这种方式构建，但实际上线后，要检索的，是一堆documents，而不是answer，如果你真的用这个方式构建过样本，看一些case就会发现，answer跟实际的文档相差非常远，导致模型微调后，性能反而出现下降
 3. Q-D（question-document）：这种方式，在几个项目中实践下来，基本上是最适合的构建方式，因为**实际检索时，就是拿问题去检索文档，确保训练、推理时任务的一致性，也是减少模型性能损失最主要的一个方法**。
 
-样本数据格式示例
-```
-{"query": str, "pos": List[str], "neg":List[str]}
-```
-微调目的是让正样本和负样本的分数差变大。
+将数据格式化为文本对（例如查询与相关文档）或三元组（anchor, positive, negative），便于使用对比损失进行训练。
+1. 样本数据格式示例，微调目的是让正样本和负样本的分数差变大。
+    ```
+    {"query": str, "pos": List[str], "neg":List[str]}
+    ```
+
+
+
+
 
 ### 训练过程
 
@@ -207,6 +211,32 @@ finetune_engine = SentenceTransformersFinetuneEngine(
 )
 finetune_engine.finetune()
 embed_model = finetune_engine.get_finetuned_model()
+```
+
+[针对RAG系统的嵌入模型微调实践指南](https://mp.weixin.qq.com/s/BXlqCOll1nEDqLWeYDkXGw)
+```
+import torch
+from torch.optim import Adam
+from torch.nn import TripletMarginLoss
+
+optimizer = Adam(model.parameters(), lr=2e-5)
+criterion = TripletMarginLoss(margin=1.0)
+for epoch in range(num_epochs):
+    for anchor, positive, negative in data_loader:
+        # 前向传播：计算嵌入向量
+        emb_anchor = model.encode(anchor, convert_to_tensor=True)
+        emb_positive = model.encode(positive, convert_to_tensor=True)
+        emb_negative = model.encode(negative, convert_to_tensor=True)
+        
+        # 计算损失
+        loss = criterion(emb_anchor, emb_positive, emb_negative)
+        
+        # 反向传播与参数更新
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+    print(f"Epoch {epoch} - Loss: {loss.item()}")
 ```
 
 ### 模型使用
