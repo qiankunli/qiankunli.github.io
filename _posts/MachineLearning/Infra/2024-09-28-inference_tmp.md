@@ -15,8 +15,6 @@ keywords: llm vLLM
 
 ## 简介
 
-
-
 ## 基础
 
 ### 模型的计算过程
@@ -212,3 +210,6 @@ Context Caching
 ![](/public/upload/machine/context_caching.jpg)
 
 [Mooncake](https://github.com/kvcache-ai/Mooncake)
+
+
+[AI 推理场景的痛点和解决方案](https://mp.weixin.qq.com/s/SeUJxNK10fhR6YsWSJRYwg) 未细读。

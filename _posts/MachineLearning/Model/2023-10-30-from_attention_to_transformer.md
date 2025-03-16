@@ -196,6 +196,8 @@ PS: head的概念类似卷积中的通道，只不过每个通道的输入都是
 
 Attention模块的作用就是确定上下文中哪些词之间有语义关系，以及如何准确地理解这些含义（更新相应的向量）。这里说的“含义”meaning指的是编码在向量中的信息。Attention模块让输入向量们彼此充分交换了信息（例如machine learning model和fashion model，单词“model”指的应该是“模特”还是“模型”）， 然后，这些向量会进入第三个处理阶段：Feed-forward / MLPs。针对所有向量做一次性变换。这个阶段，向量不再互相"交流"，而是并行地经历同一处理。**Transformer基本不断重复Attention和Feed-forward这两个基本结构，这两个模块的组合成为神经网络的一层**。输入向量通过attention更新彼此；feed-forward 模块将这些更新之后的向量做统一变换，得到这一层的输出向量；在Attention模块和多层感知机（MLP）模块之间不断切换。
 
+FFN（前馈神经网络）在 Transformer 模型中的作用是将输入向量投射到更高维度的空间中，以便发掘数据中原本隐藏的细微差别。
+
 FFN 设计的初衷，是为模型引入非线性变换，有一个维度为n_ff的隐藏层。主要还是$W_1$和$W_2$，进行了“先把hidden_size的输入向量维度升到n_ff，又降回hidden_size”的操作。
 1. FFN的作用就是空间变换。FFN层由两个线性变换组成，线性变换 中间有一个激活函数。
   1. FFN包含了2层linear transformation层，中间的激活函数是ReLu。

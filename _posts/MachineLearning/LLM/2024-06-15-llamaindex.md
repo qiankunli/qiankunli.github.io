@@ -68,7 +68,7 @@ class StructuredLLM(LLM):
         )
 ```
 
-llm 底层是text in text out。但是结构化输出也是越来月重要的特性，所以框架封装上则是 struct in struct out，对应到llamaindex 则进一步封装为messages in ChatResponse out。 
+llm 底层是text in text out。但是结构化输出也是越来月重要的特性，所以框架封装上则是 struct in struct out，对应到llamaindex 则进一步封装为messages in ChatResponse out。 PS：智能体的基础是**增强型LLM**
 
 ### 数据（未完成）
 
