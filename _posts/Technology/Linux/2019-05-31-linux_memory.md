@@ -35,6 +35,8 @@ Linux 系统中用来管理物理内存页面的**伙伴系统**，以及负责�
 
 ### 物理内存的硬件架构及管理
 
+[Linux 内核“偷吃”了你的内存！](https://mp.weixin.qq.com/s/MSlvaSmX2NQIzK10jjLXZg) 建议细读。
+
 内核是用伙伴系统来管理所有的物理内存页的。其它模块需要物理页的时候都会调用伙伴系统对外提供的函数来申请物理内存。
 
 [Linux 物理内存管理](https://time.geekbang.org/column/article/574305)

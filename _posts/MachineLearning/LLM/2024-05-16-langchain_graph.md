@@ -262,6 +262,7 @@ class Runnable(Generic[Input, Output], ABC):
     def with_fallbacks(self,fallbacks,...)-> RunnableWithFallbacksT[Input, Output]:
         return RunnableWithFallbacks(self,fallbacks,...)
 ```
+RunnableConfig 是一个配置对象，用于自定义运行链(Chain)、工具(Tool)或任何可运行组件的行为。它允许我们控制执行过程中的各种参数和行为，**可以确保配置信息与输入数据分离，不作为状态的一部分进行跟踪**。
 
 ### Runnable串联
 
