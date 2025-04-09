@@ -335,6 +335,19 @@ LlamaIndex的重点放在了Index上，也就是通过各种方式为文本建�
 
 ### trace
 
+常规的观察者模式是 Subject（被观察者） 持有Observer，Observer 统一抽象为接口，notify的内容随业务而定。在trace 场景，notify的内容统一为event，Observer一般为EventHandler。进一步在llamaindex中，会从Subject 中剥离一个dispatcher（或其它名字），Subject ==> dispatcher ==> Observer。
+
+```
+class Subject:
+    """被观察者类"""
+    def __init__(self):
+        self._observers = []  # 保存观察者列表
+    def notify(self, message):
+        """通知所有观察者"""
+        for observer in self._observers:
+            observer.update(message)
+```
+
 在trace 方面，双方的共同点通过callbackhandler（本质就是观察者模式）来暴漏内部执行数据，但差别很大，主要体现在使用event 还是handler 表达差异 [llamaindex Instrumentation](https://docs.llamaindex.ai/en/stable/module_guides/observability/instrumentation/)
 1. langchain 没有明确提出event 概念，按照领域的不同，整了几个xxcallbackhandler
     ```
@@ -352,6 +365,9 @@ LlamaIndex的重点放在了Index上，也就是通过各种方式为文本建�
         @abstractmethod
         def handle(self, event: BaseEvent, **kwargs: Any) -> Any:
             ...
+
+    dispatcher = instrument.get_dispatcher(__name__)
+    dispatcher.add_event_handler(MyEventHandler())
     ```
 4. hierarchy 体系。一般一个trace系统都会有hierarchy，组件之间的迁移都会有一个新的run_id/span_id
     1. langchain, 当从组件a 进入组件b时，会生成一个新的run_id, a_run_id 则作为parent_run_id。

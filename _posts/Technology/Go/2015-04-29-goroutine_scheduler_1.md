@@ -19,7 +19,7 @@ keywords: Go goroutine scheduler
 
 ![](/public/upload/go/go_scheduler_overview.png)
 
-调度器的任务是给不同的工作线程 (worker thread) 分发可供运行的（ready-to-run）Goroutine。 
+调度器的任务是给不同的工作线程 (worker thread) 分发可供运行的（ready-to-run）Goroutine。 go 在运行时提供了一套调度器，可以将 goroutine 分配到待执行队列中；内核线程从队列中获取并执行 goroutine，如果 goroutine 被阻塞，则会将其挂起，保留它的调用栈和上下文信息到内存中，并调度另一个 goroutine 到该线程执行；当 goroutine 恢复后，go 运行时会将其重新添加到待执行队列中；而这一切对于开发者来说是完全透明的。
 
 [万字长文深入浅出 Golang Runtime](https://zhuanlan.zhihu.com/p/95056679)调度在计算机中是分配工作所需资源的方法，linux的调度为CPU找到可运行的线程，而Go的调度是为M（线程）找到P（内存、执行票据）和可运行的G。
 
