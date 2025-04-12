@@ -32,6 +32,9 @@ Naive RAG上述痛点的原因
 
 ![](/public/upload/machine/agentic_chat_loop.jpg)
 
+产品层面：问答（从L1到L4 复杂度也很大）、报告生成
+技术层面：Agentic RAG 的基本概念及其核心 Agentic 模式，包括规划（planning）、工具使用（tool use）反思（reflection）以及多智能体协作（multi-agent collaboration）。PS： 有没有大一统工程框架在支持这些事儿？
+
 ## multistep
 
 一般过程：通过多个模型，或者本模型自己的回归方式来实现多步分解问题进而拆解，进而逐步解决。
