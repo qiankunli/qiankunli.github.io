@@ -288,7 +288,7 @@ PS: llm 根据kb、memory来执行tool（相对传统结构化编程 if else whi
 
 从框架设计思想上来说
 1. 几个基本组件都做了抽象，比如Document/Embedder/AgentKnowledge(知识库)/AgentMemory/Model(模型)/Reranker/Toolkit/VectorDb。PS：一般业务开发时，langchain 或llamaindex 的类似抽象也很难完全满足需要，往往要独立的提出这些组件的抽象，此时就是一个很好的参考。 
-2. 只有一个Agent class，持有了几乎所有可能需要的组件，Agent.run 用一个最复杂的流程 来兼容L0到L3。PS：这也导致我们很难对链路做个性化调整，但确实是很多开源框架的思路。具体细节上有很多值得参考的地方，比如流失吐字、多模态、推理模型等。
+2. 只有一个Agent class，持有了几乎所有可能需要的组件，Agent.run 用一个最复杂的流程 来兼容L0到L3。PS：这也导致我们很难对链路做个性化调整，但确实是很多开源框架的思路。具体细节上有很多值得参考的地方，比如流式吐字、多模态、推理模型等。
 
 ||手写Agent|使用框架|
 |---|---|---|
