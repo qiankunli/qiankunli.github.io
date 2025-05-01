@@ -15,7 +15,7 @@ keywords: network
 
 linux网络编程中，各层有各层的struct，但有一个struct是各层通用的，这就是描述接收和发送数据的struct sk_buff.
 
-## 分层与内核态
+## 网络分层与内核态
 
 2019.7.5补充：应用层和内核互通的机制是通过 Socket 系统调用，经常有人会问，**Socket 属于哪一层？其实它哪一层都不属于**，它属于操作系统的概念，而非网络协议分层的概念。只不过操作系统选择对于网络协议的实现模式是，**二到四层的处理代码在内核里面**，七层的处理代码让应用自己去做，两者需要跨内核态和用户态通信，就需要一个系统调用完成这个衔接，这就是 Socket。
 
@@ -27,21 +27,26 @@ TCP 层会根据 TCP 头中的序列号等信息，发现它是一个正确的�
 
 ## 宏观
 
+系统调用 与TCP 标志位的状态转换关系
+![](/public/upload/network/tcp_state_transition.png)
+
 ![](/public/upload/network/tcp_send_recv.jpg)
 
 ![](/public/upload/network/linux_tcp_function.png)
 
-### 创建socket
+创建socket
 
 ![](/public/upload/linux/socket_create.png)
 
 sock_create 函数完成通用套接字创建、初始化任务后，再调用特定协议族(上图`net_families[family]`)的套接字创建函数，对于 TCP/IP 协议栈，协议族将设置为 AF_INET。
 
-### 建立连接
+## 建立连接
 
 [那些你不知道的TCP冷门知识！](https://mp.weixin.qq.com/s/6lop61UtnQ-vfWJy17V87w)在Linux中，一般情况下都是**内核代理三次握手**的
 1. 当client端调用 `connect()` 之后内核负责发送SYN，接收SYN-ACK，发送ACK。然后 `connect()` 系统调用才会返回，客户端侧握手成功。
 2. 服务端的Linux内核会在收到SYN之后负责回复SYN-ACK再等待ACK之后才会让 `accept()` 返回，从而完成服务端侧握手。于是Linux内核就需要引入半连接队列（用于存放收到SYN，但还没收到ACK的连接）和全连接队列（用于存放已经完成3次握手，但是应用层代码还没有完成 accept() 的连接）两个概念，用于存放在握手中的连接。
+
+系统调用跟 TCP 状态关系的示意图如下
 
 ![](/public/upload/network/tcp_handshake.png)
 

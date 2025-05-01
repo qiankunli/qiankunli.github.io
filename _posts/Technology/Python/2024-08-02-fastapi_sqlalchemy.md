@@ -13,6 +13,8 @@ keywords: Python fastapi sqlalchemy
 
 ## 简介
 
+PS： fastapi 与Uvicorn 的关系有点像 springmvc 与tomcat的关系？
+
 ## FastAPI
 
 [三万字长文让你彻底掌握 FastAPI](https://mp.weixin.qq.com/s/b7-zb0FygFhiL6kfbNoazw)Python FastAPI是一个快速（高性能）的Web框架/协程框架，用于构建基于Python的RESTful API，使用异步编程模型、WebSocket，支持类型检查和自动文档生成等功能，支持Swagger和JSON Schema规范，可以方便地与其他API工具进行集成。

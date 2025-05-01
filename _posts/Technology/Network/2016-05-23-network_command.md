@@ -17,6 +17,10 @@ http://fishcried.com/ 有一个linux 网络的基础知识系列，要研读下
 
 ## tcpdump
 
+如何抓取报文？
+1. 用 tcpdump 抓取报文，最常见的场景是要抓取去往某个 ip，或者从某个 ip 过来的流量。我们可以用 host {对端 IP} 作为抓包过滤条件，比如：`tcpdump host 10.10.10.10`
+2. 另一个常见的场景是抓取某个端口的流量，比如，我们想抓取 SSH 的流量，那么可以这样：`tcpdump port 22`
+
 [tcpdump抓包使用小结](https://segmentfault.com/a/1190000017346947)
 
 ```
@@ -28,9 +32,36 @@ tcpdump port 1024
 tcpdump -i eth0 -nn 'host 目标主机ip'
 ```
 
-Wireshark 还可以用来读取 tcpdump 保存的 pcap 文件。你可以使用 tcpdump 命令行在没有 GUI 界面的远程机器上抓包然后在 Wireshark 中分析数据包。
+Wireshark 还可以用来读取 tcpdump 保存的 pcap 文件。你可以使用 tcpdump 命令行在没有 GUI 界面的远程机器上抓包然后在 Wireshark 中分析数据包。Wireshark提供了相当多的信息提示，**比如丢包和重传都会用不同的颜色跟正常的数据包区分开**。
+
+Wireshark过滤器语法
+```
+ip.addr eq my_ip：过滤出源IP或者目的IP为my_ip的报文
+ip.src eq my_ip：过滤出源IP为my_ip的报文
+ip.dst eq my_ip：过滤出目的IP为my_ip的报文
+```
+
+有时候我们并不方便用 Wireshark 打开抓包文件做分析，比如抓包的机器不允许向外传文件，也就是可能只能在这台机器上做分析。我们可以用 tcpdump -r 的方式，打开原始抓包文件看看：`tcpdump -r test.pcap | head -10`。
+
+报文都是按时间线原样展示的，缺乏逻辑关系，是不是难以组织起有效的分析？比如，要搞清楚里面有几条 TCP 连接都不太容易。这时候怎么办呢？tcptrace，是一个挺“古老”的工具了。在 Wireshark 工具集（Wireshark 图形界面和 tshark 等命令行工具）还没一统江湖的时候，tcptrace 也有其独到的价值。比如下面这样，tcptrace 告诉我们，这个抓包文件里有 2 个 TCP 连接，并且是以 RST 结束的：
+
+```
+$ tcptrace -b test.pcap
+1 arg remaining, starting with 'test.pcap'
+Ostermann's tcptrace -- version 6.6.7 -- Thu Nov  4, 2004
+
+145 packets seen, 145 TCP packets traced
+elapsed wallclock time: 0:00:00.028527, 5082 pkts/sec analyzed
+trace file elapsed time: 0:00:04.534695
+TCP connection info:
+  1: victorebpf:51952 - 180.101.49.12:443 (a2b)   15>   15<  (complete)  (reset)
+  2: victorebpf:56794 - 180.101.49.58:443 (c2d)   56>   59<  (complete)  (reset)
+```
 
 通过分析数据包收到和发出的时间差，可以分析数据包在网卡之间的耗时。
+
+原理：BPF是 tcpdump 等抓包工具的底层基础。在 BPF 出现之前，虽然各家操作系统都有自己的抓包工具，但也都有这样或那样的不足。比如，有些系统把所有网络报文一股脑儿全都塞给用户空间程序，开销非常大；而有些系统虽然有报文过滤功能，但是工作很不稳定。为了解决这些问题，1992 年，劳伦斯伯克利国家实验室，当初 tcpdump 的两个作者McCanne和Jacobson发表了关于 BPF 的论文，它以一种新的基于寄存器的虚拟机方式，实现了高效稳定的报文过滤功能。从此以后，抓包技术这棵大树有了一个甚为强大的根基，而构建在 BPF 之上的 libpcap、tcpdump 等不断枝繁叶茂，进一步使得抓包工作变得方便、稳定。BPF 实现了抓包虚拟机，但它是如何被用户空间程序使用的呢？于是，libpcap 出现了，它提供了 API 给用户空间程序（包括 tcpdump、Wireshark 等），使得后者能方便地调用 BPF 实现抓包过滤等功能。也就是说，libpcap 是 BPF 的一层 API 封装。那么到目前为止，我们应该就能明白 tcpdump 是怎么工作的了：**tcpdump 调用了 libpcap 接口，后者调用 BPF 实现了报文过滤和抓取**。
+番外：Linux 从 3.18 版本开始支持 extended BPF，简称 eBPF。这是一个更加通用的内核接口，不仅能支持网络抓包，还能支持网络以外的内核观测点的信息收集等工作。所以事实上，eBPF 已经是一个通用工具，而不再局限在网络工具这个角色定位上了。也因为它在数据面上的性能很出色，所以现在不少公司正在探索，利用它实现一些数据面的开发工作，比如高性能的负载均衡。
 
 ## ip命令
 
