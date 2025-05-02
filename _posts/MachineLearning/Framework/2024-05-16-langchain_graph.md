@@ -26,7 +26,6 @@ keywords: langchain langgraph lcel
 * 不够简洁与直观，也难以调试。基于这样一些原因，提供一种更强大的工作流定义与编排的支持，也成为了开发框架的发力重点，典型的就是之前介绍过的LangGraph以及LlamaIndex Workflows。
 PS：一个workflow 引擎，两个关键字是workflow/step(task)，三个关键字是workflow/step/context（全局的和step间的信息传递）。四个关键词就再带一个驱动机制：顺序驱动（按序执行，就没法循环了）、图驱动、事件驱动。
 
-
 ## 从顺序式为主的简单架构走向复杂的WorkFlow
 
 编程语言大类上可以分为命令式编程和声明式编程，前者深入细节，各种 if else、各种 while/for，程序员掌控每个像素；后者把任务「描述」清楚，重点在业务流程翻译成所用的语言上，具体怎么实现甩给别人（大部分是系统自带）。由于这一波 LLMs 强大的理解、生成能力，**关注细节的命令式编程似乎不再需要**，而偏重流程或者说业务逻辑编排的 pipeline 能力的声明式编程，成了主流「编程」方式。
@@ -335,6 +334,7 @@ chain_with_history = RunnableWithMessageHistory(
 LCEL提供了多种优势，例如一流的流支持、异步支持、优化的并行执行、支持重试和回退、访问中间结果、输入和输出模式以及无缝 LangSmith 跟踪集成。但因为语法上的问题，要实现 loop 和 condition 的情况就比较困难。于是LangChain社区推出了一个新的项目——LangGraph，期望基于LangChain构建支持循环和跨多链的计算图结构，以描述更复杂的，甚至具备自动化属性的AI工程应用逻辑，比如智能体应用。
 
 ## LangGraph
+
 langchain早期其实都内置有开箱即用的更简单的Agent开发组件。比如在先前LangChain中，创建一个会使用工具（Tools）的ReAct范式的Agent并不复杂：把定义好的tools交给大模型，然后让大模型自行规划与选择工具的使用，以完成输入任务。如下：
 
 ```python

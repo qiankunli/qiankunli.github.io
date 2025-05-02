@@ -11,7 +11,7 @@ keywords: llm agent
 <script>
   MathJax = {
     tex: {
-      inlineMath: [['$', '$']], // 支持 $和$$ 作为行内公式分隔符
+      inlineMath: [['$', '$'], ['$$', '$$']], // 支持 $和$$ 作为行内公式分隔符
       displayMath: [['$$', '$$']], // 块级公式分隔符
     },
     svg: {
@@ -28,6 +28,7 @@ keywords: llm agent
 ## 简介（未完成）
 
 LLM本质上就是一个具有数十亿到千亿级别参数的无状态函数， 比如可以这样
+
 $$
 y=f(\theta)=Decoder(Attention(Embed(x)*W_q,Embed(x)*W_k,Embed(x)*W_v);\theta)
 $$
