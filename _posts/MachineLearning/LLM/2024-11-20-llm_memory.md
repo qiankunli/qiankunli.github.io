@@ -8,7 +8,18 @@ keywords: llm agent
 
 ---
 
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script>
+  MathJax = {
+    tex: {
+      inlineMath: [['$', '$']], // 支持 $和$$ 作为行内公式分隔符
+      displayMath: [['$$', '$$']], // 块级公式分隔符
+    },
+    svg: {
+      fontCache: 'global'
+    }
+  };
+</script>
+<script async src="/public/js/mathjax/es5/tex-mml-chtml.js"></script>
 
 * TOC
 {:toc}

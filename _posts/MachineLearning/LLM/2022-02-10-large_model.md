@@ -8,7 +8,18 @@ keywords: large model
 
 ---
 
-<script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=default"></script>
+<script>
+  MathJax = {
+    tex: {
+      inlineMath: [['$', '$']], // 支持 $和$$ 作为行内公式分隔符
+      displayMath: [['$$', '$$']], // 块级公式分隔符
+    },
+    svg: {
+      fontCache: 'global'
+    }
+  };
+</script>
+<script async src="/public/js/mathjax/es5/tex-mml-chtml.js"></script>
 
 ## 简介
 
