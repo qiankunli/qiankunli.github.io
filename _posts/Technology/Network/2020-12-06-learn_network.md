@@ -44,3 +44,7 @@ keywords: network
 ![](/public/upload/network/network_transmission.png)
 
 [网络设计核心思想](https://mp.weixin.qq.com/s/0XXNDid8lXDbcSZ9fmWOZg)
+
+## 其它
+
+![](/public/upload/network/troubleshoot_network_lesson.jpg)
