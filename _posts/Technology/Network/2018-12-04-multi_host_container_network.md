@@ -53,7 +53,7 @@ keywords: container network
 
 1. 直接路由: BGP等
 2. 隧道: VxLAN, IPIP, GRE等。
-	1. ipip：利用了Linux 的tun/tap设备，对IP层的报文再加了一层IP层的封装实现的一种overlay模式。
+	1. ipip：利用了Linux 的tun/tap设备，在 IP 头部外面再包上一层 IP 头部实现的一种overlay模式。
 	2. gre: 主机互相维护对端的隧道地址
 	2. vxlan 通过主机的内核路由
 3. NAT: 例如docker的桥接网络模式
