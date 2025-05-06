@@ -83,6 +83,7 @@ chat_dict = [
 ```
 模型的input_ids和对应的labels应该是什么呢（input_ids 对应模型输入，labels 则是为了和模型oupput标量计算loss）？最常规的做法应该是在每一轮首尾用`[BOS]`和`[EOS]`包裹，轮次内部正常用模板非结构化就行。上例可以转换为input_ids= `[BOS][INST]U1[\INST]A1[EOS][BOS][INST]U2[\INST]A2[EOS]`，难点在于LABELS应该是什么呢？ 我们可以根据学习模式来确定LABELS。
 1. 在推理场景下，假如是第一轮对话开始，我们会输入给模型[BOS][INST]U1[\INST]，那么我们希望模型吐出的是什么呢？是A1和[EOS]，A1是模型自己的回答，EOS是为了告诉解码系统生成结束了，否则模型将一直生成到最大长度才会停止。我们获得了一个初步的学习模式需求，就是根据`[BOS][INST]U[\INST] → A[EOS]`。
+    
     |input|`[BOS]`|`[INST]`|U|`[/INST]`|A|
     |---|---|---|---|---|---|
     |label|-100|-100|-100|A|`[EOS]`|
