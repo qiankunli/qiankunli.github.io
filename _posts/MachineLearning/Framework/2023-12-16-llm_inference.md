@@ -218,6 +218,7 @@ for x in X:  # 对每一个新的输入x
 ```
 
 但是有一个问题就是KV Cache非常的大，比如说拿LLaMA-13B举例子，假设每个token在一层的大小有20KB，LLaMA-13B有40层，这样这个token大小就会达到800KB，而一个sequence一般来说会有几千的token，也就是说一个sequence就会达到几个G。[Transformers KV Caching Explained](https://medium.com/@joaolages/kv-caching-explained-276520203249) 动图实在太贴切了。PS：**KV-Cache的总空间大小为max_seqlen×layer_num×dim×sizeof(float)**。因此，在第token_pos步时，我们可以通过索引位置(token_pos, layer_idx)来获取第layer_idx层的KV-Cache。
+[KV缓存技术详解与PyTorch实现](https://mp.weixin.qq.com/s/ZcuLrPOisG17O7qgQmEkvw) forward 是要多维护k_cache/v_cache/cache_index成员。
 
 Memory waste in KV Cache
 1. 内部碎片：推理过程具有非常大的动态性，输出的长度不能预先知道，传统的serving system为了保险起见，就会预留非常大的空间，比如模型支持的最大输出2048个token，它就会预留这么大的空间，那么如果我产生的输出仅有10个token，剩下的2038的slots就会作为内部碎片被浪费。

@@ -24,7 +24,8 @@ keywords: llm agent
 |RAG/deepsearch|native rag|selfrag/corag/ircot等|search-r1等||
 |deepresearch||planer/searcher/summarier等|依赖类似openai 为deepresearch 端到端训练的模型|supervior + xxsearcher|
 |写作||outline_wirter/段落writer/润色||supervisor + xxwriter |
-|openmanus||supervisor + planer + xxer + 执行环境||supervisor + planer + xxtool + 执行环境|
+|openmanus（通用agent）||supervisor + planer + xxer + 执行环境||supervisor + planer + xxtool + 执行环境|
+|画布||||supervisor + xxtool + 执行环境|
 
 1. 从答疑到连接物理世界，业务发展的动力
     1. LLM 能力本身提升了
