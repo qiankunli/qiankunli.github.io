@@ -65,7 +65,7 @@ class EventLoop:
 
 几个理解
 1. 在go里没有同步方法异步方法一说，同步里调“异步方法” 只是go 启动了一个同步方法。但在python 里从语法上区分了同步方法和异步方法，**异步方法只能在EventLoop里执行**，可以认为同步方法和异步方法 runtime 不同。
-2. 所以在python里，同步方法里调用异步方法，要把异步方法封为task 交给loop执行，比如loop.run_until_complete(task)。异步方法可以直接执行同步方法，但如果不想让同步方法阻塞EventLoop，则需要loop.run_in_executor(sync_func)，将sync_func交给专门的线程executor。
+2. 所以在python里，同步方法里调用异步方法，要把异步方法封为task 交给loop执行，比如loop.run_until_complete(task)。异步方法可以直接执行同步方法，但如果不想让同步方法阻塞EventLoop，则需要`result = await loop.run_in_executor(sync_func)`，将sync_func交给专门的线程executor。PS：实际是executor执行sync_func
 
 ### Future
 

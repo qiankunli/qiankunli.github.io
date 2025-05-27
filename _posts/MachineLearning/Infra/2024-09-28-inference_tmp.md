@@ -227,3 +227,9 @@ Context Caching
 [AI 推理场景的痛点和解决方案](https://mp.weixin.qq.com/s/SeUJxNK10fhR6YsWSJRYwg) 未细读。
 
 [大模型推理框架RTP-LLM P-D分离之道：从思考到实战](https://mp.weixin.qq.com/s/4FVw5paNSUCeQEUp9hoJ5Q) 未读
+
+## 各种并行
+
+[LightLLM中DeepSeek V3/R1 Two MicroBatch Overlap 实现解析](https://mp.weixin.qq.com/s/V7LmiDRcBiSC0Dfl5jGm3w) 未细读（在代码上体现如何overlap）。在DeepSeek-V3/R1推理系统中，多机多卡的专家并行会引入比较大的通信开销，所以DeepSeek使用了双 batch 重叠来掩盖通信开销，提高整体吞吐。
+
+![](/public/upload/machine/micro_batch_overlap.png)

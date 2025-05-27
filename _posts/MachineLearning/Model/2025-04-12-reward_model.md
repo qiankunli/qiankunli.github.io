@@ -4,7 +4,7 @@ layout: post
 title: reward演进
 category: 架构
 tags: MachineLearning
-keywords:  rl,llm
+keywords: reward model
 
 ---
 
@@ -27,6 +27,22 @@ keywords:  rl,llm
 {:toc}
 
 在使用RL训练LLM的一个限制是奖励的计算。在模型输出可通过代码或某种测试验证的场景下，奖励更容易定义，我们可以提示模型，给出答案，让它运行并找到解决方案。这让RL无限训练模型成为可能，从而产生神奇效果。在输出不易验证的开放领域，我们通常训练奖励模型来判断输出。有不少研究表明这会导致"Reward Hacking"现象，模型学会输出内容以获得高奖励，而输出并不是我们想要的。这种情况下就不能使用RL训练模型。
+
+## reward_loss
+
+reward_loss为排序中常见的 pairwise ranking loss。其中$r_{\theta}$是奖励模型的输出标量，$y_w$是一对回答中相对较好的那个； $y_l$是相对较差的那个回答，$\sigma$ 是sigmoid函数。
+
+$$
+loss(\theta)=-\frac{1}{\binom{K}{2}} \mathbb{E}_{(x, y_w, y_l) \sim D}[\log (\sigma(r_{\theta}(x, y_w)-r_{\theta}(x, y_l)))]
+$$
+
+也有的文章公式是
+
+$$
+loss(\theta)=-\log (\sigma(r_{\theta}(x, y_w)-r_{\theta}(x, y_l)))
+$$
+
+PS： 这意思就是 $y_w$ 评分比 $y_l$ 大的越多，loss越小。此外，reward model只在t=T的时候打分，其余时间步t的时候应该是用默认值0，也就是典型的稀疏奖励，如果要改成不稀疏，需要做奖励塑形，比如每一个 token 将奖励乘上一个折扣传递给前一个 token。
 
 ## DeepSeek-GRM
 
