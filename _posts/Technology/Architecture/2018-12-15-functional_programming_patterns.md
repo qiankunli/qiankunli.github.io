@@ -60,6 +60,8 @@ It is worth noticing that the functions are actually finer grained than the stra
 
 ## 观察者模式
 
+观察者模式是一个应用很广的行为模式，更常见的别名是信号机制、发布 - 订阅机制，但它比较复杂，自己实现的难度比较高，所以大多内置在语言或者应用框架里。
+
 [Gang of Four Patterns in a Functional Light: Part 2](https://www.voxxed.com/2016/05/gang-four-patterns-functional-light-part-2/)
 
 the Template and the Observer patterns, which can both be reimplemented through the Java 8 Consumer interface.

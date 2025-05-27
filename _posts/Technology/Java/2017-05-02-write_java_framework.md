@@ -189,6 +189,8 @@ spi 是与 api 相对应的一个词，代码上会有一个接口类与其对�
 
 ## 重新理解工厂模式
 
+工厂模式可以用 DRY（Don’t Repeate Yourself）原则来理解，也就是说尽量避免重复的代码，简单地认为它就是“对 new 的封装”。想象一下，如果程序里到处都是“硬编码”的 new，一旦设计发生变动，比如说把“new 苹果”改成“new 梨子”，你就需要把代码里所有出现 new 的地方都改一遍，不仅麻烦，而且很容易遗漏，甚至是出错。如果把 new 用工厂封装起来，就形成了一个“中间层”，隔离了客户代码和创建对象，两边只能通过工厂交互，彼此不知情，也就实现了解耦，由之前的强联系转变成了弱联系。所以，你就可以在工厂模式里拥有对象的“生杀大权”，随意控制生产的方式、生产的时机、生产的内容。重点是“如何创建对象、创建出什么样的对象”，用函数或者类会比单纯用 new 更灵活。
+
 A factory class decouples the client and implementing class. 工厂模式解决的是bean的生产问题，简单工厂模式根据入参生产不同的bean，普通工厂模式针对每个bean都构建一个工厂，此两者各有优劣，看需要。如果每个bean主要的功能都在方法中，不涉及类变量的使用，可以利用spring容器生成的bean（bean作为factory的成员由spring注入）。PS：我们明确地计划不同条件下创建不同实例时。
 
 The factory pattern is a design pattern that is used to encapsulate complex logic in functions that creates the wanted instance, **without the caller knowing anything about the implementation details**.
