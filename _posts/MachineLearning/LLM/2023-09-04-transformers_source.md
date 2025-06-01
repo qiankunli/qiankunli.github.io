@@ -27,7 +27,7 @@ keywords: llm Transformers
 
 Hugging Face 自然语言处理（NLP）的开源平台和社区，主要提供了以下几个产品和服务：
 1. Hub：这是一个机器学习的中心，让你可以创建、发现和协作ML项目。可以从排行榜开始，了解社区中表现较好的模型。如果你没有 GPU，你必须使用小的模型。转到文件目录并查看 .bin 文件的大小。有的项目在型号卡中也会提到所需的最低规格。PS：就像github 包含代码文件一样，这里包含代码的模型文件，git clone 时要安装Git LFS（Git Large File Storage）
-2. Transformers：这是一个自然语言处理的库，支持多种编程语言（如Python、JavaScript、Swift等）和框架（如PyTorch、TensorFlow等），并提供了简单易用的API，让你可以快速地加载、训练和部署模型。帮我们跟踪流行的新模型，并且**提供统一的代码风格来使用BERT、XLNet和GPT等等各种不同的模型**。只有configuration，models和tokenizer三个主要类，基于上面的三个类，提供更上层的pipeline和Trainer/TFTrainer，从而用更少的代码实现模型的预测和微调。
+2. Transformers：这是一个自然语言处理的库，支持多种编程语言（如Python、JavaScript、Swift等）和框架（如PyTorch、TensorFlow等），并提供了简单易用的API，让你可以快速地加载、训练和部署模型。帮我们跟踪流行的新模型，并且**提供统一的代码风格来使用BERT、XLNet和GPT等等各种不同的模型**。只有configuration，models和tokenizer（封装了词汇表）三个主要类，基于上面的三个类，提供更上层的pipeline和Trainer/TFTrainer，从而用更少的代码实现模型的预测和微调。
     1. pipeline 在底层是由 AutoModel 和 AutoTokenizer 类来实现的。AutoClass（即像 AutoModel 和 AutoTokenizer 这样的通用类）是加载模型的快捷方式，它可以从其名称或路径中自动检索预训练模型。
     2.  
     ```python
@@ -285,7 +285,7 @@ print(squad_it_dataset) # 包括 train 和 test 的 DatasetDict 对象
 
 ![](/public/upload/machine/transformer_layer.jpg)
 
-几十层的layer结构中，KQV矩阵不断被计算出来，又传输到FF网络，再到下一个layer，中间隔着一些Norm和Add操作。在最后一个Transformer Layer输出后，要计算logits（概率向量）。最后一层输出是`seq_len*hidden_size`的矩阵，将它乘以一个固定的output矩阵（`hidden_size*vocab_size`的），得到一个`seq_len*vocab_size`的矩阵。虽然最终得到了一个大矩阵，但我们只关心它最后一行的那个32000维的向量。它就代表最终需要的logits概率向量，说明下一个token可以是什么。PS：通过一个线性层把特征向量升维到词表维度（Linear层），并且通过softmax进行归一化（Softmax层），最终输出一个概率分布。该分布表示对词表中每个词匹配这个特征向量的概率，依据这些概率，按照一定的采样规则来采样下一个token，不断重复上述过程。直到LLM输出结束流（EOS）标记表示解码结束或者已经生成所需数量的token。
+几十层的layer结构中，KQV矩阵不断被计算出来，又传输到FF网络，再到下一个layer，中间隔着一些Norm和Add操作。在最后一个Transformer Layer输出后，要计算logits（概率向量，logits是机器学习中常用的术语，**表示最后一层的原始输出值**，我们可以把logits[i]简单理解为“下一个token_id是i的得分”，因此logits肯定是长度为vocab_size的字典）。最后一层输出是`seq_len*hidden_size`的矩阵，将它乘以一个固定的output矩阵（`hidden_size*vocab_size`的），得到一个`seq_len*vocab_size`的矩阵。虽然最终得到了一个大矩阵，但我们只关心它最后一行的那个32000维的向量。它就代表最终需要的logits概率向量，说明下一个token可以是什么。PS：通过一个线性层把特征向量升维到词表维度（Linear层），并且通过softmax进行归一化（Softmax层），最终输出一个概率分布。该分布表示对词表中每个词匹配这个特征向量的概率，依据这些概率，按照一定的采样规则来采样下一个token，不断重复上述过程。直到LLM输出结束流（EOS）标记表示解码结束或者已经生成所需数量的token。
 
 ```python
 tokenizer = AutoTokenizer.from_pretrained(checkpoint)
@@ -318,6 +318,9 @@ print(output)
 2. 推理的时候，只能一个字一个字的推理，所以会调用多次。 output = model(inputs)  或者 output = model.forward(inputs)的时候，inputs 其实也不需要包含 attention_mask，inputs 仅仅是token 就可以
 
 model(xx) ==> `Module.__call__` ==> Module.forward/model.forward，几乎每一个llm 都会自定义forward 方法，如果向forward 方法传入 labels，还会自动计算loss。
+1. 参数在`__init__` 中初始化；
+2. 推理在forward 函数中实现，并通过`__call__` 允许对象被直接调用；
+3. 序列生成在generate 函数中实现；
 
 ```python
 class Module:

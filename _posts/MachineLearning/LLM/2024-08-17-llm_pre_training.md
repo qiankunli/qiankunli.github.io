@@ -59,12 +59,12 @@ keywords: llm pretrain
 5. Scaling Law 不仅适用于语言模型，还适用于其他模态以及跨模态的任务：
 
 对于 Decoder-only 的模型，计算量C(Flops)，模型参数量 N(除去 Embedding 部分)，数据大小 D(token 数)，三者的关系为: C≈6ND。推导如下，记模型的结构为：decoder 层数l，attention隐层维度d，attention feedforward层维度 $d_{ff}$，一般来说 $d_{ff} = 4 * d$。
-模型的参数量N（忽略emebedding、norm和bias） 计算如下，transformer 每层包含 self-attention 和mlp 两个部分
+模型的**参数量**N（忽略emebedding、norm和bias） 计算如下，transformer 每层包含 self-attention 和mlp 两个部分
 1. self-attention 的参数为$W_q$、$W_k$、$W_v$、$W_o$，每个矩阵的维度为$R^{d*d}$，整体参数量：$4 * d^2$
 2. mlp 的参数为 $W_1$（维度为$R^{d*d_{ff}}$）和$W_2$（维度为$R^{d_{ff}*d}$），整体参数量：$2 * d * d_ff = 2 * d * 4d = 8d^2$
 3. 所以每层参数是$4d^2 + 8d^2 = 12d^2$，全部l 层的参数量为 $12*ld^2$，即$N=12*ld^2$
 
-计算量的单位是FLOPS，float point operations 对于矩阵A (m*n)和B（n*p） AB 相乘的计算量为2mnp，一次加法一次乘法。假设decoder 层的输入X（b*s*d），b为batch size，s为序列长度，d为模型维度。
+**计算量**的单位是FLOPS，float point operations 对于矩阵A (m*n)和B（n*p） AB 相乘的计算量为2mnp，一次加法一次乘法。假设decoder 层的输入X（b*s*d），b为batch size，s为序列长度，d为模型维度。
 
 1. 前向推理的计算量：
     1. self-attention 部分的计算：

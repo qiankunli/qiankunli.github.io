@@ -135,6 +135,7 @@ updatePolicy
 1. Intitial: VPA 只在创建 Pod 时分配资源，在 Pod 的其他生命周期不改变Pod的资源。
 2. Auto(默认)：VPA 在 Pod 创建时分配资源，并且能够在 Pod 的其他生命周期更新它们，包括淘汰和重新调度 Pod。
 3. Off：VPA 从不改变Pod资源。Recommender 而依旧会在VPA对象中生成推荐信息，他们可以被用在演习中。
+PS：K8s 1.33 支持原地扩缩容
 
 ### 实践
 

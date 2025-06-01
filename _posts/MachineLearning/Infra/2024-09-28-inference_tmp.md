@@ -37,8 +37,8 @@ keywords: llm vLLM
     1. 张量的基本结构
     2. 张量操作
     3. 一系列张量操作构建了一个计算图
-2. 分词Tokenization。
-3. 嵌入embedding。
+2. 分词Tokenization（封装了词汇表/vocab）。
+3. 嵌入embedding/输入层。把离散的“token”，映射为一些连续的“数值”，两个token id之间是没有关系的，但两个Embedding的向量可以有距离、关联度等关系。
 4. Transformer，自注意力机制是LLM架构中唯一计算词元间关系的地方，因此它构成了语言理解的核心，涵盖了对词汇关系的理解。由于涉及跨词元的计算，从工程角度来看，它也是最有趣的部分，尤其是对于较长序列来说，计算量可能会非常大。自注意力机制的输入是n_tokens x n_embd的嵌入矩阵，其中每一行或向量表示一个独立的词元。这些向量中的每一个都将被转换为三个不同的向量，分别称为“键”（key）、“查询”（query）和“值”（value）向量。这种转换通过将每个词元的嵌入向量与固定的wk、wq和wv矩阵（这些矩阵是模型参数的一部分）相乘来实现：
     ![](/public/upload/machine/llm_qkv.jpg)
     这个过程会对每个词元重复进行，也就是执行n_tokens次。理论上可以通过循环来完成，但为了提高效率，所有行会通过矩阵乘法在一次操作中进行转换。最终，我们得到三个矩阵 K、Q 和 V，它们的大小均为 n_tokens x n_embd，分别包含每个词元的键（key）、查询（query）和值（value）向量堆叠在一起。
@@ -56,10 +56,10 @@ keywords: llm vLLM
 
     在Transformer架构中有多个层。这些层是相同的，除了每层都有自己的一组参数矩阵（例如用于自注意力机制的各自的wk、wq和wv矩阵）。第一层的输入是上文描述的嵌入矩阵。第一层的输出随后被用作第二层的输入，依此类推。我们可以将其看作每一层都生成了一组嵌入，但这些嵌入不再直接与单个词元相关，而是与词元关系的某种更复杂的理解相关联。
 
-    Transformer的最后一步是计算logits。logits的计算是通过将最后一个Transformer层的输出与一个固定的n_embd x n_vocab参数矩阵（在llama.cpp中也称为output）相乘来完成的。这个操作为词汇表中的每个词元生成一个logit。例如，在LLaMA中，它会生成n_vocab=32000个logits：
+5. 输出层/Transformer的最后一步是计算logits。logits的计算是通过将最后一个Transformer层的输出与一个固定的n_embd x n_vocab参数矩阵（在llama.cpp中也称为output）相乘来完成的。这个操作为词汇表中的每个词元生成一个logit。例如，在LLaMA中，它会生成n_vocab=32000个logits：
 
     ![](/public/upload/machine/llm_logitis.jpg)
-    这里只关注结果的最后一行，它包含词汇表中每个可能的下一个词元的logit值。
+    这里只关注结果的最后一行，它包含词汇表中每个可能的下一个词元的logit值。PS: **几乎所有模型最后一层都是这么一个Linear 层**，它的用途是把我们中间各种layer算出来的结果，最终映射到vocab_size 维的向量里去。因为我们最终要算的，就是vocab_size 个词里，每个词出现的概率。
 5. 拿到logits列表后，下一步是根据它们选择下一个词元。这个过程称为采样。贪婪采样;温度采样;语法采样
 6. KV缓存。每个词元都有一个关联的嵌入向量，该嵌入向量通过与参数矩阵wk和wv相乘进一步转化为键（key）和值（value）向量。KV缓存是用来缓存这些键和值向量的，通过缓存它们，我们可以节省每次迭代重新计算所需的浮点运算。
     ![](/public/upload/machine/llm_kvcache.jpg)

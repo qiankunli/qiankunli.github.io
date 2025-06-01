@@ -113,9 +113,41 @@ PS：微调模型来提高拆解子问题的能力。
 LLM 在具代理性的系统中如何决定使用哪个工具以及何时使用呢？这就是计划的作用。 LLM 代理中的计划涉及将给定任务分解为可操作的步骤。
 1. no plan。llm 隐式的有一个计划，但不外漏。 
 2. plan next/react
-1. plan ahead/planning+execution。有时生成的计划赶不上变化和实际不符合，所以即便生成了计划，往往也会根据检索到的信息调整。
+3. plan ahead/planning+execution。 有时生成的计划赶不上变化和实际不符合，所以即便生成了计划，往往也会根据检索到的信息调整。
 
 没有人，即使是具有 ReAct 的 LLM，也并非每个任务都能完美完成。失败是过程的一部分，只要你能反思这个过程就行。 
+
+### 计划
+
+[如何让 Agent 规划调用工具](https://mp.weixin.qq.com/s/7XvAcTst9OU_4orDr-dD-w)根据 Anthropic 和 OpenAI 的建议，对于多工具的 Agent 智能体，让模型在调用工具前规划都能有效提升效果。
+1. OpenAI 是通过 Prompt 引导模型思考，Prompt 如下: 
+    ```
+    You MUST plan extensively before each function call, and reflect extensively on the outcomes of the previous function calls. DO NOT do this entire process by making function calls only, as this can impair your ability to solve the problem and think insightfully.
+    ```
+2. Anthropic 的办法是让模型调用思考工具，并提供示例，让模型调用工具前/调用工具后思考。思考工具的定义如下：
+    ```
+    {
+        "name": "think",
+        "description": "Use the tool to think about something. It will not obtain new information or change the database, but just append the thought to the log. Use it when complex reasoning or some cache memory is needed.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+            "thought": {
+                "type": "string",
+                "description": "A thought to think about."
+            }
+            },
+            "required": ["thought"]
+        }
+    }
+    ```
+
+原因是 OpenAI 并不是单纯通过 Prompt 指令让模型规划，他们还通过后训练让模型严格遵循这一指令。而我们使用开源模型，没有经过微调的话，指令遵循的效果肯定会打折，而以工具的形式能够提升遵循能力：
+1. 模型调用工具有固定的格式，例如参数的 thought, plan, action，通过工具调用能够让模型以更结构化的方式输出，不会遗漏；
+2. 「调用xx工具」是一个可明确执行和评判的指令，而「做一个规划」是一个模糊的指令，相对来说以工具的形式指令遵循效果更好，尤其是在复杂 prompt 和多工具的场景。
+
+当然类 manus 的方案通过链路工程让规划和执行分离（如下图），Agent 系统的规划和遵循规划的能力肯定会更好，尤其是针对15分钟甚至30分钟以上的长程任务。但是不是所有场景都需要类 manus 的长程任务规划，我在这里介绍的方案比较轻量，适用于快速任务（期望完成任务的时间较短）。
+![](/public/upload/machine/openmanus_run.png)
 
 ## 技术架构
 
