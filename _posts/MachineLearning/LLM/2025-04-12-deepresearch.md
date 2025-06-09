@@ -16,6 +16,8 @@ keywords: deepresearch deepsearch
 什么是Deep Research? 它是一个深度搜索和调研的Agent，能在5-30分钟内出一份完整的调研报告。注意,它强调"深度搜索+调研"，而非单纯的深度搜索(Deep Search)。
 
 1. 与Deep Search关系，要复现Deep Research，首先要把搜索(Search)做好。给定用户问题，Agent要学会从浏览器或API中搜集相关知识。没有扎实的Search能力，就难以实现Research。
+2. Deep Search（深度思考）：更侧重“找”的过程，它的目标是把相关信息尽可能全面、深入地挖掘出来。Deep ReSearch更侧重“写”的过程，它可以利用Deep Search找到的信息，进行深入地思考，分析和创造，目标是产出深刻的理解或知识。
+3. 传统RAG，是当用户提出问题，系统会从大规模的知识库（通常是向量检索库）中检索出跟问题最相关的文档片段或信息，然后将这些检索到的信息连同原始问题一起提供给LLM，让LLM基于这些“增强”的上下文信息生成更准确的、更具事实性的答案。RAG中的llm比较被动，尤其是一轮rag场景仅用于生成答案（不参与检索）
 
 ## Deep Search：搜索的本质与难点
 

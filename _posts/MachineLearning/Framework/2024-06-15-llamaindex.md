@@ -397,7 +397,7 @@ class Subject:
             def prepare_to_exit_span(self,id_: str,) -> Optional[T]:...
             def prepare_to_drop_span(self,id_: str,) -> Optional[T]:...
         ```
-### human in the loop
+### HITL/human in the loop
 
 langchain 主要是通过checkpoint 机制，遇到人工录入时，先将graph暂存，拿到human input 后再根据thread-id等resume graph运行。
 
@@ -427,16 +427,16 @@ langchain 主要是通过checkpoint 机制，遇到人工录入时，先将graph
 2. 实现原理上，内置了 InputRequiredEvent and HumanResponseEvent，step 发出的InputRequiredEvent 不被任何step receive，用户的输入可以被封装到 HumanResponseEven 以被某个step 接收。
     ```python
     async for event in handler.stream_events():
-    if isinstance(event, InputRequiredEvent):
-        # capture keyboard input
-        response = input(event.prefix)
-        # send our response back
-        handler.ctx.send_event(
-            HumanResponseEvent(
-                response=response,
-                user_name=event.user_name,
+        if isinstance(event, InputRequiredEvent):
+            # capture keyboard input
+            response = input(event.prefix)
+            # send our response back
+            handler.ctx.send_event(
+                HumanResponseEvent(
+                    response=response,
+                    user_name=event.user_name,
+                )
             )
-        )
     ```
 3. 如果用户输入这个过程耗时很长，llamaindex 不提供手段持久化context，需开发者自行维护。PS： 这也是为何workflow 要有一个context，因为workflow本身的执行必须是无状态的，状态全部保存到context里。 
 

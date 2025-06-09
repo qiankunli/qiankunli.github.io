@@ -463,6 +463,7 @@ LangGraph 三个核心要素
 3. 节点通过边相互连接，形成了一个有向无环图（DAG），边有几种类型：
     1. Normal Edges：即确定的状态转移，这些边表示一个节点总是要在另一个节点之后被调用。
     2. Conditional Edges：输入是一个节点，输出是一个mapping，连接到所有可能的输出节点，同时附带一个判断函数（输入是StateGraph，输出是Literal），根据全局状态变量的当前值判断流转到哪一个输出节点上，以充分发挥大语言模型的思考能力。
+    PS: 在langgraph 较新的版本支持 langgraph.types.Command之后，一个node1 跳转到另一个node2 在node1 内部就可以定义了。
 
 当我们使用这三个核心要素构建图之后，通过图对象的compile方法可以将图转换为一个 Runnable对象（Runnable也有Runnable.get_graph 转为Graph对象），之后就能使用与lcel完全相同的接口调用图对象。
 
@@ -542,6 +543,54 @@ langgraph 的灵感来自 Pregel 和 Apache Beam。暴露的接口借鉴了 Netw
 1. CompiledGraph 类没正经干什么活儿，主要将点、边加入到了nodes/channels里，核心是父类Pregel在干活儿。触发 CompiledGraph.astream 实质是触发 Pregel.astream/stream。stream的输出是当前step的state的值。
 2. node 的输入是state，输出是对state的更新。所以langgraph 才提供了prebuilt 将 其它工具转为兼容node的形式。
 3. Pregel.stream 核心工作是按DAG依次提交node/task并执行，拿到某个node 结果后，更新state值，执行下一个node/conditional_edge。此时Pregel 与一个DAGExecutor 没什么两样。
+
+### HITL/human in the loop
+
+[彻底说清 Human-in-the-Loop](https://mp.weixin.qq.com/s/29cwAE8py18lOmI63R5XxA)实现带有HITL的Agent系统的关键在哪里：流程中断与恢复，以及为了支持它所需要的状态持久化机制。简单说，就是需要一种机制，将流程“挂起”在特定节点（或步骤），等待人类参与和反馈，然后能从中断点恢复运行。这要求系统能够记录中断时的上下文，并确保恢复后状态一致。很显然，你不能使用sleep等待或轮询这种糟糕的阻塞式方案。而LangGraph给出的解决方案是Interrupt（中断）、Command Resume（命令恢复）、Checkpoint（检查点）三大机制。
+1. Interrupt（中断），即暂停LangGraph工作流的执行，同时返回一个中断数据对象。其中含有给人类的信息，比如需要审核的内容，或者恢复时需要的元数据。典型的处理如下：
+    ```python
+    from langgraph.types import interrupt, Command
+    ...
+    #这是一个Agent的某个人工参与的节点
+    def human_review_node(state: State):
+
+        # 暂停执行，输出需人工审核的数据
+        review_data = {"question": "请审核以下内容:", "output": state["llm_output"]}
+        decision = interrupt(review_data) 
+
+        # 恢复后将根据人工决策更新状态或跳转
+        if decision == "approve":
+            return Command(goto="approved_node")
+        else:
+            return Command(goto="rejected_node")
+    ...
+    ```
+2. Command Resume（恢复），要恢复工作流，需要获得人类反馈并注入工作流状态（State），然后发出继续执行的命令：使用 Command(resume=value) 来反馈并恢复。这个工作通常是调用Agent的客户端来完成，比如：
+    ```python
+    # 假设 thread_id 标识此次任务，再次调用invoke恢复运行即可
+    user_decision = "approve"  # 这里模拟用户最后的反馈，会变成之前Agent发起的interrupt调用的返回值
+    result = graph.invoke(Command(resume=user_decision), config={"configurable": {"thread_id": thread_id}})
+    ```
+3. Checkpoint（检查点），为了实现“断点续跑”，必须要实现Agent的状态持久化，用来在恢复时“重建现场”。这种机制也有利于Agent发生故障时的轨迹重放。这需要你首先创建一个检查点管理器：
+    ```python
+    # 初始化 PostgreSQL 检查点保存器
+    with PostgresSaver.from_conn_string("postgresql://postgres:yourpassword@localhost/postgres?sslmode=disable") as checkpointer:
+        checkpointer.setup()
+        graph = builder.compile(checkpointer=checkpointer)
+    ```
+
+原理解析与注意点
+1. Interrupt的本质是什么？为什么它可以中断？原因很简单，因为它就是丢出了一个异常（Exception），异常信息就是中断时送出的数据。所以在发起Interrupt调用时不要做自定义异常捕获，否则可能无法中断。
+2. **“断点续跑”只是从中断的node重新开始，并不是从Interrupt函数调用处开始！**所以不要在这个节点的Interrupt之前做改变状态（State）的动作！如果可能，尽量让人工节点只负责处理中断。
+3. 要有唯一的ID标识一次工作流运行过程。“断点续跑”依赖于首次Agent调用时的thread_id，所以如果需要处理HITL，就需要提供该信息。因为Checkpointer需要借助它做检查点，而恢复运行时则需要提供相同的thread_id来让Checkpointer找到对应的检查点。
+
+在理解了这几个注意点后，最后来总结与回顾整个处理过程，以一个本地SDK模式下直接调用Agent的客户端为例：
+1. 客户端调用invoke启动Agent工作流，指定thread_id和输入信息
+2. 工组流运行到人工节点的interrupt调用，发生中断，并携带了中断数据
+3. 中断发生。客户端收到Agent的返回状态，从中发现有中断，则提示用户
+4. 用户输入反馈后，调用invoke恢复工作流，指定thread_id和resume信息
+5. 再次进入人工节点，**此时由于有resume信息，interrupt函数不会触发中断，直接返回resume信息**；流程得以继续运行。至此，一次中断过程处理结束
+
 
 ## 其它
 

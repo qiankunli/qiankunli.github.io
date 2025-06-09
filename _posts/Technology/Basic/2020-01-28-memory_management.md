@@ -241,7 +241,7 @@ os、语言运行时等层面 对内存分配已经做了很多优化，但是�
 1. netty arena
 2. kafka BufferPool
 3. redis
-4. go hertz RequestContext 池
+4. go hertz RequestContext 池 [cloudwego/hertz 原理浅析](https://mp.weixin.qq.com/s/HxTDCcT79FZuDoMWXK-Fow)
 
 ## 其它
 
