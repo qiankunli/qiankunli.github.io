@@ -271,9 +271,29 @@ controller, service , dao通过 对于数据通道的操作来实现业务逻辑
 **如果我们尽量使用充血模型会得到什么好处呢？ 业务逻辑和依赖关系都可以传递了**，我们回头看看失血模型下我们的代码，是不是相当于当我们的合作伙伴要调用我们的时候，我们丢出去了一堆电子元器件并且和他说『自己去把线连起来』是不是多少有那么一点点不合理？在充血模型下我们的代码是由什么组成的呢？
 1. Entity，这里面写的是关于这个实体的业务逻辑和他的关联的对象，并且触发关联对象的业务逻辑，只要有业务逻辑优先是写在 entity 里面的
 2. ValueObject，业务实体 这是业务实体的另一种体现，和 entity 的区别就是有没有 id
-3. Repository，用来获取业务实体，或者是保存业务实体，首先声明这一定是一个接口，用来获取 entity, 和我们认知的 dao 有什么区别呢？DAO 返回的对象不一定是 entity, 但是 **repository 返回的对象一定是 entity**。同时因为是一个接口所以可以用来屏蔽到底是怎么取数据的（localcache, redis, mysql）。此外，repository 的接口会写在 entity 里面， 因为Entity 是不能依赖非 entity 包下的东西的，在充血模型下，实际上 repository 是一部分 entity 的，entity 禁止依赖 redis 禁止依赖一个 xxxclient。
+3. Repository，用来获取业务实体，或者是保存业务实体，首先声明这一定是一个接口，用来获取 entity, 和我们认知的 dao 有什么区别呢？DAO 返回的对象不一定是 entity, 但是 **repository 返回的对象一定是 entity**。同时因为是一个接口所以可以用来屏蔽到底是怎么取数据的（localcache, redis, mysql），**让领域层（领域对象）只处理业务逻辑**。此外，repository 的接口会写在 entity 里面， 因为Entity 是不能依赖非 entity 包下的东西的，在充血模型下，实际上 repository 是一部分 entity 的，entity 禁止依赖 redis 禁止依赖一个 xxxclient。
 	1. **domain层repository定义**：domain 层定义了存储接口 repository（interface），定义好与业务数据底层存储交互的抽象接口，而具体实现则由infrastructure层中提供对应dao实例。
 	2. infrastructure层依赖倒置原则：infrastructrue层逆向实现由上层定义的一系列通用能力的抽象接口，以此保证其实现细节不会侵入到上层模块，能够实现低成本替换。
+	3. [从 Repository 层入手，快速理解 DDD 设计](https://mp.weixin.qq.com/s/hEvXZVo7jOmVwuhJrz0LBg)DDD中的Repository的设计思路是，由Repository 层统一封装聚合数据的获取、转换、缓存与异常处理，再向领域层或应用层提供语义清晰的业务访问接口。一般干那些活儿：
+		1. 解耦数据访问与业务逻辑：Repository层封装了对数据表的访问逻辑，Service 层（领域层）不再直接处理 SQL 或 PO 对象；
+		2. 统一对象转换逻辑：实现数据库数据对象（PO）和领域实体对象（Enitty）之间的切换，保持领域对象的“纯净”；
+		3. 便于聚合查询和缓存封装：Repository 可统一实现跨表聚合查询、缓存访问、远程服务组合等。
+	4. 假设有一个业务需求：在用户中心页面，需要展示用户的基本信息（如用户名、邮箱）、默认收货地址、账户余额信息等。三者分别存储在不同的数据库表中（user、account、address）。在传统的Service层写法大概会是这样的：
+		```
+		public UserProfileDTO getUserProfile(Long userId) {
+			UserPO user = userMapper.selectById(userId);
+			AccountPO account = accountMapper.selectByUserId(userId);
+			AddressPO address = addressMapper.selectDefaultByUserId(userId);
+
+			// 拼装 UserProfileDTO 返回
+			......
+		}
+		```
+		这样做有几个缺点：
+		1. Service 层承担了数据获取与模型拼装逻辑，职责混乱；
+		2. 多个 Mapper 的调用和聚合逻辑不易复用；
+		3. 未来如果加入缓存（Redis）、降级、远程调用（ES）等机制，Service 会越来越臃肿；
+		4. 数据模型（PO）与业务模型耦合，难以维持统一的领域表达。
 4. Service，entity 处理不了的逻辑，比如说从 repository 请求实体，将错误转换等等的
 5. http/rpc handler，只能做简单的数据转换 & 触发，转换成service 能处理的内部指令，交给 entity 执行
 6. Eventbus/timer handler，只能做简单的数据转换 & 触发，转换成 service 能处理的内部指令交给 entity 执行
@@ -294,7 +314,7 @@ controller, service , dao通过 对于数据通道的操作来实现业务逻辑
 1. 先按照需求期间产品和产品讨论出来的 uml 图 一一建立好业务实体，要和 uml 图一模一样字段和行为。当发现没法实现的时候先去和相关人员讨论 uml 图上的哪个节点发生了变化
 2. 为业务实体写单测代码，这一步的 repository 是个接口，所以直接 mock 就行
 3. 完成 service ，通过对N聚合根的操作编排来组装业务逻辑
-4. 实现 repository 接口，怼到数据库/cache上就行
+4. 实现 repository 接口，怼到数据库/cache上就行。
 5. 实现 handler,怼个适配器就行
  我们是按照洋葱架构一步步由内向外写代码的，并且大部分情况通过内存对象就可以完成测试
 

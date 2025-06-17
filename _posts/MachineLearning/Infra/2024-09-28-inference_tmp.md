@@ -212,10 +212,12 @@ Mooncake 采用了以 KVCache 为中心的分离式推理架构，主要由三�
 2. Decoding 池：这个部分集中处理所有解码阶段的任务。
 3. KVCache 池：这个部分负责存储所有中间过程中应用到的 KVCache，并决定何时使用这些缓存，何时释放它们。
 
-prefill-decode 分离（PD 分离）架构主要是考虑到了 LLM 的 prefill 和 decode 的两个阶段的特性不同，prefill 阶段是 compute bound，decode 阶段是 memory bound，prefill 阶段的能力我们用 TTFT 首 token 时延来衡量，decode 的能力我们用 TPOT 生成每个 token 的时间来衡量。
+prefill-decode 分离（PD 分离）架构主要是考虑到了 LLM 的 prefill 和 decode 的两个阶段的特性不同，prefill 阶段是 compute bound（对于上下文的embeding和自注意力计算，是可以并行的），decode 阶段是 memory bound（需要结合上下文以及当前token之前生成的token对应的KV值进行计算，过程是串行的），prefill 阶段的能力我们用 TTFT 首 token 时延来衡量，decode 的能力我们用 TPOT 生成每个 token 的时间来衡量。
 1. 但是在同一张卡上做 prefill 和 decode 会出现问题，在机器的算力等条件固定的情况下，你增加 bsz，prefill 阶段机器到算力瓶颈了，反而影响 TTFT，你减小 bsz，decode 阶段又是访存瓶颈的，decode 阶段可以比 prefill 阶段承载更大的 bsz。那么问题来了，到底要不要增大 bsz？
 2. 有了 PD 分离之后，我们可以把 prefill 阶段放在 H800 这样的算力高的机器，decode 阶段放在 H20 这样算力低的机器但是访存能力不会差太多的机器（毕竟显卡更新换代过程中算力增长是遥遥领先访存能力增长的），这样我们的如何 bsz 如何均衡的问题似乎可以得到解决，不同机器只负责一个阶段，**bsz 也只需要根据你这个阶段的特性来设置就好了**。decode 阶段可以比 prefill 阶段承载更大的 bsz。
 3. 但是 PD 分离有个很重要的问题，增加了通信和网络传输的成本，如果是卡间分离那么会增加通信的成本，如果是不同机器上进行分离那么就会增加网络传输 KV Cache 的成本。
+
+DeepSeek V3采用的也是PD 分离部署方式（prefill-32张卡，decode-320张卡），由于集群分开增加的中间状态数据的传输，在NVLink这类传输技术的加持下，有开销但是可控。prefill和decode两个集群的GPU数量需要按照实际场景调整，大部分在1:2到1:4之间，具体看实际场景中TTFT和TPOT的表现和要求。
 
 Context Caching 
 

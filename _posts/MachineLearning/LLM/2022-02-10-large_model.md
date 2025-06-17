@@ -88,10 +88,10 @@ keywords: large model
 2. 模型大（DenseNet部分），比如NLP领域，GPT-3这样的模型高达1750亿参数，显存占用高达3.5TB，至少需要44块80GB显存的GPU才能塞下一个模型副本。而Bert-Large虽然只有3.4亿参数规模，但由于各种内存占用，在16G V100上，训练也仅能使用batch Size=8。 ==> 当面对GPT-3这种DenseNet部分大的模型，Allreduce 单卡内存无法容纳，我们需要采用模型并行(model parallelism)的方式将计算图划分到不同的设备上构建有向无环图(DAG)进行分布式训练，其中Gpipe, Megatron, Oneflow和Whale都提出模型并行的相关解决方案。相比于数据并行每个worker只有一部分数据，模型并行下每个node使用所有数据.
     1. Intra-layer parallelism(Tensor Parallelism) 。主要是将一层Layer中的矩阵计算分别拆分到不同的机器上进行运算，比如简单的$Y_1=W_1*X_1$这一次矩阵乘法中，我们将模型参数$W_1$或者输入数据$X_1$，按某个维度分别拆分到不同设备上计算，比如1D Megatron。
 
-        ![](/public/upload/machine/tensor_parallelism.jpg)
+        ![](/public/upload/machine/tensor_parallelism.png)
     2. Inter-layer parallelism（Pipeline Parallelism）。而Inter-Layer Parallism会将模型的layers拆分到不同的机器上，则一次forward就需要跨过不同的机器串行地进行运算，而流行并行通过将batch size切分为更小的mirco batch，减少数据依赖，从而将整个计算过程异步起来，最大化资源利用率。举例来说，在一个简单的三层MLP中（的$Y_i = W_i X_i$, i=1,2,3）会存在三次矩阵乘法 $W_i X_i$，流水线并行会把$W_i X_i$分别分配到三台机器上进行运算。
 
-    ![](/public/upload/machine/model_parallelism.jpg)
+        ![](/public/upload/machine/pipeline_parallelism.png)
 
 [以Transformer结构为基础的大模型参数量、计算量、中间激活以及KV cache剖析](https://mp.weixin.qq.com/s/3JYz6yrLeBr5ujip3LZe6w)
 
