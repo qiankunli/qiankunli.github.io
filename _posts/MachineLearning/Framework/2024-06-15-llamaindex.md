@@ -236,7 +236,7 @@ chat 方法由一个while true 循环组成，循环内执行 _run_step， Agent
 
 ## workflow
 
-LlamaIndex Workflows是LlamaIndex近期推出的用来**替代之前Query Pipeline（查询管道）**的新特性。与LangGraph不同的是，其没有采用类似LangCraph基于图结构的流程编排模式，而是采用了一种事件驱动的工作流编排方式：工作流中的每个环节被作为step（步骤，代表一个处理动作），每个step可以选择接收（类似订阅）一种或多种event（事件）做处理，并同样可以发送一种或多种event给其他step。通过这种方式，把多个step自然的连接起来形成完整的Workflow。在这种架构中，**工作流的运行不是由框架来根据预先的定义（比如Graph）来调度任务组件执行，而是由组件自身决定**：你想接收什么event，做什么处理，并发出什么event。如果组件B接受了A发出的某种event，那么B就会在A发出event后触发执行。
+LlamaIndex Workflows是LlamaIndex近期推出的用来**替代之前Query Pipeline（查询管道）**的新特性。与LangGraph不同的是，其没有采用类似LangCraph基于图结构的流程编排模式（它没有显式地定义「边」的概念），而是采用了一种事件驱动的工作流编排方式：工作流中的每个环节被作为step（步骤，代表一个处理动作），每个step可以选择接收（类似订阅）一种或多种event（事件）做处理，并同样可以发送一种或多种event给其他step。通过这种方式，把多个step自然的连接起来形成完整的Workflow。在这种架构中，**工作流的运行不是由框架来根据预先的定义（比如Graph）来调度任务组件执行，而是由组件自身决定**：你想接收什么event，做什么处理，并发出什么event。如果组件B接受了A发出的某种event，那么B就会在A发出event后触发执行。
 
 ![](/public/upload/machine/llamaindex_workflow.jpg)
 
@@ -246,6 +246,7 @@ LlamaIndex Workflows是LlamaIndex近期推出的用来**替代之前Query Pipeli
     1. 将条件路由逻辑保留在step中而不是langgraph.conditional_edge中
 3. Event（事件）事件是一个步骤的输入输出，也是工作流各个步骤之间的数据载体。当事件发生时，“订阅”该事件的步骤就会执行，同时从事件中取出必要数据。事件是一个Pydantic类型对象，可以自由定义结构。注意两个特殊事件：StartEvent与StopEvent是两个系统事件，代表工作流开始与结束。StartEvent由框架派发，代表工作流的开始。StopEvent由框架接收，发送StopEvent的步骤代表没有后续步骤。
 4. Context（上下文），Context是一个用来在整个工作流内自动流转的上下文状态对象，放入Context中的数据可以被所有步骤接收和读取到，可以理解为全局变量。
+    1. LangGraph使用全局状态在节点之间共享数据；而LlamaIndex一方面使用event在step之间传递数据，一方面也支持通过全局状态来共享数据（以Context的形式）。
 PS：一个workflow 引擎，两个关键字是workflow/step(task)，三个关键字是workflow/step/context（全局的和step间的信息传递）。四个关键词就再带一个驱动机制：顺序驱动（按序执行，就没法循环了）、图驱动、事件驱动。
 
 ```python
@@ -286,6 +287,18 @@ async for chunk in result.async_response_gen():
 ```
 
 [深入解析LlamaIndex Workflows【下篇】：实现ReAct模式AI智能体的新方法](https://mp.weixin.qq.com/s/QTYlW3K5x5_b501Mcx_8bA) 未细读
+
+### 并发
+
+[开发AI Agent到底用什么框架——LangGraph VS. LlamaIndex](https://mp.weixin.qq.com/s/fdVnkJOGkaXsxkMC1pSiCw)LangGraph和LlamaIndex的Workflow，都天然支持**并发**。因为它们都是异步驱动的，在每一个step或superstep执行期间，具备执行条件的多个节点天然是并发执行的。而在多个节点并发执行结束后，同步 (sync) 等待执行结果的操作，LangGraph和LlamaIndex的Workflow采取了完全不同的方案。
+1. 在LangGraph中需要通过如下形式的调用，来指定框架内部的waiting_edge：`graph_builder.add_edge(["node2","node3"],"node4")`
+2. 而在LlamaIndex的Workflow中，则需要使用Context来指明同时等待多个事件（Context同时承载了太多的逻辑）。代码示例如下：`data = ctx.collect_events(ev,[QueryEvent,RetrieveEvent])`
+
+### 对streaming的支持
+
+LangGraph和LlamaIndex的Workflow，都允许通过 asyncfor的方式来深入到执行过程中去，这个能力被称为「streaming」。有一些常见的功能，比如汇报执行进度，就可以通过这种方式来实现。
+
+在LangGraph中，可以通过async for逐步遍历各个superstep；而在LlamaIndex的Workflow中，则可以通过async for遍历各个事件。对streaming的支持，本质上是对于执行过程按照时间线性分步执行的一种追踪方式。这种在时间维度展开的线性遍历，在LangGraph中体现为superstep；在LlamaIndex的Workflow中则体现为每一步的驱动事件（称为streaming events）。
 
 ### 原理
 

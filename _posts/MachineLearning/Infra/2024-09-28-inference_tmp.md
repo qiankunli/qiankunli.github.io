@@ -26,6 +26,29 @@ keywords: llm vLLM
 
 ## 简介
 
+[AI Infra 和传统 Infra 断代了吗？](https://zhuanlan.zhihu.com/p/1916694074750132757)从表面看起来，AI Infra 确实和传统 Infra 很不一样
+1. 传统 Infra 处理的是 web request，数据存储，和分布式服务协调，而 AI Infra（特别是大模型）更多围绕的是 GPU 推理，KV Cache 管理，以及大模型训练框架等全新领域。
+2. 请求形态也不一样：web request通常是毫秒级的request，stateless，而 LLM 推理一个 session 往往持续数秒甚至更久(随着context window 和模型大小增加），还要动态维护 token-level 的上下文状态。
+3. tech stack 看起来也不同：传统用的是 Kubernetes + Docker，现在大家在用 GPU, vLLM, DeepSpeed, FlashAttention, Triton, NCCL 这些仅仅从名字上听起来就很高大上的架构。
+本质其实没变，仍然是系统设计和资源调度的问题。回到工程本身，其实我们仍然在面对和传统 Infra 极其类似的问题：
+1. 如何调度资源（从CPU/内存 变成了 GPU 显存）
+2. 如何处理高并发请求（从http resource request ，变成了 prompt request）
+拿 vLLM 举个例子：它像是给 LLM 写了一个操作系统，用来调度“页面”（KV Cache），管理“进程”（requests), 本质上是引用了OS 的内存管理principles用来管理 kv cache。
+
+Infra 的“三大难题”：Scaling, Sharding, and Copying所有系统的底层挑战，基本都绕不开这三个关键词：
+1. Scaling（扩展）：系统如何支持更大的规模和更高的并发？
+    1. 在传统 Infra 中，这意味着如何横向扩展服务器，部署更多容器，使用负载均衡 (load balancing) 来分散请求
+    2. 在 AI Infra 中，这些问题转化为如何通过 数据并行， 模型并行，流水线并行 来分布和执行 GPU workload，以支持超大模型的训练以及 large number of inference requests
+2. Sharding（切片）：系统如何切分状态和计算，以实现并行处理？
+    1. 在数据库系统中，这是将数据按照主键或范围切分到不同的分区，以支持高吞吐访问
+    2. 在 AI Infra 中，sharding 变成了对模型参数，KV Cache，activation，gradients，以及optimizer states的split，比如tensor parallelism和KV paging等，是实现分布式推理和训练的前提
+3. Copying（复制）：系统如何高效同步数据或状态？
+    1. 传统系统中，复制体现在数据库副本同步或者缓存预热，以及Kafka Replication
+    2. 在 AI Infra 中，复制的代价更加显著，比如data parallelism 怎么copy model to different GPUs（所以会有ZeRO optimization 来shard 参数，gradient 等等），**通常需要依赖高性能通信机制（比如 RDMA和NCCL）**
+这些挑战的本质没有变：仍然是如何高效并且低成本地协调跨不同机器的资源。但在 AI Infra 中，由于gpu显存limited，large context window，以及模型参数量大，它们变得更加脆弱和重要，也更需要更好的工程策略去解决这些问题。
+
+真正有经验的 Infra 工程师，不仅仅是能搭件一个working的系统，而是有能力去从头到尾追踪每一个延迟点，把系统之间的关联和可能存在的bottleneck拆解成一系列可量化的问题，并在上线后持续做 cost/performance profiling。这正是 AI Infra （或者传统 Infra）对工程基本功要求极高的原因。
+
 ## 基础
 
 ### 模型的计算过程

@@ -92,6 +92,8 @@ ReAct是 Shunyu Yao 等人在 ICLR 2023 会议论文《ReAct: Synergizing Reason
 
 ## 框架
 
+[开发AI Agent到底用什么框架——LangGraph VS. LlamaIndex](https://mp.weixin.qq.com/s/fdVnkJOGkaXsxkMC1pSiCw)为什么LangGraph和LlamaIndex都基本上能做到用一个统一的底层编排系统来支持各种自主程度不同的Agentic System？（workflow和agent）不同程度的自主性，本质意味着什么？**这个本质在于系统编排的执行路径是在何时决策的**。静态编排的执行路径是完全提前确定好的，不具有太多自主性。自主性必然要求某种程度的动态编排特性才能支持。LangGraph和LlamaIndex的编排系统都有一个重要特性：能够在执行过程中动态地改变节点偏序关系。在LangGraph中，这是通过节点在superstep末尾发送动态消息做到的，而在LlamaIndex中则是通过每个step节点动态地发送事件做到的。换句话说，它们都具有动态编排的特性。对比一下，类似Dify那样，在程序执行之前就可视化地编排出整个Workflow的系统，对于自主系统的支持则是非常有限的。当深入到这个抽象层次上来看，LangGraph和LlamaIndex的编排系统，虽然它们暴露的编程接口、实现的完备程度、对于概念的抽象都完全不同，但最最底层的逻辑又是殊途同归的。
+
 ### langchain使用
 
 在chain中，操作序列是硬编码的。智能体通过将LLM与动作列表结合，自动选择最佳动作序列，从而实现自动化决策和行动。Agent在LangChain框架中负责决策制定以及工具组的串联，可以根据用户的输入决定调用哪个工具。通过精心制定的提示，我们能够赋予代理特定的身份、专业知识、行为方式和目标。提示策略为 Agent 提供了预设模板，结合关键的指示、情境和参数来得到 Agent 所需的响应。具体的说，Agent就是将大模型进行封装来简化用户使用，根据用户的输入，理解用户的相应意图，通过action字段选用对应的Tool，并将action_input作为Tool的入参，来处理用户的请求。当我们不清楚用户意图的时候，由Agent来决定使用哪些工具实现用户的需求。
@@ -465,6 +467,8 @@ BFCL 评测评估模型 Agent 能力。PS：llm 作为agent 使用时，选择�
 ### 模型AgentTuning
 
 [AgentLM：能打的 Agent 模型来了！](https://mp.weixin.qq.com/s/CMyY39qbbMNPww610dWlkA)开源模型并非没有完成智能体任务的能力，可能只是在智能体任务上缺乏对齐。对于 Agent 能力提升的策略，现有许多工作多使用 Prompt / 微调方法优化模型，在单项智能体任务上取得了卓越的表现，但智能体任务之间的促进及泛化效果有待进一步探索。智谱AI&清华KEG提出了一种对齐 Agent 能力的微调方法 AgentTuning，该方法使用少量数据微调已有模型，显著激发了模型的 Agent能力，同时可以保持模型原有的通用能力。AgentTuning 主要包括 2 个阶段。首先，我们收集并过滤得到一个多任务指令微调数据集 AgentInstrcut；然后，我们将 AgentInstruct 数据集与通用数据对模型进行混合微调。评估结果表明，AgentTuning 能让 LLM 的 Agent 能力在未见过的 Agent 任务中展现出强大的泛化，同时保持良好的通用语言能力。AgentInstruct 是一个经过筛选的智能体任务数据集。其包含 6 项智能体任务，从 Shell 交互到数据库操作，平均回合数从 5 到 35 不等，**每条轨迹都有 ReAct 形式的 CoT 标注，帮助模型深入理解决策过程**。PS： 大家发现Agent/react 有用，就微调LLM强化这方面的能力。
+
+[大模型Agent RL训练多轮planning技术](https://mp.weixin.qq.com/s/tRkeTwaNNEXl7tgq2qyEjw)DeepSeek R1带火基于GRPO的强化学习技术后，agentic tool use learning也开始用上了GRPO，Reinforce++， PPO, policy gradient等各种算法了（以前是SFT+DPO，需要大量的标注数据来cover bad case，当时标注高质量数据都把我标哭了），想**让大模型学会使用code interpreter， web search等工具**来增强现有模型的数学和推理能力， 单轮就是调用一次tool，多轮就是调用多次tools， 多轮tool use更难一点，主要是数据难以获取和建模方式（MDP这种只考虑当前状态的训练模式，还是使用full history，考虑所有的状态的模式）不清晰，**tool-use rl**也算是一个新的研究方向了，潜力还有待挖掘。最近的工作还是集中设计这个multi turn tool-use的prompt template，以及训练的时候需要设计rule based reward(correctness reward, format reward, tool execcution rewad等)， 训练的tool output的mask操作，sampling的时候加入异步并行，融入megatron的pipeline parallel，加入多模态信息等等，训练的范式基本是先收集一波expert trajectory做sft，然后使用rl训练（例如ReTool），或者直接应用RL（例如TORL，ToolRL，OTC等），目前还没有出现一个真正为agent rl设计的方法，都是复用现有的基建（比如verl， open-rlhf, trl, ms-swift），做了一些拓展。最近在tool-use的基础上还出现了一个**tool integrated reasoning**, 跟cot的区别就是在推理的过程中会使用工具，这样推理过程动态的添加了search，code，各种定制化的API的输入，推理能力得到了进一步的增强。
 
 ### 工程调优
 

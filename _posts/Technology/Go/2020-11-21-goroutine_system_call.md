@@ -17,7 +17,7 @@ Please remember that at the end of the day, all programs that work on UNIX machi
 
 当M一旦进入系统调用后，会脱离go runtime的控制。试想万一系统调用阻塞了呢，此时又无法进行抢占，是不是整个M也就罢工了。所以为了维持整个调度体系的高效运转，必然要在进入系统调用之前要做点什么以防患未然。
 1. 异步系统调用 G 会和MP分离（G挂到netpoller）
-2. 同步系统调用 MG 会和P分离（P另寻M），当M从系统调用返回时，不会继续执行，而是将G放到run queue。
+2. 同步系统调用 MG 会和P分离（P另寻M）。**在执行期间会导致整个 m 暂时不可用**，将发起 syscall 的 g 和 m 绑定，但是解除 p 与 m 的绑定关系，使得此期间 p 存在和其他 m 结合的机会。
 
 生动的说明了GPM相对GM的精妙之处。
 
@@ -98,7 +98,7 @@ G1将进行同步系统调用以阻塞M1
 
 ![](/public/upload/go/go_scheduler_sync_systemcall_1.png)
 
-调度器介入后：识别出G1已导致M1阻塞，此时，调度器将M1与P分离（**正因为M 和P 可能分离，所以mcache 挂在P上**），同时也将G1带走。然后调度器引入新的M2来服务P。
+调度器介入后：识别出G1已导致M1阻塞，此时，调度器将M1与P分离（**正因为M 和P 可能分离，所以mcache 挂在P上**），同时也将G1带走。然后调度器引入新的M2来服务P。PS：将 p 设置为 m.oldp，保留 p 与 m 之间的弱联系（使得 m syscall 结束后，还有一次尝试复用 p 的机会）
 
 ![](/public/upload/go/go_scheduler_sync_systemcall_2.png)
 
@@ -106,7 +106,7 @@ G1将进行同步系统调用以阻塞M1
 
 ![](/public/upload/go/go_scheduler_sync_systemcall_3.png)
 
-梳理：如果 G 被阻塞在某个系统调用（system call）上，那么不光 G 会阻塞，执行这个 G 的 M 也会解绑 P，与 G 一起进入挂起状态。如果此时有空闲的 M，那么 P 就会和它绑定，并继续执行其他 G；如果没有空闲的 M，但仍然有其他 G 要去执行，那么 Go 运行时就会创建一个新 M（线程）。当系统调用返回后，阻塞在这个系统调用上的 G 会尝试获取一个可用的 P，如果没有可用的 P，那么 G 会被标记为 runnable，之前的那个挂起的 M 将再次进入挂起状态。
+梳理：如果 G 被阻塞在某个系统调用（system call）上，那么不光 G 会阻塞，执行这个 G 的 M 也会解绑 P，与 G 一起进入挂起状态。如果此时有空闲的 M，那么 P 就会和它绑定，并继续执行其他 G；如果没有空闲的 M，但仍然有其他 G 要去执行，那么 Go 运行时就会创建一个新 M（线程）。当系统调用返回后，阻塞在这个系统调用上的 G 会尝试获取一个可用的 P，如果没有可用的 P，那么 G 会被标记为 runnable（添加到 grq ），之前的那个挂起的 M 将再次进入挂起状态。
 
 ## sysmon 协程
 

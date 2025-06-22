@@ -23,6 +23,7 @@ data race
 	2. 单个变量多写多读 -> sync.Mutex
 	3. 多个变量多写多读 -> sync.Mutex
 
+PS：在 golang 中的并发工具（例如锁 mutex、通道 channel 等）均契合 gmp 作了适配改造，保证在执行阻塞操作时，**会将阻塞粒度限制在 g（goroutine）而非 m（thread）的粒度**，使得阻塞与唤醒操作都属于用户态行为，无需内核的介入，同时一个 g 的阻塞也完全不会影响 m 下其他 g 的运行。
 
 ## 原子操作
 

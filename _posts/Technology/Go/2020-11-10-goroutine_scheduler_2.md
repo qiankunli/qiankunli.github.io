@@ -400,9 +400,10 @@ GMP模型结合了协同式调度与抢占式调度的特点，其中主动调�
 
 ### 协作式的抢占
 
-在 Go1.13 之前，它是协作式的。当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中（Go 编译器在每个函数或方法的入口处加上了一段额外的代码 runtime.morestack_noctxt），**当 G 进行函数调用时**，G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。
 
-但有个漏洞
+对于运行中的 g，在栈空间不足时，会切换至 g0 调用 newstack 方法执行栈空间扩张操作，在该流程中预留了一个检查桩点，当其中发现 g 已经被打上抢占标记时，就会主动配合执行让渡操作（gopreempt_m）。这种通过**预留检查点**，由 g 主动配合抢占意图完成让渡操作的流程被称作协作式抢占，其存在的局限就在于，当 g 未发生栈扩张行为时，则没有触碰到检查点的机会，也就无法响应抢占意图。
+
+当 sysmon 发现 M 已运行同一个 G（Goroutine）10ms 以上时，它会将该 G 的内部参数 preempt 设置为 true。然后，在函数序言中（Go 编译器在每个函数或方法的入口处加上了一段额外的代码 runtime.morestack_noctxt），**当 G 进行函数调用时**，G 会检查自己的 preempt 标志，如果它为 true，则它将自己与 M 分离并推入“全局队列”。但有个漏洞
 
 ```go
 func main() {
@@ -416,10 +417,10 @@ func main() {
 ### 基于信号的异步抢占机制
 
 Go1.14 引入抢占式调度
-1. M 启动时会注册信号处理函数：sighandler。
+1. 在 go 程序启动时，main thread 会完成对各类信号量的监听注册，其中也包含了抢占信号 sigPreempt和处理函数sighandler。
 1. sysmon 会检测到运行了 10ms 以上的 G（goroutine）。调用preemptone，向正在运行的 goroutine 所绑定的的那个 M（也可以说是线程）发出 SIGURG 信号。
-3. G所在的M，runtime.sighandler函数就是负责处理接收到的信号的。如果收到的信号是sigPreempt，就调用doSigPreempt函数。通过pushCall向G的执行上下文中注入一个函数调用runtime.asyncPreempt（骚操作，粗略看做向当前G的PC 地址后插入CALL 指令）
-4. 当前 goroutine 执行 asyncPreempt 函数，通过 mcall 切到 g0 栈执行 gopreempt_m。最终会调用schedule函数。PS：拿到go struct 对象就可以拿到对应的stack、gobuf结构，**改变pc、sp 等值，就可以给 goroutine 强塞一个代码里没写的函数执行**。 
+3. G所在的M，runtime.sighandler函数就是负责处理接收到的信号的。如果收到的信号是sigPreempt，就调用doSigPreempt函数。通过pushCall向G的执行上下文中注入一个函数调用runtime.asyncPreempt（骚操作，粗略看做向当前G的PC 地址后插入CALL 指令）。PS：搞不定g，就喊g的家长m，给m交派活儿来逼停g。**（软）中断、信号可以“叫停”/改变cpu的运行轨迹**。
+4. 由于 pc 被修改了，所以抢占的目标 g 随后会执行 asyncPreempt 函数，通过 mcall 切到 g0 栈执行 gopreempt_m。最终会调用schedule函数。PS：拿到go struct 对象就可以拿到对应的stack、gobuf结构，**改变pc、sp 等值，就可以给 goroutine 强塞一个代码里没写的函数执行**。 
 5. 被抢占的 goroutine 再次调度过来执行时，会继续原来的执行流。
 
 这个抢占机制也让垃圾回收器受益，可以用更高效的方式终止所有的协程。诚然，STW 现在非常容易，Go 仅需要向所有运行的线程发出一个信号就可以了。PS： linux 多了时间片硬件中断，中断是指令完毕时，进而执行中断处理程序，os重新拿到cpu使用权（继而执行Schedule），golang 用信号机制 接近模拟了这个过程，其实还是用 了linux 机制才能拦住执行流。

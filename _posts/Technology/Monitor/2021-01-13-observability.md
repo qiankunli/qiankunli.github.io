@@ -47,13 +47,6 @@ keywords: observability
     7. SpanContext 包含自身的 Span ID、Trace ID
 所处行业不同，对可观测体系的需求也会有较大差异。比如说，电商行业可能对链路和日志监控的联动要求很高，但物联网系统可能很多不需要链路监控。
 
-[透彻理解OpenTelemetry](https://mp.weixin.qq.com/s/-BRlyuMczl01P6uVh5h9Ng) 未读
-
-[OPLG：新一代云原生可观测最佳实践](https://mp.weixin.qq.com/s/Bf6nmOymcG9bk91VxLL_Kw) 未细读
-
-[使用 OpenTelemetry Tracing 最大化 Kubernetes 效率](https://mp.weixin.qq.com/s/ieBQx0z1ZofKkgHvYOq_aQ) 未读
-
-[如何利用 OpenTelemetry 监控和优化 Kubernetes 的性能](https://mp.weixin.qq.com/s/zA5NZhDOPFDzzuAAnsI_pA) 未读
 
 ## 监控报警内在原因
 

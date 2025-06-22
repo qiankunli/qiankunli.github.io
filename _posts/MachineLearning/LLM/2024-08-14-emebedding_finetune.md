@@ -41,7 +41,7 @@ Foundation Model有两个代表，一个是Large Language Model，另一个是Em
 [词嵌入的新时代](https://cloud.tencent.com/developer/article/2058413)为了让机器可以学习到文本的特征属性，我们需要一些将文本数值化的表示的方式。
 1. Word2vec算法通过使用一组固定维度的向量来表示单词，计算其方式可以捕获到单词的语义及单词与单词之间的关系。使用Word2vec的向量化表示方式可以用于判断单词是否相似，对立，或者说判断“男人‘与’女人”的关系就如同“国王”与“王后”。（这些话是不是听腻了〜 emmm水文必备）。另外还能捕获到一些语法的关系，这个在英语中很实用。例如“had”与“has”的关系如同“was”与“is”的关系。
 2. 上面介绍的词嵌入方式有一个很明显的问题，因为使用预训练好的词向量模型，那么无论上下文的语境关系如何，每个单词都只有一个唯一的且已经固定保存的向量化形式。这和中文的同音字其实也类似，用这个举一个例子吧， ‘长’ 这个字，在 ‘长度’ 这个词中表示度量，在 ‘长高’ 这个词中表示增加。那么为什么我们不通过”长’周围是度或者是高来判断它的读音或者它的语义呢？这个问题就派生出语境化的词嵌入模型。EMLo改变Word2vec类的将单词固定为指定长度的向量的处理方式，它是在为每个单词分配词向量之前先查看整个句子，然后使用bi-LSTM来训练它对应的词向量。
-3. Transformer论文和代码的发布，以及其在机器翻译等任务上取得的优异成果，让一些研究人员认为它是LSTM的替代品，事实上却是Transformer比LSTM更好的处理long-term dependancies（长程依赖）问题。从LSTM到Transformer的过渡中，我们发现少了些东西。ELMo的语言模型是双向的，但是OpenAI的transformer是前向训练的语言模型。我们能否让我们的Transformer模型也具有Bi-Lstm的特性呢？Bert =  transformer encoder + 双向 + Masked learning。 bert base 有12层encoder，最后一层的第一个输出向量（对应[cls]）可以作为整个输入的向量表示。PS：其实其它层输出向量、最后一层的非第一个输出向量 单个、或几个contact一下也都可以作为输入的表示
+3. Transformer论文和代码的发布，以及其在机器翻译等任务上取得的优异成果，让一些研究人员认为它是LSTM的替代品，事实上却是Transformer比LSTM更好的处理long-term dependancies（长程依赖）问题。从LSTM到Transformer的过渡中，我们发现少了些东西。ELMo的语言模型是双向的，但是OpenAI的transformer是前向训练的语言模型。我们能否让我们的Transformer模型也具有Bi-Lstm的特性呢？Bert =  transformer encoder + 双向 + Masked learning。 bert base 有12层encoder，**最后一层的第一个输出向量（对应`[cls]`）可以作为整个输入的向量表示**。PS：其实其它层输出向量、最后一层的非第一个输出向量 单个、或几个contact一下也都可以作为输入的表示
     ![](/![](/public/upload/machine/bert_output.jpg))
 
 

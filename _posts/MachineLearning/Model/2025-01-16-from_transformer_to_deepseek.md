@@ -73,7 +73,7 @@ PS：训练不稳定、负载不均衡
 
 边际创新
 1. 无辅助损失的负载均衡策略（Auxiliary-loss-free Load Balancing Strategy）
-2. 多头潜在注意力架构（Multi-head Latent Attention, MLA）
+2. 多头潜在注意力架构（Multi-head Latent Attention, MLA），减少了注意力部分的 KV 缓存. Low rank。
 3. DeepSeekMoE架构
 4. FP8混合精度训练框架
 5. 跨节点混合专家（MoE）训练的通信与计算重叠
