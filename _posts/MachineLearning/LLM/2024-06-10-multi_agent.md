@@ -15,11 +15,11 @@ keywords: langchain langgraph lcel
 
 PS：与其说是多agent 不如说是多模型协同，每个模型擅长的不同。agent之间部分记忆不共享（也事太多了），总要有一个管控agent，会有控制权转移的过程。解决复杂问题业界普遍还是在 agent model、workflow、multi-agent 打转转。
 
-为什么需要多智能体系统？会有两个截然不同的观点。
-1. 正方：模型越强大，所有 AI Agent 都有可能被“模型即产品”所替代，不需要多智能体系统。
-2. 反方：模型再智能，也无法主动甄别所有环境感知（Context），每个细分领域的 Agent，调研类 Agent、Coding Agent、表格 Agent，都需要花大量的时间，少则半年多则一年，去设计环境感知（Context），减少模型幻觉，Agent 会像互联网 APP 那样百家齐放，而不是一家独大。
+在处理复杂问题时，就应该用更多的 Token 换取更好的效果这样的「力大砖飞」策略。为什么需要多智能体系统？会有两个截然不同的观点。
+1. 反方：模型越强大，所有 AI Agent 都有可能被“模型即产品”所替代，不需要多智能体系统。
+2. 正方：模型再智能，也无法主动甄别所有环境感知（Context），每个细分领域的 Agent，调研类 Agent、Coding Agent、表格 Agent，都需要花大量的时间，少则半年多则一年，去设计环境感知（Context），减少模型幻觉，Agent 会像互联网 APP 那样百家齐放，而不是一家独大。
 
-这个需要时间来证明。单只从技术视角看，多智能体系统是必要的。
+这个需要时间来证明。单只从技术视角看，支持多智能体能力不失为一种稳健的选择。这样既保留了面向生态和未来的扩展性，也不妨碍我们专注于优化单智能体的能力。
 
 ##  Single-Agent  面临的困境 
 
@@ -87,6 +87,18 @@ OpenAI 是以 AGI（Artificial General Intelligence） 为愿景的公司，现�
 
 ### 反对声音——上下文工程（Context Engineering）
 
+[从Prompt Engineering到Context Engineering](https://mp.weixin.qq.com/s/nyD5Vc59FYO_ZUD8fSquJw)**跟AI开发相关的大部分工作，都是围绕着如何把上下文窗口填充正确来进行的**。随着LLM性能的进步，人们不再需要为了想出一个像咒语一样的prompt而绞尽脑汁了。但是，随着agent系统的动态性、复杂性逐步增加，保持每一次都能把context组装正确和完整，已经不是一件简单的事情了。这就需要Context Engineering这样一个专业的词汇来指代一整套系统化的方案。Context Engineering包含了所有对组装正确的上下文起到关键作用的技术组件。为了从大量文档内容中选出跟当前任务更相关的数据，就需要retrieve技术（RAG）；为了向模型传达长期记忆和短期记忆，就需要memory工程；为了更好地决策未来，就需要把当前状态以及历史信息传达给模型；另外，还需要一系列的错误处理、恢复、以及guardrails机制。所有这些，都属于Context Engineering的范畴。至少包括：
+1. 静态的prompt及instruction。
+2. RAG返回的片段。
+3. web搜索返回的页面内容。
+4. 对于工具候选集合的描述。
+5. 工具调用的历史结果。
+6. 长期记忆及短期记忆。
+7. 程序运行的其他历史轨迹信息。
+8. 出错信息。
+9. 系统执行过程中通过human-in-the-loop获取到的用户反馈。
+Context Engineering并不是某一种具体的技术，而更像是一种思想或观念。它也暗含了AI技术圈（尤其是深入一线的工程师们）对于未来技术趋势的一种判断。**AI应用开发在本质上可以看成是，从海量信息中找到恰当的有效信息，最终适配到LLM的上下文窗口上。为了让这个漏斗工作得更高效，你需要检索、过滤、排序**。你需要一套完整的Context Engineering工程架构。
+
 [别再构建多智能体了](https://mp.weixin.qq.com/s/IPaUMtZDS8ws3FpihfKZnw)来自全球首位AI程序员Devin，热门AI应用DeepWiki的开发团队，Cognition AI认为在2025年的技术水平下，追求让多个AI智能体并行协作的架构，是一种脆弱且极易失败的歧途。为什么？关键在于“上下文灾难”：
 1. 信息孤岛： 并行工作的子智能体无法看到彼此的进展和决策，就像蒙着眼睛的工匠，最终做出的“零件”风格迥异、无法组装。
 2. 决策冲突： 智能体的每一个行动都包含着“隐性决策”。当多个智能体独立决策时，这些决策极有可能相互冲突，导致整个项目走向混乱。
@@ -101,6 +113,17 @@ HTML于1993年问世。2013年，Facebook向世界发布了React。如今已是2
 3. 最后（一个总结智能体）将结果合并
 这是一个诱人的架构，特别是当你的任务领域包含多个并行组件时。然而，它非常脆弱。关键的失败点在于：假设你的任务是“构建一个Flappy Bird的克隆版”。它被分解为子任务1“构建一个带有绿色管道和碰撞区的移动游戏背景”和子任务2“构建一个可以上下移动的小鸟”。结果，子智能体1实际上误解了你的子任务，开始构建一个看起来像《超级马里奥》的背景。子智能体2为你构建了一只鸟，但它看起来不像游戏素材，其移动方式也与Flappy Bird中的完全不同。现在，最终的智能体只能面对一个棘手的任务：将这两个沟通失误的产物组合起来。
 
+[从Prompt Engineering到Context Engineering](https://mp.weixin.qq.com/s/nyD5Vc59FYO_ZUD8fSquJw)具备高度自主性的Agent，一般来说是由agent loop驱动的运行模式。在每一个循环迭代中，它借助LLM动态决策，自动调用适当的工具，存取恰当的记忆，向着任务目标不断前进，最终完成原始任务。然而，这种agent loop的运行模式，直接拿到企业生产环境中却很难长时间稳定运行。这种所谓的「tool calling loop」在连续运行10~20轮次之后一般就会进入非常混乱的状态，导致LLM再也无法从中恢复。Dex Horthy质疑道，即使你通过努力调试让你的Agent在90%的情况下都运行正确，这还是远远达不到“足以交付给客户使用”的标准。想象一下，应用程序在10%的情况下会崩溃掉，没有人能够接受这个。可以说，**Agent无法长时间稳定运行的原因，大部分都能归结到系统送给LLM的上下文 (Context) 不够准确**。
+1. 所以说，Context Engineering产生的第一个背景就是，AI技术落地已经进入了一个非常专业化的时代。这就好比，对于流行歌曲，很多人都能哼上两句。你不管是自娱自乐，还是朋友聚会唱K，这当然没问题。但是，如果你真的要去参加“中国好声音”并拿个名次回来，那就不是一回事了。类似地，Context Engineering这一概念的提出，对于Agent开发的交付质量提升到了专业工程学的高度，它要求你的系统要尽最大可能确保LLM上下文准确无误。
+2. Context Engineering产生的第二个背景，来源于LLM的技术本质，它具有天然的不确定性。LLM的底层运行原理，基于概率统计的 predictnexttoken。概率是充满不确定性的，模型本身的行为就不能被精确控制。在模型训练完成之后的生产运行环境中，**你只能通过精细地调整Context来「间接地」引导它的行为**。在很多现实场景中，都采取了较为保守的做法，在现有的业务流程代码中，穿插着调用一两次LLM，对于这种简单的情形，只要在调用的局部把LLM所需的prompt提前设计好、调试好，系统就可以上生产环境了。但是，在更复杂、更高自主性的Agent系统中，对于prompt的管理就没有这么简单了。资深的AI从业者Nate Jones把Context Engineering大体分成两部分。
+    1. 第一部分 (the smaller part)，称为deterministic context。这部分指的是我们直接发送给LLM的上下文，包括指令、规则、上传的文档等等，总之它们是可以确定性地进行控制的 (deterministically control）。
+    2. 第二部分 (the larger part) ，称为probabilistic context。这部分指的是，当LLM需要访问web以及外部工具的时候，会不可避免地将大量不确定的信息引入到LLM的上下文窗口。典型地，Deep Research就是属于这一类的技术。在这种情况下，我们能直接控制的上下文内容，只占整个上下文窗口的很小一部分（相反，来自web搜索和工具返回的内容，占据了上下文窗口的大部分）。因此，针对probabilistic context这一部分的上下文，你就很难像针对deterministic context那样，对prompt进行精细地微控制 (micro control) 。
+    总之，LLM本身的不确定性，加上访问web和外部工具带来的context的不确定性，与企业对于系统稳定运行的要求存在天然的矛盾。这样的难题解决起来，就需要更多、更系统的工程智慧。这成为Context Engineering产生的第二个背景。
+3. 至于Agent执行会失败的具体技术原因，更进一步拆解的话，可以归结为两个方面：
+    1. 第一，模型本身不够好或者参数不够，即使有了正确的context还是生成了错误结果。
+    2. 第二，模型没有被传递恰当的上下文。在实际中，占大多数。这第二个原因，又可以细分成两类：
+        1. 上下文不充分，缺失必要的信息 (missing context) 。
+        2. 上下文的格式不够好 (formatted poorly) 。类比人类，如果说话没有条例，颠三倒四，即使所有信息都提到了，仍然可能无法传达核心信息。
 
 ## 多Agent设计理念
 
@@ -131,7 +154,7 @@ PS： 你要是上万个tool的话，llm 上下文塞不下，此时让一个llm
 2. 静态拓扑常见的几种结构：
     1. 分层（Layered）结构；类似多层前馈神经网络，只是将其中的神经元替换为智能体，其针对给定问题，在推理时根据智能体优选算法选择各层中最优的智能体，然后使用选出的智能体逐层向前传递求解给定问题；
     1. 去中心化（Decentralized）结构；各智能体间直接点对点地相互通信，这种结构主要用于世界模拟（World Simulation）应用中；
-    3. 中心化（Centralized）结构，由一个或一组智能体构成中心节点，**其他智能体只与中心节点通信**；中心节点负责协调和集成所有智能体的信息，然后向各个智能体发出指令或反馈。中心节点可以全局地了解所有智能体的状态和信息，**有助于做出全局最优的决策**。但是容易出现单点故障，中心节点的故障可能导致整个系统的通信瘫痪。
+    3. 中心化（Centralized）结构/单主动-多被动，由一个或一组智能体构成中心节点（root agent/main agent/orchestrator），**其他智能体只与中心节点通信**；中心节点负责协调和集成所有智能体的信息，然后向各个智能体发出指令或反馈。中心节点可以全局地了解所有智能体的状态和信息，**有助于做出全局最优的决策**。但是容易出现单点故障，中心节点的故障可能导致整个系统的通信瘫痪。
     4. 共享消息池（Shared Message Pool）结构，所有智能体发送消息至共享消息池，并订阅和自己相关的消息。
     ![](/public/upload/machine/agent_cooperation.jpg)
 3. 通信协议
@@ -173,6 +196,21 @@ https://github.com/microsoft/autogen/tree/main/python/packages/autogen-magentic-
 
 [multi-agent-orchestrator](https://github.com/awslabs/multi-agent-orchestrator) 未读
 
+### google adk
+https://google.github.io/adk-docs 官方文档将各个方面介绍的很全面
+
+1. 有类似BaseLLM、BaseTool等抽象，以及围绕这些抽象的Callbacks/Events（比如模型安全就可以通过Callbacks来做），这些是构成一个Agent的基本要素。
+2. 与langgraph相比，明确提出了BaseAgent抽象，具体有LLM Agents/Workflow Agents/Custom agents，以及围绕这些的Context/State传递与共享等。
+3. 在agent 之上提出了agent team（Agent.sub_agents，与agno 有些不同），进一步提出了几种Multi-Agent Patterns
+    1. Coordinator/Dispatcher Pattern, A central LlmAgent (Coordinator) manages several specialized sub_agents.
+    2. Sequential Pipeline Pattern,  A SequentialAgent contains sub_agents executed in a fixed order.
+    3. Parallel Fan-Out/Gather Pattern
+    4. Hierarchical Task Decomposition, A multi-level tree of agents where higher-level agents break down complex goals and delegate sub-tasks to lower-level agents. PS：a.sub_agents=b, b.sub_agents=cd
+    5. Review/Critique Pattern 
+    6. Iterative Refinement Pattern, Uses a LoopAgent containing one or more agents that work on a task over multiple iterations.
+    6. Human-in-the-Loop Pattern
+    PS: 总之agent 多起来之后，跟微服务一样，它们的组合关系也很多样，看业务需要。
+
 ### XAgent - Agent 并行计算, LLM 汇总
 
 XAgent采用双环机制，外循环用于高层任务管理，起到规划（Planning）的作用，内循环用于底层任务执行，起到执行（Execution）的作用。
@@ -192,7 +230,7 @@ XAgent采用双环机制，外循环用于高层任务管理，起到规划（Pl
 
 XAgent缺乏多Agent的能力，例如多Agent的协作模式、通信模式和自定义等，其内部定了的多个Agent，但这些Agent更像是函数的封装。XAgent定义给出的是通用智能体：从XAgent开发框架来看，本质是想通过Agent的任务分解能力加上集成更多的Tools的能力，将复杂任务有效的分解成细粒度的任务执行，但从当前的业界实现，BabyAGI，AutoGen都不是很理想，只能在有限的问题上可能效果可以，但还不是很稳定，完全依赖GPT4的能力，遇到专业性强的复杂问题，效果都不会很好。
 
-## AutoGPT
+## AutoGPT（似已过时）
 
 Andrej Karpathy 在 2017 年提出的 Software 2.0：基于神经网络的软件设计。真的很有前瞻性了。这进一步引出了当前正在迅速发展的 Agent Ecosystem。AutoGPT ，BabyAGI 和 HuggingGPT 这些项目形象生动地为我们展示了 LLM 的潜力除了在生成内容、故事、论文等方面，它还具有强大的通用问题解决能力。如果说 ChatGPT 本身的突破体现在人们意识到**语言可以成为一种服务**，成为人和机器之间最自然的沟通接口，这一轮新发展的关键在于人们意识到语言（不一定是自然语言，也包括命令、代码、错误信息）也是模型和自身、模型和模型以及模型和外部世界之间最自然的接口，让 AI agent 在思考和表达之外增加了调度、结果反馈和自我修正这些新的功能模块。于是**在人类用自然语言给 AI 定义任务目标（只有这一步在实质上需要人类参与）之后可以形成一个自动运行的循环**：
 1. agent 通过语言思考，分解目标为子任务

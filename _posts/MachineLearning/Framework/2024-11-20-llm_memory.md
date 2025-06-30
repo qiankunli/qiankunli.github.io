@@ -160,7 +160,7 @@ $$
 
 ### Memory Bank
 
-Memory Bank作为一种长期记忆机制，通过分层存储和动态更新策略显著提升了大型语言模型（LLM）在处理长上下文和跨会话任务中的表现。其核心设计理念源于对人类记忆系统的模仿，将信息划分为短期记忆和长期记忆，并通过**分层架构**优化存储与检索效率。
+Memory Bank作为一种长期记忆机制，通过分层存储和动态更新策略显著提升了大型语言模型（LLM）在处理长上下文和跨会话任务中的表现。其核心设计理念源于对人类记忆系统的模仿，将信息划分为短期记忆和长期记忆，引入心理学理论（艾宾浩斯遗忘曲线）实现选择性记忆强化与遗忘机制（简单的说就是经常被使用的记忆会升级为长期记忆，而短期记忆会随着时间遗忘），并通过**分层架构**优化存储与检索效率。
 
 ![](/public/upload/machine/memory_bank.png)
 
@@ -207,3 +207,80 @@ Monica 会通过用户特征的持续学习，提升需求理解的精度和响�
 2. Mem0g，通过基于图的记忆表示增强基础架构，将记忆存储为带有实体节点和关系边的有向标记图。通过显式地建模实体及其关系，Mem0g支持跨多个记忆中需要穿越复杂关系路径的查询的更高级推理。
     1. 提取阶段使用LLMs将对话消息转换为实体和关系三元组。
     2. 更新阶段在将新信息集成到现有知识图中时采用冲突检测和解决机制。
+
+[AI记忆神器Mem0框架实测：有创新，但落地生产需谨慎](https://mp.weixin.qq.com/s/e4TfhwBfhAN1mPVLaIWidQ)
+```
+#从文本中提取并添加新的记忆
+ memory.add(
+        "林峰于2022年创办了星辰智能科技。这家总部位于深圳的公司专注于人工智能领域，其核心产品是名为“星语”的智能对话助手",
+        user_id="aUser")
+#基于文本比对，从记忆库中检索出与文本相关的记忆
+relevant_memories = memory.search(query="星辰智能科技的创始人是谁", user_id="aUser")
+# 示例的输出
+memories:
+- 星辰智能科技专注于人工智能领域
+- 星辰智能科技总部位于深圳
+- 林峰于2022年创办了星辰智能科技
+- 星辰智能科技的核心产品是名为“星语”的智能对话助手
+relations:
+- 林峰-founded-星辰智能科技
+- 星辰智能科技-headquarters_located_in-深圳
+- 星辰智能科技-specializes_in-人工智能
+- 星辰智能科技-core_product-星语
+```
+
+说白了都是给LLM外挂一个存储层，只是RAG一般叫做知识库，mem0里面叫做记忆。当然mem0也不是简单的换个概念就完了，它在传统RAG的基础上做了一些重要的改进：
+1. 利用LLM对外部数据进行针对性的提炼归纳，形成事实摘要。这样实际上是对本地知识做了一次过滤和总结，避免了RAG直接在大量原始外部数据中进行检索，由于噪声干扰导致效果不佳的问题。
+2. 引入了动态的记忆更新机制，这个是mem0的核心。不断产生的新的事实和知识可以通过一定的机制更新原有记忆，避免了记忆膨胀和新旧记忆冲突导致的事实矛盾。
+3. 借鉴GraphRAG，实现了记忆图谱用于增强表示记忆中实体与实体间的关系，对于多跳及时序问题有显著的加强。
+
+让我们逐条来进行分析，在调用memory.add时，mem0内部的流程大致是这样：
+1. 首先将当前上下文中的所有消息拼接成一整个字符串，包括system,user,assistant的消息，传入到配置的LLM中提取事实摘要。（add函数有一个infer参数，传入false的时候会直接将原始消息文本作为事实存储下来，这样不会使用LLM，也不会有后续的动态更新，这种方式就是简单的RAG检索，这里不做讨论）抽取的系统提示词节选如下（一部分）：
+    ```
+    You are a Personal Information Organizer, specialized in accurately storing facts, user memories, and preferences. Your primary role is to extract relevant pieces of information from conversations and organize them into distinct, manageable facts. This allows for easy retrieval and personalization in future interactions. Below are the types of information you need to focus on and the detailed instructions on how to handle the input data.
+
+    Types of Information to Remember:
+
+    1. Store Personal Preferences: Keep track of likes, dislikes, and specific preferences in various categories such as food, products, activities, and entertainment.
+    2. Maintain Important Personal Details: Remember significant personal information like names, relationships, and important dates.
+    3. Track Plans and Intentions: Note upcoming events, trips, goals, and any plans the user has shared.
+    4. Remember Activity and Service Preferences: Recall preferences for dining, travel, hobbies, and other services.
+    5. Monitor Health and Wellness Preferences: Keep a record of dietary restrictions, fitness routines, and other wellness-related information.
+    6. Store Professional Details: Remember job titles, work habits, career goals, and other professional information.
+    7. Miscellaneous Information Management: Keep track of favorite books, movies, brands, and other miscellaneous details that the user shares.
+
+    Here are some few shot examples:
+
+    Input: Hi.
+    Output: {{"facts" : []}}
+
+    Input: There are branches in trees.
+    Output: {{"facts" : []}}
+
+    Input: Hi, I am looking for a restaurant in San Francisco.
+    Output: {{"facts" : ["Looking for a restaurant in San Francisco"]}}
+
+    Input: Yesterday, I had a meeting with John at 3pm. We discussed the new project.
+    Output: {{"facts" : ["Had a meeting with John at 3pm", "Discussed the new project"]}}
+
+    ......后续省略
+    ```
+2. 针对新抽取的事实摘要，通过向量语义检索，检索出向量库中与新事实相近的记忆；
+3. 将新的事实和相关联的已存在记忆，再次传入到LLM中，由LLM综合判断应该对这些数据进行何种操作，具体的操作类型有4种：
+    1. ADD（新增独立事实），也就是原有记忆中不存在的新事实，需要添加到记忆库；
+    2. UPDATE（补充现有记忆），合并新事实和旧的记忆，比如之前的记忆是用户喜欢吃冰淇淋，新的事实是用户喜欢吃烧烤，那么两个事实就可以合并，变成用户喜欢吃冰淇淋和烧烤
+    3. DELETE（移除矛盾记忆），如果新旧事实冲突了，就要移除旧的记忆。比如之前的记忆是喜欢吃冰淇淋，现在又提到不喜欢吃冰淇淋，那么喜欢吃冰淇淋的那个记忆就要移除掉；
+    4. NOOP（不采取任何操作），这个没啥好解释的，可能只是用于引导LLM的选择（如果只有ADD,UPDATE,DELETE, LLM在不需要操作时可能也不得不选择一个操作）
+4. 最后就是根据LLM返回的事实以及操作类型对底层的向量数据库进行相关操作即可。
+5.  如果全局配置中配置了graph_store，还会利用LLM从会话上下文中抽取实体以及实体间的关系，即所谓的图结构记忆，记忆以有向标签图 G=(V,E,L) 存储。
+    ```
+    - 节点 (V)：实体名称（如`小明`）
+    - 边 (E)：实体间关系（如`lives_IN`）
+    - 标签 (L)：实体类型（如`Person`）
+    ```
+    记忆图谱也是会根据新的输入进行动态更新的，实现方式类似于第三步记忆事实的更新。通过图结构能够将记忆中的不同实体进行关联查询，在多跳推理等场景中有较好的表现。
+
+问题
+1. 记忆更新的结果非常不稳定。仅仅是新增记忆问题不大，基本能成功处理。但是当我陈述一些与记忆矛盾的事实的时候，模型的输出就不太稳定了，有时能够正确的更新，有时候直接返回了两个矛盾的结果都让系统新增，比如Name is David 和 Name is Lily。当然这个锅可能不该给mem0，毕竟决定agent上限的还是模型本身的能力。
+2. 由于借助了LLM对数据进行增强解析，导致解析速度上实在是很慢，虽然mem0针对性的做了一些优化，比如并行处理等，但一段简单的对话处理仍然需要等待近10秒钟（开启记忆图谱），这个对于实时聊天场景肯定很难接受，不过可以用在一些离线的批处理场景上，比如定期根据用户会话记录更新个性化记忆。
+3. 一次性记忆会长期占据记忆库的空间，在记忆召回时产生噪声。

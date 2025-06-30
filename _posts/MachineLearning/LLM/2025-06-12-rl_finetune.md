@@ -4,7 +4,7 @@ layout: post
 title: rl微调
 category: 技术
 tags: MachineLearning
-keywords: deepresearch deepsearch
+keywords: rl finetune
 
 ---
 
