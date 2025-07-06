@@ -40,12 +40,18 @@ keywords: rl finetune
     3. 顺序奖励（Order Reward）：通过计算参考和预测段落之间的成对逆序数来衡量序列级别的保真度。
 2. 训练数据集，包括Infinity-Doc-55K数据集，包含55,066个样本。合成方式是通过HTML模板和浏览器渲染生成，具体使用方式是：从维基百科、网络爬虫和在线语料库等来源收集文本和图像，并使用Jinja模板将采样的内容注入预定义的单列、双列或三列 HTML布局中。这些页面通过浏览器引擎渲染成扫描文档，随后进行自动过滤以去除低质量或重叠的图像。通过解析原始HTML 提取真实标注，生成对齐的Markdown表示。最终形成的数据集涵盖七个不同的文档领域，包括财务报告、医疗报告、学术论文、书籍、杂志、网页等。
 
-### 与agent 融合
+### 与agent 融合/multi-agent plan/route
+
 
 [Multi-Agent 的灵活编排之路](https://mp.weixin.qq.com/s/0c8hTMdIALjYdGZkmwLFDg) 案例，multiagent 背景下，训练plannning 模块生成plan（每一个step 是一个选中agent及其要解决的问题）
 
 [无干预，短思考，多行动：新的Multi-step LLM+RL范式](https://zhuanlan.zhihu.com/p/49397670697)在R1提出后我一直在想，这种在post-train阶段reasoning trace一直变长的现象是否是个好事。由于single-step RL任务往往是完全信息的bandit问题，模型的reasoning trace越来越长我觉得是很好理解的，因为更长的reasoning可以反复重构问题中的信息达到与pretrain阶段最匹配的token分布。但是世界上的大部分现实问题都是multi-step的，也就是说需要很多步decision的sequential impact才会拿到最后的reward，这明显用multi-step MDP去model更加合理。我坚信**真正的智能必须能够解决multi-step的问题**。做出一个decision后agent其实获得了新的信息，而这些新的信息对于最后的成败至关重要。在获得能够决定最后成败的新的信息前，agent不应该给出答案。而找这些信息往往并不需要过多的reasoning，都是非常简单的事情。这就是我们近期工作的核心思想。通过一种新的post-train算法，我们希望得到的model具有三个我们所期待的性质：无干预，短思考，多行动。
 
+
+### tool-use rl
+
+1. multi turn tool-use的prompt template
+2. 设计rule based reward(correctness reward, format reward, tool execution rewad等)，
 
 [大模型Agent RL训练多轮planning技术](https://mp.weixin.qq.com/s/tRkeTwaNNEXl7tgq2qyEjw) 
 1. agents rl的优点：

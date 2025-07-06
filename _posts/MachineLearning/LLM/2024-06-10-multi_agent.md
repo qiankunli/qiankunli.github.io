@@ -87,7 +87,7 @@ OpenAI 是以 AGI（Artificial General Intelligence） 为愿景的公司，现�
 
 ### 反对声音——上下文工程（Context Engineering）
 
-[从Prompt Engineering到Context Engineering](https://mp.weixin.qq.com/s/nyD5Vc59FYO_ZUD8fSquJw)**跟AI开发相关的大部分工作，都是围绕着如何把上下文窗口填充正确来进行的**。随着LLM性能的进步，人们不再需要为了想出一个像咒语一样的prompt而绞尽脑汁了。但是，随着agent系统的动态性、复杂性逐步增加，保持每一次都能把context组装正确和完整，已经不是一件简单的事情了。这就需要Context Engineering这样一个专业的词汇来指代一整套系统化的方案。Context Engineering包含了所有对组装正确的上下文起到关键作用的技术组件。为了从大量文档内容中选出跟当前任务更相关的数据，就需要retrieve技术（RAG）；为了向模型传达长期记忆和短期记忆，就需要memory工程；为了更好地决策未来，就需要把当前状态以及历史信息传达给模型；另外，还需要一系列的错误处理、恢复、以及guardrails机制。所有这些，都属于Context Engineering的范畴。至少包括：
+[从Prompt Engineering到Context Engineering](https://mp.weixin.qq.com/s/nyD5Vc59FYO_ZUD8fSquJw)**跟AI开发相关的大部分工作，都是围绕着如何把上下文窗口填充正确来进行的**。随着LLM性能的进步，人们不再需要为了想出一个像咒语一样的prompt而绞尽脑汁了。但是，随着agent系统的动态性、复杂性逐步增加，保持每一次都能把context组装正确和完整，已经不是一件简单的事情了。这就需要Context Engineering这样一个专业的词汇来指代一整套系统化的方案。Context Engineering包含了所有对组装正确的上下文起到关键作用的技术组件。为了从大量文档内容中选出跟当前任务更相关的数据，就需要retrieve技术（RAG）；为了向模型传达长期记忆和短期记忆，就需要memory工程；为了更好地决策未来，就需要把当前状态以及历史信息传达给模型；另外，还需要一系列的错误处理、恢复、以及guardrails机制。所有这些，都属于Context Engineering的范畴。**至少包括**：
 1. 静态的prompt及instruction。
 2. RAG返回的片段。
 3. web搜索返回的页面内容。
@@ -97,7 +97,9 @@ OpenAI 是以 AGI（Artificial General Intelligence） 为愿景的公司，现�
 7. 程序运行的其他历史轨迹信息。
 8. 出错信息。
 9. 系统执行过程中通过human-in-the-loop获取到的用户反馈。
-Context Engineering并不是某一种具体的技术，而更像是一种思想或观念。它也暗含了AI技术圈（尤其是深入一线的工程师们）对于未来技术趋势的一种判断。**AI应用开发在本质上可以看成是，从海量信息中找到恰当的有效信息，最终适配到LLM的上下文窗口上。为了让这个漏斗工作得更高效，你需要检索、过滤、排序**。你需要一套完整的Context Engineering工程架构。
+Context Engineering并不是某一种具体的技术，而更像是一种思想或观念。它也暗含了AI技术圈（尤其是深入一线的工程师们）对于未来技术趋势的一种判断。**AI应用开发在本质上可以看成是，从海量信息中找到恰当的有效信息，最终适配到LLM的上下文窗口上。为了让这个漏斗工作得更高效，你需要检索、过滤、排序**。你需要一套完整的Context Engineering工程架构。PS: **其实主要就是指令、记忆、知识。优化context（构建一个好用的单agent）也是从优化这几个方面着手：记忆召回+工具选择+知识检索**。
+
+![](/public/upload/machine/context_engineering.png)
 
 [别再构建多智能体了](https://mp.weixin.qq.com/s/IPaUMtZDS8ws3FpihfKZnw)来自全球首位AI程序员Devin，热门AI应用DeepWiki的开发团队，Cognition AI认为在2025年的技术水平下，追求让多个AI智能体并行协作的架构，是一种脆弱且极易失败的歧途。为什么？关键在于“上下文灾难”：
 1. 信息孤岛： 并行工作的子智能体无法看到彼此的进展和决策，就像蒙着眼睛的工匠，最终做出的“零件”风格迥异、无法组装。
@@ -124,6 +126,10 @@ HTML于1993年问世。2013年，Facebook向世界发布了React。如今已是2
     2. 第二，模型没有被传递恰当的上下文。在实际中，占大多数。这第二个原因，又可以细分成两类：
         1. 上下文不充分，缺失必要的信息 (missing context) 。
         2. 上下文的格式不够好 (formatted poorly) 。类比人类，如果说话没有条例，颠三倒四，即使所有信息都提到了，仍然可能无法传达核心信息。
+        3. 上下文污染，幻觉信息混入决策链
+        3. 上下文混淆，冗余信息导致推理错误
+        4. 上下文冲突，不同轮之间信息自相矛盾
+        5. 上下文干扰，重点内容被淹没，性能下降
 
 ## 多Agent设计理念
 
@@ -201,6 +207,28 @@ https://google.github.io/adk-docs 官方文档将各个方面介绍的很全面
 
 1. 有类似BaseLLM、BaseTool等抽象，以及围绕这些抽象的Callbacks/Events（比如模型安全就可以通过Callbacks来做），这些是构成一个Agent的基本要素。
 2. 与langgraph相比，明确提出了BaseAgent抽象，具体有LLM Agents/Workflow Agents/Custom agents，以及围绕这些的Context/State传递与共享等。
+    ```python
+    class BaseAgent(BaseModel):
+        name: str
+        description: str = ''
+        parent_agent: Optional[BaseAgent] = Field(default=None, init=False)
+        sub_agents: list[BaseAgent] = Field(default_factory=list)
+        before_agent_callback: Optional[BeforeAgentCallback] = None
+        after_agent_callback: Optional[AfterAgentCallback] = None
+        async def run_async(self,parent_context: InvocationContext,) -> AsyncGenerator[Event, None]:
+            with tracer.start_as_current_span(f'agent_run [{self.name}]'):
+                ctx = self._create_invocation_context(parent_context)
+                if event := await self.__handle_before_agent_callback(ctx):
+                    yield event
+                if ctx.end_invocation:
+                    return
+                async for event in self._run_async_impl(ctx):
+                    yield event
+                if ctx.end_invocation:
+                    return
+                if event := await self.__handle_after_agent_callback(ctx):
+                    yield event
+    ```
 3. 在agent 之上提出了agent team（Agent.sub_agents，与agno 有些不同），进一步提出了几种Multi-Agent Patterns
     1. Coordinator/Dispatcher Pattern, A central LlmAgent (Coordinator) manages several specialized sub_agents.
     2. Sequential Pipeline Pattern,  A SequentialAgent contains sub_agents executed in a fixed order.
@@ -210,6 +238,8 @@ https://google.github.io/adk-docs 官方文档将各个方面介绍的很全面
     6. Iterative Refinement Pattern, Uses a LoopAgent containing one or more agents that work on a task over multiple iterations.
     6. Human-in-the-Loop Pattern
     PS: 总之agent 多起来之后，跟微服务一样，它们的组合关系也很多样，看业务需要。
+4. 在以上抽象的基础上，提出了runtime。The ADK Runtime is the underlying engine that powers your agent application during user interactions. It's the system that takes your defined agents, tools, and callbacks and orchestrates their execution in response to user input, managing the flow of information, state changes, and interactions with external services like LLMs or storage.Think of the Runtime as the "engine" of your agentic application. **You define the parts (agents, tools), and the Runtime handles how they connect and run together to fulfill a user's request**. PS：adk管的很挺全乎，还囊括了会话（Session） 和记忆。
+    ![](/public/upload/machine/adk_runner.png)
 
 ### XAgent - Agent 并行计算, LLM 汇总
 
