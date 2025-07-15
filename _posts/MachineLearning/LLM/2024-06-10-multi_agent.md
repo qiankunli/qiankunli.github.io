@@ -58,6 +58,8 @@ OpenAI 是以 AGI（Artificial General Intelligence） 为愿景的公司，现�
 
 ## 多agent
 
+多Agent系统（Multi-Agent System, MAS）是Agent系统的发展趋势，因为它更适用于解决复杂问题求解、分布式任务、模拟社会系统等问题，在多Agent系统中，**每个Agent 专注单一领域，工具少于10个**，团队协作需推理支持否则成功率低（目前成功率<50%）。
+
 ### 一个材料
 
 [Agent工程能力思考记录](https://mp.weixin.qq.com/s/ZM7uHow57_KU8QlRuF_rIA)过去在微服务的实践上，我们在统一的一套系统框架（HSF）下进行交互，领域的互联以服务接口交互的方式进行，因此在AI时代，未来的系统交付物可能不再是现在的某个服务，而是某个Agent；它与接口最大的差别在于不是一轮input-output，而可能是多轮的，因此协议上的设计需要考虑多轮input-output完成某项任务；
