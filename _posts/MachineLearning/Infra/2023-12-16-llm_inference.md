@@ -176,7 +176,7 @@ LLM推理需要的芯片形态，最重要的是内存带宽和互联带宽，�
 
 ### KV Cache
 
-有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。 KVCache 顾名思义**缓存一部分K矩阵和V矩阵**（省的是$input*W_k$和$input*W_v$的计算），主要用于加速生成 token 时的 attention 计算。PS：缓存的就是kv矩阵。计算的时候，q是左乘矩阵，q矩阵不缓存不是因为需要每次重新算，而是之前的行不需要了。 
+有许多针对Transformer的重要优化技术，如KV（键-值）缓存，每个Transformer层有一个KV缓存（在许多Transformer的实现中，KV缓存位于注意力类的内部）。 KVCache 顾名思义**缓存一部分K矩阵和V矩阵**（省的是$input*W_k$和$input*W_v$的计算），主要用于加速生成 token 时的 attention 计算。PS：llm 计算就是 input矩阵 ==attention==> O矩阵 ==ffn==> last token logits
 
 ![](/public/upload/machine/kv_cache.jpg)
 
@@ -184,18 +184,16 @@ LLM推理需要的芯片形态，最重要的是内存带宽和互联带宽，�
 1. 输入“真”的向量
 2. 计算“真”向量 乘以$W_q$,$W_k$,$W_v$ 得到 $Q_i$,$K_i$,$V_i$。
 3. 拼接历史K、V的值，得到完整的K、V。PS：注意，每一步step迭代中，K矩阵列数加1，V矩阵行数加1，**“今天天气”4个token的key矩阵列和value矩阵行就不用再算了**，K矩阵前面n-1列都是保存在cache中，只有k矩阵的最后一列是通过新增加的输入input token和$W_k$进行矩阵相乘得到的（后续也会加入到kvcache中），之后进行拼接即可。
-    1. **在没有Causal Mask时**，计算t位置的Attention需要未来的KV，这在实际进行自回归推理时无法得到；加上Causal Mask之后（在计算每个位置的注意力得分时，只有该位置之前的词（包括它自己）对其有贡献），只需要1,2,…,t位置的KV就可以进行推理。说白了，**gpt decoder时，attention score 是一个阉割版的attention score**。当新加入$x_{i+1}$，其之前的x 的o向量无需更改。
-4. 然后经过Attention计算，获得 $O_i$ 输出。PS：计算$O_{i+1}$时，需要$K_{i+1}$ 、$V_{i+1}$ 和 $Q_{i+1}$的第i+1行向量，$Q_{i}$则不需要参与计算。省掉了$Q_{i}$ 就是 $o_0$到$o_i$ 向量无需重算，**$QK^T_{i+1}$ 需要新增一行$q_{i+1} * K^T_{i+1}$即可**。
+4. 然后经过Attention计算，获得 $O_i$ 输出。
+    1. 在没有Causal Mask时（原生attention），计算$O_{i+1}$，需要$K_{i+1}$ 、$V_{i+1}$ 和 $Q_{i+1}$，新加入一个$x_{i+1}$，O的每个元素都会有变化。
+    2. 加上Causal Mask之后（Masked-Attention），在计算每个位置的注意力得分时，只有该位置之前的词（包括它自己）对其有贡献，即新加入$x_{i+1}$，其之前的$o_0$到$o_i$ 向量无需重算，仅需计算$O_{i+1}$，进而仅需要$K_{i+1}$ 、$V_{i+1}$ 和 $Q_{i+1}$的第i+1行向量，$Q_{i}$则不需要参与计算。**$QK^T_{i+1}$ 需要新增一行$q_{i+1} * K^T_{i+1}$即可**。
 5. 根据$O_i$ 计算得到“好”。
 
 ![](/public/upload/machine/kvcache.png)
 
-![](/public/upload/machine/attention_kvcache.png)
-
 在推理的时候transformer本质上只需要计算出$O_i$ ，即一个字一个字地蹦。PS：也回答了为何不缓存Q？每一轮的q都是新的。
 1. Attention的第i个输出只和第 i 个query有关，和其他query无关，所以query完全没有必要缓存，每次预测 $O_i$时只要计算最新的$O_i$，其他的丢弃即可。
 2. Attention的输出$O_i$的计算和完整的K和V有关，而K、V的历史值只和历史的O有关，和当前的O无关。那么就可以通过缓存历史的K、V，而避免重复计算历史K、V
-![](/public/upload/machine/kvcache_no_query.png)
 
 ```
 K = X * W_k

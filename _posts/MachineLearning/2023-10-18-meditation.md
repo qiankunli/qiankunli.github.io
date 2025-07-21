@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 大佬沉思
+title: 大佬谈LLM
 category: 技术
 tags: MachineLearning
 keywords: llm 
@@ -40,7 +40,6 @@ keywords: llm
 4. 如果硬件成本相对极高，就得通过更为复杂的编程去尽可能节省计算和存储的硬件资源。
 5. 如果网络带宽成本很高，就会追求需要传输的信息更高压缩率。
 所以，如果没有以上各个方面成本的综合平衡，是不能简单地说哪种算法或策略更好的。
-
 
 ## 大模型行不行
 
