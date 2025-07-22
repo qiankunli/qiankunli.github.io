@@ -40,13 +40,24 @@ keywords: rl finetune
     3. 顺序奖励（Order Reward）：通过计算参考和预测段落之间的成对逆序数来衡量序列级别的保真度。
 2. 训练数据集，包括Infinity-Doc-55K数据集，包含55,066个样本。合成方式是通过HTML模板和浏览器渲染生成，具体使用方式是：从维基百科、网络爬虫和在线语料库等来源收集文本和图像，并使用Jinja模板将采样的内容注入预定义的单列、双列或三列 HTML布局中。这些页面通过浏览器引擎渲染成扫描文档，随后进行自动过滤以去除低质量或重叠的图像。通过解析原始HTML 提取真实标注，生成对齐的Markdown表示。最终形成的数据集涵盖七个不同的文档领域，包括财务报告、医疗报告、学术论文、书籍、杂志、网页等。
 
+### Query生成
+
+[GRPO强化学习增强Query生成](https://zhuanlan.zhihu.com/p/1929855356072362492)查询生成既需要理解用户的意图，合理生成多样性的查询，又需要合理的扩展查询，不能生成一些干扰信息。而这些要求一般都写在prompt里面，但是模型指令遵循比较弱的时候，经常出现query生成的结果非常不好。为了生成语义上与原始查询相似但在字面表达上不同query, 设计了三个奖励函数，分别从语义相似性、文本多样性和输出格式有效性多个维度对模型输出进行评估。
+1. calculate_similarity_reward：语义相似 & 表达多样性的核心奖励函数。衡量生成的 rewritten_query 是否在语义上贴近原始查询（query），但又在字面表达上具有差异性。`reward = cosine_similarity - jaccard_similarity`
+  1. cosine_similarity: 使用 m3e-small 编码器将原始响应和模型生成的
+  2. rewritten_query 编码为向量，通过余弦相似度衡量语义接近度。
+  3. jaccard_similarity: 用于衡量重写查询和原始查询在词汇上的重合程度（即字面相似度）。
+  目标是 提高语义相似度 但 降低字面相似度，因此用差值作为奖励。
+2. json_format_reward_func：格式合规性检查（硬约束）。确保模型输出严格符合 JSON 格式，便于结构化解析和后续使用。只要能解析出一个 JSON 对象，就给 0.2 的奖励，否则为 0.0。
+3. soft_json_format_reward_func：格式合规性检查（软约束）。当模型还没有学会完全生成正确 JSON 时，给予部分奖励，鼓励其逐步向正确格式靠拢。 如果文本中包含 `{` +0.2, 如果包含 `}` 且在 `{` 之后 +0.2, 最多奖励 0.4
+提到了 unsloth框架。
+
 ### 与agent 融合/multi-agent plan/route
 
 
 [Multi-Agent 的灵活编排之路](https://mp.weixin.qq.com/s/0c8hTMdIALjYdGZkmwLFDg) 案例，multiagent 背景下，训练plannning 模块生成plan（每一个step 是一个选中agent及其要解决的问题）
 
 [无干预，短思考，多行动：新的Multi-step LLM+RL范式](https://zhuanlan.zhihu.com/p/49397670697)在R1提出后我一直在想，这种在post-train阶段reasoning trace一直变长的现象是否是个好事。由于single-step RL任务往往是完全信息的bandit问题，模型的reasoning trace越来越长我觉得是很好理解的，因为更长的reasoning可以反复重构问题中的信息达到与pretrain阶段最匹配的token分布。但是世界上的大部分现实问题都是multi-step的，也就是说需要很多步decision的sequential impact才会拿到最后的reward，这明显用multi-step MDP去model更加合理。我坚信**真正的智能必须能够解决multi-step的问题**。做出一个decision后agent其实获得了新的信息，而这些新的信息对于最后的成败至关重要。在获得能够决定最后成败的新的信息前，agent不应该给出答案。而找这些信息往往并不需要过多的reasoning，都是非常简单的事情。这就是我们近期工作的核心思想。通过一种新的post-train算法，我们希望得到的model具有三个我们所期待的性质：无干预，短思考，多行动。
-
 
 ### tool-use rl
 

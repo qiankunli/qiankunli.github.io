@@ -111,6 +111,7 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
     办法
     1. 索引阶段：对每一页截图，并生成尽可能丰富的文本表示做嵌入（使用vlm）
     2. 生成阶段：将检索到的文本与关联的截图一起输入大模型用于生成（因为vlm 不完全准，所以不能完全靠vlm识别后的文本）
+3. [企业AI知识库的文件解析痛点-Word格式解析优化](https://mp.weixin.qq.com/s/ffW-I9G73HkikBdxf58xfQ) 未读。
 2. 表格  [Langchain下利用MutiVector Retriever更好支持RAG架构下表格文字混合内容问答](https://mp.weixin.qq.com/s/Rxwee3Hd-j1xcBqnW8PRDg) [完全指南——使用python提取PDF中的文本信息（包括表格和图片OCR）](https://mp.weixin.qq.com/s/4mg59Sb7TzaoXVctEMJVWw)
 
 利用 LLM 对知识语料进行增强和扩充。对一篇文档/chunk生成知识点、问题、短摘要，当根据query 进行匹配时，可能先匹配到知识点、问题、短摘要，再找到原始chunk。MultiVectorRetriever/ParentDocumentRetriever  。

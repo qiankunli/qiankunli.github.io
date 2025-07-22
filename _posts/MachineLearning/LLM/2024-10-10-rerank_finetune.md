@@ -26,6 +26,8 @@ keywords: llm emebedding
 
 ## 简介（未完成）
 
+Reward Mode用于评估某个状态/动作序列的好坏。
+
 对于 Embedding 模型来说，它通常采用 Encoder 架构，它的训练目标是使得语义相似的文本在向量空间距离更近，而 Reranker ，则采用 Cross Encoder 架构，它的训练目标是预测查询和文档之间的分数。
 
 ## 为什么用rerank
