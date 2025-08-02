@@ -116,6 +116,8 @@ shell 实现的功能有别于其它应用，它的功能是接受用户输入�
 
 ### 与线程区别
 
+在 Linux 内核中，其实并没有线程的概念。内核原生的 clone 系统调用仅仅只是支持生成一个和父进程共享地址空间等资源的轻量级进程而已。
+
 ||创建进程|创建线程|
 |---|---|---|
 |系统调用|fork|clone|
@@ -125,7 +127,8 @@ shell 实现的功能有别于其它应用，它的功能是接受用户输入�
 
 [聊聊Linux中线程和进程的联系与区别](https://mp.weixin.qq.com/s/--S94B3RswMdBKBh6uxt0w)**Linux进程和线程的相同点要远远大于不同点，本质上是同一个东西**，都是一个 task_struct。每一个 task_struct 都需要被唯一的标识，它的 pid 就是唯一标识号。对于进程来说，这个 pid 就是我们平时常说的进程 pid。对于线程来说，我们假如一个进程下创建了多个线程出来。那么每个线程的 pid 都是不同的。但是我们一般又需要记录线程是属于哪个进程的，通过 tgid 字段来表示自己所归属的进程 ID。
 1. 进程创建 fork ==> fork ==> do_fork ==> copy_process
-2. 线程创建 pthread_create ==> do_clone ==> clone ==> do_fork ==> copy_process
+2. 线程创建 pthread_create ==> do_clone ==> clone ==> do_fork ==> copy_process。
+    1. Linux 线程是包含了两部分的实现。第一部分是用户态的 glibc 库。我们创建线程调用的 pthread_create 就是在 glibc 库实现的。注意，glibc 库完全是在用户态运行的，并非内核源码，每一个线程对应一个struct pthread，存储了线程的相关信息，包括线程栈。第二部分是内核态的 clone 系统调用。
 可见和创建进程时使用的 fork 系统调用相比，创建线程的 clone 系统调用几乎和 fork 差不多，也一样使用的是内核里的 do_fork 函数，最后走到 copy_process 来完整创建。不过创建过程的区别是二者在调用 do_fork 时传入的 clone_flags 里的标记不一样！。
 1. 创建进程时的 flag：仅有一个 SIGCHLD
 2. 创建线程时的 flag：包括 CLONE_VM(新 task 和父进程共享地址空间)、CLONE_FS(新 task 和父进程共享文件系统信息)、CLONE_FILES(新 task 和父进程共享文件描述符表)、CLONE_SIGNAL、CLONE_SETTLS、CLONE_PARENT_SETTID、CLONE_CHILD_CLEARTID、CLONE_SYSVSEM。PS：带了就会复用、共享对应xx_struct。代码段、数据段、堆内存共享，各个线程的栈区独立（不复用）。进程在创建的时候，启动调用exec加载可执行文件的过程中，os 会为其分配一个栈内存供进程运行使用。**线程没有办法使用os 默认给进程分配的栈内存**，linux中glibc库的做法是自己(用户态)申请内存来当线程栈用。

@@ -221,7 +221,7 @@ PS：base llm对一个prompt 生成batch 个结果（O1,O2,...），基于规则
 3. 生成一个随机数$u∼U(0,1)u$ （从均匀分布中采样）。
 4. 如果 $u≤Paccept(x^∗)u$，接受这个样本；否则拒绝并重新采样。
 
-[拒绝采样](https://zhuanlan.zhihu.com/p/3907736367)LLM 的拒绝采样操作起来非常简单：让自己的模型针对 prompt 生成多个候选 response，然后用 reward_model 筛选出来高质量的 response （也可以是 pair 对），拿来再次进行训练。
+[拒绝采样](https://zhuanlan.zhihu.com/p/3907736367)LLM 的拒绝采样操作起来非常简单：让自己的模型针对 prompt 生成多个候选 response（rollout？），然后用 reward_model 筛选出来高质量的 response （也可以是 pair 对），拿来再次进行训练。
 解剖这个过程：
 1. 提议分布是我们自己的模型，目标分布是最好的语言模型；
 2. prompt + response = 一个采样结果；

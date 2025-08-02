@@ -74,9 +74,9 @@ PS：Inference-time体现在，当用户输入一个问题之后，o1要花费�
 
 [可视化角度具象化理解DeepSeek-R1类推理大模型的习得进程](https://mp.weixin.qq.com/s/ytKTGTgU2T7jSNrBghX1cA)
 
-train-time compute ==> test-time Compute; Scaling Laws ==> Inference/test-time scaling
+train-time compute ==> test-time Compute; Scaling Laws($C \approx 6ND$) ==> Inference/test-time scaling
 
-test-time Compute不是不断增加预训练预算，而是允许模式在推理过程中“思考更长时间” 。
+test-time Compute不是不断增加预训练预算，而是允许模式在推理过程中“思考更长时间”（删除cot） 。
 
 ![](/public/upload/machine/test_time_compute.jpg)
 
