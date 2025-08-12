@@ -42,15 +42,24 @@ elasticsearch 是面向文档的，**使用JSON作为文档序列化格式**，�
 |更新某个字段|`update xx set xx=xx`|`update /$index/$type/$id`|es是整体更新|
 |并发控制|隔离级别|乐观锁|
 
-es 不适合/不善于频繁更新、复杂关联查询、事务等操作。
 
-Term Query的文档相关度得分计算方式：利用倒排索引，对于输入的单词，考虑每个文档的以下指标：
-1. TFIDF 目的：用文档中的一个单词，在一堆文档中区分出该文档；
-    1. TFIDF = TF * IDF；
-    2. TF（term frequency）：词频。表示单词在该文本中出现的频率（单词在该文本中出现的多不多）；
-    3. IDF（inverse document frequency）：反向文档频率。 表示单词在整个文本集合中出现的频率（有多少文本包含了这个词）的倒数，IDF越大表示该词的重要性越高，反映了单词是否具有distinguish其所在文本的能力。
-2. 字段的长度。字段越短相关度越高；
-综合这两个指标得出每个文档的相关度评分_score。
+[Internal Working of ElasticSearch : Deep Dive](https://medium.com/%40ByteCodeBlogger/internal-working-of-elasticsearch-deep-dive-34a87bbf0404)
+1. Index ==> table, document ==> record
+2. Shard ==> replica
+  1. An index can be divided into multiple pieces called shards. This allows Elasticsearch to distribute and parallelize operations across a cluster.
+  2. Each shard is a **fully functional and independent "index"** that can be hosted on any node in the cluster.
+  3. A replica is a copy of a shard. Replicas provide redundancy and high availability. If a node fails, the data can still be served from its replica.
+3. 入库逻辑，找到index ==> 找到shard ==> shard 开始存
+  1. When you index (add) a document to Elasticsearch, the document is assigned to a specific index.
+  2. Elasticsearch routes the document to a specific shard based on a hashing mechanism.
+  3. The shard processes the document and stores it on disk. This involves analyzing the document, creating an inverted index, and storing both the original document and its searchable representation.
+4. 查询逻辑，找到index+相关shard, shard检索 ，数据汇总
+  - When a search query is received, Elasticsearch determines which indices and shards to query.
+  - The search request is **broadcast** to all relevant shards in the cluster.
+  - Each shard performs a local search and returns its results.
+  - Elasticsearch aggregates these local results into a final set of results and returns them to the client.
+
+es 不适合/不善于频繁更新、复杂关联查询、事务等操作。
 
 ## 安装和配置
 
@@ -183,7 +192,9 @@ database(es叫索引)只是一个用来指向多个shard（默认一个index被�
         }
     }
 
-## 查询dsl
+## 查询
+
+### dsl
 
 [浅谈Elasticsearch的入门与实践](https://mp.weixin.qq.com/s/wlh2AHpNLrz9dHxPw9UrkQ)基于以上的index+document+倒排索引+分析器等概念，Elasticsearch通过分布式存储结构和分析检索能力，支持并提供了多种不同类型的查询能力，用于满足各种检索需求。
 1. 单词级别查询，
@@ -234,6 +245,16 @@ database(es叫索引)只是一个用来指向多个shard（默认一个index被�
         }
 }
 ```
+
+### 得分
+
+Term Query的文档相关度得分计算方式：利用倒排索引，对于输入的单词，考虑每个文档的以下指标：
+1. TFIDF 目的：用文档中的一个单词，在一堆文档中区分出该文档；
+    1. TFIDF = TF * IDF；
+    2. TF（term frequency）：词频。表示单词在该文本中出现的频率（单词在该文本中出现的多不多）；
+    3. IDF（inverse document frequency）：反向文档频率。 表示单词在整个文本集合中出现的频率（有多少文本包含了这个词）的倒数，IDF越大表示该词的重要性越高，反映了单词是否具有distinguish其所在文本的能力。
+2. 字段的长度。字段越短相关度越高；
+综合这两个指标得出每个文档的相关度评分_score。
 
 ## 其它金句
 

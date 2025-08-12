@@ -100,7 +100,7 @@ APIServer启动时，可以指定一种或多种Authentication方法，如果指
 |x509 客户端证书|`--client-ca-file=SOMEFILE`||
 |Bearer Token（有多种方式）|csv文件`--token-auth-file=SOMEFILE`|HTTP Header中Authentication为Bearer，并跟上Base64Encode(user:passward)值|
 |Webhook Token Server|`--authentication-token-webhook-config-file`<br>`--authentication-token-webhook-cache-ttl`||
-
+PS：OpenAPI身份验证方法（Authentication）（例如，OAuth 2.0令牌使用“Bearer”，基本身份验证使用“Basic”，API密钥使用“ApiKey”）。
 
 以我们常用的kubectl 工作所需的 kubeconfig 文件为例，user 可以配置 tls 方式：client-certificate-data+client-key-data，也可以配置token 方式
 

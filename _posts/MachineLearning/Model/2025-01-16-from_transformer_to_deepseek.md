@@ -138,6 +138,8 @@ PS：训练不稳定、负载不均衡
 
 有人说sft不存在了。不可能的，最多是人类标注的sft不存在了。那么取而代之的是什么呢？ai标注的sft。模型rl得到的思维链做sft训练新模型，大模型的思维链训练小模型。ybq大佬：**post training 最关键的并不是 sft 和 rl 谁更重要，恰恰就是 multi_stage 的设计**。既可以是多阶段的 sft，也可以是多阶段的 rl，亦或者是相互交叉的多阶段。不同 topic 的多阶段，不同任务难度的多阶段，不同训练方法的多阶段，不同 seq_len 的多阶段等等，都需要做实验去设计，也往往都能让模型的效果有所提升。**pretrain 的技术方法正在全面入侵 post training（退火、课程学习、多阶段训练 ……）**。
 
+[Open R1是由Hugging Face团队开发的完全开源的DeepSeek-R1复现项目](https://mp.weixin.qq.com/s/PAYYOhcIk09exTR2eRBE1w) 未读。
+
 ### MTP(Multi-Token Prediction)
 
 与之对应的是DeepSeek-V3 发布之前业界普遍使用的单令牌预测（Single - Token Prediction，STP），STP 一次仅预测一个Token，而 MTP 可同时预测多个 Token。为什么要做MTP? 当前主流的大模型(LLMs)都是decoder-base的模型结构，也就是无论在模型训练还是在推理阶段，对于一个序列的生成过程，都是token-by-token的。每次在生成一个token的时候，都要频繁跟访存交互，加载KV-Cache，再通过多层网络做完整的前向计算。对于这样的访存密集型的任务，通常会因为访存效率形成训练或推理的瓶颈。
@@ -174,6 +176,11 @@ with the answer. The reasoning process and answer are enclosed within <think> </
 ## 自动推理
 
 [Qwen3-RL训练详解](https://zhuanlan.zhihu.com/p/1921218299133396032)将思考模式和非思考模型集成到一个统一的框架中，这使得模型既拥有拥有复杂多步骤推理的能力（例如QwQ-32B），也能够基于上下文进行快速响应（例如GPT-4o）。
+
+Open AI 二款开源模型分别为gpt-oss-120b （117B 参数 激活5.1B）与gpt-oss-20b（21B参数 激活3.6B）都支持推理，具有以下三种 reasoning level（推理深度）：
+1. 低（Low）：快速响应，适合通用对话。
+2. 中（Medium）：速度与细节兼顾的平衡选择。
+3. 高（High）：进行深入且详尽的分析。
 
 ## 其它
 

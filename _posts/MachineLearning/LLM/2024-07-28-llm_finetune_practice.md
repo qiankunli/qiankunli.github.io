@@ -63,6 +63,8 @@ steps to prepare your data:
 
 ### 指令微调
 
+sft 阶段与预训练阶段并无本质区别，仅在计算loss时所考虑的token序列成分有所不同。
+
 指令微调不仅仅考虑了对人类指令和多任务的适应性，更是希望能将角色系统融入大模型中，从而让大模型变成chat模型，指令微调并不直接产生chat model，只是其中必不可少的一步。其中比较特殊的数据形式就是多轮对话。**对话里必不可少的存在“角色”这个概念**，因为和大模型的对话仅限于用户和模型，所以极大多数的对话模板（template）里都只考虑了两个角色——user和assistant。注意，对话模板只有非base模型才需要，所以很多的base模型的tokenizer里并不携带chat_template。PS： 对话模板其实是一种便于模型区分对话角色的工具，利用特殊 token 构建一个让模型“看得懂”的对话方式，而这个方式往往是模型在 post-training 中针对性训练的。
 
 举个例子，比如：LLAMA2-chat的对话模板中user标识 是 `[INST]` ， assistant 标识是`[/INST]`，下面是一个单轮的例子
@@ -404,7 +406,7 @@ model.train()
 ```
 随着时间的推移，采用了越来越高级的接口，训练的代码已经大大简化。
 
-[四个大模型轻量级微调训练框架：兼看PPT转Markdown工具](https://mp.weixin.qq.com/s/1Wjap8kiNGXkCQQ35pJE7g) 建议把这几个框架Firefly/LLaMA-Factory/unsloth/SWIFT都看下，找找共性。 
+[四个大模型轻量级微调训练框架：兼看PPT转Markdown工具](https://mp.weixin.qq.com/s/1Wjap8kiNGXkCQQ35pJE7g) 建议把这几个框架Firefly/LLaMA-Factory/unsloth/SWIFT（阿里开源的LLM训练评估框架）都看下，找找共性。 
 
 ### LLaMA-Factory
 

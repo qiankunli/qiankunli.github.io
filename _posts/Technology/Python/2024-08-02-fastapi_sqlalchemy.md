@@ -219,6 +219,39 @@ def log_message(message: str, background_tasks: BackgroundTasks):
     return {"message": "Log will be written in the background"}
 ```
 
+### lifespan
+
+在 Web 框架中，经常需要在应用启动时初始化一些全局资源（如数据库连接池、模型、线程池），在应用关闭时清理资源。Starlette 以及基于它的 FastAPI 在早期提供了生命周期事件（startup和shutdown）来处理这种场景；但新版 FastAPI 更推荐使用 lifespan ，也就是**上下文管理器**的机制来统一管理启动和关闭逻辑 。其基本方法是：FastAPI 应用通过 lifespan 参数接受一个异步的上下文管理器，用于包裹应用的整个生命周期 。具体来说，我们可以定义如上文介绍的一个带 yield 的、使用@asnyccontextmanager装饰的异步函数，完成应用启动和关闭时的操作，并将此函数传递给 FastAPI(lifespan=...)。
+
+```python
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+
+# 示例：假设有异步数据库连接初始化函数和关闭函数
+async def init_database():
+    return DatabaseConnection()
+
+# 定义异步 lifespan 上下文管理器
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 应用启动时：初始化数据库连接（或其他全局资源），保存到app.state
+    app.state.db = await init_database()     
+    try:
+        yield   # 暂停，进入应用请求处理阶段
+    finally:
+        # 应用关闭时：清理资源
+        await app.state.db.close()   
+
+# 将 lifespan 上下文管理器传给 FastAPI 应用
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/users")
+async def list_users():
+    # 在请求处理函数中使用启动时初始化的资源
+    results = app.state.db.query("SELECT * FROM users;")
+    return {"users": results}
+```
+
 ## SQLAlchemy
 
 SQLAlchemy 不具备连接数据库的能力，它连接数据库还是使用了驱动，同步驱动用 pymysql 异步驱动为 asyncmy。

@@ -36,6 +36,8 @@ Foundation Model有两个代表，一个是Large Language Model，另一个是Em
 
 图像可以有embedding，句子和段落也可以有 embedding —— 本质都是通过一组数来表达意义。段落的 embedding 可以作为基于语义搜索的高效索引，AI 绘画技术的背后，有着这两种 embedding 的互动 —— 未来如果有一个大一统的多模态模型，embedding 必然是其中的基石和桥梁 。
 
+[On The Role of Pretrained Language Models in General-Purpose Text Embeddings: A Survey](https://arxiv.org/pdf/2507.20783) 论文综述。
+
 ## embedding 渊源
 
 [词嵌入的新时代](https://cloud.tencent.com/developer/article/2058413)为了让机器可以学习到文本的特征属性，我们需要一些将文本数值化的表示的方式。
