@@ -51,6 +51,8 @@ Infra 的“三大难题”：Scaling, Sharding, and Copying所有系统的底�
 
 ## 基础
 
+![](/public/upload/machine/prefill_decode.png)
+
 ### 模型的计算过程
 
 [理解llama.cpp怎么完成大模型推理的](https://zhuanlan.zhihu.com/p/996110863)LLM 通过每次迭代生成一个标记，然后将其添加到输入提示中，不断重复该过程，直到生成完整的输出。这就是 LLM 如何从输入提示生成文本的基础。
@@ -235,7 +237,7 @@ Mooncake 采用了以 KVCache 为中心的分离式推理架构，主要由三�
 2. Decoding 池：这个部分集中处理所有解码阶段的任务。
 3. KVCache 池：这个部分负责存储所有中间过程中应用到的 KVCache，并决定何时使用这些缓存，何时释放它们。
 
-prefill-decode 分离（PD 分离）架构主要是考虑到了 LLM 的 prefill 和 decode 的两个阶段的特性不同，prefill 阶段是 compute bound（对于上下文的embeding和自注意力计算，是可以并行的），decode 阶段是 memory bound（需要结合上下文以及当前token之前生成的token对应的KV值进行计算，过程是串行的），prefill 阶段的能力我们用 TTFT 首 token 时延来衡量，decode 的能力我们用 TPOT 生成每个 token 的时间来衡量。
+prefill-decode 分离（PD 分离）架构主要是考虑到了 LLM 的 prefill 和 decode 的两个阶段的特性不同，prefill 阶段是 compute bound（对于上下文的embeding和自注意力计算，模型会并行处理输入提示中的所有 Token，一次性计算出整个输入序列的 Attention 状态），decode 阶段是 memory bound（需要结合上下文以及当前token之前生成的token对应的KV值进行计算，过程是串行的），prefill 阶段的能力我们用 TTFT 首 token 时延来衡量，decode 的能力我们用 TPOT 生成每个 token 的时间来衡量。
 1. 但是在同一张卡上做 prefill 和 decode 会出现问题，在机器的算力等条件固定的情况下，你增加 bsz，prefill 阶段机器到算力瓶颈了，反而影响 TTFT，你减小 bsz，decode 阶段又是访存瓶颈的，decode 阶段可以比 prefill 阶段承载更大的 bsz。那么问题来了，到底要不要增大 bsz？
 2. 有了 PD 分离之后，我们可以把 prefill 阶段放在 H800 这样的算力高的机器，decode 阶段放在 H20 这样算力低的机器但是访存能力不会差太多的机器（毕竟显卡更新换代过程中算力增长是遥遥领先访存能力增长的），这样我们的如何 bsz 如何均衡的问题似乎可以得到解决，不同机器只负责一个阶段，**bsz 也只需要根据你这个阶段的特性来设置就好了**。decode 阶段可以比 prefill 阶段承载更大的 bsz。
 3. 但是 PD 分离有个很重要的问题，增加了通信和网络传输的成本，如果是卡间分离那么会增加通信的成本，如果是不同机器上进行分离那么就会增加网络传输 KV Cache 的成本。
@@ -252,6 +254,29 @@ Context Caching
 [AI 推理场景的痛点和解决方案](https://mp.weixin.qq.com/s/SeUJxNK10fhR6YsWSJRYwg) 未细读。
 
 [大模型推理框架RTP-LLM P-D分离之道：从思考到实战](https://mp.weixin.qq.com/s/4FVw5paNSUCeQEUp9hoJ5Q) 未读
+
+[浅谈基于 Kubernetes 的 LLM 分布式推理框架架构：概览](https://mp.weixin.qq.com/s/5Q2Rjg6YKs7V9kOL41eACQ)
+1. KV Cache Offloading。KV Cache Offloading 指的是将 GPU 显存中的 KV Cache 卸载到 CPU 内存或是外部存储的过程，当 LLM 需要访问被卸载的 KV Cache 时，它会按需将这些 Block 重新加载回 GPU 显存中。AIBrix 提供了多层 KV Cache 的缓存框架，默认情况下会使用 DRAM 中的 L1 Cache，在需要共享 KV Cache 的场景下则可以使用 L2 Cache，即分布式的外部存储。Dynamo 与 llm-d 等框架同样也支持使用 LMCache 等框架将不常用的 KV Cache 卸载到 CPU 内存与外部存储中。
+2. KV Cache Sharing。随着 KV Cache Offloading 的引入，如何在不同的 LLM 推理实例共享 KV Cache 也是个被广泛研究的问题。
+    1. Centralized：即通过一个中心化的 KV Cache 的池来管理不同实例的 KV Cache，其优点在于能够最大化地共享 KV Cache，可以更好地利用 Prefix Caching 的能力，但是在高并发的场景之下其可能会成为单点的性能瓶颈。
+    2. Peer-to-Peer：即直接通过 P2P 通信机制在不同实例间传输 KV Cache，避免了中心化的存储，且具有更好的容错与动态扩缩容的能力的支持。
+3. 从分布式推理到分离式推理。目前基于基础设施层的分离式推理（Disaggregated Inference）也是被广泛讨论的话题，即模块化地拆分推理的各个模块形成分离式的部署，彼此之间通过协议传输数据。
+4. 由目前 AIBrix 与 llm-d 等框架的设计上来看，将负载均衡与 KV Cache 管理等功能由推理引擎的层面上升到集群编排的层面去解决是目前的主流趋势，编排侧能够更好地与现有的集群资源管理系统（如 Kubernetes）的生态系统集成，避免一些重复性的工作，推理引擎也可以关注在内部的推理过程优化，只需要暴露一些特定的抽象与接口供编排侧对接。
+
+## 路由与负载均衡
+LLM 推理的核心是 KV Cache，其存储了模型在 Prefill 阶段计算出的 Key 和 Value。由于不同请求的 Prompt 可能存在重叠的前缀，这些共享的前缀信息可以被多个请求复用，从而显著提升推理效率。因此，在负载均衡时需要考虑如何高效地利用这些缓存（KVCache aware），而**不是简单地将请求随机分配到不同的实例上**。
+1. Prefix-Aware。这种策略需要负载均衡器维护每个实例的缓存状态信息，并根据请求的前缀特征进行路由。
+2. Fairness。LLM 实例的公平调度也是负载均衡的一个重要方面，尤其是在多租户环境中，公平性确保了所有用户都能获得相对一致的服务质量，而不会因为某些实例过载而导致其他用户的请求延迟。AIBrix 基于 Sheng et al. 实现了 Virtual Token Counter (VTC) 的 Fair Queuing 调度策略。VTC 为每个客户端维护一个虚拟 Token 计数器，通过跟踪每个客户端已接受的服务量来实现公平调度，优先服务计数器值最小的客户端。
+
+## 自动扩速容
+
+目前 Kubernetes 的生态系统中被广泛使用的自动扩缩容工具主要有以下三个：
+
+1. HPA（Horizontal Pod Autoscaler）：Kubernetes 的水平扩缩器
+2. KPA（Knative Pod Autoscaler）：Knative 的水平扩缩器
+3. KEDA（Kubernetes Event-driven Autoscaling）：事件驱动的服务扩缩器，支持服务的从零到一部署
+
+针对 LLM 推理服务的自动扩缩容，其关键在于如何决定触发自动扩缩容的指标。AIBrix 的演讲者在 vLLM Meetup Beijing 分享了与传统的微服务的自动扩缩容不同，LLM 推理请求的 QPS 可能与产生的延迟并不是正相关的，且 SM Active 等 GPU 指标也不一定能及时反映出指标的变化。因此，如何基于 LLM 推理的特性来进行可靠的自动扩缩容仍然是需要探索的问题。长期来看，笔者认为 LLM 推理服务的自动扩缩容也有可能会由 Reactive 逐渐发展到 Proactive 甚至是 Predictive 的形态（如时间序列分析与基于强化学习的预测）。
 
 ## 各种并行
 

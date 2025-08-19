@@ -27,6 +27,7 @@ keywords: ddd cqrs
 
 ![](/public/upload/architecture/crud_defect.jpg)
 PS：主要问题在service层/业务层
+PS: 互联网分层架构，是一个CPU固定，数据移动的架构。
 
 ### 业务层臃肿，能力层单薄
 

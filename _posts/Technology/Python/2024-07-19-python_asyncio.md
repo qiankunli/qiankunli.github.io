@@ -274,6 +274,44 @@ class BaseEventLoop(events.AbstractEventLoop):
 3. asyncio.Condition
 4. asyncio.Semaphore
 
+## 结构化并发
+传统asyncio.gather()存在两大痛点：
+1. 无法动态添加任务。任务列表必须在开始时确定
+2. 错误处理粗糙。一个任务失败会导致整个任务集取消
+
+```python
+import asyncio
+async def fetch_data(url):
+    print(f"开始获取 {url}")
+    await asyncio.sleep(1)
+    print(f"完成获取 {url}")
+    return f"{url}的数据"
+async def main():
+    task1 = asyncio.create_task(fetch_data(" https://api/users "))
+    task2 = asyncio.create_task(fetch_data(" https://api/products "))
+
+    results = await asyncio.gather(task1, task2)
+    print(f"用户数据: {results[0]}")
+    print(f"产品数据: {results[1]}")
+```
+
+asyncio.TaskGroup应运而生，提供了更安全、更灵活的并发管理模式：
+1. 动态添加任务
+2. 精细错误处理
+3. 自动资源清理
+4. 结构化任务管理
+
+```python
+async def main():
+    async with asyncio.TaskGroup() as tg:
+        task1 = tg.create_task(fetch_data(" https://api/users "))
+        if should_fetch_more_data(): # 动态任务管理
+            task2 = tg.create_task(fetch_data(" https://api/products "))
+
+    print(f"用户数据: {task1.result()}")
+    print(f"产品数据: {task2.result()}")
+```
+
 ## 协程上下文
 [使用 contextvars 管理上下文变量](https://mp.weixin.qq.com/s/e2myTR6wMffuUAcRIGUezg)Python 在 3.7 的时候引入了一个模块：contextvars，从名字上很容易看出它指的是上下文变量（Context Variables）。
 
@@ -327,18 +365,19 @@ import contextvars
 
 c = contextvars.ContextVar("只是一个标识, 用于调试")
 
-async def get():
+async def nested_task():
     # 获取值
     return c.get() + "~~~"
 
-async def set_(val):
+async def main_task(val):
     # 设置值
     c.set(val)
-    print(await get()) 
+    ret = await nested_task()
+    print(ret) 
 
 async def main():
-    coro1 = set_("协程1")
-    coro2 = set_("协程2")
+    coro1 = main_task("协程1")
+    coro2 = main_task("协程2")
     await asyncio.gather(coro1, coro2)
 
 
@@ -349,7 +388,7 @@ asyncio.run(main())
 """
 ```
 
-`await get()` 相当于是开启了一个新的协程，那么意味着设置值和获取值不是在同一个协程当中？Python 的协程是无栈协程，通过 await 可以实现级联调用。
+`await main_task()` 相当于是开启了一个新的协程，那么意味着设置值和获取值不是在同一个协程当中？Python 的协程是无栈协程，通过 await 可以实现级联调用。
 
 当我们调用 c.set 的时候，其实会返回一个 Token 对象：
 ```python

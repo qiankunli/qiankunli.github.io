@@ -54,19 +54,26 @@ GFS 定了三个非常重要的设计原则
     2. 在 master 里面内嵌了一个 HTTP 服务器，然后把 master 的各种状态展示出来给开发者看到。
     3. MapReduce 框架里提供了一个计数器（counter）的机制。作为开发者，你可以自己定义几个计数器，然后在 Map 和 Reduce 的函数里去调用这个计数器进行自增。所有 map 和 reduce 的计数器都会汇总到 master 节点上，通过上面的 HTTP 服务器里展现出来。
 
-在 MapReduce 任务提交了之后（注意与 Hadoop 不完全一样）
-1. 写好的 MapReduce 程序，已经指定了输入路径。所以 MapReduce 会先找到 GFS 上的对应路径，然后把对应路径下的所有数据进行分片（Split）。每个分片的大小通常是 64MB，这个尺寸也是 GFS 里面一个块（Block）的大小。接着，MapReduce 会在整个集群上，启动很多个 MapReduce 程序的复刻（fork）进程。
-2. 在这些进程中，有一个和其他不同的特殊进程，就是一个 master 进程，剩下的都是 worker 进程。然后，我们会有 M 个 map 的任务（Task）以及 R 个 reduce 的任务，分配给这些 worker 进程去进行处理。这里的 master 进程，是负责找到空闲的（idle）worker 进程，然后再把 map 任务或者 reduce 任务，分配给 worker 进程去处理。这里你需要注意一点，并不是每一个 map 和 reduce 任务，都会单独建立一个新的 worker 进程来执行。而是 master 进程会把 map 和 reduce 任务分配给有限的 worker，因为一个 worker 通常可以顺序地执行多个 map 和 reduce 的任务。
-3. 被分配到 map 任务的 worker 会读取某一个分片，分片里的数据就像上一讲所说的，变成一个个 key-value 对喂给了 map 任务，然后等 Map 函数计算完后，会生成的新的 key-value 对缓冲在内存里。
-4. 这些缓冲了的 key-value 对，会定期地写到 map 任务所在机器的本地硬盘上。并且按照一个分区函数（partitioning function），把输出的数据分成 R 个不同的区域。而这些本地文件的位置，会被 worker 传回给到 master 节点，再由 master 节点将这些地址转发给 reduce 任务所在的 worker 那里。
-5. 运行 reduce 任务的 worker，在收到 master 的通知之后，会通过 RPC（远程过程调用）来从 map 任务所在机器的本地磁盘上，抓取数据。当 reduce 任务的 worker 获取到所有的中间文件之后，它就会将中间文件根据 Key 进行排序。这样，所有相同 Key 的 Value 的数据会被放到一起，也就是完成了我们上一讲所说的混洗（Shuffle）的过程。
+在 MapReduce 任务提交了之后（注意与 Hadoop 不完全一样），不妨假设，用户设置了M个map任务，R个reduce任务。
+1. 写好的 MapReduce 程序，已经指定了输入路径。所以 MapReduce 会先找到 GFS 上的对应路径，然后把对应路径下的所有数据进行分片（Split）。每个分片的大小通常是 64MB，这个尺寸也是 GFS 里面一个块（Block）的大小。接着，MapReduce 会在整个集群上，启动很多个 MapReduce 程序的fork进程。
+2. 在这些进程中，有一个和其他不同的特殊进程，就是一个 master 进程，剩下的都是 worker 进程。然后，我们会有 M 个 map 的任务（Task）以及 R 个 reduce 的任务，分配给这些 worker 进程去进行处理。这里的 **master 进程，是负责找到空闲的（idle）worker 进程，然后再把 map 任务或者 reduce 任务，分配给 worker 进程去处理**。这里你需要注意一点，并不是每一个 map 和 reduce 任务，都会单独建立一个新的 worker 进程来执行。而是 master 进程会把 map 和 reduce 任务分配给有限的 worker，因为一个 worker 通常可以顺序地执行多个 map 和 reduce 的任务。
+3. 被分配到 map 任务的 worker 会读取某一个分片，分片里的数据就像上一讲所说的，变成一个个 key-value 对/pair喂给了 map 任务，然后等 Map 函数计算完后，会生成的新的 key-value 对缓冲在内存里。
+4. 这些缓冲了的 key-value 对，会定期地写到 map 任务所在机器的本地硬盘上。并且按照一个**分区函数**（partitioning function，保证同一个key，在合并阶段，必须落到同一个reduce上），把输出的数据分成 R 个不同的区域。而**这些本地文件的位置，会被 worker 传回给到 master 节点，再由 master 节点将这些地址转发给 reduce 任务所在的 worker 那里**。
+5. 运行 reduce 任务的 worker，在收到 master 的通知之后，会通过 RPC（远程过程调用）来从 map 任务所在机器的本地磁盘上，**抓取数据**。当 reduce 任务的 worker 获取到所有的中间文件之后，它就会将中间文件根据 Key 进行排序。这样，所有相同 Key 的 Value 的数据会被放到一起，也就是完成了我们上一讲所说的混洗（Shuffle）的过程。
 6. reduce 会对排序后的数据执行实际的 Reduce 函数，并把 reduce 的结果输出到当前这个 reduce 分片的最终输出文件里。
-7. 当所有的 map 任务和 reduce 任务执行完成之后，master 会唤醒启动 MapReduce 任务的用户程序，然后回到用户程序里，往下执行 MapReduce 任务提交之后的代码逻辑。
+7. 当所有的 map 任务和 reduce 任务执行完成之后，**master 会唤醒启动 MapReduce 任务的用户程序**，然后回到用户程序里，往下执行 MapReduce 任务提交之后的代码逻辑。
 
 ![](/public/upload/compute/mapreduce_run.png)
 
+master和worker
+1. master会存储一些元数据，监控所有map与reduce的状态，**记录哪个数据要给哪个map，哪个数据要给哪个reduce**，掌控全局视野，做中控；
+2. 多个worker进行业务逻辑处理，具体一个worker是用来执行map还是reduce，是由master调度的；PS：和工作线程池非常像，只是worker分布在多台机器上而已。**worker 从master 给的地址拉数据干活儿，干完写入本地磁盘，然后把地址给到master**。
+
 MapReduce 的容错机制非常简单，就是重新运行和写 Checkpoints。
-1. worker 节点的失效（Worker Failure）。master 节点会定时地去 ping 每一个 worker 节点，一旦 worker 节点没有响应，我们就会认为这个节点失效了。解决也简单，换一台服务器重新运行这个 worker 节点被分配到的所有任务。
+1. worker 节点的失效（Worker Failure）。master 节点会定时地去 ping 每一个 worker 节点，一旦 worker 节点超时没有响应，我们就会认为这个节点失效了。解决也简单，换一台服务器重新运行这个 worker 节点被分配到的所有任务。
+	1. 如果重新执行的是reduce任务，不需要有额外的通知；
+	2. 如果重新执行的是map任务，需要通知执行reduce的worker节点，输入数据换了一个worker；
+	在用户输入不变的情况下，MR的输出一定是不变的，这就要求MR系统必须具备幂等性：对相同的输入，不管哪个负责map的worker执行的结果，一定是不变的，产出的R个本地输出文件内容也一定是不变的；对于M个map，每个map输出的R个本地文件，只要这些输入不变，对应接收这些数据的reduce的worker执行结果，一定是不变的，输出文件内容也一定是不变的；
 2. master 节点的失效（Master Failure）。就任由 master 节点失败了，也就是整个 MapReduce 任务失败了。那么，对于开发者来说，解决这个问题的办法也很简单，就是再次提交一下任务去重试。谷歌也给出了一个很简单的解决方案，那就是让 master 定时把它里面存放的信息，作为一个个的 Checkpoint 写入到硬盘中去。一旦 master 失效，我们就可以启动一个新的 master，来读取 Checkpoints 数据，然后就可以恢复任务的继续执行了，而不需要重新运行整个任务。
 
 ## Bigtable
