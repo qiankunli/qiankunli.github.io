@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 上下文记忆
+title: 上下文记忆——AI Agent native 的任务存储机制
 category: 技术
 tags: MachineLearning
 keywords: llm agent
@@ -78,7 +78,7 @@ PS： 什么东西可以作为记忆，肯定是跟用户个人相关的东西�
             messages: List[Message] = Field(default_factory=list)
             max_messages: int = Field(default=100)
         ```
-    2. 长期记忆：智能体在多次交互中积累知识，**跨越多次对话**的客户关键信息、偏好和交互模式。例如，一个购物推荐系统可以记住用户过去购买的产品偏好，以便将来推荐相关产品。流程：Receive（接收）→ Consolidate（整合）→ Store（存储）→ Retrieve（提取）。 
+    2. 长期记忆：智能体在多次交互中积累知识，**跨越多次对话**的客户关键信息、偏好和交互模式（所有行为、习惯、失败/成功路径的累计认知）。例如，一个购物推荐系统可以记住用户过去购买的产品偏好，以便将来推荐相关产品。流程：Receive（接收）→ Consolidate（整合）→ Store（存储）→ Retrieve（提取）。 
         1. 关注模式和偏好而非具体对话内容
         2. 与客户数据平台和 CRM 系统集成
         3. 持久性以月或年计
@@ -342,3 +342,9 @@ relations:
 2. RAG也是不行的。还是用我之前总举的一个例子，pretrain阶段没有学习过量子色动力学的LLM和它构成的Agent，不可能只靠RAG学会量子色动力学。
 3. 目前唯一可行的方式只有在in-context内进行表达和学习，也就是说，所有对于单个用户的认知都需要表达为文本。但Agent对于一个用户的认知大概率不能表达为一个用户profile文本，由于数据量和目前LLM的context window能力，对于用户的profile必然有很多信息需要外溢到外部的memory存储中，按需召回进入每次请求的context中。
 4. 进一步展望的话，在这之后有可能通过RFT（强化微调）的方式，对于每个用户去训练一个特化模型/LORA来更进一步地学习/熟悉该用户。但还没学会走的时候就去学跑是不太现实的。
+
+llm memory不是传统数据库的延续，而是新的系统范式。传统 DB 是给程序员写 SQL 用的，强调 schema、字段、索引、事务。Agentbase DB 则是面向 LLM，“Memory 是 agent 可以理解、可以问、可以操控的对象”，所以它需要是语义驱动 / 任务驱动的。Agentbase 的 Memory store 未来很可能具有这三点特性：
+1. 多模态（Multimodal）：不只是文本记忆，还要支持图像、语音、甚至视频行为链（比如教育场景中 AI 教练对学员的长期反馈）
+2. 自编排（Self-orchestrated）：Agent 会动态选择：哪些 memory 激活、哪些工具调用、哪些路径最优（plan routing） → 这需要 memory store 提供状态感知和调度接口
+3. 自治（Autonomous）：系统能根据 memory 反馈自己优化 agent 的行为（比如强化成功路径、屏蔽失败路径）。
+长期来看，落地 Agentbase 将传统数据抽象成“Agent可理解的语义 API”，并与 Agent 的任务计划机制打通（Plan → Tool → Data Interface）。也就是说，这种“面向 LLM 的老数据访问”只是过渡，最终会转向 Plan-native / Tool-native 的数据结构。

@@ -44,6 +44,8 @@ while True:
 
 ## Kubernetes 资源模型与资源管理
 
+调度的本质可以概括为一个“取出 → 评估 → 绑定”的过程：从调度队列中取出一个待调度的 Pod → 执行调度逻辑，评估出最合适的目标节点 → 绑定到目标节点。
+
 从编排系统的角度来看，Node 是资源的提供者，Pod 是资源的使用者，而调度是将两者进行恰当的撮合。在 Kubernetes 里，Pod 是最小的原子调度单位。这也就意味着，所有跟调度和资源管理相关的属性都应该是属于 Pod 对象的字段。而这其中最重要的部分，就是 Pod 的CPU 和内存配置。在 Kubernetes 中，像 CPU 这样的资源被称作“可压缩资源”（compressible resources）。它的典型特点是，当可压缩资源不足时，Pod 只会“饥饿”，但不会退出。而像内存这样的资源，则被称作“不可压缩资源（incompressible resources）。当不可压缩资源不足时，Pod 就会因为 OOM（Out-Of-Memory）被内核杀掉。
 
 ### request and limit
@@ -245,6 +247,26 @@ func main() {
 [K8s调度框架引入PreEnqueue设计](https://mp.weixin.qq.com/s/ViWhCydGcqSQltWJlbx2Pw)
 
 ## 代码分析
+
+```
+$ tree pkg/scheduler/internal/
+internal
+├── cache # 调度缓存，下期介绍
+├── heap  # 堆结构，作为调度队列的底层结构
+└── queue # 调度队列
+```
+
+其中 heap 模块提供了调度队列的基础数据结构支持，queue 模块则建立在 heap 之上，实现调度队列核心逻辑，管理所有待调度的 Pod 。在 Kubernetes 源码中，**会习惯使用接口来解耦实现与定义**，提升可扩展性和可测试性。
+1. 调度队列的优先级排序能力并非凭空而来，而是构建在一个更基础的数据结构之上——堆（Heap）。（相对 Go 标准库 heap.Interface）提供更高层的 API ： Add/Update/Delete/ Peek/Pop/Get/List/Len … 还为其包装了指标统计功能。
+2. 对于调度队列，便定义了一个 SchedulingQueue 抽象接口来描述一个调度队列需要具备的所有能力：
+
+	```go
+	type SchedulingQueue interface {
+    	Add(pod *v1.Pod) error // Add 将一个 Pod 插入到调度队列。
+		Pop() (*framework.QueuedPodInfo, error)  // Pop 移除并返回队列头部的 Pod。
+	}
+	```
+	kube-scheduler 的核心调度队列实现是 PriorityQueue 结构（实现了上面的 SchedulingQueue 接口），它并非只是一个简单的优先级队列，而是一个复杂的状态机。为了精细化管理不同状态的 Pod，PriorityQueue 在内部划分了三个关键的子队列：activeQ/podBackoffQ/unschedulablePods *heap.Heap。
 
 ![](/public/upload/kubernetes/scheduler_overview.png)
 

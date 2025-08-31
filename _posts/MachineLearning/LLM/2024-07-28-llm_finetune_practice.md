@@ -98,8 +98,9 @@ chat_dict = [
 
 2. 在llama factory里有一个参数叫 Efficient EOS，所谓efficient eos并不代表是一个新的token，而是一个特殊的input和label的设计方式。 [多轮对话的训练过程详解](https://zhuanlan.zhihu.com/p/695202364)
 
-不管是PreTraining阶段还是SFT阶段，loss函数都是一样的，只是计算的方式存在差异，PreTraining阶段计算的是整段输入文本的loss，而SFT阶段计算的是response部分的loss。**sft 的 prompt 不做 loss，但这并不是说它不能做 loss。主要原因是 prompt 的同质化比较严重**，不做 loss_mask 的话，同样的一句话会被翻来覆去的学，但如果你能保证你的每条 prompt 都是独一无二的，就完全可以省去 prompt 的 loss_mask 环节。此外，LLM在推理也就是generate的时候，是要不断调用forward的。**训练的时候一句话abcd变成a->b, ab->c,abc->d三个样本，forward只需要调用一次**（一句话的多个样本构成一个batch）。且训练的时候不生成新的token（自然也就没有解码策略那一堆事），因为输入已经是prompt+response了，是根据整个序列的各个位置的最后的logits（推理时需要根据logits再sample 得到token）和response真实值做loss计算。
+不管是PreTraining阶段还是SFT阶段，loss函数都是一样的，只是计算的方式存在差异，PreTraining阶段计算的是整段输入文本的loss，而SFT阶段计算的是response部分的loss。**sft 的 prompt 不做 loss，但这并不是说它不能做 loss。主要原因是 prompt 的同质化比较严重**，不做 loss_mask 的话，同样的一句话会被翻来覆去的学，但如果你能保证你的每条 prompt 都是独一无二的，就完全可以省去 prompt 的 loss_mask 环节。
 
+此外，LLM在推理也就是generate的时候，是要不断调用forward的。sft训练时，比如input=ab,response=cd，模型一次 forward 输出整个序列的 logits `[P(b|a), P(c|a,b), P(d|a,b,c), P(<eos>|a,b,c,d)]`，每个 token 的 logits 是预测下一个 token 的概率分布。decoder 的 causal mask（上三角遮罩矩阵） 已经自动保证了预测下一 token 时不会看到未来的 token（只看到左边 token），比如在预测 c 时，模型只能看到 ab，看不到d。loss_mask = `[0, 0, 1, 1]` 标记loss只计算 response 部分（c, d），`Loss = cross-entropy(P(c|a,b), c) + cross-entropy(P(d|a,b,c), d)`。
 
 ## 微调实践
 

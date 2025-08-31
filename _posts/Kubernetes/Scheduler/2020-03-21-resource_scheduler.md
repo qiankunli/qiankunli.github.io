@@ -12,8 +12,6 @@ keywords: resource scheduler
 
 ![](/public/upload/basic/scheduler_design.png)
 
-什么是调度？本质就是通过一些自定义策略，定时或者周期性的去触发某些事件，比如去发起一次rpc调用，和下游进行一次通信。
-
 [Kubernetes架构为什么是这样的？](https://mp.weixin.qq.com/s/ps34qFlEzQNYbp6ughkrOA)在 Google 的一篇关于内部 Omega 调度系统的论文中，将调度系统分成三类：单体、二层调度和共享状态三种，按照它的分类方法，通常Google的 Borg被分到单体这一类，Mesos被当做二层调度，而Google自己的Omega被当做第三类“共享状态”。我认为 **Kubernetes 的调度模型也完全是二层调度的，和 Mesos 一样，任务调度和资源的调度是完全分离的，Controller Manager承担任务调度的职责，而Scheduler则承担资源调度的职责**。 
 
 [集群调度系统的演进](https://mp.weixin.qq.com/s/3qVdnUQ3zt4eu3lZRZ_ibg)
