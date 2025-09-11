@@ -106,7 +106,7 @@ $$P(θ|data)=\frac{P(data|θ)P(θ)}{P(data)}$$
 
 ![](/public/upload/machine/gaussian_function.png)
 
-\\(P(data|θ)P(θ)=θ^7(1−θ)^3P(θ)\\)，则`P(data|θ)P(θ)`的函数图像为：
+$P(data|\theta)P(\theta)=\theta^7(1−\theta)^3P(\theta)$，则$P(data|\theta)P(\theta)$的函数图像为：
 
 ![](/public/upload/machine/gaussian_function_move.png)
 
