@@ -59,6 +59,15 @@ keywords: rl finetune
 
 [无干预，短思考，多行动：新的Multi-step LLM+RL范式](https://zhuanlan.zhihu.com/p/49397670697)在R1提出后我一直在想，这种在post-train阶段reasoning trace一直变长的现象是否是个好事。由于single-step RL任务往往是完全信息的bandit问题，模型的reasoning trace越来越长我觉得是很好理解的，因为更长的reasoning可以反复重构问题中的信息达到与pretrain阶段最匹配的token分布。但是世界上的大部分现实问题都是multi-step的，也就是说需要很多步decision的sequential impact才会拿到最后的reward，这明显用multi-step MDP去model更加合理。我坚信**真正的智能必须能够解决multi-step的问题**。做出一个decision后agent其实获得了新的信息，而这些新的信息对于最后的成败至关重要。在获得能够决定最后成败的新的信息前，agent不应该给出答案。而找这些信息往往并不需要过多的reasoning，都是非常简单的事情。这就是我们近期工作的核心思想。通过一种新的post-train算法，我们希望得到的model具有三个我们所期待的性质：无干预，短思考，多行动。
 
+[从「会说」迈向「会做」，LLM下半场：Agentic强化学习范式综述](https://mp.weixin.qq.com/s/c1LQFS4v79pF_kWfuDCthA)早期 RL 研究多基于 PBRFT 范式（输入提示、输出文本、获得一个偏好分数），可被视为退化的单步 MDP（单 prompt、一次性文本输出、立即终止），而 Agentic RL 则将 LLM 置于部分可观测马尔可夫决策过程（POMDP）下进行多步交互，其中关键变化在于动作空间从单一文本扩展为「文本 + 操作」（A_text => A_text + A_action）；同时奖励从「单步评分」扩展为「时序反馈」，优化整条决策轨迹，把 LLM 从「文本生成器」推进为**可交互的决策体**。要让 LLM 真正成为智能体，仅有动作空间还不够，它必须发展出一套完整的能力体系。
+1. 规划（Planning）：为复杂任务设定子目标与多步行动序列。通过外部引导（外部打分生成奖励）或内部驱动（自主规划并修正）实现。
+2. 工具使用（Tool Use）：调用外部工具完成任务。从 ReAct 等静态提示模仿演进到 Tool-integrated RL (TIR)，让智能体学会自主选择组合工具。
+3. 记忆（Memory）：保持上下文连贯并积累知识，包括基于外部数据库检索记忆、Token 级别记忆和结构化记忆。中，值得关注的工作包括来自字节跳动的 MemAgent 和麻省理工大学的 MEM1，他们都通过强化学习让 LLM Agent 拥有自行管理记忆窗口的能力。
+4. 自我改进（Self-Improvement）同样是目前 Agent 最热门的发展方向。
+5. 推理（Reasoning）：解决复杂问题的推导能力，分为快速直觉推理（凭经验直觉迅速答题）和慢速缜密推理（多步演绎得出严谨结论）。
+6. 感知（Perception）：理解多模态输入的信息获取能力。
+借助强化学习，这些能力由人工启发式转变为可学习的策略，规划不再依赖硬编码流程、工具使用也可由模型自主决定、端到端训练。
+
 ### tool-use rl
 
 1. multi turn tool-use的prompt template
