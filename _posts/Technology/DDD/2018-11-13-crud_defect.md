@@ -272,7 +272,7 @@ controller, service , dao通过 对于数据通道的操作来实现业务逻辑
 **如果我们尽量使用充血模型会得到什么好处呢？ 业务逻辑和依赖关系都可以传递了**，我们回头看看失血模型下我们的代码，是不是相当于当我们的合作伙伴要调用我们的时候，我们丢出去了一堆电子元器件并且和他说『自己去把线连起来』是不是多少有那么一点点不合理？在充血模型下我们的代码是由什么组成的呢？
 1. Entity，这里面写的是关于这个实体的业务逻辑和他的关联的对象，并且触发关联对象的业务逻辑，只要有业务逻辑优先是写在 entity 里面的
 2. ValueObject，业务实体 这是业务实体的另一种体现，和 entity 的区别就是有没有 id
-3. Repository，用来获取业务实体，或者是保存业务实体，首先声明这一定是一个接口，用来获取 entity, 和我们认知的 dao 有什么区别呢？DAO 返回的对象不一定是 entity, 但是 **repository 返回的对象一定是 entity**。同时因为是一个接口所以可以用来屏蔽到底是怎么取数据的（localcache, redis, mysql），**让领域层（领域对象）只处理业务逻辑**。此外，repository 的接口会写在 entity 里面， 因为Entity 是不能依赖非 entity 包下的东西的，在充血模型下，实际上 repository 是一部分 entity 的，entity 禁止依赖 redis 禁止依赖一个 xxxclient。
+3. Repository，**用于管理领域对象的创建、更新和持久化的接口**。用来获取业务实体，或者是保存业务实体，首先声明这一定是一个接口，用来获取 entity, 和我们认知的 dao 有什么区别呢？DAO 返回的对象不一定是 entity, 但是 **repository 返回的对象一定是 entity**。同时因为是一个接口所以可以用来屏蔽到底是怎么取数据的（localcache, redis, mysql），**让领域层（领域对象）只处理业务逻辑**。此外，repository 的接口会写在 entity 里面， 因为Entity 是不能依赖非 entity 包下的东西的，在充血模型下，实际上 repository 是一部分 entity 的，entity 禁止依赖 redis 禁止依赖一个 xxxclient。
 	1. **domain层repository定义**：domain 层定义了存储接口 repository（interface），定义好与业务数据底层存储交互的抽象接口，而具体实现则由infrastructure层中提供对应dao实例。
 	2. infrastructure层依赖倒置原则：infrastructrue层逆向实现由上层定义的一系列通用能力的抽象接口，以此保证其实现细节不会侵入到上层模块，能够实现低成本替换。
 	3. [从 Repository 层入手，快速理解 DDD 设计](https://mp.weixin.qq.com/s/hEvXZVo7jOmVwuhJrz0LBg)DDD中的Repository的设计思路是，由Repository 层统一封装聚合数据的获取、转换、缓存与异常处理，再向领域层或应用层提供语义清晰的业务访问接口。一般干那些活儿：
