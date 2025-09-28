@@ -42,7 +42,9 @@ Transformer模型采用的也是编码器-解码器架构，但是在该模型�
 1. 在 Transformer 的 Decoder 结构中，Q 来自于 Decoder 的输入，K 与 V 来自于 Encoder 的输出， 从而拟合了编码信息与历史信息之间的关系，便于综合这两种信息实现未来的预测。
 1. 在 Transformer 的 Encoder 结构中，使用的是 Attention 机制的变种 —— self-attention （自注意力）机制。 所谓自注意力，即是计算本身序列中每个元素都其他元素的注意力分布， 即在计算过程中，Q、K、V 都由同一个输入通过不同的参数矩阵计算得到。 从而拟合输入语句中每一个 token 对其他所有 token 的关系，从而建模文本之间的依赖关系。​
 
-Transformer 模型本来是为了翻译任务而设计的。在训练过程中，Encoder 接受源语言的句子作为输入，主要负责理解，而 Decoder 则接受目标语言的翻译作为输入。在 Encoder 中，由于翻译一个词语需要依赖于上下文，因此注意力层可以访问句子中的所有词语；而 Decoder 是顺序地进行解码，在生成每个词语时，注意力层只能访问前面已经生成的单词。例如，假设翻译模型当前已经预测出了三个词语，我们会把这三个词语作为输入送入 Decoder，然后 Decoder 结合 Encoder 端的输出 和 当前block mask attention layer的输出作为输入（多头交叉注意力，Q来自前一个解码器层输出向量，K和V来自编码器输出的注意力向量，编码器并非只传递最后一步的隐状态，而是把所有时刻（对应每个位置）产生的所有隐状态都传给解码器，这就解决了中间语义编码上下文的长度是固定的问题）来预测第四个词语。每一个部分都有公式对应。
+Transformer 模型本来是为了翻译任务而设计的。在训练过程中，Encoder 接受源语言的句子作为输入，主要负责理解，而 Decoder 则接受目标语言的翻译作为输入。在 Encoder 中，由于翻译一个词语需要依赖于上下文，因此注意力层可以访问句子中的所有词语；而 Decoder 是顺序地进行解码，在生成每个词语时，注意力层只能访问前面已经生成的单词。例如，假设翻译模型当前已经预测出了三个词语，我们会把这三个词语作为输入送入 Decoder，然后 Decoder 结合 Encoder 端的输出 和 当前block mask attention layer的输出作为输入（多头交叉注意力，Q来自前一个Decoder 层输出向量，K和V来自Encoder输出的注意力向量，编码器并非只传递最后一步的隐状态，而是把所有时刻（对应每个位置）产生的所有隐状态都传给解码器，这就解决了中间语义编码上下文的长度是固定的问题）来预测第四个词语。每一个部分都有公式对应。
+
+![](/public/upload/machine/cross_attention.jpg)
 
 想要进一步了解 Transformer 这一架构的原理，强烈推荐阅读 Jay Alammar 的博客。从为了解决翻译问题时 Seq2Seq 模型的提出的 Attention 的基本概念 https://jalammar.github.io/visualizing-neural-machine-translation-mechanics-of-seq2seq-models-with-attention，到 Transformer 架构中完全抛弃 RNN https://www.youtube.com/watch?v=UNmqTiOnRfg 提出的 Attention is All You Need http://jalammar.github.io/illustrated-transformer，到 GPT-2 和 GPT-3 的架构解读http://jalammar.github.io/illustrated-gpt2 http://jalammar.github.io/how-gpt3-works-visualizations-animations，Jay Alammar 的博客都提供了精彩的可视化配图便于理解模型结构。
 
@@ -260,6 +262,8 @@ Normalization有两种方法，Batch Normalization和Layer Normalization。
 1. 如果认为不同样本的同一特征应该遵循相似分布，就用 BatchNorm。一张图片中的“猫”的特征（例如某个通道代表的纹理）和另一张图片中的“猫”的特征应该是相似的，所以它在批次维度上对这个特征通道进行归一化。
 2. 如果认为同一样本的不同特征应该作为一个整体看待，就用 LayerNorm。一个句子（一个样本）内部的所有词向量（特征）构成了一个整体，应该一起被归一化，而它与其他句子的关系不大。
 
+![](/public/upload/machine/transformer_norm.png)
+
 一般情况下，输入是一个矩阵，然后矩阵的 每一行是一个样本，多个行（多个样本）是 一个 batch，每一列是一个特征，多个列是 feature。batchnorm 是说每一次，去把每一个列，就是每一个特征，把它在一个小 mini-batch 里面，每列 的均值变成 0 方差变成 1。 [Batch Norm详解之原理及为什么神经网络需要它](https://zhuanlan.zhihu.com/p/441573901)
 
 **在 Transformer 里面，或者说正常的 RNN 里面，它的输入是一个三维的矩阵**。因为 输入的是一个序列的样本，即每一个样本里面有很多个元素。一个序列，如：一个句子里面有 n 个词，所以每个词表示为一个向量的话，还有一个 batch 维度，那么就是个 3D 的输入。列不再是特征，而是序列的长度，对每一个 sequence 就是 每个词，每个词有自己对应的向量。如果是 layernorm 的话，那么就是对每个样本切一下（横着切一下）。为什么 layer norm 用的多一点？一个原因是：在 时序的序列模型 里面，每个样本的长度可能会发生变化。那些不够 sequence 的长度 n 的样本 ，一般是补 0。 layernorm 是对 每个样本来做，所以不管样本是长还是短，反正算均值是在样本自己算的，这样的话相对来说它稳定一些。
@@ -316,7 +320,7 @@ softmax直白来说就是将原来输出是$z_1=3,z_2=1,z_3=-3$通过softmax函�
 
 ### 李宏毅
 
-[台大李宏毅自注意力机制和Transformer详解！](https://www.bilibili.com/video/BV1v3411r78R) 视频总结了 Self-Attention 与RNN 和 CNN和 GNN的关系，Self-Attention 可以用来学习原来由  RNN 和 CNN  和 GNN学习的任务。
+[台大李宏毅自注意力机制和Transformer详解！](https://www.bilibili.com/video/BV1v3411r78R) 视频总结了 Self-Attention 与RNN 和 CNN和 GNN的关系，Self-Attention 可以用来学习原来由RNN和CNN和GNN学习的任务。
 
 ![](/public/upload/machine/self_attention_from.png)
 
@@ -359,6 +363,8 @@ NLP 神经网络模型的本质就是对输入文本进行编码，常规的做�
    $$
 
    交叉注意力让 Decoder 能够关注 Encoder 的输出，实现了理解到生成的信息传递。但要注意交叉注意力存在于早期的 Encoder-Decoder 架构，现代的 Decoder-Only 模型（GPT3）舍弃了交叉注意力的模块，只使用掩码机制。
+
+![](/public/upload/machine/decoder_autoregressive.jpg)
 
 **对于算法这类代码来说，打印输入输出尺寸，往往可以帮助我们从直觉上快速了解这个模块在做一件什么事**。在这个基础上我们再去看细节。【看不懂就动手跑，千万不要原地纠结】
 
@@ -565,6 +571,8 @@ class Transformer(nn.Module):
 
 ### mask
 
+![](/public/upload/machine/masked_self_attention.png)
+
 [举个例子讲下transformer的输入输出细节及其他](https://zhuanlan.zhihu.com/p/166608727)
 1. 对于机器翻译来说，一个样本是由原始句子和翻译后的句子组成的。比如原始句子是： “我爱机器学习”，那么翻译后是 ’i love machine learning‘。 则该一个样本就是由“我爱机器学习”和 "i love machine learning" 组成。这个样本的原始句子的单词长度是length=4,即‘我’ ‘爱’ ‘机器’ ‘学习’。经过embedding后每个词的embedding向量是512。那么“我爱机器学习”这个句子的embedding后的维度是[4，512 ] （若是批量输入，则embedding后的维度是[batch, 4, 512]）。
 2. padding。**因为每个样本的原始句子的长度是不一样的**，那么怎么能统一输入到encoder呢。此时padding操作登场了，假设样本中句子的最大长度是10，那么对于长度不足10的句子，需要补足到10个长度，shape就变为[10, 512], 补全的位置上的embedding数值自然就是0了。
@@ -625,6 +633,12 @@ Sequence Mask， 上述训练过程是挨个单词串行进行的，那么能不
 ![](/public/upload/machine/causal_mask.jpg)
 
 ![](/public/upload/machine/decoder_mask.jpg)
+
+$$
+\text{Attention}(Q_t, K_{1:t}, V_{1:t}) = \text{softmax}\Big(\frac{Q_t K_{1:t}^\top}{\sqrt{d}} + \text{mask}\Big)V_{1:t}
+$$
+
+训练时：必须用 mask，否则模型会看到未来 token，破坏自回归特性。推理时：严格来说，自回归生成一步步输入，未来 token 不存在（或者说屏蔽padding token），不需要 mask。但框架为了统一实现，通常还是保留。
 
 ## 其它
 
