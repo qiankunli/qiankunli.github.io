@@ -135,6 +135,7 @@ LLM 擅长于一般的语言理解与推理，而不是某个具体的知识点�
 4. Agentic Chunking。核心思想是让大语言模型（LLM）主动评估每一句话，LLM会将这些句子进行propositioning（可以看做是对文档进行“句子级整容”，确保每个句子独立完整）处理，即将每个句子独立化，确保每个句子都有自己的主语。之后将其分配到最合适的文本块中。PS：问题就是慢、贵。
 5. latechunking，用 “先嵌入再分割” 思路，先对整个长文本标记化并经嵌入模型 Transformer 部分处理（需要一个很长的emb model），生成含全文上下文信息的标记嵌入，之后在均值池化前分块，并对各块做池化得嵌入表示。PS： 譬如1w 个token 经过transformer 后得到1w个 token vector输出，再根据chunk size将chunk 个token vector转为输出emb。优点是，一些代词能考虑到整个上下文。
 5. 正则表达式。[你的RAG也许真的不需要语义切分](https://mp.weixin.qq.com/s/ClpkaJVTXjJihw-rAr4rtQ)
+6. 根据不同的文档类型（如法律合同、技术手册、财务报告）选择最合适的Chunking方法。
 
 一个不好的分块，会带来很多的问题，比如说以下几点：
 1. 代称，他/她等表示响应的主题，刚好被切分在单独的块中，影响召回

@@ -28,6 +28,14 @@ keywords: agent
 
 [万字长文分析 10 种流行 Agent 框架设计思路，教你如何构建真正可靠的 Agent 系统？](https://mp.weixin.qq.com/s/8Hkq0HkVv4lYaNTB5O5jCA)OpenAI 采用更高层次、更具思想领导力的方式来定义 Agent：Agent 是能独立代表你完成任务的技术系统。这种模糊表述无助于真正理解 Agent 本质，在 Anthropic，架构上区分工作流和Agent：工作流是通过预定义代码路径编排大模型和工具的系统；Agent则是大模型动态自主控制流程和工具使用的系统，自主决定任务完成方式。Anthropic 将 Agent 定义为"...本质上只是**大模型在循环中基于环境反馈使用工具的系统**"。实际生产环境中，几乎所有的Agent 系统都是工作流和Agent的混合体。这正是我反感讨论"某物是否是 Agent"，而更倾向于讨论"**系统的 Agent 化程度**"的原因。
 
+[Microsoft Agent Framework 与 Semantic Kernel 全维度深度拆解与实战指南](https://mp.weixin.qq.com/s/SMg-1KqEdM_7YqtNO6GKtA)在 AI 应用工程化的演化曲线上，行业其实经历了几个阶段：
+1. Prompt 拼接期：直接调用 LLM，手写上下文，体验先行；
+2. 函数/插件期：出现“让模型主动调用函数”能力（OpenAI function calling 等），开始把业务 API 暴露为结构化工具；
+3. 规划与链式期：出现 Planner / Chain / Graph（如 SK Planner、LangChain Chains），对调用序列进行自动或半自动生成；
+4. 多智能体期：从“单大脑 + 工具”转为“多个具有独立角色、记忆、工具、策略的主体”进行协同——本质是软件体系结构的再分层；
+5. 运行时与治理期：需要托管、可观测、可靠恢复、跨边界（网络/组织/系统）交互与标准协议整合；面向 Agent 生命周期与交互协议的宿主体系。
+6. 生态互操作期：通过 Model Context Protocol、RAG 数据网格、事件溯源等形成“智能操作系统”式平台。
+
 ## 理念之争：agent vs workflow
 
 llm在持续计划（推理模型 ==> 自动推理等），目标都是为了提升单次LLM任务的准确率。但在实际业务中，很难通过一次LLM调用将所有问题解决。
