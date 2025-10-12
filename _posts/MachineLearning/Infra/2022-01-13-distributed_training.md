@@ -366,6 +366,23 @@ struct ncclComm {
 2. [利用多 GPU 加速深度学习模型训练](https://mp.weixin.qq.com/s/wiqOHIVfL2gKnRUhY62EBA)多机软件设计一般采用 MPI（Message Passing Interface）实现数据交互。MPI 是一种消息传递库接口描述标准，规定了点对点消息传递、协作通信、组和通讯员概念、进程拓扑、环境管理等各项内容，支持 C 和 Fortran 语言。**NCCL 出现得更晚一些，参考并兼容了 MPI 已有 API**。**NCCL 更多考虑了 GPU 的特性**，例如任意两块 GPU 之间的通信开销是有区别的，跨 QPI 情况与同一 PCIe Switch 情况，以及有 NVLink/ 无 NVLink 情况就有明显差异，但 MPI 认为两种情况下 GPU 与 GPU 都是等同的，甚至 **MPI 认为跨机器的 GPU 也是等同的**，这对于多 GPU 通信效率会有影响。MPI 可以和 NCCL 结合，实现**层次化的**并行通信机制，即同一台机器上的不同 GPU 之间采用 NCCL 通信，而不同机器上的 GPU 之间采用 MPI 辅助通信。[NCCL and MPI](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/mpi.html)
 
 
+体现在pytorch上， PyTorch 通过torch.distributed模块实现分布式计算，而 NCCL 是该模块支持的通信后端之一
+```python
+import torch.distributed as dist
+# 配置主进程地址和端口（多机训练需指定主节点IP）
+os.environ["MASTER_ADDR"] = "localhost"
+os.environ["MASTER_PORT"] = "12355"
+# 初始化分布式环境：指定后端为NCCL
+dist.init_process_group(backend, rank=rank, world_size=world_size)
+# 每个GPU创建一个张量
+tensor = torch.tensor([rank + 1.0], device=f"cuda:{rank}")
+print(f"Rank {rank} 初始张量: {tensor}")
+# 使用NCCL进行all-reduce（求和）
+dist.all_reduce(tensor, op=dist.ReduceOp.SUM)
+print(f"Rank {rank} 同步后张量: {tensor}")  # 结果应为 [3.0]（2个GPU时 1+2=3）
+```
+
+
 
 ## 资源调度
 
