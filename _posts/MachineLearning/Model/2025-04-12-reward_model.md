@@ -37,6 +37,8 @@ RM 其实扮演的是rl概念下的「环境」，在使用RL训练LLM的一个�
 
 ## 训练
 
+奖励模型的网络结构整体同预训练模型的架构一致，只是将最后的分类层替换成了一个回归层用于得分的预测。
+
 ### reward_loss
 
 reward_loss为排序中常见的 pairwise ranking loss。其中$r_{\theta}$是奖励模型的输出标量，$y_w$是一对回答中相对较好的那个； $y_l$是相对较差的那个回答，$\sigma$ 是sigmoid函数。
@@ -55,9 +57,15 @@ PS： 这意思就是 $y_w$ 评分比 $y_l$ 大的越多，loss越小。此外�
 
 ### ORM 的训练
 
+对每一组 (Prompt , Response) 标记一个得分，然后就行有监督训练吗？显然这样做不行！由于不同的标注人员对于分数尺度的把控不一样，很有可能同一个样本不同的人标注出的分数会相差很远。
+
 参考 [Reasoning LLM（二）：过程监督与结果监督](https://zhuanlan.zhihu.com/p/17569409591)
 
 ### PRM 的训练
+
+变迁
+1. 设奖励模型为 $ r_\theta(x, y) \in \mathbb{R} $，其中 $ \theta $ 表示奖励模型对应的参数，$ x $ 表示 Prompt，$ y $ 表示 Response，$ (x, y) $ 共同作为奖励模型的输入。进一步，我们假设对于同一个 Prompt $ x $，根据不同状态下（例如不同的温度或不同 Checkpoint）的初始 ChatModel 来生成 4 个候选 Response，即 $ y = \{y_0, y_1, y_2, y_3\} $。此时，令 $ b \in \{0, 1, 2, 3\} $ 是由标注员在 4 个 Response 中选择的最优回答，由此便可以得到一个由六元组表示的标注样本 $ (x, y_0, y_1, y_2, y_3, b) $。
+2. 奖励模型标注数据的候选结果从4个变成了2个。设 $ y = \{y_j, y_k\} $，$ y_j $ 是标注员在 2 个 Response 中选择的最优回答，由此便可以得到一个由三元组表示的标注样本 $ (x, y_j, y_k) $。
 
 参考 [Reasoning LLM（二）：过程监督与结果监督](https://zhuanlan.zhihu.com/p/17569409591)
 
@@ -67,7 +75,6 @@ PS： 这意思就是 $y_w$ 评分比 $y_l$ 大的越多，loss越小。此外�
 1. 提出采用「逐点生成式奖励模型」（Pointwise Generative Reward Modeling）范式，因为它在处理不同输入类型时更灵活，并具有推理时扩展的潜力。
 2. 核心贡献是一种名为「自我原则化批判调优」（Self-Principled Critique Tuning, SPCT）的新学习方法。SPCT 利用在线强化学习（RL），训练 GRM 自适应地生成「原则」（Principles）来指导评分标准，并生成「批判」（Critiques）来给出具体评分，从而提高了奖励的质量和可扩展性。
 3. 此外，论文还提出了通过并行采样和引入「元奖励模型」（Meta RM）来指导投票过程，以更有效地利用增加的推理计算。
-
 
 对于强化学习, 核心是评判多个答案的好坏, 因此Reward Model的设计就很关键了,作者将Reward生成的范式(Reward Generation Paradigms)分为了3类, 
 1. 标量(Scalar): 这种范式对给定的Query & Response计算出一个标量分数作为奖励.

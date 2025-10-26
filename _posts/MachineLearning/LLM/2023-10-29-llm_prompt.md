@@ -84,9 +84,11 @@ AI界的大佬 --- Andrew NG推出过一个Prompt Engineering的短课程《Chat
 
 [GPT Prompt编写的艺术：如何提高AI模型的表现力](https://mp.weixin.qq.com/s/N8XnSSdXlIITSig5z1oZCw) 目标、问题、上下文、要求，针对各个场景罗列了写prompt 的具体技巧和案例。 
 
-目前网上已经有不少 prompt 优化工具，比如 chatgpt 的插件中就有一个不错的工具 prompt perfect，能够基于用户给的 prompt 进行优化，再喂给 chatgpt 进行提问
+目前网上已经有不少 prompt 优化工具，比如 chatgpt 的插件中就有一个不错的工具 prompt perfect，能够**基于用户给的 prompt 进行优化**，再喂给 chatgpt 进行提问
 
 ![](/public/upload/machine/prompt_perfect.jpg)
+
+https://prompt.always200.com/
 
 ## 自动化提示词工程
 

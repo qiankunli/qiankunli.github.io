@@ -78,7 +78,7 @@ PS： 什么东西可以作为记忆，肯定是跟用户个人相关的东西�
             messages: List[Message] = Field(default_factory=list)
             max_messages: int = Field(default=100)
         ```
-    2. 长期记忆：智能体在多次交互中积累知识，**跨越多次对话**的客户关键信息、偏好和交互模式（所有行为、习惯、失败/成功路径的累计认知）。例如，一个购物推荐系统可以记住用户过去购买的产品偏好，以便将来推荐相关产品。流程：Receive（接收）→ Consolidate（整合）→ Store（存储）→ Retrieve（提取）。 
+    2. 长期记忆：智能体在多次交互中积累知识，**跨越多次对话**的客户关键信息、偏好和交互模式（所有行为、习惯、失败/成功路径的累计认知）。例如，一个购物推荐系统可以记住用户过去购买的产品偏好，以便将来推荐相关产品。流程：Receive（接收）→ Consolidate（整合）→ Store（存储）→ Retrieve（提取）。 PS：也就是短期记忆技术上是session维度，可能做一下增量summary（summary + user + ai + user + ai）；长期记忆是uid维度，会走提取+融合等pipeline。CLAUDE.md。
         1. 关注模式和偏好而非具体对话内容
         2. 与客户数据平台和 CRM 系统集成
         3. 持久性以月或年计

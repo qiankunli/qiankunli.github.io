@@ -78,7 +78,9 @@ dy2_dy1 = autograd.grad(y2,[y1],retain_graph=True)[0]
 dy1_dw1 = autograd.grad(y1,[w1],retain_graph=True)[0]
 dy2_dw1 = autograd.grad(y2,[w1],retain_graph=True)[0]
 ```
-dy2_dw1 可以用公式 推导直接算出来， 也可以 根据 $\frac{dy2}{dw1} = \frac{dy2}{dy1} * \frac{dy1}{dw1}$ 先计算 $\frac{dy2}{dy1}$ ，再使用 $\frac{dy2}{dy1} * \frac{dy1}{dw1}$ 计算 $\frac{dy2}{dw1}$。**$\frac{dy2}{dw1}$ 偏导数的计算 先用到了 $\frac{dy2}{dy1}$，此为“反向”**。y1 将 y2 对自己的梯度/导数 $\frac{dy2}{dy1}$ 和自己 对w1 梯度 $\frac{dy1}{dw1}$ 传给 w1，w1 将这两者 相乘 即可得到 y2（output） 对自己的梯度， 传播的是 output 对 y1 中间值的 偏导数，此为“反向传播”。**当我们在一个张量上调用 `.backward()` 时，PyTorch 的 Autograd 引擎就会自动计算并填充所有参与计算的张量的 `.grad` 属性**。PS： 对应到 《用python实现深度学习框架》，从计算图中作为结果的节点开始，依次从后向前，每个节点都将结果 对自己的雅克比矩阵 和 自己对父节点的雅克比矩阵 传给父节点，根据链式法则，父节点将这二者想乘就得到 结果对自己的雅克比矩阵。
+dy2_dw1 可以用公式 推导直接算出来， 也可以 根据 $\frac{dy2}{dw1} = \frac{dy2}{dy1} * \frac{dy1}{dw1}$ 先计算 $\frac{dy2}{dy1}$ ，再使用 $\frac{dy2}{dy1} * \frac{dy1}{dw1}$ 计算 $\frac{dy2}{dw1}$。**$\frac{dy2}{dw1}$ 偏导数的计算 先用到了 $\frac{dy2}{dy1}$，此为“反向”**。y1 将 y2 对自己的梯度/导数 $\frac{dy2}{dy1}$ 和自己 对w1 梯度 $\frac{dy1}{dw1}$ (局部梯度/倒数) 传给 w1，w1 将这两者 相乘 即可得到 y2（output） 对自己的梯度，传播的是 output 对 y1 中间值的 偏导数，此为“反向传播”（PS： output 的梯度向上游传播，传播过程经过某个节点时，乘以节点的局部梯度），这个过程用到了**拓扑排序**。**当我们在一个张量上调用 `.backward()` 时，PyTorch 的 Autograd 引擎就会自动计算并填充所有参与计算的张量的 `.grad` 属性**。PS： 对应到 《用python实现深度学习框架》，从计算图中作为结果的节点开始，依次从后向前，每个节点都将结果 对自己的雅克比矩阵 和 自己对父节点的雅克比矩阵 传给父节点，根据链式法则，父节点将这二者想乘就得到 结果对自己的雅克比矩阵。
+
+Karpathy说，**神经网络训练的核心是反向传播**。其他的——优化算法、正则化、数据增强——都是效率问题。反向传播才是"一阶项"。所以[micrograd](https://github.com/karpathy/micrograd)项目，100行代码，只讲反向传播。
 
 ### 优化算法：梯度下降法 ==> 求使得J极小的(w1,w2,b)
 

@@ -58,9 +58,9 @@ d64e482d2843        mesos-705b5dc6-7169-42e8-a143-6a7dc2e32600   0.18%          
 
 cgroup 是 调度器 暴露给外界操作 的接口，对于 进程cpu 相关的资源配置 RT（realtime调度器） 和CFS 均有实现。本文主要讲  CFS，CFS 也是在不断发展的。
 
-### CFS 基于虚拟运行时间的调度
+### CFS基于虚拟运行时间的调度
 
-[What is the concept of vruntime in CFS](https://stackoverflow.com/questions/19181834/what-is-the-concept-of-vruntime-in-cfs/19193619)vruntime is a measure of the "runtime" of the thread - the amount of time it has spent on the processor. The whole point of CFS is to be fair to all; hence, the algo kind of boils down to a simple thing: (among the tasks on a given runqueue) the task with the lowest vruntime is the task that most deserves to run, hence select it as 'next'. CFS（完全公平调度器）是Linux内核2.6.23版本开始采用的进程调度器，具体的细节蛮复杂的，整体来说是保证每个进程运行的虚拟时间一致， **每次选择vruntime 较少的进程来执行**。
+[What is the concept of vruntime in CFS](https://stackoverflow.com/questions/19181834/what-is-the-concept-of-vruntime-in-cfs/19193619)vruntime is a measure of the "runtime" of the thread - the amount of time it has spent on the processor. The whole point of CFS is to be fair to all; hence, the algo kind of boils down to a simple thing: (among the tasks on a given runqueue) the task with the lowest vruntime is the task that most deserves to run, hence select it as 'next'. CFS（完全公平调度器）是Linux内核2.6.23版本开始采用的进程调度器，Linux 内核在调度器工作的时候，**会通过定时器来周期性地给所有的容器发放可运行的 CPU 时间**，这个时间会记录到控制组内核对象 task_group 下的 cfs_b->runtime 字段中。负责给 task_group 分配运行时间的定时器包括两个，一个是 period_timer，另一个是 slack_timer。 具体的细节蛮复杂的，整体来说是保证每个进程运行的虚拟时间一致， **每次选择vruntime 较少的进程来执行**。
 
 另外两个细节
 1. 进程上下文切换会导致额外的 CPU 浪费。假如被选中的进程刚运行没多久，它的虚拟时间时间就比另一个进程小了。这时候难道要马上换另一个进程处理么？出于减少频繁切换进程所带来的成本考虑，Linux 会保证选择到的进程一个最短的运行时间，这个时间由 sched_min_granularity_ns 这个内核参数来控制。当然了，如果进程因为等待网络、磁盘等资源时主动放弃那另算。
@@ -86,7 +86,9 @@ NICE_0_LOAD = 1024
 
 ### CFS hard limits
 
-对一个进程配置 cpu-shares 并不能绝对限制 进程对cpu 的使用（如果机器很闲，进程的vruntime 虽然很大，但依然可以一直调度执行），也不能预估 进程使用了多少cpu 资源。这对于 桌面用户无所谓，但对于企业用户或者云厂商来说就很关键了。所以CFS 后续加入了 bandwith control。 将 进程的 cpu-period,cpu-quota 数据纳入到调度逻辑中。
+在 period_timer 的回调函数 sched_cfs_period_timer 中，周期性地为任务组分配带宽时间（具体的说就是 每隔 period 这么长时间会分配 quota 这么多的可用时间），并且解挂当前任务组中所有挂起的队列。在内核进行进程调度的时候，会在运行队列上记录已经给容器分配的 CPU 时间，会更新 cfs_rq 队列中的 runtime_remaining（即减去当前执行了多少时间）。如果相减后发现是负数，表示当前 cfs_rq 的时间余额已经耗尽，则会立即尝试从容器任务组中申请（一个容器 task_group 只有一个内核对象，但是有多少个逻辑核就会有多少个 cfs_rq）。如果申请时间失败的话，会触发 throttle 限流。throttle 限流的实现过程是把当前容器 task_group 在所有的运行队列中把红黑树节点都删掉。这样在直到下一次分配运行时间之前，容器中的所有进程都不会再得到 CPU 资源来运行了。
+
+对一个进程配置 cpu-shares 并不能绝对限制 进程对cpu 的使用（如果机器很闲，进程的vruntime 虽然很大，但依然可以一直调度执行），也不能预估 进程使用了多少cpu 资源。这对于 桌面用户无所谓，但对于企业用户或者云厂商来说就很关键了。所以CFS 后续加入了 bandwith control。 将进程的 cpu-period,cpu-quota 数据纳入到调度逻辑中。
 
 1. 在操作系统里，cpu.cfs_period_us 的值一般是个固定值， Kubernetes 不会去修改它
 1. `cpu.cfs_quota_us/cpu.cfs_period_us` 的值与 top 命令看到的 进程 `%CPU` 是一致的。 PS： 这就把原理与实践串起来了。
@@ -131,7 +133,7 @@ shares值即CFS中每个进程的(准确的说是调度实体)权重(weight/load
 
 现在的多核系统中每个核心都有自己的缓存，如果频繁的调度进程在不同的核心上执行势必会带来缓存失效等开销。--cpuset-cpus 可以让容器始终在一个或某几个 CPU 上运行。--cpuset-cpus 选项的一个缺点是必须指定 CPU 在操作系统中的编号，这对于动态调度的环境(无法预测容器会在哪些主机上运行，只能通过程序动态的检测系统中的 CPU 编号，并生成 docker run 命令)会带来一些不便。解决办法 [深入理解 Kubernetes CPU Manager](https://mp.weixin.qq.com/s/4qnbtwXi4TScEIYyfRm9Qw) [Uber的20万容器实践：如何避免容器化环境中的 CPU 节流](https://mp.weixin.qq.com/s/MPE92VARsJsNx6ewKYweOg)
 
-## Kubernetes 与 CFS
+## Kubernetes与CFS
 
 QoS(Guaranteed，Burstable，BestEffort) 是对 SLO 宏观层面的定义，而操作系统为不同 QoS 的 Pod 提供微观层面的 SLO 保障和隔离能力。Kubelet 对外暴露了绑核、NUMA 亲和等能力，针对 Guaranteed 类型的 Pod，其每个 Container 会独占 CPU，而所有非 Guaranteed Pod 的 Container 将会共享（也做了绑核，绑的是余下所有的核，包括预留的核）剩余的所有核，同时 Kubelet 也会根据 CPU Request 和 Limit 的值设置 CPU shares 和 quota 的值（cgroup v1 v2 对应不同的文件）。也可以通过扩展 Kubelet 或者完全自研的方式，配合 kernel，实现更丰富的隔离、压制能力等，例如基于 RDT 的超线程隔离，基于 cgroup identity 的绝对压制能力等。
 
@@ -179,7 +181,7 @@ $ docker inspect f2321226620e --format '{{.HostConfig.CpuShares}}'
 ```
 Why 51, and not 50? The cpu control group and docker both divide a core into 1024 shares, whereas kubernetes divides it into 1000.
 
-Requests 使用的是 cpu shares 系统，cpu shares 将每个 CPU 核心划分为 1024 个时间片，并保证每个进程将获得固定比例份额的时间片。如果总共有 1024 个时间片，并且两个进程中的每一个都将 cpu.shares 设置为 512，那么它们将分别获得大约一半的 CPU 可用时间。但 cpu shares 系统无法精确控制 CPU 使用率的上限，也就是说如果一个进程没有使用它的这一份，其它进程是可以使用的。PS：核心是cfs每次挑选vruntime 最小的来执行，但某个进程如果io较多，就进不到就绪队列里，就只能等下一个调度周期了。
+Requests 使用的是 cpu shares 系统，cpu shares 将每个 CPU 核心划分为 1024 个时间片，并保证每个进程将获得固定比例份额的时间片。如果总共有 1024 个时间片，并且两个进程中的每一个都将 cpu.shares 设置为 512，那么它们将分别获得大约一半的 CPU 可用时间。但 cpu shares 系统无法精确控制 CPU 使用率的上限，也就是说如果一个进程没有使用它的这一份，其它进程是可以使用的。PS：核心是cfs每次挑选vruntime 最小的来执行（vruntime 在计算的时候，会根据每个容器的 weight 不同来进行缩放），但某个进程如果io较多，就进不到就绪队列里，就只能等下一个调度周期了。
 
 
 ### limit
@@ -205,7 +207,7 @@ cpu limits 会被带宽控制组设置为 cpu.cfs_period_us 和 cpu.cfs_quota_us
 
 kubelet 会在 node 上创建了 4 个 cgroup 层级，从 node 的root cgroup（一般都是/sys/fs/cgroup）往下：
 1. Node 级别：针对 SystemReserved、KubeReserved 和 k8s pods 分别创建的三个 cgroup；
-2. QoS 级别：在kubepodscgroup 里面，又针对三种 pod QoS 分别创建一个 sub-cgroup：
+2. QoS 级别：在kubepodscgroup 里面，又针对三种 pod QoS 分别创建一个 sub-cgroup；PS：这样发现有稳定问题，可以只调整BestEffort cgroup
 3. Pod 级别：每个 pod 创建一个 cgroup，用来限制这个 pod 使用的总资源量；
 4. Container 级别：在 pod cgroup 内部，限制单个 container 的资源使用量。
 
@@ -261,8 +263,8 @@ Kubelet 寻求最大资源效率，因此默认没有设置资源限制， Burst
 [资源隔离技术之CPU隔离](https://mp.weixin.qq.com/s/q-O2L-6_DMwhjCjGVAvmrg) 建议先复习下linux 的抢占调度机制：每个CPU都有一个运行队列rq，每个rq会有一个cfs_rq运行队列，该结构包含一棵红黑树rb_tree，用来链接调度实体se，每次只能调度一个se到cpu上去运行。**如果想要在任意时刻cfs_rq上的se运行时间都尽可能的接近，那么就需要不停地切换se上cpu运行**，但是频繁的切换会有开销，想要减小这种开销，就需要减少切换的次数。为了可以减小开销还能保证时间上的统一，内核便给cfs_rq的se进行排序，让他们按照时间顺序挂在rb_tree上，这样每次取红黑树最左边的se，就可以得到运行时间的最小的那个。但实际上，se又会有优先级的概念，不同优先级的se所分配到的cpu时间片是不一样的。内核便经过一系列公式的转换，可以得到一样的值，这个转换后的值称作虚拟运行时间vruntime，**CFS实际上只需要保证每个任务运行的虚拟时间是相等的即可**。每次挑选se上cpu运行，当分配的时间片用完，就会将它再放回到cfs_rq中，挂在红黑树的适当位置。
 1. 内核CFS设置有两种最小时间粒度保护：sched_min_granularity_ns 和 sched_wakeup_granularity_ns，实际效果并不那么理想。在离线业务的混跑，当在线和离线任务分别调度到一个核上，相互抢执行时间，意味着**离线一旦抢占，便可以持续运行一个最小粒度的时间sched_min_granularity_ns，在线任务的唤醒延迟可能达sched_wakeup_granularity_ns，即在线业务的调度延迟可能会很大**，导致在线业务的性能下降。另外，如果在离线业务跑到相互对应的一对HT上，还将面临超线程干扰的问题，虽然有core scheduling技术，但是其设计初衷并非为了混部，设计和实现开销较大，这些都将直接影响在线业务的性能。
 2. 当然也有可能会碰到运行过程中，时间片还未用完，但主动放弃运行的情况，如睡眠（TASK_INTERRUPTIBLE）或等待某种资源（TASK_UNINTERRUPTIBLE），这时就需要出列等待，进到“小黑屋”，直至相应事件发生才会再次放到红黑树中等待调度。等待后重新放入红黑树的se，如果休眠时间比较长，vruntime可能会非常小，便会迅速得到运行。为了避免其疯狂地执行，cfs_rq上会维护min_vruntime，如果新唤醒的vruntime(se) < vruntime (cfs_rq→min_vruntime)，会将se的vruntime修正至接近min_vruntime，这样就可以保证此类se优先执行，但是又不会疯狂执行。
-3. 调度器每次唤醒的是 vruntime 最小的task，task 一定获取cpu 除非主动放弃， 调度器会保证其至少可以执行sched_min_granularity_ns。这些都可能导致 高优任务 ready时因为cpu在执行低优任务而无法被立即执行。 
-  1. group identity特性相对于upstream kernel的CFS设计，新增一棵低优先级红黑树，用于存放低优先级任务。能做到 当高优任务ready时，立即抢占低优任务，哪怕此时低优任务 尚未执行够 sched_min_granularity_ns。
+3. 调度器每次唤醒的是 vruntime 最小的task，task 一定获取cpu 除非主动放弃， 调度器会保证其至少可以执行sched_min_granularity_ns。这些都可能导致高优任务ready时因为cpu在执行低优任务而无法被立即执行。 
+  1. group identity特性相对于upstream kernel的CFS设计，新增一棵低优先级红黑树，用于存放低优先级任务。能做到当高优任务ready时，立即抢占低优任务，哪怕此时低优任务 尚未执行够sched_min_granularity_ns。
 
 [K8s CPU Throttle 优化方案](https://mp.weixin.qq.com/s/KrEcd71gmelL0zC4g5sMsg)受内核调度控制周期（cfs_period）影响，容器的 CPU 利用率往往具有一定的欺骗性，比如在 1s 级别的粒度下容器的 CPU 用量较为稳定，平均在 2.5 核左右。根据经验，管理员会将 CPU Limit设置为 4 核。本以为这已经保留了充足的弹性空间，然而若我们将观察粒度放大到 100ms 级别容器的 CPU 用量呈现出了严重的毛刺现象，峰值达到 4 核以上。毛刺产生的原因通常是由于应用突发性的 CPU 资源需求（如代码逻辑热点、流量突增等），假设每个请求的处理时间均为 60 ms，可以看到，即使容器在最近整体的 CPU 利用率较低，由于在 100 ms～200 ms 区间内连续处理了4 个请求，将该内核调度周期内的时间片预算（Limit=2对应200ms）全部消耗，需要等待下一个周期才能继续将 req 处理完成，该请求的响应时延（RT）就会变长。这种情况在应用负载上升时将更容易发生，导致其 RT 的长尾情况将会变得更为严重。为了避免 CPU Throttle 的问题，我们只能将容器的 CPU Limit 值调大。然而，若想彻底解决 CPU Throttle，通常需要将 CPU Limit 调大两三倍，有时甚至五到十倍，问题才会得到明显缓解。而为了降低 CPU Limit 超卖过多的风险，还需降低容器的部署密度，进而导致整体资源成本上升。
 

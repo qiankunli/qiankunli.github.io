@@ -141,6 +141,14 @@ assistant：炒米粉在广东是蛮常见的早餐，但是油太多，可以�
 
 不幸的是，目前还没有一个标准来确定使用哪些标记，因此不同的模型使用的格式和控制标记都可能大相径庭。聊天对话通常表示为字典列表，每个字典包含角色和内容键，表示一条单独的聊天消息。聊天模板是包含Jinja模板的字符串，用于指定如何将给定模型的对话格式化为一个可分词的序列。通过将这些信息存储在分词器中，我们可以确保模型以其期望的格式获取输入数据。对于一个模型来说，chat template 存储在tokenizer.chat_template 属性上（这个属性将保存在tokenizer_config.json文件中），如果chat template没有被设置，对那个模型来说，默认模版会被使用。
 
+## 包构成
+
+1. langchain-core：提供底层抽象和接口定义，是整个框架的基石。包含了一些核心组件以及将它们组合在一起的方式，例如 ChatModels、Vector Stores、Tools 等。不包含任何集成包。
+2. langchain：实现具体功能组件，核心功能包括链（Chains）、智能体（Agents）、检索策略。
+3. langchan-*：langchain 集成包，由 langchain 团队和集成开发者共同维护。例如langchain-openai、langchain-deepseek、langchain-redis、langcahin-mongodb等。
+4. langchain-community：由社区维护的第三方集成包。
+5. langgraph：用于将 LangChain 组件编排为生产级应用的框架，支持持久化、流式处理等关键特性。
+
 ## LLM模型层
 
 LangChain的一个核心价值就是它提供了标准的模型接口；然后我们可以自由的切换不同的模型。一次最基本的LLM调用需要的prompt、调用的LLM API设置、输出文本的结构化解析（**output_parsers 在 prompt 中尤其是system prompt中插入了需要返回的格式说明**）等。从 BaseLanguageModel 可以看到**模型层抽象接口方法predict 输入和输出是str**，也就是 TEXT IN TEXT OUT。PS：底层Transformer比如 chatglm原输出不是直接str，langchain中要求模型返回必须是str的结果，因此 Transformers.Model 与 langchain.llm 要有一个适配。

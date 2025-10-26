@@ -26,7 +26,7 @@ keywords: llm finetune
 
 ## 为什么需要微调
 
-预训练是让大模型获得通用能力，SFT是为了提升大模型在特定领域的能力。
+预训练是让大模型获得通用能力，SFT是为了提升大模型在特定领域的能力。大语言推理模型常见的两个痛点：一是“答不对”，二是“答不规范”。前者意味着推理链条断裂或迁移失效，后者则让后续评估与系统对接步步惊心。
 
 [通俗解读大模型微调(Fine Tuning)](https://mp.weixin.qq.com/s/PXTAhvUGzvOPLdBYNWb3xw)Prompt Engineering的方式是一种相对来说容易上手的使用大模型的方式，但是它的缺点也非常明显。
 1. 因为通常大模型的实现原理，都会对输入序列的长度有限制，Prompt Engineering 的方式会把Prompt搞得很长。**越长的Prompt，大模型的推理成本越高**，因为推理成本是跟Prompt长度的平方正向相关的。
