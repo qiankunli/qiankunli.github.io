@@ -61,7 +61,7 @@ keywords:  deepseek
 
 ### 实现
 
-在构建MoE语言模型时，通常会将Transformer中的某些FFN替换为MoE层（MOE FFN，陆续还出现了MOE Attention，在某些情况下，并非所有 FFN 层都被 MoE 取代，例如Jamba模型具有多个 FFN和MoE 层）。具体来说，MoE层由多个专家组成，每个专家的结构与标准的FFN相同。每个token会被分配给一个或两个专家。MoE模型的推理过程主要包含三个阶段:
+在构建MoE语言模型时，通常会将Transformer中的某些FFN替换为MoE层（MOE FFN，陆续还出现了MOE Attention，在某些情况下，并非所有 FFN 层都被 MoE 取代，例如Jamba模型具有多个 FFN和MoE 层）。具体来说，MoE层由多个专家组成，每个专家的结构与标准的FFN相同。MoE 的核心思想源于 "分而治之"：将模型的FFN/MLP拆分为多个独立的 "专家"（Expert），每个输入 token 仅由部分专家（TOPK个）处理，再通过门控网络聚合结果。这种设计使模型参数量随专家数量线性增长，**却无需按比例增加计算量**（因每个 token 仅激活少数专家）。MoE模型的推理过程主要包含三个阶段:
 1. 路由计算:通过路由器计算专家选择概率
 2. 专家选择:基于概率选择Top-K个专家
 3. 并行计算:选中的专家并行处理输入并聚合结果

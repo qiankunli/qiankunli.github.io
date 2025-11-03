@@ -320,8 +320,7 @@ groups:
 [Prometheus与OpenTelemetry该选哪个？](https://mp.weixin.qq.com/s/uB3ZB4uUhdIOtGCweeHBlQ)
 
 1. Prometheus提供指标收集、存储和查询。它通常通过一个简单的爬虫系统收集指标，从主机中提取数据。Prometheus数据库存储这些数据，然后你可以用Prometheus查询语言PromQL来查询。
-2. OpenTelemetry的领域要小得多。它通过推送或拉动，使用统一的API收集指标（以及链路追踪和日志），可能会对它们进行转换，并将它们发送到其他系统进行存储或查询。**只关注可观测性中与应用程序交互的部分**（与Log、Trace、Metric等的创建与存储、查询问题解耦），这意味着OpenTelemetry的指标往往最终会回到Prometheus或与Prometheus兼容的系统中。
-
+2. OpenTelemetry。otel sdk使用push 模式（需要配置 collector 地址）主动推送数据给 OTel Collector，也可以使用  otel.Prometheus exporter对外暴漏 `/metrics` 地址进而与Prometheus Server 兼容。 
 
 OpenTelemetry-collector 配置文件分为两个部分
 1. 先通过 exporters /extensions/processors/receivers 配置细节

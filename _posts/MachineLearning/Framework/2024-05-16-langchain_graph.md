@@ -546,6 +546,15 @@ langgraph 的灵感来自 Pregel 和 Apache Beam。暴露的接口借鉴了 Netw
 
 ### HITL/human in the loop
 
+[一文讲透AI Agent开发中的human-in-the-loop](https://mp.weixin.qq.com/s/fNN32CGANMeAr_wlvhxtWA) 。实现human-in-the-loop技术因素：
+
+1. 分布式。生产环境都不止一台服务器，a server 发起了hitl，client 把这个feedback发送回server端，由于server端有多个服务器节点，一般来说，来自client端的网络请求会被随机分配到某个服务器节点上。这样就会导致，来自client的feedback信息，未必会落在当初发起human-in-the-loop请求的节点A上；同时，节点A由于收不到feedback而没法把human-in-the-loop继续下去。
+2. 用户和AI Agent之间的通道性质。
+
+这要求
+1. client端和server端之间具备长连接的条件，且能够做到会话保持的。这种实现方式对于基础设施存在比较高的要求。
+2. 对Agent的整个运行状态进行序列化、持久化、反序列化。把一个复杂对象进行序列化和反序列化，不是一件容易的事。难度来源于对象之间的关系：一个复杂的对象，可能引用了其他对象；而其他对象又引用了更多对象；面向对象编程带来的method和对象实例之间的绑定关系，也为序列化和反序列化带来了诸多麻烦。假设仅仅是对于某个**数据对象**进行序列化和反序列化，情况可能尚在可控范围内。数据对象通常只包含数据字段，数据对象之间的引用关系一般也呈现单向的引用关系。
+
 [彻底说清 Human-in-the-Loop](https://mp.weixin.qq.com/s/29cwAE8py18lOmI63R5XxA)实现带有HITL的Agent系统的关键在哪里：流程中断与恢复，以及为了支持它所需要的状态持久化机制。简单说，就是需要一种机制，将流程“挂起”在特定节点（或步骤），等待人类参与和反馈，然后能从中断点恢复运行。这要求系统能够记录中断时的上下文，并确保恢复后状态一致。很显然，你不能使用sleep等待或轮询这种糟糕的阻塞式方案。而LangGraph给出的解决方案是Interrupt（中断）、Command Resume（命令恢复）、Checkpoint（检查点）三大机制。
 1. Interrupt（中断），即暂停LangGraph工作流的执行，同时返回一个中断数据对象。其中含有给人类的信息，比如需要审核的内容，或者恢复时需要的元数据。典型的处理如下：
     ```python

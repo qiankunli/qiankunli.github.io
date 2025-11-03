@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 从RNN到Attention
+title: 对序列建模——从RNN到Attention
 category: 架构
 tags: MachineLearning
 keywords:  rnn attention transformer

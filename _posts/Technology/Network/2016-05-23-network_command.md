@@ -17,6 +17,8 @@ http://fishcried.com/ 有一个linux 网络的基础知识系列，要研读下
 
 ## tcpdump
 
+正常抓包并不会影响当前流量转发，本质是从内核复制了一份流量至用户态抓包进程，不过因为涉及内存复制，会消耗 CPU，在一些网络设备上要尤为小心。Wireshark 和 tcpdump 的抓包原理，没有本质区别，都是借助系统提供的扩展能力，在类 UNIX 系统（Linux 和 macOS）上是 libpcap 库，而在 Windows 上是基于 Npcap 库（或之前的 WinPcap）。Wireshark 只是在流量效果呈现上更加方便，会标出 RST、Retransmission 等异常，跟踪 TCP 流，支持不同格式条件过滤等，另外还提供更便捷的 TLS 卸载能力，比如在本地安装 MITM 证书或者利用预主密钥（Pre-Master Secret）日志卸载 TLS 流量。
+
 如何抓取报文？
 1. 用 tcpdump 抓取报文，最常见的场景是要抓取去往某个 ip，或者从某个 ip 过来的流量。我们可以用 host {对端 IP} 作为抓包过滤条件，比如：`tcpdump host 10.10.10.10`
 2. 另一个常见的场景是抓取某个端口的流量，比如，我们想抓取 SSH 的流量，那么可以这样：`tcpdump port 22`
