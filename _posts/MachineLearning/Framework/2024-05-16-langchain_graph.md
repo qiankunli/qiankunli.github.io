@@ -158,7 +158,7 @@ class Runnable(Generic[Input, Output], ABC):
 Runnable所有接口都接收可选的配置参数，可用于配置执行、添加标签和元数据，以进行跟踪和调试。
 1. invoke/ainvoke: 单个输入转为输出。
 2. batch/abatch:批量转换。
-3. stream/astream: 单个流式处理。PS： 如果没有这个，只能通过callbackhandler.on_llm_new_token 获取llm的吐字了
+3. stream/astream: 单个流式处理，提供了对图（Graph）执行过程中各个节点产生的数据进行精细化控制的能力。PS： 如果没有这个，只能通过callbackhandler.on_llm_new_token 获取llm的吐字了
     ```
     chunks = []
     async for chunk in model.astream("你好。告诉我一些关于你自己的事情"):
@@ -457,13 +457,15 @@ LangGraph的核心方法是：通过定义一个Graph图结构的流程来代表
 2. 灵活定义每个节点任务，**每个节点都被设计为纯函数**，可以是简单函数、LLM调用，或一次Agent交互
 3. 可持久的全局状态控制，工作流可随时暂停、启动或介入人工交互
 
+### 三要素
+
 LangGraph 三个核心要素
 1. StateGraph，LangGraph 在图的基础上增添了全局状态变量，是一组键值对的组合，可以被整个图中的各个节点访问与更新，从而实现有效的跨节点共享及透明的状态维护。它将该对象传递给每个节点。然后，节点会以键值对的形式，返回对状态属性的操作。这些操作可以是在状态上设置特定属性（例如，覆盖现有值）或者添加到现有属性。
 2. 在创建了StateGraph之后，我们需要向其中添加Nodes（节点）。添加节点是通过`graph.add_node(name, value)`语法来完成的。其中，`name`参数是一个字符串，用于在添加边时引用这个节点。`value`参数应该可以是函数或runnable 接口，它们将在节点被调用时执行。其输入应为状态图的全局状态变量，在执行完毕之后也会输出一组键值对，字典中的键是State对象中要更新的属性。说白了，Nodes（节点）的责任是“执行”，在执行完毕之后会更新StateGraph的状态。PS： node 输入都是state，输出是对state的更新
 3. 节点通过边相互连接，形成了一个有向无环图（DAG），边有几种类型：
     1. Normal Edges：即确定的状态转移，这些边表示一个节点总是要在另一个节点之后被调用。
     2. Conditional Edges：输入是一个节点，输出是一个mapping，连接到所有可能的输出节点，同时附带一个判断函数（输入是StateGraph，输出是Literal），根据全局状态变量的当前值判断流转到哪一个输出节点上，以充分发挥大语言模型的思考能力。
-    PS: 在langgraph 较新的版本支持 langgraph.types.Command之后，一个node1 跳转到另一个node2 在node1 内部就可以定义了。
+    PS: 在langgraph 较新的版本支持 langgraph.types.Command（动态路由）之后，一个node1 跳转到另一个node2 在node1 内部就可以定义了。
 
 当我们使用这三个核心要素构建图之后，通过图对象的compile方法可以将图转换为一个 Runnable对象（Runnable也有Runnable.get_graph 转为Graph对象），之后就能使用与lcel完全相同的接口调用图对象。
 
@@ -543,6 +545,182 @@ langgraph 的灵感来自 Pregel 和 Apache Beam。暴露的接口借鉴了 Netw
 1. CompiledGraph 类没正经干什么活儿，主要将点、边加入到了nodes/channels里，核心是父类Pregel在干活儿。触发 CompiledGraph.astream 实质是触发 Pregel.astream/stream。stream的输出是当前step的state的值。
 2. node 的输入是state，输出是对state的更新。所以langgraph 才提供了prebuilt 将 其它工具转为兼容node的形式。
 3. Pregel.stream 核心工作是按DAG依次提交node/task并执行，拿到某个node 结果后，更新state值，执行下一个node/conditional_edge。此时Pregel 与一个DAGExecutor 没什么两样。
+
+### runtime 和context
+LangGraph ≈ 一个“声明式 DAG + 动态运行时注入系统”
+1. 编译阶段，`graph = workflow.compile()`, 这一步只是定义“结构与依赖关系”（DAG 拓扑、边、node 名称），它是一个 纯描述性的编排对象，没有携带任何运行时数据。compile 阶段没有 state，也没有 runtime；所有 node 仅仅是“函数定义引用”，不会执行；节点所需的所有数据，都要在 invoke 阶段注入。PS：control flow
+2. invoke阶段，数据注入的唯一入口：`graph.invoke(input_state={"query": "AI policy"}, context=my_context,   config=my_config,)`。一个node 的运行需要很多数据，一些数据可以从state 传入（和写入），但类似db/redis client无法被序列化，于是又提出 context 负责承载长期依赖（连接、LLM、缓存、logger 等）；所有 node 共用同一个 context；runtime 自动持有对 context 的引用。PS：data flow
+    ```
+    def node_func(state, runtime, config)
+        1. 读写 state（流转数据）
+        2. 访问 runtime.context（DB/LLM等资源）
+    ```
+3. 节点函数（node_func）到底能有很多入参形式
+    1. `def node_func(state)` state 来自 `graph.invoke(input_state)`
+    2. `def node_func(context：langgraph.types.RunContext)` context 自动封装 (包含 state/runtime/config)
+    3. `def node_func(context, **state)` context 自动封装，state 解包
+    4. `def node_func(state, runtime, config)` 三者分别由 runtime 注入, 语义最清晰、类型最安全、可并行, 最接近 runtime 底层逻辑。
+    5. `def node_func(state, runtime)` runtime/context 部分注入
+    6. `def node_func()` 无注入 常用于起始节点或初始化任务
+    7. `def node_func(state, **kwargs)`, state + 其他参数（来自 invoke）, 不建议
+
+
+LangGraph 完整执行生命周期
+```
+graph.compile()
+     ↓
+graph.ainvoke(input_state, context, config)
+     ↓
+Runtime(graph, context, config)
+     ↓
+state = copy.deepcopy(input_state)
+     ↓
+┌─────────────────────────────────────────────┐
+│current_nodes = [graph.START]                |
+|while current_nodes:                         │
+│   node = graph.get_node(name)               │
+│   snapshot = runtime.state_snapshot()       │
+│   result = await execute_node(node)         │
+│   runtime.merge_state(result)               │
+│   next_nodes = handle_result(result)        │
+│   current_nodes.extend(next_nodes)          │
+└─────────────────────────────────────────────┘
+     ↓
+return runtime.state  # 最终输出
+```
+
+```python
+await graph.ainvoke(
+    input_state={"query": "AI policy"},
+    context=my_context,
+    config=my_config,
+)
+```
+
+初始化阶段（Invoke / Runtime 构造）
+```python
+async def ainvoke(graph, input_state, context, config):
+    # Step 1: 初始化 runtime
+    runtime = Runtime(
+        graph=graph,
+        context=context,
+        config=config,
+    )
+
+    # Step 2: 初始 state 拷贝
+    runtime.state = copy.deepcopy(input_state)
+
+    # Step 3: 调度入口
+    return await runtime.run()
+```
+Runtime 主调度循环
+```python
+class Runtime:
+    async def run(self):
+        # 初始化节点队列
+        current_nodes = [self.graph.START]
+        visited = set()
+
+        while current_nodes:
+            node_name = current_nodes.pop(0)
+            node = self.graph.get_node(node_name)
+
+            # 获取当前节点的 state 快照
+            state_snapshot = self.state_snapshot()
+
+            # 执行节点函数
+            try:
+                result = await self.execute_node(node, state_snapshot)
+            except Exception as e:
+                # 广播错误事件，可用于 tracing
+                await self.handle_error(node, e)
+                raise e
+
+            # 结果可能是 dict 或 Command
+            next_nodes = await self.handle_result(node, result)
+            visited.add(node_name)
+
+            # 合并 state
+            self.merge_state(result)
+
+            # 推入下一个节点（可能多个）
+            for next_node in next_nodes:
+                if next_node not in visited:
+                    current_nodes.append(next_node)
+
+        # 返回最终状态
+        return self.state
+```
+execute_node（节点执行阶段）
+```python
+async def execute_node(self, node, state):
+    # 1️⃣ 分析函数签名
+    sig = inspect.signature(node.func)
+
+    # 2️⃣ 构造 RunContext（若需要）
+    if "context" in sig.parameters:
+        ctx = RunContext(state=state, runtime=self, config=self.config)
+
+    # 3️⃣ 动态调度调用
+    if {"state", "runtime", "config"} <= sig.parameters.keys():
+        output = await node.func(state, self, self.config)
+    elif "context" in sig.parameters:
+        output = await node.func(ctx)
+    elif "state" in sig.parameters:
+        output = await node.func(state)
+    else:
+        output = await node.func()
+
+    # 4️⃣ 输出类型检查
+    if not isinstance(output, (dict, Command, Return)):
+        raise TypeError(f"Invalid node output: {output}")
+
+    return output
+```
+
+### 结合Agent 设计
+
+
+```
+def node_func1(state, runtime, config):
+    # 读写 state（流转数据）
+    # 访问 runtime.context（DB/LLM等资源）
+def node_func2(state, runtime, config):
+    # 读写 state（流转数据）
+    # 访问 runtime.context（DB/LLM等资源）
+workflow = StateGraph(xxState)
+workflow.add_node(node_func1)
+workflow.add_node(node_func2)
+graph = workflow.compile()
+graph.ainvoke(input_state=args, context=xx)
+```
+我们一般不单独按上述代码过程式的使用langgraph，往往将其封装为一个Agent
+```
+class BaseAgent:
+    parameter1
+    parameter2
+    runnable
+
+    def __init__(self):
+        self.parameter1 = ...
+        self.parameter2 = ...
+        self.build_runnable()
+
+    def build_runnable(self):
+        workflow = StateGraph(xxState)
+        workflow.add_node(xx)
+        self.runnable = workflow.compile()
+
+    async def run(self, args):
+        await self.runnable.ainvoke(input_state=args, context=xx)
+```
+node_func 执行需要各种参数（依赖，数据依赖，资源依赖） 便有了三种层级
+||生命周期|放置内容|
+|---|---|---|
+|Agent-level|常驻|agent 的静态配置、构造参数、策略参数，生命周期长，构建时就确定；不随每次调用变化|
+|Context-level|可跨多次 run|DB/Redis client、LLM client、缓存、工具集、logger，尤其是不可序列化的参数|
+|State-level|每次 run 独立|（可序列化的）用户输入、查询内容、中间结果、输出结果|
+
 
 ### HITL/human in the loop
 

@@ -104,6 +104,8 @@ HTML于1993年问世。2013年，Facebook向世界发布了React。如今已是2
 
 ## Agent自省之路-ACE/Agentic Context Engineering
 
+ACE核心理念：不依赖模型微调，而是通过上下文的自我演化，让智能体实现“自学成长”。
+
 **如何利用历史轨迹？**
 
 ![](/public/upload/machine/context_category.png)
@@ -119,6 +121,8 @@ ACE将 “历史轨迹” 通过生成（新轨迹）、反思（评估轨迹有
 1. 离线场景：将历史轨迹提炼为 “系统提示（System Prompt）”，比如把多次解决金融问题的轨迹总结为领域专属策略，供新推理直接参考；
 2. 在线场景：将历史轨迹融入 “智能体记忆（Agent Memory）”，比如实时推理时，动态调用之前解决同类问题的轨迹，调整当前推理路径。
 
+一些工程实现： https://github.com/pingcy/ace-langgraph
+https://github.com/kayba-ai/agentic-context-engine
 
 ## 上下文工程之工程
 

@@ -16,27 +16,7 @@ keywords: llm agent
 
 Agentic 源自 “Agent”（代理）在 AI 领域特指具有自主性、目标导向和决策能力的智能系统。PS：区别于传统的被动式AI系统。
 
-使用具有自主决策能力的 Agent 实现的 RAG 系统可以称为 Agentic RAG。与传统的**线性RAG**（单轮检索 + 单轮生成）流程不同，Agentic 特性的产品是通过嵌入具有自主决策能力的专业化智能体，LLM 系统能够自主选择控制流程，从根本上解决了传统方法的局限。这些智能体能够动态管理检索策略、迭代优化上下文理解、适应复杂工作流程（比如在两条潜在路径之间进行路由；决定调用哪些工具；判断生成的答案是否足够，或者是否需要进一步工作），**将系统从被动信息处理转变为主动理解问题并规划解决**。将固定的工作流基于用户场景动态生成。PS：与Native RAG相比，一般可以认为至少引入了工具，自然也就伴随着问题拆解和工具的先后调用，以及最后的对多个observation的反思/总结。
-
-产品层面：问答（从L1到L4 复杂度也很大）、报告生成
-技术层面：Agentic RAG 的基本概念及其核心 Agentic 模式，包括规划（planning）、工具使用（tool use）反思（reflection）以及多智能体协作（multi-agent collaboration）。PS： 有没有大一统工程框架在支持这些事儿？
-
-|业务/技术|线性|workflow|单agent|multiagent|
-|---|---|---|---|---|
-|RAG/deepsearch|native rag|selfrag/corag/ircot等|search-r1等||
-|deepresearch||planer/searcher/summarier等|依赖类似openai 为deepresearch 端到端训练的模型|supervior + xxsearcher|
-|写作||outline_wirter/段落writer/润色||supervisor + xxwriter |
-|openmanus（通用agent）||supervisor + planer + xxer + 执行环境||supervisor + planer + xxtool + 执行环境|
-|画布||||supervisor + xxtool + 执行环境|
-
-1. 从答疑到连接物理世界，业务发展的动力
-    1. LLM 能力本身提升了
-    2. 多工具协作（Tool Use）的成熟
-    3. 长期记忆和自主性能力发展，记忆机制让 Agent 能记住用户习惯、历史任务，自动优化策略。自主性支持 Agent 根据反馈调整自身行为，不需要用户的每一步指令。
-    4. 规划和推理模块的成熟：早期 LLM 只能“回答”，而现在已经可以“先思考计划”，再执行，更像人类的助理。
-1. 一般情况下，需求能简单做就简单实现，避免用更复杂实现，比如rag 一般不用multiagent
-2. multiagent 在agno 中用一个team 概念来承载，这样一般一个业务用team + agent + tool 三级概念来承接。尽力沉淀通用team + agent + tool 以及三者的协作链路，特殊业务场景就用特殊team + agent + tool 实现，作为子类存在。
-2. 同一个技术架构在不同的业务领域也是侧重点不同，比如multiagent中的不同agent 在deepsearch/deepresearch 一般是分层/主从关系（按部就班干活儿），但在写作或者以创造力为主的场景，可能就更自由一些。
+使用具有自主决策能力的 Agent 实现的 RAG 系统可以称为 Agentic RAG。与传统的**线性RAG**（单轮检索，检索不到就没戏 + 单轮生成，容易被无关信息带偏）流程不同，Agentic 特性的产品是通过嵌入具有自主决策能力的专业化智能体，LLM 系统能够自主选择控制流程，从根本上解决了传统方法的局限。这些智能体能够动态管理检索策略、迭代优化上下文理解、适应复杂工作流程（比如在两条潜在路径之间进行路由；决定调用哪些工具；判断生成的答案是否足够，或者是否需要进一步工作），**将系统从被动信息处理转变为主动理解问题并规划解决**。将固定的工作流基于用户场景动态生成。PS：与Native RAG相比，一般可以认为至少引入了工具，自然也就伴随着问题拆解和工具的先后调用，以及最后的对多个observation的反思/总结。
 
 ## 对比Naive RAG
 

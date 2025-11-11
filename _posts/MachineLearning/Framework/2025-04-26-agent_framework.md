@@ -96,6 +96,17 @@ llm在持续计划（推理模型 ==> 自动推理等），目标都是为了提
 
 ## 框架
 
+[The Claude Code SDK and the Birth of HaaS (Harness as a Service)](https://www.vtrivedy.com/posts/claude-code-sdk-haas-harness-as-a-service)Vtrivedy认为AI开发的核心原语正在从LLM API转向Harness API：
+
+```
+client.chat.completions.create() --> client.responses.create() --> agent.query()
+```
+Vtrivedy对Agent Harness的定义很具体：增强模型运行时执行的外部功能集合，包括对话和上下文管理、工具调用层、权限控制、会话和文件系统状态、循环控制和错误处理、基础可观测性等。简单讲，就是一个更高阶的，能够低门槛，正确高效实施Agent的具备开放性的开箱即用方案（模板）。他强调，构建Agent的关键是"个性化定制基座"，包括四个核心组件：
+1. 系统提示词 - 告诉Agent目标、环境、工具使用方法等
+2. 工具/MCP - 内置工具加上特定用例的自定义逻辑
+3. 上下文 - 代码文档、记忆、用户个性化信息等
+4. 子Agent - 用于专业化和并行化处理
+
 ### 现有框架对比
 
 [Agentic AI：8个开源框架对比-2025更新](https://mp.weixin.qq.com/s/waol_6y7VH_SQZwNBJ9qQw) PS：有细节控制需求用langgraph，稍微抽象好一点可以尝试 Agno
