@@ -162,22 +162,6 @@ PS：actor model根据prompt 产生response，reward model 根据(prompt, respon
 
 [OpenAI-O1之下，我们技术该何去何从](https://mp.weixin.qq.com/s/yIM1j6XFz_Hc67bW3FaNgg)o1 则再次证明了强化学习的重要性。dpo 是我这种没有强化基础的老 nlp 从业者的一块遮羞布，o1 则完全撕下了这张遮羞布。不学强化，不训 reward_model 是吧，那就抱着 sft / dpo 这些老古董一辈子技术落后别人吧。
 
-### Reinforcement Fine-Tuning
-
-RFT 只是 PPO 技术范式下的一个新应用范式。它本身并不是一个全新的技术范式，
-
-RFT 就是针对给定 prompt，产生一些包含 cot 的 response ，再通过一个 verifier 来判断 response 是否正确，作为信号来指导模型进行参数更新。抛开 cot 过程不谈，如果我们把这套流程的 verifier 换成 reward_model ，这个流程看上去是不是感到很熟悉？ —— 那就是最传统的基于 PPO 的 RLHF。RFT 和 RLHF 唯一的区别就是，它的 return (reward 信号) 是通过 verifier 算出来的，而不是一个 reward_model 计算出来的。verifier 本身则可以看成是一个 rule，比如 math 任务的答案是否正确，code 任务的代码是否能执行 …… 因此， RFT = PPO + rule_based reward_model。至于 RFT 的技术难点，我个人认为和 o1 的技术难点完全 match：高质量 cot 的生产与高准确率 verifier 的获取。
-
-RFT 的价值：只要能定制好一个任务的 verifier，那么 RFT 便可以在这个新的领域场景，以十分之一或更少的数据，轻松超过 SFT 的结果。当然，用 PPO 训练模型能带来的所有收益也都是 RFT 的优点，这里就不赘述了。介绍中还提到，RFT 擅长解决法律、保险、医疗、金融和工程领域等任务，而这些任务通常有明确的“正确答案”。是因为 RFT 只适合答案固定的场景吗？不是，仅仅是因为答案固定的场景 verifier 非常容易制定。Sam Altman 在直播中认为 RFT 是 2024 最牛的技术进展，能帮助大家搞定专业模型的训练。说的没错，RFT 在大模型应用方向确实是划时代的，因为它真的能帮 OpenAI 卖更多的定制化服务。LLM 从业者们也能从中些许受益，**掌握了 RFT 技术后，以后老板再提出做一个新的应用模型，我们就不需要再枯燥的标注大量的 SFT 数据，而是花一点时间训个 verifier 即可**。
-
-字节的 ReFT 可以看作是 OpenAI 的 RFT 在数学任务上的一个极简版实现方案
-1. SFT 得到一个较好的模型；
-2. 给定 prompt，do_sample 多次，生成一些带 cot 的 response；
-3. 答案正确，1 分；答案错误，0.1 分；提取不到答案（说明没有 follow 输出格式），0分；
-4. 根据 returns 更新模型。
-
-ReFT 这篇论文，好就好在它是在 o1 之前发表的。因为 o1 的出现，“cot 的推理过程，MCTS 采样，PRM，ORM，rule-based reward_model” 等概念，已经在 LLM 圈深入人心了。
-
 ### GRPO（Group Relative Policy Optimization）
 
 

@@ -13,6 +13,8 @@ keywords: Python
 
 ## 简介
 
+[从 yield 到 await：Python 协程的进化史](https://mp.weixin.qq.com/s/mWFm1N_kZhXYMJWxINyZOQ) 未细读。
+
 在异步程序中，用户编写的程序通过asyncio.run 调度最初的协程（启动事件循环），用户编写的各个协程使用await表达式驱动下一步。 await链最终到达一个底层可异步调用对象，返回一个生成器，由EventLoop驱动，对计时器或io等event做出响应。
 
 创建协程 ==> asyncio.create_task(coroutine)协程转为task并注册到eventloop ==> eventloop 驱动task 执行。
@@ -31,6 +33,33 @@ keywords: Python
     2. 提供一套 async 的替代品，把阻塞系统调用替换掉，比如 asyncio.sleep 等。
 2. 协程的调度。如果我们有 1000 个协程，每次都从队列里随机选一个协程，也会导致每个协程都要等待 1000 次， 才能运行一次。所以我们需要一个更加合理的办法， 来找出哪些协程是可以运行的。上面说过, 协程库需要提供系统调用接口， 比如 sleep, send_request 等。这些系统调用接口可以向操作系统注册事件， 比如 sleep 可以注册一个定时器事件，send_request 可以注册一个网络事件。当这些事件发生时，操作系统会通知协程库，然后协程库再通知相应的协程。这样的话， 协程库就可以知道哪些协程是可以运行的了， 效率被极大地提高了。 比如你有十万个协程，但是只有 100 个协程是可以继续跑的， 那么调度器就只需要运行这 100 个协程， 而不需要处理其他的 99900 个协程。
 有了上面说的这两点想法，我们就可以实现一个高效的协程库了。当然具体做起来还有很多细节需要处理，比如协程的异常处理，协程的返回值等等。
+
+## 历史
+
+早在 Python 2.2（2001年），语言引入了 yield 关键字，用于创建惰性计算的序列，此时，yield 被视为一种增强版的 return，主要用于节省内存地遍历大数据集或无限序列。
+
+```python
+def counter():
+    i = 0
+    while True:
+        yield i
+        i += 1
+
+gen = counter()
+print(next(gen))  # 输出 0
+print(next(gen))  # 输出 1
+```
+
+2006 年的 Python 2.5，加入了 .send(value) 方法，使外部可以向生成器内部传递数据。这一特性彻底改变了生成器的角色：它不再只是“产出值”，而是能接收输入、维护状态、主动暂停的独立执行体。这正是“协程（Coroutine）”的核心定义——一个可中断、可恢复、能与调用方协作的过程。
+
+![](/public/upload/python/generator.jpg)
+
+随着异步模式在实践中应用加深，开发者开始尝试用生成器模拟复杂任务流。然而很快遇到了一个经典问题：如何在一个生成器中“发起/调用”另一个生成器，并正确转发所有控制信号(数据输入、数据产出、异常处理、返回值捕获)？
+1. 2012 年，随着 Python 3.3 发布，PEP 380 正式引入 yield from，一举解决了嵌套生成器问题，但它仍属于普通生成器语法，难区分“真协程”与“假生成器”；
+2. 因此，PEP 492 （2015年，Python 3.5）提出了更高级的抽象：async def 与 await，async def 明确定义一个 原生协程函数；await 替代 yield from，只能用于 awaitable 对象；本质上，await 是 yield from 在异步上下文下的专用化版本——去除了通用性，换取更强的语义清晰度。
+3. 最后，配合 async/await 的语义升级，官方标准库 asyncio 成为现代异步编程的核心。至此，Python 完成了从“生成器兼职协程”到“原生异步优先”的全面转型。可以看到技术演进不是跳跃式的，而是遵循 “hack → 模式 → 库 → 语法 → 生态” 的升维路径。
+
+PS：一般情况下，协程是一个独立的并发执行体，其它执行体在协程执行期间可以与之交互数据。但大多数时候，比如用fastapi async 写业务逻辑，此时虽然用await执行的async方法，但与async的方法的交互仅限于入参和出参，此时就仅有一个提高并发（I/O 处理能力）的作用。但是在底层，多个请求的协程在交替执行。
 
 ## 事件循环/EventLoop
 
@@ -313,7 +342,7 @@ async def main():
 ```
 
 ## 协程上下文
-[使用 contextvars 管理上下文变量](https://mp.weixin.qq.com/s/e2myTR6wMffuUAcRIGUezg)Python 在 3.7 的时候引入了一个模块：contextvars，从名字上很容易看出它指的是上下文变量（Context Variables）。
+[使用 contextvars 管理上下文变量](https://mp.weixin.qq.com/s/e2myTR6wMffuUAcRIGUezg)Python 在 3.7 的时候引入了一个模块：contextvars，从名字上很容易看出它指的是上下文变量（Context Variables）。contextvars 的值是绑定在当前协程（Task）的执行上下文（Context）上（后续对 contextvars 的修改只影响当前Task的副本），不是绑定在线程全局，也不是绑定在函数的全局变量上。contextvars = asyncio 下正确处理上下文状态的唯一方式。
 
 先讲下 ThreadLocal，从名字上看可以得出它肯定是和线程相关的。没错，它专门用来创建局部变量，并且创建的局部变量是和线程绑定的。
 
@@ -417,7 +446,7 @@ print(c.get())  # val3
 ```
 Token 对象还有一个 old_value 属性，它会返回上一次 set 设置的值，如果是第一次 set，那么会返回一个 `<Token.MISSING>`。那么这个 Token 对象有什么作用呢？它最大的用处就是和 reset 搭配使用，可以对状态进行重置。PS： 比如fastapi_sqlalchemy 将db session 对象保存在ContextVar中，api handler开始时存入，api handler 结合时重置。
 
-ContextVar 除了可以作用在协程上面，它也可以用在线程上面，可以替代 threading.local。
+ContextVar 除了可以作用在协程上面，它也可以用在线程上面，可以替代 threading.local。“绝大多数”情况下，**使用 contextvars意味着应该配合上下文管理器一起使用**（set+reset）。
 
 ## 应用场景
 

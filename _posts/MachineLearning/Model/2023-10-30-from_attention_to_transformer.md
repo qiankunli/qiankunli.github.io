@@ -424,6 +424,34 @@ $$
 
 PS：mlp参数量和计算量都不输attention。 $C_{token} \approx 6N$ 可以认为是正反向3倍*加法乘法2倍=6倍。 一般推演的时候，可以先只考虑一个句子的 输入10个token 输出10个token的变换，实际计算时，还要再考虑batch 维度。
 
+### 从训练/反向传播视角来看transformer
+
+[为什么我还是无法理解transformer？](https://www.zhihu.com/question/596771388/answer/1974891633284781738) 建议细读，讲到了Attention的很多why
+1. Attention机制负责路由（Routing），它决定了信息从哪流向哪（xx与xx关系紧密）；而FFN层负责记忆（Memory）和加工。
+2. 为什么Transformer里到处都是LayerNorm？**在反向传播里起作用**。如果你尝试过去掉LayerNorm训练Transformer，你会发现根本训练不起来。梯度要么消失要么爆炸。Attention是两个向量做点积，数值很容易就变得巨大。如果没有LayerNorm在后面压着，Loss算出来的梯度会非常大，一更新权重，Q和K就飞了。而且，LayerNorm让每一层的输入分布保持稳定。这让后面的层在反向传播时，不用去适应前面层参数剧烈变化带来的分布漂移。这在深层网络里是保命的机制。
+3. 现在的模型（比如GPT系列）大多使用可学习的位置编码（Learnable Positional Embeddings），也是权重，一个大矩阵，行数是最大序列长度，列数是隐藏层维度。反向传播的时候，模型会根据位置信息的贡献来更新这个矩阵。比如，如果模型发现动词总是在名词后面，它就会调整位置编码的权重。
+
+$$
+Attention(Q,K,V) = softmax(\frac{QK^T}{\sqrt{d_k}})V
+$$
+
+Attention是一个由矩阵乘法、缩放、Softmax组成的计算过程，没有W和B，那梯度传给谁了？真正的参数藏在进入这个公式之前和出去之后的地方。
+1. 在数据X进入Attention机制之前，它必须经过三个线性变换 Q=XWq,K=XWk,V=XWv。反向传播的时候，梯度顺着Loss往下流，经过Softmax，经过矩阵乘法，最后就是为了更新这三个矩阵里的数值。Loss计算出来后，我们对Attention的输出求导，这个导数会怎么流？
+  1. 首先它会回传到V上，因为输出是Attention权重矩阵和V的加权和。
+  2. 梯度怎么流向Q和K的?Attention的核心是Softmax出来的权重矩阵，我们姑且叫它A，这个A不仅决定了输出用了多少
+W的信息，它本身也是Q和K计算出来的。当梯度穿过Softmax后(会把梯度放缩并分发)，它来到了$QK^T$这一步。这里是矩阵乘法。根据链式法则，对Q求导，就是把梯度乘以K；对K求导，就是把梯度乘以Q。这意味着，Wq权重的更新方向，不仅取决于当前的Loss，还取决于当前的K长什么样；同理，Wk的更新也受制于Q。这就是为什么Transformer训练起来有时候很妖。它的参数更新是高度耦合的。Wq和Wk必须在训练过程中不仅要学会提取特征，还要学会互相配合。如果Wq把向量映射到了一个奇怪的空间，而Wk没跟上，那点积出来的结果就是一团糟，Softmax后的概率分布就是均匀噪声，模型就什么都学不到。在反向传播调整Wq和Wk时，模型实际上是在学习一种对齐机制。我们希望对于某个特定的输入Xi，它的Qi能和它真正相关的那个Xj生成的Kj产生最大的点积。这也是为什么Transformer刚开始训练时特别不稳定，因为Wq和Wk都是瞎随机初始化的，大家都在乱转，根本对不上号。所以必须要有一个Warmup阶段，让学习率慢慢热起来，给这两个矩阵一点时间去找到彼此的这种对应关系的基准面。
+
+Transformer的反向传播不是一条单一的河流，它是一张复杂的网
+1. Embedding层：更新词向量，让语义相近的词在空间上靠得更近。
+2. Positional Encoding：更新位置向量（如果是可学习的），捕捉序列顺序信息。
+3. Linear Layers (Q, K, V)：这是重头戏。梯度教导Wq和Wk如何将输入映射到一种能通过点积来衡量相关性的空间。这本质上是在学习一种度量学习（Metric Learning）。梯度同时教导Wv提取什么样的内容特征是有用的。
+4. Attention Output Linear：Attention算完后还有一个Wo，负责把多头（Multi-head）的结果融合起来。这部分的梯度告诉模型怎么把不同头关注到的不同侧面（比如一个头看语法，一个头看语义）拼在一起。
+5. FFN Layers：梯度在这里把共现知识刻录进W1和W2。
+6. LayerNorm：$\gamma$和$\beta$根据梯度的统计特性进行微调，保证数据流的稳定性。
+反向传播在Transformer里的实质：通过无数次的误差反馈，微调高维空间里的线性映射矩阵，使得向量的点积能够正确反映token之间的语义依赖关系。也得提醒一点，别太迷信那些复杂的数学推导。Transformer的成功，很大程度上不是因为它的数学有多精妙，而是因为它硬件友好。Transformer就是一堆可以并行训练的线性层，中间夹了一些点积操作来做信息筛选，GPU最喜欢干这事。RNN和LSTM之所以被淘汰，不是因为它们原理不行，而是因为它们那个递归结构（上一步输出做下一步输入）导致没法并行计算。反向传播的时候也要一步步往回推（BPTT），梯度流太长，很容易就没了。
+
+Karpathy大神100行代码讲反向传播，[micrograd](https://github.com/karpathy/micrograd)，300行代码讲GPT [minGPT](https://github.com/karpathy/minGPT) 极简代码微调GPT [nanoGPT](https://github.com/karpathy/nanoGPT)建议看看。
+
 ### 代码
 
 

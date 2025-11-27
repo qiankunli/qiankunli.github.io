@@ -38,8 +38,6 @@ Paul Graham： 代码中任何外加的形式都是一个信号，表明我对�
 
 如果函数的内部出现了 yield 关键字，那么它就不再是普通的函数了，而是一个生成器函数，调用之后会返回一个生成器对象。
 
-![](/public/upload/python/generator.jpg)
-
 生成器在很多常用语言中，并没有相对应的模型。调用生成器函数（带有yield关键字的函数），返回一个生成器对象 generator（由python编译器构建，提供了·__next__`方法实现），也就是说，生成器函数是generator工厂。generator 实现了Iterator 接口，因此generator 也可以迭代。生成器函数中的return 语句触发generator抛出StopIteration 异常。生成器是懒人版本的迭代器，在你调用 next() 函数的时候，才会生成下一个变量。生成器并不会像迭代器一样占用大量内存，只有在被使用的时候才会调用。
 1. next(generator) 调用生成器的 `__next__()` 方法，每次遇到 yield 时函数会暂停并保存当前所有的运行信息，**返回 yield 的值后挂起**, 并在下一次执行 next(generator) 方法时从当前位置继续运行。    
 1. Python 引入生成器的最初目的是作为迭代器的替代。Python 中，可以迭代处理（比如在 for 循环中）的对象称为可迭代对象，可迭代对象实现了 `__iter__()` 特殊方法，返回一个迭代器。生成器允许用户使用 yield 关键字，**将函数作为迭代器，而不用定义类并实现对应的特殊方法。Python 会自动帮用户填充特殊方法，使生成器变成迭代器**。
@@ -150,36 +148,35 @@ def timer(func):
 
 ### 类装饰器
 
-类装饰器：类中一个非常特殊的实例方法，即 `__call__()`。该方法的功能类似于在类中重载 `()` 运算符，使得类实例对象可以像调用普通函数那样，以`对象名()`的形式使用。PS：**可以看做python 对象和函数都实现了 Callable 接口，因此在`()`这个场景可以互相替换，在很多场合函数被包装成了一个对象**。
-
-绝大多数情况下，我们会选择用嵌套函数来实现装饰器，但这并非构造装饰器的唯一方式。事实上，某个对象是否能通过装饰器（@decorator）的形式使用只有一条判断标准，那就是 decorator 是不是一个可调用的对象。类同样也是可调用对象。类装饰器主要依赖于 `__call__` 方法，当一个类的实例被当作函数调用时，`__call__` 方法就会被执行。PS： 把函数变成了一个类
+类装饰器是一个接收类作为参数，并返回类或其替代物的函数。
 
 ```python
-class Count:
-    def __init__(self, func):   # 初始化时传入原函数 func()
-        self.func = func
-        self.num_calls = 0
+def decorator(cls):
+    print(f"装饰了类：{cls.__name__}")
+    # 修改类（增加属性、方法等）
+    # 替换类（返回一个新类或其实例）
+    # 注册类（放入全局 registry）
+    # 在类定义阶段自动执行逻辑（日志、校验、依赖注入）
+    return cls
 
-    def __call__(self, *args, **kwargs):
-        self.num_calls += 1
-        print('num of calls is: {}'.format(self.num_calls))
-        return self.func(*args, **kwargs)
-@Count
-def example():
-    print("hello world")
-example()
-
-# 输出
-num of calls is: 1
-hello world
-example()
-
-# 输出
-num of calls is: 2
-hello world
-...
+@decorator
+class MyClass:
+    pass
 ```
+上面执行时，其实等价于：
+```python
+class MyClass:
+    pass
+MyClass = decorator(MyClass)
+```
+类装饰器在 类定义完成后立即执行，但在实例化前。即：
+```python
+@decorator
+class A: ...
+# 这里装饰器已经执行完了
 
+a = A()  # 实例化时不会再调用装饰器
+```
 
 ### 参数化装饰器
 
@@ -284,9 +281,11 @@ def log(func, *args, **kw):
 
 ## with和上下文管理器
 
-with 是一种**不常见的控制流功能**， 目的是简化常用的一些try/finally结构，使资源（如文件句柄、数据库连接、缓存等）能够方便地在进入和退出特定代码块时自动初始化和清理。with 语句对一段定义在上下文管理器的代码进行包装（封装 try-catch-finally），当对象使用 with 声明创建时，上下文管理器允许类做一些设置和清理工作。上下文管理器的行为由下面两个魔法方法所定义： `__enter__()` 和`__exit__()`，这两个方法会由Python解释器调度自动执行。PS：魔术方法的支持下的一种语法糖。
+with 是一种**不常见的控制流功能**，本质上就是 对 try / except / finally 的结构化封装，使资源（如文件句柄、数据库连接、缓存等）能够方便地在进入和退出特定代码块时自动初始化和清理，**越复杂的资源管理逻辑，它的价值越大**，业务代码可以尽量简洁。它不是功能上能做 try/except 做不到的事，而是在可维护性、可复用性、抽象能力、安全性上有非常明显的优势。比如作为框架提供方来说，你可以提供一个resource_client封装逻辑，但是你无法控制resource_client.biz_func 抛出异常时用户如何处理。
 
-with 语句适用于对资源进行访问的场合，确保不管使用过程中是否发生异常都会执行必要的“清理”操作，释放资源。类似于java的 `try(xx){...}` 或 `try...finally...`
+with 语句对一段定义在上下文管理器的代码进行包装（封装 try-catch-finally），当对象使用 with 声明创建时，上下文管理器允许类做一些设置和清理工作。上下文管理器的行为由下面两个魔法方法所定义： `__enter__()` 和`__exit__()`，这两个方法会由Python解释器调度自动执行。PS：魔术方法的支持下的一种语法糖。
+
+with 语句适用于对资源进行访问、事务（退出时成功则提交、失败则回滚）、与contextvars结合（contextvars 的正确使用必须要set+reset+token）、有异常处理逻辑需要统一管理等场合，确保不管使用过程中是否发生异常都会执行必要的“清理”操作，释放资源。类似于java的 `try(xx){...}` 或 `try...finally...`
 ```python
 with open('path','读写模式‘) as f:
     do something
@@ -303,32 +302,32 @@ f.close()
 
 基于类的上下文管理器
 ```python
-class FileManager:
-    def __init__(self, name, mode):
-        print('calling __init__ method')
-        self.name = name
-        self.mode = mode 
-        self.file = None
-        
-    def __enter__(self):
-        print('calling __enter__ method')
-        self.file = open(self.name, self.mode)
-        return self.file
+class Transaction:
+    def __init__(self, db):
+        self.db = db
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        print('calling __exit__ method')
-        if self.file:
-            self.file.close()
-            
-with FileManager('test.txt', 'w') as f:
-    print('ready to write to file')
-    f.write('hello world')
-    
-## 输出
-calling __init__ method
-calling __enter__ method
-ready to write to file
-calling __exit__ method
+    def __enter__(self):
+        print("BEGIN")
+        self.db["transaction_active"] = True
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is None:
+            print("COMMIT")
+        else:
+            print("ROLLBACK because:", exc)
+        self.db["transaction_active"] = False
+        return False
+
+# =====================
+# 使用示例
+# =====================
+
+db = {}
+with Transaction(db) as tx:
+    print("doing query")
+    # raise Exception("oops")  # 试试异常
+
 ```
 
 某些时候，如果只有很少的上下文需要管理，那么定义一个类便会有些麻烦。可以使用装饰器 contextlib.contextmanager将一个**生成器函数**转换为上下文管理器，来定义自己所需的基于生成器的上下文管理器，用以支持 with 语句。使用@contextmanager 能减少创建上下文管理器的样板代码，不用编写一个完整的类来定义`__enter__()` 和`__exit__()` 方法，而只需实现一个含有yield 语句的生成器，生成想让`__enter__()` 方法返回的值。yield 把函数主体分为两部分：在yield 之前的所有代码在调用`__enter__()` 方法时执行，yield 之后的代码在调用`__exit__()` 方法时执行。
@@ -391,6 +390,12 @@ BAKA⑨
 ```
 
 需要注意的是，当我们用 with 语句执行上下文管理器的操作时，一旦有异常抛出，异常的类型、值等具体信息，都会通过参数传入“__exit__()”函数中。你可以自行定义相关的操作对异常进行处理，而处理完异常后，也别忘了加上“return True”这条语句。如果 __exit__ 方法最后返回了一个布尔类型为 True 的值，那么会把塞进嘴里的异常吞下去，程序不报错正常执行。如果返回布尔类型为 False 的值，则会在执行完 __exit__ 方法之后再把异常吐出来，引发程序崩溃。
+
+在工程实践中
+1. 因为涉及到一些类似事务逻辑（比如资源释放），因此使用了上下文管理器，比如暴漏句柄/实例 resource
+2. 因为resource想在deep func 里也被使用，所以用了contextvars 
+3. 刚好使用 contextvars 一般也要配合上下文管理器使用。
+所以 contextvars+ 上下文管理器就成了一些资源管理组件的常见组合
 
 ## 动态语言
 
