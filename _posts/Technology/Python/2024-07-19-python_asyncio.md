@@ -123,7 +123,7 @@ await future
 
 ### Task
 
-Task 是 Future 的子类，它的作用是把协程对象包装成 Future，在 Future 的基础上加入了一个 coroutine。PS：类似java的FutureTask，协程离不开调度器，一个调度器管理多个协程，调度器需要有一个队列，用来存放等待运行的协程。现在看，是不是可以认为，调度器队列里的基本单元是Task？单纯一个 coro 则调度器无法设置coro的状态。
+Task 是 Future 的子类，它的作用是把协程对象包装成 Future，在 Future 的基础上加入了一个 coroutine。PS：类似java的FutureTask，协程离不开调度器，一个调度器管理多个协程，调度器需要有一个队列，用来存放等待运行的协程。现在看，是不是可以认为，调度器队列里的基本单元是Task？单纯一个 coro 则调度器无法设置coro的状态。PS：**Task类似go 里的G，Event Loop类似go的P。Task 是Event Loop的调度对象。Python 的 Task = 跑一条固定 await 链的执行环境（context + stack + state）。在 Python 中：只有遇到 await，当前协程才会把控制权交回Event Loop。Event Loop不是自由地抢占协程、切换协程（传统调度器），而是：await 遇到 I/O future → 让出控制权；	future 完成 → 恢复协程执行**，完全协作式，不是调度器想调哪个async 方法就调， async 方法之间的调用顺序由代码结构决定（A await B await C）。FastAPI 每个请求对应一个 Task。
 
 调用异步函数并不能执行函数，**异步函数就不能由我们自己直接执行**（这也是函数与协程的区别），异步代码是以 Task 的形式去运行，被 EventLoop 管理和调度的。`result = async_function()` 协程对象 result 虽然生成了，但是还没有运行，要使代码块实际运行，需要使用 asyncio 提供的其他工具。
 1. 最常见的是 await 关键字。当我们await一个Coroutine，这个异步函数就会被提交给asyncio底层，然后asyncio就会开始执行这个函数。
