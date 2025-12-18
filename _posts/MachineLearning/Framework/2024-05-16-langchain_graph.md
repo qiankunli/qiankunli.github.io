@@ -651,7 +651,13 @@ class Runtime:
         # 返回最终状态
         return self.state
 ```
-execute_node（节点执行阶段）
+execute_node（节点执行阶段），每一步执行：
+1. 取当前 state
+2. 执行一个 node（函数）
+3. 得到 state_delta
+4. merge → 新 state
+5. 决定下一个 node
+
 ```python
 async def execute_node(self, node, state):
     # 1️⃣ 分析函数签名
@@ -768,7 +774,7 @@ node_func 执行需要各种参数（依赖，数据依赖，资源依赖） 便
 
 原理解析与注意点
 1. Interrupt的本质是什么？为什么它可以中断？原因很简单，因为它就是丢出了一个异常（Exception），异常信息就是中断时送出的数据。所以在发起Interrupt调用时不要做自定义异常捕获，否则可能无法中断。
-2. **“断点续跑”只是从中断的node重新开始，并不是从Interrupt函数调用处开始！**所以不要在这个节点的Interrupt之前做改变状态（State）的动作！如果可能，尽量让人工节点只负责处理中断。
+2. **“断点续跑”只是从中断的node重新开始执行整个节点，并不是从Interrupt函数调用处那一行代码开始！**所以不要在这个节点的Interrupt之前做改变状态（State）的动作！任何位于 `interrupt()` 调用之前的、具有副作用的操作（如 API 调用、数据库写入）都会被重复执行。如果可能，尽量让人工节点只负责处理中断。
 3. 要有唯一的ID标识一次工作流运行过程。“断点续跑”依赖于首次Agent调用时的thread_id，所以如果需要处理HITL，就需要提供该信息。因为Checkpointer需要借助它做检查点，而恢复运行时则需要提供相同的thread_id来让Checkpointer找到对应的检查点。
 
 在理解了这几个注意点后，最后来总结与回顾整个处理过程，以一个本地SDK模式下直接调用Agent的客户端为例：
@@ -776,8 +782,9 @@ node_func 执行需要各种参数（依赖，数据依赖，资源依赖） 便
 2. 工组流运行到人工节点的interrupt调用，发生中断，并携带了中断数据
 3. 中断发生。客户端收到Agent的返回状态，从中发现有中断，则提示用户
 4. 用户输入反馈后，调用invoke恢复工作流，指定thread_id和resume信息
-5. 再次进入人工节点，**此时由于有resume信息，interrupt函数不会触发中断，直接返回resume信息**；流程得以继续运行。至此，一次中断过程处理结束
+5. 再次进入人工节点，**此时由于有resume信息，interrupt函数不会触发中断，interrupt函数直接返回Command(resume=...)提供的信息**；流程得以继续运行。至此，一次中断过程处理结束
 
+在LangChain 0.x时代，虽然官方提供的 Human-in-the-Loop 相关 API，但是该 API 设计上较为零散，开发者还需要手动处理很多底层细节（如中断后的状态恢复、决策结果的传递等）。LangChain 1.0 版本带来了全新的 Middleware 架构，这一架构通过统一的拦截层和内置的状态管理机制，彻底改变了 Human-in-the-Loop 的实现方式；其中专门推出的 HumanInTheLoopMiddleware 组件，更是将原本复杂的审批触发逻辑、状态保存与恢复、人机决策交互等功能进行了高度封装，开发者只需通过简单的配置（如指定需要拦截的工具名称、允许的决策类型、审批提示信息等），就能快速实现灵活且可靠的 Human-in-the-Loop 效果，让整个开发过程变得更加优雅且高效。
 
 ## 其它
 

@@ -55,7 +55,7 @@ Transformer 模型本来是为了翻译任务而设计的。在训练过程中�
 
 ## 位置编码/Positional Encoding
 
-Transformer提出了深度学习领域既MLP、CNN、RNN后的第4大特征提取器。一个好的特征提取器需要自带输入处理模块的前后顺序信息，而Attention机制并没有考虑先后顺序信息（源于注意力机制固有的排列不变性，因此修改tokens的顺序不会改变输出加权值。因此，注意机制本身缺乏对token顺序的意识），但前后顺序信息对语义影响很大，因此需要通过位置嵌入这种方式把前后位置信息加在输入的Embedding上。
+Transformer提出了深度学习领域既MLP、CNN、RNN后的第4大特征提取器。一个好的特征提取器需要自带输入处理模块的前后顺序信息，在传统的RNN中，词是一个接一个处理的，天然知道顺序，而Attention机制并没有考虑先后顺序信息（源于注意力机制固有的排列不变性，因此修改tokens的顺序不会改变输出加权值。因此，注意机制本身缺乏对token顺序的意识），但前后顺序信息对语义影响很大，因此需要通过位置嵌入这种方式把前后位置信息加在输入的Embedding上。
 
 对self-attention来说，它跟每一个input vector都做attention，在计算注意力矩阵时每个 token 都与其他所有 token 交互，没有考虑到input sequence的顺序。更通俗来讲，大家可以发现我们前文的计算每一个词向量都与其他词向量计算内积，得到的结果丢失了我们原来文本的顺序信息。打乱词向量的顺序，得到的结果仍然是相同的。但实际上位置信息很有用，比如动词出现在句首的概率就比名词低，所以要把位置信息塞到学习过程中去。 
 
@@ -203,13 +203,13 @@ $$
 ![](/public/upload/machine/end_to_end_multi_head.jpg)
 PS: head的概念类似卷积中的通道，只不过每个通道的输入都是一样的，类似于把一个通道的数据复制多次。多头注意力的计算过程类似深度可分离卷积，把通道分开计算，再融合到一起。经过注意力层，**输入向量和输出向量的shape是一致的**，可以看做向量相互"交流"并根据彼此信息更新自身的值。Attention模块的作用就是要确定上下文中哪些词对更新其他词的意义有关，以及应该如何准确地更新这些含义。
 
-多头注意力（MHA），由于对键-值缓存的二次计算复杂度和高内存消耗而受到限制。为了解决这些问题，提出了几种变体，如多查询注意力（MQA）、组查询注意力（GQA）和多潜在注意力（MLA）。[手撕大模型Attention：MLA、MHA、MQA与GQA（含实现代码）](https://mp.weixin.qq.com/s/sAxXiWsMbcuvmxxJ8lpodA)
+多头注意力（MHA），假设有 H 个头，每个头的维度是 d，则 KV Cache显存占用量与Hd成正比。当上下文长度达到 128k 甚至 1M 时，KV Cache 会大到单张显卡根本放不下（例如可能需要几百 GB 显存）。为了解决这些问题，提出了几种变体，如多查询注意力（MQA）、组查询注意力（GQA）和多潜在注意力（MLA）。[手撕大模型Attention：MLA、MHA、MQA与GQA（含实现代码）](https://mp.weixin.qq.com/s/sAxXiWsMbcuvmxxJ8lpodA)
 
 ## Position-wise Feed Forward（对输出进行非线性变换）
 
 Attention模块的作用就是确定上下文中哪些词之间有语义关系，以及如何准确地理解这些含义（更新相应的向量）。这里说的“含义”meaning指的是编码在向量中的信息。Attention模块让输入向量们彼此充分交换了信息（例如machine learning model和fashion model，单词“model”指的应该是“模特”还是“模型”）， 然后，这些向量会进入第三个处理阶段：Feed-forward / MLPs。针对所有向量做一次性变换。这个阶段，向量不再互相"交流"，而是并行地经历同一处理。**Transformer基本不断重复Attention和Feed-forward这两个基本结构，这两个模块的组合成为神经网络的一层**。输入向量通过attention更新彼此；feed-forward 模块将这些更新之后的向量做统一变换，得到这一层的输出向量；在Attention模块和多层感知机（MLP）模块之间不断切换。
 
-FFN（前馈神经网络）在 Transformer 模型中的作用是将输入向量投射到更高维度的空间中，以便发掘数据中原本隐藏的细微差别。
+MLP是一个更广泛的神经网络概念，而FFN则是该概念在Transformer层中的具体应用。FFN（前馈神经网络）在 Transformer 模型中的作用是将输入向量投射到更高维度的空间中，以便发掘数据中原本隐藏的细微差别。
 
 FFN 设计的初衷，是为模型引入非线性变换，有一个维度为n_ff的隐藏层。主要还是$W_1$和$W_2$，进行了“先把hidden_size的输入向量维度升到n_ff，又降回hidden_size”的操作。
 1. FFN的作用就是空间变换。FFN层由两个线性变换组成，线性变换 中间有一个激活函数。
@@ -352,7 +352,7 @@ NLP 神经网络模型的本质就是对输入文本进行编码，常规的做�
 
 [白话科普：Transformer和注意力机制](https://mp.weixin.qq.com/s/jyy7WXtOqJPXJYssPpfiUA)从Transformer整体来看，Encoder负责将输入序列（通常是自然语言的）变换成一个「最佳的」**内部表示**；而Decoder则负责将这个「内部表示」变换成最终想要的目标序列（通常也是自然语言的）。
 1. 现在，我们先来看一下Encoder，它其实是由多个网络层组成的。输入序列进入Encoder之后，会经过多个Encoder Layer。每经过一层，相当于输入序列中的每个token进行了一次向量变换（非线性的），也就离那个「最佳的」内部表示又接近了一步。但是，每次变换都不改变向量的维度数量。每个Encoder Layer到底做了什么呢？这里面关键的一个机制是自注意力 (self-attention)。为什么需要自注意力呢？在模型内部，每个token都是用一个多维向量来表示的。向量的值决定了这个token在多维空间中的位置，也决定了它所代表的真实含义。一个token的真实含义，不仅仅取决于它自身，还取决于句子中的其它上下文信息（来自其它token的信息）。而借助向量，就可以用数量关系来描述这些现象了：相当于是说，**一个token的向量值，需要从句子上下文中的其他token中「吸收」信息，在数学上可以表达为所有token的向量值的加权平均**。这些权重值，我们可以称之为注意力权重 (attention weights)。在Encoder中，每经过一层Encoder Layer，一个token都会「参考」上一层的所有token，并根据对它们注意力权重的不同，决定「携带」它们中多少量的信息进来。对于这一过程，一个最简化的说法可以表达为：一个token会注意到 (attend to)所有其他token。
-1. Decoder 的结构相比 Encoder 更加复杂，因为它不仅要理解，还要生成，它主要有三个核心组件：**掩码多头注意力**+多头交叉注意力+前馈神经网络。对于Decoder这里的自注意力来说，生成的过程需要遵循因果关系。也就是说，生成下一个token的时候，它必须只能注意到 (attend to) 之前已经生成的token；所以，对于已经生成的序列来说，Decoder Layer对这个序列进行处理的时候，序列中每个token也都应该保持跟生成时一样的逻辑，即它只能注意到 (attend to) 在它之前的token。在计算上需要构建一个mask矩阵。而Encoder中的自注意力却允许序列中的每个token都可以注意到 (attend to) 所有的token（包括在它之前和它之后的）。
+1. Decoder 的结构相比 Encoder 更加复杂，因为它不仅要理解，还要生成，它主要有三个核心组件：**掩码多头注意力**+多头交叉注意力+前馈神经网络。对于Decoder这里的自注意力来说，生成的过程需要遵循因果关系(因果注意力/masked attention)。也就是说，生成下一个token的时候，它必须只能注意到 (attend to) 之前已经生成的token；所以，对于已经生成的序列来说，Decoder Layer对这个序列进行处理的时候，序列中每个token也都应该保持跟生成时一样的逻辑，即它只能注意到 (attend to) 在它之前的token。这与标准的自注意力机制形成对比，后者允许一次访问整个输入序列。在计算上需要构建一个mask矩阵。而Encoder中的自注意力却允许序列中的每个token都可以注意到 (attend to) 所有的token（包括在它之前和它之后的）。
    $$
     \text{MaskedAttention}(Q, K, V) = \text{softmax}\left( \frac{QK^T + \text{Mask}}{\sqrt{d_k}} \right) V
    $$

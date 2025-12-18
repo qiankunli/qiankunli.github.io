@@ -271,6 +271,38 @@ for i in range(20):
 |1|[464,23878,16599,11]|the elf queen,|508|
 |2|[464,23878,16599,11,508]|the elf queen,who|550|
 
+为什么可以一次性构建：
+1. Transformer的并行架构：可以同时处理序列的所有位置
+2. 因果掩码（Causal Mask）：确保每个位置只看到前面的信息，保持因果性 
+3. 高效训练：一次前向传播完成所有时间步的学习 
+4. 数学等价：一次性训练与传统逐位训练数学上等价
+
+在实际应用中，我们通常面对的是很长的文本，比如一篇文章、一本书。这时候就不能用"向右位移"的方法处理整个文本了，为此，我们引入了滑动窗口技术。滑动窗口包含两个关键参数：
+1. 窗口长度：每次能看到多少个词
+2. 窗口位移：每次滑动多少个词
+
+
+损失函数：衡量“猜对”的程度。在训练过程中，我们需要一个标准来衡量AI“猜词”的水平。这就是损失函数的作用。 计算原理：
+1. 在每个位置，AI会给出对下一个词的“猜测”（一个概率分布）
+2. 我们将这个猜测与真实的词比较
+3. 计算它们之间的差异（使用交叉熵损失）
+
+$$
+\mathcal{L} = -\sum_{t=1}^{T-1} \log P(x_{t+1} \mid x_1, \dots, x_t)
+$$
+
+比如“机器, 学习, 是, 人工, 智能, 的, 重要, 分支”，当AI看到“机器学习是”时：
+- 它可能认为下一个是“人工智能”的概率是0.7
+- 是“深度学习”的概率是0.2
+- 是“一个”的概率是0.1
+
+如果真实的下一个词是“人工智能”，那么损失就是：
+- 理想情况：AI应该100%确定是“人工智能”
+- 实际情况：AI只有70%确定
+- 损失值 $ = -\log(0.7) \approx 0.36 $
+
+在自回归模型中，最核心的要求是：生成第t个词时，只能看到前面t-1个词，不能看到未来的词。这就是后续掩码（Causal Mask，也叫因果掩码）要确保的事情。后续掩码是一个下三角矩阵，掩码位置不参与梯度计算。在正向传播中，这些值被设为常数-1e9，经过softmax后，这些位置的权重约等为0，对输出没有任何贡献。在反向传播中，这些常数位置的梯度为0，位置2的梯度只能流向位置0、1、2的参数。
+
 ### 微调GPT-2 model
 
 GPT models are trained in an unsupervised way on a large amount of text (or text corpus). The corpus is broken into sequences, usually of uniform size (e.g., 1024 tokens each). PS： 预训练素材通常被切成特定长度的句子。The model is trained to predict the next token (word) at each step of the sequence. For example (here, we write words instead of integer encodings for clarity) :

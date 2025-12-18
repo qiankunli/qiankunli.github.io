@@ -61,7 +61,7 @@ OpenAI 是以 AGI（Artificial General Intelligence） 为愿景的公司，现�
 
 ## 多Agent拓扑结构
 
-多Agent系统（Multi-Agent System, MAS）是Agent系统的发展趋势，因为它更适用于解决复杂问题求解、分布式任务、模拟社会系统等问题，在多Agent系统中，**每个Agent 专注单一领域，工具少于10个**，团队协作需推理支持否则成功率低（目前成功率<50%）。
+多Agent系统（Multi-Agent System, MAS）是Agent系统的发展趋势，因为它更适用于解决复杂问题求解、分布式任务、模拟社会系统等问题，在多Agent系统中，**每个Agent 专注单一领域（通过不同的Prompt、工具和知识库来定义），工具少于10个**，团队协作需推理支持否则成功率低（目前成功率<50%）。
 
 ### 一个材料
 
@@ -226,6 +226,8 @@ https://google.github.io/adk-docs 官方文档将各个方面介绍的很全面
         sub_agents: list[BaseAgent] = Field(default_factory=list)
         before_agent_callback: Optional[BeforeAgentCallback] = None
         after_agent_callback: Optional[AfterAgentCallback] = None
+        # AsyncGenerator是AsyncIterator 的子类
+        # 返回[Event, None] 跟语法没关系，类似tuple[Event,None]，一般一个作为数据，一个作为控制信号
         async def run_async(self,parent_context: InvocationContext,) -> AsyncGenerator[Event, None]:
             with tracer.start_as_current_span(f'agent_run [{self.name}]'):
                 ctx = self._create_invocation_context(parent_context)

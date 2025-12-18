@@ -50,8 +50,7 @@ Undo日志记录某数据被修改前的值，可以用来在事务失败时进�
 
 ![](/public/upload/storage/run_sql.png)
 
-宕机恢复后（redo log undo log 貌似都是从宕机恢复的视角来说的）
-
+宕机恢复后（redo log undo log 貌似都是从宕机恢复的视角来说的），redo log保证已提交事务对数据产生的影响都刷到磁盘上，，undo日志用于保障撤销未提交事务对数据库产生的影响。
 1. 针对已经提交的数据还未写入到磁盘：InnoDB 如果判断到一个数据页可能在崩溃恢复的时候丢失了更新，就会将它读到内存，然后让 redo log 更新内存内容。并不关心事务性，提交的事务和未提交的事务都被重放了，从而**让数据库”原封不动“的回到宕机前的状态**。
 2. 针对还未提交的数据已经写入到磁盘：重放完成后，再把未完成的事务找出来，逐一利用undo log进行逻辑上的“回滚”。 undo log 记录了sql 的反操作，所谓回滚即 执行反操作sql
 
@@ -63,6 +62,7 @@ redo log 不保证事务原子性， 只是保证了持久性， 不管提交未
 
 ### redolog/事务提交
 
+随机写优化为顺序写
 1. 同步写改为异步写：数据写磁盘一般是随机的，单次较慢，也不允许频繁写入。数据写入一般先保存在内存中，然后定期将内存数据写入到磁盘
 3. 用Write-Ahead log/redo log 解决异步写在宕机场景下的数据丢失问题
 
@@ -88,7 +88,7 @@ Undo Log的设计思路不同于Redo Log，Undo Log需要的是事务之间的�
 
 undo log 亦log亦数据，每个事务在修改记录之前，都会先把该记录拷贝出来一份，存在undo log里，也就是copyOnWrite。也正因为每条记录都有多个版本，才很容易实现隔离性。事务提交后，没用其它事务引用的“历史版本/undo log”就可以删除了。PS：跟cpu 缓存导致一条内存数据多个cpu 副本异曲同工
 
-InnoDB将Undo Log看作数据，因此记录Undo Log的操作也会记录到redo log中，包含Undo Log操作的Redo Log，看起来是这样的：
+InnoDB将Undo Log看作数据（存储在回滚段里），因此记录Undo Log的操作也会记录到redo log中，包含Undo Log操作的Redo Log，看起来是这样的：
 
 ```
 记录1: <trx1, Undo log insert <undo_insert …>>

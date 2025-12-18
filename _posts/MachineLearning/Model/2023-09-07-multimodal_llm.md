@@ -34,6 +34,8 @@ keywords: llm multimodal
 
 [多模态大模型技术点总结](https://mp.weixin.qq.com/s/P2lMI6TkHo7SjamjMO3G3A) 未读。
 
+[多模态 LLM对齐的演进之路，从 CLIP到Qwen3-Omni](https://zhuanlan.zhihu.com/p/1982065391216923209) 未读。
+
 
 ## Transformer与多模态
 
