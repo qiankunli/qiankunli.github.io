@@ -101,6 +101,14 @@ PS: 你看到一个需求，反应从control-service-dao 转为agent-tool-resoru
 
 ![](/public/upload/machine/ai_softwoard.png)
 
+## 把业务知识丝滑地融入到 Agent
+
+两条线
+1. 技术架构演进，llm ==> rag ==> agent ==> multi-agent
+2. 融入业务
+  1. 融入 Prompt，绞尽脑汁地编写 prompt，试图把业务逻辑“翻译”成模型能懂的口吻。
+  2. 企业知识库 (RAG)，虽然能解决知识体量问题。但需要定义 Index、处理向量化、精心切分文档……
+  3. Claude Skill，将专业知识打包成可组合的资源提供给 Claude。PS: 扩展Agent 能力，重点是渐进式扩展。开发者仅提供 bash 工具，并写入提示词：“如果你发现当前没有合适的工具，请使用 /help 命令探测系统环境。” 不再为每个程序（如 ffmpeg）封装独立的 MCP。
 
 ## 有哪些
 
