@@ -24,7 +24,7 @@ keywords: context engineer
 * TOC
 {:toc}
 
-## 简介(未完成)
+## 简介
 
 提示工程（PE）的主要关注点是如何编写有效的提示，特别是系统提示。然而，随着我们向工程更强大的 Agent 转变，这些 Agent 能够进行多轮推理并具备更长的时间视野，我们需要管理整个上下文状态（系统指令、工具、模型上下文协议（MCP）、外部数据、消息历史等）的策略。
 
@@ -144,6 +144,10 @@ https://github.com/kayba-ai/agentic-context-engine
 ## 上下文工程之工程
 
 仅仅提示词的优化更多还是停留在提示词的质量、指令清晰度、书写规范上面，很少关注到上下文的动态组合，包括对系统指令的组装、对话History的组装、长期Memory的存储和读取等等更工程的层面。
+
+1. Context is Everything， LLM 是无状态的。
+2. The Dumb Zone（愚蠢区）研究发现，上下文用得越多，model 越蠢。Context Window 用了 40%（Smart Zone） 之后，表现就会开始明显的下降。
+  1. Dex 的观点是，Sub-agent 不是用来拟人的（比如前端 Agent、后端 Agent、QA Agent），而是用来控制 context 的（fork 一个新的上下文，然后返回精简的结果）。
 
 
 ## 实践

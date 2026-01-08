@@ -221,6 +221,15 @@ https://github.com/microsoft/autogen/tree/main/python/packages/autogen-magentic-
 
 [multi-agent-orchestrator](https://github.com/awslabs/multi-agent-orchestrator) 未读
 
+### langchain deepagents
+
+![](/public/upload/machine/langchain_deep_agents.png)
+
+1. 任务规划(Planning):使用内置 write_todos 和 read_todos 工具将复杂任务分解为结构化待办事项列表,agent 按列表执行并标记完成状态。
+2. 文件系统访问(Computer Access):提供 ls、read_file、write_file、edit_file、glob、grep 等工具,让 agent 能够读写文件、搜索文件内容。大型工具调用结果自动保存到文件,避免消耗上下文窗口。
+    1. 长周期任务面临的核心挑战是上下文窗口限制与成本控制之间的矛盾。传统 agent 将所有工具调用结果堆入上下文，导致 token 成本激增，同时模型在海量信息中逐渐失焦。deepagents 的解决思路是重新设计信息流架构：引入文件系统作为上下文缓冲区，大型工具结果自动写入文件，agent 上下文中仅保留路径引用。配合自动摘要和提示缓存机制，系统显著降低成本的同时保持任务执行效率。
+3. 子 agent 委托(Sub-agent Delegation):通过 task 工具将子任务委托给专门的子 agent 执行,每个子 agent 拥有独立的上下文窗口和工具集。
+
 ### google adk
 https://google.github.io/adk-docs 官方文档将各个方面介绍的很全面
 
