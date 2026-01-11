@@ -26,6 +26,14 @@ keywords: reward model
 * TOC
 {:toc}
 
+## RM的作用
+
+reward model 通常只对一个完整的 response 进行打分，而不是对每个 token 打分。在典型的 RLHF 流程中，RM 接收一个 prompt + response 对，输出一个 scalar score，代表整体偏好程度。这个 score 是全局的、延迟的、稀疏的：它只在序列末尾出现，无法告诉模型“哪一部分写得好、哪一部分写得差”。例如，模型生成了一段 500 个 token 的回答，RM 给出 +1 分。但其中前 300 个 token 逻辑严谨，后 200 个 token 胡说八道——RM 无法区分。如果直接用这个 +1 去反向传播到整个序列的每个 token，就会导致“好 token 被差 token 拖累，差 token 被好 token 带飞”的问题。这就是 credit assignment problem（信用分配问题） 的典型体现。你可能会想：那能不能让 RM 输出 token-level 的奖励？技术上当然可以尝试（例如用对比学习训练一个 local RM），但这会带来几个问题：
+1. 缺乏人类标注的 token-level 偏好数据
+2. 局部奖励可能误导全局目标：一个 token 看似“好”（比如用了一个高级词汇），但放在上下文中反而破坏逻辑连贯性。局部最优 ≠ 全局最优。
+3. RM 本质是判别模型，不具备时序建模能力：它不理解“未来还有多少 token 要生成”，也无法估计“当前 action 对最终 reward 的贡献”。
+因此，reward model 的定位是提供 unbiased 的最终 outcome 信号，而不是指导 token-by-token 的训练过程。
+
 [Reasoning LLM（二）：过程监督与结果监督](https://zhuanlan.zhihu.com/p/17569409591) 奖励模型的作用
 1. 训练数据增强。即通过奖励模型评分结合拒绝抽样来采用数据选择过程， 其本质是通过这种方式产生更高质量的数据。这种方法当前已被广泛用在 SFT 数据构造上
 2. 强化学习训练。这种方式是最广泛最经典的奖励模型的用法，即在强化学习训练并提供有效的奖励信号，进一步提升模型性能。如果说 reject sampling 是一种静态的监督增强（即离线产生数据之后不会随模型训练而变化），那么在 RLHF 中，可以认为是一种动态的监督的方式。由于 RLHF 训练成本的高昂，后续的研究对此做了一些精简，比较经典的就是 DeepSeek 的 GRPO，该方法抛弃了 Value Model 而仅保留 Reward Model 作为监督的依据，同样可以采用两种监督方式，概括而言：
