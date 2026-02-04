@@ -479,3 +479,4 @@ print(async_function())
     1. `__enter__`和`__exit__`两个方法都是不支持await调用的，为了解决这个问题，Python引入了async with语法。
 2. async for  可以处理实现了`__aiter__`方法的异步可迭代对象，返回异步迭代器。异步迭代器提供`__anext__`协程方法，返回一个可异步调用对象，通常是协程对象。 
 3. 若想实现 异步迭代器，可以编写一个类，实现`__anext__`和`__aiter__`，不过还有更简单的方法：以async def 声明一个函数，在主体使用yield。 
+PS：从调用方视角看，async def 一旦具备 yield，其「Generator 特性」在语义和用法上完全压过 「协程特性」。

@@ -169,8 +169,6 @@ change buffer 对更新的加速（尤其是适用于写多读少的业务）：
 
 如果要简单地对比redo log和change buffer 在提升更新性能上的收益的话，redo log 主要节省的是随机写磁盘的 IO 消耗（转成顺序写），而 change buffer 主要节省的则是随机读磁盘的 IO 消耗（避免更新时读取）。PS：redo log主要是为了crash-safe的
 
-
-
 由[互联网分层架构的本质](http://www.10tiao.com/html/249/201710/2651960455/1.html) 想到的数据在不同介质的表现形式，以mysql innodb存储引擎为例
 
 ||表现形式|
@@ -187,3 +185,4 @@ change buffer 对更新的加速（尤其是适用于写多读少的业务）：
 	
 上层抹不去的底层印记。磁盘天然的随机读写慢于顺序读写，迫使os、mysql进行了大量的缓冲优化。
 
+![](/public/upload/storage/cloud_native_mysql.png)

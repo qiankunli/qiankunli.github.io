@@ -817,6 +817,17 @@ class Qwen2RMSNorm(nn.Module):  # 标准化层
         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
         return self.weight * hidden_states.to(input_dtype)
 ```
+### 投机解码/Speculative Decoding
+
+用更小更快的草稿模型（draft）先连续吐出一段候选 token，然后用目标大模型（target）在一次前向里统一判断候选 token ，能接受多少就一次推进多少，从而减少目标模型的前向传播的次数。 
+1. 许多位置预测下一个 token 其实很容易，小模型和大模型的预测结果会高度一致，比如固定搭配、模板化语言、代码里的常见语法片段。
+2. Transformer架构的输出，本来就不是一个 token，而是一个长度等于词表大小的打分向量。所有的输入token对词表的打分向量都会在一次向前中全部计算出来，所以我们可以直接看某一段token对词表的打分，来判断这一段token里哪些token符合要求可以被采用。
+  1. 当输入ABC时，输出层logits形状，`[batch_size, seq_len, vocab_size]`，不考虑batch_size，其实A对应位置的logits 大小为vocab_size，按target解码策略，argmax=B。
+  2. 如果draft input=ABC，输出DEF，则将input=ABCDEF给到target，输出output，此时对于output不是为了计算G，而是
+    1. 根据C 对应的logits，判断是否可以接受D（target argmax也是D 或者相差不多）。
+    2. 如果D可以接受，再看 E
+    3. 如果E 可以接受，再看F，如果不接受F(reject)，则commit DE，由target重新采样
+
 ## 模型加载
 
 通常情况下，使用Pytorch来加载模型步骤如下：

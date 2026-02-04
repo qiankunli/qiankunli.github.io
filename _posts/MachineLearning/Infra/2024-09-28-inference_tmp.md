@@ -26,6 +26,8 @@ keywords: llm vLLM
 
 ## 简介
 
+[万字详解大模型推理加速核心原理：分形规律与资源计算公式](https://mp.weixin.qq.com/s/ytNCNlWJzXCRx7DvTxfp4A) 未细读
+
 [AI Infra 和传统 Infra 断代了吗？](https://zhuanlan.zhihu.com/p/1916694074750132757)从表面看起来，AI Infra 确实和传统 Infra 很不一样
 1. 传统 Infra 处理的是 web request，数据存储，和分布式服务协调，而 AI Infra（特别是大模型）更多围绕的是 GPU 推理，KV Cache 管理，以及大模型训练框架等全新领域。
 2. 请求形态也不一样：web request通常是毫秒级的request，stateless，而 LLM 推理一个 session 往往持续数秒甚至更久(随着context window 和模型大小增加），还要动态维护 token-level 的上下文状态。
@@ -229,6 +231,8 @@ class CustomPreprocessor : public Plugin {
 
 ## 以kvcache为核心的分布式架构
 
+传统的推理服务架构采用同构部署模式，即所有的GPU节点既负责Prefill也负责Decode。随着长上下文场景的增加，这种模式暴露出了严重的性能缺陷。在同构集群中，当一个长Context的Prefill请求（例如处理一本小说的输入）被调度到某张GPU上时，该GPU会被长时间占用（可能长达数秒）。此时，该GPU上原本正在进行的Decode任务会被强制挂起，导致正在等待生成下一个Token的用户感受到明显的卡顿，即Token间延迟（Inter-Token Latency, ITL）激增。这种现象被称为“**队头阻塞**”（Head-of-Line Blocking）或“干扰效应”（Interference Effect）。PD分离架构将GPU资源划分为两个独立的池，Prefill 侧计算 Prompt 并产出 KV；Decode 侧接收 KV 后持续生成 token，从架构上隔离长 Prefill 对短 Decode 的干扰。
+
 [LLM PD 分离背后的架构问题](https://zhuanlan.zhihu.com/p/27836625742) 未细读。
 
 Mooncake 采用了以 KVCache 为中心的分离式推理架构，主要由三个核心部分组成：
@@ -263,6 +267,8 @@ Context Caching
     1. Centralized：即通过一个中心化的 KV Cache 的池来管理不同实例的 KV Cache，其优点在于能够最大化地共享 KV Cache，可以更好地利用 Prefix Caching 的能力，但是在高并发的场景之下其可能会成为单点的性能瓶颈。
     2. Peer-to-Peer：即直接通过 P2P 通信机制在不同实例间传输 KV Cache，避免了中心化的存储，且具有更好的容错与动态扩缩容的能力的支持。
 3. 从分布式推理到分离式推理。目前基于基础设施层的分离式推理（Disaggregated Inference）也是被广泛讨论的话题，即模块化地拆分推理的各个模块形成分离式的部署，彼此之间通过协议传输数据。
+    1. 基于Attention的LLM模型通常由注意力模块和前馈网络模块组成，解码阶段中，注意力模块的参数量少但需要大量KV交互，是访存密集型的，而前馈网络模块参数量大，是计算密集型的，因此Step-3模型论文提出了AFD（Attention - FFN Disaggregation）架构，即将注意力模块和前馈网络模块部署在不同的设备上，在PD分离的基础上进一步优化资源的利用率和推理服务效率。
+    2. MoE模型由若干专家模型组成，主流的大模型拥有几千甚至更多的专家数量，例如DeepSeek V3系列有约1.4万个专家模型，如果所有的专家模型全部部署在一张GPU卡，或一台服务器上是远远无法承载的。由于MoE模型的稀疏激活特性，在多机部署时GPU之间的通信（all-to-all）仅需按需传输，仅把对应的token传给激活的专家模块。仅用NCCL在这种通信模型效率很低，导致带宽资源大量浪费，原因是NCCL更擅长全量而密集的通信。由DeepSeek开发的DeepEP是专门为混合专家模型（MoE）+专家并行（EP）设计的通信库。
 4. 由目前 AIBrix 与 llm-d 等框架的设计上来看，将负载均衡与 KV Cache 管理等功能由推理引擎的层面上升到集群编排的层面去解决是目前的主流趋势，编排侧能够更好地与现有的集群资源管理系统（如 Kubernetes）的生态系统集成，避免一些重复性的工作，推理引擎也可以关注在内部的推理过程优化，只需要暴露一些特定的抽象与接口供编排侧对接。
 
 ## 控制面

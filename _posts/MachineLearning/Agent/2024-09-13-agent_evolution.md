@@ -183,6 +183,11 @@ plt.show()
 
 ## Claude Skills
 
+skill的诞生是Anthropic 对于claude code在演进的过程中，淘汰了All-in-one的加载所有tools，采用了定义skills来渐进式加载提示词以减少上下文压力和幻觉现象的手段。
+
+1. 与agent对比，当我们一般说agent时，一般会提到loop（当然，workflow agent不是个loop），agent一般对目标负责（虽然很多时候能力不够导致效果不佳），部分场景是long-running的，有时要维护状态（比如反问），业界最近在提Ralph Loop。从这个视角看，skill粒度是小于agent的，不大可能long-running 和有状态。此外，skill 只是一个静态的规范，与agent相同点是运行时仍需要llm驱动。
+2. 与mcp对比，在Claude Code中，Skills是提供Knowledge的，而不是用于提供工具的。如果你想在Claude Code的system tools之外，额外给它配置一些其他的工具，那么似乎还是只能依赖MCP。实际上，Skills能做的事更多，你可以在里面配置流程、编码规范、业务知识、代码示例、各种规则等等，以及对于现有工具的调用指导，你都可以在Skills中描述。但是，引入新的工具还是得通过MCP。
+
 PS：Agent ==> skill ==> tool vs  team ==> agent ==> tool，在后者的概念里，skill 是规范格式+workflow（向导式多步骤）形态的“agent”，
 
 ### 是什么
