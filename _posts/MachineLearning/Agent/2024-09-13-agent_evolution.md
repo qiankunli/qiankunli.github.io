@@ -181,49 +181,6 @@ plt.show()
 </pre>
 
 
-## Claude Skills
-
-skill的诞生是Anthropic 对于claude code在演进的过程中，淘汰了All-in-one的加载所有tools，采用了定义skills来渐进式加载提示词以减少上下文压力和幻觉现象的手段。
-
-1. 与agent对比，当我们一般说agent时，一般会提到loop（当然，workflow agent不是个loop），agent一般对目标负责（虽然很多时候能力不够导致效果不佳），部分场景是long-running的，有时要维护状态（比如反问），业界最近在提Ralph Loop。从这个视角看，skill粒度是小于agent的，不大可能long-running 和有状态。此外，skill 只是一个静态的规范，与agent相同点是运行时仍需要llm驱动。
-2. 与mcp对比，在Claude Code中，Skills是提供Knowledge的，而不是用于提供工具的。如果你想在Claude Code的system tools之外，额外给它配置一些其他的工具，那么似乎还是只能依赖MCP。实际上，Skills能做的事更多，你可以在里面配置流程、编码规范、业务知识、代码示例、各种规则等等，以及对于现有工具的调用指导，你都可以在Skills中描述。但是，引入新的工具还是得通过MCP。
-
-PS：Agent ==> skill ==> tool vs  team ==> agent ==> tool，在后者的概念里，skill 是规范格式+workflow（向导式多步骤）形态的“agent”，
-
-### 是什么
-
-**利用文件和文件夹构建专业智能体的新方式**：Skill就是一个标准化的文件夹，用来打包Agent完成特定任务所需的知识、工作流和工具。可以把它理解成给模型的说明书或标准作业程序（SOP，或者之前比较火的概念：SPEC的增强版）。
-
-1. SKILL.md, 核心文件，必须存在。告诉Claude在什么情况下、以及如何使用这个Skill。
-  1. YAML Frontmatter (元数据区)：里面用YAML写元数据（name和description）
-  2. Markdown Body (指令区)：用Markdown 详细说明了执行该任务的工作流程 (Workflow)、最佳实践、注意事项，以及如何调用 scripts 和 references 目录下的资源。
-  ![](/public/upload/machine/skill_md.png)
-2. `scripts/`：存放可执行的Python、Shell脚本。
-2. `references/`：存放参考文档。比如API文档、数据库Schema、公司政策等，这些是给Claude看的知识库。
-4. `assets/`：存放资源文件。比如PPT模板、公司Logo、React项目脚手架等，这些是Claude在执行任务时直接使用的文件，而不是阅读的。
-
-它把完成一个特定任务所需的一切都打包好了，本质上就是一种代码和资源的组织方式，一种约定优于配置的理念。当你的Agent能力越来越多时，怎么管理？一个几千行的System Prompt？一个包含几十个工具函数的大杂烩文件？这些都很难维护。而Skills提供了一种解耦的、模块化的方案（可组合性、可扩展性和可移植性）。你团队里的Agent不再是依赖一个巨大的、难以维护的system_prompt.txt，而是一个由几十个标准化的Skill文件夹组成的能力库，每个Skill都可以独立版本控制、测试和迭代。
-
-"Agent Skills" 更是一种架构思想和工程实践，其核心思路在所有主流 LLM 平台上都是通用的：
-1. 发现（Discovery）：Agent 如何知道“技能”的存在
-2. 加载（Loading）：Agent 如何在需要时获取技能的详细信息（即“渐进式披露”）
-3. 执行（Execution）：Agent 如何运行代码或调用 API
-
-### 发现与加载
-
-渐进式披露(Progressive Disclosure)，让Agent可以访问大量技能，但不会一次性“灌输式”教学，而是“按需加载”。“渐进式”的方式。
-1. 技能发现。会话开始时从SKILL.md文件的元数据区域加载名称与描述，用于发现技能。具体来说就是把name和description注入系统Prompt。
-2. 技能理解。当LLM识别需要使用某个Skill时，会加载该技能的完整SKILL.md，以了解真正的技能指南。
-3. 资源按需加载。在使用技能时，如果发现有额外的动态资源需要读取（文档、模板、脚本等），则按需加载对应资源。
-
-### 一些实践
-
-工程落地-定义技能元工具 (skill meta tools)：list_skill/get_skill/run_skill，在 system prompt 里强调这 3 个 tools
-```
-- 你具备很多与外部世界互动的能力，但需要通过 list_skill 来了解自己的能力；然后通过 get_skill 了解某项特定能力；最后可以通过 run_skill 来实施具体的能力；
-- 通过 list_skill、get_skill 了解到的能力，如果要执行，一定要走 run_skill 方法来执行
-```
-
 ## 大佬
 
 [台大李宏毅2025 AI Agent新课来了！](https://mp.weixin.qq.com/s/d5FnSATz3tPfCOu2a53uKQ)李宏毅：
