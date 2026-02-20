@@ -124,6 +124,12 @@ Andrej Karpathy
   2. 企业知识库 (RAG)，虽然能解决知识体量问题。但需要定义 Index、处理向量化、精心切分文档……
   3. Claude Skill，将专业知识打包成可组合的资源提供给 Claude。PS: 扩展Agent 能力，重点是渐进式扩展。开发者仅提供 bash 工具，并写入提示词：“如果你发现当前没有合适的工具，请使用 /help 命令探测系统环境。” 不再为每个程序（如 ffmpeg）封装独立的 MCP。
 
+按跑在哪+能碰到什么数据来分
+1. local first，比如Claude Code/OpenClaw，接入本地数据，个人 AI 操作系统。
+2. Cloud-native，Manus， 跑在云端虚拟机里，需要你把数据上传过去，高级 AI 外包
+3. Enterprise-integrated，跑在云端，打通了内部系统api。
+用户在哪跟它对话（专门app还是嵌入到已有工具）？用户可以自定义prompt 或skill嘛？服务跑在哪（本地还是云端？）它能碰到什么数据（本地文件？企业内部系统？还是只有公网）？这些搞清楚，它能做什么、不能做什么、天花板在哪就清楚了，它最弱的那一层——那就是它下一步要补的方向，也是它当前最大的限制。
+
 ## 有哪些
 
 在最早的宣传和很多人的印象里，Manus 更像是一个什么都能做的通用 Agent，但真实用户的使用行为其实反复出现在几类非常具体的任务结构中。从任务类型来看，几乎所有常见的使用场景都可以归入：Office 三件套（Word、PPT、Excel）、网站 / App / 工作流搭建。
@@ -163,5 +169,6 @@ Andrej Karpathy
 1. 一般情况下，需求能简单做就简单实现，避免用更复杂实现，比如rag 一般不用multiagent
 2. multiagent 在agno 中用一个team 概念来承载，这样一般一个业务用team + agent + tool 三级概念来承接。尽力沉淀通用team + agent + tool 以及三者的协作链路，特殊业务场景就用特殊team + agent + tool 实现，作为子类存在。
 2. 同一个技术架构在不同的业务领域也是侧重点不同，比如multiagent中的不同agent 在deepsearch/deepresearch 一般是分层/主从关系（按部就班干活儿），但在写作或者以创造力为主的场景，可能就更自由一些。
+
 
 

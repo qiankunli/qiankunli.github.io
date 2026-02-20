@@ -29,14 +29,57 @@ JavaScript 虚拟机是一种进程虚拟机，专门设计来解释和执行的
 **预处理：**有时为了提高运行效率，会将javascript源码先编译成字节码，然后解释器（引擎）逐行执行字节码。java也有类似的目的，比如代码引用另外一个jar，因为jar都是class文件，所以运行时就省了编译jar java源码的负担。
 
 ## javascript的一些特性
-
 [JavaScript 运行机制详解：再谈Event Loop](http://www.ruanyifeng.com/blog/2014/10/event-loop.html)
 
 主要有以下基本特点：
 
 1. JavaScript是单线程
 2. 任务队列
- 
+
+
+JSON 是 JS 的亲儿子：JS 对象和 JSON 字符串几乎是无缝切换的。在 JS 里，你可以随时随地用大括号创造一个(裸)对象(没有类定义)：
+
+```
+const user = { name: "Tom", age: 18 }; // 这是一个“正经”对象，不需要类
+```
+
+函数也是对象：甚至 JS 的函数也是对象，可以动态挂载属性。
+
+### ES6
+ECMAScript是一个国际标准（由 ECMA 国际组织制定）定义了 JavaScript 语言的语法规则、特性、API 等核心内容。JavaScript 是 ECMAScript 标准的具体实现（还有 ActionScript 等其他实现，但 JS 是最主流的）。ES6是ECMAScript 第 6 版的简称，是 ECMAScript 标准史上最重大的一次更新。
+1. let/const 声明变量（替代 var）
+2. 箭头函数（简化函数写法）
+    ```
+    // ES5 老写法
+    function add(a, b) {
+        return a + b;
+    }
+    // ES6 箭头函数写法
+    const add = (a, b) => a + b; // 一行搞定，不用写function和return
+    ```
+3. 扩展运算符
+    ```
+    // ES5 老写法（麻烦）
+    const obj1 = { name: '小明', age: 18 };
+    const obj2 = {};
+    obj2.name = obj1.name;
+    obj2.age = obj1.age;
+
+    // ES6 新写法（简洁）
+    const obj3 = { ...obj1 }; // 一行搞定拷贝
+    ```
+4. 解构赋值（快速提取数据）
+    ```
+    // ES5 老写法
+    const user = { name: '小红', age: 20 };
+    const name = user.name;
+    const age = user.age;
+
+    // ES6 解构写法
+    const { name, age } = user; // 一行提取name和age
+    ```
+
+
 ## 浏览器环境
  
 JavaScript代码嵌入网页的方法

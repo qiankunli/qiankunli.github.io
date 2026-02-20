@@ -362,7 +362,7 @@ if __name__ == "__main__":
 
 ## 分布式训练
 
-pytorch ddp论文：During distributed training, each pro- cess has its own local model replica and local optimizer. In terms of correctness, distributed data parallel training and local training must be mathematically equivalent. DDP guarantees the correctness by making sure that all model replicas start from the exact same model state, and see the same parameter gradients after every backward pass. Therefore, even though optimizers from different processes are all independent, they should be able to bring their local model replicas to the same state at the end of every iteration. 
+pytorch ddp论文：During distributed training, each pro- cess has its own local model replica and local optimizer. In terms of correctness, distributed data parallel training and local training must be mathematically equivalent. DDP guarantees the correctness by making sure that all model replicas start from the exact same model state, and see the same parameter gradients after every backward pass. Therefore, even though optimizers from different processes are all independent, they should be able to bring their local model replicas to the same state at the end of every iteration. PS：SPMD，所有设备执行相同的程序，只是处理不同的数据分片。最后将梯度进行全局的all-reduce然后返回给每张卡上更新模型。
 
 [ PyTorch 分布式(5) ------ DistributedDataParallel 总述&如何使用](https://mp.weixin.qq.com/s/WdLpHfWLRvDLLxeanFduxA)
 
