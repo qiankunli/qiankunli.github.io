@@ -16,13 +16,15 @@ keywords: agent software
 1. 不变的：在正确的时机，以正确的格式，向 LLM 提供正确的信息。
 2. 变化的：构建 Long-horizon Agent 涉及很多微妙的工程细节（compaction 策略、subagent 通信、error handling 等）
   - Compaction 策略：当上下文窗口不够时如何压缩
-  - Memory 管理：如何在跨会话中保持关键信息
-  - Tool 选择：什么时候使用什么工具
+  - Memory 管理：如何在跨会话中保持关键信息。像“经验库”，增强稳定性、抗遗忘与长期一致性。
+  - Tool 选择：什么时候使用什么工具。pi的agent loop 只提供了4个工具：read/write/edit/bash。有bash 就可以安装世界上所有软件，有read/write/edit就有了读写、做事儿、记忆的能力。**我们可以去掉一些工具，更多依赖 Skill**。
   - Subagent 通信：如何让主 Agent 和子 Agent 高效协作
+
+
 
 ## 场景
 
-1. Coding
+1. Coding。编程在大多数用例中现在已经解决了。
 2. AI SRE，能够进行深度日志分析和故障排查
 3. Deepresearch
 4. openclaw
@@ -44,8 +46,9 @@ keywords: agent software
 2. 有效信息被噪声淹没或被截断 → 输出质量下降；
 3. Agent 在长流程中“忘记”关键上下文 → 任务失败率上升；
 
+## 其它
 
-
+赋予智能体计算机访问权限（文件系统+Shell环境）是能力跃迁的关键——文件系统提供持久化上下文存储，Shell使其调用工具链、CLI或自主生成代码。
 
 
 

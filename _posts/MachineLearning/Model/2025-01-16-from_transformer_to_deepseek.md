@@ -148,9 +148,10 @@ PS：训练不稳定、负载不均衡
 
 与之对应的是DeepSeek-V3 发布之前业界普遍使用的单令牌预测（Single - Token Prediction，STP），STP 一次仅预测一个Token，而 MTP 可同时预测多个 Token。为什么要做MTP? 当前主流的大模型(LLMs)都是decoder-base的模型结构，也就是无论在模型训练还是在推理阶段，对于一个序列的生成过程，都是token-by-token的。每次在生成一个token的时候，都要频繁跟访存交互，加载KV-Cache，再通过多层网络做完整的前向计算。对于这样的访存密集型的任务，通常会因为访存效率形成训练或推理的瓶颈。
 
-MTP核心思想：通过解码阶段的优化，将1-token的生成，转变成multi-token的生成，从而提升训练和推理的性能。具体来说，在训练阶段，一次生成多个后续token，可以一次学习多个位置的label，进而有效提升样本的利用效率，提升训练速度；在推理阶段通过一次生成多个token，实现成倍的推理加速来提升推理性能。
+MTP核心思想（一般涉及到model改动）：通过解码阶段的优化，将1-token的生成，转变成multi-token的生成，从而提升训练和推理的性能。具体来说，在训练阶段，一次生成多个后续token，可以一次学习多个位置的label，进而有效提升样本的利用效率，提升训练速度；在推理阶段通过一次生成多个token，实现成倍的推理加速来提升推理性能。
 
 ![](/public/upload/machine/deepseek_mtp.jpg)
+mtp 需要在representation 上、在训练信号上、在 loss 设计上都适应“远距离预测”。
 
 ### 蒸馏/distilled
 

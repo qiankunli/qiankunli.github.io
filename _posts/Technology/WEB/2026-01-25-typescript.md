@@ -71,3 +71,4 @@ TypeScript 的设计哲学可以总结为一句话：在不改变 JavaScript 运
   "start": "node dist/index.js"     // 生产环境运行编译后的代码
 }
 ```
+初次接触一个项目，一般从 package.json 开始， 了解项目的整体依赖和核心脚本命令。

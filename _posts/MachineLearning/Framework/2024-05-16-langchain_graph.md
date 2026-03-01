@@ -784,7 +784,41 @@ node_func 执行需要各种参数（依赖，数据依赖，资源依赖） 便
 4. 用户输入反馈后，调用invoke恢复工作流，指定thread_id和resume信息
 5. 再次进入人工节点，**此时由于有resume信息，interrupt函数不会触发中断，interrupt函数直接返回Command(resume=...)提供的信息**；流程得以继续运行。至此，一次中断过程处理结束
 
+![](/public/upload/machine/langgraph_interrupt.png)
+
 在LangChain 0.x时代，虽然官方提供的 Human-in-the-Loop 相关 API，但是该 API 设计上较为零散，开发者还需要手动处理很多底层细节（如中断后的状态恢复、决策结果的传递等）。LangChain 1.0 版本带来了全新的 Middleware 架构，这一架构通过统一的拦截层和内置的状态管理机制，彻底改变了 Human-in-the-Loop 的实现方式；其中专门推出的 HumanInTheLoopMiddleware 组件，更是将原本复杂的审批触发逻辑、状态保存与恢复、人机决策交互等功能进行了高度封装，开发者只需通过简单的配置（如指定需要拦截的工具名称、允许的决策类型、审批提示信息等），就能快速实现灵活且可靠的 Human-in-the-Loop 效果，让整个开发过程变得更加优雅且高效。
+
+### 状态机
+
+LangGraph 本质是：一个可持久化的状态机，而不是一个“函数”。从输出就可以看出来
+1. LangChain 输出 = 一个值（通常经 OutputParser 处理）
+2. LangGraph 输出 = 一次状态机运行后的“State”
+
+```python
+class State(TypedDict):
+    messages: list[BaseMessage]
+    foo: str
+result = await graph.ainvoke(input, config)
+# 返回的就是
+{
+    "messages": [...],
+    "foo": "...",
+}
+# 如果发生了中断返回的是
+{
+    "__interrupt__": [Interrupt(...)]
+}
+result : AsyncIterator[Event] = await graph.astream_events(version="v2")
+async for event in result:
+    # 每个 event 是一个 dict
+    {
+        "event": "on_chat_model_stream",
+        "name": "model",
+        "run_id": "...",
+        "parent_ids": [...],
+        "data": {...}
+    }
+```
 
 ## 其它
 
