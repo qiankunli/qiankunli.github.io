@@ -547,6 +547,17 @@ langgraph 的灵感来自 Pregel 和 Apache Beam。暴露的接口借鉴了 Netw
 3. Pregel.stream 核心工作是按DAG依次提交node/task并执行，拿到某个node 结果后，更新state值，执行下一个node/conditional_edge。此时Pregel 与一个DAGExecutor 没什么两样。
 
 ### runtime 和context
+
+```
+LangGraph Run
+
+Input ---------> Graph ---------> Node ---------> Node ---------> Output
+                     │
+                     │
+                 RunnableConfig
+             (runtime control plane)
+```
+
 LangGraph ≈ 一个“声明式 DAG + 动态运行时注入系统”
 1. 编译阶段，`graph = workflow.compile()`, 这一步只是定义“结构与依赖关系”（DAG 拓扑、边、node 名称），它是一个 纯描述性的编排对象，没有携带任何运行时数据。compile 阶段没有 state，也没有 runtime；所有 node 仅仅是“函数定义引用”，不会执行；节点所需的所有数据，都要在 invoke 阶段注入。PS：control flow
 2. invoke阶段，数据注入的唯一入口：`graph.invoke(input_state={"query": "AI policy"}, context=my_context,   config=my_config,)`。一个node 的运行需要很多数据，一些数据可以从state 传入（和写入），但类似db/redis client无法被序列化，于是又提出 context 负责承载长期依赖（连接、LLM、缓存、logger 等）；所有 node 共用同一个 context；runtime 自动持有对 context 的引用。PS：data flow

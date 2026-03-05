@@ -8,7 +8,7 @@ keywords:  typescript
 
 ---
 
-## 简介（未完成）
+## 简介
 
 JavaScript 作为一门拥有悠久历史的脚本语言，几乎无处不在，而 TypeScript 作为其超集，它们之间最核心的区别在于 静态类型系统（意味着变量的类型在程序中的任何时候都不能改变）。 TypeScript 代码需要先编译成 JavaScript 才能在浏览器中运行。
 
@@ -27,6 +27,25 @@ TypeScript 的设计哲学可以总结为一句话：在不改变 JavaScript 运
 2. export 关键字在 TypeScript（以及 ES 模块系统）中用于控制模块成员的 可见性 ，决定哪些成员可以被其他模块访问。
 
 ### 类型
+
+Object 是 JavaScript 的基础构造单位，几乎一切都是 Object（一个增强版的 dict，本质 hash 表 + prototype，动态语言的极致表达自由）。所以看起来，在js 里 创建个变量 **形式上都是 {}+ kv** （`const user = { name: "Tom", age: 18 }`）。TS 运行时仍然是 JS object，在编译期给 object 增加“形状约束”（并没有引入真正的 struct，考虑到ts 要100% 兼容js，TS 不能改变 JS 的运行模型）。
+
+```ts
+type User = {
+  name: string
+  age: number
+}
+
+const x = {
+  name: "Tom",
+  age: 18,
+  extra: true
+}
+
+const u: User = x // 可以
+```
+
+python（动态类型语言 + nominal typing/名义类型系统，类型由“名字”决定）如果你定义了 class User，那么只有 User() 实例才被认作 User。即使一个 dict 的 KV 结构和 User 一模一样，它也不是 User。TS( structural typing/结构类型系统，类型由“形状”决定) 的类型定义（Interface/Type）是一份“数据契约”(**形式上也是 {}+ kv**)，只要你的 {}（Dict）里有KV 与user 结构兼容就可以视为user。
 
 1. 在 TypeScript 中，any 类型被称为 top type。所谓的 top type 可以理解为通用父类型，也就是能够包含所有值的类型。any 类型本质上是类型系统的一个逃生舱口，TypeScript 允许我们对 any 类型的值执行任何操作，而无需事先执行任何形式的检查。如果代码里使用了大量的 any，那 TypeScript 也就失去了意义，所以我们应该尽量避免使用 any 。
 2. 为了解决 any 类型存在的安全隐患，在 TypeScript 3.0 时，引入一个新的 top type —— unknown 类型。同 any 一样，你也可以把任何值赋给 unknown 类型的变量。两者有啥区别呢？「any 类型：我不在乎它的类型，unknown 类型：我不知道它的类型。」你可以把它理解成类型安全的 any 类型。相比 any 类型，TypeScript 会对 unknown 类型的变量执行类型检查
