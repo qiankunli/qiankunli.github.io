@@ -15,15 +15,14 @@ keywords: agent software
 
 1. 不变的：在正确的时机，以正确的格式，向 LLM 提供正确的信息。
 2. 变化的：构建 Long-horizon Agent 涉及很多微妙的工程细节（compaction 策略、subagent 通信、error handling 等）
-  - Compaction 策略：当上下文窗口不够时如何压缩
-  - Memory 管理：如何在跨会话中保持关键信息。像“经验库”，增强稳定性、抗遗忘与长期一致性。
-  - Tool 选择：什么时候使用什么工具。pi的agent loop 只提供了4个工具：read/write/edit/bash。有bash 就可以安装世界上所有软件，有read/write/edit就有了读写、做事儿、记忆的能力。**我们可以去掉一些工具，更多依赖 Skill**。
-  - Subagent 通信：如何让主 Agent 和子 Agent 高效协作
-
-
+  1. 上下文管理
+    - Compaction 策略：当上下文窗口不够时如何压缩
+    - Memory 管理：如何在跨会话中保持关键信息。像“经验库”，增强稳定性、抗遗忘与长期一致性。
+    - Subagent 通信：如何让主 Agent 和子 Agent 高效协作
+  - Tool 选择：什么时候使用什么工具。pi的agent loop 只提供了4个工具：read/write/edit/bash。有bash 就可以安装世界上所有软件，有read/write/edit就有了读写、做事儿、记忆的能力。**我们可以去掉一些工具，更多依赖 Skill**。PS：文件系统权限
 
 ## 场景
-
+Long Horizon Task（LHT）
 1. Coding。编程在大多数用例中现在已经解决了。
 2. AI SRE，能够进行深度日志分析和故障排查
 3. Deepresearch
@@ -37,8 +36,8 @@ keywords: agent software
 
 ## 特点
 
-1. 运行时间更长
-2. 自主决策能力
+1. 运行时间更长，中间状态很多，需要记忆与上下文管理。
+2. 自主决策能力，需要长期规划，而不是局部贪心。
 3. 中途接受外部的信息、纠正指令等
 
 这使得模型的上下文规模呈指数级膨胀。文件内容、构建日志、多轮工具输出、任务中间状态、先前讨论……这些都逐步挤进了 Prompt，使得原本相对可控的短对话场景，变成了复杂的多源异构大上下文输入。结果非常直接：

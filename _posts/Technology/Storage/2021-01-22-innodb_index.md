@@ -169,7 +169,7 @@ explain结果中的type（the join type）字段代表什么意思？**在 MySQL
 for each row in table:
     check condition
 ```
-type描述了如何访问这张表/找到所需数据使用的扫描方式。最为常见的扫描方式有：
+type描述了如何访问这张表/找到所需数据使用的扫描方式（The join type indicates how MySQL finds rows in a table）。最为常见的扫描方式有：
 1. system：系统表，少量数据，数据已经加载到内存里，往往不需要进行磁盘IO，是速度最快的；
 2. const：主键等值/一次定位；
 3. eq_ref：主键索引(primary key)或者非空唯一索引(unique not null)等值扫描；对于前表的每一行(row)，后表只有一行被扫描。
@@ -177,6 +177,23 @@ type描述了如何访问这张表/找到所需数据使用的扫描方式。最
 5. range：范围扫描；
 6. index：索引树扫描/扫完整索引；
 7. ALL：全表扫描(full table scan)；
+
+Extra contains additional information about how MySQL executes the query. 描述执行过程中额外发生的操作或优化
+1. 最优
+    2. Using index, 查询所需所有列都在索引树上，无需回表访问数据行。
+    2. Select tables optimized away, 优化器直接从索引取聚合值（如 MAX(id)、MIN(id)），无需访问表。
+2. 优秀
+    1. Using index condition, 命中索引，但需回表
+    8. Using index for group-by, GROUP BY/DISTINCT 用索引完成，无需临时表 / 文件排序。
+3. 一般
+    1. Using where, 用 WHERE 条件过滤数据（可能在索引扫描后、也可能在回表后）。
+4. 中危
+    1. Using join buffer (Block Nested Loop), 多表连接时，关联字段无索引，用连接缓冲区做嵌套循环。
+5. 高危
+    4. Using filesort（文件排序）, 数据量大时极慢, 需给 ORDER BY 字段加索引，或用覆盖索引包含排序列。
+    5. Using temporary, 需创建临时表存中间结果（常见于 GROUP BY/ORDER BY 不同字段）。
+6. Impossible WHERE, WHERE 条件永远不成立（如 1=2），直接返回空集。
+
 
 ## 其它
 
