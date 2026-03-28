@@ -1,53 +1,122 @@
+# The Site Configuration
+
+remote_theme: cotes2020/jekyll-theme-chirpy
+
+lang: zh-CN
+timezone: Asia/Shanghai
+
+title: 李乾坤的博客
+tagline: AI、系统与工程实践
+description: >-
+  记录 AI、工程架构、系统设计与个人思考。
+
+url: "https://qiankunli.github.io"
+baseurl: ""
 permalink: /:year/:month/:day/:title.html
 paginate: 10
-# markdown: rdiscount
-markdown: kramdown
 
-# 作者信息
-author: 
+github:
+  username: qiankunli
+
+social:
   name: 李乾坤
   email: qiankun.li@qq.com
-  link: 
-  weibo: 
-  github: http://qiankunli.github.io
+  links:
+    - https://github.com/qiankunli
+    - https://qiankunli.github.io
 
-# 站点信息
-title: 李乾坤的博客 
-description: 李乾坤的博客
-url: http://qiankunli.github.io
-rss_url: 
+avatar: /public/upload/gavatar/gavatar.jpg
 
-# gavatar头像及Favicon
-gavatar: /public/upload/gavatar/gavatar.jpg
-favicon: /public/upload/gavatar/favicon.ico
+toc: true
 
-# google analytics 设置
-google_analytics_tracking_id: UA-108442533-1
-ga:
-  id: UA-108442533-1
-  url: 
+comments:
+  provider: giscus
+  giscus:
+    repo: qiankunli/qiankunli.github.io
+    repo_id: MDEwOlJlcG9zaXRvcnkyMTY0NTUyNA==
+    category: Announcements
+    category_id: DIC_kwDOAUpI1M4C5dyQ
+    mapping: pathname
+    strict: 0
+    input_position: bottom
+    lang: zh-CN
+    reactions_enabled: 1
 
-# disqus 设置
-disqus:
-  shortname: qiankunli
+pwa:
+  enabled: true
+  cache:
+    enabled: true
 
-# gitment
-gitment:
-  id: ddbaadab5f5d810805c3
-  secret: 13b91b306680f11a55713382529b83259ef56546
+kramdown:
+  footnote_backlink: "&#8617;&#xfe0e;"
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    css_class: highlight
+    span:
+      line_numbers: false
+    block:
+      line_numbers: true
+      start_line: 1
 
-# 主题设置，自动激活某个标签
-active: 技术
+collections:
+  tabs:
+    output: true
+    sort_by: order
 
-# 首页除了最新文章外显示分类
-cates: 
-  - MachineLearning
-  - Kubernetes
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: post
+      comments: true
+      toc: true
+  - scope:
+      path: _drafts
+    values:
+      comments: false
+  - scope:
+      path: ""
+      type: tabs
+    values:
+      layout: page
+      permalink: /:title/
 
-# 中文本地化
-locals:
-  tags: 标签
-  about: 关于
-  newest: 最新文章
+sass:
+  style: compressed
+
+compress_html:
+  clippings: all
+  comments: all
+  endings: all
+  profile: false
+  blanklines: false
+  ignore:
+    envs: [development]
+
+exclude:
+  - "*.gem"
+  - "*.gemspec"
+  - docs
+  - tools
+  - README.md
+  - LICENSE
+  - LICENSE.txt
+  - purgecss.js
+  - "*.config.js"
+  - "package*.json"
+  - AGENTS.md
+
 plugins:
-- jekyll-paginate
+  - jekyll-remote-theme
+  - jekyll-archives
+  - jekyll-paginate
+
+jekyll-archives:
+  enabled: [categories, tags]
+  layouts:
+    category: category
+    tag: tag
+  permalinks:
+    tag: /tags/:name/
+    category: /categories/:name/

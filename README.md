@@ -1,18 +1,22 @@
-### 我的博客
+# qiankunli.github.io
 
-地址：[http://qiankunli.github.io](http://qiankunli.github.io "")
+个人技术博客，基于 Jekyll + Chirpy 构建，发布到 GitHub Pages。
 
-### 安装说明
+## 内容组织
 
-1. fork库到自己的github
-2. 修改名字为：`username.github.io`
-3. clone库到本地，参考`_posts`中的目录结构自己创建适合自己的文章目录结构
-4. 修改CNAME，或者删掉这个文件，使用默认域名
-5. 修改`_config.yml`配置项
-6. It's done!
+- 文章放在 `_posts/`
+- 页面放在 `_tabs/`
+- 图片和附件放在 `public/upload/`
+- 站点配置在 `_config.yml`
 
-### 分支说明
+## 本地预览
 
-- 三栏布局（master分支）
-- 单栏布局（first-ui分支）
+```bash
+cd <repo_root>
+bundle exec jekyll serve
+```
+
+## 发布
+
+推送到 GitHub 后，由仓库中的 GitHub Actions 工作流构建并发布 Pages。
 
