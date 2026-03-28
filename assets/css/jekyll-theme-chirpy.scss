@@ -3,6 +3,10 @@
 
 @use 'main';
 
+#main-wrapper {
+  overflow: hidden;
+}
+
 #sidebar {
   .sidebar-qr {
     display: flex;
