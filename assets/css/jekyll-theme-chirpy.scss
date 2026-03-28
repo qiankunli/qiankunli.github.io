@@ -3,6 +3,23 @@
 
 @use 'main';
 
+@media all and (min-width: 850px) {
+  #topbar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    #breadcrumb {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    #search {
+      margin-left: auto;
+    }
+  }
+}
+
 #sidebar {
   .sidebar-qr {
     display: flex;
