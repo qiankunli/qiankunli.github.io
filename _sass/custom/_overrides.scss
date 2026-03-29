@@ -5,6 +5,119 @@
   -webkit-box-orient: vertical;
 }
 
+.home .page__content {
+  max-width: none;
+}
+
+.home-hero {
+  margin: 0 0 2.5rem;
+  padding: 2rem 2rem 1.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at top right, rgba(99, 102, 241, 0.12), transparent 32%),
+    linear-gradient(135deg, #fffaf0 0%, #ffffff 58%, #f8fbff 100%);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.home-hero__eyebrow {
+  margin: 0 0 0.75rem;
+  color: #b45309;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.home-hero h1 {
+  margin: 0;
+  color: #111827;
+  font-size: clamp(2.4rem, 4vw, 4rem);
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+}
+
+.home-hero__lead {
+  max-width: 48rem;
+  margin: 1rem 0 0;
+  color: #374151;
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.home .archive {
+  margin-top: 2rem;
+}
+
+.home .list__item {
+  margin-bottom: 1.5rem;
+}
+
+.home .archive__item {
+  padding: 1.5rem 1.6rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.home .archive__item:hover {
+  transform: translateY(-2px);
+  border-color: #d6d3d1;
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.1);
+}
+
+.home .archive__item-title {
+  margin-bottom: 0.8rem;
+  font-size: 1.65rem;
+  line-height: 1.2;
+}
+
+.home .archive__item-title a {
+  color: #111827;
+  text-decoration: none;
+}
+
+.home .archive__item-title a:hover {
+  color: #9a3412;
+}
+
+.home .page__meta {
+  margin-bottom: 0.85rem;
+  color: #6b7280;
+  font-size: 0.88rem;
+}
+
+.home .archive__item-excerpt {
+  color: #4b5563;
+  font-size: 1rem;
+  line-height: 1.9;
+}
+
+.home .pagination {
+  margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+  .home-hero {
+    padding: 1.5rem 1.25rem;
+    border-radius: 1.1rem;
+  }
+
+  .home .archive__item {
+    padding: 1.2rem 1.05rem;
+    border-radius: 1rem;
+  }
+
+  .home .archive__item-title {
+    font-size: 1.35rem;
+  }
+}
+
 .about-qr-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
