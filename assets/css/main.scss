@@ -1,0 +1,40 @@
+---
+---
+
+@charset "utf-8";
+
+@import "minimal-mistakes/skins/default";
+@import "minimal-mistakes";
+
+.archive__item-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+.about-qr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.about-qr-card {
+  padding: 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+  background: #fafafa;
+}
+
+.about-qr-card h3 {
+  margin-top: 0;
+}
+
+.about-qr-card img {
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  margin: 1rem auto 0;
+  border-radius: 0.75rem;
+}

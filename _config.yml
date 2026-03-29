@@ -1,98 +1,97 @@
-# The Site Configuration
+remote_theme: mmistakes/minimal-mistakes
+minimal_mistakes_skin: default
 
-remote_theme: cotes2020/jekyll-theme-chirpy
-
-lang: zh-CN
+locale: zh-CN
 timezone: Asia/Shanghai
 
 title: 李乾坤的博客
-tagline: AI、系统与工程实践
-description: >-
-  记录 AI、工程架构、系统设计与个人思考。
-
+name: 李乾坤
+description: 记录 AI、工程架构、系统设计与个人思考。
 url: "https://qiankunli.github.io"
 baseurl: ""
+repository: qiankunli/qiankunli.github.io
 permalink: /:year/:month/:day/:title.html
+
+logo: /public/upload/gavatar/gavatar.jpg
+masthead_title: 李乾坤的博客
+breadcrumbs: true
+search: true
+search_full_content: true
+
 paginate: 10
+paginate_path: /page:num/
 
-github:
-  username: qiankunli
-
-social:
+author:
   name: 李乾坤
-  email: qiankun.li@qq.com
+  avatar: /public/upload/gavatar/gavatar.jpg
+  bio: AI、系统与工程实践
+  location: Shanghai
   links:
-    - https://github.com/qiankunli
-    - https://qiankunli.github.io
+    - label: GitHub
+      icon: fab fa-github
+      url: https://github.com/qiankunli
+    - label: Email
+      icon: fas fa-envelope
+      url: mailto:qiankun.li@qq.com
+    - label: RSS
+      icon: fas fa-rss
+      url: /feed.xml
 
-avatar: /public/upload/gavatar/gavatar.jpg
-
-toc: true
+footer:
+  links:
+    - label: GitHub
+      icon: fab fa-github
+      url: https://github.com/qiankunli
+    - label: Email
+      icon: fas fa-envelope
+      url: mailto:qiankun.li@qq.com
 
 comments:
   provider: giscus
   giscus:
-    repo: qiankunli/qiankunli.github.io
     repo_id: MDEwOlJlcG9zaXRvcnkyMTY0NTUyNA==
-    category: Announcements
+    category_name: Announcements
     category_id: DIC_kwDOAUpI1M4C5dyQ
-    mapping: pathname
-    strict: 0
-    input_position: bottom
-    lang: zh-CN
+    discussion_term: pathname
     reactions_enabled: 1
-
-pwa:
-  enabled: true
-  cache:
-    enabled: true
-
-kramdown:
-  footnote_backlink: "&#8617;&#xfe0e;"
-  syntax_highlighter: rouge
-  syntax_highlighter_opts:
-    css_class: highlight
-    span:
-      line_numbers: false
-    block:
-      line_numbers: true
-      start_line: 1
-
-collections:
-  tabs:
-    output: true
-    sort_by: order
+    theme: preferred_color_scheme
 
 defaults:
   - scope:
       path: ""
       type: posts
     values:
-      layout: post
+      layout: single
+      author_profile: true
+      read_time: true
       comments: true
+      share: false
+      related: true
+      show_date: true
       toc: true
-  - scope:
-      path: _drafts
-    values:
-      comments: false
+      classes: wide
   - scope:
       path: ""
-      type: tabs
+      type: pages
     values:
-      layout: page
-      permalink: /:title/
+      layout: single
+      author_profile: false
 
-sass:
-  style: compressed
+category_archive:
+  type: liquid
+  path: /categories/
 
-compress_html:
-  clippings: all
-  comments: all
-  endings: all
-  profile: false
-  blanklines: false
-  ignore:
-    envs: [development]
+tag_archive:
+  type: liquid
+  path: /tags/
+
+atom_feed:
+  path: feed.xml
+date_format: "%Y/%m/%d"
+
+search_provider: lunr
+lunr:
+  search_within_pages: true
 
 exclude:
   - "*.gem"
@@ -102,21 +101,11 @@ exclude:
   - README.md
   - LICENSE
   - LICENSE.txt
-  - purgecss.js
-  - "*.config.js"
-  - "package*.json"
   - AGENTS.md
 
 plugins:
   - jekyll-remote-theme
-  - jekyll-archives
+  - jekyll-feed
   - jekyll-paginate
-
-jekyll-archives:
-  enabled: [categories, tags]
-  layouts:
-    category: category
-    tag: tag
-  permalinks:
-    tag: /tags/:name/
-    category: /categories/:name/
+  - jekyll-sitemap
+  - jekyll-include-cache
