@@ -1,11 +1,11 @@
 # qiankunli.github.io
 
-个人技术博客，基于 Jekyll + Chirpy 构建，发布到 GitHub Pages。
+个人技术博客，基于 Jekyll + Minimal Mistakes 构建，发布到 GitHub Pages。
 
 ## 内容组织
 
 - 文章放在 `_posts/`
-- 页面放在 `_tabs/`
+- 独立页面放在仓库根目录，如 `about.md`、`archives.md`
 - 图片和附件放在 `public/upload/`
 - 站点配置在 `_config.yml`
 

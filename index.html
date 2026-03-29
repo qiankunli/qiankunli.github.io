@@ -1,4 +1,4 @@
 ---
 layout: home
-# Index page
+author_profile: true
 ---
