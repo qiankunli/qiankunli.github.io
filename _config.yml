@@ -54,7 +54,7 @@ comments:
     category_id: DIC_kwDOAUpI1M4C5dyQ
     discussion_term: pathname
     reactions_enabled: 1
-    theme: preferred_color_scheme
+    theme: light
 
 defaults:
   - scope:
