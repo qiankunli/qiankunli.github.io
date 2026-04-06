@@ -24,3 +24,5 @@ package-lock.json
 _sass/vendors
 .DS_Store
 AGENTS.md
+.learnings/
+docs/
