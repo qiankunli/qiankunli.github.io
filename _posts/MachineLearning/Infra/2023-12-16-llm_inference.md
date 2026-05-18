@@ -220,7 +220,7 @@ for x in X:  # 对每一个新的输入x
     output = Attention(Q, K_cache, V_cache)
 ```
 
-但是有一个问题就是KV Cache非常的大，比如说拿LLaMA-13B举例子，假设每个token在一层的大小有20KB，LLaMA-13B有40层，这样这个token大小就会达到800KB，而一个sequence一般来说会有几千的token，也就是说一个sequence就会达到几个G。[Transformers KV Caching Explained](https://medium.com/@joaolages/kv-caching-explained-276520203249) 动图实在太贴切了。PS：**KV-Cache的总空间大小为max_seqlen×layer_num×dim×sizeof(float)**。因此，在第token_pos步时，我们可以通过索引位置(token_pos, layer_idx)来获取第layer_idx层的KV-Cache。
+但是有一个问题就是KV Cache非常的大，比如说拿LLaMA-13B举例子，假设每个token在一层的大小有20KB，LLaMA-13B有40层，这样这个token大小就会达到800KB，而一个sequence一般来说会有几千的token，也就是说一个sequence就会达到几个G。对于 256K 上下文的模型来说，这部分显存可以轻松超过模型权重本身。[Transformers KV Caching Explained](https://medium.com/@joaolages/kv-caching-explained-276520203249) 动图实在太贴切了。PS：**KV-Cache的总空间大小为max_seqlen×layer_num×dim×sizeof(float)**。因此，在第token_pos步时，我们可以通过索引位置(token_pos, layer_idx)来获取第layer_idx层的KV-Cache。
 [KV缓存技术详解与PyTorch实现](https://mp.weixin.qq.com/s/ZcuLrPOisG17O7qgQmEkvw) forward 是要多维护k_cache/v_cache/cache_index成员。
 
 Memory waste in KV Cache

@@ -1,6 +1,8 @@
 main:
   - title: 首页
     url: /
+  - title: Knowledge
+    url: /knowledge/
   - title: 分类
     url: /categories/
   - title: 标签

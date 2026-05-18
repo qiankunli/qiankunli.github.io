@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 624" role="img" aria-labelledby="title desc">
+  <title id="title">OS Agent browser stack diagram</title>
+  <desc id="desc">A reconstructed diagram showing Chromium, CDP, cdp-use, Playwright, Puppeteer, Midscene, browser-use, and browsermcp.</desc>
+  <defs>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <rect width="24" height="24" fill="#f8f2e7"/>
+      <path d="M24 0H0V24" fill="none" stroke="#dfd2bb" stroke-width="1"/>
+    </pattern>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.18"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto">
+      <path d="M0 0L7 3.5L0 7" fill="none" stroke="#555555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .title { font: 700 34px "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; fill: #111; }
+      .subtitle { font: 700 22px "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; fill: #222; }
+      .label { font: 700 18px "Helvetica Neue", Arial, sans-serif; fill: #222; }
+      .cn { font: 600 17px "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; fill: #333; }
+      .small { font: 600 15px "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; fill: #444; }
+      .box { fill: #f4f0e8; stroke: #222; stroke-width: 2; rx: 12; ry: 12; filter: url(#shadow); }
+      .line { fill: none; stroke: #575757; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .thin { fill: none; stroke: #575757; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .icon { font: 28px "Apple Color Emoji", "Segoe UI Emoji", sans-serif; }
+    </style>
+  </defs>
+
+  <rect width="1080" height="624" fill="url(#grid)"/>
+
+  <text class="title" x="540" y="68" text-anchor="middle">完整架构推演：这不是替代，而是向上生长</text>
+  <path d="M230 96C410 72 650 72 814 96C825 99 828 110 820 118C663 132 419 136 242 118C230 114 225 103 230 96Z" fill="#f4ea64" opacity="0.78"/>
+  <text class="subtitle" x="540" y="116" text-anchor="middle">顶层向着不同的感官与场景发生分化。</text>
+
+  <text class="icon" x="128" y="190">🖐</text>
+  <text class="icon" x="606" y="196">👁</text>
+  <text class="icon" x="905" y="192">🧠</text>
+
+  <rect class="box" x="182" y="150" width="128" height="42"/>
+  <text class="label" x="246" y="177" text-anchor="middle">browser-use</text>
+  <text class="cn" x="246" y="223" text-anchor="middle">（面向 Agent 工作流）</text>
+
+  <rect class="box" x="493" y="140" width="95" height="42"/>
+  <text class="label" x="540" y="167" text-anchor="middle">Midscene</text>
+  <text class="cn" x="540" y="212" text-anchor="middle">（跨越结构屏障）</text>
+
+  <rect class="box" x="739" y="150" width="138" height="42"/>
+  <text class="label" x="808" y="177" text-anchor="middle">browsermcp</text>
+  <text class="cn" x="808" y="223" text-anchor="middle">（共享实时状态）</text>
+
+  <path class="line" d="M520 340C472 298 396 245 320 198"/>
+  <path class="line" d="M540 335C540 281 540 231 540 188"/>
+  <path class="line" d="M560 340C620 301 700 249 781 198"/>
+
+  <rect class="box" x="395" y="260" width="110" height="42"/>
+  <text class="label" x="450" y="287" text-anchor="middle">Puppeteer</text>
+
+  <rect class="box" x="514" y="260" width="213" height="42"/>
+  <text class="label" x="620" y="287" text-anchor="middle">Playwright</text>
+  <text class="cn" x="700" y="287">（工程框架）</text>
+
+  <path class="thin" d="M540 410C540 394 540 381 540 364"/>
+  <path class="thin" d="M540 486C540 470 540 457 540 440"/>
+
+  <rect class="box" x="488" y="336" width="104" height="42"/>
+  <text class="label" x="540" y="363" text-anchor="middle">cdp-use</text>
+  <text class="cn" x="610" y="363">（底层封装）</text>
+
+  <rect class="box" x="488" y="412" width="104" height="42"/>
+  <text class="label" x="540" y="439" text-anchor="middle">CDP</text>
+  <text class="cn" x="606" y="439">（协议）</text>
+
+  <g transform="translate(475 494)">
+    <path d="M68 0L78 21L101 16L98 39L121 46L107 66L123 83L100 91L103 114L80 109L70 130L52 115L34 129L25 108L2 112L5 89L-17 80L-2 61L-16 43L7 36L3 13L26 18L36 -3L54 12Z" fill="#c9c7c0" stroke="#3e3d39" stroke-width="3"/>
+    <circle cx="53" cy="62" r="28" fill="#f8f2e7" stroke="#3e3d39" stroke-width="3"/>
+    <circle cx="53" cy="62" r="9" fill="#c9c7c0" stroke="#3e3d39" stroke-width="2"/>
+  </g>
+  <text class="label" x="596" y="555">Chromium</text>
+  <text class="cn" x="692" y="555">（齿轮）</text>
+
+  <text class="small" x="847" y="590">reconstructed for local blog asset</text>
+</svg>

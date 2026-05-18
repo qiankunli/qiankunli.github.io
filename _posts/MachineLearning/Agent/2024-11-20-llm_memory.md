@@ -36,7 +36,20 @@ $$
 每次调用都像一次“短暂失忆”（金鱼记忆）。为了让 AI Agent真正理解上下文、具备个性化交互和任务持续性，引入记忆系统至关重要。记忆的本质：创建真正个性化体验/“千人千面”。记忆的作用是提供上下文，它是将过去的经历与当下的行为连接起来的桥梁。PS：记忆增强RAG。
 
 ## 什么是记忆
-PS： 会话级记忆 vs 跨会话记忆
+
+把"学到的东西"抽象成一个对输出分布有影响的对象，它有两种经典承载方式：
+1. 参数化记忆（parametric memory）：经验被写进模型权重。训练 / 微调就是把历史数据编译进权重的过程，推理时直接用更新后的模型，不需要额外检索。
+2. 非参数化记忆（non-parametric memory）：经验被写在外部状态里（ledger + views + skill pool + 索引结构）。写入由 policy 决定写哪些、怎么写；推理时通过检索、汇聚、注入等环节让外部状态影响输出。
+两者的差别不在"有没有存储"，而在适应算子写在哪里。参数化把"写入成本"前置在训练阶段；非参数化把"写入成本"分摊到在线（commit）与推理（retrieve + inject）阶段。
+
+[「纯干货」几万字都讲不明白的Memory架构与思考](https://mp.weixin.qq.com/s/bl77_Mb85C4AKe8h4__V6Q)
+1. Memory 不是"存储"，而是可被决策利用的外部状态（external state）。Memory 的价值不在于"存了多少历史"，而在于这条从历史到当前决策的通道是否有效。
+2. Memory 的最小闭包不是"文档块"，而是 (Ledger, Views, Policy) 三件套
+    1.  Raw Ledger（权威记录）：追加式记录每次写入/更新/删除发生了什么（以及当时的输入、时间、scope 等）。
+    2. Derived Views（派生视图）：面向检索/推理的派生状态（向量索引、keyword/hybrid、KG/TKG（时序知识图谱, Temporal Knowledge Graph）、timeline、skill index 等）。views 可以多、可以 lossy，但必须可回指到 Raw Ledger。
+    3. Policy（控制层）：决定何时读、读多少、何时写、如何更新、如何遗忘；并且这些决策必须显式化为可记录/可回放的 Action 序列（ADD/UPDATE/DELETE/NONE…），而不是"靠 prompt 里一句话暗示"。
+3. Memory 的基本单位应当是 event 序列，但"直接用 event 流"不等于可用系统。把 Raw Ledger 建模成 event 序列是合理的，因为协议里所有可审计性都依赖"事件闭包"。
+event 序列是"真相来源"，但它太底层。如果只存 event，你得到的是可审计的历史，不是可用的记忆能力；真正把历史变成能力的是 views（对 event 的重组织/压缩/索引/时序化/技能化）和 policy（决定什么时候触发哪些 view、怎么更新 view）。换句话说：event 是 Ledger 的数据形态；views/policy 是能力形态。
 
 ### 与存储对比
 
