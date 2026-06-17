@@ -159,7 +159,41 @@ while True:
         return resp.text
 ```
 
+复杂一点
+
+```
+loop_state      = ...
+context_manager = ...
+skill_manager   = ...
+
+while not done:
+    fire_before_turn()
+    related_skills = skill_manager.search(query)
+    context = context_manager.build_context(query, related_skills)
+
+    fire_before_model()
+    llm_result = call_llm(context)
+    fire_after_model()
+
+    if llm_result.tool_calls:
+        for call in llm_result.tool_calls:
+            fire_before_tool(call)
+            result = tool_call(call)
+            fire_after_tool(call)
+        context_manager.append(results)
+    else:
+        context_manager.append(llm_result.text)
+
+    context_manager.compact_if_need()
+    fire_after_turn()
+```
+
 AIAgent 的复杂度，不是来自“调模型”这一步，而是来自调模型失败以后怎么办、用户半路打断怎么办、上下文塞不下了怎么办。也正因为这样，这个循环体才会达到数千行。它已不是一个单纯的推理循环，而是**一条完整的交互控制链**。用户在前台等回复，这条链路不是只追求“能跑通”，还需要把交互过程本身兜住。源码里能直接看到这类需求留下来的痕迹：流式输出、Provider 容错、上下文压缩、用户中断、预算耗尽后的 Grace Call、子 Agent 委派、插件钩子，基本都堆在这条路径上。
+
+1. Context 是"组装出来的"，不是"写出来的"。传统 Prompt 是一段固定文字。Loop 里 Context 是根据当前状态动态拼出来的——上一轮失败日志、当前文件树、最近 N 条调用记录，全自动拼进下一轮 Prompt。这意味着你不再是"写 Prompt 的人"，而是"设计 Context 怎么自动生长"的人。
+2. 失败是输入，不是终点。跑挂了？把错误堆栈、报错截图、上次 Diff 全自动喂回去当下一轮的输入。Loop 把"失败"重新定义成"用来下一步推理的数据"——这跟传统编程"出错就停"是反过来的思路。
+
+
 
 ## learning loop/ 面向 RL rollout 的 `HermesAgentLoop`
 
