@@ -270,7 +270,7 @@ System Prompt Caching，也称为 Prefix Sharing，其基本思想是对System P
 矩阵的并行算法已经比较成熟，GPU 上也有 TensorCore 来加速计算。 Softmax 操作让并行计算有些棘手。Softmax 的并行无法将计算放到一个 Kernel 中。后面的建议细读文章。
 
 传统attention流程如下：从显存中取QK计算->将结果S写回显存->从显存读S计算softmax->将结果P写回显存->从显存读取P和V进行计算->将结果O写回显存。因此想办法进行分块计算，拆到足够小，就能全塞到L1缓存上（比如说A100的L1只有192KB）进行计算了，不需要将这些参数从显存反复的读入读出，只需要读L1缓存，就实现了加速。但是softmax是需要需要知道全局信息的，所以分块计算后，需要一些技巧对结果进行融合。
-1. FlashAttention是一种IO-aware算法，它通过tiling来减少对HBM的访存量，从而提高性能
+1. FlashAttention是一种IO-aware算法，它通过tiling来减少对HBM的访存量，从而提高性能。**本质上是利用IO Aware、重计算提升计算强度**；
 2. FlashAttention避免了从HBM读写一些中间结果，比如QK得到的相似度矩阵，以及基于相似度矩阵计算softmax得到的概率矩阵
 Flash Attention 的目标是尽可能使用 SRAM来加快计算速度，避免从全局内存中读取或写入注意力矩阵（H100 全局内存80G，访问速度3.35TB/s，但当全部线程同时访问全局内存时，其平均带宽仍然很低）。达成该目标需要做到在不访问整个输入的情况下计算softmax函数，并且后向传播中不能存储中间注意力矩阵（存部分信息，反向传播时重新计算）。PS：通过数学变换，换个算法，减少内存占用，pytorch2.0 已支持Flash Attention。PS：FA的本质是融合算子的一种新的实现方式。
 
