@@ -141,6 +141,34 @@ PS：粗看（人去梳理的时候，都是只能先从粗的看），一些设
 ```
 SubAgent 的本质可以概括为：用一次 Tool 调用，启动另一个隔离的 Agent Loop；父 Agent 不消费子 Agent 的完整过程，只消费最终结果。SubAgent 真正解决的是：把复杂任务的探索过程隔离出去，让父 Agent 只拿结论，少污染主上下文。
 
+Dynamic Workflow，Claude Code 官方文档的定义是：一个 JavaScript 脚本，编排大规模 Subagent，由 Claude 为你描述的任务编写，由运行时在后台执行。Dynamic Workflow 背后有一套清晰的分工原则：
+  1. JavaScript Engine，循环、分支、并发调度、去重、精确排序、数学运算、字段完整性检查、重试限制
+  2. agent()，语义理解、证据权衡、风险判断、文本生成、异常裁决
+  3. Skill，领域术语、判断 Rubric、工具使用经验、沟通语气
+  4. Tool，对文件和业务系统产生实际影响（副作用）
+  5. Human，高风险最终确认、异常审批、策略决策
+
+Dynamic Workflow 的可见原语精简但功能完备：
+1. agent() — 唯一直接启动 AI 执行的方法，启动一个完整的 ReAct Loop：拥有独立 Context、可用 Tool、能读文件/搜索/运行命令，并根据工具结果继续判断。Workflow 只接收最终结果。
+  ```
+  agent(prompt: string, opts?: {
+    label?: string;
+    phase?: string;
+    schema?: object;
+    model?: string;
+    effort?: string;
+    isolation?: 'worktree';
+  }): Promise<string | T | null>
+  ```
+2. parallel() — 带 Barrier 的并发，并发执行一组任务，等待全部结束后返回。适用于下一步需要看到全体结果的场景（投票、汇总、交叉验证）。
+  ```
+  parallel(tasks: Array<() => Awaitable>): Promise<Array<T | null>>
+  ```
+3. pipeline() — 无 Barrier 的流水线
+  ```
+  pipeline(items: T[], ...stages: Array<(value, item, index) => Awaitable>): Promise<Array<unknown | null>>
+  ```
+
 ### agent team
 
 "多 Agent + 软件工程团队角色"是不是研发的全能解？我的判断是：它是全能解，但不是最优解。说它是"全能解"，因为它确实能 cover 软件工程的完整生命周期。需求分析、方案设计、代码实现、测试验证、文档维护——每个环节都可以由对应角色的 Agent 来执行，而且已经有人在这么做了。说它"不是最优解"，因为不是所有项目都需要完整的软件工程团队角色支持。每个项目有自己的特性——从个人开发者的 side project 到小团队的快速迭代，很多优秀的软件从来不需要 PM 写 PRD、Architect 画架构图、SM 管 Sprint。即使对于确实需要多角色协作的大型项目，角色化本身也引入了具体的成本：

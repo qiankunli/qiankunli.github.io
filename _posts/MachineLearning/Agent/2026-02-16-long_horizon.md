@@ -201,6 +201,14 @@ AIAgent 的复杂度，不是来自“调模型”这一步，而是来自调模
 
 ## learning loop/ 面向 RL rollout 的 `HermesAgentLoop`
 
+自进化 RSI(recursive self-improvement)可以分成以下三个方向，三个方形都是自进化。自我进化的目标优化对象是什么，就决定了它属于哪一个方向
+1. 改产出物（代码/论文/算法…）
+2. 改脚手架（prompt/memory/tool/skill/hook…）是 Harness
+  1. Hermes：踩坑自动写成 SKILL.md
+  2. 自动跑评测迭代 scaffold，全自主跑”分析失败轨迹 → 规划改动 → 修改 scaffold 代码 → 跑评测 → 对比结果 → 决定保留或回退”
+3. 改模型参数本身是 Model
+自进化 self-evolving、self-improving 是模型智能跨过某个门槛之后自然长出来的东西。当模型的代码能力、推理能力强到一定水平，它开始能自己修改我们给它的脚手架；脚手架变好了，一边能反过来加速模型本身的训练，一边能让模型更好地完成复杂的长程任务。等模型真的能稳定完成长程任务，我们把"改脚手架 → 训练 → 完成任务"这整个过程包成一个 loop，让它自己不断循环下去——这就出现了 RSI（recursive self-improvement）。
+
 用户交互系统优化的是体验、鲁棒性和可恢复性；RL rollout 优化的是吞吐、并发和训练信号精度。它们都叫 Agent Loop，但回答的不是同一个工程问题。训练 rollout 关心 async、token/logprobs、reward 计算和并发调度。它不面向用户，真正看重的是另外几件事：
 1. 必须是 async，才能并发跑大量 rollout
 2. 必须拿到真实 token、logprobs、masks，供 GRPO 训练使用
@@ -222,6 +230,12 @@ collect_trajectory
   ScoredDataItem(tokens, masks, scores)
   GRPO trainer 更新模型
 ```
+
+[让 Agent 越用越准、成本越来越低：AgentLoop 的 Agent 经验自进化闭环](https://mp.weixin.qq.com/s/9zGGPFl5PKkzc6JLTnz6vQ)
+1. AgentLoop： Trace ==> Trajectory ==> 结构化经验 ==> Context。用经验降低 Agent 的不确定性，Agent 的不确定性无法被彻底消除，但可以被持续约束。
+2. 很多失败并不是因为模型完全不具备能力，而是因为 Agent 在关键节点做出了错误选择：选错了信息入口、错误理解了工具参数、在空结果后反复重试、忽略了业务范围，或者在结果尚未验证时就提前结束任务。这些问题具有明显的经验属性。同类任务运行得越多，系统越有机会识别哪些选择经常带来成功，哪些行为容易导致失败，以及不同情境下应当采用什么恢复策略。经验注入的价值，是在 Agent 做出关键决策之前，缩小无效的探索空间。
+3. 面向真实轨迹深度优化的挖掘与召回算法：经验不是对单条 Trace 做一次摘要，也不是简单保存成功案例。AgentLoop 会在多个轨迹之间进行比较，识别反复出现的有效动作和高风险路径，生成不同类型的结构化经验。经验生成后，不需要重新训练模型，也不需要重建 Agent。用户可以在客户端安装 Recall Skill，通过 CLI 配置经验库（Experience Store）和库级访问凭证。安装完成后，Agent 可以在任务开始、调用关键工具、遇到错误或准备交付时主动检索相关经验，并将召回结果作为当前任务的参考上下文。Agent 完成任务后，新的执行结果再作为 Trace 进入经验挖掘链路，形成持续闭环。
+观测系统负责看到真实运行，评估系统负责定义什么是好，经验自进化负责把已经验证的有效方法重新带回运行。
 
 ## 其它
 
