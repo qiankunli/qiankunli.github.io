@@ -100,7 +100,17 @@ chat_dict = [
 
 不管是PreTraining阶段还是SFT阶段，loss函数都是一样的，只是计算的方式存在差异，PreTraining阶段计算的是整段输入文本的loss，而SFT阶段计算的是response部分的loss。**sft 的 prompt 不做 loss，但这并不是说它不能做 loss。主要原因是 prompt 的同质化比较严重**，不做 loss_mask 的话，同样的一句话会被翻来覆去的学，但如果你能保证你的每条 prompt 都是独一无二的，就完全可以省去 prompt 的 loss_mask 环节。
 
-此外，LLM在推理也就是generate的时候，是要不断调用forward的。sft训练时，比如input=ab,response=cd，模型一次 forward 输出整个序列的 logits `[P(b|a), P(c|a,b), P(d|a,b,c), P(<eos>|a,b,c,d)]`，每个 token 的 logits 是预测下一个 token 的概率分布。decoder 的 causal mask（上三角遮罩矩阵） 已经自动保证了预测下一 token 时不会看到未来的 token（只看到左边 token），比如在预测 c 时，模型只能看到 ab，看不到d。loss_mask = `[0, 0, 1, 1]` 标记loss只计算 response 部分（c, d），`Loss = cross-entropy(P(c|a,b), c) + cross-entropy(P(d|a,b,c), d)`。
+此外，LLM在推理也就是generate的时候，是要不断调用forward的；SFT 训练则使用 teacher forcing。假设每个字母都是一个 token，`input=abc,response=def`，一条 SFT 数据可以理解为同时提供了三个 token 级监督目标：
+
+```text
+abc   → d
+abcd  → e
+abcde → f
+```
+
+**但它们并不会真的被拆成三条训练样本**，也不需要调用三次 forward。Teacher forcing 会把 ground truth `def` 一起放入输入，decoder 的 causal mask 则保证每个位置只能看到左侧 token，因此一次 full-sequence forward 就能并行得到所有位置的 logits。prompt 对应的 label 会被置为 `-100`，只有 response 部分参与 loss 计算：`Loss = cross-entropy(P(d|abc), d) + cross-entropy(P(e|abcd), e) + cross-entropy(P(f|abcde), f)`，实际训练中通常还会包含 `<eos>`。
+
+这种计算形态通常称为 **full-sequence training**：从执行方式看，它更接近整段 prefill，而不是推理时逐 token 的 autoregressive decode。不过两者并不完全等同，推理 prefill 通常会构建供后续 decode 复用的 KV cache；训练还需要保留 activation 并执行 backward，通常不会复用这份 KV cache。
 
 ## 微调实践
 

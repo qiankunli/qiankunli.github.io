@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 大模型推理tips
+title: 大模型推理系统：引擎、调度与分布式架构
 category: 架构
 tags: MachineLearning
 keywords: llm vLLM
@@ -51,53 +51,29 @@ Infra 的“三大难题”：Scaling, Sharding, and Copying所有系统的底�
 
 真正有经验的 Infra 工程师，不仅仅是能搭件一个working的系统，而是有能力去从头到尾追踪每一个延迟点，把系统之间的关联和可能存在的bottleneck拆解成一系列可量化的问题，并在上线后持续做 cost/performance profiling。这正是 AI Infra （或者传统 Infra）对工程基本功要求极高的原因。
 
-## 基础
+## 技术栈
 
-![](/public/upload/machine/prefill_decode.png)
+[大模型推理加速技术概要](https://mp.weixin.qq.com/s/kr5-QFhPXrUb7omTvJ-rDw)目前大模型推理加速技术栈大体可以分成三层（从低到高）：
+1. 线性代数计算库，cuBLAS、Eigen、Intel MKL、ARM Compute Library等，其中定义了矩阵乘法、矩阵和向量乘法等数十个标准函数。线性代数层的加速主要依赖以下优化：
+    1. GPU多核计算能力：通过调用CUDA、OpenCL等API，来利用GPU的并行能力。
+    2. CPU SIMD和多核 ：单指令多数据SIMD在x86上有SSEx和AVX等指令，在ARM上有NEON和SVE，都广泛被使用，也有的库通过OpenMP再叠加多核能力。
+    3. Tiling分块：矩阵乘法GEMM作为机器学习关键操作（矩阵乘还经常用作张量形状的变换），Tiling（平铺）是一种优化技术，它涉及将大的矩阵分解成更小的块或“瓦片”（tiles），**这些小块的大小通常与CPU或GPU的缓存大小相匹配**，以便可以完全加载到缓存中
+    4. Autotuning自动调优：通过参数空间搜索，可以在多个分块办法和操作核之间自动优选适合本机的优化方案。
+2. 模型推理引擎，TensorRT、TensorFlowServing、TVM等。 和线性代数层的优化不同，执行引擎能够看到整个神经网络的架构，也能够同时处理多个来自客户端的请求，所以可以使用涉及多个算子、整个模型，以及多个请求间的优化来提高执行效率。执行引擎一般有这些办法将模型推理进一步加速：
+    1. Operator Fusion 算子融合：因为内存带宽往往是一大瓶颈，所以简单将多个相邻的算子找准机会合并起来计算，就可以减少对数据的扫描而大幅提升性能，所以Fusion是算子间优化的重要步骤，可以手工进行，也可以由执行引擎自动进行。
+    2. Quantization 量化：随着GPU对数据结构支持的多元化，当前推理的基线数据类型已经是FP16，比几年前的FP32提高了不少速度。即便如此，将模型量化为INT8进行推理，依然可以提高较多速度，而在手机平台上，量化推理能进一步降低能耗。
+    3. Distribution 分布式：使用多卡推理，以及通信加速，来提升能推理的模型规模和速度。
+    4. Batching 批量化：将多个请求合并处理，是提高性能的另外一个关键办法，这个能大幅提高性能的原因主要有两个：1. 合并请求可以增大代数运算的矩阵规模，而下层代数库处理越大的矩阵规模，相对性能越高。2. 合并请求可以减少对静态的模型参数矩阵的扫描次数，减少内存带宽消耗。
+3. 大模型调度引擎，vLLM、TensorRT-LLM（原FasterTransformer）、llama.cpp等。大模型调度引擎是2022年开始新出现的一层抽象。为什么有了执行引擎还需要大模型调度引擎？主要是因为大家希望进一步优化推理性能，而大模型架构相对固定（Transformer架构及变形），通过专门针对大模型而不是更通用的神经网络进行推理优化，就可以利用大模型架构的特点和算法特性，来进一步提高性能。
+    1. KV Cache：这是fairseq等系统很早就开始有的基础方法，就是将transformer attention计算中的Key和Value张量集合缓存下来，避免每输出一个token都重复计算。
+    2. Iteration-level scheduling 迭代层调度：这是2022年Orca引入的方法，推理引擎默认都是按请求批量化，而LLM推理需要多次迭代进行自回归计算，所以按“迭代”为单位进行批量化，可以提高并行度和性能。
+    3. PagedAttention 分页注意力: 这是今年vLLM引入的方法（参考文献2），背后洞察是上面提到的KV cache占用大量GPU内存，一个13B模型每个输出token对应的KV张量，需要800KB，而最长输出长度2048个token的话，一个请求就需要1.6GB显存。因此vLLM引入类似操作系统中的分页机制，大幅减少了KV cache的碎片化，提高性能。
+    4. 低比特量化。传统的量化方法分为Quantization-Aware Training (QAT) 和 Post-Training Quantization (PTQ)。PTQ主要是对模型权重值和激活值进行INT8/INT4量化，QAT一般效果是更好的，但是它需要重训模型所以成本会大一些，相关的研究成果相较PTQ也少一些，在fintune阶段会用的比较多一些，例如 QLoRA。GPTQ量化。有一批研究专注于寻找更优的量化方法，llama.cpp支持近期发表的GPTQ（参考文献3），默认将模型量化到4比特，大幅提升性能且准确率下降很小。
+    5. Fused kernels等各类手工优化：很多时候，手打优化都是少不了的办法，llama.cpp短时间积累大量用户，就是因为项目作者不怕麻烦，快速积累了大量手工小优化，集腋成裘，形成领先的综合性能。
 
-### 模型的计算过程
+![](/public/upload/machine/vllm_arch.jpg)
 
-[理解llama.cpp怎么完成大模型推理的](https://zhuanlan.zhihu.com/p/996110863)LLM 通过每次迭代生成一个标记，然后将其添加到输入提示中，不断重复该过程，直到生成完整的输出。这就是 LLM 如何从输入提示生成文本的基础。
-
-![](/public/upload/machine/llm_infer.jpg)
-1. 理解张量及其在 ggml（llama.cpp 使用的是 ggml，这是一种纯 C++ 实现的张量库） 中的应用。
-    1. 张量的基本结构
-    2. 张量操作
-    3. 一系列张量操作构建了一个计算图
-2. 分词Tokenization（封装了词汇表/vocab）。
-3. 嵌入embedding/输入层。把离散的“token”，映射为一些连续的“数值”，两个token id之间是没有关系的，但两个Embedding的向量可以有距离、关联度等关系。
-4. Transformer，自注意力机制是LLM架构中唯一计算词元间关系的地方，因此它构成了语言理解的核心，涵盖了对词汇关系的理解。由于涉及跨词元的计算，从工程角度来看，它也是最有趣的部分，尤其是对于较长序列来说，计算量可能会非常大。自注意力机制的输入是n_tokens x n_embd的嵌入矩阵，其中每一行或向量表示一个独立的词元。这些向量中的每一个都将被转换为三个不同的向量，分别称为“键”（key）、“查询”（query）和“值”（value）向量。这种转换通过将每个词元的嵌入向量与固定的wk、wq和wv矩阵（这些矩阵是模型参数的一部分）相乘来实现：
-    ![](/public/upload/machine/llm_qkv.jpg)
-    这个过程会对每个词元重复进行，也就是执行n_tokens次。理论上可以通过循环来完成，但为了提高效率，所有行会通过矩阵乘法在一次操作中进行转换。最终，我们得到三个矩阵 K、Q 和 V，它们的大小均为 n_tokens x n_embd，分别包含每个词元的键（key）、查询（query）和值（value）向量堆叠在一起。
-
-    自注意力机制的下一步是将包含查询向量的矩阵 Q 与包含键向量的矩阵 K 的转置相乘。对于不太熟悉矩阵操作的人来说，此操作实际上是为每对查询和键向量计算一个联合得分。我们使用符号 S(i,j) 来表示查询 i 与键 j 的得分。这个过程生成了 n_tokens^2 个得分，每个查询-键对都有一个得分，并将其打包在一个称为 KQ 的矩阵中。随后，该矩阵会进行掩码操作，以移除对角线以上的元素：
-    ![](/public/upload/machine/llm_score.jpg)
-    掩码操作是一个关键步骤。对于每个词元，它只保留与其前面词元之间的得分。在训练阶段，这一约束确保LLM仅根据之前的词元预测当前词元，而不是未来的词元。
-
-    自注意力机制的最后一步是将掩码后的得分矩阵KQ_masked与之前的值向量相乘。这样的矩阵乘法操作会生成所有前面词元值向量的加权和，其中权重是得分S(i,j)。例如，对于第四个词元“ics”，它会生成“Quant”、“um”、“▁mechan”和“ics”这几个词元的值向量的加权和，权重为S(3,0)到S(3,3)，这些得分是由“ics”的查询向量与之前所有词元的键向量计算出来的。
-
-    ![](/public/upload/machine/llm_kqv.jpg)
-
-    每一层除了自注意力机制外，还包含多个其他的张量操作，主要是矩阵加法、乘法和激活函数操作，这些都是前馈神经网络的一部分。
-    ![](/public/upload/machine/llm_llama.jpg)
-
-    在Transformer架构中有多个层。这些层是相同的，除了每层都有自己的一组参数矩阵（例如用于自注意力机制的各自的wk、wq和wv矩阵）。第一层的输入是上文描述的嵌入矩阵。第一层的输出随后被用作第二层的输入，依此类推。我们可以将其看作每一层都生成了一组嵌入，但这些嵌入不再直接与单个词元相关，而是与词元关系的某种更复杂的理解相关联。
-
-5. 输出层/Transformer的最后一步是计算logits。logits的计算是通过将最后一个Transformer层的输出与一个固定的n_embd x n_vocab参数矩阵（在llama.cpp中也称为output）相乘来完成的。这个操作为词汇表中的每个词元生成一个logit。例如，在LLaMA中，它会生成n_vocab=32000个logits：
-
-    ![](/public/upload/machine/llm_logitis.jpg)
-    这里只关注结果的最后一行，它包含词汇表中每个可能的下一个词元的logit值。PS: **几乎所有模型最后一层都是这么一个Linear 层**，它的用途是把我们中间各种layer算出来的结果，最终映射到vocab_size 维的向量里去。因为我们最终要算的，就是vocab_size 个词里，每个词出现的概率。
-5. 拿到logits列表后，下一步是根据它们选择下一个词元。这个过程称为采样。贪婪采样;温度采样;语法采样
-6. KV缓存。每个词元都有一个关联的嵌入向量，该嵌入向量通过与参数矩阵wk和wv相乘进一步转化为键（key）和值（value）向量。KV缓存是用来缓存这些键和值向量的，通过缓存它们，我们可以节省每次迭代重新计算所需的浮点运算。
-    ![](/public/upload/machine/llm_kvcache.jpg)
-    缓存的工作方式如下：
-
-    1. 在初始迭代期间，所有词元的键和值向量都会按照之前的描述进行计算，并保存到KV缓存中。
-    2. 在后续迭代中，仅需要计算最新词元的键和值向量。**缓存的键值向量与新词元的键值向量一起被拼接**，形成K和V矩阵。这避免了重新计算所有先前词元的键值向量，从而大大提高了效率。
-    能够使用键和值向量的缓存，是因为这些向量在迭代之间保持不变。例如，如果我们首先处理四个词元，然后处理五个词元，而最初的四个词元没有变化，那么前四个键和值向量在第一次和第二次迭代中将保持相同。因此，在第二次迭代中不需要重新计算前四个词元的键和值向量。这一原则在Transformer的所有层中都成立，而不仅仅是在第一层。在所有层中，每个词元的键和值向量仅依赖于先前的词元。因此，当在后续迭代中添加新词元时，现有词元的键和值向量保持不变。
-    你可能会疑惑，既然我们缓存了键和值向量，为什么不缓存查询向量呢？答案是，实际上，除了当前词元的查询向量外，后续迭代中不再需要之前词元的查询向量。有了kv缓存后，我们实际上只需要将最新词元的查询向量传入自注意力机制即可。这个查询向量将与缓存的K矩阵相乘，计算最后一个词元与所有之前词元的联合得分。然后，它与缓存的V矩阵相乘，只计算KQV矩阵的最新一行。这个过程在所有层中重复，利用每一层的kv缓存。因此，在这种情况下，Transformer的输出是一个包含n_vocab个logit的向量，用于预测下一个词元。通过这种优化，我们节省了在KQ和KQV矩阵中计算不必要行的浮点运算，这种节省在词元列表增大时尤为显著。
-
-### 格式
+## 模型文件格式
 
 一些常见的大模型权重存储格式：
 1. PyTorch格式，pth, .pt, .bin：这是PyTorch框架的原生格式，广泛使用但安全性相对较低。
@@ -108,7 +84,7 @@ Infra 的“三大难题”：Scaling, Sharding, and Copying所有系统的底�
 6. 量化格式，.gguf (llama.cpp使用), .ggml (旧版GGML), model-q4_0.bin (4-bit量化), model-q8_0.bin (8-bit量化)：量化格式通过降低权重和激活值的精度来减小模型大小和内存占用，但可能略微降低精度。
 7. 分片格式， pytorch_model-00001-of-00003.bin：用于存储超大型模型，将权重文件分割成多个部分。
 
-## 框架抽象
+## 推理引擎
 
 [当我们谈论 AI 推理的 KV Cache，我们在说什么？](https://mp.weixin.qq.com/s/N44kMpWtgmfqLB4S5MUjaA)回过头来看，vLLM 最大的贡献是什么呢？我认为更多地在于它定义了一个推理框架应该具备的基础功能模块，譬如围绕着虚拟内存建设的高效 KV Cache 管理模块，譬如考虑 KV Cache 分布情形来做相应请求路由的灵活的 Scheduler 调度模块，譬如对各类解码算法的支持，parallel sampling，beam search，等等，譬如一个多级存储架构（从 GPU VRAM，到 CPU DRAM，再到 NVMe Storage，甚至是 Storage Backends）以支持 KV Cache 根据其热度在不同层之间的高效流动，......更为重要的是，vLLM 展示了 KV Cache 的确可以是 LLM Inference 的性能胜负手，此处的优化空间巨大。此番意义，不亚于茫茫的淘金时代，当众人在苦苦找寻的时候，忽然有人喊了一声：“我这里发现金子了！”，于是乎，众人皆蜂拥而至 ......
 
@@ -161,6 +137,48 @@ public:
 对 Continuous Batching 实现来说，就要求它调度策略尽量清晰，并且参数可调。所以更灵活的实现，未来可能会更受欢迎。
 
 [一些已成为LLM 推理引擎中事实标准的方法](https://zhuanlan.zhihu.com/p/685706549) 建议细读。
+
+### 调度优化/动态批处理
+
+[大模型推理服务调度优化技术-Continuous batching](https://mp.weixin.qq.com/s/Se4lzaTLNZF29BXLRjw0xw)
+1. 单处理，也就是单个提示（Prompt）传过来直接送入到LLM进行推理。因为每次只能处理一条数据，对GPU资源的利用率较低。
+2. 静态批处理（static batching），将请求凑成固定Batch再执行，不同的request组成batch后，要等最长的一个request执行完毕，才能整体退出，批处理的大小在推理完成之前保持不变。因此，GPU 未得到充分利用。
+3. 动态批处理（Dynamic batching），动态批处理是指允许将一个或多个推理请求组合成单个批次（必须动态创建）以最大化吞吐量的功能。
+    1. 静态批处理是基于固定的请求个数来触发的，**比如每4个请求一批进行处理**；动态批处理是在静态批处理之上，增加一个时间窗口的维度，比如也是4个请求，但同时还有一个时间窗口100ms的约束，那么在100ms以内，如果积累了4个请求，那么就会触发后置处理，或者是在100ms的窗口时间内，没有达到4个请求，那么也会触发后置处理，动态相比静态处理来说，对用户侧会更友好，但是从资源利用率上来说没有静态批处理好，使用哪种方式可以结合场景进行权衡选择。
+4. 连续批处理（Continuous Batching），在Token粒度动态插入/移除请求。无论是动态批处理还是静态批处理，通常在相同形状的输入和输出请求的场景，提高GPU的利用率。但对于自回归大模型推理场景而言，都不太适用（同一批次中的数据输入和输出长度都不一样）。Continuing Batching（有的地方也叫做 Inflight batching 或者 Iteration batching）指请求在到达时一起批量处理，但它不是等待批次中所有序列都完成，而是当一个输入提示生成结束之后，**就会在其位置将新的输入Prompt插入进来**，从而比静态批处理具备更高的 GPU 利用率。由于**每次迭代的批处理大小是动态的**，因此，有些地方也叫动态Batching。PS：当一个request执行完毕之后，可以继续插入新的request，从request视角是立即开始立即结束。
+
+提升模型服务吞吐最重要的手段是 Batching 策略，Batching主要包含以下三个步骤：
+
+1. 模型服务调度层将多个不同的请求组成一个 batch 的模型输入；
+2. 将batch 化的模型输入放入推理后端进行推理，得到一个 batch 结果；
+3. 再将推理的 batch 结果拆分，并封装成不同的 Response 返回到对应的请求中。
+
+一般来说，合并越多的请求作为单次推理的输入，服务吞吐越高。所以从请求 Batching 的角度去提升模型服务吞吐的本质是提升单次推理的最大合并请求数，即 batch size。对于模型服务来说，单次推理最大合并请求数主要受显存制约。合并越多的请求，batch size 越大，KVCache 的显存占用则越大。KVCache 的显存占用上限可简单的通过显卡的最大显存减去模型权重显存计算得到。
+
+Batching就是将一段时间内到达的用户请求合并到一起，提交到GPU中执行，从而提高系统的吞吐量。然而，**与传统的 DNN Model 在推理时只要正向执行一遍不同，基于 Transformer 的 Generative Model 在推理时是迭代式的（Iterative），每个请求都需要迭代式执行多次，每次生成部分结果（一个 Token），且每个请求的迭代次数可能是不同的（例如迭代直到模型生成一个 End-Of-Sequence Token）**。因此将现有的 Batching 方式应用在 Generative Model 时，可能导致有的请求已经迭代结束了，但是还需要和同Batch中没有迭代结束的请求继续一起执行。这个问题的核心在于，传统的 Batching 技术是以 Request 为粒度的（Request-Level），将多个 Request 绑定在一起提交给执行引擎，多个 Request 同时开始同时结束。因此需要一个新的 Batching 的方式，这也是本项工作核心的 Insight：使用更细粒度的，Iteration-level Batching，在每个 Iteration 中将不同的 Request 合并到一起。对于新到达的请求，有机会在当前的迭代执行后进行处理，从而减少等待时间。**通过迭代级调度，调度器可以完全控制每次迭代处理的请求数量和哪些请求**。PS： batch的粒度不同。
+
+![](/public/upload/machine/iteration_level_batching.jpg)
+
+为了进行批次生成，我们改为一次向模型传递多个序列，在同一前向传递中为每个序列生成一个补全（completion），这需要在左侧或右侧使用填充词元对序列进行填充，使它们达到相同的长度。填充词元（可以是任何词元，我这里使用 `[end]`）在注意力掩码中被屏蔽，以确保它们不会影响生成。
+
+但在上面的例子中，请注意 “Mark is quick. He moves quickly.” 在其他序列之前完成，但由于整个批次尚未完成，我们被迫继续为其生成词元（“Random”）。这并不影响准确度，我们只需简单地将生成的序列截断到 `[end]` 词元即可，但这样很浪费资源，因为GPU资源正在用于生成我们即将丢弃的词元。连续批处理通过将新序列插入批次来解决这一问题，插入位置是 `[end]` 词元之后。在 `[end]` 词元之后生成随机词元的代替方案是，在批次的相应行中插入新序列，并使用注意力掩码机制来防止该序列受到上一序列中词元的影响。（实际上，先前的序列充当了额外的填充内容。）
+
+[vLLM（二）架构概览](https://zhuanlan.zhihu.com/p/681716326)vllm Scheduler 使用 iterative-level 策略对请求进行调度（选择要被处理的请求），被调度的请求在生成一个 token 后会被重新调度。得益于 itertive-level 策略，vLLM 能够在每一轮新的迭代时选择不固定数量的请求进行处理（即 batch size 每次都不一定相同），因此它能够尽可能多地处理请求。
+
+请求的处理通常分为两个阶段，第一个阶段对 prompt 进行处理（也被称为填充阶段，后文使用填充阶段表示这一个阶段），生成 prompt KV cache 的同时生成第一个 token，第二个阶段是生成阶段，不断预测下一个 token。目前对 iterative-level 的实现有两种方式，一种是区分填充阶段和生成阶段，另一种是不区分这两个阶段。vLLM 采用的 iterative-level 策略是区分两个阶段的（https://github.com/vllm-project/vllm/pull/658），即同一批被调度的请求要么都处于填充阶段，要么都处于生成阶段，Scheduler 中有 3 个队列，waiting（接受到的新请求会先放入 waiting 队列）、running（被调度的请求）和 swapped 队列（swapped 队列用于存放被抢占的请求，即当请求处于生成阶段时，但由于空间的不足，需暂时将 running 队列中优先级低的请求移到 swapped 队列）。在调度时，Scheduler 会按照先到先处理（first come first served）的原则从 waiting 队列中选择请求放入 running 队列，此外，Scheduler 的另一个核心组件是 BlockSpaceManager，它主要负责块表的维护。
+
+![](/public/upload/machine/vllm_overview.jpg)
+
+假设 vLLM 接收到 3 个请求（记为 s0, s1, s2）并放入 waiting 队列中，它们的 prompt 分别为 "Hello, my name is"、"The future of AI is" 和 "The life is"。接下来开始 vLLM 的调度和处理。
+1. vLLM 的第一轮处理，假设 vLLM 在这一轮只能调度两个请求进行处理，那么根据先到先处理的原则，会从 waiting 队列中选择 s0 ("Hello, my name is") 和 s1 ("The future of AI is") 放入到 running 队列。对于 s0，Worker 生成的 token 为 Dustin，对于 s1，Worker 生成的 token 为 bright。同时，Worker 会将计算过程产生的 KV 值存储在 KV cache 中
+    ![](/public/upload/machine/vllm_scheduler_1.jpg)
+2. vLLM 的第二轮处理，由于 waiting 队列中还有一个请求 s2（The life is)，因此，vLLM 在第二轮只会处理这一个请求，因为前面提到，vLLM 只会处理要么都是填充阶段的请求，要么都是生成阶段的请求。
+    ![](/public/upload/machine/vllm_scheduler_2.jpg)
+3. vLLM 的第三轮处理，waiting 队列中没有要处理的新请求，所以会从 running 队列中选择此轮要处理的请求（这些请求均处于生成阶段）。但由于没有多余的空间，vLLM 只会选择 s0 和 s1 进行处理。经过多轮调度和推理，最终完成 3 个请求的处理，以上就是 vLLM 的工作流。
+
+[让LLM推理加速的batching是什么技术（in-flight batching）](https://zhuanlan.zhihu.com/p/679723881)
+
+[借着triton inference server聊一下各种batching方法](https://mp.weixin.qq.com/s/R2PPbHcOgJVAM3nPVOKdFw) 未读
 
 ### 模型文件加载
 
@@ -231,7 +249,46 @@ class CustomPreprocessor : public Plugin {
 ```
 
 
-## 以kvcache为核心的分布式架构
+### 在线推理框架
+
+[揭秘大语言模型实践：分布式推理的工程化落地才是关键！](https://mp.weixin.qq.com/s/QeDmD-XlvkkJ7LMNJEynHg)与以往的模型不同，单张 GPU 卡的显存可能不足以支撑大语言模型。因此，需要使用模型并行技术，将大语言模型进行切分后，在多张 GPU 卡上进行推理。我们使用 DeepSpeed Inference 来部署大语言模型分布式推理服务。DeepSpeed Inference 是 Microsoft 提供的分布式推理解决方案，能够很好的支持 transformer 类型的大语言模型。。DeepSpeed Inference 提供了模型并行能力，在多 GPU 上对大模型并行推理。通过张量并行技术同时利用多个 GPU，提高推理性能。DeepSpeed 还提供了优化过的推理定制内核来提高 GPU 资源利用率，降低推理延迟。
+
+有了大模型分布式推理方案，然而想要在 Kubernetes 集群中高效部署大模型推理服务，还存在很多工程化挑战，比如大规模的 GPU 等异构资源如何高效地管理运维和自动调度？如何快速部署推理服务，服务上线后如何保证资源能够应对波动的访问量？以及没有适合的工具进行推理服务时延、吞吐、GPU 利用率、显存占用等关键指标监控，没有合理的模型切分方案，模型版本管理等。
+
+[大模型的好伙伴，浅析推理加速引擎FasterTransformer](https://mp.weixin.qq.com/s/Gkf_zIYWs4u7AJrJLDVq_Q) 未细读
+FasterTransformer 是真对于 Transofrmer 类型模型（也包括 encoder-only、decoder-only）的推理加速方案，其提供了 Kernel Fuse、Memory reuse、kv cache、量化等多种优化方案，同时也提供了 Tensor Parallel 和 Pipeline Parallel 两种分布式推理方案。
+
+[​揭秘NVIDIA大模型推理框架：TensorRT-LLM](https://mp.weixin.qq.com/s/xv3gBjmejoxJEpvFoeUXOg)
+
+[大模型推理优化实践：KV cache复用与投机采样](https://mp.weixin.qq.com/s/W9iVW7niyi_HvEWxOcnwuA)RTP-LLM 是阿里巴巴大模型预测团队开发的大模型推理加速引擎，该引擎与当前广泛使用的多种主流模型兼容，并通过采用高性能的 CUDA 算子来实现了如 PagedAttention 和 Continuous Batching 等多项优化措施。RTP-LLM 还支持包括多模态、LoRA、P-Tuning、以及 WeightOnly 动态量化等先进功能。
+
+[高性能 LLM 推理框架的设计与实现](https://mp.weixin.qq.com/s/4o86rMuburB8jcbU0aYC7g)PPL.LLM，商汤，开源。 
+
+![](/public/upload/machine/single_machine_infer.png)
+
+## 分布式推理
+
+[LightLLM中DeepSeek V3/R1 Two MicroBatch Overlap 实现解析](https://mp.weixin.qq.com/s/V7LmiDRcBiSC0Dfl5jGm3w) 未细读（在代码上体现如何overlap）。在DeepSeek-V3/R1推理系统中，多机多卡的专家并行会引入比较大的通信开销，所以DeepSeek使用了双 batch 重叠来掩盖通信开销，提高整体吞吐。
+
+![](/public/upload/machine/micro_batch_overlap.png)
+
+### 并行与分布式部署
+
+1. 在提升模型显存使用效率方面，Flash Attention 和 Paged Attention 是两种常用的方法。在输入序列中，模型会根据每个词的重要性来分配显存。对于重要性较高的词，模型会分配更多的显存空间来存储其信息；而对于重要性较低的词，模型则会分配较少的显存空间。
+2. 量化。从感知上来讲模型的参数量越大，其中的信息冗余程度也就越高，低精度量化在传统的小模型推理中已经是一个常见的优化手段了，对于更大参数量的语言模型更是如此。量化过程主要涉及两个方面：参数环节的小型化和降低数据类型。通过这一步骤，我们能够使得模型加载的参数更小，从原本的 FP32 降低到 FP16，从而提高推理性能。在量化过程中，我们还会采用混合精度量化技术。这种技术能够在保证模型准确性的前提下，将异常值保留精度，并在混合精度分块矩阵最后再加回去。
+    1. BF16拥有与FP32相同的8位指数部分，因而能够表示与FP32几乎一样广泛的数值范围，这对于避免上溢和下溢非常重要。尽管BF16在尾数精度上不如HF16，但在深度学习应用中，这种较宽的数值范围通常比尾数的额外几位精度更为重要。这是因为深度学习模型通常对权重的尾数精度不是非常敏感，而更依赖于能够处理范围广泛的梯度和权重值。
+    2. 量化对于文本生成特别有效，因为我们关心的是选择 最可能的下一个词元的分布 ，而不真正关心下一个词元的确切 logit 值。所以，只要下一个词元 logit 大小顺序保持相同， argmax 或 topk 操作的结果就会相同。
+    3. 常用量化方法：GPTQ、AWQ和GGUF
+3. 模型稀疏化。模型稀疏化是一种重要的优化方法。它的主要目的是减少模型参数的数量，从而降低模型的复杂度，提高模型的泛化能力和计算效率。模型稀疏化的主要方法有剪枝、量化、低秩近似等。剪枝是一种直接删除模型中部分参数的方法，它可以有效地减少模型的规模，但需要注意不能过度剪枝，以免影响模型的性能。低秩近似则是通过将模型转换为低秩矩阵，来减少模型的参数数量。
+4. 并行。**在Attention层中采用TP、SP，也可以开始CP；FFN层如果是dense结构用TP+SP，如果是sparse结构(MoE)常用EP；DP是所有层都适用**。ZeRO策略(参数分片/shard)、PP层间的流水线并行相对而言当前的使用频率较低，在一些特定场景中可考虑开启。[分布式推理并行策略](https://mp.weixin.qq.com/s/KlDLR1SqSJFdSGJmpyd0zQ)
+    ![](/public/upload/machine/infer_parallelism.png)
+    4. 推理引擎都是做成多卡TP而不是PP，主要是因为从服务器视角看PP的吞吐上限更高，但是从单个请求视角看TP的延迟会更低，在线服务往往不需要那么高的吞吐，延迟更加重要。后来vLLM还增加了流水线并行（Pipeline Parallelism）的支持，从vLLM版本 0.5.1 开始支持跨多节点的流水线并行，对于那些跨多个节点的超大模型和低带宽连接，流水线并行是一种更优的选择。
+
+随着 DeepSeek V3/R1 与 Kimi K2  等 MoE 架构的模型的横空出世，更大参数量与上下文的模型以及更复杂的使用场景使得单机的 GPU 部署方式无法再适用，因为节点内卡间的通信以及跨节点的通信（根据网络拓扑的不同）在不同的并行方式下都会引入难以忽略的延迟，对多个关键指标都会造成显著的降级，从而影响推理服务的质量。
+
+![](/public/upload/machine/distribute_infer.png)
+
+## 以 KV Cache 为核心的分布式架构
 
 传统的推理服务架构采用同构部署模式，即所有的GPU节点既负责Prefill也负责Decode。随着长上下文场景的增加，这种模式暴露出了严重的性能缺陷。在同构集群中，当一个长Context的Prefill请求（例如处理一本小说的输入）被调度到某张GPU上时，该GPU会被长时间占用（可能长达数秒）。此时，该GPU上原本正在进行的Decode任务会被强制挂起，导致正在等待生成下一个Token的用户感受到明显的卡顿，即Token间延迟（Inter-Token Latency, ITL）激增。这种现象被称为“**队头阻塞**”（Head-of-Line Blocking）或“干扰效应”（Interference Effect）。PD分离架构将GPU资源划分为两个独立的池，Prefill 侧计算 Prompt 并产出 KV；Decode 侧接收 KV 后持续生成 token，从架构上隔离长 Prefill 对短 Decode 的干扰。
 
@@ -246,14 +303,36 @@ Mooncake 采用了以 KVCache 为中心的分离式推理架构，主要由三�
 prefill-decode 分离（PD 分离）架构主要是考虑到了 LLM 的 prefill 和 decode 的两个阶段的特性不同，prefill 阶段是 compute bound（对于上下文的embeding和自注意力计算，模型会并行处理输入提示中的所有 Token，一次性计算出整个输入序列的 Attention 状态），decode 阶段是 memory bound（需要结合上下文以及当前token之前生成的token对应的KV值进行计算，过程是串行的），prefill 阶段的能力我们用 TTFT 首 token 时延来衡量，decode 的能力我们用 TPOT 生成每个 token 的时间来衡量。
 1. 但是在同一张卡上做 prefill 和 decode 会出现问题，在机器的算力等条件固定的情况下，你增加 bsz，prefill 阶段机器到算力瓶颈了，反而影响 TTFT，你减小 bsz，decode 阶段又是访存瓶颈的，decode 阶段可以比 prefill 阶段承载更大的 bsz。那么问题来了，到底要不要增大 bsz？
 2. 有了 PD 分离之后，我们可以把 prefill 阶段放在 H800 这样的算力高的机器，decode 阶段放在 H20 这样算力低的机器但是访存能力不会差太多的机器（毕竟显卡更新换代过程中算力增长是遥遥领先访存能力增长的），这样我们的如何 bsz 如何均衡的问题似乎可以得到解决，不同机器只负责一个阶段，**bsz 也只需要根据你这个阶段的特性来设置就好了**。decode 阶段可以比 prefill 阶段承载更大的 bsz。
-    1. P和D的并行策略可以不一样，比如，P实例处理请求数一般较少，DP设置小；而decode需将并发打上去，DP数量设置大； P实例的MoE层可使用TP并行，D实例则一般使用EP并行。
-3. 但是 PD 分离有个很重要的问题，增加了通信和网络传输的成本(KV cache从prefill节点到decode节点)，如果是卡间分离那么会增加通信的成本，如果是不同机器上进行分离那么就会增加网络传输 KV Cache 的成本。
-
+    1. TTFT 和 TPOT 可以各自独立优化（两个阶段的画像差异很大）。P和D的并行策略可以不一样，比如，P实例处理请求数一般较少，DP设置小；而decode需将并发打上去，DP数量设置大； P实例的MoE层可使用TP并行，D实例则一般使用EP并行。不要让”擅长大矩阵计算的 Prefill”和”擅长高带宽 KV Cache 访问的 Decode”去争同一批 GPU。
+    2. 两种资源可以分别扩容。真实业务的流量画像往往是不均衡的。比如一个 RAG 场景：prompt 动辄几万 token，但输出只有两三百字。反过来，如果你的业务是”短 prompt + 长输出”（比如 agent、长文写作），那就反着扩 Decode。
+3. 但是 PD 分离有个很重要的问题，
+    1. KV Cache 必须搬家。从 Prefill GPU 搬到 Decode GPU，增加了通信和网络传输的成本(KV cache从prefill节点到decode节点)，如果是卡间分离那么会增加通信的成本，如果是不同机器上进行分离那么就会增加网络传输 KV Cache 的成本 `KV Cache size  ×  request rate  =  所需 KV 传输带宽`。如果 KV Cache 大、请求率又高，网络会直接成为整个推理系统的瓶颈，而不是算力。PD 分离不是无条件提速，而是拿 TTFT 换 TPOT、拿网络开销换 GPU 利用率和可运维性。**如果你的业务对首字延迟极度敏感（比如短 prompt 的对话补全），PD 分离甚至可能是负收益**。
+    2. KV Cache 到底该放在哪？KV Cache 不是必须一直待在 GPU HBM 里，于是自然演化出分层存储
+    3. 调度器从配角变成主角，而且是拓扑感知（topology-aware）的。不分离的时候，调度逻辑很朴素：Request → 一个 GPU worker。分离之后：
+        ```
+        Request
+        ↓
+        Scheduler
+        ↓
+        选择 Prefill GPU
+        ↓
+        生成 KV
+        ↓
+        选择 Decode GPU
+        ↓
+        传输 KV
+        ↓
+        Decode
+        ```
 DeepSeek V3采用的也是PD 分离部署方式（prefill-32张卡，decode-320张卡），由于集群分开增加的中间状态数据的传输，在NVLink这类传输技术的加持下，有开销但是可控。prefill和decode两个集群的GPU数量需要按照实际场景调整，大部分在1:2到1:4之间，具体看实际场景中TTFT和TPOT的表现和要求。
 
 Context Caching 
 
 ![](/public/upload/machine/context_caching.jpg)
+
+[Mooncake: A KVCache-centric Disaggregated Architecture for LLM Serving](https://zhuanlan.zhihu.com/p/706109023)Mooncake的核心是其以KVCache为中心的调度器，将预填充/prefill服务器与解码/decoding服务器分开，因为LLM服务的这两个阶段具有非常不同的计算特性，Prefill是计算密集，受限算力带宽用不满，Decode是访存密集性，受限带宽算力用不满。所以用同一种硬件部署两阶段往往顾此失彼，不是最有性价比。拆分Prefill/Decode之后，LLM推理系统就更像一个分布式内存系统+流处理系统，其中KVCache随着请求从预填充移动到解码服务器而转移，将KVCache和计算分离开，它将GPU集群的CPU、DRAM、SSD和RDMA资源分组组成Distributed KVCache Pool，KVCache也是分块以Paged方式管理，KVCache Blocks如何在Pool中调度，请求和复用KVCache乃精髓。这就是传统计算机系统研究者最擅长的领域，sys三板斧，batch， cache，调度都可以招呼上，比如
+1. Prefill阶段可以利用request间存在共同前缀的机会，尽可能复用KVCache。PS：比如agent 循环调用 多次请求的prompt prefix是一样的。
+2. Decode可以进一步拆成Attention和非Attention算子分离调度。
 
 [Mooncake](https://github.com/kvcache-ai/Mooncake)
 
@@ -290,6 +369,8 @@ vLLM通过PagedAttention等技术，极大地提升了单机或单节点的LLM�
 3. 「容错与管理」：如何处理硬件故障，如何高效地管理成百上千个LoRA适配器？
 这些问题，vLLM本身并不直接解决。它们属于“「控制平面」”的范畴。
 
+函数计算推出 GPU 闲置计费功能，在保障性能的前提下，可以帮助您大幅降低 GPU 的成本开销。以往部署大型语言模型（LLM）可能需要昂贵的 GPU 支持，尤其在需要大量计算资源时。但请求处理并不是每时每刻都处于活跃状态，势必存在流量的潮汐现象，后端的计算资源会出现空载导致成本的浪费。借助函数计算 GPU 闲置计费功能，用户的开销将会根据实际计算负载动态调整。
+
 ### 路由与负载均衡
 
 [Higress LLM 服务负载均衡的新实践](https://mp.weixin.qq.com/s/TIv1BlU8vHeGA2HBGqjAaA)在面对 LLM 服务时，这些传统方法（常见的负载均衡算法有轮询、随机、最小请求数、一致性哈希等）往往暴露出以下几个关键缺陷：
@@ -302,7 +383,7 @@ LLM 推理的核心是 KV Cache，其存储了模型在 Prefill 阶段计算出�
 2. Profile-based SLO-aware。在异构GPU环境中，路由器会根据每个实例的性能画像（Profile）和服务等级目标（SLO），进行负载感知和队列管理，确保高优先级的请求被快速处理。
 2. Fairness。LLM 实例的公平调度也是负载均衡的一个重要方面，尤其是在多租户环境中，公平性确保了所有用户都能获得相对一致的服务质量，而不会因为某些实例过载而导致其他用户的请求延迟。AIBrix 基于 Sheng et al. 实现了 Virtual Token Counter (VTC) 的 Fair Queuing 调度策略。VTC 为每个客户端维护一个虚拟 Token 计数器，通过跟踪每个客户端已接受的服务量来实现公平调度，优先服务计数器值最小的客户端。
 
-### 自动扩速容
+### 自动扩缩容
 
 目前 Kubernetes 的生态系统中被广泛使用的自动扩缩容工具主要有以下三个：
 
@@ -311,9 +392,3 @@ LLM 推理的核心是 KV Cache，其存储了模型在 Prefill 阶段计算出�
 3. KEDA（Kubernetes Event-driven Autoscaling）：事件驱动的服务扩缩器，支持服务的从零到一部署
 
 针对 LLM 推理服务的自动扩缩容，其关键在于如何决定触发自动扩缩容的指标。AIBrix 的演讲者在 vLLM Meetup Beijing 分享了与传统的微服务的自动扩缩容不同，LLM 推理请求的 QPS 可能与产生的延迟并不是正相关的，且 SM Active 等 GPU 指标也不一定能及时反映出指标的变化。因此，如何基于 LLM 推理的特性来进行可靠的自动扩缩容仍然是需要探索的问题。长期来看，笔者认为 LLM 推理服务的自动扩缩容也有可能会由 Reactive 逐渐发展到 Proactive 甚至是 Predictive 的形态（如时间序列分析与基于强化学习的预测）。
-
-## 各种并行
-
-[LightLLM中DeepSeek V3/R1 Two MicroBatch Overlap 实现解析](https://mp.weixin.qq.com/s/V7LmiDRcBiSC0Dfl5jGm3w) 未细读（在代码上体现如何overlap）。在DeepSeek-V3/R1推理系统中，多机多卡的专家并行会引入比较大的通信开销，所以DeepSeek使用了双 batch 重叠来掩盖通信开销，提高整体吞吐。
-
-![](/public/upload/machine/micro_batch_overlap.png)

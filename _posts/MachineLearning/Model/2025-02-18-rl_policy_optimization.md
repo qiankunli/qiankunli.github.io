@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 强化学习细节（下）：策略梯度、Actor-Critic 与训练机制
+title: 语言模型强化学习基础：从策略梯度到 PPO
 category: 架构
 tags: MachineLearning
 keywords: rl, ppo, importance sampling, on-policy, off-policy
@@ -26,6 +26,15 @@ keywords: rl, ppo, importance sampling, on-policy, off-policy
 * TOC
 {:toc}
 
+如果你想先建立整体框架，建议先看[从长期回报、Credit Assignment 到 PPO]({% post_url 2026-04-06-rl_mainline %})。这篇保留细节、公式和推导，主线篇则以问题主线和演化关系为主。经典书 https://github.com/walkinglabs/hands-on-modern-rl
+
+
+这篇虽然会多次借用 LLM / token 生成来帮助理解，但它讨论的仍然是**通用 RL 细节**，重点在策略梯度、Advantage、Actor-Critic、GAE、PPO 这些方法本身。如果你更想专门看 RL 放到 LLM post-train 之后的对应关系，可以再读[LLM Post-Train 中的强化学习：PPO、GRPO 与 GSPO]({% post_url 2025-02-18-llm_rl %})。
+
+PS：单单是rl 强化学习本身的推导就是一门很厚的知识，搞明白actor-critic 就有百分之七八十了，之后是ppo 针对actor-critic 的一些调整，可以直接看[PPO理论推导+代码实战](https://zhuanlan.zhihu.com/p/13467768873)
+
+这篇保留的是细节、推导和 LLM / PPO / GAE 相关内容。如果你想先看主线，比如 Agent / Environment / MDP / Bellman / MC / TD / value-based / policy-based 是怎么串起来的，可以先读[从长期回报、Credit Assignment 到 PPO]({% post_url 2026-04-06-rl_mainline %})。
+
 
 一些基础概念：
 - $\pi$（Policy，策略）：即LLM模型
@@ -33,6 +42,86 @@ keywords: rl, ppo, importance sampling, on-policy, off-policy
 - s（State，交互状态）：即上文，初始状态即为$s_1$
 - a（Action，交互行为）：即输出的token，可以简单理解为每个字符。（实际上一个字不等于一个token）
 - $\tau$（Trajectory，轨迹）：$\tau = \{ s_1,a_1,r_1,s_2,a_2,r_2,...,s_T,a_T,r_T \}$
+
+## 换个视角：RL 本质上是一个 gradient estimator
+
+不管是 backprop 还是 RL，它们的最终目的都是修改 DNN 的 parameters $\theta$。先厘清一件事：**backprop 本身不是一种 learning algorithm，它的作用其实是求导（differentiation）**。给定一个可微的 loss $L(\theta)$，backprop 通过 chain rule 算出 $\nabla_\theta L$，然后我们把这个 gradient 交给 optimizer（SGD、Adam）去更新 $\theta$。
+
+在监督学习（比如 CNN）里，这个流程非常直观，因为 data 和 $\theta$ 无关——不管训练时 params 怎么变，图片本身不会变，所以我们可以直接对着固定的 dataset 做 backprop。
+
+而 RL 的目标函数是 $J(\theta) = \mathbb{E}_{\tau \sim \pi_\theta}[R(\tau)]$，我们想最大化策略 $\pi_\theta$ 所能 sample 到的 trajectory 的 average returns。看起来也是"算个目标、对 $\theta$ 求导、交给 optimizer"，但真要动手求导，会撞上两道监督学习里根本不存在的坎。
+
+1. 数据分布本身随 $\theta$ 一起动（监督学习里数据是钉死的）。把两边的目标摊开对比就清楚了。监督学习的 loss 长这样：
+
+    $$L(\theta) = \frac{1}{N}\sum_{i=1}^{N} \ell\big(f_\theta(x_i),\, y_i\big)$$
+
+    这里的数据 $(x_i, y_i)$ 来自一个**固定的、和 $\theta$ 无关**的 dataset。所以求梯度时，求和号外面那一圈样本纹丝不动，梯度只落在里面的 $f_\theta$ 上：$\nabla_\theta L = \frac{1}{N}\sum_i \nabla_\theta\, \ell\big(f_\theta(x_i), y_i\big)$。一句话——对着一批不变的题，只调整你的答题函数。
+
+    而 RL 的目标，把期望按定义展开，其实是对所有可能的轨迹求和：
+
+    $$J(\theta) = \sum_{\tau} P(\tau;\theta)\, R(\tau)$$
+
+    关键在于轨迹出现的概率 $P(\tau;\theta)$ 里带着 $\theta$。逻辑链路是：$\theta$ 变 → 策略 $\pi_\theta$ 变 → 每一步采的 action 变 → 环境随之给出的下一个 state 也变 → 整条轨迹 $\tau$ 的分布 $P(\tau;\theta)$ 跟着变。也就是说，**你"训练数据"（采样到的轨迹）的分布，随着你优化 $\theta$ 一起在漂**。这就是后面会反复出现的 on-policy 困境：上一轮采的数据，参数一更新就"过期"了。落到求导上，这一项绕不过去——你必须对 $P(\tau;\theta)$ 本身求导，而不能像监督学习那样把数据分布当常数提到求和号外面。
+
+2. 采样这一步不可导，链式法则在这里断了。
+
+    就算我们下决心去对 $P(\tau;\theta)$ 求导，还有第二道坎。策略网络的实际工作方式是：forward 先算出一个动作的概率分布（比如 logits 过 softmax），然后**从这个分布里"掷骰子"抽一个具体的 action** $a \sim \pi_\theta(\cdot\mid s)$。（顺带一提，**softmax 有平移不变性——logit 的绝对高度无意义，只有 logit 之间的差值有意义**：所有 logit 同时加一个常数，$\text{softmax}$ 出来的分布完全不变。这也是常说"模型权重的绝对大小意义不大、相对值才重要"的一个来源。）
+
+    监督学习的前向过程，从头到尾都是矩阵乘、激活函数这类**可微算子**的堆叠，所以 chain rule 能一路从 loss 流回每个参数。**但"从分布里采样"这一步不是可微算子**：它的输入是一组概率，输出是一个被随机抽中的离散动作。你把 $\theta$ 挪动一丁点，这个被抽中的动作**要么不变、要么突然跳到另一个值**，中间没有平滑的 $\frac{\partial a}{\partial \theta}$ 可言。形象点说，采样就像在计算图正中间插了个 `np.random.choice`，梯度流到这儿就断了，没法像监督学习一样直接 backprop 穿过去。
+
+所以 RL 真正要解决的是：**如何去 estimate $\nabla_\theta J(\theta)$？这就是 policy gradient 的由来。**解法是一个很巧的数学技巧——log-derivative（似然比）技巧。它基于一个对任意可微概率 $P$ 都成立的恒等式（来自 $\nabla_\theta \log P = \frac{\nabla_\theta P}{P}$ 这条求导链式法则的反用）：
+
+$$\nabla_\theta P(\tau;\theta) = P(\tau;\theta)\,\nabla_\theta \log P(\tau;\theta)$$
+
+把它代进 $\nabla_\theta J(\theta) = \sum_\tau \nabla_\theta P(\tau;\theta)\, R(\tau)$：
+
+$$\nabla_\theta J(\theta) = \sum_\tau P(\tau;\theta)\,\nabla_\theta \log P(\tau;\theta)\, R(\tau) = \mathbb{E}_{\tau \sim \pi_\theta}\big[R(\tau)\,\nabla_\theta \log P(\tau;\theta)\big]$$
+
+这一步同时拆掉了上面两道坎：
+
+- **拆第一道坎**：右边重新变回了一个"对 $\pi_\theta$ 的期望"，于是可以**用采样去估计**——拿当前策略实际跑出来的几条轨迹求平均，就是对这个期望的无偏估计，不必再纠结"分布在漂"。
+- **拆第二道坎**：再把 $\log P(\tau;\theta)$ 展开，一条轨迹的概率 = 环境的状态转移概率 × 策略每步的动作概率，而**环境转移概率不含 $\theta$、求导后整项消失**，只剩下 $\sum_t \nabla_\theta \log \pi_\theta(a_t\mid s_t)$。这一项是策略网络输出的 log 概率，**完全可微**，backprop 能正常穿过去——我们绕开了"对采样本身求导"，改成对"采到的动作的 log 概率"求导。
+
+于是就得到著名的 REINFORCE：$\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta}[R(\tau)\nabla_\theta \log \pi_\theta(\tau)]$，通过 sampling 若干 trajectories 来 estimate 这个 expected value，得到一个关于 gradient 的“近似”。直觉上它在干一件很朴素的事：**对你真正采到的那些动作，按它最终带来的回报 $R$ 的好坏，去调高或调低它们的 log 概率**——好动作让它以后更容易被采到，差动作压下去。这也正是"用 A 来表示你有多希望 s 时采取动作 a"的数学出处：公式里的 $R(\tau)$ 就是那个权重 A，A 估得越准，这个梯度就越靠谱。
+
+说清楚这一层，关系就明确了：在监督学习里，backprop 直接精确地给出 gradient；但在 RL 里，我们没法直接求这个 gradient，所以需要 policy gradient 这类方法先 estimate 出一个 gradient，然后把这个近似值交给**和监督学习完全一样的 optimizer（Adam）**去更新 $\theta$。换句话说，**RL 的作用本质上是一个结构复杂的 gradient estimator**，给 optimizer 提供优化信息；而它的那些子问题（credit assignment、exploration、variance reduction）全部是为了让最终输出的那个 gradient vector 更准。
+
+## 有偏与无偏：RL 估计里的两个维度
+
+RL 里到处在“估计”一个没法直接算出来的量——最典型的就是“在当前局面下，未来到底能拿多少分”（价值 $V$）。未来还没发生、还带运气成分，所以只能拿手头的样本去估计它。既然是估计，“准不准”要拆成**两个互相独立的维度**：有没有偏（bias）、稳不稳（variance）。很多人一上来就把它们混在一起，这是第一个坎。
+
+把“估计”想象成反复做很多次、每次给出一个数：
+
+- **无偏（unbiased）**：这些数**平均下来正好等于真实值**。单看某一次可能偏高偏低，但没有系统性地偏向某个方向，误差会互相抵消。
+- **有偏（biased）**：这些数**平均下来系统性地偏高（或偏低）**，而且这个偏差再多做几次也消不掉——因为方法本身锚错了地方。
+
+关键：**“无偏”不等于“这一次准”**。无偏说的是方法没有系统性偏向，是对**方法**的评价，不是对**单次结果**的评价。
+
+打靶比喻最直观（真实值 = 靶心，每次估计 = 一发子弹）：
+
+| | 方差小（稳） | 方差大（散） |
+|---|---|---|
+| **无偏** | 全打在靶心——理想 | 弹着点乱飞，但平均落点在靶心，多打几枪取平均会逼近靶心 |
+| **有偏** | 枪枪打在一起，但整体偏在角落，再多打也到不了靶心 | 又散又偏——最差 |
+
+带数字的小例子：假设某学生这类考试的真实平均分 = 70（靶心，但你不知道）。
+
+- **无偏、高方差**：随便抽他一次成绩当估计，这次 45、下次 92，单看不靠谱，但抽足够多次取平均 → 收敛到 70。它没偏，只是抖。
+- **有偏、低方差**：干脆每次都报“上学期记录的 65 分”，永远 65、超级稳，但系统性低了 5 分，做一万次还是 65。它很稳，但偏了。
+
+放到 RL 里（具体推导见下篇与主线篇），这正是 MC 与 TD 的区别：
+
+- **MC（蒙特卡洛）**：用整条轨迹真实拿到的回报 $G_t$，没掺任何猜测 → **无偏**；但把一整条轨迹的随机都加进来 → **高方差**。
+- **TD**：用“当前奖励 + 对下一步价值的估计 $V(s')$”，而 $V(s')$ 是还没训准的网络猜的 → **有偏**；但只看一步 → **低方差**。
+
+所以 RL 里很多估计方法都在这条 **bias-variance（偏差-方差）权衡**轴上挑位置：完整 on-policy 轨迹上的 MC 通常无偏但高方差；TD / critic 通过 bootstrap 用一定偏差换取更低方差。GRPO 的组内均值、标准差归一和 clip 还会引入额外的估计偏差，不能简单归入“无偏但高方差”。这条轴会在下篇的 baseline / Actor-Critic / GAE 里反复出现。
+
+而且**这条轴的最优落点会随任务的“长短”移动**——2025 年长程 Agentic 任务起来后，这点变得很显眼：
+
+- **短任务**（数学题、单测这类几十到几千 token、可验证的）：轨迹较短、最终得分清晰，省掉 critic 的 GRPO 路线常有较好的工程性价比，但组内估计、归一化和 clip 并不保证严格无偏。
+- **长程任务**（几十上百步、动辄上十万 token 的 agent 轨迹）：方差随轨迹长度不断累积，“整条输出共用一个优势”又把信用分配摊得极粗，这时往往值得把 critic 请回来（PPO 那一路）压方差、给每一步更细的信号。
+
+所以“短任务爱用 GRPO、长任务回 critic”，本质不是谁取代谁，而是 bias-variance 天平随 horizon 换了落点。这个“天平”的完整版（GRPO/PPO 在长短程下的机制差异）见 [LLM Post-Train 中的强化学习]({% post_url 2025-02-18-llm_rl %})；通用 RL 的 critic / GAE 推导见下文。
 
 ## Policy Gradient（策略梯度）
 
@@ -140,7 +229,7 @@ $$
 
 两个关键步：$p_\theta \cdot \nabla \log p_\theta = \nabla p_\theta$（对数求导反过来用），以及 $\sum_a p_\theta(a \mid s) = 1$ 求梯度后恒为 0。所以 baseline 这一项对期望梯度的贡献恒为 0，怎么减都不会把梯度“减偏”。
 
-这条结论很重要：**减 baseline 是一次“免费的方差削减”——无论 $b$ 怎么挑都不引入偏差，所以可以放心去挑一个能把方差压到最小的 $b$**。后面用 NN 估的 $V(s)$（critic），或用同一道题一组样本的 reward 均值（GRPO 的组内均值）来当 baseline，都满足“不依赖被评估的那个 action”，因此都还是无偏的；区别只在方差降得多不多、以及估这个 baseline 要花多少成本。真正的偏差，是后面 critic 用 bootstrap（$r + \gamma V(s')$ 里带上自己尚不准的估计 $V$）才引入的——那一步才进入上篇「有偏与无偏」里说的 bias-variance 权衡；减 baseline 本身还停在“无偏”这一侧。这背后其实是一句更朴素的直觉——**奖励的绝对水平无意义，只有相对（advantage）有意义**：给所有 reward 同时加减一个常数，梯度的期望纹丝不动，就像考试只看你“比平均高几分”，整张卷子按 100 还是 1000 分制都不影响名次。
+这条结论很重要，但前提也很重要：**只有当 baseline 不依赖当前被评估的 action 时，减 baseline 才不会改变策略梯度的期望。**用状态价值 $V(s)$ 作 baseline，并在更新 actor 时将它视为常量，满足这个条件。GRPO 的组内均值则包含当前样本自己的 reward，因此严格说并不满足“与当前 action 无关”；如果只减组内均值，梯度期望会出现约 $(G-1)/G$ 的常数缩放，使用组内标准差归一和 clip 后还会有进一步偏差。所以 GRPO 的组内 Advantage 不能简单称为“完全无偏”，它是用有限组采样换取无需训练 Critic 的工程折中。
 
 我们知道最终输出的是一个序列 $ \tau $，且在算reward时是以 $ \tau $ 的粒度计算的（episode-level reward）（PS：**reward只能告诉我们哪个$ \tau $ 更好**）。即使整体的reward是正的，也不意味着序列中的每一个action都是有收益的（如：说了一串废话，最后才说对结果）。因此，更合理的做法是我们需要**给每一个action合适的credit**（action/token-level reward）。
 
@@ -231,24 +320,25 @@ GAE是在 Actor-Critic 里，继续优化 Advantage 的估计。
 
 TD偏差大但方差小，Monte Carlo偏差小但方差大。GAE 把多步 TD 残差按权重叠起来，在 bias / variance 之间调平衡，目的是在估计优势函数时，降低方差、同时控制偏差。PS：在只有终点奖励（如 0/1）的情况下，稳定、高效地把最终奖励“分摊”到每一个 token 的决策上。在 PPO 中，真正用来更新 policy 的不是 reward，而是 Advantage。如何估计每个action的$A_t$。
 
-在训练开始阶段， $V_{\pi}$很有可能无法刻画真实的状态价值，我们可以选择少信任$V_{\pi}$的计算结果，将 $V_{\pi}(s_{t+1})$展开得：
+先定义一步 TD error：
 
 $$
-r_t + \gamma V_{\pi}(s_{t+1}) - V_{\pi}(s_t) = -V_{\pi} + \sum_{l=0}^{\infty} \gamma^l r_{t+l}
+\delta_t = r_t + \gamma V_{\pi}(s_{t+1}) - V_{\pi}(s_t)
 $$
 
-其中，$r_t,r_{t+1},r_{t+2},...$都是我们某次采样得到的即时奖励数据。如果$V_{\pi}$不准，那就信任实际采样结果，这样至少不会对优势函数的估计出现偏差。
+GAE 不把单个 $\delta_t$ 直接当作最终结果，而是把从当前位置开始的多步 TD error 按指数权重累加：
 
 $$
-A_t^{GAE} =  \sum_{l=0}^{\infty} (\gamma\lambda)^l \delta_{t+l}
+\hat A_t^{GAE(\gamma,\lambda)} = \sum_{l=0}^{\infty} (\gamma\lambda)^l \delta_{t+l}
 $$
 
 $$
-\delta_{t+l} = r_t + \gamma V_{\pi}(s_{t+1}) - V_{\pi}(s_t)
+\delta_{t+l} = r_{t+l} + \gamma V_{\pi}(s_{t+l+1}) - V_{\pi}(s_{t+l})
 $$
-当 $\lambda$ 接近0时，$A_t^{GAE}$ 退化成一步TD误差：$r_t + \gamma V_{\pi}(s_{t+1}) - V_{\pi}(s_t)$。
 
-当 $\lambda$ 接近1时$A_t^{GAE}$ 变成 $-V_{\pi} + \sum_{l=0}^{\infty} \gamma^l r_{t+l}$ GAE 使用整个剩余奖励序列来估计优势。记这种引入了GAE方法的单步优势为 $A_t^{GAE}(s_t,a_t)$，新的策略梯度调整为：
+当 $\lambda=0$ 时，$\hat A_t^{GAE}$ 退化成一步 TD error：$r_t + \gamma V_{\pi}(s_{t+1}) - V_{\pi}(s_t)$。
+
+有限 episode 中，终止之后的 $\delta$ 视为 0。当 $\lambda=1$ 且终止状态的价值取 0 时，TD error 的加权和会望远镜式消去中间的 $V$，得到蒙特卡洛形式 $G_t-V_{\pi}(s_t)$。因此 $\lambda$ 控制 GAE 在一步 TD 与完整 return 之间的 bias-variance 折中。记这种优势估计为 $A_t^{GAE}(s_t,a_t)$，新的策略梯度调整为：
 
 $$
 \nabla J(\pi_{\theta}) = \underset{\tau \sim \pi_{\theta_{old}}}{E_t} \left[ \frac{\pi_{\theta}(a_t | s_t)}{\pi_{old}(a_t | s_t)} A_{\pi}^{GAE}(s_t, a_t) \nabla log \pi_{\theta}(a_t | s_t) \right]
@@ -326,54 +416,6 @@ Exploration,采集trainning data时可以给actor 加一些随机性，不必每
 
 ![](/public/upload/machine/rl_exploration.jpg)
 
-###  OPD/On-Policy Distillation 
-
-OPD把on-policy和offline优点结合起来，用老师模型对学生的每一步打分。让学生从自己当前的分布采样轨迹，这就是 on-policy 的含义，像蒸馏一样，由教师对每个 token 给出密集反馈，信号密度上来了。学生通过最小化与教师之间的 reverse KL 散度来更新，梯度方向是让学生在自己采样的 token 上，逐步向教师的概率分布靠近。
-
-on-policy模型的学习内容是自己 rollout 出来的好的样本。这样做的好处有很多，举一些例子：
-1. 这样的模型不容易出现灾难性遗忘的问题。RL 的训练目标是“强化”自身生成的好的样本，而不是强行去拟合新的数据分布，对模型内部的知识不会产生破坏效果。
-2. 真正 inference 的时候会更加鲁棒。少量的 SFT 样本，只能教会模型强行记住某一条轨迹（A -> B -> C），但是一旦中途发生了些许扰动（如 A -> B' -> ?），模型由于缺乏对轨迹的深入理解，就可能就会发生错乱。
-
-但是 RL 也有它固有的问题，就是计算不够高效，每次 rollout 一条 trace，都只能获得一个最终的奖励信号。而对比 SFT，对于每一个 token，都有一个对应的 label 来约束更新。这样相比起来，RL 在训练中，模型从一次尝试中学到的内容太少了，效率较低。那么，能不能有一种方法，既具有 on-policy 的特征，又能像 SFT 那样，对每个 token 都加以监督呢？OPD 就是一个有效的尝试，引入蒸馏的思想来解决这个问题。核心的思想很简单，首先由 student model 来 rollout 样本（体现了 on-policy 特点）；然后用 teacher model 计算每个 token 对应的 logit；最后拉近 student 和 teacher 在每个 token 上的 logit 分布即可（体现了蒸馏）。具体到实现方式层面，我们简单介绍几种常见的实现。按照Thinking Machine Lab 的实现，OPD 本质上就是通过采样的方法，优化模型策略  和教师策略  之间的 reverse KL，也就是：
-
-$$
-\mathrm{KL}\big(\pi_\theta \parallel \pi_{\mathrm{teacher}}\big)
-= \mathbb{E}_{x \sim \pi_\theta}\Big[
-\log \pi_\theta(x_{t+1} \mid x_{1..t})
-- \log \pi_{\mathrm{teacher}}(x_{t+1} \mid x_{1..t})
-\Big]
-$$
-
-在实操的时候也很简单，首先使用需要训练的模型  进行 rollout；然后再使用上面右侧的公式计算出 logit 距离 teacher 的距离作为损失函数；最后梯度下降进行计算就可以了。
-
-三种主流 OPD 实现
-|类型|	计算规则|	特点|
-|---|---|---|
-|采样 Token OPD|	仅对学生实际采样的单个 Token 计算损失|	最轻量、工业界最常用，无额外显存开销|
-|全词表 OPD|	对整个词表所有 Token 计算 KL 散度	|梯度最密集，但显存 / 计算成本极高|
-|Top-K OPD|	仅对学生概率最高的前 K 个 Token 计算损失|	折中方案，兼顾效果与成本，本文实验默认使用|
-
-OPD 成败的两大决定性条件
-1. 师生必须具备兼容的思维模式。即便教师基准精度更高，若师生推理逻辑、候选 Token 偏好差异过大（初始重叠率低），OPD 会彻底失效；早期思维模式的错位造成的损失，训练后期也无法修复。OPD 学习的不是「教师的高分能力」，而是教师的推理思维范式。
-2. 教师必须提供学生未掌握的全新知识。思维模式匹配≠OPD 一定成功。若师生来自同一训练流水线、同源数据，即便教师规模更大、精度更高，也无法提供可迁移的新知识，OPD 依然收效甚微。模型高分 ≠ 拥有新知识。同家族不同规模模型，只是对同一数据的拟合程度不同，底层分布几乎一致，无法产生 OPD 可利用的新知识。
-
-
-OPD的基本流程如下：
-1. On-Policy采样：学生模型根据输入prompt自回归生成完整回答（不使用教师的输出）
-2. 教师评分：将学生生成的序列送入教师模型，获取逐token位置的logits
-3. 分布对齐：计算学生分布与教师分布之间的KL，以此作为训练损失
-4. 反向传播：更新学生模型参数，使其在自身生成的序列上接近教师的logits分布。损失函数设计
-  1. Forward KL
-  2. Reverse KL
-
-这一流程与标准SFT的区别在于步骤1（on-policy vs 离线）和步骤3（软标签分布匹配 vs 硬标签CE损失）。与RL的区别在于步骤3（密集软标签 vs 稀疏标量奖励）。
-
-OPD 的固有缺陷与适用边界（代价与局限）
-1. 奖励质量随序列长度衰减（长 Horizon 失效）。OPD 存在「最优序列长度区间」（实验中 3K~7K Token 效果最佳）。
-2. 全局有效奖励 ≠ 局部可优化梯度。教师的逐 Token 优势信号存在各向异性（不同位置信号相互抵消），梯度幅值极小，学生无法完成局部优化。
-
-从 OPD 到 self-distillation。OPD 单纯的方法部分已经相当简洁有效了，感觉可优化的空间不大，唯独不好处理的点在于 **teacher model 怎么获得**。如果按照一般的想法，teacher model 使用一个 size 很大的开源模型，那么 tokenizer 很可能和 student model 不一致，那么蒸馏的 logit 和位置就对不齐，直接导致方法用不了；另一方面，虽说做实操我们总喜欢蒸馏更强的模型（不是），但做科研我们总是想提高模型的上限，那么简单的蒸馏就做不到这点了。所以最近看到不少 paper 都采用了 self-distillation 的思想，也就是自己蒸馏自己 —— 这样就避免了 tokenizer 不统一的问题。这类工作的核心问题在于，怎么让自己 rollout 更好的结果，作为 teacher。因此不少文章给出了解决方案：可以在模型输入的 prompt 里面，把专家的解答过程（demonstration）放进去，并让模型基于专家答案，给出解答过程（成为和符合自己模型风格的样本，后续再进行训练和监督）。这样一来，能保证最终 rollout 的质量，又能保证 on-policy 的特点。
-
 ### 重要性采样
 
 先不说rl，前文提到，我们可以通过足够的采样的均值来近似一个分布的期望。 
@@ -428,9 +470,9 @@ $$
 - PPO 复用的那批数据来自 $\pi_{old}$，而 $\pi_{old}$ 只是“几步梯度之前的自己”，分布只漂了一点点。所以 PPO 本质上仍是**近似 on-policy**：importance ratio $\frac{\pi_\theta}{\pi_{old}}$ 只是把这点小漂移修正回来，clip 则把漂移摁在一个小区间里、不让它越漂越远。正因如此，PPO 通常被归为 on-policy（或 near-on-policy），而不是真正的 off-policy。
 - **真正的 off-policy**，是行为策略可以离目标策略任意远的那种——replay buffer、人类示范、别的模型的输出（也就是前文那个定义）。这时分布差异大，要么靠完整的重要性采样硬扛，要么干脆换一套机制（如 Q-learning / DQN 的经验回放）。
 
-一句话：“复用 K 次”只让 PPO **轻微**偏离 on-policy，而 clip 的存在，正是为了守住“轻微”这两个字——一旦 $\frac{\pi_\theta}{\pi_{old}}$ 超出 $[1-\varepsilon,1+\varepsilon]$，更新就被截断，不让它滑进真正 off-policy 那种高方差地带。
+一句话：“复用 K 次”只让 PPO **轻微**偏离 on-policy，而 clip 的作用是限制 surrogate objective 继续奖励过大的有利变化。它不是把 ratio 硬限制在 $[1-\varepsilon,1+\varepsilon]$：当 $A_t>0$ 时主要裁掉 ratio 过大的方向，当 $A_t<0$ 时主要裁掉 ratio 过小的方向；如果策略朝不利方向移动，仍会保留梯度把它拉回来。
 
-注意，重要性采样有效的前提是p(x)和q(x)分布不能差别太大，这也是为何PPO进入KL和clip的原因。 
+重要性采样恒等式严格要求目标分布的支撑集被行为分布覆盖；两个分布差得太大时主要问题是估计方差会很高。PPO 用 clip 控制 surrogate objective 的更新幅度，一些实现还会额外使用 KL penalty，但 KL 并不是 PPO-Clip 目标的必选项。
 
 ```
 model = SFT_model
@@ -517,5 +559,3 @@ Advantage 的意义：
 ## 缺点
 
 rl最大的缺点：效率极低。模型往往要把整个任务完整跑一遍，等到最后才知道自己做得对不对。只有在这一次尝试彻底结束后，它才能收到一个简单的结果信号。想象一下，一个系统花了几十步、上百步去写代码、下棋或解题，最后得到的只是一个模糊的提示：成功还是失败。它不知道哪一步做得好，也不清楚哪一步出错，只能靠反复试验去猜。往往要重复上千次，才能从偶然的成功里提炼出一点有价值的经验。**低效的根源在于，它几乎只看结果**。模型在完成一项复杂任务时，无论中间经历了多少误判和偶然，只要最后成功，就会被判定为正确。它学到的不是理解，而是取巧。强化学习让模型更会迎合奖励，却未必更聪明。现实世界的目标是模糊的、多维度的，根本无法被单一的奖励函数概括。Karpathy 更看重的，是让模型在每一步中学会理解。不是完成任务后才得到结果，而是在过程中就能意识到自己哪里做得好、哪里需要调整。这需要更细致的过程监督与反思机制，让模型能像人一样边做边学。人类的智慧并非来自被奖励，而是来自对错误的体察与对过程的理解。
-
-
