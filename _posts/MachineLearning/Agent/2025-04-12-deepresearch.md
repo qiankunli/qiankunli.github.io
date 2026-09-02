@@ -116,7 +116,7 @@ keywords: deepresearch deepsearch
 ## RL赋能
 
 1. What RL is for
-    1. Search-R1学会了只在内部知识不足时才调用搜索引擎
+    1. Search-R1学会了只在内部知识不足时才调用搜索引擎。它和传统RAG 的差别不是”有没有检索”，而是”谁来决定检索”——传统 RAG 由系统先检索，再把文档交给模型；Search-R1 让模型在推理过程中自己发起 search action。
     2. DeepRAG将复杂查询分解为原子子查询，逐个决策
     3. IKEA引入知识边界感知奖励，鼓励优先使用内部知识
     4. ConvSearch-R1通过Rank-Incentive奖励，让改写后的查询能检索到更高排名的相关文档

@@ -26,6 +26,12 @@ keywords: reward model
 * TOC
 {:toc}
 
+游戏环境里，奖励由环境规则直接给出，比如着陆得分、坠毁扣分。LLM 对齐场景没有这样的规则来源：”请帮我写一首诗”对应的回答值多少分，没有客观答案。 Reward Model（RM）就是要把人类判断转成标量奖励。
+
+LLM 对齐有两条强化路径：
+1. 主观对齐（礼貌、安全、有帮助）：没有客观对错标准，必须通过人类偏好训练 RM
+2. 客观推理（数学、代码）：有明确规则校验，可以直接用规则奖励。RLVR。
+
 ## RM的作用
 
 reward model 通常只对一个完整的 response 进行打分，而不是对每个 token 打分。在典型的 RLHF 流程中，RM 接收一个 prompt + response 对，输出一个 scalar score，代表整体偏好程度。这个 score 是全局的、延迟的、稀疏的：它只在序列末尾出现，无法告诉模型“哪一部分写得好、哪一部分写得差”。例如，模型生成了一段 500 个 token 的回答，RM 给出 +1 分。但其中前 300 个 token 逻辑严谨，后 200 个 token 胡说八道——RM 无法区分。如果直接用这个 +1 去反向传播到整个序列的每个 token，就会导致“好 token 被差 token 拖累，差 token 被好 token 带飞”的问题。这就是 credit assignment problem（信用分配问题） 的典型体现。你可能会想：那能不能让 RM 输出 token-level 的奖励？技术上当然可以尝试（例如用对比学习训练一个 local RM），但这会带来几个问题：
@@ -48,7 +54,7 @@ RM 其实扮演的是rl概念下的「环境」，在使用RL训练LLM的一个�
 2. 想方设法的造数据，优化 reward 打分模型，给出更准确的 reward 信号。
 显然，后者的投入产出比会更高一些
 
-## LLM-as-Judge vs reward model
+### LLM-as-Judge vs reward model
 
 LLM-as-Judge
 1. 算力 vs 时延。 PS：现阶段最现实的原因
@@ -65,6 +71,8 @@ LLM-as-Judge
   3. 通用大模型因为见多识广，能识别出“虽然没见过这个写法，但这也是胡说八道”，对于 OOD 鲁棒性更好。
 
 目前的业界解决方案（RLAIF / Iterative Training）：我们并不直接用 LLM-as-Judge 跑 PPO，而是用 LLM-as-Judge 去生产数据，然后蒸馏给 RM。
+
+## Bradley‑Terry 模型
 
 ## 训练
 

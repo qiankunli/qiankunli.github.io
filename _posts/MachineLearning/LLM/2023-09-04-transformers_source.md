@@ -274,6 +274,27 @@ print(squad_it_dataset) # 包括 train 和 test 的 DatasetDict 对象
     ```
 4. 用于预训练 GPT-2 的 WebText 语料库包含超过 800 万个文档和 40 GB 的文本，全加载到计算机内存吃不消，`pubmed_dataset_streamed = load_dataset("json", data_files=data_files, split="train", streaming=True)`，streaming=True 返回的对象是一个 IterableDataset
 
+## 整体流程
+
+LLM 本质上不是“输入文字、输出文字”的黑盒，而是一个不断输出“下一个 token 概率分布”的模型。
+1. 文本先变成 token ID
+2. Token ID 查表得到 embedding
+3. Transformer 计算上下文表示
+    ```
+    embedding
+        ↓
+    causal self-attention
+        ↓
+    MLP
+        ↓
+    多层 Transformer
+        ↓
+    hidden states
+    ```
+    输出形状是：`[B,L,D]`，Decoder-only LLM 使用 causal mask，保证每个位置只能看到自己和前面的 token。
+4. LM Head 把 hidden state 变成 logits，输出形状为：`[B,L,D]` ==> `[B,L,V]`/`[batch, seq_len, vocab_size]`，其中每个 seq 位置，都有一个长度为 vocab_size 的向量，表示在当前上下文后面，词表中每个 token 作为下一个 token 的评分。注意，logits 还不是概率，经过 softmax才得到下一个 token 的概率分布。
+5. 从 Logits 到 Token
+6. 然后token 追加到prompt，循环往复
 
 ## 源码分析
 

@@ -26,6 +26,9 @@ keywords: agent team
 
 ## 简介
 
+主流多 Agent 框架（CrewAI、AutoGen、MetaGPT）大多采用 Leader-Worker 架构。有基于 capability 的分配和结果验证，但本质仍是调度器，没有方案讨论、共识达成、动态重规划的交互。核心缺陷：Worker 之间完全隔离，缺少 peer-to-peer 的横向信息流。
+
+[从 ReAct 到 Agent Teams：一个工程师视角的 Agent 协作机制思考](https://mp.weixin.qq.com/s/T_sYOS11KrOijp_aCEcgnQ)AgentScope 团队开源的 AgentTeams把「多 Agent 协作平台」当作一个云原生系统来做：Kubernetes 控制面（agentteams-controller）通过 CRD 声明式管理 Worker/Team/Manager，Higress AI Gateway 统一托管模型密钥与 MCP（Worker 只拿消费令牌，从架构上根除凭据外泄），Matrix 协议（Tuwunel）作为 Agent 与人共用的通信总线，MinIO 提供跨 Worker 的共享文件系统降低 token 消耗，Skills 通过 skills.sh 按需拉取。OpenClaw / QwenPaw / Hermes 多种运行时可以在同一个 Matrix Room 里共存，人类通过 Element Web 或任意 Matrix 客户端旁听、介入，一切通信「可见、可干预、无隐藏调用」。这套设计把 Leader-Worker 的**工程侧问题**解决得相当彻底：凭据安全、通信基础设施、共享存储、可观测性、人在环、多运行时兼容。但结构上它仍然是 Manager-Workers——Manager 负责编排和心跳汇报，Worker 通过 Matrix 的 m.mentions 互相点名，本质上是「把每个 Agent 拉进同一个群」。通信通道有了，但协作语义没有：没有方案共同讨论、没有 OKR 协商、没有分歧仲裁、没有任务完成后的集体复盘、没有基于历史的团队演化。Agent Teams 现阶段的瓶颈不在基础设施（Matrix / A2A / ANP / 共享文件系统都已成熟），而在协作机制——如何让一群 Agent 像一支真实团队那样讨论、对齐、跟进、复盘。基础设施解决了"能不能说话"，还没解决"该说什么、怎么达成共识、说完之后如何沉淀"。
 
 ## 场景
 
@@ -36,7 +39,45 @@ keywords: agent team
 2. 多智能体治理
 3. 沉淀组织级知识
 
+## 协作
 
+要组织一支团队，第一步得知道「团队」可以长成什么样。有哪些组织形态可选，分为4个维度和五种基本组织形态
+1. 协作类型（合作／竞争／竞合）
+2. 协调策略（规则／角色／模型驱动）
+3. 通信结构（中心化／去中心化／层级）
+4. 动态性（静态／运行时可变）
+
+五种基本组织形态，没有哪一种结构能普适所有场景，越是需要灵活交互、频繁互相求助的场景，全连接的 Flat 结构反而比层级结构更合适。
+1. 全连接的 Flat/P2P
+2. 指挥链清晰的 Hierarchical
+3. 群组内合作对外统一的 Team
+4. 大规模去中心的 Society
+5. 把前几种拼起来的 Hybrid
+
+另一个视角
+1. 如何分工（分治）
+  1. 分工的前提是有一个计划 ==> 谁做计划
+  1. Leader 要具备四个特征：深度参与方案制定，不管细节，但知道"这事大方向该往哪走"；与 Worker 讨论后再执行，方案不是单方灌输，Leader 提大方向，Worker 补执行侧的约束；具备兜底能力——Worker 做不了、卡住了，Leader 能亲自接手完成；负责方案变更审查。
+2. 如何协同
+  1. 协同的前提是有一个目标 ==> 对齐目标
+  2. 主动广播（Worker 有阶段性成果或发现共同风险时，主动 push 给相关方）
+  3. 被动查询（Worker 需要另一个 Worker 的中间结果或专业判断时，pull 式请求）
+  4. 求助升级（Worker 卡住时先横向找同伴，同伴也解决不了再向 Leader 升级）
+3. 经验积累 ==> 团队进化
+  1. 单agent进化，分析自己的执行轨迹、提取捷径经验
+  2.  Team 层面的进化。Team 复盘应该由 Leader 主持、所有相关 Worker 参与，结构化输出三类资产：方法论（这次成功/失败的关键因素，抽象为下次可复用的原则）；协作模式（哪些 Worker 组合、哪种通信模式在这类任务里效果好，形成 team playbook）；反模式（这次踩的坑、走的弯路，作为下次的 anti-pattern 提前规避）。这些资产存两个层次——团队共享知识库（所有 Worker 都能读）+ 角色专属经验（只对当前岗位有意义的技巧）。
+
+```
+playbook = xx
+while xx:  # 注意积累trajectory
+  plan_and_tasks = plan(question,check,playbook)
+  agents = []
+  for task in tasks:
+    agent = agent(task)
+    agents.add(agent)
+  progress = wait(agents)
+  check = verifier(progress) 
+```
 
 ## claude方案
 
