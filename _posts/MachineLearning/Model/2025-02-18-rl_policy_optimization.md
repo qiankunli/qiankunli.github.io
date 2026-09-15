@@ -26,7 +26,6 @@ keywords: rl, ppo, importance sampling, on-policy, off-policy
 * TOC
 {:toc}
 
-
 这篇虽然会多次借用 LLM / token 生成来帮助理解，但它讨论的仍然是**通用 RL 细节**。一些基础概念：
 - $\pi$（Policy，策略）：即LLM模型
 - $\theta$（Parameter，参数）：即模型参数
@@ -34,6 +33,7 @@ keywords: rl, ppo, importance sampling, on-policy, off-policy
 - a（Action，交互行为）：即输出的token，可以简单理解为每个字符。（实际上一个字不等于一个token）
 - $\tau$（Trajectory，轨迹）：$\tau = \{ s_1,a_1,r_1,s_2,a_2,r_2,...,s_T,a_T,r_T \}$
 
+reward怎样变成各个 Token 的更新：Reward ==> advantage ==> loss
 
 ## 从Policy-Based到在 policy gradient
 
@@ -318,7 +318,7 @@ Critic 不会凭空创造奖励，它的训练目标最终仍来自环境或 Rew
 
 MC 看到了完整未来，却容易受整条轨迹的随机性影响；一步 TD 更新及时，却把一步之后的未来全部交给了尚在学习的 Critic。接下来的 GAE 会在这两端之间连续取值。
 
-### GAE：在 MC 与 TD 之间折中
+### GAE（Generalized Advantage Estimation）：在 MC 与 TD 之间折中
 
 GAE（Generalized Advantage Estimation，广义优势估计）的基本材料仍然是一步 TD error。对于采样得到的一段长度为 $T$ 的轨迹，先计算：
 
@@ -395,6 +395,8 @@ L_{\mathrm{Critic}}(\phi)
 \right]
 $$
 
+由于每个时间步对应不同的状态——在 LLM 中就是不同的 token prefix——Critic 给出的 $V_\phi(s_t)$ 不同，TD error 或 GAE 得到的 $\hat A_t$ 通常也不同。Actor 用各自的 $\hat A_t$ 加权每个 action/token 的策略梯度，因此 Advantage estimation 在提供更新信号的同时，也实现了 action/token 级的 temporal credit assignment；这里的 $\hat A_t$ 是基于 Critic 的估计信号，并不是对每个 token 真实因果贡献的精确识别。
+
 因此，GAE 同时连接了两条训练线：$\hat A_t$ 告诉 Actor 每个动作相对平均水平好多少，$\hat R_t$ 则成为 Critic 下一轮要拟合的价值目标。在 LLM 的稀疏奖励场景中，中间 token 的即时奖励往往为 $0$，GAE 仍能通过后续 $\delta$ 的加权累积，把终点反馈逐步传回前面的 token。更准确地说，完成 credit assignment 的是“Critic 提供相邻状态价值 + GAE 累积多步 TD error”这一整套机制，Critic 单独只负责提供价值估计。
 
 至此，Advantage “怎么算”已经解决。演进思路
@@ -461,6 +463,8 @@ G_t - Vφ(s_t)
 
 ## 从 Actor-Critic 到 PPO
 
+PPO 早在 2017 年就已提出，[原论文](https://arxiv.org/abs/1707.06347)在模拟机器人运动、Atari 游戏等任务上进行了验证，初衷是解决通用强化学习中“如何高效、稳定地更新策略”的问题，LLM RLHF是这套方法在语言生成任务上的应用。
+
 ### Actor-Critic 尚未解决的两个问题
 
 策略梯度最核心的直觉：如果优势为正，就提高这个动作的概率；如果优势为负，就降低这个动作的概率。但这个直觉落到实际训练中，还有两个问题需要解决。
@@ -489,8 +493,20 @@ $$
 原始 Policy Gradient / REINFORCE 因而属于 on-policy 方法：通常需要不断重复“用当前策略采样 → 更新策略 → 重新采样”。PPO 希望让刚刚采集的同一批 rollout 多训练几轮，首先要处理新旧策略之间的数据分布差异。
 
 ### 重要性采样：从旧分布估计新分布
+普通 Monte Carlo Sampling 是：想估计分布 $p$ 下的平均值，就从 $p$ 采样，再直接求平均。重要性采样（Importance Sampling）则是：想估计分布 $p$ 下的平均值，但从另一个分布 $q$ 采样，再加权求平均。
 
-重要性采样（Importance Sampling）解决的是一个朴素问题：**样本来自一个分布，但我们想估计另一个分布下的平均值。** 先看普通采样平均。回到策略梯度公式：
+$$
+\mathbb E_{x\sim p}[f(x)]
+=
+\mathbb E_{x\sim q}
+\left[
+\frac{p(x)}{q(x)}f(x)
+\right]
+$$
+
+“Importance” 从哪里来？ 在典型用法中，我们会设计 $q$，让它更多地采到“对期望贡献大”的区域。例如某种罕见事件虽然出现概率低，但影响特别大，就可以刻意多采一些这种事件，再通过权重修正“采多了”的影响。因此，整个名字可以理解为：把采样机会更多地分配给重要区域，再用权重保持估计目标不变。而在 PPO 的语境里，$q$ 已经是采集数据的旧策略，并不是专门为了“重要区域”设计的。我们主要利用这个方法的另一面——对已有的旧分布样本加权，估计目标分布下的期望。
+
+先看普通采样平均。回到策略梯度公式：
 
 $$
 \nabla_\theta J(\theta)
@@ -716,93 +732,14 @@ PPO 通常仍被归类为 on-policy 算法。它只对当前策略刚刚采集�
 
 ## 李宏毅老师对Policy Gradient的讲解
 
-### 从期望回报到 Policy Gradient
-
-最原始的Policy Gradient 直接$A_t=G_t$
-
-![](/public/upload/machine/rl_lhy_policy_gradient.jpg)
-
 [The Definitive Guide to Policy Gradients in Deep ReinforcementLearning:Theory, Algorithms and Implementations](https://arxiv.org/pdf/2401.13662) Policy Gradient 论文综述。
 
 
 [DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning](https://zhuanlan.zhihu.com/p/20530204146)
 
-Reward Function（奖励函数定义，即输出序列$\tau$ 能获得的奖励），用于评估某个状态/**动作序列**的好坏：
-
-$$
-R(\tau) = \sum_{t=1}^{T} r_t
-$$
-
-因为actor输出有一定的随机性，即对与同一个$s_t$，actor不一定每次都输出$a_t$，自然each $\tau$ has a probability to be sampled（PS：采样出来的数据分布不一定是真实的数据分布）. 这个probability用$p_\theta(\tau)$ 或 $p(\tau \mid \theta)$ 表示，连带$R(\tau)$也是随机的（所以不能单纯用标量，要计算期望），所以模型参数 $\theta$ 下的Expected Reward（期望奖励）表示为sum over all possible trajectory：
-
-$$
-\overline{R}_\theta = \sum_{\tau} R(\tau) p_\theta(\tau)
-$$
-
-综上，我们希望调整模型参数 $ \theta $ 使这个期望奖励越大越好，因此可得Policy Gradient公式如下，期望做gradient ascent最大化期望奖励：
-
-$$
-\nabla \overline{R}_\theta = \sum_{\tau} R(\tau) \nabla p_\theta(\tau)
-$$
-
-其中 $R(\tau)$ 来自environment 反馈（it can even be a black box），跟$\theta $没关系，所以做gradient的时候只对$p_\theta(\tau)$ 做gradient即可。
-
-**我们分别来看 $R(\tau)$ 和 $p_\theta(\tau)$ 可以被约等为什么样子**。
-
-### 从轨迹概率到单步动作梯度
-
-$$
-\nabla \overline{R}_\theta = \sum_{\tau} R(\tau) \nabla p_\theta(\tau)
-= \sum_{\tau} R(\tau)  p_\theta(\tau) \frac {\nabla p_\theta(\tau)}{p_\theta(\tau)}
-
-= \sum_{\tau} R(\tau) p_\theta(\tau) \nabla \log p_\theta(\tau) \quad \text{\# Note: } \nabla f(x) = f(x) \nabla \log f(x)
-$$
-
-![](/public/upload/machine/rl_rt.jpg)
-
-直接对$p_\theta(\tau)$ 求导无法计算，$R(\tau) p_\theta(\tau)$是期望形式，可以通过采样足够多的轨迹来估计。
-
-$$
-\sum_{\tau} R(\tau) p_\theta(\tau) \nabla \log p_\theta(\tau) \approx \frac{1}{N} \sum_{n=1}^{N} R(\tau^n) \nabla \log p_\theta(\tau^n) \quad \text{\# 实际上就是N个sample轨迹近似期望}
-$$
-
-接下来的问题是如何计算 $\nabla \log p_\theta(\tau^n)$， 其中，模型参数$\theta$ 下生成序列$\tau$ 的概率如下：
-
-$$
-p(\tau \mid \theta) = p_\theta(\tau) = p(s_1) p_\theta(a_1|s_1) p(s_2|s_1, a_1) \ldots = p(s_1) \prod_{t=1}^{T} p_\theta(a_t|s_t) p(s_{t+1}|s_t, a_t)
-$$
-
-轨迹概率可以分解为动作条件概率的连乘，对数概率可以拆成每一步的 log 概率之和。
-
-![](/public/upload/machine/rl_pt1.jpg)
-
-忽略掉跟 $\theta$ 无关的项（ 环境无法作用gradient 所以可以移除）
-
-![](/public/upload/machine/rl_pt2.jpg)
-
-
-$$
-\nabla \overline{R}_\theta = \frac{1}{N} \sum_{n=1}^{N} \sum_{t=1}^{T_n} R(\tau^n) \nabla \log p_\theta(a_t^n | s_t^n) 
-$$
-
-$$
-\nabla \log p_\theta(a_t \mid s_t)
-= \frac{\nabla p_\theta(a_t \mid s_t)}{p_\theta(a_t \mid s_t)}
-$$
-
-$\nabla p_\theta(\tau)$ 转换为 $\nabla p_\theta(a_t^n | s_t^n)$ 之后可以通过实际采样到的 (s, a) 对来计算。
-
-其中(用到了对数求导)，分母$p_\theta(a_t \mid s_t)$ 体现了重要性比重：小概率但被采样到的动作，对梯度更新影响会更大（因为这说明策略应该更重视它）。避免了在采样过程中采到很多奖励值很低但是出现频次高的动作，造成模型对这种低奖励值高频次动作的偏好。 整体而言，相当于用$p_{\theta}(a_t \mid s_t)$做了某种归一化。
-
-![](/public/upload/machine/rl_pg.jpg)
-
-直观理解：在某个state（上文）下执行某个action（token）使得最后整个输出$ \tau$ 的reward是正的时候，我们应该**增加这个输出的几率**，反之减少。each training data is weighted by $R(\tau^n). $ PS：rl就是，判断哪个输出更好，把这个输出的概率提高，花活在于提高多少。可以给action model 每个token算loss 了。进而**是不是可以理解为rlhf和sft的反馈粒度都是token？**
-
-**以上是REINFORCE 算法的核心更新公式，在此基础上，可以引入 baseline（不影响期望，减少方差）、优势函数（A3C, PPO 等方法），改进收敛效果**。
-
 ### 从轨迹回报到 Advantage
 
-如果仔细看上述公式，首先，它并没有告诉我们轨迹中某个单独的动作到底好不好，其次会发现 $ R(\tau) $ 即reward恒为正的情况，那会导致一直在增加任何token的输出概率。我们希望调小概率时，reward应该是个负的。直观的想法，如果我见过一批reward，减去他们的均值就好了，这个方法叫REINFORCE with baseline，让reward有正有负，这对rl的训练效率至关重要。这个方法搞出来的均值baseline不一定是最好的，我们想知道的是此刻状态对应的价值，均值没有这样的物理意义，是不是可以用一个NN模型来预估出这个价值呢？这就是Actor-Critic方法。Actor就是你的动作概率模型，Critic就是用一个NN在算这个baseline，或者我们叫他value-base的model。如果不用一个model来估计状态的价值，还有什么好办法？那你就基于每一条原始样本生成一组序列，用他们的reward均值作为baseline，这种方法叫self-critic，它利用了蒙特卡洛方法代替了TD error。
+回到前文的 REINFORCE 公式，首先，它并没有告诉我们轨迹中某个单独的动作到底好不好，其次会发现 $ R(\tau) $ 即reward恒为正的情况，那会导致一直在增加任何token的输出概率。我们希望调小概率时，reward应该是个负的。直观的想法，如果我见过一批reward，减去他们的均值就好了，这个方法叫REINFORCE with baseline，让reward有正有负，这对rl的训练效率至关重要。这个方法搞出来的均值baseline不一定是最好的，我们想知道的是此刻状态对应的价值，均值没有这样的物理意义，是不是可以用一个NN模型来预估出这个价值呢？这就是Actor-Critic方法。Actor就是你的动作概率模型，Critic就是用一个NN在算这个baseline，或者我们叫他value-base的model。如果不用一个model来估计状态的价值，还有什么好办法？那你就基于每一条原始样本生成一组序列，用他们的reward均值作为baseline，这种方法叫self-critic，它利用了蒙特卡洛方法代替了TD error。
 
 ![](/public/upload/machine/reinforce_baseline.png)
 
@@ -867,6 +804,7 @@ $$\underbrace{r / R(\tau)}_{\text{绝对、给定}}\ \xrightarrow{\ \text{减 ba
   1. 有两种典型的方法：蒙特卡洛法（MC）和时序差分法（ TD）
     1. Monte Carlo 方法采用最直观的评价方式：一句话最终好 → 这句话里所有 token 都好；一句话最终坏 → 所有 token 都坏，如果整句话得了 +10 分，那每个 token 都应该更常出现；如果得了 -10 分，每个 token 都应该更少出现。每个 token 获得相同的梯度信号，无法区分贡献度。
     2. TD 引入一个新角色：Value Function（价值函数）V(s)，也叫 Critic（评论家），它是一个预测未来 reward 的模型（通常是另一个神经网络）。它的定义是：V(s) = "从当前上下文 s 开始，我预计这句话最终能拿多少分？"
+    3. GAE
 
 以最简单的 TD(0)（TD是一个算法家族名） 为例，最简单的 TD(0) 算法定义 TD 误差 (TD Error)：
 $$
@@ -945,6 +883,3 @@ RL 里到处在“估计”一个没法直接算出来的量——最典型的�
 
 所以“短任务爱用 GRPO、长任务回 critic”，本质不是谁取代谁，而是 bias-variance 天平随 horizon 换了落点。这个“天平”的完整版（GRPO/PPO 在长短程下的机制差异）见 [LLM Post-Train 中的强化学习]({% post_url 2025-02-18-llm_rl %})；通用 RL 的 critic / GAE 推导见上文。
 
-## 局限：样本效率与信用分配
-
-rl最大的缺点：效率极低。模型往往要把整个任务完整跑一遍，等到最后才知道自己做得对不对。只有在这一次尝试彻底结束后，它才能收到一个简单的结果信号。想象一下，一个系统花了几十步、上百步去写代码、下棋或解题，最后得到的只是一个模糊的提示：成功还是失败。它不知道哪一步做得好，也不清楚哪一步出错，只能靠反复试验去猜。往往要重复上千次，才能从偶然的成功里提炼出一点有价值的经验。**低效的根源在于，它几乎只看结果**。模型在完成一项复杂任务时，无论中间经历了多少误判和偶然，只要最后成功，就会被判定为正确。它学到的不是理解，而是取巧。强化学习让模型更会迎合奖励，却未必更聪明。现实世界的目标是模糊的、多维度的，根本无法被单一的奖励函数概括。Karpathy 更看重的，是让模型在每一步中学会理解。不是完成任务后才得到结果，而是在过程中就能意识到自己哪里做得好、哪里需要调整。这需要更细致的过程监督与反思机制，让模型能像人一样边做边学。人类的智慧并非来自被奖励，而是来自对错误的体察与对过程的理解。
