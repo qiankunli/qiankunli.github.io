@@ -296,6 +296,16 @@ LLM 本质上不是“输入文字、输出文字”的黑盒，而是一个不�
 5. 从 Logits 到 Token
 6. 然后token 追加到prompt，循环往复
 
+$$
+\text{hidden state }h
+\xrightarrow{\text{Linear}}
+\text{logits}
+\xrightarrow{\text{Softmax}}
+\text{Token 概率}
+\xrightarrow{\text{采样}}
+\text{Token}
+$$
+
 ## 源码分析
 
 [Deepseek大模型推理算法其实很简单](https://mp.weixin.qq.com/s/kVkw73XhcOE6t4HZyKRUAA)我们听说Deepseek是开源的，这具体是什么意思？训练代码没有开源，但是在论文与技术报告中介绍了关键的Deepseek V3和R1大模型训练的的一些细节，开源的是两个东西，一个是权重，一个是推理代码。这两者是什么关系？可以理解为：权重是人类知识的加密压缩，推理是解码检索知识的工具。**推理过程也不需要太多矩阵知识，就是矩阵乘法/gemm和加法**。

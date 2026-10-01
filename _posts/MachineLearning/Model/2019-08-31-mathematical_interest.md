@@ -405,6 +405,7 @@ parameters: $W^{[1]},b^{[1]},W^{[2]},b^{[2]},...$
 
 1. learning rate。随着batch_size变大Learning_rate也需要变大，按照大模型经验公式为根号下同比，例如batch从8变为16扩大2倍，则LR扩大根号二倍。[当Batch Size增大时，学习率该如何随之变化？](https://mp.weixin.qq.com/s/fSsOzZwQAuyQFhr7PY5kcg) [重新思考学习率与Batch Size（一）：现状](https://kexue.fm/archives/11260)
 2. 梯度下降算法循环的数量  epoch
+  1. 一次反向传播只计算当前梯度，随后 `optimizer.step()` 让参数沿这个方向走一小步，并不能一步到达最优位置。
 3. 隐层数
 4. 每个隐层的单元数
 5. 激活函数
