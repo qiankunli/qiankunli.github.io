@@ -4,7 +4,7 @@ layout: post
 title: 《Robot Learning: A Tutorial》笔记
 category: 技术
 tags: MachineLearning
-keywords: deepresearch deepsearch
+keywords: Robot Tutorial
 
 ---
 

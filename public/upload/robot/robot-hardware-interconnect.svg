@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1310" viewBox="0 0 1600 1310" role="img" aria-labelledby="title desc">
+<title id="title">机器人硬件互连：CPU、内存、摄像头与关节</title>
+<desc id="desc">示例机器人使用 Linux SoC 主控板。CPU 经片上互连访问 DDR 内存控制器、USB 主控制器和 SPI 控制器。USB 摄像头连接主板 USB 接口；外置 CAN 控制器通过 SPI 连接 SoC，并经 CAN 收发器接入共享 CAN 总线，控制三个智能关节。每个关节包含 CAN 接口、控制 MCU、功率驱动、电机和编码器。本图展示一种通用硬件连接方案，不是 Microduck 实际电路或 PCB 制造图。</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#24798c"/></marker>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#193546}.title{font-size:34px;font-weight:700}.section{font-size:25px;font-weight:700}.label{font-size:22px;font-weight:650}.body{font-size:19px}.small{font-size:17px;fill:#607885}.buslabel{font-size:18px;fill:#2367b3}.trace{fill:none;stroke:#2367b3;stroke-width:3.5;stroke-linejoin:round}.flow{fill:none;stroke:#24798c;stroke-width:2.5;marker-end:url(#arrow)}.chip{fill:white;stroke:#77a597;stroke-width:2}.module{fill:#fff9ee;stroke:#d7bc8e;stroke-width:2}
+</style>
+</defs>
+<rect width="1600" height="1310" fill="#fff"/>
+<text x="50" y="61" class="title">机器人“主板架构图”：程序最终通过哪些硬件连接身体？</text>
+<text x="50" y="102" class="body">示例：Linux 主控板 + USB 摄像头 + 3 个 CAN 智能关节</text>
+<path d="M1090 96H1150" class="trace"/><text x="1165" y="103" class="small">蓝线：数据 / 控制连接，可双向通信</text>
+
+<!-- Board and chip boundaries are physical integration boundaries. -->
+<rect x="50" y="160" width="1500" height="590" rx="24" fill="#f0f7f3" stroke="#77a597" stroke-width="2"/>
+<text x="78" y="201" class="section">机器人主控板 / PCB</text>
+<text x="78" y="234" class="small">板上的芯片和连接器</text>
+<circle cx="74" cy="724" r="8" fill="#fff" stroke="#9db8ad" stroke-width="3"/>
+<circle cx="1526" cy="724" r="8" fill="#fff" stroke="#9db8ad" stroke-width="3"/>
+<rect x="390" y="210" width="670" height="360" rx="18" fill="#e3eeff" stroke="#6992c5" stroke-width="2"/>
+<text x="413" y="242" class="label">SoC：同一颗芯片内集成多个功能模块</text>
+<rect x="420" y="270" width="260" height="95" rx="10" class="chip"/>
+<text x="440" y="307" class="label">CPU 核心 / Cache</text>
+<text x="440" y="340" class="small">执行 Linux、ROS2 和应用</text>
+<rect x="800" y="270" width="225" height="95" rx="10" class="chip"/>
+<text x="820" y="307" class="label">DDR 内存控制器</text>
+<text x="820" y="340" class="small">管理内存访问</text>
+<path d="M680 315H800" class="trace"/>
+<text x="740" y="298" text-anchor="middle" class="small">片上互连</text>
+<rect x="1150" y="270" width="310" height="95" rx="10" class="chip"/>
+<text x="1170" y="307" class="label">DDR / LPDDR 内存</text>
+<text x="1170" y="340" class="small">程序、图像缓冲区、关节状态</text>
+<path d="M1025 315H1150" class="trace"/>
+<text x="1087" y="298" text-anchor="middle" class="buslabel">DDR</text>
+<path d="M550 365V402H865V440 M550 402V440" class="trace"/>
+<text x="635" y="425" class="small">片上互连</text>
+<rect x="430" y="440" width="240" height="90" rx="10" class="chip"/>
+<text x="450" y="477" class="label">USB 主控制器</text>
+<text x="450" y="509" class="small">连接 USB 外设</text>
+<rect x="750" y="440" width="230" height="90" rx="10" class="chip"/>
+<text x="770" y="477" class="label">SPI 控制器</text>
+<text x="770" y="509" class="small">连接板上外置芯片</text>
+
+<rect x="180" y="630" width="180" height="70" rx="10" class="chip"/>
+<text x="270" y="673" text-anchor="middle" class="label">USB 连接器</text>
+<path d="M550 530V600H270V630" class="trace"/>
+<text x="300" y="588" class="buslabel">USB</text>
+<rect x="720" y="620" width="250" height="90" rx="10" class="chip"/>
+<text x="740" y="655" class="label">外置 CAN 控制器</text>
+<text x="740" y="687" class="small">组帧、过滤、仲裁等</text>
+<path d="M865 530V620" class="trace"/>
+<text x="881" y="597" class="buslabel">SPI + 中断线</text>
+<rect x="1100" y="620" width="300" height="90" rx="10" class="chip"/>
+<text x="1120" y="655" class="label">CAN 收发器</text>
+<text x="1120" y="687" class="small">逻辑信号 ↔ 差分电信号</text>
+<path d="M970 665H1100" class="trace"/>
+<text x="1035" y="649" text-anchor="middle" class="buslabel">TX / RX</text>
+<text x="1130" y="425" class="body">现代嵌入式主板常用 SoC</text>
+<text x="1130" y="460" class="small">CPU、内存控制器与多种 I/O 控制器</text>
+<text x="1130" y="488" class="small">集成在同一颗芯片内。</text>
+<text x="1130" y="530" class="small">此例通过 SPI 扩展 CAN；若 SoC</text>
+<text x="1130" y="558" class="small">自带 CAN 控制器，可省略该外置芯片。</text>
+
+<!-- External wiring. One blue CAN trunk represents the differential pair. -->
+<path d="M270 700V850" class="trace"/>
+<text x="288" y="815" class="buslabel">USB 线缆</text>
+<rect x="70" y="850" width="360" height="205" rx="18" class="module"/>
+<text x="95" y="891" class="section">USB 摄像头</text>
+<text x="95" y="929" class="body">图像传感器 + 摄像头控制电路</text>
+<text x="95" y="968" class="small">数据：图像帧 → 主控板</text>
+<text x="95" y="997" class="small">配置：曝光等参数 ← 主控板</text>
+<text x="95" y="1031" class="small">用户态常用：V4L2 / OpenCV</text>
+<path d="M1250 710V790 M575 790H1450 M655 790V850 M1005 790V850 M1355 790V850" class="trace"/>
+<text x="615" y="778" class="buslabel">共享 CAN 总线：CAN_H / CAN_L（合并为一条线示意）</text>
+
+<g>
+<rect x="500" y="850" width="310" height="300" rx="18" class="module"/>
+<text x="520" y="887" class="label">关节 1：肩关节</text>
+<rect x="520" y="907" width="270" height="55" rx="9" class="chip"/>
+<text x="655" y="941" text-anchor="middle" class="body">CAN 接口 + 控制 MCU</text>
+<path d="M655 962V983" class="flow"/>
+<rect x="520" y="987" width="270" height="50" rx="9" class="chip"/>
+<text x="655" y="1019" text-anchor="middle" class="body">电机功率驱动电路</text>
+<path d="M655 1037V1058" class="flow"/>
+<rect x="520" y="1062" width="270" height="50" rx="9" class="chip"/>
+<text x="655" y="1094" text-anchor="middle" class="body">电机 + 传动 + 编码器</text>
+<text x="655" y="1137" text-anchor="middle" class="small">编码器反馈至 MCU，形成闭环</text>
+</g>
+
+<g>
+<rect x="850" y="850" width="310" height="300" rx="18" class="module"/>
+<text x="870" y="887" class="label">关节 2：肘关节</text>
+<rect x="870" y="907" width="270" height="55" rx="9" class="chip"/>
+<text x="1005" y="941" text-anchor="middle" class="body">CAN 接口 + 控制 MCU</text>
+<path d="M1005 962V983" class="flow"/>
+<rect x="870" y="987" width="270" height="50" rx="9" class="chip"/>
+<text x="1005" y="1019" text-anchor="middle" class="body">电机功率驱动电路</text>
+<path d="M1005 1037V1058" class="flow"/>
+<rect x="870" y="1062" width="270" height="50" rx="9" class="chip"/>
+<text x="1005" y="1094" text-anchor="middle" class="body">电机 + 传动 + 编码器</text>
+<text x="1005" y="1137" text-anchor="middle" class="small">编码器反馈至 MCU，形成闭环</text>
+</g>
+
+<g>
+<rect x="1200" y="850" width="310" height="300" rx="18" class="module"/>
+<text x="1220" y="887" class="label">关节 3：夹爪执行器</text>
+<rect x="1220" y="907" width="270" height="55" rx="9" class="chip"/>
+<text x="1355" y="941" text-anchor="middle" class="body">CAN 接口 + 控制 MCU</text>
+<path d="M1355 962V983" class="flow"/>
+<rect x="1220" y="987" width="270" height="50" rx="9" class="chip"/>
+<text x="1355" y="1019" text-anchor="middle" class="body">电机功率驱动电路</text>
+<path d="M1355 1037V1058" class="flow"/>
+<rect x="1220" y="1062" width="270" height="50" rx="9" class="chip"/>
+<text x="1355" y="1094" text-anchor="middle" class="body">电机 + 传动 + 编码器</text>
+<text x="1355" y="1137" text-anchor="middle" class="small">编码器反馈至 MCU，形成闭环</text>
+</g>
+
+<text x="80" y="1100" class="body">关节模块独立供电</text>
+<text x="80" y="1132" class="small">CPU 发指令；功率驱动电路为电机供能。</text>
+<line x1="50" y1="1185" x2="1550" y2="1185" stroke="#cbd5df"/>
+<text x="60" y="1220" class="body">这是硬件互连框图，非 PCB 原理图或布线图；电源、地、时钟、终端匹配等电路省略。</text>
+<text x="60" y="1255" class="small">示例采用 USB 摄像头和 CAN 智能关节，不代表 Microduck 的实际电路；实际接口取决于所选设备。</text>
+<text x="60" y="1285" class="small">对应 PC 的理解：SoC 集成许多传统北桥 / 南桥功能；CAN 控制器是 I/O 控制器，CAN 是连接外部设备的总线。</text>
+</svg>

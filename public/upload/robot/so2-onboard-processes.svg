@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1690" viewBox="0 0 1800 1690" role="img" aria-labelledby="title desc">
+<title id="title">独立 SO-2 机器人内部：进程、MCU 任务与机械装置</title>
+<desc id="desc">机器人内部包含板载 Linux 计算机、MCU、电池和机械装置。四个 Linux 进程直接通过 ROS2 消息通信；micro-ROS 通信任务贴近 MCU 边界，用箭头与文字标注收发和任务间数据传递。周期控制任务是 MCU 主体。下方电机驱动器与电机纵向排列，编码器在电机旁边，测量反馈向上返回控制任务。进程与任务划分为教学示例，非已部署硬件。</desc>
+<defs>
+<marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#078875"/></marker>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#172b45}.title{font-size:36px;font-weight:700}.section{font-size:26px;font-weight:700}.label{font-size:23px;font-weight:650}.body{font-size:20px}.small{font-size:18px;fill:#64748b}.mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:18px}.blue{fill:#2563eb}.green{fill:#078875}.cmd{fill:none;stroke:#2563eb;stroke-width:3;marker-end:url(#b);stroke-linejoin:round}.fb{fill:none;stroke:#078875;stroke-width:3;marker-end:url(#g);stroke-linejoin:round}.link{fill:none;stroke:#526981;stroke-width:3;stroke-linejoin:round}
+</style>
+</defs>
+<rect x="0" y="0" width="1800" height="1690" rx="0" fill="white" stroke="none" stroke-width="2"/>
+<text x="45" y="60" class="title" >独立 SO-2 机器人：身体内部有哪些进程和任务？</text>
+<text x="45" y="101" class="body" >本机触发 → 挥手 → 夹爪张合 → 回到初始姿态；进程与硬件为主体，通信沿箭头标注</text>
+<path d="M1400 94H1440" class="cmd"/>
+<text x="1454" y="101" class="small" >指令</text>
+<path d="M1555 94H1595" class="fb"/>
+<text x="1609" y="101" class="small" >反馈</text>
+<rect x="40" y="145" width="1720" height="1385" rx="26" fill="#fafbfd" stroke="#8da4bb" stroke-width="2"/>
+<text x="66" y="183" class="section" >机器人本体内部</text>
+<text x="940" y="181" class="small" >板载计算、控制与供电齐备；运行此动作无需外部电脑</text>
+<rect x="70" y="210" width="1660" height="520" rx="20" fill="#f1f6ff" stroke="#c3d7f6" stroke-width="2"/>
+<text x="98" y="252" class="section" >板载计算机 · Linux / Ubuntu</text>
+<text x="960" y="250" class="small" >CPU 调度进程 / 线程 · ROS2 Executor 调度回调</text>
+<rect x="100" y="310" width="310" height="150" rx="14" fill="#fff" stroke="#b9cfee" stroke-width="2"/>
+<text x="120" y="346" class="label" >进程 A：本机交互</text>
+<text x="120" y="379" class="mono" >Node: local_ui</text>
+<text x="120" y="421" class="body" >读取本机按键 / 事件</text>
+<rect x="520" y="310" width="520" height="150" rx="14" fill="#fff" stroke="#b9cfee" stroke-width="2"/>
+<text x="540" y="346" class="label" >进程 B：动作程序</text>
+<text x="540" y="379" class="mono" >Node: hello_arm</text>
+<text x="540" y="412" class="body" >订阅回调 + Timer / tick</text>
+<text x="540" y="443" class="body" >STEPS → 发目标 → 收反馈 → 下一步</text>
+<path d="M410 390H520" class="cmd"/>
+<text x="465" y="369" class="small blue" text-anchor="middle">start</text>
+<rect x="1190" y="310" width="500" height="320" rx="14" fill="#fff" stroke="#b9cfee" stroke-width="2"/>
+<text x="1210" y="346" class="label" >进程 D：micro-ROS Agent</text>
+<text x="1210" y="387" class="mono" >ROS2 DDS ↔ DDS-XRCE</text>
+<text x="1210" y="475" class="body" >代理 MCU 的 ROS2 通信实体</text>
+<text x="1210" y="515" class="body" >转发目标指令与关节状态</text>
+<text x="1210" y="590" class="small" >通过机内串口连接 MCU</text>
+<path d="M1040 375H1190" class="cmd"/>
+<text x="1115" y="358" class="small blue" text-anchor="middle">target</text>
+<path d="M1190 440H1040" class="fb"/>
+<text x="1115" y="423" class="small green" text-anchor="middle">joint_states</text>
+<rect x="100" y="560" width="380" height="120" rx="14" fill="#fff" stroke="#b9cfee" stroke-width="2"/>
+<text x="120" y="596" class="label" >进程 C：状态显示</text>
+<text x="120" y="629" class="mono" >Node: status_ui</text>
+<text x="120" y="660" class="small" >显示动作进度与实际关节状态</text>
+<path d="M600 460V505H300V560" class="fb"/>
+<text x="620" y="504" class="small green" >status · 动作进度</text>
+<path d="M1250 630V650H480" class="fb"/>
+<text x="760" y="638" class="small green" >joint_states · 关节状态</text>
+<text x="570" y="555" class="body" >ROS2 Topic / DDS：进程之间的消息通道</text>
+<text x="570" y="585" class="small" >发布 / 订阅标在连线上，无独立通信总线进程</text>
+<text x="570" y="702" class="small" >上电启动：例如 systemd → ROS2 launch → 拉起应用与 Agent</text>
+<rect x="620" y="820" width="1110" height="320" rx="20" fill="#f0faf6" stroke="#bddfd1" stroke-width="2"/>
+<text x="650" y="860" class="section" >MCU 控制板 · FreeRTOS 固件</text>
+<text x="1120" y="859" class="small" >内部为 RTOS 任务，由同一固件调度</text>
+<text x="1290" y="908" class="body" >任务 1：micro-ROS 通信</text>
+<text x="1290" y="936" class="small" >Node / rclc Executor → 订阅回调</text>
+<text x="1290" y="987" class="small blue" >接收 target → 目标队列</text>
+<text x="1290" y="1034" class="small green" >发布 joint_states</text>
+<text x="1290" y="1092" class="small green" >状态快照 → 发布回调</text>
+<rect x="650" y="890" width="590" height="215" rx="14" fill="#e5f4ed" stroke="#6caa93" stroke-width="2"/>
+<text x="675" y="930" class="section" >任务 2：周期控制任务</text>
+<text x="675" y="972" class="body" >读取编码器 → 换算角度、估算速度</text>
+<text x="675" y="1009" class="body" >读取最新目标 → PID → PWM / 方向</text>
+<text x="675" y="1046" class="body" >更新状态快照，供通信任务发布</text>
+<text x="675" y="1083" class="small" >固定周期执行 · 包含位置控制和硬件驱动</text>
+<path d="M1630 630V960H1240" class="cmd"/>
+<path d="M1240 1060H1665V630" class="fb"/>
+<text x="1130" y="768" class="body" >机内 USB / UART 串口 · DDS-XRCE 双向通信</text>
+<rect x="100" y="875" width="340" height="130" rx="14" fill="#fff8ef" stroke="#e4cca6" stroke-width="2"/>
+<text x="120" y="915" class="label" >电池 + 电源管理</text>
+<text x="120" y="951" class="small" >为计算机、MCU、驱动器供电</text>
+<text x="120" y="984" class="small" >电源线路省略</text>
+<text x="100" y="1050" class="small" >控制与供电均在机器人内部</text>
+<rect x="70" y="1190" width="1660" height="320" rx="20" fill="#fff8ef" stroke="#ead5b5" stroke-width="2"/>
+<text x="100" y="1230" class="section" >驱动与机械装置</text>
+<text x="100" y="1265" class="small" >以一个关节示意</text>
+<rect x="720" y="1240" width="420" height="90" rx="14" fill="white" stroke="#e4cca6" stroke-width="2"/>
+<text x="740" y="1277" class="label" >电机驱动器</text>
+<text x="740" y="1310" class="body" >接收 PWM / 方向，调节电机电流</text>
+<path d="M930 1105V1240" class="cmd"/>
+<text x="951" y="1170" class="small blue" >PWM / 方向</text>
+<path d="M930 1330V1390" class="cmd"/>
+<text x="951" y="1368" class="small blue" >电流</text>
+<rect x="720" y="1390" width="420" height="90" rx="14" fill="white" stroke="#e4cca6" stroke-width="2"/>
+<text x="740" y="1427" class="label" >电机 + 传动 → 关节运动</text>
+<text x="740" y="1460" class="body" >电流 → 转矩 → 运动</text>
+<rect x="1300" y="1390" width="360" height="90" rx="14" fill="white" stroke="#e4cca6" stroke-width="2"/>
+<text x="1320" y="1427" class="label" >编码器</text>
+<text x="1320" y="1460" class="body" >输出脉冲 / 数字位置读数</text>
+<path d="M1140 1435H1300" class="fb"/>
+<text x="1220" y="1416" class="small green" text-anchor="middle">测量转动</text>
+<path d="M1480 1390V1170H1210V1105" class="fb"/>
+<text x="1500" y="1270" class="small green" >编码器读数</text>
+<text x="1500" y="1300" class="small green" >反馈至 MCU</text>
+<text x="100" y="1360" class="label green" >本地位置闭环</text>
+<text x="100" y="1396" class="body" >PID → 驱动器 → 关节</text>
+<text x="100" y="1430" class="body" >→ 编码器 → PID</text>
+<text x="100" y="1470" class="small" >实际运动受负载、惯性与摩擦影响</text>
+<rect x="40" y="1550" width="1720" height="85" rx="14" fill="#eef3f8" stroke="none" stroke-width="2"/>
+<text x="65" y="1583" class="body" >Linux Process：操作系统进程　　ROS2 Node：功能与通信单位，一个进程可包含多个 Node</text>
+<text x="65" y="1617" class="body" >RTOS Task：固件内的调度单位　　Callback：由 Executor 调用的函数，通常不是独立进程或任务</text>
+<text x="45" y="1668" class="small" >设计示意，非已部署硬件：进程 / 任务可按实际需求合并或拆分；micro-ROS 负责通信，位置控制与硬件驱动由应用固件实现。</text>
+</svg>

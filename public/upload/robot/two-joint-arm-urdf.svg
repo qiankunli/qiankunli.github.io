@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1060" viewBox="0 0 1500 1060" role="img" aria-labelledby="title desc">
+  <title id="title">两关节机械臂与夹爪：从机械结构到 URDF</title>
+  <desc id="desc">左侧为 XY 平面内的机械臂：底座、大臂、小臂及夹爪固定侧、活动爪指；右侧为对应的四个 link 和三个 joint。肩、肘为绕 Z 轴旋转的关节，夹爪为沿局部 Y 轴滑动的关节。下方展示肘关节的 URDF 定义。图中姿态为肩角四十五度、肘角负四十五度、夹爪位移四厘米。</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#64748b"/></marker>
+    <marker id="amberArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#b45309"/></marker>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans CJK SC', sans-serif; fill: #172b42; }
+      .title { font-size: 36px; font-weight: 700; }
+      .heading { font-size: 27px; font-weight: 650; }
+      .body { font-size: 23px; }
+      .small { font-size: 21px; }
+      .muted { fill: #576b80; }
+      .mono { font-family: 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 22px; }
+      .label { font-size: 23px; font-weight: 600; }
+      .leader { fill: none; stroke: #94a3b8; stroke-width: 2; }
+      .joint { fill: #b45309; }
+    </style>
+  </defs>
+  <rect width="1500" height="1060" rx="24" fill="#f6f8fb"/>
+  <text x="44" y="64" class="title">两关节机械臂 + 夹爪，如何用 URDF 表示？</text>
+  <text x="44" y="108" class="body muted">Link 是刚体；Joint 描述刚体之间的连接与运动。相同颜色对应同一个 Link。</text>
+
+  <rect x="40" y="146" width="674" height="635" rx="20" fill="white" stroke="#dce4ed"/>
+  <rect x="738" y="146" width="722" height="635" rx="20" fill="white" stroke="#dce4ed"/>
+  <text x="68" y="190" class="heading">① 机械结构 · XY 平面示意</text>
+  <rect x="68" y="210" width="616" height="46" rx="10" fill="#f1f5f9"/>
+  <text x="85" y="240" class="small">图示状态：肩 45° · 肘 −45° · 夹爪位移 0.04 m</text>
+
+  <!-- Same kinematics as the companion URDF: shoulder 45°, elbow -45°. -->
+  <rect x="103" y="535" width="84" height="76" rx="12" fill="#e2e8f0" stroke="#64748b" stroke-width="3"/>
+  <path d="M145 570 L314.7 400.3" stroke="#2563eb" stroke-width="28" stroke-linecap="round"/>
+  <path d="M314.7 400.3 H514.7" stroke="#0d9488" stroke-width="24" stroke-linecap="round"/>
+  <rect x="496.3" y="369.9" width="20.8" height="48" rx="3" fill="#0d9488"/>
+  <rect x="514.7" y="406.7" width="56" height="6.4" rx="2" fill="#0d9488"/>
+  <rect x="514.7" y="368.3" width="56" height="6.4" rx="2" fill="#9333ea"/>
+  <path d="M507 403.5 V371.5 H514.7" stroke="#9333ea" stroke-width="7" fill="none"/>
+  <circle cx="145" cy="570" r="17" fill="white" stroke="#b45309" stroke-width="5"/>
+  <circle cx="145" cy="570" r="5" fill="#b45309"/>
+  <circle cx="314.7" cy="400.3" r="17" fill="white" stroke="#b45309" stroke-width="5"/>
+  <circle cx="314.7" cy="400.3" r="5" fill="#b45309"/>
+  <rect x="500" y="396.5" width="14" height="14" rx="3" fill="white" stroke="#b45309" stroke-width="3"/>
+
+  <path d="M174 594 A38 38 0 0 0 181 557" fill="none" stroke="#b45309" stroke-width="2.5" marker-end="url(#amberArrow)"/>
+  <path d="M343 425 A38 38 0 0 0 348 381" fill="none" stroke="#b45309" stroke-width="2.5" marker-end="url(#amberArrow)"/>
+  <path d="M596 409 V366" stroke="#b45309" stroke-width="2.5" marker-start="url(#amberArrow)" marker-end="url(#amberArrow)"/>
+  <text x="605" y="386" class="small joint">+Y</text>
+  <text x="190" y="579" class="label joint">J1</text>
+  <text x="358" y="440" class="label joint">J2</text>
+  <text x="596" y="443" class="label joint">J3</text>
+
+  <text x="78" y="344" class="label" style="fill:#2563eb">upper_arm_link</text>
+  <text x="78" y="376" class="small muted">大臂 · 0.30 m</text>
+  <path d="M174 389 V427 L217 484" class="leader"/>
+  <text x="375" y="300" class="label" style="fill:#0d9488">forearm_link</text>
+  <text x="375" y="333" class="small muted">小臂 · 0.25 m</text>
+  <text x="375" y="361" class="small muted">含夹爪外壳与固定侧</text>
+  <path d="M429 372 V387" class="leader"/>
+  <text x="402" y="535" class="label" style="fill:#9333ea">finger_link</text>
+  <text x="402" y="566" class="small muted">活动爪指</text>
+  <path d="M554 511 H574 V375" class="leader"/>
+  <text x="77" y="651" class="label" style="fill:#475569">base_link</text>
+  <text x="77" y="680" class="small muted">底座</text>
+  <path d="M145 617 V627" class="leader"/>
+
+  <path d="M330 625 H395 M330 625 V565" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+  <path d="M330 625 H395" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="403" y="632" class="small muted">X</text>
+  <text x="322" y="554" class="small muted">Y</text>
+  <circle cx="330" cy="625" r="7" fill="white" stroke="#64748b" stroke-width="1.5"/>
+  <circle cx="330" cy="625" r="2" fill="#64748b"/>
+  <text x="321" y="662" class="small muted">Z 朝向读者</text>
+  <path d="M68 706 H686" stroke="#e2e8f0"/>
+  <text x="68" y="743" class="small muted">教学简化：夹爪一侧固定，另一侧沿局部 Y 轴滑动。</text>
+
+  <text x="768" y="190" class="heading">② URDF 结构 · 4 个 Link / 3 个 Joint</text>
+  <g>
+    <rect x="790" y="216" width="620" height="62" rx="12" fill="#f1f5f9" stroke="#94a3b8"/>
+    <rect x="790" y="216" width="7" height="62" rx="3" fill="#64748b"/>
+    <text x="816" y="254" class="mono">base_link</text><text x="1277" y="254" class="small muted">底座</text>
+    <path d="M821 279 V348" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="851" y="309" class="mono joint">J1 shoulder_joint</text>
+    <text x="851" y="338" class="small muted">revolute · 绕 Z 轴旋转</text>
+
+    <rect x="790" y="356" width="620" height="62" rx="12" fill="#eff6ff" stroke="#93b4fa"/>
+    <rect x="790" y="356" width="7" height="62" rx="3" fill="#2563eb"/>
+    <text x="816" y="394" class="mono" style="fill:#1d4ed8">upper_arm_link</text><text x="1277" y="394" class="small muted">大臂</text>
+    <path d="M821 419 V488" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="851" y="449" class="mono joint">J2 elbow_joint</text>
+    <text x="851" y="478" class="small muted">revolute · 绕 Z 轴旋转</text>
+
+    <rect x="790" y="496" width="620" height="62" rx="12" fill="#ecfdf5" stroke="#79cabb"/>
+    <rect x="790" y="496" width="7" height="62" rx="3" fill="#0d9488"/>
+    <text x="816" y="534" class="mono" style="fill:#0f766e">forearm_link</text><text x="1160" y="534" class="small muted">小臂 + 固定侧</text>
+    <path d="M821 559 V628" stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="851" y="589" class="mono joint">J3 gripper_joint</text>
+    <text x="851" y="618" class="small muted">prismatic · 沿局部 Y 轴滑动</text>
+
+    <rect x="790" y="636" width="620" height="62" rx="12" fill="#faf5ff" stroke="#c7a0ed"/>
+    <rect x="790" y="636" width="7" height="62" rx="3" fill="#9333ea"/>
+    <text x="816" y="674" class="mono" style="fill:#7e22ce">finger_link</text><text x="1230" y="674" class="small muted">活动爪指</text>
+  </g>
+  <text x="790" y="743" class="small muted">每条 Joint 连接一个 parent Link 和一个 child Link。</text>
+
+  <rect x="40" y="805" width="1420" height="218" rx="18" fill="#eaf0f7"/>
+  <text x="66" y="845" class="heading">③ 以肘关节为例</text>
+  <text x="66" y="884" class="mono">&lt;parent link="upper_arm_link"/&gt;</text>
+  <text x="66" y="916" class="mono">&lt;child link="forearm_link"/&gt;</text>
+  <text x="66" y="948" class="mono">&lt;origin xyz="0.30 0 0" rpy="0 0 0"/&gt;</text>
+  <text x="66" y="980" class="mono">&lt;axis xyz="0 0 1"/&gt;</text>
+  <path d="M708 839 V990" stroke="#c7d3e0"/>
+  <text x="744" y="858" class="body">origin：肘关节装在大臂坐标系 X = 0.30 m 处。</text>
+  <text x="744" y="901" class="body">axis：肘关节绕其局部 Z 轴旋转。</text>
+  <text x="744" y="944" class="body">当前肩角、肘角和夹爪位移来自 /joint_states。</text>
+  <text x="744" y="987" class="small muted">URDF 描述装配结构；运行时状态决定此刻的姿态。</text>
+</svg>

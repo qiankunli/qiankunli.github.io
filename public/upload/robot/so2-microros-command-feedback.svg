@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1340" viewBox="0 0 1800 1340" role="img" aria-labelledby="title desc">
+<title id="title">SO-2 实体装置：上位机、micro-ROS 单片机与电机反馈</title>
+<desc id="desc">MCU、驱动器、电机与编码器位于同一个机器人装置边界内，开发者电脑位于装置外部。上位机Linux运行hello_arm ROS2 Node与micro-ROS Agent。目标角度经DDS、Agent和USB串口或UDP传到单片机上的micro-ROS订阅回调。单片机固件的PID位置控制循环输出PWM和方向信号，电机驱动器调节电流使电机与关节运动。编码器测得角度，反馈到MCU位置控制循环，同时MCU发布JointState，经Agent回到上位机。图示选用带编码器的直流电机，PID和硬件驱动由应用固件实现。</desc>
+<defs>
+  <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker>
+  <marker id="green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#078875"/></marker>
+  <style>
+    text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#172b45}
+    .title{font-size:36px;font-weight:700}.subtitle{font-size:21px;fill:#64748b}.section{font-size:27px;font-weight:700}.label{font-size:23px;font-weight:650}.body{font-size:20px}.small{font-size:18px;fill:#64748b}.mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:18px}.blue{fill:#2563eb}.green{fill:#078875}
+    .cmd{fill:none;stroke:#2563eb;stroke-width:3;marker-end:url(#blue);stroke-linejoin:round}.fb{fill:none;stroke:#078875;stroke-width:3;marker-end:url(#green);stroke-linejoin:round}
+  </style>
+</defs>
+<rect width="1800" height="1340" fill="white"/>
+<text x="45" y="65" class="title">SO-2 实体装置：一个数值，如何驱动真实关节？</text>
+<text x="45" y="105" class="subtitle">肩关节目标 0.9 rad ≈ 51.6° · 示例：MCU 实现位置闭环，控制带编码器的直流电机</text>
+<path d="M1370 97H1410" class="cmd"/><text x="1422" y="105" class="small">目标 / 驱动</text>
+<path d="M1562 97H1602" class="fb"/><text x="1614" y="105" class="small">实际状态</text>
+
+<!-- MCU and physical actuation are stacked within the robot boundary. -->
+<rect x="787" y="125" width="988" height="1028" rx="25" fill="#fafbfd" stroke="#8da4bb" stroke-width="2"/>
+<rect x="1060" y="112" width="470" height="30" rx="8" fill="white"/>
+<text x="1295" y="135" text-anchor="middle" class="body" style="font-weight:650">下位机：机器人 / 装置（物理边界）</text>
+<rect x="40" y="150" width="590" height="810" rx="22" fill="#f5f8ff" stroke="#cbdcfb"/>
+<rect x="800" y="150" width="960" height="490" rx="22" fill="#f1faf7" stroke="#c3e4db"/>
+<rect x="800" y="720" width="960" height="420" rx="22" fill="#fff8ee" stroke="#eddbc1"/>
+<text x="65" y="196" class="section">外置上位机：开发者电脑</text>
+<text x="65" y="226" class="small">Linux · ROS2 应用与 Agent 分别运行</text>
+<text x="830" y="196" class="section">单片机 MCU</text>
+<text x="830" y="226" class="small">运行固件（例如 FreeRTOS）· 内部方框为固件功能模块</text>
+<text x="830" y="759" class="section">驱动与机械装置</text>
+<text x="1160" y="757" class="small">真实电流、真实运动、传感器测量</text>
+<!-- Boxes identify processes; publish/subscribe operations and topics are inline annotations. -->
+<rect x="75" y="265" width="260" height="650" rx="14" fill="#fff" stroke="#b8cbea" stroke-width="2"/>
+<text x="95" y="301" class="label">hello_arm 进程</text>
+<text x="95" y="330" class="small">包含 hello_arm Node</text>
+<text x="105" y="382" class="body" style="font-weight:650">STEPS → 目标角度</text>
+<text x="105" y="418" class="mono blue">Float64(data=0.9)</text>
+<text x="105" y="455" class="small blue">Publisher · 发布目标</text>
+<text x="105" y="499" class="small">Topic</text>
+<text x="105" y="526" class="mono" style="font-size:16px">/so2/</text>
+<text x="105" y="551" class="mono" style="font-size:16px">shoulder_joint/target</text>
+<text x="105" y="737" class="small green">Subscription · 接收反馈</text>
+<text x="105" y="770" class="mono">on_feedback</text>
+<text x="105" y="804" class="body">更新实际关节位置</text>
+<text x="105" y="881" class="small">tick 到位后推进动作</text>
+<path d="M105 842H90V382H100" class="fb"/>
+
+<rect x="365" y="265" width="240" height="650" rx="14" fill="#eaf0fc" stroke="#b8cbea" stroke-width="2"/>
+<text x="385" y="301" class="label">micro-ROS Agent</text>
+<text x="385" y="330" class="small">独立进程</text>
+<path d="M335 398H365" class="cmd"/>
+<text x="385" y="409" class="body blue">转发目标消息 →</text>
+<path d="M605 398H745V350H1150" class="cmd"/>
+<text x="385" y="517" class="body">连接两侧通信</text>
+<text x="385" y="552" class="mono">DDS ↔ DDS-XRCE</text>
+<text x="385" y="592" class="small">代表 MCU 接入</text>
+<text x="385" y="619" class="small">ROS2 通信图</text>
+<text x="385" y="686" class="small">保持 ROS 消息语义</text>
+<text x="385" y="713" class="small">电机 PID 在 MCU 执行</text>
+<text x="385" y="817" class="body green">← 转发状态消息</text>
+<text x="385" y="852" class="mono">JointState</text>
+<path d="M365 842H335" class="fb"/>
+
+<!-- The wire can be serial or network; XRCE is the protocol above it. -->
+<text x="665" y="369" text-anchor="middle" class="small blue">DDS-XRCE</text>
+<text x="715" y="550" text-anchor="middle" class="body">通信链路</text>
+<text x="715" y="585" text-anchor="middle" class="small">USB 串口</text>
+<text x="715" y="614" text-anchor="middle" class="small">或 UDP</text>
+<text x="715" y="814" text-anchor="middle" class="small green">DDS-XRCE</text>
+
+<!-- micro-ROS is shown along the message path, not as an independent component box. -->
+<text x="830" y="282" class="small">micro-ROS</text>
+<text x="830" y="310" class="small blue">Subscription · 接收目标</text>
+<text x="830" y="335" class="small" style="font-size:16px">rclc Executor → 订阅回调</text>
+<text x="830" y="378" class="mono blue" style="font-size:16px">target_position = 0.9</text>
+
+<rect x="1150" y="255" width="565" height="150" rx="14" fill="#e5f4ed" stroke="#6caa93" stroke-width="2"/>
+<text x="1175" y="296" class="section">位置控制循环 / PID</text>
+<text x="1175" y="338" class="body">比较目标与测得角度，计算控制输出</text>
+<text x="1175" y="378" class="body">应用固件实现 · 按固定周期执行</text>
+<path d="M1715 330H1745V785H1570V805" class="cmd"/>
+<text x="1545" y="679" class="body blue">PWM / 方向 ↓</text>
+
+<!-- Firmware acquires measured state for both local control and remote reporting. -->
+<rect x="1150" y="465" width="565" height="145" rx="14" fill="#e5f4ed" stroke="#6caa93" stroke-width="2"/>
+<text x="1175" y="505" class="section">硬件驱动 / 状态采集</text>
+<text x="1175" y="547" class="body">读取编码器 → 换算角度、估算速度</text>
+<text x="1175" y="585" class="body">按零位、正方向与减速比进行换算</text>
+<path d="M1430 465V405" class="fb"/>
+<text x="1452" y="442" class="small green">实际角度、速度</text>
+<text x="830" y="493" class="small">micro-ROS</text>
+<text x="830" y="519" class="small green">Publisher · 发布反馈</text>
+<text x="830" y="543" class="mono" style="font-size:16px">/so2/joint_states</text>
+<path d="M1150 555H795V887H605" class="fb"/>
+<text x="830" y="585" class="small" style="font-size:16px">JointState · 实际角度、速度</text>
+
+<!-- Actuation flows downward; the encoder beside the motor returns measurements upward. -->
+<rect x="1410" y="805" width="320" height="120" rx="12" fill="#fff" stroke="#e4cca6"/>
+<text x="1430" y="840" class="label">电机驱动器</text>
+<text x="1430" y="876" class="body">接收 PWM / 方向</text>
+<text x="1430" y="907" class="body">调节电机电流</text>
+<path d="M1570 925V990" class="cmd"/>
+<text x="1593" y="963" class="small blue">电流</text>
+
+<rect x="1410" y="990" width="320" height="120" rx="12" fill="#fff" stroke="#e4cca6"/>
+<text x="1430" y="1025" class="label">电机 + 传动</text>
+<text x="1430" y="1061" class="body">电流 → 转矩 → 关节运动</text>
+<text x="1430" y="1092" class="small">受负载、惯性与摩擦影响</text>
+<path d="M1410 1050H1250" class="fb"/>
+<text x="1330" y="1031" text-anchor="middle" class="small green">测量转动</text>
+
+<rect x="970" y="990" width="280" height="120" rx="12" fill="#fff" stroke="#e4cca6"/>
+<text x="990" y="1025" class="label">编码器</text>
+<text x="990" y="1061" class="body">测量实际转动</text>
+<text x="990" y="1092" class="small">脉冲 / 数字位置读数</text>
+<path d="M1110 990V690H1430V610" class="fb"/>
+<text x="1128" y="864" class="small green">编码器读数</text>
+<text x="1128" y="893" class="small green">反馈至 MCU</text>
+<rect x="40" y="1169" width="815" height="90" rx="14" fill="#f1f5fe"/>
+<text x="63" y="1203" class="label blue">① 上位机动作流程</text>
+<text x="63" y="1238" class="body">目标姿态 → 等待关节反馈 → 挥手下一步 / 夹爪张合</text>
+<rect x="880" y="1169" width="880" height="90" rx="14" fill="#eaf7f2"/>
+<text x="903" y="1203" class="label green">② 下位机位置闭环</text>
+<text x="903" y="1238" class="body">PID → 驱动器 → 电机与关节 → 编码器 → PID</text>
+<text x="45" y="1291" class="small">设计示意，非已部署硬件：micro-ROS 提供通信；PID、编码器读取与电机驱动由固件实现。智能舵机可在内部完成位置闭环。</text>
+<a href="https://micro.ros.org/docs/concepts/middleware/Micro_XRCE-DDS/" target="_blank"><text x="45" y="1321" class="small">通信架构参考：micro-ROS 官方 Micro XRCE-DDS 文档 · 本图沿用 SO-2 的目标 Topic 与 JointState 接口</text></a>
+</svg>

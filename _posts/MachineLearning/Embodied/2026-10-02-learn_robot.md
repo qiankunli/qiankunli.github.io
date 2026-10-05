@@ -4,7 +4,7 @@ layout: post
 title: 学习具身智能
 category: 技术
 tags: MachineLearning
-keywords: deepresearch deepsearch
+keywords: Embodied Intelligence
 
 ---
 
@@ -34,22 +34,22 @@ Embodied Intelligence 是data-driven + model-based的融合，核心是智能体
 
 具身智能的实现，不仅是单点算法的突破，更是硬件、软件、算法、应用四层深度耦合、协同进化的系统工程挑战。 
 1. 硬件层，the body，驱动、传感、计算平台。决定了智能体物理能力上限，比如机器人跳1m还是跳1cm。
-  1. 驱动：电机，减速器，控制器
-  2. 传感：摄像头，编码器，力矩传感器
-  3. 计算平台：MCU（底层控制），边缘设备，板载GPU/NPU
+   1. 驱动：电机，减速器，控制器
+   2. 传感：摄像头，编码器，力矩传感器
+   3. 计算平台：MCU（底层控制），边缘设备，板载GPU/NPU
 2. 软件/系统层，the nervous system，操作系统、仿真、通信。 
-  1. 操作系统，ROS/ROS2
-  2. 仿真环境：NVIDIA Isaac Sim
-  3. 通信协议，DDS/Websocket/grpc
+   1. 操作系统，ROS/ROS2
+   2. 仿真环境：NVIDIA Isaac Sim
+   3. 通信协议，DDS/Websocket/grpc
 3. 算法/认知层，the brain，感知、决策、规划、控制
-  1. 感知，opencv, cnn/yolo 
-  2. 决策与规划, PPO/BC， diffusion policy
-  3. 控制算法，PID(底层)，运动学/动力学逆解，mcp
+   1. 感知，opencv, cnn/yolo 
+   2. 决策与规划, PPO/BC， diffusion policy
+   3. 控制算法，PID(底层)，运动学/动力学逆解，mcp
 4. 应用层，the purpose
-  1. 工业自动化，分拣、装配
-  2. 家庭服务，清洁、烹饪
-  3. 特种作业，巡检、救援
-  4. 医疗康复，外骨骼、护理
+   1. 工业自动化，分拣、装配
+   2. 家庭服务，清洁、烹饪
+   3. 特种作业，巡检、救援
+   4. 医疗康复，外骨骼、护理
 
 
 四大挑战

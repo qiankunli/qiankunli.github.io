@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1060" viewBox="0 0 1600 1060" role="img" aria-labelledby="title desc">
+  <title id="title">SO-2：从目标数值到关节运动，再到状态反馈</title>
+  <desc id="desc">以肩关节目标角度0.9弧度为例。hello_arm通过ROS2 Publisher发送目标，ros_gz_bridge转换消息，Gazebo的JointPositionController计算力矩，物理引擎更新关节位置与速度。实际状态一方面反馈给关节控制器，另一方面由JointStatePublisher经通信桥送回ROS2订阅回调。Timer判断到位后切换下一步，形成动作流程和关节控制两层反馈循环。</desc>
+  <defs>
+    <marker id="blueArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker>
+    <marker id="tealArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#078875"/></marker>
+    <marker id="grayArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#94a3b8"/></marker>
+    <style>
+      text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#172b45}
+      .title{font-size:36px;font-weight:700}.subtitle{font-size:21px;fill:#64748b}.section{font-size:27px;font-weight:700}.label{font-size:23px;font-weight:650}.body{font-size:20px}.small{font-size:18px;fill:#64748b}.mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:18px}.blue{fill:#2563eb}.teal{fill:#078875}
+      .command{fill:none;stroke:#2563eb;stroke-width:3;marker-end:url(#blueArrow);stroke-linejoin:round}
+      .feedback{fill:none;stroke:#078875;stroke-width:3;marker-end:url(#tealArrow);stroke-linejoin:round}
+      .config{fill:none;stroke:#94a3b8;stroke-width:2;stroke-dasharray:7 6;marker-end:url(#grayArrow)}
+    </style>
+  </defs>
+  <rect width="1600" height="1060" fill="#fff"/>
+  <text x="48" y="65" class="title">SO-2：一个数值，如何变成关节运动？</text>
+  <text x="48" y="105" class="subtitle">以肩关节为例 · 目标 0.9 rad ≈ 51.6° · 两个旋转关节 + 一个滑动夹爪</text>
+  <path d="M1140 98H1185" class="command"/><text x="1200" y="105" class="small">目标 / 驱动</text>
+  <path d="M1355 98H1400" class="feedback"/><text x="1415" y="105" class="small">实际状态</text>
+
+  <!-- Three runtime responsibilities; the bridge is a separate process. -->
+  <rect x="40" y="150" width="430" height="725" rx="22" fill="#f5f8ff" stroke="#cbdcfb"/>
+  <rect x="515" y="150" width="315" height="725" rx="22" fill="#f8fafc" stroke="#dbe2eb"/>
+  <rect x="875" y="150" width="685" height="725" rx="22" fill="#f1faf7" stroke="#c3e4db"/>
+  <text x="68" y="196" class="section">hello_arm 进程</text>
+  <text x="68" y="224" class="small">ROS2 Node · hello_arm</text>
+  <text x="541" y="196" class="section">通信桥进程</text>
+  <text x="541" y="224" class="small">ros_gz_bridge</text>
+  <text x="905" y="196" class="section">Gazebo Server 进程</text>
+  <text x="905" y="224" class="small">内部方框为仿真组件；消息沿箭头传递</text>
+
+  <!-- ROS application sequence. -->
+  <text x="125" y="299" class="label">STEPS → 目标姿态</text>
+  <text x="125" y="330" class="body">肩关节目标：0.9 rad</text>
+  <text x="125" y="360" class="small">Timer / tick 决定当前动作</text>
+  <path d="M272 385V430" class="command"/>
+  <text x="125" y="465" class="label">Publisher · 发布目标</text>
+  <text x="125" y="496" class="mono blue">Float64(data=0.9)</text>
+  <text x="125" y="523" class="small">发布目标，不等待关节到位</text>
+  <text x="106" y="582" class="small">ROS2 Topic</text>
+  <text x="106" y="610" class="mono">/so2/shoulder_joint/target</text>
+
+  <!-- Command bridge. -->
+  <path d="M470 485H515" class="command"/>
+  <text x="560" y="465" class="label">ROS2 → Gazebo</text>
+  <text x="560" y="496" class="mono">Float64 → Double</text>
+  <text x="560" y="523" class="small">目标值仍为 0.9</text>
+  <path d="M830 485H930" class="command"/>
+  <text x="540" y="582" class="small">两侧 Topic 同名</text>
+  <text x="540" y="610" class="small">配置负责连接与类型转换</text>
+
+  <!-- Model is configuration, not a runtime message source. -->
+  <text x="950" y="300" class="label">模型配置：URDF → SDF</text>
+  <text x="950" y="330" class="body">link / joint、质量、惯性、运动约束</text>
+  <text x="950" y="356" class="small">结构与物理参数</text>
+  <path d="M930 320H903V620H930" class="config"/>
+
+  <rect x="930" y="425" width="515" height="115" rx="12" fill="#fff" stroke="#9bcdbf"/>
+  <text x="950" y="460" class="label">JointPositionController</text>
+  <text x="950" y="491" class="body">绑定 shoulder_joint 与目标 Topic</text>
+  <text x="950" y="520" class="body">PID：根据目标与实际状态计算力矩</text>
+  <path d="M1187 540V580" class="command"/>
+  <text x="1210" y="567" class="small blue">torque / 力矩</text>
+
+  <rect x="930" y="580" width="515" height="95" rx="12" fill="#fff" stroke="#9bcdbf"/>
+  <text x="950" y="616" class="label">物理引擎</text>
+  <text x="950" y="651" class="body">计算运动 → 更新实际角度、速度</text>
+  <!-- Inner feedback remains inside Gazebo. -->
+  <path d="M1445 625H1513V482H1445" class="feedback"/>
+  <rect x="1459" y="545" width="86" height="51" rx="8" fill="#f1faf7"/>
+  <text x="1502" y="565" text-anchor="middle" class="small teal">实际</text>
+  <text x="1502" y="588" text-anchor="middle" class="small teal">状态</text>
+  <path d="M1187 675V735" class="feedback"/>
+  <text x="1210" y="710" class="small teal">读取各关节状态</text>
+
+  <text x="950" y="758" class="body">JointStatePublisher 插件 · 发布反馈</text>
+  <text x="950" y="802" class="mono">/so2/joint_states</text>
+  <text x="950" y="825" class="small">一条消息汇总多个关节的实际状态</text>
+
+  <!-- State bridge and the application's feedback. -->
+  <path d="M930 780H830" class="feedback"/>
+  <text x="560" y="765" class="label">Gazebo → ROS2</text>
+  <text x="560" y="797" class="mono">Model → JointState</text>
+  <text x="560" y="824" class="small">保留关节名称、位置、速度</text>
+  <path d="M515 780H470" class="feedback"/>
+  <text x="125" y="739" class="label">Subscription · 接收反馈</text>
+  <text x="125" y="770" class="mono">on_feedback → positions</text>
+  <text x="125" y="800" class="body">tick 检查实际位置是否到位</text>
+  <text x="125" y="825" class="small">满足条件后，切换下一步目标</text>
+  <path d="M105 766H75V325H105" class="feedback"/>
+
+  <!-- Two loops are distinct: task sequencing versus continuous joint control. -->
+  <rect x="40" y="904" width="725" height="101" rx="14" fill="#f1f5fe"/>
+  <text x="62" y="941" class="label blue">① 动作流程：hello_arm</text>
+  <text x="62" y="977" class="body">发送目标姿态 → 等待反馈到位 → 执行下一步动作</text>
+  <rect x="790" y="904" width="770" height="101" rx="14" fill="#eaf7f2"/>
+  <text x="812" y="941" class="label teal">② 关节控制：Gazebo 内部</text>
+  <text x="812" y="977" class="body">目标与实际状态 → PID → 力矩 → 运动 → 实际状态</text>
+  <text x="48" y="1040" class="small">肘关节沿用相同链路；夹爪目标是位移（m），控制器施加力（force）。本图对应 SO-2 的原生 Gazebo 控制器方案。</text>
+</svg>
