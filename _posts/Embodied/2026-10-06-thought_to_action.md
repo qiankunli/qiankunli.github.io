@@ -49,6 +49,37 @@ GPT-3.5推出之前NLP领域，那时，Pretrained Model/Foundation Model已经�
 2. 
 
 
+## VLA(Vision-Language-Action model)
+
+
+VLA aim to unify perception, language understanding, and action prediction within a single architecture.  VLA 通常以原始视觉观测和自然语言指令为输入，输出相应的机器人动作。
+
+SmolVLA 是约 450M 参数的预训练模型，支持输入自然语言、图像和机器人状态，输出 Action Chunk，适合用来验证“语言与观测直接生成动作”的流程。SmolVLA 主要由两部分组成：
+1. 视觉语言骨干（VLM）：提取图像与语言特征，结合身体状态形成动作生成所需的条件信息。SmolVLM 是一个开源2B 的VLM。[SmolVLM - small yet mighty Vision Language Model](https://huggingface.co/blog/smolvlm)
+    1. multimodal AI 发展趋势先是扩大计算规模，随后通过利用大模型生成合成数据来提升数据多样性，而近期则转向轻量化，以提高这些模型的运行效率。小型开源模型支持在浏览器或边缘设备上本地部署，不仅降低了推理成本，还能实现用户自定义定制。
+    ![](/public/upload/robot/smolvlm.png)
+2. 动作专家（Action Expert）：根据这些信息，生成未来一段时间的连续动作序列，采用 Flow Matching 训练。
+
+为了让实时机器人技术更易用，我们推出了一套异步推理栈。该技术将机器人执行动作的方式与它们感知视听信息的方式分离开来。SmolVLA takes as input a sequence of RGB images from multiple cameras, the robot’s current sensorimotor state, and a natural language instruction. The VLM encodes these into contextual features, which condition the action expert to generate a continuous sequence of actions.
+
+![](/public/upload/robot/smolvla.png)
+
+SmolVLA’s action expert is a compact transformer  (~100M parameters) that generates action chunks conditioned on the VLM’s outputs. It is trained using a flow matching objective, which teaches the model to guide noisy samples back to the ground truth. 相比之下，离散动作表示法（例如通过分词实现）虽具备强大性能，但通常需要自回归解码，这会导致推理过程缓慢且效率低下。而流匹配技术则支持对连续动作进行直接、非自回归的预测，从而实现高精度的实时控制。更直观地说，在训练过程中，我们会向机器人的真实动作序列添加随机噪声，然后让模型预测出能将这些序列恢复到正确轨迹的“correction vector”。This forms a smooth vector field over the action space, helping the model learn accurate and stable control policies.We implement this using a transformer architecture with interleaved attention blocks,  and reduce its hidden size to 75% of the VLM’s, keeping the model lightweight for deployment.
+1. Cross-attention (CA), where action tokens attend to the VLM’s features
+2. Self-attention (SA), where action tokens attend to each other (causally—only to the past)
+
+CA ensures that actions are well-conditioned on perception and instructions,while SA improves temporal smoothness—especially critical for real-world control,where jittery predictions can result in unsafe or unstable behavior.
+
+现代视觉运动策略输出动作块——即需要执行的动作序列。管理这些动作块有两种方式：
+1. synchronous (sync): The robot executes a chunk, then pauses while the next one is computed. Simple, but causes a delay where the robot can't react to new inputs.
+2. Asynchronous (async): While executing the current chunk, the robot already sends the latest observation to a Policy Server (possibly hosted on GPU) for the next chunk. This avoids idle time and improves reactivity.
+
+Our async stack decouples action execution from chunk prediction,  resulting in higher adaptability, and the complete lack of execution lags at runtime. It relies on the following key mechanisms:
+1.  Early trigger: When the queue length falls below a threshold (e.g., 70%), we send an observation to a Policy Server, calling for a new action chunk.
+2. Decoupled threads: Control loop keeps executing → inference happens in parallel (non-blocking).
+3. Chunk fusion: Overlapping actions from successive chunks are stitched with a simple merge rule to avoid jitter.
+In short, async inference keeps the robot responsive by overlapping execution and remote prediction.
+
 ## 工程
 
 ## 长期：人形机器人和 Microduck 能共用吗？
