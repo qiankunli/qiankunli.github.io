@@ -71,7 +71,9 @@ Streamlined end-to-end control pipelines, data-driven feature extraction and a d
 of interaction data are all features of RL for robotics. However, RL still suffers from limitations concerning safety and
 learning efficiency, particularly pressing for real-world robotics applications.首先，尤其是在训练早期，动作通常具有探索性，因此可能难以预测。在物理系统上，未经训练的策略可能会发出高速度指令、导致自碰撞的配置，或超过关节限制的扭矩，从而造成磨损并可能损坏硬件。缓解这些风险需要外部保护措施（例如看门狗、安全监控器、急停装置），而这往往需要大量人工监督。其次，在强化学习中，高效学习仍然是一个难题，因此训练所需的时间尺度往往高得令人望而却步，限制了强化学习在现实世界机器人学中的适用性。强化学习用于robotics时，一个或许更根本的局限是，通常无法获得复杂任务的稠密回报函数；这类函数的设计本质上依赖于人类的专业知识、创造力和反复试错。在实践中，稀疏回报函数可用于判断某个特定目标是否已经达成——这件T恤是否已经正确折叠，尽管已取得显著成功，但由于监督减少，通常会导致学习速度慢得多，即使是成功检测本身，往往也需要定制仪器。sample-efficient learning也至关重要，因为在真实世界中训练本质上受时间瓶颈限制。
 
-## Action Chunking：生成什么/不要每次只预测一个动作
+## 工程（没想好名字）
+
+### Action Chunking：生成什么/不要每次只预测一个动作
 
 最初的模型是：$o_t\longrightarrow a_t$，Action Chunking 改成：
 
@@ -89,7 +91,7 @@ $$
 3. **Conditional VAE**：帮助模型表示示范中不同的动作风格或变化。
 
 
-## 异步推理 asynchronous inference
+### 异步推理 asynchronous inference
 
 机器人执行动作需要连续，而模型生成动作块需要时间。如果每次都是：动作执行完 → 停下来等模型 → 再执行。机械臂可能一顿一顿。
 
@@ -99,7 +101,6 @@ $$
 ![](/public/upload/robot/async_infer.png)
 
 将动作预测与动作执行解耦，动作块推理可以在独立的机器上运行，而该机器通常配备比机器人机载资源更好的计算资源。在异步推理中，机器人客户端将时刻t的观测o发送给策略服务器，并在推理完成后通过网络接收一个动作块$A_t$。
-
 
 
 ## Generalist Robot Policies
@@ -126,7 +127,7 @@ $$
 
 LLM 输出词表里的 token，机器人究竟输出什么？如何把大模型的表示能力连接到机器人的动作空间?
 1. 把连续动作离散化，变成 token。例如，把某个动作分量的数值范围切成 256 档，模型预测该选哪一档。这样就能借用分类、token 预测的训练方式。RT-2、OpenVLA 是这条路线的代表。
-2. 保留连续动作，用专门的生成模型输出。
+2. 保留连续动作，用专门的生成模型输出。VLA 模型由VLM 和 Action Expert 两部分组成，通过张量特征连接
   - **VLM Backbone**：处理图像和语言，提供场景与任务的表示。
   - **Action Expert**：结合这些表示、机器人状态，用 Flow Matching 生成动作块。
   但它**不必先写出一段文字计划，再交给另一个模型翻译成动作**。两个部分通过 Attention 在内部特征层面交换信息。
@@ -155,6 +156,8 @@ $$
 ## Robot (Imitation) Learning 示范给机器人看，让它学会一个任务。
 
 Behavioral Cloning （BC）sidesteps these constraints by casting control an imitation learning problem，绕开了这些限制，并利用先前收集的专家示范来锚定所学习到的自主行为。最值得注意的是，通过模仿学习，自主系统能够自然地遵循数据中隐含编码的目标、偏好和成功标准，从而减少早期探索失败，并完全免去人工设计reward shaping。
+
+“接收 observation 等条件，生成连续、多峰的 Action Chunk”有多种方法，$\pi_0$ 和 SmolVLA的Flow Matching，CogACT的Diffusion Policy，关键：在相同数据和硬件下，在算力和延迟预算内，哪种方法能产生更可靠的动作。
 
 ### 机器人控制，也可以是监督学习
 

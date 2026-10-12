@@ -235,7 +235,7 @@ RL虽然能够有效提升模型的推理能力，但一个重要的前提是基
 
 ## RFT/Reinforcement Fine-Tuning
 
-RFT 只是 PPO 技术范式下的一个新应用范式。它本身并不是一个全新的技术范式，
+RFT(Rejection Fine-Tuning) 只是 PPO 技术范式下的一个新应用范式。它本身并不是一个全新的技术范式，
 
 RFT 就是针对给定 prompt，产生一些包含 cot 的 response ，再通过一个 verifier 来判断 response 是否正确，作为信号来指导模型进行参数更新。抛开 cot 过程不谈，如果我们把这套流程的 verifier 换成 reward_model ，这个流程看上去是不是感到很熟悉？ —— 那就是最传统的基于 PPO 的 RLHF。RFT 和 RLHF 唯一的区别就是，它的 return (reward 信号) 是通过 verifier 算出来的，而不是一个 reward_model 计算出来的。verifier 本身则可以看成是一个 rule，比如 math 任务的答案是否正确，code 任务的代码是否能执行 …… 因此， RFT = PPO + rule_based reward_model。至于 RFT 的技术难点，我个人认为和 o1 的技术难点完全 match：高质量 cot 的生产与高准确率 verifier 的获取。
 
