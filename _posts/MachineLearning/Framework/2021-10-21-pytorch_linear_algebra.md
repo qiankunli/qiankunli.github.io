@@ -369,7 +369,57 @@ for i_epoch in range(n_epochs):
          optimizer.step()
 ```
 
+## 一次学习示例
 
+准备一批数据
+```
+import torch
+from torch import nn
+
+x = torch.tensor([
+    [1.],
+    [2.],
+    [3.],
+    [4.],
+])
+
+target = torch.tensor([
+    [3.],
+    [5.],
+    [7.],
+    [9.],
+])
+```
+定义模型(计算 $\hat{y} = wx + b$)、Loss 和优化器
+```
+torch.manual_seed(0)  # 固定随机种子，方便重复观察结果
+
+model = nn.Linear(1, 1)
+loss_fn = nn.MSELoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.05)
+```
+训练
+```
+for step in range(1000):
+    optimizer.zero_grad()
+
+    prediction = model(x)           # 同时预测 4 个样本
+    loss = loss_fn(prediction, target)  # 对 4 个误差平方取平均
+
+    loss.backward()
+    optimizer.step()
+
+    if step % 200 == 0:
+        print(f"step={step}, loss={loss.item():.6f}")
+```
+推理看下
+```
+with torch.no_grad():
+    test_x = torch.tensor([[5.], [6.]])
+    print(model(test_x))
+# 预测应接近：
+tensor([[11.],[13.]])
+```
 ## 其它
 
 ![](/public/upload/machine/numpy.png)
