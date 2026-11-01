@@ -24,7 +24,7 @@ keywords: agent software
 
 ## 简介（未完成）
 
-过去三年里，大模型的后训练（post-training）范式经历了从 RLHF（基于人类反馈的强化学习，Reinforcement Learning from Human Feedback）到 RLVR（基于可验证奖励的强化学习，Reinforcement Learning with Verifiable Rewards），再到 Agentic RL（面向智能体的强化学习）的快速演进。RLHF 时代的优化对象是单轮对话 + 标量偏好奖励，RLVR 把奖励换成了数学题、代码单测这类可自动判定的信号，而 Agentic RL 则把训练对象彻底变成了在真实或仿真环境里多轮调用工具、读写文件、执行代码、检索网页、完成长程任务 的智能体轨迹。
+过去三年里，大模型的后训练（post-training）范式经历了从 RLHF（基于人类反馈的强化学习，Reinforcement Learning from Human Feedback）到 RLVR（基于可验证奖励的强化学习，Reinforcement Learning with Verifiable Rewards），再到 Agentic RL（面向智能体的强化学习）的快速演进。RLHF 时代的优化对象是单轮对话 + 标量偏好奖励，RLVR 把奖励换成了数学题、代码单测这类可自动判定的信号，而 Agentic RL 则把训练对象彻底变成了在真实或仿真环境里多轮调用工具、读写文件、执行代码、检索网页、完成长程任务 的智能体轨迹。PS：Agent后训练
 
 Agentic RL 就是 RLVR 在多轮交互场景的自然延伸，RLVR 的核心思想是”用可验证的结果作为 reward，不需要训练 Reward Model”。Agentic RL 与单轮 RL 的根本差异：训练对象从 completion 变成 trajectory，rollout 必须在真实环境里执行。
 1. 单轮决策：模型接收一个 prompt，输出一段完整回答，奖励模型给出一个分数，策略据此更新一次。无论底层算法是 PPO 还是 GRPO，”一问一答一打分”的骨架始终未变。

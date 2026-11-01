@@ -61,8 +61,6 @@ Agent 可以工作很久，也可以一起工作很多，但工程系统要能�
 
 ## Loop怎么设计
 
-
-
 Harness loop 可以简化成四个动作：plan、act、observe、update。模型基于任务和上下文形成计划，harness 将模型输出映射为工具调用，环境返回观察，harness 更新状态和上下文，然后进入下一轮。表面上是模型在“思考并行动”，实际是 harness 在控制模型能看到什么、能调用什么、调用结果如何进入下一轮、什么时候必须停下。Operating Loop则是发现任务（task contract）==> 调度与分派 ==> 验证与验收（独立 verifier/gate） ==> 状态写回（task ledger）。 loop engineering不是又一圈把模型包起来的结构，而是在 harness 之上运营一整条任务流的调度层，尤其是那套决定"何时停、何时把人叫回来"的退出与升级逻辑。
 
 一个最小的 Loop
@@ -103,6 +101,8 @@ Claude Code 官方把 loop 分成了四类：
 5. 你是否愿意为 Loop 的结果持续 review、迭代和治理？不打算，就别建
 
 如果这五个问题里有四个以上的答案是肯定的，Loop 往往值得做。否则，你可能需要考虑更加可控的 Workflow、半自动化+人工辅助的流程，而不是无人值守的 Loop。
+
+![](/public/upload/machine/loope.png)
 
 ## 验证工程
 
