@@ -1,7 +1,7 @@
 ---
 
 layout: post
-title: 自进化Agent 
+title: Personal Agent 
 category: 技术
 tags: MachineLearning
 keywords: agent software

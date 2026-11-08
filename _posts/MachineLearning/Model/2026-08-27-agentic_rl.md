@@ -377,6 +377,8 @@ Agent 任务的环境核心是沙箱——一个隔离的执行环境，policy �
 
 ## 工程
 
+[Molt 设计解读](https://mp.weixin.qq.com/s/5NE9W307aGjxDoyleG_wOw)Molt 的定位是：能看懂、改得动、又不在规模上妥协的 LLM RL 训推框架。12K 行 Python, 55 个文件, PyTorch-native, Apache 2.0 — NVIDIA 出品。
+
 传统的 LLM 预训练或 SFT，本质上是一条相对封闭的数据流水线：Dataset ==> Trainer ==> Checkpoint。而 Agentic RL 的训练数据并不是提前准备好的静态数据，而是由当前 Policy 持续与外部环境交互后在线产生。因此整个系统实际上形成了一个持续运行的闭环：Policy ==> Rollout ==> Environment ==> Reward ==> Trainer ==> New Policy ==> ...当 trajectory 从简单的数学题回答扩展到浏览器操作、代码执行、工具调用、多轮交互甚至数十分钟的长程任务以后，这个闭环的复杂度会迅速超过传统 RLHF。此时，一个完整的 Agentic RL 系统通常可以拆成 Control Plane、Data Plane、State Plane 和 Weight Plane 四个相互关联的部分：
 1. Control Plane：负责全局调度、资源分配、版本管理、故障恢复与系统观测。
 2. Data Plane：负责 trajectory、logprob、reward 等训练数据在 Rollout、Queue、Verifier 与 Trainer 之间流转。

@@ -26,14 +26,12 @@ keywords: rl, ppo, importance sampling, on-policy, off-policy
 * TOC
 {:toc}
 
-这篇虽然会多次借用 LLM / token 生成来帮助理解，但它讨论的仍然是**通用 RL 细节**。一些基础概念：
-- $\pi$（Policy，策略）：即LLM模型
-- $\theta$（Parameter，参数）：即模型参数
-- s（State，交互状态）：即上文，初始状态即为$s_1$
-- a（Action，交互行为）：即输出的token，可以简单理解为每个字符。（实际上一个字不等于一个token）
-- $\tau$（Trajectory，轨迹）：$\tau = \{ s_1,a_1,r_1,s_2,a_2,r_2,...,s_T,a_T,r_T \}$
-
-reward怎样变成各个 Token 的更新：Reward ==> advantage ==> loss
+强化学习在数学上做的事情是：你控制一个概率分布，从这个分布里采样，样本会得到一个你看不见内部、也没法求导的打分，你要调整这个分布，让打分的期望最大。
+|层次|	要解决什么|	对应工具|
+|---|---|---|
+|优化分布|reward 无法直接反向传播，怎样提高 expected reward？|Policy Gradient、baseline|
+|序列决策|最终结果如何归因到中间动作？|Value Function、TD、GAE|
+|采样与分布变化|如何探索，以及如何使用旧策略采集的数据？|exploration、Importance Sampling、PPO|
 
 ## 从Policy-Based到在 policy gradient
 
@@ -61,15 +59,50 @@ $$
 \right]
 $$
 
-如果一个动作导致了好的结果（$G_t$ 大），就增加再做这个动作的概率；如果导致了坏的结果（$G_t$ 小），就降低它的概率。为什么不直接写成 $\nabla_\theta \pi_\theta(a_t \mid s_t)\cdot G_t$，非要多一个 $\log$？这是一个数学技巧，叫做对数导数技巧（Log-Derivative Trick）。根据链式法则：
+如果一个动作导致了好的结果（$G_t$ 大），就增加再做这个动作的概率；如果导致了坏的结果（$G_t$ 小），就降低它的概率。这里有一个关键问题：reward 可能来自“运行代码后测试是否通过”“一盘棋最后是否获胜”，这些评分过程无法直接反向传播，Policy Gradient 怎么更新模型？
+
+先把目标中的期望展开。记 $p_\theta(\tau)$ 为策略产生轨迹 $\tau$ 的概率，$R(\tau)$ 为这条轨迹的总回报：
 
 $$
-\nabla_\theta \log \pi
+J(\theta)=\sum_\tau p_\theta(\tau)R(\tau)
+$$
+
+在环境和评分规则固定的前提下，对于一条给定的轨迹，$R(\tau)$ 不随策略参数 $\theta$ 改变；参数改变的是这条轨迹被生成出来的概率。因此：
+
+$$
+\nabla_\theta J(\theta)
 =
-\frac{\nabla_\theta \pi}{\pi}
+\sum_\tau R(\tau)\nabla_\theta p_\theta(\tau)
 $$
 
-这个“除以 $\pi$”的操作恰好抵消了期望计算中隐含的 $\pi$ 因子，让整个公式变得干净且可计算。从工程角度看，概率 $\pi$ 在 $(0,1)$ 之间，直接对概率求梯度可能产生极小的数值，影响训练稳定性。$\log$ 把 $(0,1)$ 映射到 $(-\infty,0)$，梯度数值更稳定。
+**这里完全不需要对 reward 求导。我们调整的是各种轨迹出现的概率，让高回报轨迹在期望中占据更大的权重。** 比如，模型只有两种回答，分别得 80 分和 20 分，好回答的概率为 $p_\theta$：
+
+$$
+J(\theta)=80p_\theta+20(1-p_\theta)=20+60p_\theta
+$$
+
+于是 $\nabla_\theta J(\theta)=60\nabla_\theta p_\theta$。80 分和 20 分只是数值，梯度来自回答概率对参数的依赖。
+
+但真实问题无法枚举所有轨迹。利用 Log-Derivative Trick：
+
+$$
+\nabla_\theta p_\theta(\tau)
+=
+p_\theta(\tau)\nabla_\theta\log p_\theta(\tau)
+$$
+
+就能把梯度重新写成期望：
+
+$$
+\nabla_\theta J(\theta)
+=
+\mathbb E_{\tau\sim p_\theta}
+\left[
+R(\tau)\nabla_\theta\log p_\theta(\tau)
+\right]
+$$
+
+这样，我们只需要采样轨迹、获得回报，再计算轨迹 log-prob 的梯度，就能估计目标梯度。reward 提供更新的权重，log-prob 提供对策略参数可求导的部分；反向传播不需要穿过环境或评分过程。
 
 ### 从轨迹回报降到单步训练信号
 
