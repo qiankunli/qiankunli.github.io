@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="940" height="385" viewBox="0 0 940 385" role="img" aria-labelledby="title desc">
+<title id="title">TCP：笔尖的位置与钢笔的书写姿态</title>
+<desc id="desc">左图用沿笔杆安装的钢笔示例说明从法兰原点 F 到笔尖 TCP 的固定偏移 d。右图从侧面观察，笔尖从纸上 A 点沿直线移向 B 点，笔杆与纸面保持五十度。虚线是到达 B 的姿态。</desc>
+<defs>
+<marker id="teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#08776d"/></marker>
+<marker id="orange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#ad521d"/></marker>
+<!-- Local origin is the tip. The pen axis points from the tip toward the flange. -->
+<g id="pen" stroke-linejoin="round">
+<path d="M0 0 Q12 -3 25 -9 L39 -6 L39 6 L25 9 Q12 3 0 0Z" fill="#edd4a3" stroke="#936b37" stroke-width="1.5"/>
+<path d="M0 0H20" stroke="#836638"/><circle cx="21" r="1.8" fill="#836638"/>
+<path d="M38 -7 L61 -11 H157 Q164 -11 164 -5 V5 Q164 11 157 11 H61 L38 7Z" fill="#29485a" stroke="#1b3849" stroke-width="1.6"/>
+<path d="M63 -7H141" stroke="#688796" stroke-width="1.8"/>
+<path d="M146 -13 H162 V13 H146Z" fill="#8ca4b1" stroke="#415e70"/>
+<path d="M162 -22 H175 V22 H162Z" fill="#b9cad1" stroke="#415e70" stroke-width="1.5"/>
+<path d="M175 -15 H196 Q200 -15 200 -10 V10 Q200 15 196 15 H175Z" fill="#e3ebef" stroke="#577181" stroke-width="1.5"/>
+</g>
+</defs>
+<rect width="940" height="385" rx="14" fill="white"/>
+<g font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif" fill="#223744">
+<path d="M402 22V359" stroke="#dbe4e8"/>
+<text x="27" y="40" font-size="21" font-weight="600">工具安装 · 从法兰到笔尖</text>
+<text x="430" y="40" font-size="21" font-weight="600">书写任务 · 笔尖从 A 移到 B</text>
+<text x="28" y="67" font-size="14" fill="#667a86">工具上固定的两个点</text>
+<text x="430" y="67" font-size="14" fill="#667a86">侧视图，虚线为终点姿态</text>
+<use xlink:href="#pen" transform="translate(158 300) rotate(-90)"/>
+<path d="M120 131H158 M120 300H158" stroke="#95afaf" stroke-dasharray="3 4"/>
+<path d="M120 131V298" stroke="#08776d" stroke-width="2" marker-end="url(#teal)"/>
+<text x="98" y="218" font-size="24" fill="#08776d" font-family="Georgia,serif" font-style="italic">d</text>
+<circle cx="158" cy="131" r="4" fill="#344f62" stroke="white"/>
+<path d="M181 131H204" stroke="#8b9ca6"/>
+<text x="212" y="137" font-size="17">法兰原点 F</text>
+<path d="M168 276 L195 255 H204" fill="none" stroke="#8b9ca6"/>
+<text x="212" y="261" font-size="15">笔尖正面</text>
+<circle cx="158" cy="300" r="4" fill="#b45c29"/>
+<path d="M164 302H204" stroke="#c6a28a"/>
+<text x="212" y="308" font-size="17" fill="#97471e">TCP（笔尖）</text>
+<text x="28" y="357" font-size="15">标定得到偏移 d，以法兰坐标系表示。</text>
+<path d="M449 300 H909" stroke="#7d909b" stroke-width="1.8"/>
+<path d="M453 307 H906" stroke="#dce5e8"/>
+<text x="862" y="331" font-size="14" fill="#637782">纸面</text>
+<g transform="translate(755 300) rotate(-50)" fill="none" stroke="#91a5ae" stroke-width="1.6" stroke-dasharray="5 4">
+<path d="M0 0 L26 -8 L38 -6 L62 -11 H162 V-22 H175 V-15 H200 V15 H175 V22 H162 V11 H62 L38 6 L26 8Z"/>
+</g>
+<use xlink:href="#pen" transform="translate(503 300) rotate(-50)"/>
+<path d="M564 300 A61 61 0 0 0 542.21 253.27" fill="none" stroke="#a05623" stroke-width="1.8"/>
+<text x="565" y="278" font-size="18" fill="#984c22">50°</text>
+<path d="M508 300 H749" stroke="#ad521d" stroke-width="3" marker-end="url(#orange)"/>
+<circle cx="503" cy="300" r="4.5" fill="#ad521d"/><circle cx="755" cy="300" r="4.5" fill="#ad521d"/>
+<text x="496" y="330" font-size="19">A</text><text x="749" y="330" font-size="19">B</text>
+<text x="615" y="289" font-size="15" fill="#97471e">TCP 轨迹</text>
+<text x="430" y="357" font-size="15">示例姿态：笔杆与纸面成 50°，笔尖正面朝上。</text>
+</g></svg>

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="600" viewBox="0 0 720 600" role="img" aria-labelledby="title desc">
+<title id="title">二维绕原点旋转</title>
+<desc id="desc">固定坐标系中，点 P 从初始极角 α 逆时针旋转 θ 到达 P′，两点到原点的距离均为 r。蓝色表示初始位置，橙色表示旋转后位置，虚线表示坐标投影。</desc>
+<defs>
+<marker id="axis" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#475569"/></marker>
+<marker id="turn" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 Z" fill="#d97706"/></marker>
+</defs>
+<rect width="720" height="600" rx="16" fill="white"/>
+<g font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Noto Sans CJK SC', sans-serif" fill="#334155">
+<text x="40" y="42" font-size="24" font-weight="600">二维绕原点旋转</text>
+<text x="40" y="69" font-size="15" fill="#64748b">坐标系固定 · 逆时针旋转 θ</text>
+<g stroke="#e8edf3" stroke-width="1"><path d="M 170 80 V 480"/><path d="M 230 80 V 480"/><path d="M 290 80 V 480"/><path d="M 350 80 V 480"/><path d="M 410 80 V 480"/><path d="M 470 80 V 480"/><path d="M 530 80 V 480"/><path d="M 110 120 H 550"/><path d="M 110 180 H 550"/><path d="M 110 240 H 550"/><path d="M 110 300 H 550"/><path d="M 110 360 H 550"/><path d="M 110 420 H 550"/></g>
+<path d="M 470 480 A 360 360 0 0 0 110 120" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 6"/>
+<g fill="none" stroke-width="1.5" stroke-dasharray="6 5">
+<path d="M 110 342.234 H 442.597 V 480" stroke="#93b8e2"/>
+<path d="M 110 225.442 H 364.558 V 480" stroke="#edbb7c"/>
+</g>
+<g stroke="#475569" stroke-width="2" marker-end="url(#axis)"><path d="M 80 480 H 590"/><path d="M 110 505 V 95"/></g>
+<g font-family="Georgia, 'Times New Roman', serif" font-size="23" font-style="italic">
+<text x="605" y="488">x</text><text x="103" y="88">y</text><text x="83" y="509">O</text>
+<text x="442.597" y="511" text-anchor="middle" fill="#2563a6">x</text>
+<text x="364.558" y="511" text-anchor="middle" fill="#b96308">x′</text>
+<text x="92" y="349.234" text-anchor="end" fill="#2563a6">y</text>
+<text x="92" y="232.442" text-anchor="end" fill="#b96308">y′</text>
+</g>
+<path d="M 110 480 L 442.597 342.234" stroke="#2563a6" stroke-width="3"/>
+<path d="M 110 480 L 364.558 225.442" stroke="#d97706" stroke-width="3"/>
+<path d="M 190.000,480.000 A 80 80 0 0 0 183.910,449.385" fill="none" stroke="#2563a6" stroke-width="2"/>
+<path d="M 231.952,429.486 A 132 132 0 0 0 203.338,386.662" fill="none" stroke="#d97706" stroke-width="2" marker-end="url(#turn)"/>
+<path d="M 457.116,318.137 A 383 383 0 0 0 394.624,223.723" fill="none" stroke="#d97706" stroke-width="2.5" marker-end="url(#turn)"/>
+<g font-family="Georgia, 'Times New Roman', serif" font-size="24" font-style="italic">
+<text x="202" y="468" fill="#2563a6">α</text><text x="235" y="397" fill="#b96308">θ</text>
+<text x="303" y="418" fill="#2563a6">r</text><text x="231" y="341" fill="#b96308">r</text>
+</g>
+<circle cx="110" cy="480" r="4" fill="#475569"/>
+<circle cx="442.597" cy="342.234" r="6" fill="#2563a6" stroke="white" stroke-width="2"/>
+<circle cx="364.558" cy="225.442" r="6" fill="#d97706" stroke="white" stroke-width="2"/>
+<g font-family="Georgia, 'Times New Roman', serif" font-size="24">
+<text x="459.597" y="351.234" fill="#2563a6">P(x, y)</text>
+<text x="355.558" y="205.442" fill="#b96308">P′(x′, y′)</text>
+</g>
+<text x="110" y="556" font-size="17">OP = OP′ = r</text>
+<text x="340" y="556" font-size="17">极角：α → α + θ</text>
+</g>
+</svg>

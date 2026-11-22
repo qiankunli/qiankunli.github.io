@@ -39,6 +39,8 @@ keywords:  概率论
 
 ## 概率论
 
+probability, a formal way to quantity the uncertain of out knowledge about the physical world. PS： modeling uncertainty
+
 ![](/public/upload/machine/probability_theory.png)
 
 [为什么我说概率论是大学最不能翘的一门数学课](https://zhuanlan.zhihu.com/p/36920233)
